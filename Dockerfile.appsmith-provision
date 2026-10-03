@@ -1,0 +1,34 @@
+# Dockerfile.appsmith-provision — one-shot Story-Intra (extranet) cockpit importer.
+#
+# WHY: the extranet Appsmith cockpit is imported by scripts/provision-intranet.sh,
+# which talks to the Appsmith HTTP API. In production that API sits behind an
+# oauth2-proxy (appsmith.backend.<tld>) that only lets /api/v1/health through —
+# every other path 302s to Keycloak — so the importer CANNOT run from outside the
+# cluster, and there is no SSH into the Coolify workers. It also has to survive a
+# cold-start wipe (the cockpit was wiped 2026-07-16) without a manual step.
+#
+# FIX: run the importer as a one-shot INSIDE the admin compose, against the raw
+# container alias http://appsmith:80 (same `internal`/coolify network, no
+# oauth2-proxy). provision-intranet.sh --prod honours $APPSMITH_URL, so no host
+# access is ever needed — the cockpit re-provisions itself on every admin deploy.
+#
+# Idempotent + best-effort: the compose service wraps the call so a provisioning
+# hiccup logs a WARN and exits 0, never failing the admin deploy.
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/alpine:3.20
+
+# provision-intranet.sh needs bash (arrays, BASH_SOURCE), curl (Appsmith API),
+# jq (JSON), coreutils (portable basename/find).
+RUN apk add --no-cache bash curl jq coreutils ca-certificates
+
+WORKDIR /app
+# PROJECT_ROOT = SCRIPT_DIR/.. → /app; TEMPLATES_DIR → /app/appsmith/templates.
+COPY scripts/provision-intranet.sh /app/scripts/provision-intranet.sh
+COPY appsmith /app/appsmith
+RUN chmod +x /app/scripts/provision-intranet.sh
+
+# --prod mode reads $APPSMITH_URL / $AISHA_API_URL / $AISHA_POSTGREST_ANON_KEY /
+# $INTRANET_API_KEY / $INTRANET_PROXY_URL / $INTERNAL_TLD from the environment,
+# all supplied by the compose service.
+ENTRYPOINT ["/bin/sh", "-c"]
+CMD ["bash /app/scripts/provision-intranet.sh --prod || { echo '[appsmith-provision] non-fatal failure — cockpit provisioning will retry on next deploy'; exit 0; }"]

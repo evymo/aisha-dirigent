@@ -1,0 +1,728 @@
+/* Workbench shell — LAYOUT only.
+ *
+ * Every colour, type and spacing decision comes from @aisha/design-language
+ * (semantic tokens + rdl-* classes); the instance overrides those tokens in its
+ * public/tokens.css overlay. This file therefore holds what the design language
+ * cannot know: how THIS surface arranges its frame — a sidebar of sections, a
+ * top bar for the current view, and a scrolling content column.
+ *
+ * The shell never hardcodes a brand value. If a colour appears below that is not
+ * a var(--…), it is a bug in this file, not a shortcut. */
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+html, body, #root { height: 100%; }
+
+.app.workbench {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 0 var(--space-5) var(--space-8);
+}
+
+/* ── Frame (sidebar + main), per the product design ───────────────────────── */
+.app.workbench.has-frame {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+.wb-main { flex: 1; display: flex; flex-direction: column; min-width: 0; height: 100%; }
+.wb-main > main {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-5) var(--space-6) var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  /* One readable measure regardless of monitor width — a 4K screen must not
+     stretch a table to 3000px. */
+  align-items: stretch;
+}
+.wb-main > main > * { max-width: 1380px; width: 100%; margin-inline: auto; }
+
+.wb-sidebar {
+  width: 256px;
+  flex: none;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+.wb-sidebar__brand {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  height: 64px;
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+.wb-brand__sub {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.wb-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3) var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.wb-nav__group { display: flex; flex-direction: column; gap: 2px; }
+.wb-nav__group + .wb-nav__group { margin-top: var(--space-4); }
+.wb-nav__glabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  opacity: 0.8;
+}
+.wb-navitem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 9px 11px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  position: relative;
+  transition: background var(--dur-micro), color var(--dur-micro);
+}
+.wb-navitem:hover:not(:disabled) { background: color-mix(in srgb, var(--text) 6%, transparent); color: var(--text); }
+.wb-navitem.is-active { background: var(--surface-raised); color: var(--text-strong); font-weight: 600; }
+/* The active marker is the one Ignition accent in the nav. */
+.wb-navitem.is-active::before {
+  content: "";
+  position: absolute;
+  left: -8px; top: 7px; bottom: 7px;
+  width: 3px;
+  background: var(--primary);
+  border-radius: 0 2px 2px 0;
+}
+/* Declared but not yet connected: visible, greyed, not clickable. Hiding it
+   would tell the customer the product cannot do it, which is a lie. */
+.wb-navitem.is-inactive { opacity: 0.45; cursor: not-allowed; }
+.wb-navitem__lbl { flex: 1; }
+.wb-navitem__count { font-size: 11px; color: var(--text-muted); }
+
+.wb-topbar {
+  /* min-height + wrap, ne pevná výška: pás náhledu nese flex-basis:100 %, tedy
+   * PATŘÍ na vlastní řádek. Když lišta dostala height:64px a přestala wrapovat,
+   * zůstal pás v řádku a těch 100 % sebralo titulu celou šířku — logo pak
+   * vyteklo pod přepínač témat (1440 px) a lišta přetekla viewport (375 px). */
+  min-height: 64px;
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0 var(--space-5);
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border);
+  position: relative;
+  z-index: 20;
+}
+.wb-topbar__title { display: flex; flex-direction: column; gap: 1px; flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.wb-topbar__view {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  color: var(--text-strong);
+  line-height: 1.1;
+}
+.wb-topbar__actions { display: flex; align-items: center; gap: var(--space-3); flex: none; }
+.wb-locale select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 6px 8px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+}
+
+@media (max-width: 900px) {
+  .app.workbench.has-frame { flex-direction: column; overflow: auto; height: auto; }
+  .wb-sidebar { width: 100%; height: auto; border-right: 0; border-bottom: 1px solid var(--border); }
+  .wb-nav { flex-direction: row; overflow-x: auto; }
+  .wb-nav__group { display: flex; flex-direction: column; gap: 2px; }
+.wb-nav__group + .wb-nav__group { margin-top: var(--space-4); }
+.wb-nav__glabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  opacity: 0.8;
+}
+.wb-navitem { width: auto; white-space: nowrap; }
+  .wb-navitem.is-active::before { left: 0; right: 0; top: auto; bottom: -1px; width: auto; height: 2px; border-radius: 0; }
+}
+
+/* -- chrome -- */
+.topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2, 8px);
+  padding: var(--space-4, 16px) 0 var(--space-3, 12px);
+  border-bottom: 1px solid var(--border);
+}
+.topbar-left { display: flex; align-items: center; gap: var(--space-3, 12px); }
+.topbar h1 {
+  font-family: var(--font-display, inherit);
+  font-size: 1.15rem;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+.surface-tag {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px var(--space-2, 8px);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+}
+.topbar-right { display: flex; align-items: center; gap: var(--space-2, 8px); }
+.locale select {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1, 4px) var(--space-2, 8px);
+  font: inherit;
+}
+.banner {
+  /* Vlastní řádek pod ovládáním — proto flex-basis 100 %. Aby to platilo,
+   * musí .wb-topbar wrapovat a mít volnou výšku; viz tam. */
+  flex-basis: 100%;
+  font-size: 0.8rem;
+  padding: var(--space-1, 4px) var(--space-2, 8px);
+  border-radius: var(--radius-sm);
+}
+.banner.preview { background: color-mix(in srgb, var(--primary-accent) 15%, transparent); color: var(--primary-accent); }
+
+/* -- ask (question → grounded answer, above the blocks of every section) -- */
+.wb-ask { display: flex; flex-direction: column; gap: var(--space-3); }
+
+/* -- blocks (shared base) -- */
+.block {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-5, 24px);
+  margin-top: var(--space-4, 16px);
+}
+.block h3 {
+  margin: 0 0 var(--space-3, 12px);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.kpi-value { margin: 0; font-family: var(--font-mono, monospace); font-size: clamp(1.6rem, 4vw, 2.2rem); }
+.kpi-unit { font-size: 0.9rem; color: var(--text-muted); }
+.kpi-delta { margin: var(--space-1, 4px) 0 0; font-size: 0.85rem; }
+.kpi-delta.pos { color: var(--gain-400, var(--primary-accent)); }
+.kpi-delta.neg { color: var(--loss); }
+
+.table-scroll { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+th, td { padding: var(--space-2, 8px); border-bottom: 1px solid var(--border); white-space: nowrap; text-align: left; }
+/* ⭐ TEXT V TABULKÁCH SE ZALAMUJE (majitel 2026-09-28): extrémně dlouhý název protistrany
+   (OCR shluk bez mezer) s `nowrap` roztáhl sloupec a schoval všechny další. Pravidlo výš
+   platí i pro <es-table> ze SDK (styly SDK jsou schválně :where, tedy slabší), proto
+   výjimka tady: textová buňka se zalomí i uprostřed shluku, čísla (td.num) zůstanou na řádku. */
+es-table td:not(.num) { white-space: normal; overflow-wrap: anywhere; min-width: 8ch; }
+th { color: var(--text-muted); font-weight: 600; }
+tr.row-link { cursor: pointer; }
+tr.row-link:hover, tr.row-link:focus-visible { background: color-mix(in srgb, var(--surface-raised) 50%, transparent); outline: none; }
+
+.timeline ol { list-style: none; margin: 0; padding: 0; }
+.timeline li { display: flex; gap: var(--space-3, 12px); padding: var(--space-2, 8px) 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+.timeline li:last-child { border-bottom: 0; }
+.timeline time { color: var(--text-muted); flex-shrink: 0; }
+
+.alerts ul { list-style: none; margin: 0; padding: 0; }
+.alerts li { display: flex; align-items: center; gap: var(--space-2, 8px); padding: var(--space-2, 8px) 0; font-size: 0.85rem; }
+.sev-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+.sev-warning .sev-dot { background: var(--warning-400, orange); }
+.sev-critical .sev-dot { background: var(--loss); }
+.alerts time { margin-left: auto; color: var(--text-muted); }
+
+.narrative p { font-size: 0.9rem; line-height: 1.55; }
+
+.prov {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2, 8px);
+  margin-top: var(--space-3, 12px);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+/* Zvolený pohled, který blok nepotvrdil (scope_applied) — vlastní řádek pod zdrojem,
+   tónem varování: číslo platí, ale pro celý podnik, ne pro zvolenou firmu. */
+.prov:has(.prov__scope) { flex-wrap: wrap; }
+.prov__scope {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--warning-400, orange);
+}
+
+/* -- record detail (extracted fields) -- */
+.badges { display: flex; flex-wrap: wrap; gap: var(--space-2, 8px); margin-bottom: var(--space-3, 12px); }
+.badge {
+  font-size: 0.7rem;
+  padding: 2px var(--space-2, 8px);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  color: var(--text-muted);
+}
+dl.fields { margin: 0; display: grid; grid-template-columns: 1fr; gap: 0; }
+.field { display: grid; grid-template-columns: minmax(120px, 32%) 1fr; gap: var(--space-3, 12px); padding: var(--space-2, 8px) 0; border-bottom: 1px solid var(--border); }
+.field:last-child { border-bottom: 0; }
+.field dt { margin: 0; font-size: 0.8rem; color: var(--text-muted); }
+.field dd { margin: 0; display: flex; align-items: center; gap: var(--space-2, 8px); flex-wrap: wrap; font-size: 0.9rem; }
+.field-value { font-family: var(--font-mono, monospace); }
+.field-confidence { font-size: 0.7rem; color: var(--text-muted); }
+dl.fields.compact .field { padding: var(--space-1, 4px) 0; }
+
+/* status tags — neutral by default; only known states get color */
+.tag { font-size: 0.65rem; padding: 1px var(--space-2, 8px); border-radius: var(--radius-sm); background: var(--surface-raised); color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.tag.state-needs_review { background: var(--warning-400, color-mix(in srgb, var(--primary-accent) 20%, transparent)); color: var(--text); }
+.tag.state-human_confirmed { background: var(--gain-400, var(--primary-accent)); color: var(--primary-ink); }
+.tag.state-rejected, .tag.state-failed { background: var(--loss); color: var(--loss-ink); }
+
+.grounded-quote {
+  margin: var(--space-3, 12px) 0 0;
+  padding: var(--space-2, 8px) var(--space-3, 12px);
+  border-left: 3px solid var(--border);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* -- review queue (příprava) -- */
+.review-queue ul { list-style: none; margin: 0; padding: 0; }
+.review-item { padding: var(--space-3, 12px) 0; border-bottom: 1px solid var(--border); }
+.review-item:last-child { border-bottom: 0; }
+.review-item.rowstate-done { opacity: 0.6; }
+.review-head { display: flex; align-items: center; gap: var(--space-2, 8px); flex-wrap: wrap; }
+.review-title { font-size: 0.9rem; font-weight: 600; }
+.review-sub { font-size: 0.75rem; color: var(--text-muted); }
+.review-actions { display: flex; align-items: center; gap: var(--space-2, 8px); margin-top: var(--space-2, 8px); flex-wrap: wrap; }
+button.action {
+  font: inherit;
+  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  padding: var(--space-1, 4px) var(--space-3, 12px);
+  min-height: 32px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+}
+button.action:disabled { opacity: 0.5; cursor: default; }
+button.action.intent-approve { border-color: var(--gain-400, var(--primary-accent)); }
+button.action.intent-approve.chosen { background: var(--gain-400, var(--primary-accent)); color: var(--primary-ink); }
+button.action.intent-reject { border-color: var(--loss); color: var(--loss); }
+button.action.intent-reject.chosen { background: var(--loss); color: var(--loss-ink); }
+.review-result { font-size: 0.8rem; color: var(--gain-400, var(--primary-accent)); }
+.review-error { font-size: 0.8rem; color: var(--loss); }
+
+/* -- detail view -- */
+.detail { margin-top: var(--space-4, 16px); }
+button.ghost.back { font-weight: 600; }
+
+/* -- login & misc -- */
+/* Tlačítka mluví jazykem SDK (.es-btn čte --primary/--primary-ink z instanční
+   značky); dřívější button.primary tu duplikoval totéž vlastními pravidly a
+   s příchodem SDK zůstal bez čtenáře — smazán, ne ponechán driftovat. */
+.login { text-align: center; padding: var(--space-8, 64px) var(--space-4, 16px); }
+.login-card {
+  max-width: 380px;
+  margin: 0 auto;
+  display: grid;
+  gap: var(--space-3, 12px);
+  justify-items: center;
+}
+/* grid gap řídí rytmus karty — výchozí margin nadpisu/odstavce by mezery zdvojil */
+.login-card h2, .login-card p { margin: 0; }
+button.ghost {
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1, 4px) var(--space-3, 12px);
+  font: inherit;
+  min-height: 32px;
+  cursor: pointer;
+}
+.center { text-align: center; }
+.muted { color: var(--text-muted); }
+.empty { color: var(--text-muted); font-size: 0.85rem; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); border: 0; }
+
+/* goal_progress — process runs on their milestone track (oval contract) */
+.goal-progress .runs { list-style: none; margin: 0; padding: 0; }
+.goal-progress .runs > li { padding: var(--space-2, 8px) 0; border-bottom: 1px solid var(--border); }
+.goal-progress .runs > li:last-child { border-bottom: 0; }
+.goal-progress .run-head { display: flex; justify-content: space-between; align-items: center; gap: var(--space-2, 8px); }
+.goal-progress .run-title { font-size: 0.9rem; font-weight: 600; }
+.goal-progress .run-goal-met { color: var(--primary); font-weight: 700; }
+.goal-progress .track { height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; margin: var(--space-1, 4px) 0; }
+.goal-progress .track-fill { height: 100%; border-radius: 3px; background: var(--primary); }
+.goal-progress .milestones { list-style: none; display: flex; flex-wrap: wrap; gap: var(--space-2, 8px); margin: 0; padding: 0; font-size: 0.75rem; color: var(--text-muted); }
+.goal-progress .milestones .ms-completed { color: var(--gain); }
+.goal-progress .milestones .ms-completed::before { content: '● '; }
+.goal-progress .milestones .ms-failed { color: var(--loss); }
+.goal-progress .milestones .ms-failed::before { content: '✕ '; }
+.goal-progress .milestones .ms-pending::before, .goal-progress .milestones .ms-in_progress::before { content: '○ '; }
+
+/* Section nav — the extranet's sections as the backend serves them. Scrolls
+   horizontally rather than wrapping: a new section must never push content
+   down the page, and how many exist is data we cannot bound at build time. */
+.sections {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 12px;
+  scrollbar-width: thin;
+}
+.section-tab {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.section-tab:hover { color: var(--text); }
+.section-tab.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-ink);
+  font-weight: 600;
+}
+
+/* Timing tower — ranked runs. Segments count comes from each run's template. */
+.tower-head { display: flex; justify-content: space-between; align-items: baseline; }
+.tower-count { font-size: 12.5px; color: var(--text-muted); }
+.tower-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.tower-row { display: grid; grid-template-columns: 28px 1fr auto auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--border); }
+.tower-pos { font-variant-numeric: tabular-nums; color: var(--text-muted); }
+.tower-main { min-width: 0; }
+.tower-top { display: flex; align-items: center; gap: 6px; }
+.tower-title { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tower-prio { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-muted); }
+.tower-flag { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.tower-flag.flag-green { background: var(--gain); }
+.tower-flag.flag-yellow { background: var(--warning); }
+.tower-flag.flag-red { background: var(--loss); }
+.tower-flag.flag-box { background: var(--info); }
+.tower-flag.flag-finish { background: var(--text-muted); }
+.tower-sectors { display: flex; gap: 3px; }
+.tower-seg { width: 16px; height: 6px; border-radius: 2px; background: var(--border); }
+.tower-seg.is-done { background: var(--gain); }
+.tower-seg.is-fail { background: var(--loss); }
+.tower-state { font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--text-muted); }
+.tower-row.flag-finish { opacity: .55; }
+
+/* ── chart ────────────────────────────────────────────────────────────────
+ * The chart mask shipped without any of these (2026-07-27), and an unstyled
+ * chart does not degrade to "plain" — it degrades to WRONG. An SVG <polyline>
+ * with no CSS takes the defaults `fill: black; stroke: none`, so the trend
+ * rendered as a black filled blob on a dark card; the bar list rendered as a
+ * bulleted <ul> with label and value run together
+ * ("gemini-2.5-flash0,002 app.units.usd38"). Both looked like data defects and
+ * were missing stylesheet rules.
+ *
+ * Colours come from the instance overlay's tokens (public/tokens.css), so a
+ * fork restyles charts by shipping its own tokens — nothing here hardcodes a
+ * palette. */
+.chart-svg { display: block; width: 100%; height: 120px; overflow: visible; }
+
+.chart-line {
+  fill: none;                       /* the whole bug, in one declaration */
+  stroke: var(--primary);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;  /* viewBox is stretched, the stroke is not */
+}
+.chart-target {
+  stroke: var(--text-muted);
+  stroke-width: 1;
+  stroke-dasharray: 4 4;
+  vector-effect: non-scaling-stroke;
+}
+.chart-empty { margin: 0; color: var(--text-muted); font-size: 0.9rem; }
+
+.chart-bars { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2, 8px); }
+.chart-bar {
+  display: grid;
+  /* label | track | value — the three were concatenated because nothing laid
+   * them out. `minmax(0,…)` so a long model name shrinks instead of shoving
+   * the value off the card. */
+  grid-template-columns: minmax(0, 10rem) 1fr auto;
+  align-items: center;
+  gap: var(--space-3, 12px);
+}
+.chart-bar-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.chart-bar-track {
+  background: var(--surface-raised);
+  border-radius: var(--radius-sm);
+  height: 0.6rem;
+  overflow: hidden;
+}
+.chart-bar-fill { display: block; height: 100%; background: var(--primary); }
+.chart-bar-value { font-family: var(--font-mono, monospace); font-size: 0.85rem; white-space: nowrap; }
+.chart-bar-note { grid-column: 2 / -1; font-size: 0.8rem; color: var(--text-muted); }
+
+/* State is the block's own signal, not decoration: a losing bar must not read
+ * the same as a healthy one at a glance. */
+.chart-bar.state-warning .chart-bar-fill { background: var(--primary-accent); }
+.chart-bar.state-loss .chart-bar-fill { background: var(--loss); }
+
+.chart-donut-wrap { display: grid; justify-items: center; gap: var(--space-1, 4px); }
+.chart-svg.donut { width: 8rem; height: 8rem; }
+.donut-track { fill: none; stroke: var(--surface-raised); stroke-width: 10; }
+.donut-fill { fill: none; stroke: var(--primary); stroke-width: 10; stroke-linecap: round; }
+.donut-fill.state-warning { stroke: var(--primary-accent); }
+.donut-fill.state-loss { stroke: var(--loss); }
+.donut-label { margin: 0; font-family: var(--font-mono, monospace); font-size: 1.4rem; }
+.donut-sub { margin: 0; font-size: 0.85rem; color: var(--text-muted); }
+
+/* Capture panel — the exception to "read + one tap". Touch targets are 44px
+   because this is used standing at a tailgate, not at a desk. */
+.capture-panel { border: 1px solid var(--border); border-radius: 8px; padding: 12px; margin: 8px 0; }
+.capture-field { display: block; margin-bottom: 12px; }
+.capture-field > span { display: block; font-size: 13px; margin-bottom: 4px; opacity: .8; }
+.capture-field input[type="text"] { width: 100%; min-height: 44px; padding: 8px 10px; font-size: 16px; }
+.capture-pad { height: 150px; border: 2px dashed var(--border); border-radius: 8px; }
+.capture-panel .action, .capture-panel .ghost { min-height: 44px; }
+
+
+/* ── Okruh (goal_progress) ────────────────────────────────────────────────────
+   Trať samotnou kreslí `Circuit` z návrhového jazyka (`.rdl-circuit__*`), takže
+   ji tenhle shell nestyluje — jinak by okruh vypadal na každém povrchu jinak.
+   Zdejší pravidla se týkají jen legendy kolem něj. */
+.block.goal-progress .rdl-circuit { max-width: 420px; margin: 0 auto var(--space-4); }
+
+.block.goal-progress .run-figs { font-size: 12px; color: var(--text-muted); margin-left: auto; }
+.block.goal-progress .run-head { display: flex; align-items: baseline; gap: var(--space-2); }
+
+/* ── Block frame (Section) ────────────────────────────────────────────────
+   The repeated rhythm of the product design: eyebrow title, optional sub-line,
+   optional action on the right. Blocks own their content; the frame is shared
+   so a new block cannot invent its own heading. */
+.block__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); margin-bottom: var(--space-4); }
+.block__heading { min-width: 0; }
+.block__title {
+  margin: 0; font-family: var(--font-sans); font-size: 12px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--text-muted);
+}
+.block__sub { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); }
+
+/* KPI tiles sit in a responsive row, the way the cockpit opens every view.
+   The tile itself is the language's Card, so the wrapper adds no chrome. */
+.block--kpi { padding: 0; border: 0; background: none; }
+.block--kpi .prov { margin-top: var(--space-2); }
+.wb-main > main > .block--kpi { grid-column: span 1; }
+
+/* ── Mockup page rhythm: PageHead + KPI row + two columns ──────────────────
+   Derived from block TYPES, not per-section code: KPI tiles open the view,
+   work blocks fill main, commentary sits in the rail. Collapses on narrow. */
+.wb-pagehead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); margin: 0 0 var(--space-4); }
+.wb-pagehead__title { margin: 0; font-family: var(--font-display); font-size: 28px; font-weight: 600; letter-spacing: -.01em; color: var(--text-strong); }
+.wb-textbtn, .wb-pagehead .wb-textbtn {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  color: var(--primary); font: inherit; font-weight: 600;
+}
+.wb-textbtn:hover { color: var(--primary-strong); text-decoration: underline; }
+.wb-kpigrid {
+  /* ⛔ NE `auto-fit`. S jedinou dlaždicí ji roztáhne přes celou šířku (naměřeno
+     1216 px na 1280px okně) a z „ukazatele" se stane billboard — přesně ta
+     řídkost, kvůli které sekce vypadá jako nudle. Pevná mřížka drží dlaždici
+     v jejím poli; `auto-fill` nechá zbytek řady prázdný, což je správně: KPI je
+     údaj, ne výplň. */
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: var(--space-4); margin-bottom: var(--space-5);
+}
+@media (min-width: 981px) { .wb-kpigrid { grid-template-columns: repeat(4, 1fr); } }
+.wb-cols { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: var(--space-5); align-items: start; }
+.wb-cols__main, .wb-cols__side { display: flex; flex-direction: column; gap: var(--space-5); min-width: 0; }
+@media (max-width: 980px) { .wb-cols { grid-template-columns: 1fr; } }
+
+/* ── Tape (presentation hint 'tape'): done → NOW → ahead, one stream ── */
+.review-queue.tape .tape-sect {
+  margin: var(--space-4, 16px) 0 var(--space-2, 8px);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.review-queue.tape .tape-done-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 10px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+.review-queue.tape .tape-dot.done {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--gain);
+}
+.review-queue.tape .tape-done-list {
+  list-style: none;
+  margin: var(--space-2, 8px) 0 0;
+  padding: 0 0 0 16px;
+  border-left: 2px solid var(--border);
+}
+.review-queue.tape .tape-done-item {
+  padding: 8px 0;
+  opacity: 0.85;
+}
+.review-queue.tape .tape-done-title { font-weight: 600; margin-right: 8px; }
+.review-queue.tape .tape-done-quote { color: var(--text-muted); }
+.review-queue.tape ul.tape-now { list-style: none; margin: 0; padding: 0; }
+.review-queue.tape ul.tape-now > li {
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-lg, 14px);
+  padding: var(--space-4, 16px);
+}
+.review-queue.tape ul.tape-now .review-actions button { min-height: 48px; }
+
+/* ── Přepínač pohledu ────────────────────────────────────────────────────────
+ * Kterou z našich firem právě sledujeme. Řádek „čipů" pod nadpisem sekce: volba
+ * pohledu je rozhodnutí PŘED čtením čísel, takže musí být nad nimi a musí být
+ * vidět, která platí — jinak si člověk přečte součet a netuší, čí je.
+ *
+ * Barvy a poloměry výhradně z tokenů design language; tenhle soubor rozhoduje
+ * jen o rozvržení. Počet dokladů je záměrně tišší než jméno firmy — je to
+ * vodítko pro volbu, ne údaj ke čtení. */
+.wb-lens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-5);
+}
+.wb-lens__chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.wb-lens__chip:hover { border-color: var(--primary-accent); }
+.wb-lens__chip:focus-visible { outline: 2px solid var(--primary-accent); outline-offset: 2px; }
+.wb-lens__chip.is-active {
+  background: var(--primary-accent);
+  border-color: var(--primary-accent);
+  color: var(--primary-ink);
+}
+.wb-lens__count { opacity: 0.6; font-size: 0.85em; }
+.wb-lens__chip.is-active .wb-lens__count { opacity: 0.8; }
+
+/* Osy pohledu ve skupinách: „podle firmy" a „podle areálu" vedle sebe. Skupina má
+ * vlastní popisek, protože bez něj by to byla jedna dlouhá řada čipů, ve které se
+ * nepozná, že jde o DVA různé způsoby čtení téhož portfolia. */
+.wb-lens__axis { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+.wb-lens__axislabel {
+  font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .08em;
+  color: var(--text-muted); margin-left: var(--space-3);
+}
+
+/* ── KPI: provenance PATŘÍ DO KARTY ─────────────────────────────────────────
+   Renderer ji kreslí jako SOUROZENCE dlaždice (u ostatních deseti typů je
+   uvnitř), takže pod každou dlaždicí visel odsazený proužek a řada KPI se
+   opticky rozpadla na „karta + cedulka". Sjednoceno vizuálně, bez zásahu do
+   stromu: dlaždice a její zdroj tvoří jeden blok. */
+.block--kpi { display: flex; flex-direction: column; }
+.block--kpi .rdl-card { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.block--kpi .rdl-prov {
+  border-top: 0; border-top-left-radius: 0; border-top-right-radius: 0;
+  justify-content: flex-start; width: 100%; box-sizing: border-box;
+}
+
+/* ── action_form: akce správy z plochy (ADR-003, K4) ─────────────────────────
+   Tlačítka z allowlistu, formulář z deklarace polí. Vstupy mají min. 44px kvůli
+   dotyku (stejné pravidlo jako capture-field u předání). */
+.block.action-form .action-form__list { display: flex; flex-wrap: wrap; gap: var(--space-2, 8px); }
+.block.action-form .action-form__form { margin-top: var(--space-3, 12px); display: grid; gap: var(--space-2, 8px); max-width: 560px; }
+.block.action-form .action-form__field { display: block; }
+.block.action-form .action-form__label { display: block; font-size: 13px; margin-bottom: 4px; opacity: .8; }
+.block.action-form .action-form__req { font-style: normal; color: var(--text-muted); }
+.block.action-form .action-form__input { width: 100%; min-height: 44px; padding: 8px 10px; font-size: 16px; box-sizing: border-box; }
+.block.action-form textarea.action-form__input { min-height: 88px; resize: vertical; }
+.block.action-form .action-form__buttons { display: flex; align-items: center; gap: var(--space-2, 8px); flex-wrap: wrap; margin-top: var(--space-1, 4px); }
+.block.action-form .action-form__status { font-size: 13px; }
+.block.action-form .action-form__status--done { color: var(--text-muted); }
+.block.action-form .action-form__status--error { color: var(--danger); }
+
+/* Souhrn pod trendem (es-trend nemá osy s popisky): součet každé řady slovy. */
+.chart-sum { display: flex; gap: var(--space-5); flex-wrap: wrap; margin: 8px 0 0; }
+.chart-sum > div { display: flex; flex-direction: column; gap: 2px; }
+.chart-sum dt { font: 600 10px var(--font-mono, monospace); letter-spacing: .07em; text-transform: uppercase; color: var(--text-muted); }
+.chart-sum dd { margin: 0; font: 650 15px var(--font-mono, monospace); font-variant-numeric: tabular-nums; color: var(--text-strong); }
+.relation-web es-web { margin-block: 4px 8px; }
+
+/* Blok s filtry (ESDK es-filters nad blokem) — mezera mezi filtry a blokem. */
+.wb-blockwrap { display: flex; flex-direction: column; gap: var(--space-2, 8px); }

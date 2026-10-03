@@ -1,0 +1,426 @@
+{
+  "$comment": "AISHA Ops Dashboard \u2014 base template. Built by WF_APPSMITH_DASHBOARD_BUILDER. See docs/deploy/APPSMITH_AISHA_OPS.md.",
+  "applicationName": "AISHA Ops",
+  "applicationSlug": "aisha-ops",
+  "applicationColor": "#4F46E5",
+  "applicationIcon": "dashboard",
+  "workspaceId": "{{WORKSPACE_ID}}",
+  "exportedApplication": {
+    "name": "AISHA Ops",
+    "slug": "aisha-ops",
+    "color": "#4F46E5",
+    "icon": "dashboard"
+  },
+  "datasourceList": [
+    {
+      "name": "AISHA Postgres REST",
+      "pluginId": "restapi-plugin",
+      "datasourceConfiguration": {
+        "url": "{{POSTGREST_URL}}/rest/v1",
+        "headers": [
+          {
+            "key": "apikey",
+            "value": "{{ANON_KEY}}"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{ANON_KEY}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AISHA n8n API",
+      "pluginId": "restapi-plugin",
+      "datasourceConfiguration": {
+        "url": "{{N8N_API_URL}}/api/v1",
+        "headers": [
+          {
+            "key": "X-N8N-API-KEY",
+            "value": "{{N8N_API_KEY}}"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AISHA Coolify API",
+      "pluginId": "restapi-plugin",
+      "datasourceConfiguration": {
+        "url": "{{COOLIFY_API_URL}}",
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{COOLIFY_API_TOKEN}}"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AISHA Sentry API",
+      "pluginId": "restapi-plugin",
+      "datasourceConfiguration": {
+        "url": "{{SENTRY_URL}}/api/0",
+        "headers": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{SENTRY_AUTH_TOKEN}}"
+          }
+        ]
+      }
+    }
+  ],
+  "pageList": [
+    {
+      "$comment": "Page 1: Overview \u2014 top-level dashboard with StatBoxes + recent tables",
+      "pageName": "Overview",
+      "pageSlug": "overview",
+      "isHidden": false,
+      "isDefault": true,
+      "queries": [
+        {
+          "name": "getActiveSlots",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/get_active_slots",
+            "body": "{}"
+          }
+        },
+        {
+          "name": "getUnresolvedDriftCount",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/get_unresolved_drift_count",
+            "body": "{ \"p_min_risk\": \"low\" }"
+          }
+        },
+        {
+          "name": "getPendingRollbackCount",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/get_pending_rollback_count"
+          }
+        },
+        {
+          "name": "getPendingApprovalCount",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/get_pending_approval_count"
+          }
+        },
+        {
+          "name": "getRecentBGSwitches",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/get_recent_b_g_switches",
+            "body": "{ \"p_limit\": 10 }"
+          }
+        },
+        {
+          "name": "getLatestDriftState",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/get_latest_drift_state",
+            "body": "{ \"p_limit\": 10, \"p_only_unresolved\": true }"
+          }
+        },
+        {
+          "name": "getRecentSentryIssues",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/get_recent_sentry_issues",
+            "body": "{ \"p_limit\": 20, \"p_min_level\": \"error\" }"
+          }
+        },
+        {
+          "name": "getFleetOverview",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/fn_operator_fleet_overview",
+            "body": "{ \"p_window_hours\": 24 }"
+          }
+        }
+      ],
+      "widgets": "{{OVERVIEW_WIDGETS}}",
+      "_widgetSlots": [
+        "statbox-active-slots",
+        "statbox-drift",
+        "statbox-rollbacks",
+        "statbox-approvals",
+        "statbox-fleet-llm-calls",
+        "statbox-fleet-errors",
+        "statbox-fleet-latency",
+        "statbox-fleet-pending-proposals",
+        "table-bg-switches",
+        "table-drift",
+        "table-sentry"
+      ]
+    },
+    {
+      "$comment": "Page 2: Per-Story view \u2014 filter by story_id (AISHA stack default)",
+      "pageName": "Per-Story",
+      "pageSlug": "per-story",
+      "isHidden": false,
+      "queries": [
+        {
+          "name": "listIntegrationServices",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/list_integration_services",
+            "body": "{ \"p_active_only\": true }"
+          }
+        },
+        {
+          "name": "getStoryEnvironments",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/get_story_environments",
+            "body": "{ \"p_story_id\": \"{{ Select_Story.selectedOptionValue }}\" }"
+          }
+        }
+      ],
+      "widgets": "{{PER_STORY_WIDGETS}}",
+      "_widgetSlots": [
+        "select-story",
+        "table-environments",
+        "table-deploys"
+      ]
+    },
+    {
+      "$comment": "Page 3: n8n \u2014 workflow executions and switches",
+      "pageName": "n8n",
+      "pageSlug": "n8n",
+      "isHidden": false,
+      "queries": [
+        {
+          "name": "listWorkflows",
+          "datasource": "AISHA n8n API",
+          "actionConfiguration": {
+            "httpMethod": "GET",
+            "path": "/workflows?active=true"
+          }
+        },
+        {
+          "name": "listExecutions",
+          "datasource": "AISHA n8n API",
+          "actionConfiguration": {
+            "httpMethod": "GET",
+            "path": "/executions?limit=100"
+          }
+        }
+      ],
+      "widgets": "{{N8N_WIDGETS}}",
+      "_widgetSlots": [
+        "table-workflows",
+        "table-executions",
+        "chart-executions-per-day"
+      ]
+    },
+    {
+      "$comment": "Page 4: Sentry \u2014 top issues + correlation",
+      "pageName": "Sentry",
+      "pageSlug": "sentry",
+      "isHidden": false,
+      "queries": [
+        {
+          "name": "correlateSentryWithDeploys",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/correlate_sentry_with_deploys",
+            "body": "{ \"p_window_minutes\": 15 }"
+          }
+        },
+        {
+          "name": "getRollbackHistory",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/get_rollback_history",
+            "body": "{ \"p_limit\": 30 }"
+          }
+        }
+      ],
+      "widgets": "{{SENTRY_WIDGETS}}",
+      "_widgetSlots": [
+        "table-sentry-issues",
+        "table-rollback-history",
+        "chart-issues-vs-switches",
+        "iframe-sentry"
+      ]
+    },
+    {
+      "$comment": "Page 5: Langfuse \u2014 LLM cost/latency",
+      "pageName": "Langfuse",
+      "pageSlug": "langfuse",
+      "isHidden": false,
+      "queries": [],
+      "widgets": "{{LANGFUSE_WIDGETS}}",
+      "_widgetSlots": [
+        "statbox-traces-24h",
+        "statbox-avg-latency",
+        "table-recent-traces",
+        "iframe-langfuse"
+      ]
+    },
+    {
+      "$comment": "Page 6: Logs \u2014 embedded Dozzle",
+      "pageName": "Logs",
+      "pageSlug": "logs",
+      "isHidden": false,
+      "queries": [],
+      "widgets": "{{LOGS_WIDGETS}}",
+      "_widgetSlots": [
+        "iframe-dozzle"
+      ]
+    },
+    {
+      "$comment": "Page 7: Actions \u2014 admin manual triggers",
+      "pageName": "Actions",
+      "pageSlug": "actions",
+      "isHidden": false,
+      "queries": [
+        {
+          "name": "triggerDriftNow",
+          "datasource": "AISHA n8n API",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/webhook/drift-now"
+          }
+        },
+        {
+          "name": "triggerAppsmithRebuild",
+          "datasource": "AISHA n8n API",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/webhook/appsmith-rebuild"
+          }
+        }
+      ],
+      "widgets": "{{ACTIONS_WIDGETS}}",
+      "_widgetSlots": [
+        "btn-drift-now",
+        "btn-rebuild",
+        "btn-bg-switch",
+        "btn-rollback"
+      ]
+    },
+    {
+      "$comment": "Page 8: AISHA Self-Tooling \u2014 admin review/approve/reject AISHA-generated skills/hooks/commands",
+      "pageName": "Self-Tooling",
+      "pageSlug": "self-tooling",
+      "isHidden": false,
+      "queries": [
+        {
+          "name": "getPendingToolingProposals",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/get_pending_tooling_proposals",
+            "body": "{ \"p_limit\": 50 }"
+          }
+        },
+        {
+          "name": "getToolingProposalCountPending",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/get_tooling_proposal_count_pending"
+          }
+        },
+        {
+          "$comment": "Selected proposal full content drilldown \u2014 driven by table row selection",
+          "name": "getProposalDetail",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "GET",
+            "path": "/aisha_tooling_proposals?id=eq.{{TableProposals.selectedRow.id}}&select=id,proposal_kind,artifact_name,artifact_path,artifact_content,trigger_pattern,occurrence_count,decision_provenance,approval_status,manual_locked"
+          }
+        },
+        {
+          "$comment": "Approve action (step 1/2) \u2014 admin clicks Approve \u2192 status to 'approved'. Does NOT commit; admin then clicks the separate Commit button (triggerCommitter).",
+          "name": "approveProposal",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/update_tooling_proposal_status",
+            "body": "{ \"p_proposal_id\": \"{{TableProposals.selectedRow.id}}\", \"p_new_status\": \"approved\" }"
+          }
+        },
+        {
+          "$comment": "Reject action \u2014 admin clicks Reject button \u2192 status to 'rejected' (no committer dispatch)",
+          "name": "rejectProposal",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/update_tooling_proposal_status",
+            "body": "{ \"p_proposal_id\": \"{{TableProposals.selectedRow.id}}\", \"p_new_status\": \"rejected\" }"
+          }
+        },
+        {
+          "$comment": "Commit action (step 2/2) \u2014 fired by the explicit Commit button on an already-approved proposal. POSTs to WF_AISHA_TOOLING_COMMITTER which guards approval_status='approved' before creating the Forgejo branch/file/PR.",
+          "name": "triggerCommitter",
+          "datasource": "AISHA n8n API",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/webhook/aisha-tooling-committer",
+            "body": "{ \"proposal_id\": \"{{TableProposals.selectedRow.id}}\", \"approved_by\": \"{{appsmith.user.id}}\" }"
+          }
+        },
+        {
+          "$comment": "Lock proposal artifact (admin manually edited skill/hook \u2192 don't overwrite)",
+          "name": "lockProposal",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": {
+            "httpMethod": "POST",
+            "path": "/rpc/lock_tooling_proposal",
+            "body": "{ \"p_artifact_path\": \"{{TableProposals.selectedRow.artifact_path}}\", \"p_locked\": true }"
+          }
+        }
+      ],
+      "widgets": "{{SELF_TOOLING_WIDGETS}}",
+      "_widgetSlots": [
+        "statbox-pending-proposals",
+        "statbox-recent-committed",
+        "table-pending-proposals",
+        "code-proposal-detail",
+        "btn-approve-proposal",
+        "btn-commit-proposal",
+        "btn-reject-proposal",
+        "btn-lock-proposal"
+      ]
+    }
+  ],
+  "applicationDetail": {
+    "navigation": {
+      "showNavbar": true,
+      "logoConfiguration": "APPSMITH_LOGO_DEFAULT"
+    },
+    "themeSetting": {
+      "primaryColor": "#4F46E5",
+      "fontFamily": "System Default",
+      "borderRadius": "8px",
+      "boxShadow": "0 1px 3px rgba(0,0,0,0.1)"
+    }
+  },
+  "_metadata": {
+    "schema_version": "1.0",
+    "created_by": "WF_APPSMITH_DASHBOARD_BUILDER",
+    "spec_reference": "docs/deploy/APPSMITH_AISHA_OPS.md",
+    "regenerable": true,
+    "manual_locked_widgets": []
+  }
+}

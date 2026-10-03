@@ -1,0 +1,55 @@
+# @generated expo-cli sync
+expo-env.d.ts
+# @end expo-cli
+
+# Expo / React Native
+.expo/
+.expo-shared/
+
+# Native builds (local only — built via Xcode/Gradle)
+#
+# ⛔ LOMÍTKO NA ZAČÁTKU JE PODSTATNÉ. Bez něj vzor platí na adresář toho jména
+# v JAKÉKOLI hloubce — tedy i na `modules/*/android/`, kde bydlí nativní půlka
+# vlastních Expo modulů. Naměřeno 2026-09-22: modul `rizena-konfigurace` se
+# commitnul jen svou JS půlkou, takže by se appka postavila BEZ nativní části,
+# `requireOptionalNativeModule` by vrátil null a konfigurace od správce
+# zařízení by tiše neexistovala. Vada, která vypadá jako hotová funkce.
+/ios/
+/android/
+
+# Build / bundler caches
+.parcel-cache/
+.turbo/
+dist/
+build/
+
+# Local configs & secrets
+.env
+.env.*
+!.env.example
+!.env.build.example
+
+# Signing keys / credentials
+*.keystore
+*.jks
+*.p8
+*.pem
+.env.build.local
+GoogleService-Info.plist
+# Android protějšek MUSÍ být ignorovaný taky. Nese API klíč Firebase projektu a je
+# INSTANČNÍ — každá instance má vlastní projekt (platforma svým jménem, každá instance
+# svým). iOS varianta ignorovaná byla, tahle se zapomněla: stačilo by
+# soubor položit vedle a odešel by prvním commitem do forku i do upstreamu.
+google-services.json
+
+# Node
+node_modules/
+
+# Test
+coverage/
+test-results/
+
+# IDE
+.idea/
+*.swp
+.DS_Store

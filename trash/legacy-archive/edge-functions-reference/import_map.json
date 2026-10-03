@@ -1,0 +1,11 @@
+{
+  "imports": {
+    "@std/http": "https://deno.land/std@0.190.0/http/server.ts",
+    "@supabase/supabase-js": "npm:@supabase/supabase-js@2.57.2",
+    "stripe": "https://esm.sh/stripe@18.5.0",
+    "jose": "https://deno.land/x/jose@v4.14.4/index.ts",
+    "firebase-admin": "https://esm.sh/firebase-admin@12.0.0/app",
+    "firebase-admin/messaging": "https://esm.sh/firebase-admin@12.0.0/messaging",
+    "openai": "https://esm.sh/openai@4.104.0"
+  }
+}

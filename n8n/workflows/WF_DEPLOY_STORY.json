@@ -1,0 +1,337 @@
+{
+  "name": "WF_DEPLOY_STORY",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "deploy-story",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "deploy-trigger",
+      "name": "Deploy Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate and normalize deploy request\nconst body = $input.first().json.body || $input.first().json;\n\nconst storyId = body.story_id;\nconst environment = body.environment || 'preview';\nconst trigger = body.trigger || 'manual';\nconst force = body.force === true;\nconst appName = body.app_name || null; // optional; used by post-deploy WF_PLAYWRIGHT_RUN chain to resolve B/G slot URL\nconst playwrightSuite = body.playwright_suite || 'all';\nconst playwrightOptIn = body.playwright !== false; // default: run; caller can disable per-deploy\n\nif (!storyId) {\n  throw new Error('Missing story_id in deploy request');\n}\n\nreturn [{\n  json: {\n    story_id: storyId,\n    environment,\n    trigger,\n    force,\n    app_name: appName,\n    playwright_suite: playwrightSuite,\n    playwright_opt_in: playwrightOptIn,\n    requested_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "get_story_environments",
+        "rpcParams": "={{ JSON.stringify({ p_story_id: $json.story_id }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "resolve-env",
+      "name": "Resolve Environment",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/functions/v1/deployment-executor",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"story_id\": \"{{ $('Validate Input').item.json.story_id }}\",\n  \"environment\": \"{{ $('Validate Input').item.json.environment }}\",\n  \"trigger\": \"{{ $('Validate Input').item.json.trigger }}\",\n  \"force\": {{ $('Validate Input').item.json.force }}\n}",
+        "options": {
+          "timeout": 120000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "execute-deploy",
+      "name": "Execute Deploy",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-deploy-ok",
+              "leftValue": "={{ $json.ok }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "evaluate-result",
+      "name": "Evaluate Result",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build success report\nconst deploy = $input.first().json;\nconst input = $('Validate Input').item.json;\n\nreturn [{\n  json: {\n    status: 'success',\n    story_id: input.story_id,\n    environment: input.environment,\n    provider: deploy.provider,\n    duration_ms: deploy.duration_ms,\n    message: deploy.message,\n    trigger: input.trigger,\n    completed_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "log-success",
+      "name": "Log Success",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_URL }}/webhook/expert-notification",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"source\": \"deploy_story\",\n  \"severity\": \"high\",\n  \"story_id\": \"{{ $('Validate Input').item.json.story_id }}\",\n  \"environment\": \"{{ $('Validate Input').item.json.environment }}\",\n  \"provider\": \"{{ $json.provider || 'unknown' }}\",\n  \"error\": \"{{ $json.message || 'Deployment failed' }}\",\n  \"trigger\": \"{{ $('Validate Input').item.json.trigger }}\",\n  \"duration_ms\": {{ $json.duration_ms || 0 }}\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "escalate-failure",
+      "name": "Escalate Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Chain into WF_PLAYWRIGHT_RUN after a successful staging deploy.\n// Skips silently when: not staging, opt-out flag set, or no app_name was passed.\n// Soft-fails so a Playwright outage cannot mask a deploy success.\nconst input = $('Validate Input').item.json;\nconst success = $('Log Success').item.json;\nconst envIsStaging = (input.environment || '').toLowerCase() === 'staging';\nconst shouldRun = envIsStaging && input.playwright_opt_in === true && input.app_name;\nif (!shouldRun) {\n  return [{ json: { ...success, playwright: { skipped: true, reason: !envIsStaging ? 'not_staging' : !input.playwright_opt_in ? 'opted_out' : 'no_app_name' } } }];\n}\nconst n8nBase = $env.N8N_WEBHOOK_URL || 'http://n8n:5678';\nconst webhookPath = `${n8nBase.replace(/\\/$/, '')}/webhook/playwright-run`;\ntry {\n  const res = await fetch(webhookPath, {\n    method: 'POST',\n    headers: { 'content-type': 'application/json' },\n    body: JSON.stringify({\n      trigger_kind: 'staging_auto',\n      target_env: 'staging',\n      target_base_url: 'auto',\n      app_name: input.app_name,\n      story_id: input.story_id,\n      suite: input.playwright_suite || 'all',\n      deploy_ref: success.provider ? String(success.provider) : null,\n      metadata: {\n        source: 'WF_DEPLOY_STORY',\n        provider: success.provider || null,\n        deploy_duration_ms: success.duration_ms || null,\n        trigger: success.trigger || input.trigger || null\n      }\n    })\n  });\n  if (!res.ok) {\n    const text = await res.text();\n    return [{ json: { ...success, playwright: { skipped: false, ok: false, status: res.status, body: text.slice(0, 400) } } }];\n  }\n  const j = await res.json().catch(() => ({}));\n  return [{ json: { ...success, playwright: { skipped: false, ok: true, run_id: j.run_id || null, approval_required: !!j.approval_required } } }];\n} catch (e) {\n  return [{ json: { ...success, playwright: { skipped: false, ok: false, error: e.message } } }];\n}"
+      },
+      "id": "trigger-playwright-staging-auto",
+      "name": "Trigger Playwright Staging Auto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1450,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_integration_action",
+        "rpcParams": "={{ JSON.stringify({ p_service_name: 'n8n', p_action: 'deploy_story_' + ($json.status || 'unknown'), p_action_detail: { story_id: $json.story_id || $('Validate Input').item.json.story_id, environment: $json.environment || $('Validate Input').item.json.environment, provider: $json.provider || 'unknown', trigger: $json.trigger || $('Validate Input').item.json.trigger, duration_ms: $json.duration_ms || 0, playwright: $json.playwright || null }, p_status: $json.status === 'success' ? 'success' : 'failure', p_duration_ms: $json.duration_ms || 0 }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "record-trace",
+      "name": "Record Trace",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1700,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Deploy Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Resolve Environment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Environment": {
+      "main": [
+        [
+          {
+            "node": "Execute Deploy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Deploy": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Result": {
+      "main": [
+        [
+          {
+            "node": "Escalate Failure",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Success": {
+      "main": [
+        [
+          {
+            "node": "Trigger Playwright Staging Auto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Playwright Staging Auto": {
+      "main": [
+        [
+          {
+            "node": "Record Trace",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalate Failure": {
+      "main": [
+        [
+          {
+            "node": "Record Trace",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

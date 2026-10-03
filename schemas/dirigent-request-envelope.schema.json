@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evymo.local/schemas/dirigent-request-envelope.schema.json",
+  "title": "AISHA Dirigent Request Envelope",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "workflow",
+    "payload",
+    "context_profile",
+    "autonomy_mode",
+    "risk_level",
+    "run_id"
+  ],
+  "properties": {
+    "workflow": {
+      "type": "string",
+      "minLength": 1
+    },
+    "payload": {
+      "type": "object"
+    },
+    "story_id": {
+      "type": "string"
+    },
+    "context_profile": {
+      "type": "string",
+      "enum": ["repo", "story", "workspace"]
+    },
+    "autonomy_mode": {
+      "type": "string",
+      "enum": ["local", "remote", "hybrid"]
+    },
+    "risk_level": {
+      "type": "string",
+      "enum": ["smoke", "full", "trusted"]
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

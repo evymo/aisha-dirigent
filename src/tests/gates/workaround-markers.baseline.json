@@ -1,0 +1,14 @@
+{
+  "_generated": "2026-04-22T06:40:41.251Z",
+  "_note": "Baseline for workaround-markers.gate.test.ts. Regenerate after fixing markers: `node scripts/gen-workaround-markers-baseline.mjs`. Number must only DECREASE.",
+  "totalMarkers": 12,
+  "totalFiles": 6,
+  "perFile": {
+    "scripts/test-aisha-chat.mjs": 3,
+    "aisha/db/seed.compiled.sql": 2,
+    "aisha/db/seed.instance.sql": 2,
+    "aisha/db/seed.sql": 2,
+    "aisha/db/seed/demo/02_expert_rules.sql": 2,
+    "scripts/populate-kb-production.mjs": 1
+  }
+}

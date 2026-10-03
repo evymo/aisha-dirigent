@@ -1,0 +1,62 @@
+--- stock/app_Traits_ExecuteRemoteCommand.php	2026-09-05 14:32:17
++++ live/app_Traits_ExecuteRemoteCommand.php	2026-09-05 14:32:18
+@@ -55,6 +55,59 @@
+             );
+         }
+ 
++        return $this->redact_env_flag_values($text);
++    }
++
++    /**
++     * Blank the values of -e / --env / --build-arg flags, keeping the names.
++     *
++     * The value-based redaction above only covers variables flagged is_shown_once,
++     * which is an opt-in UI toggle. Measured 2026-09-02 on an installation with
++     * 14050 environment variables: not one had it set, and 3381 of them were named
++     * like secrets. A failed deployment throws the whole `docker run` command into
++     * the log, so every value it carries ends up in
++     * application_deployment_queues.logs in clear text.
++     *
++     * Matching the flag rather than the value is deliberate: redacting by value
++     * would need every variable in the database and would rewrite unrelated text
++     * whenever a value happened to be something like "80" or "true".
++     *
++     * Coolify sets its own non-secret variables on every container, and blanking
++     * those would cost the log its most useful context for no gain, so they stay
++     * readable. Everything else is blanked regardless of how it is named -- a
++     * name-based guess would miss the one variable somebody called SEED or PEPPER.
++     *
++     * Runs per output chunk, so it stays cheap and predictable: a substring guard
++     * skips the regexes for chunks that carry no such flag, and every quantifier is
++     * possessive so no input can make it backtrack.
++     */
++    private function redact_env_flag_values(string $text): string
++    {
++        if (! str_contains($text, '-e ') && ! str_contains($text, '--env ') && ! str_contains($text, '--build-arg ')) {
++            return $text;
++        }
++
++        // Kept readable: Coolify generates these and none carries a secret.
++        $keep = 'COOLIFY_URL|COOLIFY_FQDN|COOLIFY_BRANCH|COOLIFY_RESOURCE_UUID|COOLIFY_CONTAINER_NAME|SOURCE_COMMIT|DOCKER_BUILDKIT';
++        $flag = '(\\s(?:-e|--env|--build-arg)\\s+(?!(?:'.$keep.')=)[A-Za-z_][A-Za-z0-9_]*=)';
++
++        $patterns = [
++            // Shell single quoting, including a value that contains a quote and is
++            // therefore written as several segments joined by \' -- 'a'\''b'.
++            '/'.$flag."'[^']*+'(?:\\\\''[^']*+')*+/",
++            // Double quoted, honouring backslash escapes.
++            '/'.$flag.'"(?:[^"\\\\]++|\\\\.)*+"/',
++            // Unquoted, up to the next whitespace.
++            '/'.$flag.'(?![\'"])\\S++/',
++        ];
++
++        foreach ($patterns as $pattern) {
++            $replaced = preg_replace($pattern, '${1}'.REDACTED, $text);
++            if ($replaced !== null) {
++                $text = $replaced;
++            }
++        }
++
+         return $text;
+     }
+ 

@@ -1,0 +1,145 @@
+{
+  "items": {
+    "account_deletion_status": {
+      "hash": "2557c318a4723db89a1856341824d939",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "admin_section": {
+      "hash": "90964d4252927533e9bd120ec16400ec",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "app_role": {
+      "hash": "67289eb4bb5d085edc8884043f084c41",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "assessment_status": {
+      "hash": "8103119fe9eec77078f85e2bc2065b2d",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "batch_purpose": {
+      "hash": "5f3d7c4b294b84be09ed905d6e1e2db4",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "batch_status": {
+      "hash": "e82bb9c3c7bdd3d3157b964134832db3",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "blockchain_event_type": {
+      "hash": "da7ad7c27951941c00f91eda10d33dff",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "check_in_type": {
+      "hash": "8ebc7598fd25e29b518aea3d0e414777",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "operational_dimension": {
+      "hash": "18e0b7dc65040133d482e1af727c94f4",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "consent_type": {
+      "hash": "2dd540597d47e7d21755b4a18cd55807",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "consultant_role_enum": {
+      "hash": "c6d4eeb292344e6788ae9a25919e9329",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "consultant_status_enum": {
+      "hash": "abbda360ec4c5418ca02f3813f7d9dd6",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "contribution_status_enum": {
+      "hash": "7125278368523bfe689f488953b8a863",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "contribution_type_enum": {
+      "hash": "07b0f7281f6f3c692a58e88eac5cf4a5",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "document_processing_status": {
+      "hash": "284a049aeba6afea552ef6fc0ede4da3",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "registration_status": {
+      "hash": "72835881b3ae29e58adf314c10ae625d",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "health_document_category": {
+      "hash": "97727759c76a8cd7db49d667d46f8353",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "journal_action_type": {
+      "hash": "fe3a5cc8bcad1dd6800856d2c1b6ee77",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "journal_area": {
+      "hash": "bf9a92edeb1416fecd576820ae49794a",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "journal_severity": {
+      "hash": "c6194d3cdc659983eb5da44e223458cd",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "lab_result_status": {
+      "hash": "78c02b62653657b13d9ab4edf29b8bb3",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "membership_status": {
+      "hash": "b2bfb750c097b8d2f3eb4c0aea3473a6",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "membership_tier": {
+      "hash": "3f3596510af993699df5ac67e5d99104",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "order_status": {
+      "hash": "40998531b8b0bfc7a4ce841d96e6189d",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "partner_certification_level": {
+      "hash": "a738a76e345cc1828d82bdfcc824d563",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "payment_type": {
+      "hash": "18cad17529525bd95dc6f2f18a4db1c4",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "permission_type": {
+      "hash": "51deccb1e0c5bf20142b3a3b1999b97c",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "product_access_type": {
+      "hash": "238a0ffcd079feedc9cbc035f47c7994",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "shipping_method": {
+      "hash": "007fee6dfec9fa896668ae5485e4062d",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "study_status": {
+      "hash": "8c1989a1649375b9c75ebb6933d53cca",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "study_type": {
+      "hash": "4372323b32e433e6ca86b73fda1866f8",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "subscription_period": {
+      "hash": "e58e029f7763dbff274fd031d43a22f2",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "vial_content_type": {
+      "hash": "56af00b6bc4a31d12672b4c1d97b463a",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "vial_status": {
+      "hash": "b2a512fd5dada88077918c3fbf07bf77",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    },
+    "workflow_step_status": {
+      "hash": "32c6c185fe269d14ccfba409ede434b7",
+      "syncedAt": "2026-02-10T13:24:04.319Z"
+    }
+  },
+  "lastSync": "2026-02-10T13:24:04.319Z"
+}

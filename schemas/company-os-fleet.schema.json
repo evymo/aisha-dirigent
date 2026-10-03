@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evymo.local/schemas/company-os-fleet.schema.json",
+  "title": "AISHA Company OS Fleet Manifest",
+  "description": "Declarative agent-fleet definition for the AISHA Company OS layer (docs/AISHA_COMPANY_OS.md). One human in the decision seat, specialized agents on the execution layer. Shared agent fields mirror plugin_catalog.agent_spec so a local agent can later be published via publish_agent / materialize_agent_runtime.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "agents"],
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "Optional pointer to this schema for editor validation."
+    },
+    "version": {
+      "const": 1,
+      "description": "Manifest format version. Currently always 1."
+    },
+    "preset": {
+      "type": "string",
+      "maxLength": 64,
+      "description": "Informative provenance — which preset this fleet started from (e.g. one-person-company)."
+    },
+    "prefix": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]{0,11}$",
+      "default": "os",
+      "description": "Artifact prefix: agents become .claude/agents/<prefix>-<slug>.md, commands /<prefix>-<slug>."
+    },
+    "owner": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "The human in the decision seat."
+        },
+        "decision_seat": {
+          "const": true,
+          "description": "Doctrine marker: the human decides, the agents execute. Always true."
+        }
+      }
+    },
+    "slot_models": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Soulforge slot → Claude Code model mapping (see routerCoach.slotProfiles in .aisha/dirigent.json for the gateway-side equivalent).",
+      "properties": {
+        "spark": { "$ref": "#/$defs/claudeModel" },
+        "ember": { "$ref": "#/$defs/claudeModel" },
+        "verify": { "$ref": "#/$defs/claudeModel" },
+        "default": { "$ref": "#/$defs/claudeModel" }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Fleet-wide defaults merged into every agent.",
+      "properties": {
+        "slot": { "$ref": "#/$defs/slot" },
+        "autonomy_level": { "$ref": "#/$defs/autonomyLevel" },
+        "brain": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/brainFile" },
+          "description": "Brain files every agent reads first (prepended, deduped)."
+        }
+      }
+    },
+    "agents": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/agent" },
+      "description": "The fleet. Slugs must be unique; at most one agent may have role=review."
+    }
+  },
+  "$defs": {
+    "claudeModel": {
+      "type": "string",
+      "enum": ["haiku", "sonnet", "opus", "inherit"],
+      "description": "Claude Code subagent model frontmatter value."
+    },
+    "slot": {
+      "type": "string",
+      "enum": ["spark", "ember", "verify", "default"],
+      "description": "Soulforge router slot: spark = cheap/fast, ember = balanced, verify = highest quality."
+    },
+    "autonomyLevel": {
+      "type": "string",
+      "enum": ["advisory", "draft", "execute"],
+      "description": "advisory = read-only recommendations; draft = writes drafts/proposals, never ships; execute = may act, outward actions still human-gated."
+    },
+    "brainFile": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*\\.md$",
+      "description": "File name inside company-os/brain/ (no paths)."
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slug", "title", "purpose"],
+      "properties": {
+        "slug": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,30}$",
+          "description": "Unique agent slug (mirrors agent_catalog.slug conventions)."
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 80,
+          "description": "Human-readable agent name (e.g. Leads Agent)."
+        },
+        "purpose": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "What the agent does — maps to agent_spec.purpose."
+        },
+        "mission": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "One-line value transform (e.g. \"leads → buyers\")."
+        },
+        "best_for": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Where this agent shines."
+        },
+        "tip": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Operator playbook tip embedded in the agent prompt."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["worker", "review"],
+          "default": "worker",
+          "description": "review = the ship-quality gate; forced advisory and read-only."
+        },
+        "slot": { "$ref": "#/$defs/slot" },
+        "autonomy_level": { "$ref": "#/$defs/autonomyLevel" },
+        "brain": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/brainFile" },
+          "description": "Agent-specific brain files, appended after defaults.brain (deduped)."
+        },
+        "outputs": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Output contract — what the agent must return to the human."
+        },
+        "tools": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Tool surface. When claude is omitted it is derived from autonomy_level.",
+          "properties": {
+            "claude": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 },
+              "description": "Claude Code tool names (Read, Grep, Glob, Write, Edit, Bash, WebSearch, WebFetch, …)."
+            },
+            "mcp": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^mcp__[A-Za-z0-9_-]+__[A-Za-z0-9_-]+$" },
+              "description": "Fully-qualified MCP tool names appended to the subagent tools list. Inventory them in brain/mcp-tools.md."
+            }
+          }
+        },
+        "platform": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Optional plugin_catalog.agent_spec passthrough used by `company-os:agent-spec` (see materialize_agent_runtime.sql).",
+          "properties": {
+            "default_model": { "type": "string", "maxLength": 64 },
+            "context_profile": { "type": "string", "maxLength": 64 },
+            "max_loops": { "type": "integer", "minimum": 1, "maximum": 20 },
+            "safety_level": { "type": "string", "maxLength": 32 },
+            "rule_slugs": { "type": "array", "items": { "type": "string" } },
+            "knowledge_items": { "type": "array", "items": { "type": "string" } }
+          }
+        }
+      }
+    }
+  }
+}

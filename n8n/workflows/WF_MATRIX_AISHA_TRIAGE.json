@@ -1,0 +1,148 @@
+{
+  "name": "WF_MATRIX_AISHA_TRIAGE",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "matrix-aisha",
+        "options": {
+          "rawBody": false
+        },
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "ma-webhook",
+      "name": "Matrix Event Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ================================================================\n// TRIAGE — Classify Matrix event and decide action\n// ================================================================\nconst body = $input.item.json.body || $input.item.json;\nconst eventType = body.event_type || '';\nconst sender = body.sender || '';\nconst roomId = body.room_id || '';\nconst content = body.content || {};\nconst msgBody = content.body || '';\n\n// Ignore events from AISHA herself\nif (sender === '@aisha:{{ $env?.MATRIX_DOMAIN || '' }}') {\n  return { json: { action: 'ignore', reason: 'self_message' } };\n}\n\n// Only process m.room.message events\nif (eventType !== 'm.room.message') {\n  return { json: { action: 'ignore', reason: 'non_message_event', eventType } };\n}\n\n// Detect @aisha mention\nconst isMention = msgBody.toLowerCase().includes('@aisha') ||\n  msgBody.toLowerCase().includes('aisha') ||\n  (content['m.mentions']?.user_ids || []).includes('@aisha:{{ $env?.MATRIX_DOMAIN || '' }}');\n\n// Detect DM (room with only sender + aisha)\nconst isDM = body.is_direct || false;\n\nif (!isMention && !isDM) {\n  return { json: { action: 'ignore', reason: 'no_mention_no_dm' } };\n}\n\n// Classify intent\nlet intent = 'general';\nconst lower = msgBody.toLowerCase();\nif (lower.includes('story') || lower.includes('příběh') || lower.includes('เรื่อง')) {\n  intent = 'story_context';\n} else if (lower.includes('help') || lower.includes('pomoc') || lower.includes('ช่วย')) {\n  intent = 'help';\n} else if (lower.includes('status') || lower.includes('stav')) {\n  intent = 'status_check';\n} else if (lower.includes('bridge') || lower.includes('propojení')) {\n  intent = 'bridge_status';\n}\n\n// Look up story context from room mapping\nconst supabaseUrl = $env?.AISHA_POSTGREST_URL || '';\nconst serviceKey = $env?.AISHA_POSTGREST_SERVICE_KEY || '';\n\nlet storyContext = null;\ntry {\n  const roomRes = await fetch(\n    `${supabaseUrl}/rest/v1/story_matrix_rooms?matrix_room_id=eq.${encodeURIComponent(roomId)}&select=story_id,room_type,bridge_type`,\n    {\n      headers: {\n        'apikey': serviceKey,\n        'Authorization': `Bearer ${serviceKey}`,\n      },\n    }\n  );\n  const rooms = await roomRes.json();\n  if (rooms.length > 0) {\n    storyContext = rooms[0];\n  }\n} catch (e) {\n  // Non-critical — proceed without story context\n}\n\nreturn {\n  json: {\n    action: 'respond',\n    intent,\n    sender,\n    roomId,\n    message: msgBody,\n    isDM,\n    isMention,\n    storyContext,\n    timestamp: body.timestamp || Date.now(),\n  },\n};"
+      },
+      "id": "ma-triage",
+      "name": "Triage & Classify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.action }}",
+              "value2": "respond"
+            }
+          ]
+        }
+      },
+      "id": "ma-filter",
+      "name": "Should Respond?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are AISHA (AI Story Health Assistant), an AI assistant embedded in the AISHA platform.\nYou appear as @aisha:{{ $env?.MATRIX_DOMAIN || '' }} in Matrix rooms.\n\nYour role:\n- Help users with their stories (health journeys, projects, learning paths)\n- Monitor bridge connections (Telegram, WhatsApp, Signal, Discord, Slack, Meta)\n- Provide status updates on active consultations\n- Answer questions about the platform\n\nGuidelines:\n- Be concise and helpful\n- Respond in the same language the user writes in\n- If you have story context, reference it naturally\n- For bridge issues, suggest checking the bridge status page\n- Never expose internal system details or database structure\n- If asked about something you can't help with, suggest contacting a guild expert\n\nStory context (if available): {{ $json.storyContext ? JSON.stringify($json.storyContext) : 'No story linked to this room' }}"
+        },
+        "text": "={{ $json.message }}",
+        "model": "gpt-4o-mini"
+      },
+      "id": "ma-ai",
+      "name": "AISHA AI Response",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ================================================================\n// SEND RESPONSE — Post AISHA reply back to Matrix room\n// ================================================================\nconst triage = $('Triage & Classify').item.json;\nconst aiResponse = $input.item.json.text || $input.item.json.message || 'I apologize, I could not process your request.';\nconst roomId = triage.roomId;\n\nconst supabaseUrl = $env?.AISHA_POSTGREST_URL || '';\nconst serviceKey = $env?.AISHA_POSTGREST_SERVICE_KEY || '';\nconst synapseUrl = $env?.SYNAPSE_ADMIN_URL || 'http://synapse:8008';\nconst aishaToken = $env?.AISHA_MATRIX_ACCESS_TOKEN || '';\n\n// Send message via Matrix client-server API\nconst txnId = 'm.' + Date.now() + '.' + Math.random().toString(36).slice(2, 8);\n\ntry {\n  const res = await fetch(\n    `${synapseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,\n    {\n      method: 'PUT',\n      headers: {\n        'Content-Type': 'application/json',\n        'Authorization': `Bearer ${aishaToken}`,\n      },\n      body: JSON.stringify({\n        msgtype: 'm.text',\n        body: aiResponse,\n      }),\n    }\n  );\n\n  const result = await res.json();\n\n  // Log to audit_journal\n  await fetch(\n    `${supabaseUrl}/rest/v1/audit_journal`,\n    {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n        'apikey': serviceKey,\n        'Authorization': `Bearer ${serviceKey}`,\n        'Prefer': 'return=minimal',\n      },\n      body: JSON.stringify({\n        action: 'aisha.matrix_response',\n        entity_type: 'matrix_room',\n        entity_id: roomId,\n        metadata: {\n          intent: triage.intent,\n          sender: triage.sender,\n          event_id: result.event_id,\n          has_story_context: !!triage.storyContext,\n        },\n      }),\n    }\n  );\n\n  return { json: { success: true, event_id: result.event_id } };\n} catch (err) {\n  return { json: { success: false, error: err.message } };\n}"
+      },
+      "id": "ma-send",
+      "name": "Send Matrix Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// No-op for ignored events\nreturn { json: { action: 'ignored', status: 'ok' } };"
+      },
+      "id": "ma-noop",
+      "name": "Ignore Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 400]
+    }
+  ],
+  "connections": {
+    "Matrix Event Webhook": {
+      "main": [
+        [
+          {
+            "node": "Triage & Classify",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Triage & Classify": {
+      "main": [
+        [
+          {
+            "node": "Should Respond?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Respond?": {
+      "main": [
+        [
+          {
+            "node": "AISHA AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ignore Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AISHA AI Response": {
+      "main": [
+        [
+          {
+            "node": "Send Matrix Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "AISHA Matrix bot — receives events from matrix-webhook edge function, triages @aisha mentions and DMs, generates AI responses, sends replies back to Matrix rooms. Integrated with story context via story_matrix_rooms table.",
+    "templateCredsSetupCompleted": true
+  }
+}

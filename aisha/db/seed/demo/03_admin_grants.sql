@@ -1,0 +1,24 @@
+-- ============================================================================
+-- Operator admin grants — MOVED to dynamic provisioning (de-hardcoded)
+-- ============================================================================
+-- This file used to INSERT real operators (demo-operator@example.com, demo-operator2@example.com)
+-- into aisha_auth.users + user_roles with HARDCODED Keycloak subs
+-- (5298d168…, d665df59…). Those subs are stale: a freshly provisioned Keycloak
+-- mints NEW random subs (verified 2026-05-30: zdenek=67408d6d…, premma=723f49a9…),
+-- so the hardcoded grants pointed at non-existent users → is_admin_or_staff()
+-- returned false → operators lost role + story access on every cold-start
+-- (the identity-drift bug).
+--
+-- Real operators are now provisioned DYNAMICALLY by resolving each operator's
+-- LIVE sub from Keycloak by email:
+--     config/operators.json            (roster: email + roles, NO sub)
+--     scripts/db/provision-operators.mjs --apply   (resolve sub → upsert)
+-- The cold-start runs this after Keycloak + core are healthy.
+--
+-- This file is intentionally a NO-OP now (kept so the seed compiler's file
+-- enumeration stays stable). Demo/local installs that want a fixed admin should
+-- grant one of the demo/00_prod_users.sql test identities explicitly.
+-- ============================================================================
+
+-- (no statements — operator grants are dynamic; see provision-operators.mjs)
+SELECT 1;

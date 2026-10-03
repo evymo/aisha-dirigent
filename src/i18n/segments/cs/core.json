@@ -1,0 +1,967 @@
+{
+  "production": {
+    "nodes": {
+      "received": "Přijato",
+      "handedOver": "Předáno",
+      "transportLoss": "Ztráta při přepravě",
+      "input": "Vstup",
+      "output": "Výstup",
+      "humidity": "Vlhkost",
+      "volume": "Objem",
+      "alcoholContent": "Lihovost",
+      "percentageOfTotal": "% celku",
+      "loss": "Ztráta",
+      "yield": "Výtěžnost",
+      "waste": "Odpad",
+      "dilution": "Ředění",
+      "water": "voda"
+    }
+  },
+  "notifications": {
+    "title": "Oznámení",
+    "empty": "Žádná oznámení",
+    "markAllRead": "Označit vše jako přečtené",
+    "questionnaireRequest": {
+      "title": "Nový dotazník k vyplnění",
+      "message": "Máte nový dotazník: {{name}}"
+    },
+    "meetingRequest": {
+      "title": "Pozvánka na schůzku",
+      "message": "Byli jste pozváni na schůzku: {{title}}"
+    },
+    "consentRequest": {
+      "title": "Požadavek na souhlas",
+      "message": "Prosíme o váš souhlas: {{title}}"
+    },
+    "labOrder": {
+      "title": "Hodnocení platformy",
+      "message": "Máte naplánované hodnocení platformy"
+    },
+    "distributionAdjustment": {
+      "title": "Úprava dávkování",
+      "message": "Vaše dávkování bylo upraveno"
+    },
+    "reminder": {
+      "title": "Připomínka",
+      "message": "Máte novou připomínku"
+    },
+    "message": {
+      "title": "Nová zpráva",
+      "message": "Máte novou zprávu"
+    },
+    "generic": {
+      "title": "Upozornění",
+      "message": "Máte nové upozornění"
+    }
+  },
+  "hero": {
+    "badge": "Vývoj poháněný AI",
+    "headlinePart1": "Váš produkt,",
+    "headlinePart2": "vaše cesta",
+    "subheadline": "Připojte se ke komunitě tvůrců, kteří dodávají software s AI orchestrací, expertním dohledem a transparentními quality gates.",
+    "cta": {
+      "primary": "Začít zdarma",
+      "secondary": "Časté dotazy",
+      "protocol": "Náš framework"
+    },
+    "stats": {
+      "members": "Aktivních členů",
+      "studies": "Aktivní programy",
+      "partners": "Ověření partneři",
+      "secure": "Zabezpečená data"
+    }
+  },
+  "common": {
+    "days": {
+      "sunday": "Neděle",
+      "monday": "Pondělí",
+      "tuesday": "Úterý",
+      "wednesday": "Středa",
+      "thursday": "Čtvrtek",
+      "friday": "Pátek",
+      "saturday": "Sobota",
+      "day": "den",
+      "dayCount_one": "den",
+      "dayCount_few": "dny",
+      "dayCount_other": "dnů"
+    },
+    "date": "Datum",
+    "day": "Den",
+    "of": "z",
+    "uploading": "Nahrávám...",
+    "month": "Měsíc",
+    "year": "Rok",
+    "close": "Zavřít",
+    "more": "Více",
+    "morePages": "Další stránky",
+    "toggleSidebar": "Přepnout boční panel",
+    "previousSlide": "Předchozí snímek",
+    "nextSlide": "Další snímek",
+    "signIn": "Přihlásit se",
+    "signInRequired": "Přihlášení vyžadováno",
+    "signInToAddToCart": "Pro přidání zboží do košíku se prosím přihlaste.",
+    "signOut": "Odhlásit se",
+    "signUp": "Registrace",
+    "backToHome": "Zpět na úvod",
+    "backToDashboard": "Zpět na nástěnku",
+    "back": "Zpět",
+    "loading": "Načítání...",
+    "retry": "Zkusit znovu",
+    "learnMore": "Zjistit více",
+    "loadMore": "Načíst další",
+    "readMore": "Číst více",
+    "viewAll": "Zobrazit vše",
+    "contactUs": "Kontaktujte nás",
+    "downloadPDF": "Stáhnout PDF",
+    "apply": "Použít",
+    "send": "Odeslat",
+    "share": "Sdílet",
+    "download": "Stáhnout",
+    "viewDetails": "Zobrazit detaily",
+    "warning": "Varování",
+    "validate": "Ověřit",
+    "validating": "Ověřuji...",
+    "tomorrow": "Zítra",
+    "clearAll": "Vymazat vše",
+    "examples": "Příklady",
+    "contents": "Obsah",
+    "save": "Uložit",
+    "settings": "Nastavení",
+    "theme": {
+      "toggle": "Přepnout motiv",
+      "light": "Světlý",
+      "dark": "Tmavý",
+      "system": "Systémový"
+    },
+    "you": "Vy",
+    "saving": "Ukládání...",
+    "processing": "Zpracování...",
+    "saveChanges": "Uložit změny",
+    "cancel": "Zrušit",
+    "search": "Hledat",
+    "filter": "Filtr",
+    "all": "Vše",
+    "yes": "Ano",
+    "no": "Ne",
+    "active": "Aktivní",
+    "inactive": "Neaktivní",
+    "pending": "Čeká",
+    "completed": "Dokončeno",
+    "error": "Chyba",
+    "success": "Úspěch",
+    "select": "Vybrat",
+    "submit": "Odeslat",
+    "continue": "Pokračovat",
+    "next": "Další",
+    "step": "Krok",
+    "selectDate": "Vyberte datum",
+    "previous": "Předchozí",
+    "total": "Celkem",
+    "valueOutOf": "{{value}}/{{total}}",
+    "currency": "Měna",
+    "currencyCzk": "KČ",
+    "currencyKc": "Kč",
+    "separatorBullet": "-",
+    "separatorSlash": "/",
+    "multiplierTimes": "×",
+    "separatorColon": ":",
+    "ipLabel": "IP:",
+    "placeholderHyphen": "-",
+    "placeholderDash": "-",
+    "infinity": "∞",
+    "versionPrefixShort": "v",
+    "scaleOutOfTen": "/10",
+    "unitHourShort": "h",
+    "unitMinuteShort": "min",
+    "timeHourSuffix": ":00",
+    "unitMgPerL": "mg/l",
+    "unitMgPerDl": "mg/dl",
+    "unitNgPerMl": "ng/ml",
+    "unitUPerL": "U/L",
+    "symbolPercent": "%",
+    "status": "Stav",
+    "vip": "VIP",
+    "never": "Nikdy",
+    "justNow": "právě teď",
+    "minutesAgo": "před {{count}} min",
+    "hoursAgo": "před {{count}} h",
+    "daysAgo": "před {{count}} d",
+    "unnamed": "Nepojmenovaný",
+    "untitled": "Bez názvu",
+    "unknown": "Neznámý",
+    "noData": "Žádná data nejsou k dispozici",
+    "create": "Vytvořit",
+    "edit": "Upravit",
+    "approved": "Schváleno",
+    "rejected": "Zamítnuto",
+    "none": "Žádný",
+    "unlimited": "Neomezeno",
+    "required": "Povinné",
+    "other": "Jiné",
+    "backToStudies": "Zpět na clustery",
+    "verifying": "Ověřuji...",
+    "or": "nebo",
+    "confirm": "Potvrdit",
+    "confirmDelete": "Potvrdit smazání",
+    "noResults": "Žádné výsledky nenalezeny",
+    "latest": "Nejnovější",
+    "detected": "Detekováno",
+    "recentLogins": "Nová přihlášení (24h)",
+    "from": "Od",
+    "to": "Do",
+    "refresh": "Obnovit",
+    "update": "Aktualizovat",
+    "undo": "Zpět",
+    "uploadDocument": "Nahrát dokument",
+    "redactDocument": "Redigovat dokument",
+    "redactHint": "Nakreslete obdélníky pro skrytí citlivých dat.",
+    "redirecting": "Přesměrování...",
+    "delete": "Smazat",
+    "export": "Exportovat",
+    "view": "Zobrazit",
+    "notes": "Poznámky",
+    "actions": "Akce",
+    "tryAgain": "Zkusit znovu",
+    "somethingWentWrong": "Něco se pokazilo",
+    "copied": "Zkopírováno",
+    "copyId": "Kopírovat ID",
+    "copyLink": "Kopírovat odkaz",
+    "openMenu": "Otevřít menu",
+    "areYouSure": "Jste si jistí?",
+    "selected": "Vybráno",
+    "optional": "Volitelné",
+    "units": "Jednotky",
+    "firstName": "Jméno",
+    "lastName": "Příjmení",
+    "emailPlaceholder": "user@example.com",
+    "phone": "Telefon",
+    "requestedAt": "Požadováno",
+    "scheduledFor": "Naplánováno na",
+    "selectOption": "Vyberte možnost",
+    "cancelling": "Rušení...",
+    "selectAll": "Vybrat vše",
+    "selectRow": "Vybrat řádek",
+    "anonymous": "Anonymní",
+    "created": "Vytvořeno",
+    "createdAt": "Datum vytvoření",
+    "open": "Otevřít",
+    "pageOf": "Stránka {{current}} z {{total}}",
+    "updated": "Aktualizováno",
+    "add": "Přidat",
+    "copy": "Kopírovat do schránky",
+    "noPermission": "Nemáte oprávnění k přístupu na tuto stránku",
+    "selectItem": "Vyberte položku",
+    "permissionDenied": "Přístup zamítnut",
+    "revoke": "Odvolat",
+    "hour": "hodina"
+  },
+  "errors": {
+    "alreadyEnrolled": "V tomto clusteru jste již zaregistrováni.",
+    "serviceNotConfigured": "Služba není správně nakonfigurovaná (chybí databázová část). Zkuste to prosím později.",
+    "signInRequired": "Pro pokračování se prosím přihlaste.",
+    "noPermission": "Nemáte oprávnění k této akci.",
+    "genericError": "Došlo k chybě. Zkuste to prosím znovu.",
+    "downloadFailed": "Stažení se nezdařilo. Zkuste to prosím znovu.",
+    "loadingConsents": "Nepodařilo se načíst souhlasy. Zkuste to prosím znovu.",
+    "accessDenied": "Přístup odepřen",
+    "accessDeniedDescription": "Nemáte oprávnění k přístupu na tuto stránku.",
+    "forbiddenCode": "403",
+    "pageLoadError": "Došlo k neočekávané chybě při načítání stránky. Zkuste to prosím znovu nebo se vraťte později.",
+    "devDetails": "Detaily (pouze development):"
+  },
+  "session": {
+    "timeout_warning_title": "Relace brzy vyprší",
+    "timeout_warning_message": "Vaše relace brzy vyprší kvůli neaktivitě.",
+    "time_remaining": "Zbývající čas: {{time}}",
+    "logout_now": "Odhlásit se",
+    "stay_logged_in": "Zůstat přihlášen"
+  },
+  "navigation": {
+    "archive": "Archiv",
+    "news": "Novinky",
+    "story": "Příběh",
+    "studies": "Clustery",
+    "whitepaper": "Bílá kniha",
+    "shop": "Služby",
+    "partners": "Kontakty"
+  },
+  "header": {
+    "memberArea": "Členská sekce",
+    "memberSection": "Člen",
+    "dashboard": "Nástěnka",
+    "profile": "Profil",
+    "orders": "Objednávky",
+    "tokens": "AISHA tokeny",
+    "appointments": "Moje schůzky",
+    "questionnaires": "Dotazníky",
+    "checkIn": "Zdravotní check-in",
+    "studiesSection": "Clustery",
+    "browseStudies": "Procházet clustery",
+    "enrollStudy": "Zapsat do clusteru",
+    "qualificationTest": "Test dovedností",
+    "partnerSection": "Partner",
+    "partnerDashboard": "Partnerská nástěnka",
+    "partnerCertification": "Partnerská certifikace",
+    "myDiary": "Můj deník",
+    "adminSection": "Administrace",
+    "adminDashboard": "Admin nástěnka",
+    "signIn": "Přihlásit se",
+    "signOut": "Odhlásit se",
+    "basicMembership": "Základní",
+    "openCart": "Otevřít nákupní košík",
+    "devBackend": "Vývojový backend"
+  },
+  "footer": {
+    "brandDescription": "AISHA je builderská platforma pro samostatné týmy a operátory. Můžete používat vlastní presety ve svém cloudu, nebo si přidat naši expertní vrstvu, provoz a maintenance jako managed službu.",
+    "services": "Služby",
+    "contacts": "Kontakty",
+    "phone": "+420 723 960 666",
+    "company": "Společnost",
+    "news": "Novinky",
+    "whitepaper": "Bílá kniha",
+    "rtnArchive": "Archiv",
+    "timeline": "Časová osa",
+    "documentLibrary": "Knihovna dokumentů",
+    "provenance": "Provenience",
+    "methods": "Metody a integrita",
+    "knowledge": "Znalosti",
+    "ourStory": "Náš příběh",
+    "rdPipeline": "Vývojový pipeline",
+    "faq": "Časté dotazy",
+    "platformShop": "Služby platformy",
+    "allProducts": "Všechny služby platformy",
+    "legal": "Právní informace",
+    "privacyPolicy": "Ochrana soukromí",
+    "termsOfService": "Obchodní podmínky",
+    "disclaimer": "Právní prohlášení",
+    "allRightsReserved": "Všechna práva vyhrazena.",
+    "location": "Praha, Česká republika",
+    "buildSignatureLabel": "π",
+    "buildSignatureTooltipDate": "Datum",
+    "buildSignatureTooltipEnvironment": "Prostředí",
+    "buildSignatureTooltipSite": "Web",
+    "buildSignatureTooltipBackend": "Backend",
+    "buildSignatureBackendSourceEnv": "env",
+    "buildSignatureBackendSourceFallback": "nouzové řešení",
+    "buildSignatureTooltipVersion": "Verze",
+    "buildSignatureTooltipRepo": "Repo",
+    "buildSignatureTooltipWorkflow": "Pracovní postupy",
+    "buildSignatureTooltipBranch": "Větev",
+    "buildSignatureTooltipRun": "Spustit",
+    "disclaimerText": "Všechny ceny jsou orientační. Finální kalkulace závisí na rozsahu, hosting modelu a úrovni managed služby. Evymo s.r.o. — orchestrace a dodávka softwaru.",
+    "terminalLogin": "Přihlášení",
+    "gettingStarted": "Jak začít"
+  },
+  "heroArchive": {
+    "archiveBadge": "Archiv Evymo • Zal. 2012",
+    "headlinePart1": "Z firemního archivu",
+    "headlinePart2": "k otevřeným znalostem",
+    "contextLine": "Společnost Evymo, založená v roce 2012, se vyvinula od podnikové IT integrace přes IoT automatizaci k platformě AISHA pro AI orchestraci — a buduje nástroje přirozeně podporující dodávku softwaru.",
+    "subheadline": "Otevíráme firemní archiv: projektové záznamy, technické zprávy a fotografie milníků. Prozkoumejte historii, ptejte se a utvořte si vlastní názor.",
+    "exploreArchive": "Prozkoumat archiv",
+    "readWhitepaper": "Číst whitepaper",
+    "curatorQuote": "Jedná se o historické záznamy prezentované tak, jak jsou, s moderním kontextem. Digitalizujeme je a sdílíme otevřeně — ne jako důkaz aktuálních schopností, ale jako transparentní okno do naší inženýrské historie.",
+    "curatorAttribution": "Archivní tým Evymo"
+  },
+  "archiveProvenance": {
+    "sectionLabel": "Archiv Evymo",
+    "title": "Provenience",
+    "subtitle": "U každého dokumentu ukazujeme, odkud pochází, jak byl digitalizován a jaké limity má jeho interpretace.",
+    "whatIsTitle": "Co znamená provenience",
+    "whatIsText": "Provenience je souhrn informací o původu dokumentu (zdroj, autor, datum, kontext) a o tom, jak s ním bylo nakládáno (digitalizace, přepis, překlad, redakční zásahy).",
+    "badgesTitle": "Odznaky u dokumentů",
+    "badges": [
+      {
+        "label": "Originální sken",
+        "description": "Zpřístupňujeme přímý obrazový záznam původního dokumentu."
+      },
+      {
+        "label": "Přepis",
+        "description": "Textová verze pro čitelnost a vyhledávání (může obsahovat normalizaci)."
+      },
+      {
+        "label": "Překlad",
+        "description": "Přeložený výňatek nebo celý dokument; u překladů uvádíme, že jde o interpretaci."
+      },
+      {
+        "label": "Redakční poznámka",
+        "description": "Moderní kontext, upozornění na dobovou terminologii a limity důkazů."
+      }
+    ],
+    "weVerifyTitle": "Co ověřujeme",
+    "verifyItems": [
+      "Základní metadata (datum, typ dokumentu, jazyk, rozsah)",
+      "Původ souboru (kde a kdy byl dokument získán/digitalizován)",
+      "Řetězec správy (kdo provedl digitalizaci/přepis)"
+    ],
+    "weCannotVerifyTitle": "Co často nelze spolehlivě ověřit",
+    "cannotVerifyItems": [
+      "Dobová tvrzení bez nezávislé replikace",
+      "Úplnost souboru (zda nechybí přílohy/strany)",
+      "Interpretace historických termínů v dnešním významu"
+    ]
+  },
+  "archiveMethods": {
+    "sectionLabel": "Archiv Evymo",
+    "title": "Metody a integrita",
+    "subtitle": "Jak digitalizujeme, popisujeme a zpřístupňujeme materiály tak, aby byly dohledatelné a interpretovatelné.",
+    "sections": [
+      {
+        "title": "Digitalizace a uchování",
+        "body": "Preferujeme přímé skeny, zachování původního pořadí stran a jednoznačné označení verzí souborů."
+      },
+      {
+        "title": "Přepis a překlad",
+        "body": "Přepisy slouží čitelnosti a vyhledávání. Překlady jsou vždy interpretací; u nejasných míst preferujeme konzervativní formulace."
+      },
+      {
+        "title": "Moderní kontext",
+        "body": "Upozorňujeme na dobové standardy, terminologii a limity důkazů. Historické dokumenty nejsou prezentovány jako tvrzení o schopnostech."
+      },
+      {
+        "title": "Změnová stopa",
+        "body": "Kde je to možné, udržujeme dohledatelnost úprav (verze přepisu/překladu) a oddělujeme originál od redakčních poznámek."
+      }
+    ]
+  },
+  "provenance": {
+    "sectionLabel": "Metody a integrita",
+    "title": "Transparentní od základů",
+    "subtitle": "Každý dokument v našem archivu obsahuje jasné informace o provenienci. Ukazujeme vám přesně, na co se díváte, jak jsme to digitalizovali a jaký moderní kontext platí.",
+    "disclaimer": "\"Tento dokument odráží standardy své doby. Je poskytován pro historický zájem a transparentnost, nikoli jako důkaz účinnosti.\"",
+    "disclaimerAttribution": "— Standardní kontextové prohlášení",
+    "curationMethods": "Naše kurátorské metody",
+    "points": {
+      "openAccess": {
+        "title": "Otevřený přístup",
+        "description": "Není vyžadováno přihlášení. Žádné omezování. Všechny dokumenty volně přístupné výzkumníkům a veřejnosti."
+      },
+      "provenanceVerified": {
+        "title": "Ověřená provenience",
+        "description": "Každý dokument ukazuje zdroj, datum, autora, metodu digitalizace a řetězec správy."
+      },
+      "editorialTransparency": {
+        "title": "Redakční transparentnost",
+        "description": "Označujeme, co můžeme ověřit a co ne. Překlady ukazují verzi a iniciály redaktora."
+      },
+      "downloadPacks": {
+        "title": "Stažitelné balíčky",
+        "description": "Balíček skenů + přepis + kontextové PDF. Kompletní materiály pro váš vlastní výzkum."
+      }
+    }
+  },
+  "whitepaperSection": {
+    "label": "Bílá kniha",
+    "title": "AISHA Builders",
+    "description": "Kanonická reference pro pochopení našeho přístupu. Jak interpretujeme starší materiály dnes, naše metodologie, slovník historických vs. moderních termínů a inženýrské principy.",
+    "features": {
+      "interpretation": "Metodologie interpretace projektových dokumentů z let 2012–2024",
+      "glossary": "Glosář: historické termíny vs. současná terminologie",
+      "curation": "Kurátorská pravidla a zveřejnění redakčních konfliktů"
+    },
+    "readOnline": "Číst online",
+    "version": "v2.0"
+  },
+  "archive": {
+    "sectionLabel": "Archiv dokumentů Evymo",
+    "title": "Prozkoumat archiv",
+    "subtitle": "Procházejte originální dokumenty, fotografie a záznamy z příběhu Evymo. Každá položka obsahuje informace o provenienci a moderní kontext. Není nutné přihlášení — tento archiv je otevřen všem.",
+    "searchPlaceholder": "Hledat dokumenty...",
+    "filter": {
+      "label": "Filtr:",
+      "decade": "Dekáda",
+      "allDecades": "Všechny dekády",
+      "type": "Typ",
+      "allTypes": "Všechny typy",
+      "preparation": "Přípravek",
+      "allPreparations": "Všechny přípravky",
+      "keywords": "Klíčová slova"
+    },
+    "allDecades": "Všechna desetiletí",
+    "allTypes": "Všechny typy",
+    "allPreparations": "Všechny preparáty",
+    "allTags": "Všechny tagy",
+    "badges": {
+      "featured": "Doporučeno"
+    },
+    "exploreDecade": "Prozkoumat {{decade}}",
+    "editorialPolicy": "— Redakční politika",
+    "resultCount": "Nalezeno {{count}} dokumentů",
+    "backToList": "Zpět na seznam",
+    "documentTypes": {
+      "operational_report": "Klinická zpráva",
+      "operational_study": "Klinický cluster",
+      "correspondence": "Korespondence",
+      "certificate": "Certifikát",
+      "directive": "Směrnice",
+      "form": "Formulář",
+      "formula": "Receptura",
+      "guideline": "Metodický pokyn",
+      "letter": "Dopis",
+      "patent": "Patent",
+      "photograph": "Fotografie",
+      "policy": "Politika",
+      "preparation_record": "Záznam o přípravku",
+      "procedure": "Postup",
+      "product_label": "Certifikát produktu",
+      "protocol": "Protokol",
+      "report": "Zpráva",
+      "research_paper": "Výzkumná práce",
+      "research_report": "Výzkumná zpráva",
+      "template": "Šablona",
+      "testimonial": "Svědectví",
+      "other": "Ostatní"
+    },
+    "emptyState": "Žádné archivní dokumenty nenalezeny",
+    "viewDocument": "Zobrazit dokument",
+    "noDocuments": "Žádné dokumenty k dispozici"
+  },
+  "whitepaper": {
+    "version": "Verze 1.0 • Prosinec 2024",
+    "title": "Whitepaper archivu Evymo",
+    "subtitle": "Jak interpretujeme historické materiály, naše redakční metodologie a standardy, které aplikujeme na digitalizaci, překlad a kontextovou anotaci. Toto je náš motor důvěryhodnosti.",
+    "browseArchive": "Procházet archiv",
+    "sections": {
+      "introduction": "Úvod",
+      "methods": "Metody a integrita",
+      "curation": "Kurátorská pravidla",
+      "digitization": "Pracovní postup digitalizace",
+      "editorial": "Redakční politika",
+      "glossary": "Glosář terminologie",
+      "compliance": "Soulad a standardy",
+      "problem": "Problém",
+      "solution": "Řešení",
+      "tokenomics": "Tokenomika",
+      "roadmap": "Plán",
+      "team": "Tým",
+      "legal": "Právní informace"
+    },
+    "introText1": "Archiv Evymo obsahuje dokumenty od roku 2012 po současnost — projektové záznamy, technické specifikace, architektonická rozhodnutí, korespondenci, fotografie a administrativní záznamy související s vývojem softwaru a AI orchestrací.",
+    "introText2": "Tyto materiály vznikly v technickém a obchodním rámci, který se v průběhu let výrazně vyvinul. Neprezentujeme je jako důkaz aktuálních schopností. Místo toho je nabízíme jako historické dokumenty s transparentní proveniencí a současným kontextem.",
+    "introQuote": "\"Naším cílem není dokazovat tvrzení, ale sdílet historii otevřeně a nechat čtenáře utvořit si vlastní informované názory.\"",
+    "whatWeVerify": "Co ověřujeme",
+    "whatWeCannotVerify": "Co nemůžeme ověřit",
+    "verifyItems": [
+      "Autenticita a provenience dokumentu",
+      "Fyzické charakteristiky originálů",
+      "Řetězec správy, kde je sledovatelný",
+      "Datování prostřednictvím papíru, inkoustu a kontextu"
+    ],
+    "cannotVerifyItems": [
+      "Tvrzení obsažená v historických dokumentech",
+      "Přesnost klinických pozorování z dané doby",
+      "Kompletní řetězec pro všechny materiály",
+      "Autorství, kde není podepsáno"
+    ],
+    "methodsNote": "Každý dokument v archivu obsahuje explicitní poznámku o tom, co můžeme potvrdit a co zůstává nejisté. Tato transparentnost je základem našeho přístupu.",
+    "curationRules": {
+      "rule1": {
+        "title": "Pravidlo 1: Vyžadovaná provenience",
+        "description": "Žádný dokument nevstoupí do archivu bez zdokumentované provenience — odkud pochází, kdy byl získán a kdo ho spravoval."
+      },
+      "rule2": {
+        "title": "Pravidlo 2: Kontext vždy přidán",
+        "description": "Každý historický dokument je doprovázen moderním kontextem vysvětlujícím jeho historický význam a rozdíly od současných standardů."
+      },
+      "rule3": {
+        "title": "Pravidlo 3: Nejistota označena",
+        "description": "Kde nemůžeme ověřit informace, explicitně to říkáme. Tvrzení z dané doby jsou jako taková označena, nikoli prezentována jako fakt."
+      },
+      "rule4": {
+        "title": "Pravidlo 4: Žádný prodejní tlak",
+        "description": "Stránky archivu neobsahují přímé odkazy na preparáty ani prodejní výzvy k akci. Archiv je pro vzdělávání, ne pro konverzi."
+      }
+    },
+    "digitizationSteps": [
+      "Dokument přijat a zkatalogizován s akvizičními metadaty",
+      "Fyzická prohlídka: zaznamenán stav, papír, charakteristiky inkoustu",
+      "Skenování ve vysokém rozlišení minimálně 600 DPI",
+      "OCR zpracování pro vyhledávání (kde je to použitelné)",
+      "Překlad kvalifikovaným překladatelem s verzováním",
+      "Redakční kontrola a kontextová anotace",
+      "Přiřazen odznak provenience na základě úrovně ověření",
+      "Publikace s dostupností stažitelného balíčku"
+    ],
+    "editorialIntro": "Náš redakční přístup upřednostňuje transparentnost před přesvědčováním. Jsme kurátoři, ne obhájci.",
+    "editorialPolicies": {
+      "translations": {
+        "title": "Překlady",
+        "description": "Všechny překlady ukazují číslo verze, iniciály překladatele a datum. Skeny v původním jazyce jsou vždy k dispozici vedle."
+      },
+      "redactions": {
+        "title": "Redakce",
+        "description": "Osobní informace (adresy, rodinné podrobnosti) mohou být redigovány z důvodu ochrany soukromí. Všechny redakce jsou označeny a vysvětleny."
+      },
+      "corrections": {
+        "title": "Opravy",
+        "description": "Pokud jsou po publikaci objeveny chyby, vydáváme opravy s udržovanou kompletní historií verzí."
+      }
+    },
+    "glossaryIntro": "Historické dokumenty používají terminologii, která se liší od moderního vědeckého jazyka. Tento glosář pomáhá překlenout propast.",
+    "glossaryHeaders": {
+      "period": "Dobový termín",
+      "modern": "Moderní ekvivalent",
+      "context": "Kontext"
+    },
+    "glossaryTerms": [
+      {
+        "period": "System Integration",
+        "modern": "Cloud-native orchestration",
+        "context": "Historical approach to connecting enterprise systems"
+      },
+      {
+        "period": "Manual Deployment",
+        "modern": "CI/CD Pipeline",
+        "context": "Early deployment approach before automation"
+      },
+      {
+        "period": "Script Automation",
+        "modern": "AI Agent Workflow",
+        "context": "Evolution from scripts to intelligent agent orchestration"
+      },
+      {
+        "period": "Monolithic Architecture",
+        "modern": "Multi-agent orchestration",
+        "context": "Architectural evolution from monoliths to distributed agents"
+      }
+    ],
+    "complianceIntro": "Archiv je udržován odděleně od komerčních operací. Služby platformy jsou vyvíjeny podle aktuálních standardů a nespoléhají na historické dokumenty jako důkaz aktuálních schopností.",
+    "standardDisclaimer": "Standardní prohlášení",
+    "disclaimerText": "\"Historické dokumenty v archivu Evymo odrážejí technické standardy, metodologii a obchodní kontext své doby. Jsou poskytovány pro historický zájem a transparentnost, ne jako důkaz aktuálních schopností platformy. Aktuální služby platformy jsou vyvíjeny nezávisle podle moderních softwarových inženýrských standardů.\"",
+    "cta": {
+      "title": "Připraveni prozkoumat?",
+      "subtitle": "Procházejte archiv s důvěrou, znalí naší metodologie a standardů.",
+      "button": "Vstoupit do archivu"
+    }
+  },
+  "security": {
+    "mustChangePassword": {
+      "title": "Vyžadována změna hesla",
+      "description": "Z bezpečnostních důvodů musíte změnit své heslo před pokračováním.",
+      "warning": "Váš účet má nastaveno výchozí heslo nebo bylo označeno ke změně. Pro vaši bezpečnost je nutné nastavit nové heslo.",
+      "instructions": "Klikněte na tlačítko níže a my vám pošleme email s odkazem pro bezpečnou změnu hesla.",
+      "sendEmail": "Odeslat email pro změnu hesla"
+    }
+  },
+  "notFound": {
+    "title": "404",
+    "message": "Stránka nenalezena",
+    "description": "Stránka, kterou hledáte, neexistuje nebo byla přesunuta.",
+    "exploreTitle": "Kam můžete pokračovat?",
+    "returnHome": "Zpět na úvod",
+    "links": {
+      "archive": "Archiv",
+      "archiveDesc": "Historické dokumenty a materiály z archivu",
+      "story": "Příběh",
+      "storyDesc": "Příběh AISHA Dirigent — AI orchestrace vývoje software",
+      "studies": "Clustery",
+      "studiesDesc": "Aktivní clustery a vývojové programy",
+      "whitepaper": "Bílá kniha",
+      "whitepaperDesc": "Vědecké podklady a metodologie",
+      "shop": "Služby",
+      "shopDesc": "Služby a nabídky platformy",
+      "partners": "Partneři",
+      "partnersDesc": "Síť expertů a ověřených specialistů",
+      "faq": "Časté dotazy",
+      "faqDesc": "Odpovědi na nejčastější otázky"
+    }
+  },
+  "faq": {
+    "badge": "Časté dotazy",
+    "title": "Odpovědi na vaše otázky",
+    "subtitle": "Časté dotazy o platformě AISHA Dirigent, vývoji s pomocí AI a o tom, jak vám Evymo může pomoci s úspěchem vašeho projektu.",
+    "categories": {
+      "general": "Obecné informace",
+      "platform": "Platforma a technologie",
+      "agents": "AI agenti a automatizace",
+      "services": "Služby a spolupráce",
+      "security": "Bezpečnost a soukromí",
+      "pricing": "Plány a ceník"
+    },
+    "general": {
+      "q1": {
+        "question": "Co je AISHA Dirigent?",
+        "answer": "AISHA Dirigent je platforma pro AI orchestraci vyvinutá společností Evymo. Koordinuje specializované AI agenty, kteří pomáhají v celém životním cyklu vývoje softwaru — od plánování a implementace přes testování až po nasazení a provoz. Název Dirigent odráží její roli: orchestraci práce více AI agentů a lidských specialistů do uceleného pracovního postupu."
+      },
+      "q2": {
+        "question": "Kdo je Evymo?",
+        "answer": "Evymo s.r.o. je česká technologická společnost, která vytváří nástroje poháněné umělou inteligencí pro vývoj softwaru a realizaci projektů. Propojujeme klienty, kteří potřebují zakázkový software, s kvalifikovanými specialisty a poskytujeme jim AISHA — naši AI platformu, která urychluje vývoj, udržuje standardy kvality a snižuje náklady."
+      },
+      "q3": {
+        "question": "Pro koho je platforma určena?",
+        "answer": "AISHA slouží dvěma skupinám: klientům, kteří potřebují spolehlivě a nákladově efektivně vytvořit zakázkový software, a specialistům (vývojářům, architektům, konzultantům), kteří chtějí posílit své schopnosti pomocí nástrojů poháněných AI. Ať už jste startup potřebující MVP, nebo enterprise vyžadující komplexní integrace, platforma se přizpůsobí vašim potřebám."
+      }
+    },
+    "platform": {
+      "q1": {
+        "question": "Jaký technologický stack platforma používá?",
+        "answer": "Platforma je postavena na Reactu s TypeScriptem pro frontend, PostgreSQL 17 s PostgREST za AISHA Gateway pro backend, Keycloak pro autentizaci, n8n pro automatizaci workflow a Elasticsearch pro vyhledávání znalostí. Funkční endpointy běží jako self-hosted služby za gateway. Celý stack je navržen pro self-hosting a lze jej nasadit na libovolnou infrastrukturu."
+      },
+      "q2": {
+        "question": "Lze AISHA provozovat na vlastní infrastruktuře?",
+        "answer": "Ano. AISHA je navržena pro self-hosted nasazení. Platforma běží v Docker kontejnerech a lze ji nasadit přes Coolify, Docker Compose nebo jakýkoli systém orchestrace kontejnerů. Vaše data zůstávají na vaší infrastruktuře — nikdy nevyžadujeme cloudové závislosti, které nemáte pod kontrolou."
+      },
+      "q3": {
+        "question": "Jaké programovací jazyky a frameworky AISHA podporuje?",
+        "answer": "Znalostní báze a systém agentů AISHA jsou v principu jazykově nezávislé. Samotná platforma je postavena na TypeScriptu a Reactu, ale AI agenti mohou pomáhat s projekty v jakémkoli hlavním jazyce či frameworku. Znalostní systém lze natrénovat na libovolný technologický stack, který váš projekt vyžaduje."
+      }
+    },
+    "agents": {
+      "q1": {
+        "question": "Jak AI agenti fungují?",
+        "answer": "AISHA používá katalog sedmi specializovaných agentů, každý s definovaným účelem: Dirigent koordinuje workflow, Knihovník spravuje znalosti, Compliance Gate kontroluje standardy kvality, Dev Patch implementuje změny, Verifier ověřuje výsledky, Plánovač vytváří projektové plány a Debug Agent diagnostikuje problémy. Spolupracují společně, přičemž Dirigent směruje úkoly na správného agenta podle kontextu."
+      },
+      "q2": {
+        "question": "Nahrazují AI agenti lidské vývojáře?",
+        "answer": "Ne. AI agenti zesilují lidské schopnosti, nenahrazují je. Specialista vždy dohlíží na práci, činí architektonická rozhodnutí a kontroluje výsledky. Agenti zpracovávají repetitivní úkoly, vynucují standardy, prohledávají znalostní báze a urychlují implementaci — čímž uvolňují specialistům prostor pro kreativní a strategickou práci."
+      },
+      "q3": {
+        "question": "Co je systém znalostní báze?",
+        "answer": "Každý projekt si buduje znalostní bázi expertních pravidel, architektonických vzorů, konvencí kódování a doménově specifických informací. AI agenti konzultují tyto znalosti před každou změnou, čímž zajišťují konzistenci napříč celou codebase. Systém využívá vektorové vyhledávání a textový matching pro nalezení relevantních znalostí ke každému úkolu."
+      }
+    },
+    "services": {
+      "q1": {
+        "question": "Jaké služby Evymo nabízí?",
+        "answer": "Nabízíme tři základní služby: Řízený vývoj (specialista + AI agenti budují váš projekt), Dohled nad provozem (monitoring, quality gates a kontrola compliance pro existující projekty) a Údržba a podpora (průběžné opravy chyb, aktualizace a správa infrastruktury). Každou službu lze využít samostatně nebo v kombinaci."
+      },
+      "q2": {
+        "question": "Jak probíhá typický projekt?",
+        "answer": "Popíšete, co potřebujete, my přiřadíme specialistu, který nakonfiguruje AISHA pro technologický stack a doménu vašeho projektu. Specialista pracuje společně s AI agenty, kteří zpracovávají implementaci, zatímco Dirigent zajišťuje dodržování standardů kvality. Projekty se typicky dodávají v řádu týdnů, nikoli měsíců, protože AI agenti pracují nepřetržitě a iterují v reálném čase."
+      },
+      "q3": {
+        "question": "Mohu si po projektu ponechat kód?",
+        "answer": "Samozřejmě. Veškerý kód, dokumentace a znalostní báze vytvořené během projektu patří vám. Neexistuje žádné uzamčení u dodavatele. Můžete kód spravovat sami, najmout jiný tým, nebo pokračovat s námi na průběžné podpoře — volba je zcela na vás."
+      }
+    },
+    "security": {
+      "q1": {
+        "question": "Jak jsou moje data chráněna?",
+        "answer": "Bezpečnost je zabudována do každé vrstvy: Row-Level Security (RLS) na všech databázových tabulkách, auditní logování každé citlivé operace, šifrovaná připojení (TLS 1.2+) a žádná osobní data v logách ani chybových zprávách. Platforma dodržuje směrnice OWASP Top 10 a prochází pravidelnými bezpečnostními revizemi."
+      },
+      "q2": {
+        "question": "Kde běží kód a data?",
+        "answer": "Na infrastruktuře, kterou máte pod kontrolou. AISHA je navržena pro self-hosting. V případě řízených služeb nasazujeme na infrastrukturu v EU. Váš zdrojový kód, databáze a znalostní báze zůstávají na vašich určených serverech. Nikdy nesdílíme projektová data mezi klienty."
+      },
+      "q3": {
+        "question": "Jaké standardy compliance platforma splňuje?",
+        "answer": "Platforma je navržena s principy SOC 2: kompletní auditní stopy, řízení přístupu na základě rolí, izolace dat mezi tenanty a automatizované compliance gates, které validují každou změnu. Všechny databázové operace jsou logovány a přístup k citlivým datům vyžaduje explicitní autorizaci."
+      }
+    },
+    "pricing": {
+      "q1": {
+        "question": "Co zahrnují jednotlivé plány?",
+        "answer": "Starter zahrnuje komunitní projekty s maximálně 3 specialisty, ideální pro menší zakázky. Professional přidává pokročilou analytiku, prioritní matching a podporuje až 10 specialistů. Enterprise poskytuje SLA garance, dedikovaného koordinátora Dirigenta, vlastní integrace a neomezený počet specialistů."
+      },
+      "q2": {
+        "question": "Je k dispozici bezplatná zkušební verze nebo proof of concept?",
+        "answer": "Ano. Nabízíme bezplatnou fázi Proof of Concept, kde nakonfigurujeme AISHA pro váš konkrétní případ použití a předvedeme schopnosti platformy na malém rozsahu. To vám umožní zhodnotit kvalitu a rychlost vývoje s pomocí AI ještě před závazkem k plné spolupráci."
+      },
+      "q3": {
+        "question": "Jak funguje cenotvorba?",
+        "answer": "Cenotvorba je projektová a závisí na rozsahu a složitosti. Typicky stojí vývoj s pomocí AI přibližně polovinu ve srovnání s tradičním outsourcingem, protože agenti zpracovávají repetitivní práci, zatímco specialisté se soustředí na vysocehodnotné úkoly. Váš specialista vám poskytne konkrétní odhad po bezplatné konzultaci."
+      }
+    },
+    "disclaimer": "Zde uvedené informace slouží jako obecné vodítko. Konkrétní schopnosti, termíny a ceny závisí na požadavcích projektu. Kontaktujte nás pro podrobnou konzultaci."
+  },
+  "landing": {
+    "hero": {
+      "badge": "Inženýrství od roku 2012",
+      "title": "AI dodávka pro každý projekt",
+      "subtitle": "Vývojové služby poháněné orchestrací AISHA, navržené pro moderní týmy. Od startupů po enterprise.",
+      "fallbackTitle": "Váš vývojový partner",
+      "fallbackSubtitle": "Vývoj s podporou AI a dodávka projektů.",
+      "ctaShop": "Prozkoumat služby",
+      "ctaResearch": "Naše technologie",
+      "addToCart": "Přidat do košíku",
+      "addedToCart": "Přidáno do košíku",
+      "featuredProduct": "Doporučená služba",
+      "forEveryone": "Pro každý tým"
+    },
+    "segments": {
+      "title": "Pro koho jsou naše služby",
+      "subtitle": "Vyberte kategorii, která odpovídá vašemu projektu",
+      "kids": {
+        "title": "Startupy",
+        "description": "Vývoj MVP a rychlé prototypování"
+      },
+      "athletes": {
+        "title": "Rostoucí týmy",
+        "description": "Škálování a optimalizace výkonu"
+      },
+      "midlife": {
+        "title": "Podnik",
+        "description": "Integrace, compliance, architektura"
+      },
+      "seniors": {
+        "title": "Údržba",
+        "description": "Operace a kontinuální zlepšování"
+      }
+    },
+    "products": {
+      "label": "Naše služby",
+      "title": "Populární služby",
+      "subtitle": "Vyberte si z naší nabídky AI vývojových služeb",
+      "viewAll": "Zobrazit vše"
+    },
+    "research": {
+      "label": "Podloženo technologií",
+      "title": "Desetiletí inženýrství",
+      "subtitle": "Evymo vzniklo z podnikové IT integrace v roce 2012. Dokumentujeme naši inženýrskou cestu a zpřístupňujeme projektové archivy veřejnosti. Utvořte si vlastní názor — a pokud s námi chcete pracovat, přidejte se ke komunitě tvůrců. Aktivní členové s ověřenými dovednostmi mohou přistupovat ke službám platformy.",
+      "archive": {
+        "title": "Archiv dokumentů",
+        "description": "Procházejte originální projektové záznamy, technické zprávy a fotografie z let 2012–2026."
+      },
+      "studies": {
+        "title": "Vývojové programy",
+        "description": "Připojte se k aktivním programům a staňte se součástí komunity."
+      },
+      "cta": "Prozkoumat technologie"
+    },
+    "trust": {
+      "title": "Proč nám důvěřovat",
+      "subtitle": "Transparentnost, kvalita a komunita jsou naše základní hodnoty",
+      "quality": {
+        "title": "Kvalitní ingredience",
+        "description": "Pečlivě vybrané ingredience s ověřeným původem"
+      },
+      "community": {
+        "title": "Rostoucí komunita",
+        "description": "Aktivní členové v našem programu"
+      },
+      "research": {
+        "title": "Aktivní programy",
+        "description": "Probíhající a dokončené programy"
+      },
+      "security": {
+        "title": "Bezpečná data",
+        "description": "Vaše data jsou šifrována a chráněna"
+      }
+    },
+    "cta": {
+      "title": "Začněte cestu k lepšímu softwaru",
+      "subtitle": "Vyberte si službu, která odpovídá potřebám vašeho projektu",
+      "button": "Prozkoumat služby",
+      "learnMore": "Náš příběh"
+    }
+  },
+  "validation": {
+    "passwordMin8": "Heslo musí mít alespoň 8 znaků",
+    "passwordUppercase": "Heslo musí obsahovat velké písmeno",
+    "passwordLowercase": "Heslo musí obsahovat malé písmeno",
+    "passwordNumber": "Heslo musí obsahovat číslo",
+    "passwordMatch": "Hesla se neshodují",
+    "passwordsNotMatch": "Hesla se neshodují",
+    "required": "Toto pole je povinné",
+    "email": "Zadejte platnou e-mailovou adresu"
+  },
+  "datatable": {
+    "rowsSelected": "{{selected}} z {{total}} řádků vybráno.",
+    "rowsPerPage": "Řádků na stránku",
+    "pageOf": "Stránka {{current}} z {{total}}",
+    "goToFirst": "Přejít na první stránku",
+    "goToPrevious": "Přejít na předchozí stránku",
+    "goToNext": "Přejít na další stránku",
+    "goToLast": "Přejít na poslední stránku"
+  },
+  "pwa": {
+    "offlineReadyTitle": "Aplikace je připravena k offline použití",
+    "offlineReadyMessage": "Obsah byl uložen pro offline použití.",
+    "updateAvailableTitle": "Dostupná nová verze",
+    "updateAvailableMessage": "Klikněte na aktualizovat pro načtení nejnovější verze aplikace.",
+    "update": "Aktualizovat"
+  },
+  "news": {
+    "badge": "Novinky",
+    "title": "Co je nového",
+    "subtitle": "Nejnovější zprávy, aktualizace a oznámení od našeho týmu.",
+    "noArticles": "Zatím nebyly publikovány žádné novinky.",
+    "readMore": "Číst více",
+    "backToNews": "Zpět na novinky",
+    "notFound": "Článek nebyl nalezen.",
+    "emptyState": "Žádné novinky nenalezeny",
+    "searchPlaceholder": "Vyhledat články…",
+    "filter": {
+      "tags": "Štítky",
+      "sort": "Seřadit",
+      "label": "Filtr"
+    },
+    "sort": {
+      "recent": "Nejnovější",
+      "oldest": "Nejstarší",
+      "alpha": "Abecedně (A–Z)",
+      "featured": "Doporučené"
+    }
+  },
+  "betaBanner": {
+    "message": "Platforma je ve zkušebním provozu. Některé funkce mohou být omezené nebo se mohou měnit.",
+    "dismiss": "Rozumím"
+  },
+  "dataConsent": {
+    "message": "Tato platforma shromažďuje anonymizovaná data pro analýzu a zlepšování služeb. Žádná data nejsou odesílána třetím stranám.",
+    "accept": "Rozumím a souhlasím",
+    "decline": "Nechci pokračovat",
+    "privacyNote": "Veškerá data zůstávají na našich serverech v rámci EU."
+  },
+  "secretTerminal": {
+    "bootHeader": "AISHA SYSTEM v3.14\n(c) 2012-2026 Evymo Engineering Division\nInicializace zabezpečeného terminálu...",
+    "welcomeMessage": "Zadejte přístupový kód pro pokračování.",
+    "prompt": ">",
+    "accessDenied": "PŘÍSTUP ZAMÍTNUT",
+    "accessGranted": "PŘÍSTUP POVOLEN — Přesměrování...",
+    "inputLabel": "Vstup terminálu"
+  },
+  "phiMode": {
+    "title": "Zabezpečený režim citlivých dat",
+    "passwordPlaceholder": "Zadejte heslo",
+    "description": "Zadejte své přihlašovací údaje pro přístup k chráněným citlivým informacím",
+    "cancel": "Zrušit",
+    "unlock": "Odemknout",
+    "unsupported": "Zabezpečený režim není pro váš typ účtu podporován",
+    "magicLinkUserInfo": "Přihlásili jste se pomocí magic linku. Použijte OTP ověření níže.",
+    "passwordLabel": "Heslo",
+    "passwordRequired": "Vyžadováno heslo",
+    "passwordRequiredDescription": "Pro přístup k citlivým datům musíte nastavit heslo nebo použít OTP",
+    "passwordEmailSent": "E‑mail pro reset hesla odeslán",
+    "mustSetPasswordOrUseOtp": "Pro zobrazení citlivých dat musíte nastavit heslo nebo použít jednorázový kód.",
+    "setPasswordViaEmail": "Nastavit heslo e-mailem",
+    "useOtpInstead": "Nebo použijte jednorázový kód",
+    "noPasswordHint": "Nemáte heslo? Použijte záložku OTP.",
+    "otpLabel": "Jednorázový kód",
+    "otpDescription": "Na váš e-mail odešleme jednorázový ověřovací kód",
+    "otpPlaceholder": "Zadejte kód z e-mailu",
+    "otpSent": "Ověřovací kód odeslán na váš e-mail",
+    "otpSendFailed": "Odeslání ověřovacího kódu se nezdařilo",
+    "otpRateLimitGeneric": "Příliš mnoho požadavků. Počkejte prosím a zkuste to znovu.",
+    "otpRateLimitWithTime": "Příliš mnoho požadavků. Počkejte prosím {{seconds}} sekund.",
+    "sendOtp": "Odeslat kód",
+    "verifyOtp": "Ověřit kód"
+  },
+  "story": {
+    "knowledge": {
+      "title": "Knowledge base storyline",
+      "dropZone": "Přetáhněte soubor sem nebo klikněte pro nahrání",
+      "acceptedTypes": "PDF, DOCX, TXT, MD do 50 MB",
+      "uploading": "Nahrávám…",
+      "selectFile": "Vybrat soubor",
+      "empty": "Zatím žádné dokumenty.",
+      "deleteAria": "Smazat dokument",
+      "uploadError": "Nahrávání selhalo",
+      "uploadSuccess": "Dokument byl nahrán.",
+      "deleteSuccess": "Dokument byl smazán.",
+      "deleteError": "Smazání selhalo"
+    }
+  },
+  "discussion": {
+    "title": "Diskuse",
+    "type": "Typ",
+    "placeholder": "Napište komentář…",
+    "submit": "Příspěvek",
+    "cancel": "Zrušit",
+    "reply": "Odpovědět",
+    "replyingTo": "Odpověď na",
+    "posted": "Zveřejněno",
+    "signIn": "Přihlaste se a zapojte se do diskuze",
+    "unconfigured": "Diskuse zde zatím není k dispozici."
+  }
+}

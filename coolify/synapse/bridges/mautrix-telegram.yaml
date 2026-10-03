@@ -1,0 +1,43 @@
+# =============================================================================
+# mautrix-telegram Bridge Configuration — Evymo Production
+# =============================================================================
+# Docs: https://docs.mau.fi/bridges/python/telegram/
+# =============================================================================
+
+homeserver:
+  address: http://synapse:8008
+  domain: ${MATRIX_DOMAIN}
+
+appservice:
+  address: http://mautrix-telegram:29317
+  hostname: 0.0.0.0
+  port: 29317
+  database: postgres://synapse_user:${SYNAPSE_DB_PASSWORD}@${APP_NAME_PREFIX}-db:5432/synapse_bridge_telegram?sslmode=disable
+  id: telegram
+  as_token: ${AISHA_AS_TOKEN}_telegram
+  hs_token: ${AISHA_HS_TOKEN}_telegram
+  bot:
+    username: telegrambot
+    displayname: Telegram Bridge Bot
+    avatar: mxc://maunium.net/tJCRmUyJDsgRNgqhOgoiHWbX
+
+telegram:
+  api_id: ${TELEGRAM_API_ID}
+  api_hash: ${TELEGRAM_API_HASH}
+  bot_token: ${TELEGRAM_BOT_TOKEN:-}
+
+bridge:
+  permissions:
+    "*": relay
+    "${MATRIX_DOMAIN}": user
+    "@admin:${MATRIX_DOMAIN}": admin
+  relay:
+    enabled: true
+  command_prefix: "!tg"
+  double_puppet_allow_discovery: true
+
+logging:
+  min_level: warn
+  writers:
+    - type: stdout
+      format: json

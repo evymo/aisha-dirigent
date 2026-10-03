@@ -1,0 +1,78 @@
+{
+  "name": "WF_DIRIGENT_INTENT_ADVISOR",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "dirigent/intent_advisor",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "intent-trigger",
+      "name": "Intent Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// UserPromptSubmit playbook — quick heuristic on agent intent.\n// MVP: keyword scan for non-best-practice signals (skip tests, quick hack,\n// ignore RLS, disable auth). Future iteration: LLM call via aishaLlmRouter\n// with cheap model (Haiku 4.5) for nuanced intent classification.\n//\n// CONTRACT: NEVER decision != allow on user prompts — user has priority.\nconst body = $input.first().json.body || $input.first().json;\nif (body.event !== 'prompt_submit') {\n  throw new Error(`WF_DIRIGENT_INTENT_ADVISOR expects event=prompt_submit, got ${body.event}`);\n}\nconst prompt = String(body.user_prompt || '').toLowerCase();\n\nconst signals = [\n  { pattern: /skip\\s+tests?|--no-verify|disable\\s+(?:tests?|gate)/, note: 'pomijí testy/gate' },\n  { pattern: /quick\\s+(?:hack|fix)|hot.?fix|workaround/, note: 'navrhuje quick hack' },\n  { pattern: /ignore\\s+rls|disable\\s+rls|drop\\s+(?:rls|policy)/, note: 'obchází RLS' },\n  { pattern: /turn\\s+off\\s+auth|skip\\s+auth|bypass\\s+(?:auth|jwt)/, note: 'obchází autentikaci' },\n  { pattern: /push\\s+(?:--force|-f)|force.?push/, note: 'force push' },\n  { pattern: /git\\s+reset\\s+--hard|drop\\s+(?:table|database)/, note: 'destruktivní operace' }\n];\n\nconst hits = signals.filter(s => s.pattern.test(prompt)).map(s => s.note);\n\nlet advisory = '';\nif (hits.length > 0) {\n  advisory = `⚠️ AISHA Advisor: detekuji v promptu signál — ${hits.join(', ')}. AISHA Development Law nepředepisuje, jen upozorňuje. Tvoje rozhodnutí.`;\n}\nreturn [{\n  json: {\n    advisory,\n    decision: 'allow',\n    _audit: { event: 'prompt_submit', story_id: body.story_id, session_id: body.session_id, hits }\n  }\n}];"
+      },
+      "id": "intent-scan",
+      "name": "Intent Scan",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_integration_action",
+        "rpcParams": "={{ JSON.stringify({ p_action_key: 'dirigent.intent_advisor.completed', p_integration: 'wf_dirigent_intent_advisor', p_payload: $json._audit }) }}",
+        "authMode": "service_role",
+        "options": { "timeout": 3000, "auditTrail": false },
+        "onError": "continueRegularOutput"
+      },
+      "id": "audit-log",
+      "name": "Audit Log",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "credentials": {
+        "aishaPostgrestApi": { "id": "__REMAP__", "name": "AISHA PostgREST" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ advisory: $('Intent Scan').first().json.advisory, decision: 'allow' }) }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Intent Trigger": { "main": [[{ "node": "Intent Scan", "type": "main", "index": 0 }]] },
+    "Intent Scan": { "main": [[{ "node": "Audit Log", "type": "main", "index": 0 }]] },
+    "Audit Log": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

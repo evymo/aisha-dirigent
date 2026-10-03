@@ -1,0 +1,4 @@
+/target/
+# Cargo.lock IS tracked: a Zed extension is built standalone outside the
+# monorepo, so pinning the dependency graph makes that build reproducible.
+# Bundled bridge artifact (server/) is generated — see scripts/bundle-bridge.mjs.

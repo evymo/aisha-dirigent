@@ -1,0 +1,539 @@
+{
+  "_note": "Translation values for every data-i18n-key across all 4 pages. Consumed by `npm --prefix services/svc-web-artifact run export-web-seed` → emitted as `translations` rows (one per key×locale, web namespace). EN + CS authored by hand; de/fr/ru/th filled by `node scripts/i18n/translate-template-i18n.mjs domains/templates/company-wiki` (DeepL + context review). The brand wordmark is hand-set in all 6 locales so the filler leaves it Latin.",
+  "web.wiki.brand": {
+    "en": "Northwind Handbook",
+    "cs": "Northwind Handbook",
+    "de": "Northwind Handbook",
+    "fr": "Northwind Handbook",
+    "ru": "Northwind Handbook",
+    "th": "Northwind Handbook"
+  },
+  "web.wiki.footer.name": {
+    "en": "Northwind Handbook",
+    "cs": "Northwind Handbook",
+    "de": "Northwind Handbook",
+    "fr": "Northwind Handbook",
+    "ru": "Northwind Handbook",
+    "th": "Northwind Handbook"
+  },
+  "web.wiki.search.placeholder": {
+    "en": "Search the handbook…",
+    "cs": "Hledat v příručce…",
+    "de": "Im Handbuch suchen…",
+    "fr": "Rechercher dans le manuel…",
+    "ru": "Поиск по справочнику…",
+    "th": "ค้นหาในคู่มือ..."
+  },
+  "web.wiki.topnav.home": {
+    "en": "Home",
+    "cs": "Domů",
+    "de": "Startseite",
+    "fr": "Accueil",
+    "ru": "Главная",
+    "th": "หน้าแรก"
+  },
+  "web.wiki.topnav.handbook": {
+    "en": "Handbook",
+    "cs": "Příručka",
+    "de": "Handbuch",
+    "fr": "Guide",
+    "ru": "Справочник",
+    "th": "คู่มือ"
+  },
+  "web.wiki.footer.note": {
+    "en": "Open by default — edit history is public.",
+    "cs": "Otevřené ve výchozím nastavení — historie úprav je veřejná.",
+    "de": "Standardmäßig öffentlich – der Bearbeitungsverlauf ist öffentlich einsehbar.",
+    "fr": "Ouvert par défaut — l'historique des modifications est public.",
+    "ru": "Открыто по умолчанию — история правок доступна всем.",
+    "th": "เปิดโดยค่าเริ่มต้น — ประวัติการแก้ไขเป็นสาธารณะ"
+  },
+  "web.wiki.sidebar.start": {
+    "en": "Getting started",
+    "cs": "Začínáme",
+    "de": "Erste Schritte",
+    "fr": "Pour commencer",
+    "ru": "Начало работы",
+    "th": "เริ่มต้น"
+  },
+  "web.wiki.sidebar.policies": {
+    "en": "Policies & security",
+    "cs": "Zásady a bezpečnost",
+    "de": "Richtlinien & Sicherheit",
+    "fr": "Conditions générales et sécurité",
+    "ru": "Политики и безопасность",
+    "th": "นโยบายและความปลอดภัย"
+  },
+  "web.wiki.nav.welcome": {
+    "en": "Welcome",
+    "cs": "Vítejte",
+    "de": "Willkommen",
+    "fr": "Bienvenue",
+    "ru": "Добро пожаловать",
+    "th": "ยินดีต้อนรับ"
+  },
+  "web.wiki.nav.remote": {
+    "en": "Working remotely",
+    "cs": "Práce na dálku",
+    "de": "Im Homeoffice arbeiten",
+    "fr": "Télétravail",
+    "ru": "Удаленная работа",
+    "th": "การทำงานทางไกล"
+  },
+  "web.wiki.nav.security": {
+    "en": "Security basics",
+    "cs": "Základy bezpečnosti",
+    "de": "Grundlagen der Sicherheit",
+    "fr": "Les bases de la sécurité",
+    "ru": "Основы безопасности",
+    "th": "พื้นฐานด้านความปลอดภัย"
+  },
+  "web.wiki.breadcrumb.home": {
+    "en": "Home",
+    "cs": "Domů",
+    "de": "Startseite",
+    "fr": "Accueil",
+    "ru": "Главная",
+    "th": "หน้าแรก"
+  },
+  "web.wiki.editnote": {
+    "en": "This page is open — anyone can suggest an edit, and the full history is public.",
+    "cs": "Tato stránka je otevřená — kdokoli může navrhnout úpravu a celá historie je veřejná.",
+    "de": "Diese Seite ist offen – jeder kann eine Änderung vorschlagen, und der gesamte Bearbeitungsverlauf ist öffentlich einsehbar.",
+    "fr": "Cette page est ouverte : tout le monde peut proposer une modification, et l'historique complet est accessible à tous.",
+    "ru": "Эта страница открыта — любой желающий может предложить правку, а полная история правок доступна для всех.",
+    "th": "หน้านี้เปิดอยู่ — ทุกคนสามารถเสนอการแก้ไขได้ และประวัติการแก้ไขทั้งหมดเป็นสาธารณะ"
+  },
+  "web.wiki.title": {
+    "en": "Northwind Handbook — the company wiki",
+    "cs": "Northwind Handbook — firemní wiki",
+    "de": "Northwind Handbook – das Unternehmens-Wiki",
+    "fr": "Northwind Handbook — le wiki de l'entreprise",
+    "ru": "Northwind Handbook — вики компании",
+    "th": "Northwind Handbook — วิกิของบริษัท"
+  },
+  "web.wiki.description": {
+    "en": "The open company handbook: how we work, our policies, and the things new joiners need to know.",
+    "cs": "Otevřená firemní příručka: jak pracujeme, naše zásady a vše, co potřebují vědět noví kolegové.",
+    "de": "Das Handbuch für alle Mitarbeiter: Wie wir arbeiten, unsere Richtlinien und was neue Mitarbeiter wissen müssen.",
+    "fr": "Le guide de l'entreprise : notre façon de travailler, nos politiques et ce que les nouveaux arrivants doivent savoir.",
+    "ru": "Справочник открытой компании: как мы работаем, наши правила и все, что нужно знать новым сотрудникам.",
+    "th": "คู่มือบริษัทแบบเปิด: วิธีที่เราทำงาน, นโยบายของเรา, และสิ่งที่ผู้เข้าร่วมใหม่ต้องรู้"
+  },
+  "web.wiki.hero.heading": {
+    "en": "Everything we know, written down",
+    "cs": "Všechno, co víme, sepsané",
+    "de": "Alles, was wir wissen, schriftlich festgehalten",
+    "fr": "Tout ce que nous savons, mis par écrit",
+    "ru": "Все, что мы знаем, записано",
+    "th": "ทุกสิ่งที่เรารู้ ถูกบันทึกไว้"
+  },
+  "web.wiki.hero.body": {
+    "en": "The handbook is our single source of truth — how we work, what we've decided, and why. It's public, it's versioned, and anyone can suggest an edit.",
+    "cs": "Příručka je náš jediný zdroj pravdy — jak pracujeme, na čem jsme se shodli a proč. Je veřejná, verzovaná a kdokoli může navrhnout úpravu.",
+    "de": "Das Handbuch ist unsere zentrale Informationsquelle – es beschreibt, wie wir arbeiten, welche Entscheidungen wir getroffen haben und warum. Es ist öffentlich zugänglich, wird in verschiedenen Versionen geführt, und jeder kann Änderungen vorschlagen.",
+    "fr": "Ce manuel est notre référence unique : il explique comment nous travaillons, ce que nous avons décidé et pourquoi. Il est accessible à tous, mis à jour régulièrement, et tout le monde peut proposer des modifications.",
+    "ru": "Это руководство — наш единственный достоверный источник информации о том, как мы работаем, какие решения принимаем и почему. Оно находится в открытом доступе, имеет версионный контроль, и любой желающий может предложить свои правки.",
+    "th": "คู่มือนี้เป็นแหล่งข้อมูลที่ถูกต้องเพียงแหล่งเดียวของเรา — วิธีที่เราทำงาน, สิ่งที่เราได้ตัดสินใจ, และเหตุผล. มันเป็นสาธารณะ, มีเวอร์ชัน, และใครก็ตามสามารถเสนอการแก้ไขได้."
+  },
+  "web.wiki.hero.search": {
+    "en": "Search 120+ articles…",
+    "cs": "Prohledat 120+ článků…",
+    "de": "Über 120 Artikel durchsuchen…",
+    "fr": "Rechercher parmi plus de 120 articles…",
+    "ru": "Поиск среди более 120 статей…",
+    "th": "ค้นหาบทความมากกว่า 120 บทความ..."
+  },
+  "web.wiki.cat.1.title": {
+    "en": "Getting started",
+    "cs": "Začínáme",
+    "de": "Erste Schritte",
+    "fr": "Pour commencer",
+    "ru": "Начало работы",
+    "th": "เริ่มต้น"
+  },
+  "web.wiki.cat.1.desc": {
+    "en": "Your first week, the tools we use, and who to ask.",
+    "cs": "Tvůj první týden, nástroje, které používáme, a na koho se obrátit.",
+    "de": "Deine erste Woche, die von uns verwendeten Tools und an wen du dich wenden kannst.",
+    "fr": "Votre première semaine, les outils que nous utilisons et à qui s'adresser.",
+    "ru": "Ваша первая неделя, инструменты, которыми мы пользуемся, и к кому обращаться.",
+    "th": "สัปดาห์แรกของคุณ, เครื่องมือที่เราใช้, และใครที่คุณสามารถถามได้."
+  },
+  "web.wiki.cat.1.count": {
+    "en": "12 articles",
+    "cs": "12 článků",
+    "de": "12 Artikel",
+    "fr": "12 articles",
+    "ru": "12 статей",
+    "th": "12 บทความ"
+  },
+  "web.wiki.cat.2.title": {
+    "en": "How we work",
+    "cs": "Jak pracujeme",
+    "de": "So arbeiten wir",
+    "fr": "Notre méthode de travail",
+    "ru": "Как мы работаем",
+    "th": "วิธีการทำงานของเรา"
+  },
+  "web.wiki.cat.2.desc": {
+    "en": "Remote norms, meetings, and how decisions get made.",
+    "cs": "Pravidla práce na dálku, schůzky a jak se rozhoduje.",
+    "de": "Regeln für die Arbeit im Homeoffice, Besprechungen und Entscheidungsprozesse.",
+    "fr": "Les règles du télétravail, les réunions et le processus décisionnel.",
+    "ru": "Нормы удаленной работы, совещания и процесс принятия решений.",
+    "th": "มาตรฐานการทำงานทางไกล การประชุม และวิธีการตัดสินใจ"
+  },
+  "web.wiki.cat.2.count": {
+    "en": "18 articles",
+    "cs": "18 článků",
+    "de": "18 Artikel",
+    "fr": "18 articles",
+    "ru": "18 статей",
+    "th": "18 บทความ"
+  },
+  "web.wiki.cat.3.title": {
+    "en": "Security & data",
+    "cs": "Bezpečnost a data",
+    "de": "Sicherheit & Daten",
+    "fr": "Sécurité et données",
+    "ru": "Безопасность и данные",
+    "th": "ความปลอดภัยและข้อมูล"
+  },
+  "web.wiki.cat.3.desc": {
+    "en": "Keeping accounts, devices and customer data safe.",
+    "cs": "Jak chránit účty, zařízení a zákaznická data.",
+    "de": "Sicherheit für Konten, Geräte und Kundendaten.",
+    "fr": "Assurer la sécurité des comptes, des appareils et des données des clients.",
+    "ru": "Обеспечение безопасности учетных записей, устройств и данных клиентов.",
+    "th": "การรักษาบัญชี, อุปกรณ์ และข้อมูลลูกค้าให้ปลอดภัย"
+  },
+  "web.wiki.cat.3.count": {
+    "en": "9 articles",
+    "cs": "9 článků",
+    "de": "9 Artikel",
+    "fr": "9 articles",
+    "ru": "9 статей",
+    "th": "9 บทความ"
+  },
+  "web.wiki.updated.heading": {
+    "en": "Recently updated",
+    "cs": "Nedávno upravené",
+    "de": "Kürzlich aktualisiert",
+    "fr": "Mis à jour récemment",
+    "ru": "Недавно обновлено",
+    "th": "อัปเดตเมื่อเร็ว ๆ นี้"
+  },
+  "web.wiki.updated.1.title": {
+    "en": "Welcome — your first week",
+    "cs": "Vítejte — váš první týden",
+    "de": "Willkommen – deine erste Woche",
+    "fr": "Bienvenue — votre première semaine",
+    "ru": "Добро пожаловать — ваша первая неделя",
+    "th": "ยินดีต้อนรับ — สัปดาห์แรกของคุณ"
+  },
+  "web.wiki.updated.1.meta": {
+    "en": "Updated 2 days ago",
+    "cs": "Upraveno před 2 dny",
+    "de": "Vor 2 Tagen aktualisiert",
+    "fr": "Mis à jour il y a 2 jours",
+    "ru": "Обновлено 2 дня назад",
+    "th": "อัปเดตเมื่อ 2 วันที่ผ่านมา"
+  },
+  "web.wiki.updated.2.title": {
+    "en": "Working remotely, well",
+    "cs": "Práce na dálku, ale dobře",
+    "de": "Erfolgreich im Homeoffice arbeiten",
+    "fr": "Bien travailler à distance",
+    "ru": "Как правильно работать удаленно",
+    "th": "การทำงานทางไกลอย่างมีประสิทธิภาพ"
+  },
+  "web.wiki.updated.2.meta": {
+    "en": "Updated last week",
+    "cs": "Upraveno minulý týden",
+    "de": "Letzte Woche aktualisiert",
+    "fr": "Mis à jour la semaine dernière",
+    "ru": "Обновлено на прошлой неделе",
+    "th": "อัปเดตเมื่อสัปดาห์ที่แล้ว"
+  },
+  "web.wiki.updated.3.title": {
+    "en": "Security basics everyone should know",
+    "cs": "Základy bezpečnosti, které by měl znát každý",
+    "de": "Grundlagen der Sicherheit, die jeder kennen sollte",
+    "fr": "Les principes fondamentaux de la sécurité que tout le monde devrait connaître",
+    "ru": "Основы безопасности, которые должен знать каждый",
+    "th": "พื้นฐานความปลอดภัยที่ทุกคนควรรู้"
+  },
+  "web.wiki.updated.3.meta": {
+    "en": "Updated last week",
+    "cs": "Upraveno minulý týden",
+    "de": "Letzte Woche aktualisiert",
+    "fr": "Mis à jour la semaine dernière",
+    "ru": "Обновлено на прошлой неделе",
+    "th": "อัปเดตเมื่อสัปดาห์ที่แล้ว"
+  },
+  "web.wiki.gs.title": {
+    "en": "Welcome — your first week · Northwind Handbook",
+    "cs": "Vítejte — váš první týden · Northwind Handbook",
+    "de": "Willkommen – deine erste Woche · Northwind Handbook",
+    "fr": "Bienvenue — votre première semaine · Northwind Handbook",
+    "ru": "Добро пожаловать — ваша первая неделя · Northwind Handbook",
+    "th": "ยินดีต้อนรับ — สัปดาห์แรกของคุณ · Northwind Handbook"
+  },
+  "web.wiki.gs.description": {
+    "en": "What to expect in your first week, the tools we use, and who to ask for help.",
+    "cs": "Co čekat v prvním týdnu, jaké nástroje používáme a koho požádat o pomoc.",
+    "de": "Was dich in deiner ersten Woche erwartet, welche Tools wir verwenden und an wen du dich wenden kannst, wenn du Hilfe brauchst.",
+    "fr": "À quoi s'attendre pendant votre première semaine, les outils que nous utilisons et à qui s'adresser en cas de besoin.",
+    "ru": "Чего ожидать в первую неделю, какие инструменты мы используем и к кому обращаться за помощью.",
+    "th": "สิ่งที่คุณคาดหวังได้ในสัปดาห์แรก เครื่องมือที่เราใช้ และใครที่คุณสามารถขอความช่วยเหลือได้"
+  },
+  "web.wiki.gs.heading": {
+    "en": "Welcome — your first week",
+    "cs": "Vítejte — váš první týden",
+    "de": "Willkommen – deine erste Woche",
+    "fr": "Bienvenue — votre première semaine",
+    "ru": "Добро пожаловать — ваша первая неделя",
+    "th": "ยินดีต้อนรับ — สัปดาห์แรกของคุณ"
+  },
+  "web.wiki.gs.meta": {
+    "en": "Updated 2 days ago · 4 min read",
+    "cs": "Upraveno před 2 dny · 4 min čtení",
+    "de": "Vor 2 Tagen aktualisiert · 4 Minuten Lesezeit",
+    "fr": "Mis à jour il y a 2 jours · 4 min de lecture",
+    "ru": "Обновлено 2 дня назад · Время чтения: 4 мин",
+    "th": "อัปเดตเมื่อ 2 วันที่แล้ว · อ่าน 4 นาที"
+  },
+  "web.wiki.gs.intro": {
+    "en": "Welcome aboard. This page is the short version of everything you need in week one — skim it now, and come back when a question comes up. Nothing here is secret; if something's unclear, that's a bug in the handbook, so please fix it.",
+    "cs": "Vítej v týmu. Tahle stránka je zkrácená verze všeho, co budeš v prvním týdnu potřebovat — teď ji jen proleť a vrať se, až vyvstane otázka. Nic tady není tajné; pokud je něco nejasné, je to chyba v příručce, tak ji prosím oprav.",
+    "de": "Willkommen an Bord. Diese Seite ist eine Kurzfassung aller wichtigen Informationen für die erste Woche – überfliege sie jetzt und schau wieder vorbei, wenn du eine Frage hast. Hier gibt es keine Geheimnisse; sollte etwas unklar sein, handelt es sich um einen Fehler im Handbuch, den du bitte beheben solltest.",
+    "fr": "Bienvenue à bord. Cette page est un résumé de tout ce dont vous aurez besoin au cours de la première semaine : parcourez-la rapidement dès maintenant, et revenez-y si vous avez des questions. Il n'y a aucun secret ici ; si quelque chose n'est pas clair, c'est qu'il y a une erreur dans le manuel, alors n'hésitez pas à la corriger.",
+    "ru": "Добро пожаловать! Эта страница представляет собой краткое изложение всего, что вам понадобится в первую неделю — просмотрите её сейчас и возвращайтесь сюда, когда у вас возникнут вопросы. Здесь нет ничего секретного; если что-то непонятно, значит, это ошибка в руководстве, поэтому, пожалуйста, исправьте её.",
+    "th": "ยินดีต้อนรับสู่ทีม หน้านี้เป็นเวอร์ชันย่อของทุกสิ่งที่คุณต้องรู้ในสัปดาห์แรก — อ่านผ่านตอนนี้ แล้วกลับมาเมื่อมีคำถามเกิดขึ้น ไม่มีอะไรเป็นความลับ หากมีอะไรไม่ชัดเจน นั่นคือข้อผิดพลาดในคู่มือ กรุณาแก้ไขด้วย"
+  },
+  "web.wiki.gs.s1.title": {
+    "en": "Your first day",
+    "cs": "Tvůj první den",
+    "de": "Dein erster Tag",
+    "fr": "Votre premier jour",
+    "ru": "Ваш первый день",
+    "th": "วันแรกของคุณ"
+  },
+  "web.wiki.gs.s1.body": {
+    "en": "Someone from your team will meet you and walk you through accounts, the calendar, and where to find things. Don't try to read everything at once — the handbook is here so you don't have to remember it. Your only real job this week is to ask a lot of questions and write down anything that surprised you.",
+    "cs": "Někdo z tvého týmu tě přivítá a provede tě účty, kalendářem a tím, kde co najdeš. Nesnaž se přečíst všechno najednou — příručka je tu právě proto, aby sis to nemusel pamatovat. Tvým jediným skutečným úkolem tento týden je hodně se ptát a zapisovat si všechno, co tě překvapilo.",
+    "de": "Ein Kollege aus deinem Team wird dich in Empfang nehmen und dir die Konten, den Kalender und die verschiedenen Funktionen erklären. Versuch nicht, alles auf einmal zu lesen – das Handbuch ist dafür da, damit du dir nicht alles merken musst. Deine einzige Aufgabe in dieser Woche ist es, viele Fragen zu stellen und alles aufzuschreiben, was dich überrascht hat.",
+    "fr": "Un membre de votre équipe viendra vous accueillir et vous guidera à travers les comptes, le calendrier et vous indiquera où trouver les différentes informations. N'essayez pas de tout lire d'un coup : le manuel est là pour que vous n'ayez pas à tout retenir. Votre seule véritable tâche cette semaine est de poser beaucoup de questions et de noter tout ce qui vous a surpris.",
+    "ru": "Кто-то из вашей команды встретит вас и расскажет о рабочих аккаунтах, календаре и о том, где что найти. Не пытайтесь прочитать всё сразу — руководство создано для того, чтобы вам не приходилось всё запоминать. Ваша единственная настоящая задача на этой неделе — задавать много вопросов и записывать всё, что вас удивило.",
+    "th": "จะมีคนจากทีมของคุณมาพบคุณและแนะนำเกี่ยวกับบัญชี ปฏิทิน และวิธีค้นหาสิ่งต่างๆ อย่าพยายามอ่านทุกอย่างในครั้งเดียว — คู่มือนี้มีไว้เพื่อให้คุณไม่ต้องจำ งานหลักของคุณในสัปดาห์นี้คือการถามคำถามให้มากและจดบันทึกสิ่งที่คุณรู้สึกประหลาดใจ"
+  },
+  "web.wiki.gs.s2.title": {
+    "en": "Where to ask",
+    "cs": "Kde se ptát",
+    "de": "Wo kann man nachfragen?",
+    "fr": "À qui s'adresser",
+    "ru": "К кому обратиться",
+    "th": "ที่ไหนที่ควรถาม"
+  },
+  "web.wiki.gs.s2.body": {
+    "en": "Default to asking in the open, in a shared channel, rather than a private message — that way the answer helps the next person too, and often becomes a new handbook page. There are no silly questions in your first month; the people who ask the most tend to ramp up the fastest.",
+    "cs": "Ptej se raději veřejně, ve sdíleném kanálu, než v soukromé zprávě — odpověď tak pomůže i dalšímu člověku a často se z ní stane nová stránka příručky. V prvním měsíci neexistují hloupé otázky; ti, kdo se ptají nejvíc, se obvykle zapracují nejrychleji.",
+    "de": "Frage grundsätzlich öffentlich in einem gemeinsamen Kanal statt per Privatnachricht – so hilft die Antwort auch dem Nächsten und wird oft zu einer neuen Seite im Handbuch. Im ersten Monat gibt es keine dummen Fragen; wer am meisten fragt, kommt in der Regel am schnellsten voran.",
+    "fr": "Privilégiez les questions posées en public, dans un canal partagé, plutôt que par message privé : ainsi, la réponse aidera également la personne suivante, et donnera souvent lieu à une nouvelle page du guide. Il n'y a pas de questions stupides pendant votre premier mois ; ce sont souvent ceux qui posent le plus de questions qui progressent le plus vite.",
+    "ru": "По возможности задавайте вопросы в открытом общем канале, а не в личных сообщениях — так ваш ответ поможет и следующему пользователю, а зачастую станет новой страницей в руководстве. В первый месяц не бывает глупых вопросов; те, кто задает больше всего вопросов, как правило, осваиваются быстрее всех.",
+    "th": "ให้ถามในที่เปิดเผย ในช่องทางที่ใช้ร่วมกัน แทนที่จะส่งข้อความส่วนตัว — วิธีนี้คำตอบจะช่วยคนต่อไปด้วย และมักกลายเป็นหน้าคู่มือใหม่ ไม่มีคำถามที่โง่ในเดือนแรกของคุณ คนที่ถามมากที่สุดมักจะพัฒนาได้เร็วที่สุด"
+  },
+  "web.wiki.gs.callout": {
+    "en": "Tip:",
+    "cs": "Tip:",
+    "de": "Tipp:",
+    "fr": "Conseil :",
+    "ru": "Совет:",
+    "th": "เคล็ดลับ:"
+  },
+  "web.wiki.gs.calloutBody": {
+    "en": "Found something out of date? Click “Suggest an edit” on any page — small fixes are the most welcome contribution there is.",
+    "cs": "Našel jsi něco zastaralého? Na každé stránce klikni na „Navrhnout úpravu“ — drobné opravy jsou tím nejvítanějším příspěvkem.",
+    "de": "Hast du etwas Veraltetes entdeckt? Klicke auf einer beliebigen Seite auf „Änderung vorschlagen“ – kleine Korrekturen sind der wertvollste Beitrag, den es gibt.",
+    "fr": "Vous avez repéré une information obsolète ? Cliquez sur « Proposer une modification » sur n'importe quelle page : les petites corrections sont les contributions les plus appréciées.",
+    "ru": "Заметили неактуальную информацию? Нажмите «Предложить правку» на любой странице — даже небольшие исправления являются самым ценным вкладом.",
+    "th": "พบข้อมูลที่ล้าสมัยหรือไม่ตรงกัน? คลิก \"เสนอการแก้ไข\" บนหน้าใดก็ได้ — การแก้ไขเล็กน้อยถือเป็นการสนับสนุนที่มีค่าที่สุด"
+  },
+  "web.wiki.rw.title": {
+    "en": "Working remotely, well · Northwind Handbook",
+    "cs": "Práce na dálku, ale dobře · Northwind Handbook",
+    "de": "Erfolgreich im Homeoffice · Northwind Handbook",
+    "fr": "Bien travailler à distance · Northwind Handbook",
+    "ru": "Как эффективно работать удаленно · Northwind Handbook",
+    "th": "การทำงานทางไกลอย่างมีประสิทธิภาพ · Northwind Handbook"
+  },
+  "web.wiki.rw.description": {
+    "en": "How we work across time zones: async by default, clear writing, and meetings that earn their place.",
+    "cs": "Jak pracujeme napříč časovými pásmy: asynchronně jako výchozí, jasné psaní a schůzky, které si své místo zaslouží.",
+    "de": "So arbeiten wir über Zeitzonen hinweg: standardmäßig asynchron, klare Kommunikation und Meetings, die ihren Platz verdienen.",
+    "fr": "Notre façon de travailler malgré les décalages horaires : communication asynchrone par défaut, communication écrite claire et réunions qui se justifient pleinement.",
+    "ru": "Как мы работаем в разных часовых поясах: асинхронная работа по умолчанию, четкое изложение мыслей и встречи, которые действительно оправдывают себя.",
+    "th": "วิธีทำงานข้ามเขตเวลา: โดยค่าเริ่มต้นคือการทำงานแบบไม่พร้อมกัน (async), การเขียนที่ชัดเจน, และการประชุมที่มีคุณค่าสมควรแก่การจัดขึ้น"
+  },
+  "web.wiki.rw.heading": {
+    "en": "Working remotely, well",
+    "cs": "Práce na dálku, ale dobře",
+    "de": "Erfolgreich im Homeoffice arbeiten",
+    "fr": "Bien travailler à distance",
+    "ru": "Как правильно работать удаленно",
+    "th": "การทำงานทางไกลอย่างมีประสิทธิภาพ"
+  },
+  "web.wiki.rw.meta": {
+    "en": "Updated last week · 5 min read",
+    "cs": "Upraveno minulý týden · 5 min čtení",
+    "de": "Letzte Woche aktualisiert · 5 Minuten Lesezeit",
+    "fr": "Mis à jour la semaine dernière · 5 min de lecture",
+    "ru": "Обновлено на прошлой неделе · Время чтения: 5 минут",
+    "th": "อัปเดตเมื่อสัปดาห์ที่แล้ว · อ่าน 5 นาที"
+  },
+  "web.wiki.rw.intro": {
+    "en": "We're a remote-first team spread across several time zones. That only works if we're deliberate about it: we write things down, we treat asynchronous as the default, and we protect each other's focus time.",
+    "cs": "Jsme tým fungující primárně na dálku, rozprostřený přes několik časových pásem. To funguje jen tehdy, když k tomu přistupujeme uvědoměle: zapisujeme si věci, bereme asynchronní komunikaci jako výchozí a chráníme si navzájem čas na soustředění.",
+    "de": "Wir sind ein Team, das vorrangig remote arbeitet und über mehrere Zeitzonen verteilt ist. Das funktioniert nur, wenn wir bewusst darauf achten: Wir halten alles schriftlich fest, betrachten asynchrone Kommunikation als Standard und achten darauf, dass jeder seine Arbeitszeit ungestört nutzen kann.",
+    "fr": "Nous sommes une équipe qui privilégie le télétravail et dont les membres sont répartis sur plusieurs fuseaux horaires. Cela ne fonctionne que si nous y prêtons une attention particulière : nous mettons les choses par écrit, nous considérons la communication asynchrone comme la norme et nous veillons à respecter le temps de concentration de chacun.",
+    "ru": "Мы — команда, ориентированная на удаленную работу, члены которой находятся в разных часовых поясах. Такой подход работает только в том случае, если мы подходим к нему осознанно: мы фиксируем все в письменной форме, рассматриваем асинхронную коммуникацию как стандарт и бережно относимся к времени, когда друг другу нужно сосредоточиться на работе.",
+    "th": "เราเป็นทีมที่เน้นการทำงานทางไกลเป็นหลัก กระจายตัวอยู่หลายเขตเวลา สิ่งนี้จะสำเร็จได้ก็ต่อเมื่อเราตั้งใจทำอย่างจริงจัง: เราเขียนทุกอย่างไว้เป็นลายลักษณ์อักษร เราถือว่าความไม่พร้อมกันเป็นเรื่องปกติ และเราปกป้องเวลาที่ต้องใช้สมาธิของกันและกัน"
+  },
+  "web.wiki.rw.s1.title": {
+    "en": "Async by default",
+    "cs": "Asynchronně jako výchozí",
+    "de": "Standardmäßig asynchron",
+    "fr": "Asynchrone par défaut",
+    "ru": "Асинхронный режим по умолчанию",
+    "th": "ค่าเริ่มต้นแบบอะซิงโครนัส"
+  },
+  "web.wiki.rw.s1.body": {
+    "en": "Most work doesn't need a meeting. Write a short doc, share it, and let people respond when their day allows. A clear message that someone can read in their own time zone beats a call that forces half the team to join at an awkward hour. Save real-time for the things that genuinely need it — kickoffs, hard decisions, and getting to know each other.",
+    "cs": "Většina práce schůzku nepotřebuje. Napiš krátký dokument, sdílej ho a nech lidi odpovědět, až jim to jejich den dovolí. Jasná zpráva, kterou si někdo přečte ve svém časovém pásmu, je lepší než hovor, který nutí půlku týmu připojit se v nevhodnou hodinu. Živé setkání si nech na to, co ho opravdu potřebuje — rozjezdy projektů, těžká rozhodnutí a vzájemné poznávání.",
+    "de": "Für die meisten Aufgaben ist kein Meeting nötig. Verfasse ein kurzes Dokument, teile es und lass die anderen darauf reagieren, wann es ihnen zeitlich passt. Eine klare Botschaft, die jeder in seiner eigenen Zeitzone lesen kann, ist besser als ein Anruf, der die Hälfte des Teams zwingt, zu einer ungünstigen Uhrzeit teilzunehmen. Spar dir die Echtzeit für die Dinge auf, die sie wirklich brauchen – Kick-offs, schwierige Entscheidungen und das gegenseitige Kennenlernen.",
+    "fr": "La plupart des tâches ne nécessitent pas de réunion. Rédigez un petit document, partagez-le et laissez les gens y répondre quand leur emploi du temps le leur permet. Un message clair que chacun peut lire à son rythme vaut mieux qu’un appel qui oblige la moitié de l’équipe à se connecter à une heure peu pratique. Réservez le temps réel pour les choses qui en ont vraiment besoin : les lancements de projet, les décisions difficiles et le fait d'apprendre à se connaître.",
+    "ru": "Для большинства задач не нужны совещания. Напишите краткий документ, поделитесь им и дайте людям возможность ответить, когда у них будет время. Четкое сообщение, которое каждый может прочитать в удобное для себя время, гораздо лучше, чем звонок, из-за которого половине команды приходится собираться в неудобное время. Сохраните общение в режиме реального времени для тех вещей, которые действительно в этом нуждаются — стартовые совещания, сложные решения и знакомство друг с другом.",
+    "th": "งานส่วนใหญ่ไม่จำเป็นต้องประชุม เขียนเอกสารสั้น ๆ แชร์ให้ทุกคน แล้วให้แต่ละคนตอบกลับเมื่อสะดวก ข้อความที่ชัดเจนซึ่งใครก็สามารถอ่านได้ในเวลาของตนเอง ย่อมดีกว่าการประชุมทางโทรศัพท์ที่บังคับให้ครึ่งทีมต้องเข้าร่วมในเวลาที่ไม่เหมาะสม ประหยัดเวลาแบบเรียลไทม์ไว้สำหรับสิ่งที่จำเป็นจริง ๆ — การเริ่มต้น การตัดสินใจที่ยาก และการทำความรู้จักกัน"
+  },
+  "web.wiki.rw.s2.title": {
+    "en": "Meetings that earn their place",
+    "cs": "Schůzky, které si zaslouží své místo",
+    "de": "Treffen, die ihren Platz verdienen",
+    "fr": "Des réunions qui méritent leur place",
+    "ru": "Встречи, которые заслуживают внимания",
+    "th": "การประชุมที่สมควรได้รับการจัดขึ้น"
+  },
+  "web.wiki.rw.s2.body": {
+    "en": "If we do meet, there's an agenda beforehand and notes afterward, posted where everyone can find them. No agenda, no meeting. We record the important ones so nobody has to choose between sleep and being in the room, and decisions always get written up so they outlive the call.",
+    "cs": "Když už se sejdeme, předem je program a po schůzce zápis, vyvěšený tam, kde ho každý najde. Bez programu není schůzka. Ty důležité nahráváme, aby si nikdo nemusel vybírat mezi spánkem a účastí, a rozhodnutí vždy sepíšeme, aby přežila samotný hovor.",
+    "de": "Wenn wir uns treffen, gibt es im Vorfeld eine Tagesordnung und im Anschluss ein Protokoll, die für alle einsehbar veröffentlicht werden. Keine Tagesordnung, kein Treffen. Wir zeichnen die wichtigen Besprechungen auf, damit niemand zwischen Schlaf und Anwesenheit wählen muss, und die Beschlüsse werden stets schriftlich festgehalten, damit sie über die Besprechung hinaus Bestand haben.",
+    "fr": "Si nous nous réunissons, un ordre du jour est établi à l'avance et un compte-rendu est rédigé après coup, tous deux mis à la disposition de tous. Pas d'ordre du jour, pas de réunion. Nous enregistrons les réunions importantes afin que personne n'ait à choisir entre dormir et y assister, et les décisions sont toujours consignées par écrit pour qu'elles perdurent au-delà de la réunion.",
+    "ru": "Если мы и собираемся, то заранее составляется повестка дня, а после встречи публикуются протоколы в общедоступном месте. Без повестки дня встречи не бывает. Важные встречи мы записываем, чтобы никому не приходилось выбирать между сном и участием в ней, а решения всегда фиксируются в письменном виде, чтобы они остались в силе и после завершения встречи.",
+    "th": "หากเราพบกัน จะมีวาระการประชุมล่วงหน้าและบันทึกหลังการประชุม ซึ่งจะถูกโพสต์ไว้ในที่ที่ทุกคนสามารถหาได้ หากไม่มีวาระการประชุม ก็ไม่มีการประชุม เราจะบันทึกการประชุมที่สำคัญไว้เพื่อให้ไม่มีใครต้องเลือกระหว่างการนอนหลับกับการอยู่ในห้อง และการตัดสินใจทุกอย่างจะถูกบันทึกไว้เพื่อให้มีอายุยืนยาวเกินกว่าการโทร"
+  },
+  "web.wiki.rw.callout": {
+    "en": "Rule of thumb:",
+    "cs": "Orientační pravidlo:",
+    "de": "Faustregel:",
+    "fr": "Règle générale :",
+    "ru": "Общее правило:",
+    "th": "กฎทั่วไป:"
+  },
+  "web.wiki.rw.calloutBody": {
+    "en": "If a decision isn't written down somewhere searchable, it didn't happen. Capture it, then move on.",
+    "cs": "Pokud rozhodnutí není zapsané někde, kde se dá vyhledat, jako by se nestalo. Zaznamenej ho a jdi dál.",
+    "de": "Wenn eine Entscheidung nicht an einem Ort festgehalten ist, an dem man sie finden kann, hat sie nicht stattgefunden. Halte sie fest und mach dann weiter.",
+    "fr": "Si une décision n'est pas consignée par écrit dans un document consultable, c'est comme si elle n'avait jamais été prise. Consignez-la, puis passez à autre chose.",
+    "ru": "Если решение не зафиксировано в доступном для поиска документе, значит, его и не было. Зафиксируйте его и двигайтесь дальше.",
+    "th": "หากไม่มีการตัดสินใจใดถูกบันทึกไว้ที่ไหนสักแห่งที่สามารถค้นหาได้ แสดงว่ามันไม่เคยเกิดขึ้น จดบันทึกไว้ แล้วจึงดำเนินการต่อไป"
+  },
+  "web.wiki.sec.title": {
+    "en": "Security basics everyone should know · Northwind Handbook",
+    "cs": "Základy bezpečnosti, které by měl znát každý · Northwind Handbook",
+    "de": "Sicherheitsgrundlagen, die jeder kennen sollte · Northwind Handbook",
+    "fr": "Les bases de la sécurité que tout le monde devrait connaître · Northwind Handbook",
+    "ru": "Основы безопасности, которые должен знать каждый · Northwind Handbook",
+    "th": "พื้นฐานความปลอดภัยที่ทุกคนควรรู้ · Northwind Handbook"
+  },
+  "web.wiki.sec.description": {
+    "en": "The few security habits that matter most: strong unique passwords, a password manager, and 2FA.",
+    "cs": "Pár bezpečnostních návyků, na kterých nejvíc záleží: silná unikátní hesla, správce hesel a dvoufázové ověření.",
+    "de": "Die wenigen Sicherheitsmaßnahmen, auf die es wirklich ankommt: sichere, einzigartige Passwörter, ein Passwort-Manager und die Zwei-Faktor-Authentifizierung.",
+    "fr": "Les quelques habitudes de sécurité qui comptent le plus : des mots de passe forts et uniques, un gestionnaire de mots de passe et l'authentification à deux facteurs.",
+    "ru": "Несколько важнейших правил безопасности: надежные уникальные пароли, менеджер паролей и двухфакторная аутентификация.",
+    "th": "นิสัยด้านความปลอดภัยที่สำคัญที่สุดเพียงไม่กี่ข้อ: รหัสผ่านที่แข็งแกร่งและไม่ซ้ำกัน, ตัวจัดการรหัสผ่าน, และการยืนยันตัวตนสองขั้นตอน"
+  },
+  "web.wiki.sec.heading": {
+    "en": "Security basics everyone should know",
+    "cs": "Základy bezpečnosti, které by měl znát každý",
+    "de": "Grundlagen der Sicherheit, die jeder kennen sollte",
+    "fr": "Les principes fondamentaux de la sécurité que tout le monde devrait connaître",
+    "ru": "Основы безопасности, которые должен знать каждый",
+    "th": "พื้นฐานความปลอดภัยที่ทุกคนควรรู้"
+  },
+  "web.wiki.sec.meta": {
+    "en": "Updated last week · 3 min read",
+    "cs": "Upraveno minulý týden · 3 min čtení",
+    "de": "Letzte Woche aktualisiert · 3 Minuten Lesezeit",
+    "fr": "Mis à jour la semaine dernière · 3 min de lecture",
+    "ru": "Обновлено на прошлой неделе · Время чтения: 3 мин",
+    "th": "อัปเดตเมื่อสัปดาห์ที่แล้ว · อ่าน 3 นาที"
+  },
+  "web.wiki.sec.intro": {
+    "en": "You don't need to be a security expert. A handful of habits cover the vast majority of real risk — and they take an afternoon to set up once, then look after themselves.",
+    "cs": "Nemusíš být odborník na bezpečnost. Hrstka návyků pokryje naprostou většinu skutečného rizika — jednou je za odpoledne nastavíš a pak se o sebe starají samy.",
+    "de": "Man muss kein Sicherheitsexperte sein. Mit nur wenigen Maßnahmen lässt sich der Großteil der tatsächlichen Risiken abdecken – und die Einrichtung dauert nur einen Nachmittag, danach läuft alles wie von selbst.",
+    "fr": "Pas besoin d'être un expert en sécurité. Quelques habitudes suffisent pour couvrir la grande majorité des risques réels — et il suffit d'y consacrer un après-midi pour les mettre en place une bonne fois pour toutes, après quoi elles fonctionnent toutes seules.",
+    "ru": "Необязательно быть экспертом по безопасности. Достаточно нескольких простых привычек, чтобы устранить подавляющую часть реальных угроз — их достаточно внедрить один раз за полдня, а дальше они работают сами по себе.",
+    "th": "คุณไม่จำเป็นต้องเป็นผู้เชี่ยวชาญด้านความปลอดภัย เพียงแค่มีนิสัยบางอย่างก็สามารถครอบคลุมความเสี่ยงส่วนใหญ่ในชีวิตจริงได้แล้ว — และใช้เวลาเพียงช่วงบ่ายในการตั้งค่าครั้งเดียว จากนั้นก็ดูแลตัวเองได้"
+  },
+  "web.wiki.sec.s1.title": {
+    "en": "Use a password manager",
+    "cs": "Používej správce hesel",
+    "de": "Verwende einen Passwort-Manager",
+    "fr": "Utilisez un gestionnaire de mots de passe",
+    "ru": "Используйте менеджер паролей",
+    "th": "ใช้ผู้จัดการรหัสผ่าน"
+  },
+  "web.wiki.sec.s1.body": {
+    "en": "Every account should have a long, random password you've never used anywhere else, and the only sane way to do that is a password manager. Let it generate and remember them — you only memorise one strong passphrase for the manager itself. Reusing a password is the single most common way accounts get taken over.",
+    "cs": "Každý účet by měl mít dlouhé, náhodné heslo, které jsi nikde jinde nepoužil, a jediný rozumný způsob, jak toho dosáhnout, je správce hesel. Nech ho hesla generovat a pamatovat si je — ty si zapamatuješ jen jedno silné heslo k samotnému správci. Opakované používání hesla je vůbec nejčastější způsob, jak dochází k převzetí účtů.",
+    "de": "Jedes Konto sollte ein langes, zufälliges Passwort haben, das du noch nirgendwo anders verwendet hast, und der einzig vernünftige Weg, dies zu erreichen, ist ein Passwort-Manager. Lass ihn die Passwörter generieren und speichern – du musst dir lediglich eine einzige sichere Passphrase für den Manager selbst merken. Die Wiederverwendung von Passwörtern ist der häufigste Grund dafür, dass Konten gehackt werden.",
+    "fr": "Chaque compte doit être protégé par un mot de passe long et aléatoire que vous n'avez jamais utilisé ailleurs, et la seule solution sensée pour y parvenir est d'utiliser un gestionnaire de mots de passe. Laissez-le générer et enregistrer ces mots de passe — vous n'avez qu'à mémoriser une seule phrase de passe sécurisée pour le gestionnaire lui-même. La réutilisation d'un mot de passe est la cause la plus fréquente de piratage de comptes.",
+    "ru": "Каждый аккаунт должен иметь длинный случайный пароль, который вы нигде больше не использовали, и единственный разумный способ обеспечить это — воспользоваться менеджером паролей. Пусть он сам генерирует и запоминает пароли — вам нужно запомнить только одну надежную парольную фразу для доступа к самому менеджеру. Повторное использование паролей — самая распространенная причина взлома аккаунтов.",
+    "th": "ทุกบัญชีควรมีรหัสผ่านที่ยาวและสุ่มซึ่งคุณไม่เคยใช้ที่ใดมาก่อน และวิธีเดียวที่สมเหตุสมผลในการทำเช่นนั้นคือการใช้ตัวจัดการรหัสผ่าน ให้มันสร้างและจดจำรหัสผ่านเหล่านั้น — คุณเพียงแค่จำวลีรหัสผ่านที่แข็งแกร่งเพียงหนึ่งเดียวสำหรับตัวจัดการรหัสผ่านเองเท่านั้น การใช้รหัสผ่านซ้ำเป็นวิธีที่พบได้บ่อยที่สุดในการที่บัญชีถูกยึดครอง"
+  },
+  "web.wiki.sec.s2.title": {
+    "en": "Turn on two-factor",
+    "cs": "Zapni dvoufázové ověření",
+    "de": "Zwei-Faktor-Authentifizierung aktivieren",
+    "fr": "Activer l'authentification à deux facteurs",
+    "ru": "Включить двухфакторную аутентификацию",
+    "th": "เปิดใช้งานการยืนยันตัวตนแบบสองปัจจัย"
+  },
+  "web.wiki.sec.s2.body": {
+    "en": "Two-factor authentication means a stolen password alone isn't enough to get in. Switch it on for email, the password manager, and anything that touches customer data — an app-based code or a hardware key, not SMS where you can avoid it. If something ever feels off, change the password and tell us; we would much rather hear a false alarm than miss a real one.",
+    "cs": "Dvoufázové ověření znamená, že samotné ukradené heslo k přihlášení nestačí. Zapni si ho u e-mailu, u správce hesel a u všeho, co se dotýká zákaznických dat — kód z aplikace nebo hardwarový klíč, ne SMS, pokud se tomu dá vyhnout. Pokud ti někdy něco přijde podezřelé, změň heslo a dej nám vědět; mnohem raději si vyslechneme planý poplach, než abychom přehlédli ten skutečný.",
+    "de": "Dank der Zwei-Faktor-Authentifizierung reicht ein gestohlenes Passwort allein nicht aus, um Zugriff zu erhalten. Aktiviere sie für E-Mails, den Passwort-Manager und alles, was mit Kundendaten zu tun hat – nutze einen App-basierten Code oder einen Hardware-Schlüssel, nicht SMS, sofern dies möglich ist. Wenn dir etwas verdächtig vorkommt, ändere das Passwort und informiere uns; wir hören lieber einen Fehlalarm, als einen echten zu verpassen.",
+    "fr": "L'authentification à deux facteurs signifie qu'un mot de passe volé ne suffit pas à lui seul pour accéder au système. Activez-la pour vos e-mails, votre gestionnaire de mots de passe et tout ce qui concerne les données clients — utilisez un code généré par une application ou une clé matérielle, et évitez les SMS si possible. Si quelque chose vous semble suspect, changez votre mot de passe et prévenez-nous ; nous préférons de loin recevoir une fausse alerte plutôt que de passer à côté d'une véritable menace.",
+    "ru": "Двухфакторная аутентификация означает, что одного украденного пароля недостаточно для входа в систему. Включите ее для электронной почты, менеджера паролей и всего, что имеет отношение к данным клиентов — используйте код из приложения или аппаратный ключ, а не SMS, если это возможно. Если что-то покажется вам подозрительным, смените пароль и сообщите нам; мы лучше получим ложную тревогу, чем пропустим настоящую.",
+    "th": "การยืนยันตัวตนแบบสองปัจจัยหมายความว่าเพียงแค่รหัสผ่านที่ถูกขโมยไม่สามารถเข้าถึงได้ เปิดใช้งานสำหรับอีเมล, ตัวจัดการรหัสผ่าน, และทุกสิ่งที่เกี่ยวข้องกับข้อมูลลูกค้า — รหัสผ่านแบบแอปพลิเคชันหรือกุญแจฮาร์ดแวร์ ไม่ใช่ SMS หากคุณสามารถหลีกเลี่ยงได้ หากมีสิ่งใดรู้สึกไม่ปกติ ให้เปลี่ยนรหัสผ่านและแจ้งให้เราทราบ; เราต้องการได้ยินการแจ้งเตือนที่ผิดพลาดมากกว่าการพลาดการแจ้งเตือนที่แท้จริง"
+  },
+  "web.wiki.sec.callout": {
+    "en": "Remember:",
+    "cs": "Pamatuj:",
+    "de": "Denk daran:",
+    "fr": "N'oubliez pas :",
+    "ru": "Помните:",
+    "th": "จำไว้ว่า:"
+  },
+  "web.wiki.sec.calloutBody": {
+    "en": "We will never ask for your password — not over chat, not over email, not on a call. Anyone who does is not us.",
+    "cs": "Nikdy tě nepožádáme o heslo — ani v chatu, ani e-mailem, ani po telefonu. Kdokoli to udělá, nejsme my.",
+    "de": "Wir werden dich niemals nach deinem Passwort fragen – weder im Chat, noch per E-Mail, noch am Telefon. Wer das tut, ist nicht von uns.",
+    "fr": "Nous ne vous demanderons jamais votre mot de passe — ni par chat, ni par e-mail, ni au téléphone. Si quelqu'un vous le demande, ce n'est pas nous.",
+    "ru": "Мы никогда не будем спрашивать у вас пароль — ни в чате, ни по электронной почте, ни по телефону. Если кто-то просит вас об этом, это не мы.",
+    "th": "เราจะไม่ขอรหัสผ่านของคุณ — ไม่ว่าจะทางแชท อีเมล หรือโทรศัพท์ หากมีใครขอ นั่นไม่ใช่เรา"
+  }
+}

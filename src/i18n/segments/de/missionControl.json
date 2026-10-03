@@ -1,0 +1,127 @@
+{
+  "missionControl": {
+    "pageTitle": "Einsatzleitung",
+    "pageSubtitle": "Live-Ansicht des AISHA-Stacks - Agenten, Deploys, Drift, Rollback, Stories, Audit.",
+    "liveAgents": {
+      "title": "Live-Agenten",
+      "subtitle": "AISHA-Läufe, die im Moment ausgeführt werden.",
+      "running": "Laufen",
+      "starting": "Ab..",
+      "empty": "Keine laufenden Agenten.",
+      "cancelled": "Lauf abgebrochen.",
+      "cancelTooltip": "Lauf abbrechen",
+      "cancelTitle": "Diesen Lauf abbrechen?",
+      "cancelConfirm": "„{{agent}}“ stoppen? Dadurch wird der Lauf beendet und im Audit-Journal protokolliert.",
+      "cancelConfirmAction": "Lauf abbrechen"
+    },
+    "deploy": {
+      "title": "Bereitstellungsstatus",
+      "subtitle": "Aktive blaue/grüne Steckplätze pro Anwendung.",
+      "empty": "Keine verfolgten Anwendungen.",
+      "lockTooltip": "Schalter in Betrieb"
+    },
+    "drift": {
+      "title": "Drift",
+      "subtitle": "Ungeklärte Risikobefunde ≥ {{minRisk}}."
+    },
+    "rollback": {
+      "title": "Rollback",
+      "subtitle": "Ausstehende Genehmigung + jüngste Rollback-Historie.",
+      "empty": "Keine kürzlichen Rückschritte."
+    },
+    "kanbanMini": {
+      "title": "Geschichten Kanban",
+      "subtitle": "{{total}} Geschichten über den gesamten Lebenszyklus.",
+      "open": "Offene Tafel"
+    },
+    "audit": {
+      "title": "Audit-Feed",
+      "subtitle": "Warnungen, Fehler und kritische Ereignisse aus audit_journal.",
+      "empty": "Keine erhöhten Audit-Einträge - ruhiges System."
+    },
+    "agentSessions": {
+      "title": "Agentensitzungen",
+      "subtitle": "Live-Arbeitssitzungen über IDE, CLI und untergeordnete Agenten hinweg.",
+      "active": "Aktiv",
+      "empty": "Keine aktiven Sitzungen.",
+      "noStory": "Keine Geschichte",
+      "aishaSpawned": "AISHA",
+      "collapseAgents": "Unteragenten ausblenden",
+      "expandAgents": "Unteragenten erweitern"
+    },
+    "spendApprovals": {
+      "title": "Ausgabenfreigaben",
+      "subtitle": "Aufgaben, bei denen vor Beginn eine Kostenentscheidung getroffen werden muss.",
+      "empty": "Es steht nichts zur Genehmigung an.",
+      "noStory": "Keine Geschichte",
+      "approve": "Genehmigen",
+      "reject": "Ablehnen",
+      "approved": "Ausgabe genehmigt.",
+      "rejected": "Ausgabe abgelehnt.",
+      "approveTitle": "Soll diese Ausgabe genehmigt werden?",
+      "approveConfirm": "Soll „{{kind}}“ (geschätzte Kosten ~${{estimate}}) gestartet werden? Die Entscheidung wird protokolliert.",
+      "raiseBudget": "Erhöhen Sie außerdem das Gesamtbudget für die Geschichte um ${{estimate}}",
+      "rejectTitle": "Diese Ausgabe ablehnen?",
+      "rejectConfirm": "„{{kind}}“ abbrechen? Der Lauf wird nicht gestartet."
+    },
+    "spendPolicies": {
+      "title": "Ausgabenrichtlinien",
+      "subtitle": "Schwellenwerte pro Aufgabentyp zulassen / abfragen / ablehnen. Keine Regel = Standardwerte der Kostenklasse.",
+      "empty": "Keine benutzerdefinierten Regeln – es gelten die Standardeinstellungen des Katalogs.",
+      "scopeGlobal": "weltweit",
+      "allKinds": "alle Arten",
+      "addRule": "Regel",
+      "dialogTitle": "Regel für weltweite Ausgaben",
+      "dialogSubtitle": "Schwellenwerte in USD im Vergleich zur Schätzung vor dem Flug. Leeres Feld = Standardwert aus dem Katalog.",
+      "kind": "Aufgabenart (leer = alle Arten)",
+      "allowUnder": "Zulassen unter",
+      "askOver": "Frag nach",
+      "denyOver": "Ablehnen",
+      "saved": "Regel gespeichert.",
+      "activated": "Regel aktiviert.",
+      "deactivated": "Regel deaktiviert.",
+      "activate": "Regel aktivieren",
+      "deactivate": "Regel deaktivieren"
+    },
+    "spawnClaude": {
+      "button": "Mit Claude starten",
+      "title": "Claude-Agent-Lauf starten",
+      "description": "AISHA startet einen isolierten Claude-Code-Agenten in einem frischen Worktree für diese Aufgabe. Er läuft über dein Abo und wird unten live überwacht.",
+      "promptLabel": "Aufgabe für den Agenten",
+      "promptPlaceholder": "Beschreibe, was der Agent tun soll…",
+      "cancel": "Abbrechen",
+      "submit": "Lauf starten",
+      "spawning": "Wird gestartet…",
+      "success": "Claude-Lauf {{id}} eingereiht — erscheint gleich unten.",
+      "error": "Lauf konnte nicht gestartet werden: {{msg}}"
+    },
+    "claudeApprovals": {
+      "title": "CLI-Lauf-Freigaben",
+      "subtitle": "Agenten-CLI-Läufe, die auf Freigabe warten (Hochrisiko-Zulassung).",
+      "empty": "Keine Läufe warten auf Freigabe.",
+      "approve": "Genehmigen"
+    },
+    "resolverPolicy": {
+      "cost": "cost-match",
+      "title": "Entscheidungsgewichte",
+      "subtitle": "Wie AISHA Kandidaten bei der Auswahl eines Modells und eines Ausführers bewertet. Live angepasst; keine Codeänderung.",
+      "missing": "Keine globale Entscheidungsrichtlinie – der Resolver wird einen lautstarken Fehler ausgeben. Führen Sie den Kaltstart bzw. die Heilungsvorgänge erneut durch.",
+      "bench": "Bank",
+      "local": "lokal",
+      "tools": "Werkzeuge",
+      "vision": "Vision",
+      "costClass": "Kostenklasse",
+      "budget": "Budget",
+      "premium": "Premium",
+      "batch": "Stapel",
+      "edit": "Stimmung",
+      "saved": "Entscheidungsgewichte wurden gespeichert.",
+      "dialogTitle": "Entscheidungsgewichte anpassen",
+      "dialogSubtitle": "Globale Bewertungsgewichte + Schwellenwerte für Kostenklassen. Bei leerem Feld wird der aktuelle Wert beibehalten.",
+      "weightsGroup": "Bewertungsgewichte",
+      "costGroup": "Grenzwerte für Kostenklassen (USD)",
+      "budgetMax": "Budget unter",
+      "premiumMax": "Aufschlag auf"
+    }
+  }
+}

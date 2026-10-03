@@ -1,0 +1,321 @@
+{
+  "name": "WF_AITG_RUNTIME_SENTINEL",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all"
+  },
+  "nodes": [
+    {
+      "name": "Langfuse Anomaly Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "authentication": "headerAuth",
+        "path": "aitg-runtime-sentinel",
+        "httpMethod": "POST"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      }
+    },
+    {
+      "name": "Read Automation Setting",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_get_automation_audited",
+        "rpcArgs": "={ \"p_automation_id\": \"runtime_sentinel\" }",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Should Run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.mode }}",
+              "rightValue": "automated",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Record Skipped",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        720,
+        180
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_record_automation_run_audited",
+        "rpcArgs": "={ \"p_automation_id\": \"runtime_sentinel\", \"p_status\": \"skipped\", \"p_details\": { \"reason\": \"mode_\" + $node['Read Automation Setting'].json.mode } }",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Classify Anomaly",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        -120
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const signal = $node['Langfuse Anomaly Webhook'].json;\nconst threshold = $node['Read Automation Setting'].json.parameters?.anomaly_threshold ?? 0.7;\nconst toxic = (signal?.score?.toxicity ?? 0) > threshold;\nconst injection = (signal?.score?.prompt_injection ?? 0) > 0.5;\nconst leak = (signal?.score?.canary_leak ?? 0) > 0;\nconst tests = [];\nif (toxic) tests.push('AITG-APP-12');\nif (injection) tests.push('AITG-APP-01');\nif (leak) tests.push('AITG-DAT-02');\nreturn [{ json: { tests, signal, threshold } }];"
+      }
+    },
+    {
+      "name": "Re-run Probes",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        960,
+        -120
+      ],
+      "parameters": {
+        "batchSize": 1
+      }
+    },
+    {
+      "name": "Probe Dispatch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        -120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=http://svc-aitg-probes:3041/probes/{{ $json.test_id === 'AITG-APP-01' ? 'app-01-prompt-injection' : $json.test_id === 'AITG-APP-12' ? 'app-12-toxic-output' : 'app-03-data-leak' }}",
+        "sendHeaders": false,
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ payload: $node['Classify Anomaly'].json.signal?.prompt ?? '', triggeredBy: 'sentinel' }) }}",
+        "onError": "continueRegularOutput",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "name": "Escalate If Critical",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        -120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.severity }}",
+              "rightValue": "critical",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Expert Notification",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        -240
+      ],
+      "parameters": {
+        "workflowId": "WF_EXPERT_NOTIFICATION"
+      }
+    },
+    {
+      "name": "Log Only",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "log_integration_action",
+        "rpcArgs": "={{ { p_service_name: 'aitg-sentinel', p_action: 'soft-failure', p_action_detail: $json } }}",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Record Success",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        -120
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_record_automation_run_audited",
+        "rpcArgs": "={ \"p_automation_id\": \"runtime_sentinel\", \"p_status\": \"success\", \"p_details\": { \"tests_run\": $node['Classify Anomaly'].json.tests } }",
+        "onError": "continueRegularOutput"
+      }
+    }
+  ],
+  "connections": {
+    "Langfuse Anomaly Webhook": {
+      "main": [
+        [
+          {
+            "node": "Read Automation Setting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Automation Setting": {
+      "main": [
+        [
+          {
+            "node": "Should Run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Run?": {
+      "main": [
+        [
+          {
+            "node": "Classify Anomaly",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Anomaly": {
+      "main": [
+        [
+          {
+            "node": "Re-run Probes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-run Probes": {
+      "main": [
+        [
+          {
+            "node": "Probe Dispatch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Probe Dispatch": {
+      "main": [
+        [
+          {
+            "node": "Escalate If Critical",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Escalate If Critical": {
+      "main": [
+        [
+          {
+            "node": "Expert Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expert Notification": {
+      "main": [
+        [
+          {
+            "node": "Record Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Only": {
+      "main": [
+        [
+          {
+            "node": "Record Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,3127 @@
+# =============================================================================
+# CI/CD Pipeline — AISHA Platform (Forgejo Actions)
+# =============================================================================
+# Self-hosted Forgejo runner (git.id3a.cz), DinD (Docker-in-Docker).
+# Actions: git.id3a.cz (mirrory actions/checkout, actions/setup-node)
+# NPM: npm.id3a.cz (Verdaccio proxy/cache -> npmjs.org)
+#
+# Smart routing: detect job analyzes changed paths and triggers ONLY relevant
+# CI + deploy jobs. Each Coolify stack has its own deploy step.
+#
+# Subsystems:
+#   app (web SPA)     — check -> test -> build -> deploy-web
+#   n8n nodes         — test-n8n -> deploy-n8n (publish Verdaccio + restart)
+#   edge functions    — deploy-core (redeploy functions-init + edge-runtime)
+#   VS Code extension — test-extension (manual marketplace publish)
+#   infra per-stack   — deploy without CI (Coolify rebuild)
+#
+# Manual deploy: use .forgejo/workflows/deploy.yml (workflow_dispatch)
+# =============================================================================
+
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Supply-chain scanners (npm-audit / SBOM / trivy) live in supply-chain.yml —
+  # nightly schedule + own dispatch — so the heavy matrix load never rides the
+  # push/PR fast lane. Semgrep stays here (SEC-02: diff-aware on PR, no docker).
+  workflow_dispatch: {}
+
+concurrency:
+  # Per-ref, not one global lane. The previous constant group (aisha-ci-runner)
+  # was a patch for a runner that OOMed when heavy jobs from several runs met
+  # (#279). The runner has since been given hard cpus/mem_limit on its DinD,
+  # twice the RAM and cores, and a shared package cache -- so the patch now only
+  # costs: a concurrency group is a gate BEFORE the scheduler, so jobs never
+  # reach the runner at all and its capacity sits idle. Measured median queue
+  # wait was 30 min, p90 105 min, while the runner ran a single job.
+  #
+  # Overlap is now bounded where it belongs -- on the machine (runner capacity +
+  # DinD cpus/mem_limit), not in the workflow.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  # Cancel superseded runs on PR branches only. NOT on main: deploy jobs hang off
+  # main CI and killing an in-flight deploy is worse than waiting for it.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: "22"
+  N8N_NODE_VERSION: "22"
+  VERDACCIO_URL: ${{ vars.VERDACCIO_URL }}
+  # TVAR NASAZENÍ, který tahle CI měří. ⛔ Naměřeno 2026-08-22: dosud se
+  # nedeklaroval vůbec, takže každý nástroj si dosadil vlastní (resolver
+  # `cloud-single`, cold-start `cloud-multi`) — CI ověřovala jiný tvar, než jaký
+  # se nasazuje, a obojí bylo zelené. Změna tvaru patří sem, do viditelného
+  # řádku, ne do dosazení uvnitř knihovny.
+  AISHA_PROFILE: ${{ vars.AISHA_PROFILE || 'cloud-multi' }}
+  # Pull-through cache pro obrazy z Docker Hubu (prefix, končí `/`). Kroky, které
+  # obraz staví nebo spouštějí, ho ověří `scripts/ci/registry-proxy-guard.sh`.
+  # ⛔ Naměřeno 2026-09-13: bez předání šel cold-start build přímo na Docker Hub
+  # a PR #955 padl na 429 dřív, než se spustila jediná SQL.
+  REGISTRY_PROXY: ${{ vars.REGISTRY_PROXY }}
+
+jobs:
+  # ===========================================================================
+  # Detect changes — granular smart routing
+  # ===========================================================================
+  detect:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      app: ${{ steps.changes.outputs.app }}
+      edge_functions: ${{ steps.changes.outputs.edge_functions }}
+      n8n_nodes: ${{ steps.changes.outputs.n8n_nodes }}
+      extension: ${{ steps.changes.outputs.extension }}
+      workbench: ${{ steps.changes.outputs.workbench }}
+      infra_web: ${{ steps.changes.outputs.infra_web }}
+      infra_core: ${{ steps.changes.outputs.infra_core }}
+      infra_keycloak: ${{ steps.changes.outputs.infra_keycloak }}
+      infra_integration: ${{ steps.changes.outputs.infra_integration }}
+      infra_langfuse: ${{ steps.changes.outputs.infra_langfuse }}
+      infra_admin: ${{ steps.changes.outputs.infra_admin }}
+      infra_llm_gateway: ${{ steps.changes.outputs.infra_llm_gateway }}
+      infra_openclaw: ${{ steps.changes.outputs.infra_openclaw }}
+      docs_only: ${{ steps.changes.outputs.docs_only }}
+      db_change: ${{ steps.changes.outputs.db_change }}
+      n8n_workflow: ${{ steps.changes.outputs.n8n_workflow }}
+      security_change: ${{ steps.changes.outputs.security_change }}
+      mobile_app: ${{ steps.changes.outputs.mobile_app }}
+      cosmos: ${{ steps.changes.outputs.cosmos }}
+      av_change: ${{ steps.changes.outputs.av_change }}
+      services_change: ${{ steps.changes.outputs.services_change }}
+      # Appky, které se změny TÝKAJÍ — z aisha-changed-apps.mjs, tedy z manifestu
+      # + compose, ne z hrubých příznaků výš. Viz krok `deploy_apps` níž.
+      deploy_apps: ${{ steps.deploy_apps.outputs.deploy_apps }}
+      kontrakt_apps: ${{ steps.deploy_apps.outputs.kontrakt_apps }}
+      blockchain_change: ${{ steps.changes.outputs.blockchain_change }}
+      surfaces: ${{ steps.changes.outputs.surfaces }}
+      ci_change: ${{ steps.changes.outputs.ci_change }}
+      already_verified: ${{ steps.verified.outputs.already_verified }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # ---------------------------------------------------------------------
+      # Měřil tenhle strom už někdo?
+      #
+      # Merge PR do main přehrával celou sadu podruhé nad obsahem, který PR běh
+      # právě prohlásil za zelený. Při globální sériové concurrency skupině to
+      # zdvojnásobuje nejen náklad, ale i čekání každého dalšího PR.
+      #
+      # Přeskočit se ale NESMÍ podle „PR byl zelený" — status visí na hlavě
+      # větve, kdežto CI měřila merge commit. Když se main mezitím pohnul, je
+      # to JINÝ strom a přeskočení by pustilo do main obsah, který nikdo neměřil.
+      #
+      # Bezpečná podmínka je rovnost STROMŮ: tree(HEAD) == tree(HEAD^2).
+      # Ta platí právě tehdy, když merge nepřinesl nic nad hlavu PR — z čehož
+      # plyne, že base v době běhu byl předkem té hlavy, a tedy že testovaný
+      # strom je BAJTOVĚ tenhle. Pohnul-li se main, rovnost neplatí a jede se
+      # celá sada. Fail-closed: cokoli nečekaného (mělký klon, chybějící druhý
+      # rodič, API mlčí) končí na false, tedy plným během.
+      #
+      # Deploy joby na tomhle výstupu ZÁMĚRNĚ nevisí — smyslem běhu nad main je
+      # nasadit. Hlídá to brána ci-neopakovat-mereni.
+      - name: Merge nad main, jehož strom už CI změřila?
+        id: verified
+        env:
+          TOK: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          V=false
+          if [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            P2=$(git rev-parse -q --verify 'HEAD^2' 2>/dev/null || true)
+            if [ -n "$P2" ]; then
+              T_HEAD=$(git rev-parse 'HEAD^{tree}' 2>/dev/null || echo x)
+              T_P2=$(git rev-parse "$P2^{tree}" 2>/dev/null || echo y)
+              if [ "$T_HEAD" = "$T_P2" ]; then
+                STATE=$(SHA="$P2" node -e 'const https=require("https");const u=new URL(process.env.GITHUB_API_URL+"/repos/"+process.env.GITHUB_REPOSITORY+"/commits/"+process.env.SHA+"/status");https.get(u,{headers:{Authorization:"token "+process.env.TOK}},r=>{let b="";r.on("data",d=>b+=d);r.on("end",()=>{try{process.stdout.write(String(JSON.parse(b).state||""))}catch{}})}).on("error",()=>{});' 2>/dev/null || true)
+                if [ "$STATE" = "success" ]; then
+                  V=true
+                  echo "::notice title=testy přeskočeny::merge nepřinesl nic nad ${P2} (shodný strom ${T_HEAD}) a ten běh byl zelený — sada se nepřehrává, deploy joby jedou"
+                else
+                  echo "shodný strom, ale status hlavy PR je '${STATE:-<nedostupný>}' — jede plná sada"
+                fi
+              else
+                echo "main se mezitím pohnul (tree ${T_HEAD} != ${T_P2}) — tenhle strom nikdo neměřil, jede plná sada"
+              fi
+            fi
+          fi
+          echo "already_verified=$V" >> "$GITHUB_OUTPUT"
+          echo "already_verified=$V"
+
+      - name: Detect changed paths
+        id: changes
+        env:
+          # PR base SHA passed via env (NOT ${{ }} inside run:) — workflow-injection-safe per
+          # the semgrep-sast gate (github.event.pull_request.* must not be interpolated into a
+          # shell run: block); env values are not shell-evaluated.
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # ─── Proč se tu NEPOUŽÍVÁ `echo "$CHANGED" | grep -q` ────────────────
+          # ⛔ NAMĚŘENO 2026-09-11. `grep -q` končí na PRVNÍ shodě a zavře čtecí
+          # konec roury. Zapisovatel (`echo`) pak dostane SIGPIPE, a JE-LI zapnutý
+          # `pipefail`, návratový kód CELÉ roury je 141 — takže `&& FLAG=true` se
+          # přeskočí a sáhne se pro `|| FLAG=false`. Příznak zhasne, ačkoli shoda
+          # NASTALA. Doloženo pokusem:
+          #
+          #     set -e -o pipefail
+          #     echo "$SEZNAM" | grep -qE '^\.forgejo/'   → rc=141, tedy „false"
+          #     grep -qE '^\.forgejo/' <<< "$SEZNAM"      → rc=0,   tedy true
+          #
+          # Nastane to jen když vstup přeroste kapacitu roury (zapisovatel ještě
+          # píše, když čtenář skončí), tedy u VELKÝCH změn — a je to ZÁVOD, ne
+          # práh: tentýž vstup jednou projde a podruhé ne. Odpovídá to pozorování
+          # z běhů 3570 / 3592 / 3598: čím DŘÍV vzor v setříděném seznamu poprvé
+          # sedne, tím spíš příznak zhasl (`services/` na řádku 282 přežilo,
+          # `.forgejo/` na řádku 1 zhaslo).
+          #
+          # Herestring rouru neotevírá vůbec, takže tahle třída odpadá celá.
+          # ⚠️ Zda je v téhle úloze `pipefail` opravdu zapnutý, ZATÍM NEVÍME:
+          # výchozí shell Actions je `bash -e` (bez pipefail), explicitní
+          # `shell: bash` ho zapíná a runner se může lišit. Proto se to níž
+          # VYPISUJE — příští běh z toho udělá měření místo domněnky.
+          # Sebekontrola na konci kroku zůstává tak jako tak: je pojistkou proti
+          # TŘÍDĚ „příznak zhasl", ne proti jedné její příčině.
+          echo "diag/shell: $(set -o | grep -E '^(pipefail|errexit|nounset)' | tr '\n' ' ')BASH_VERSION=${BASH_VERSION:-<none>}"
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # PR: diff the head against the PR BASE sha. HEAD~1 is unreliable here — Forgejo
+            # checks out a merge commit whose parent order can make `git diff HEAD~1 HEAD`
+            # return EMPTY, which silently skipped the DB/security gates (db_change/security_change
+            # defaulted false while APP defaulted true → only Web/SBOM ran on DB-only PRs). The
+            # base SHA is stable regardless of parent order.
+            CHANGED=$(bash scripts/ci/zmenene-cesty.sh --seznam "$PR_BASE_SHA" HEAD 2>/dev/null || echo "")
+          elif [ "${{ github.event_name }}" = "push" ] && [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            CHANGED=$(bash scripts/ci/zmenene-cesty.sh --seznam "${{ github.event.before }}" "${{ github.sha }}" 2>/dev/null || echo "")
+          else
+            CHANGED=$(bash scripts/ci/zmenene-cesty.sh --seznam HEAD~1 HEAD 2>/dev/null || echo "")
+          fi
+
+          # Seznam i pravidla mají JEDEN DOMOV (scripts/ci/zmenene-cesty.sh): `--seznam` diffuje
+          # s --no-renames (přesun ze services/ jinak ukázal jen cílovou cestu) a quotePath=false.
+          # ── Směrování podle cest = JEDEN DOMOV: scripts/ci/zmenene-cesty.sh ─────────
+          # Do 2026-09-25 žila pravidla tady inline; pre-push hook je potřebuje taky a druhá
+          # kopie by se rozešla tiše (třída vady popsaná ve skriptu). Skript čte seznam
+          # změn na stdin, vypíše `priznak=true|false` (tytéž klíče jako dřív) a při
+          # rozporu směrování skončí 1 — krok tím spadne, jako dřív sebekontrola.
+          SMEROVANI="${RUNNER_TEMP:-/tmp}/smerovani.env"
+          bash scripts/ci/zmenene-cesty.sh <<< "$CHANGED" > "$SMEROVANI"
+          cat "$SMEROVANI" >> "$GITHUB_OUTPUT"
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Které APPKY se změna týká (ne které příznaky se rozsvítily)
+      # ─────────────────────────────────────────────────────────────────────
+      # ⛔ NAMĚŘENO 2026-08-11. PR #184 změnil `services/svc-web-artifact/` —
+      # kontejner, který běží v CORE stacku. Byl zelený, sloučený, a nasadilo
+      # ho NULA úloh: `services_change` se sice rozsvítil, ale nekonzumovala ho
+      # ŽÁDNÁ nasazovací úloha, jen `Services: Tests`. Deploy úlohy klíčují na
+      # hrubé příznaky (`app`, `infra_core`), a mezi ně se services nevešly.
+      #
+      # Příznaky odpovídají na „co se změnilo". Nasazení potřebuje odpověď na
+      # „která appka se tím mění" — a tu už umí `aisha-changed-apps.mjs`, který
+      # vlastníka ODVOZUJE z `build.dockerfile` v compose souboru přiřazeném
+      # appce v manifestu. Tady se jen zpřístupní úlohám.
+      #
+      # ⭐ O RELEVANCI nasazení rozhoduje JEN tenhle seznam (i u Core/Edge/Extranet).
+      # ⛔ 2026-09-17: dokud se k němu přičítaly hrubé příznaky (`app`, `infra_*`),
+      # změna jen v compose integration (#1001, run 3750) nasadila i core, edge
+      # a extranet — `app` je pravda pro KAŽDÝ docker-compose*.yml i scripts/.
+      # Hrubé příznaky zůstávají pro TESTOVACÍ úlohy a jako podmínka kvality
+      # („měnil-li se web, musí být zelené testy"), ne jako důvod nasadit.
+      - name: Které appky se změna týká
+        id: deploy_apps
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="$PR_BASE_SHA"
+          elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            BASE="${{ github.event.before }}"
+          else
+            BASE="HEAD~1"
+          fi
+          # Selhání skriptu NESMÍ tiše vydat prázdno — prázdný seznam je platná
+          # odpověď („netýká se ničeho") a od pádu by se nedal odlišit.
+          if ! OUT=$(node scripts/aisha-changed-apps.mjs --base="$BASE" --head="${{ github.sha }}" --json 2>/tmp/detapps.err); then
+            echo "::error title=detekce appek selhala::aisha-changed-apps.mjs skončil nenulově."
+            cat /tmp/detapps.err || true
+            exit 1
+          fi
+          # ⭐ `nasadit`, ne `affected_apps` (2026-09-16). Změna KONTRAKTU (manifest,
+          # verze obrazů, domény, env-doktor) se k aplikaci dostane jen doručením
+          # z trezoru — a trezor zůstává mimo CI (rozhodnutí majitele). Redeploy
+          # z CI by ji nedoručil, jen by restartoval všech 36 stacků naprázdno.
+          APPS=$(printf '%s' "$OUT" | node -e '
+            let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
+              const j=JSON.parse(s);
+              if (!j.nasadit || !j.jen_kontrakt) { process.stderr.write("detektor nevydal nasadit/jen_kontrakt\n"); process.exit(3); }
+              process.stdout.write(Object.keys(j.nasadit).sort().join(","));
+            });') || { echo "::error title=detekce appek selhala::výstup detektoru nemá tvar nasadit/jen_kontrakt."; exit 1; }
+          KONTRAKT=$(printf '%s' "$OUT" | node -e '
+            let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
+              process.stdout.write(Object.keys(JSON.parse(s).jen_kontrakt).sort().join(","));
+            });')
+          if [ -n "$KONTRAKT" ]; then
+            echo "::warning title=kontrakt proměnných se změnil — CI ho nedoručí::${KONTRAKT} — hodnoty jdou z trezoru, který CI nemá. Dorovnání instance: bash scripts/aisha-cold-start.sh --skip-create"
+          fi
+          # ⚠️ OBALENO ČÁRKAMI. `contains()` v podmínkách je PODŘETĚZCOVÝ:
+          # `contains('ledger', 'edge')` je PRAVDA (l-`edge`-r), takže holý
+          # seznam by nasazoval edge při každé změně ledgeru. S čárkami se
+          # porovnává `,edge,` proti `,ledger,` — celá jména.
+          echo "deploy_apps=,$APPS," >> "$GITHUB_OUTPUT"
+          echo "kontrakt_apps=,$KONTRAKT," >> "$GITHUB_OUTPUT"
+          echo "Appky, kterých se změna týká: ${APPS:-(žádné)}"
+
+      # ─────────────────────────────────────────────────────────────────────
+      # Rekonciliace K1: co by se nasadilo NAVÍC, kdyby se měřilo, co běží
+      # ─────────────────────────────────────────────────────────────────────
+      # ⛔ NAMĚŘENO 2026-09-26/27: `deploy_apps` je rozdíl proti PŘEDCHOZÍMU
+      # commitu. Core z #1090 padl na disku build serveru a stacky vln 3+ se
+      # přeskočily kvůli padlému Edge — další push je už neviděl a nový web pak
+      # volal routy, které starý backend neměl (404). Návrh: základem má být
+      # POSLEDNÍ ÚSPĚŠNÉ nasazení každé aplikace v Coolify (scripts/lib/nasazeny-stav.mjs).
+      # K1 JEN HLÁSÍ: `deploy_apps` se tu nemění. Nezměřeno = varování s důvodem,
+      # ne pád detekce — přepnutí na rekonciliaci (a fail-closed) je K2.
+      - name: "Rekonciliace K1 (jen hlášení): co by se nasadilo navíc"
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+          DEPLOY_APPS: ${{ steps.deploy_apps.outputs.deploy_apps }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          node scripts/lib/nasazeny-stav.mjs --navic --head "$HEAD_SHA" --deploy-apps "$DEPLOY_APPS"
+          rc=$?
+          if [ "$rc" != "0" ]; then
+            echo "::warning title=rekonciliace K1 nezměřena::nasazeny-stav skončil kódem $rc (2 = chybí přístup/identita, 3 = část aplikací nezměřena) — viz výpis; detekce se nemění (K1)."
+          fi
+
+  # ===========================================================================
+  # CI: Web App — TypeScript + Lint + i18n
+  # ===========================================================================
+  check-web:
+    name: "Web: TypeScript & Lint"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: detect
+    if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.app == 'true'
+    env:
+      # Both steps here peak near ~2GB on this repo: the `npx tsc` type-check and
+      # `npm run lint`. Node's DEFAULT old-space ceiling is ~2048MB, so each OOM'd
+      # ("FATAL ERROR: ... heap out of memory", 2026-07-13) — the earlier package.json
+      # NODE_OPTIONS only reached ESLint, never the direct `npx tsc` step. The soren
+      # runner has ~8GB and NO cgroup memory limit (verified /sys/fs/cgroup/memory.max
+      # = max), so raise V8's ceiling for the WHOLE job. Verified locally: tsc + eslint
+      # both pass at 4096, both OOM below ~2GB.
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+
+      # Typecheck se týká i kódu, který importuje @aisha/* po JEJICH PUBLIKOVANÉM
+      # vstupu (dist/), ne po zdrojích — takže bez buildu balíčků `tsc` hlásí
+      # "has no exported member" u symbolu, který ve zdroji existuje. Naměřeno
+      # 2026-08-01: main zčervenal hned po přidání src/tests/db/
+      # surface-block-contract.runtime.test.ts, který importuje validateBlockData.
+      # Surfaces job tenhle krok má i s vysvětlením; tady chyběl.
+      - name: Build @aisha workspace packages
+        run: npm run build:packages
+
+      - name: TypeScript compile check
+        run: npx tsc --noEmit -p tsconfig.app.json
+
+      # tsconfig.app.json covers the ROOT web app only. The shells ARE type-checked
+      # elsewhere — `surfaces:build:all` runs `tsc && vite build` — but that step
+      # lives in "Services: Tests", which is gated on `services_change`. So a PR
+      # touching only a shell skips the sole job that would have checked it, the
+      # error lands on main, and the NEXT PR to touch `services/` fails on a defect
+      # it did not introduce. That is exactly how #34 put a non-assignable filter
+      # predicate into workbench-shell App.tsx (fixed by #38) and why it surfaced
+      # as a red CI on the unrelated chat fix (#40).
+      #
+      # This is not a new check — it is the existing one, placed in a job whose
+      # change-detection can actually see `apps/` (see the APP filter in `detect`).
+      # Shelly typují proti `@aisha/surface-blocks`, jehož `types` míří na
+      # `dist/index.d.ts` — soubor, který vzniká až buildem. `npm ci` ho
+      # nevyrobí, takže krok níž padal na TS2307 „Cannot find module" u OBOU
+      # shellů a za ním na kaskádě implicit-any. Reprodukováno lokálně na čistém
+      # fork main; po `npm run build -w @aisha/surface-blocks` typují oba čistě.
+      #
+      # Sourozenec `@aisha/design-language` build nepotřebuje — vydává
+      # `src/index.ts` jako types, takže se řeší z podkladů.
+      - name: Build workspace types the shells compile against
+        run: npm run build -w @aisha/surface-blocks
+
+      - name: TypeScript compile check — surface shells
+        run: |
+          for shell in apps/*-shell; do
+            [ -f "$shell/tsconfig.json" ] || continue
+            echo "── $shell"
+            npx tsc --noEmit -p "$shell/tsconfig.json"
+          done
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: i18n check
+        run: npm run i18n:check
+
+      # Generic channels must not name an implementation. The rule existed in
+      # the dissolved surfaces repo's CI and was lost in the merge — the script
+      # came along, nothing called it. Identifiers derive from instances/.
+      - name: Split-rule gate (generic channels name no instance)
+        run: npm run gate
+
+  # ===========================================================================
+  # CI: Secret scan — gitleaks (E0.7). .gitleaks.toml is the SoT ruleset; this
+  # job runs on every push/PR regardless of changed paths — a leaked secret
+  # matters anywhere. SCOPE = the commits this change INTRODUCES
+  # (merge-base(origin/main)..HEAD), NOT the full 2679-commit history: re-scanning
+  # immutable history re-flags pre-existing content noise (generic-api-key on demo
+  # seed / docs / i18n keys / test fixtures) that is already addressed — historical
+  # secrets by rotation (docs/security/SERVICE_ROLE_KEY_ROTATION.md), and the
+  # current tree by the always-on vitest enforcer no-committed-secrets.gate.test.ts
+  # (decodes JWT payloads, stricter than any regex). This job is the "no NEW secret
+  # in this change" delta gate — it keeps full teeth on everything a PR adds.
+  # ===========================================================================
+  secret-scan:
+    name: "Secret scan (gitleaks)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        run: |
+          GL_VERSION=8.18.4
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GL_VERSION}/gitleaks_${GL_VERSION}_linux_x64.tar.gz" \
+            | tar -xz -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: Scan introduced commits against .gitleaks.toml
+        run: |
+          git fetch -q origin main || true
+          BASE="$(git merge-base origin/main HEAD 2>/dev/null || true)"
+          HEAD_SHA="$(git rev-parse HEAD)"
+          if [ -n "$BASE" ] && [ "$BASE" != "$HEAD_SHA" ]; then
+            echo "Scanning $BASE..HEAD ($(git rev-list --count "$BASE..HEAD") introduced commits)"
+            gitleaks detect --source . --config .gitleaks.toml --no-banner --redact \
+              --log-opts="$BASE..HEAD" --exit-code 1
+          else
+            echo "On the base branch (merge-base == HEAD) — scanning the latest commit only"
+            gitleaks detect --source . --config .gitleaks.toml --no-banner --redact \
+              --log-opts="-1" --exit-code 1
+          fi
+
+  # ===========================================================================
+  # Disclosure scan — CELÝ sledovaný strom, ne jen staged soubory
+  # ===========================================================================
+  # Doplněk ke gitleaks: ten hlídá TAJEMSTVÍ v commitech, které změna PŘIDÁVÁ.
+  # Tenhle job hlídá jinou třídu a v jiném rozsahu — ÚNIK DŮVĚRY v celém
+  # aktuálním stromu: jména konkrétních projektů, osobní e-maily, absolutní
+  # cesty z vývojářského stroje, ukázky reálných dat.
+  #
+  # PROČ VZNIKL: `scripts/verify-no-dev-codes.mjs` uměl celý strom od začátku
+  # (`--staged` je VOLBA, ne výchozí), ale volal ho jedině pre-commit hook nad
+  # staged soubory. Cokoli, co do repa přišlo jinou cestou než mým commitem —
+  # merge forku, cizí PR, přímý zápis — tímhle sítem nikdy neprošlo.
+  #
+  # Job je levný (žádný build, žádné npm ci) a NEomezuje se na změněné cesty:
+  # únik důvěry se netýká „cest, kterých se PR dotkl" — kontroluje se celý
+  # aktuální strom, ať PR sáhl kamkoli. `already_verified` je něco jiného než
+  # path-gating: znamená „přesně tenhle obsah už jednou změřen byl", takže
+  # merge commit neopakuje, co PR běh právě prohlásil za čisté.
+  disclosure-scan:
+    name: "Disclosure: celý strom (jména, osobní data, cesty)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [detect]
+    if: needs.detect.outputs.already_verified != 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Bez závislostí — skript stojí jen na node:* a `git`.
+      - name: Dev-codes + osobní data přes CELÝ sledovaný strom
+        run: node scripts/verify-no-dev-codes.mjs
+
+  # ===========================================================================
+  # CI: Web App — Unit & Integration tests + Gate tests
+  # ===========================================================================
+  test-web:
+    name: "Web: Tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [detect, check-web]
+    if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.app == 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # packages/insight is a github.com submodule the self-hosted runner
+          # cannot reach (checkout failed at ~10s). Check out WITHOUT submodules;
+          # the insight gates skip-when-absent and run fully in any checkout that
+          # HAS the submodule (local dev / full clones). The pin/patch-drift check
+          # still runs here (it reads the gitlink via `git ls-tree`, no content).
+          submodules: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+
+      # npm/cli#4828 guard — shared script; see scripts/ci/repair-native-deps.sh
+      # for the full live-failure forensics (runs 1832/1840/1846/1850).
+      - name: Repair native optional deps (npm/cli#4828 guard)
+        run: bash scripts/ci/repair-native-deps.sh
+
+      # `jq` pro brány, které spouštějí SKUTEČNÉ shellové skripty stacku.
+      # Naměřeno 2026-08-11: pki-renewer-token-failure-diagnosis padala čtyřmi
+      # behaviorálními testy, protože get_token() rozebírá odpověď Keycloaku přes
+      # jq — a runner ho nemá. Renewer běží v kontejneru, který jq MÁ, takže
+      # závislost je legitimní; chybělo jen ji tady doručit. Brána si ji od té
+      # doby sama vynucuje (fail-loud, ne skip), takže tenhle krok NENÍ tichý
+      # předpoklad: kdyby zmizel, brána to řekne jednou větou.
+      - name: Install jq (shell-level gates run the real scripts)
+        run: |
+          command -v jq >/dev/null && { jq --version; exit 0; }
+          SUDO=""; [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends jq
+          jq --version
+
+      # Táž třída jako v check-web (#89), tady RUNTIME podoba: vitest řeší
+      # @aisha/* po PUBLIKOVANÉM vstupu (dist/), ne po zdrojích. Naměřeno
+      # 2026-08-02 (task 184007): surface-block-contract.runtime.test.ts padá na
+      # "Failed to resolve entry for package \"@aisha/surface-blocks\"" — test
+      # dorazil s #86 a tenhle job byl první, kdo ho spustil bez dist/.
+      - name: Build workspace packages (runtime deps of the test suite)
+        run: npm run build:packages
+
+      - name: Run tests (sharded, 1 worker/shard — fits runner memory)
+        # The unit suite’s jsdom base is ~1.7 GB with 2 workers (~2 GB peak),
+        # which OOM-kills the memory-limited self-hosted runner mid-suite
+        # (#279 layer 2). Run as 4 sequential shards, each a fresh SINGLE-worker
+        # process: 1-worker base (~0.7 GB) + ~1/4 of the files ≈ ~1.1 GB peak per
+        # shard. Local dev keeps one fast 2-worker run (VITEST_MAX_WORKERS unset).
+        env:
+          VITEST_MAX_WORKERS: "1"
+          # ⛔ NAMĚŘENO 2026-08-19, uvnitř DinD na build serveru:
+          #     JOB-Web-Tests  die  exit=137        (SIGKILL = došla paměť)
+          # Job padal ČTYŘIKRÁT po sobě vždy po ~20 minutách a nikdy nenechal
+          # podpis: kontejner je ZABIT, takže se nespustí ani krok s `if: failure()`.
+          # Na hostiteli přitom OOM není vidět — je to cgroup kill uvnitř DinD
+          # (limit 15 GB). Lokálně suite prochází (4 shardy, 6173 testů, 0 pádů),
+          # protože tam žádný takový strop není.
+          # Strop haldy dělá dvojí práci: sníží špičku (V8 uklízí dřív, místo aby
+          # rostl do limitu) a hlavně ZMĚNÍ TVAR SELHÁNÍ — místo tichého SIGKILL
+          # přijde `JS heap out of memory`, což diagnostika níž umí zachytit.
+          # ⛔ 3072 NESTAČILO (naměřeno 2026-08-19, druhý pokus). Runner má
+          # `FORGEJO_RUNNER_CAPACITY=4`, takže uvnitř JEDNOHO DinD s limitem 15 GB
+          # běží až ČTYŘI joby naráz — a padly dva zároveň:
+          #     JOB-Web-Tests exit=137     JOB-probe exit=137
+          # Rozpočet je tedy ~15/4 GB na job, ne 15 GB. Ověřeno lokálně, že shard
+          # projde i na 2048 (51 souborů / 585 testů).
+          NODE_OPTIONS: "--max-old-space-size=2048"
+        shell: bash
+        run: |
+          # ⚠️ RUNNER MÁ UKLÍZEČE, KTERÝ UMÍ SÁHNOUT DO BĚŽÍCÍHO JOBU (naměřeno
+          # 2026-08-19 na build serveru). Kontejner `prune-*` běží každých
+          # CI_PRUNE_INTERVAL=1800 s a při volném místě ≤ CI_MIN_FREE_PCT=15 %
+          # dělá `rm -rf /ci-cache/npm/*` — tedy maže cache, kterou tenhle job
+          # PRÁVĚ POUŽÍVÁ (viz CI_CACHE_DIR níž u lintu a bran). Projeví se to
+          # jako nahodilý pád testů, ne jako chyba disku.
+          # Disk se plní proto, že janitor uklízí s filtrem `until=24h`, takže na
+          # čerstvou build cache nesáhne: naměřeno 50,8 GB, z toho 47,4 GB
+          # k uvolnění, volné místo klesalo 26 % → 21 % během půldruhé hodiny.
+          # Když `Web: Tests` padá bez podpisu, ZKONTROLUJ NEJDŘÍV `df -h /` na
+          # runneru a `docker system df` — teprve pak hledej vadu v testech.
+          # (Janitor NENÍ v tomhle repu, je to konfigurace runneru.)
+          set -o pipefail
+          # Osm shardů místo čtyř: každý proces drží POLOVINU testů, takže
+          # špička paměti klesne. Delší o pár minut, ale job má strop 45 min.
+          for i in 1 2 3 4 5 6 7 8; do
+            echo "::group::test:run shard $i/8"
+            # Memory-limited runner can OOM-kill a shard mid-run (#279) — the process
+            # dies with no test assertion. The suite is deterministic (5664/5664 pass
+            # locally at 1 worker), so retrying once absorbs a transient OOM while a
+            # REAL failure still fails both attempts and fails the job.
+            #
+            # ⛔ NAMĚŘENO 2026-08-19: značky o pádu šly jen na stdout, tedy do job
+            # logu — a ten Forgejo přes API nedává. `diag/webtests-cause` grepuje
+            # /tmp/webtests.log, kde po pádu NEBYLO NIC: shard umřel bez shrnutí
+            # vitestu, takže se nenašel ani „Test Files N failed". Diagnostika pak
+            # vracela jediný řádek, a ten PROŠEL. Výsledek se proto píše DO TÉHOŽ
+            # SOUBORU, nad kterým se pak hledá — a hlavně s NÁVRATOVÝM KÓDEM:
+            # 137 = zabito (OOM), 139 = segfault, 1 = spadlé testy. Ten kód sám
+            # rozhoduje, jestli je vada v kódu, nebo ve stroji.
+            rc=0
+            npm run test:run -- --shard="$i/8" 2>&1 | tee -a /tmp/webtests.log || rc=$?
+            # ⛔ 75 = NEZMĚŘENO (scripts/test/verdikt-kody.mjs): běh nenechal důkaz,
+            # jak testy dopadly. Patří do TÉŽE slovní zásoby jako 137 (zabito) a
+            # 139 (segfault) — je to selhání měřidla, ne nález v kódu; opakuje se
+            # stejně, ale v logu se nesmí číst jako „real failure".
+            popis_rc() { [ "$1" = "75" ] && echo "NEZMĚŘENO (běh nenechal důkaz)" || echo "rc=$1"; }
+            if [ "$rc" -ne 0 ]; then
+              echo "SHARD-FAILED shard=$i/8 rc=$rc pokus=1" | tee -a /tmp/webtests.log
+              echo "::warning::test:run shard $i/8 — $(popis_rc "$rc"); opakuji JEDNOU"
+              rc=0
+              npm run test:run -- --shard="$i/8" 2>&1 | tee -a /tmp/webtests.log || rc=$?
+              if [ "$rc" -ne 0 ]; then
+                echo "SHARD-FAILED-TWICE shard=$i/8 rc=$rc" | tee -a /tmp/webtests.log
+                if [ "$rc" = "75" ]; then
+                  echo "::error::shard $i/8 NEZMĚŘENO dvakrát — zamrzá měřidlo, ne testy"
+                else
+                  echo "::error::shard $i/8 failed twice (rc=$rc) — real failure"
+                fi
+                exit 1
+              fi
+            fi
+            echo "::endgroup::"
+          done
+
+      - name: Generate source-of-truth report (required by gate tests)
+        run: node scripts/db/db-manager/source.mjs
+
+      - name: Registr forků (pro bránu stack-nesmi-znat-jmeno-instance)
+        # ⛔ NAMĚŘENO 2026-09-12: brána odvozuje jména instancí z `instances/`,
+        # z remotů `<jméno>-orchestrator` a z identity stromu — v CI upstreamu
+        # (jen `origin`, bez .env*) je množina prázdná a brána se PŘESKAKUJE,
+        # tedy identitu žádného forku tu nikdy neměřila. Jediný registr forků je
+        # organizace na Forgejo, a ta je PRIVÁTNÍ (anonymně HTTP 200 + prázdné
+        # pole). Stahuje se proto TADY, SAMOSTATNÝM krokem s tokenem, do souboru —
+        # token se do kroku s testy NEDÁVÁ (ten spouští kód z PR, plný token
+        # organizace by z něj šel vynést). Bez tokenu (PR z forku) se soubor
+        # nezaloží a brána ohlásí NEZMĚŘENO s důvodem, ne zelenou.
+        #
+        # ⛔ KTERÉ SECRETY BĚH DOSTANE (naměřeno 2026-09-12 06:08 UTC tokenem z
+        # `git credential fill`, Forgejo `GET /version` = 16.0.2+gitea-1.22.0,
+        # nezávisle 2×):
+        #   · `GET /repos/aisha/evymo-ai-orchestrator/actions/secrets` — 100 jmen
+        #     (2 stránky po 50, X-Total-Count=100, po dedup 100): `FORGEJO_API_TOKEN`
+        #     JE, `REPO_API_TOKEN` NENÍ;
+        #   · `GET /orgs/aisha/actions/secrets` — 1 jméno: `REPO_API_TOKEN`.
+        # Forgejo (models/secret/secret.go, FetchActionSecrets) slévá secrety
+        # vlastníka + repa do jedné mapy BEZ filtru, takže neforkový běh dostane
+        # OBA. `ValidateName` zakazuje ZALOŽIT nový secret s prefixem FORGEJO_/
+        # GITEA_/GITHUB_ (proto HTTP 400 na PUT z 2026-08-02) — existující se
+        # přesto doručuje. Běh PR z forku nedostane ŽÁDNÝ. První verze kroku
+        # četla jen `secrets.REPO_API_TOKEN` a tvrdila „v repu není → vždy
+        # prázdný" — v repo-scope opravdu není, jenže z org-scope do neforkového
+        # běhu dorazí; co tehdy v běhu skutečně přišlo, změřeno nebylo. Čtou se
+        # proto OBA (repo-scope jméno první, org-scope jako záloha, týž vzor jako
+        # „Získat instanční overlay"): jméno secretu je adresa, a brána pinuje
+        # invariant, ne adresu.
+        #
+        # IDENTITA FORKU Z JEHO INSTANCE-DATA: jméno repa NENÍ jméno instance —
+        # nasazený prefix je DEKLARACE v `<fork>-instance-data/profiles/*.json`
+        # (`domain.subdomain_prefix`) a z tvaru repa se nepozná (naměřeno: sonda
+        # `<prefix>-x` bránou prošla). Instance s VLASTNÍ veřejnou zónou prefix
+        # nemá a identitu nese zóna sama: `auth.<jméno>.<tld>` → první label
+        # `domain.public_tld` (derive-domains, prefixProZonu). Fork S prefixem
+        # zónu sdílí, její label jménem není (naměřeno 2026-09-12: byl by to
+        # `staging`). Pro každé `*-instance-data` repo se proto stáhne
+        # `contents/profiles` a z každého JSON profilu se odvodí jméno filtrem
+        # JQ_JMENO_Z_PROFILU; k repu se zapíše jako `jmena_z_profilu`. Repo bez
+        # `profiles/` (HTTP 404) nic nepřidá — nic, ne pád; jiná chyba API =
+        # NEZMĚŘENO s důvodem, protože částečný registr by byl tichý přeskok.
+        # ⚠️ Filtr je DRUHÝ DOMOV pravidla `jmenoZProfilu` v bráně — tenhle krok
+        # běží s tokenem a repo kód spouštět nesmí; brána filtr ČTE odsud a
+        # srovnává ho se svou funkcí nad touž fixturou (musí zůstat na jednom
+        # řádku v jednoduchých uvozovkách).
+        shell: bash
+        env:
+          TOK_PRIMARY: ${{ secrets.FORGEJO_API_TOKEN }}
+          TOK_FALLBACK: ${{ secrets.REPO_API_TOKEN }}
+        run: |
+          set -o pipefail
+          nezmereno() {
+            echo "::warning::registr forků NEZMĚŘEN — $1; brána stack-nesmi-znat-jmeno-instance to ohlásí jako NEZMĚŘENO, ne jako zelenou"
+            echo "AISHA_FORK_REGISTRY_NEZMERENO=$1" >> "$GITHUB_ENV"
+            exit 0
+          }
+          TOK="${TOK_PRIMARY:-${TOK_FALLBACK:-}}"
+          [ -n "$TOK" ] || nezmereno "nedorazil ani FORGEJO_API_TOKEN (repo-scope), ani REPO_API_TOKEN (org-scope) — fork-PR běh secrety nedostává"
+          origin="$(git remote get-url origin)"
+          server="$(printf '%s' "$origin" | sed -E 's#^(https?://[^/]+)/.*$#\1#')"
+          org="$(printf '%s' "$origin" | sed -E 's#^https?://[^/]+/([^/]+)/.*$#\1#')"
+          # GET přes API: tělo do souboru ($2), HTTP kód na stdout. Návrat ≠ 0 =
+          # síť/TLS selhaly — a HTTP 000 není „žádné forky". (Kód se NEVRACÍ
+          # proměnnou: `$(api …)` běží v podshellu a proměnná by se ztratila —
+          # naměřeno při lokální replice kroku: „vrátil HTTP “ s prázdným kódem.)
+          api() {
+            curl -sS --max-time 30 -o "$2" -w '%{http_code}' -H "Authorization: token $TOK" "$1"
+          }
+          out="${RUNNER_TEMP:-/tmp}/fork-registry.json"
+          : > "$out.pages"
+          for page in 1 2 3 4 5 6 7 8 9 10; do
+            HTTP="$(api "$server/api/v1/orgs/$org/repos?limit=50&page=$page" "$out.davka")" || nezmereno "curl na registr organizace $org selhal (síť/TLS, HTTP ${HTTP:-000})"
+            [ "$HTTP" = "200" ] || nezmereno "registr organizace $org vrátil HTTP $HTTP"
+            jq -c '.[]' "$out.davka" >> "$out.pages" || nezmereno "odpověď registru organizace není JSON pole"
+            [ "$(jq 'length' "$out.davka")" -lt 50 ] && break
+          done
+          # Jména z instance-data: profiles/*.json → prefix, jinak první label vlastní veřejné zóny
+          JQ_JMENO_Z_PROFILU='((.domain? // {}) | (.subdomain_prefix // "" | tostring | ascii_downcase | gsub("^\\s+|\\s+$"; "") | sub("[-.]+$"; "")) as $p | if ($p | length) > 0 then $p else (.public_tld // "" | tostring | ascii_downcase | gsub("^\\s+|\\s+$"; "") | split(".")[0] // "") end)'
+          : > "$out.prefixes"
+          while IFS= read -r repo; do
+            [ -n "$repo" ] || continue
+            HTTP="$(api "$server/api/v1/repos/$org/$repo/contents/profiles" "$out.seznam")" || nezmereno "curl na $repo/contents/profiles selhal (síť/TLS, HTTP ${HTTP:-000})"
+            if [ "$HTTP" = "404" ]; then continue; fi
+            [ "$HTTP" = "200" ] || nezmereno "$repo/contents/profiles vrátil HTTP $HTTP"
+            while IFS= read -r soubor; do
+              [ -n "$soubor" ] || continue
+              HTTP="$(api "$server/api/v1/repos/$org/$repo/raw/profiles/$soubor" "$out.profil")" || nezmereno "curl na $repo/profiles/$soubor selhal (síť/TLS, HTTP ${HTTP:-000})"
+              [ "$HTTP" = "200" ] || nezmereno "$repo/profiles/$soubor vrátil HTTP $HTTP"
+              jmeno="$(jq -r "$JQ_JMENO_Z_PROFILU" "$out.profil")" || nezmereno "$repo/profiles/$soubor není JSON"
+              if [ -n "$jmeno" ]; then
+                jq -cn --arg r "$repo" --arg p "$jmeno" '{repo: $r, jmeno: $p}' >> "$out.prefixes"
+              fi
+            done < <(jq -r '.[] | select(.type == "file") | select(.name | endswith(".json")) | .name' "$out.seznam")
+          done < <(jq -r 'select(.name | endswith("-instance-data")) | .name' "$out.pages")
+          jq -s --slurpfile pref "$out.prefixes" '
+            ($pref | group_by(.repo) | map({key: .[0].repo, value: map(.jmeno)}) | from_entries) as $pp
+            | map(. + {jmena_z_profilu: ($pp[.name] // [])})
+          ' "$out.pages" > "$out"
+          echo "registr forků: $(jq 'length' "$out") repozitářů, $(jq '[.[].jmena_z_profilu[]] | length' "$out") jmen z instance-data → $out"
+          echo "AISHA_FORK_REGISTRY=$out" >> "$GITHUB_ENV"
+
+      - name: Gate tests
+        # node-env gate suite defaults to 8 workers; on the memory-limited
+        # runner that OOMs after test:run (#279 layer 2b). 2 workers keeps it
+        # parallel at a fraction of the memory. No timeout on this job.
+        env:
+          VITEST_MAX_WORKERS: "2"
+          # Týž rozpočet jako u test:run: 2 workery × halda se SČÍTAJÍ, a runner
+          # pouští 4 joby naráz v jednom DinD (15 GB). Viz komentář u test:run.
+          NODE_OPTIONS: "--max-old-space-size=2048"
+        shell: bash
+        run: |
+          set -o pipefail
+          # ⛔ OPAKUJE SE NEZMĚŘENÝ BĚH, NE PADLÁ BRÁNA. Krok dosud opakoval KAŽDÉ
+          # selhání („transient-OOM tolerance"), tedy i poctivě padlou bránu: to
+          # stojí druhých ~15 minut CI a v logu se to čte jako nestabilita, i když
+          # je nález pravý. `run-vitest.mjs` nově rozlišuje třetí stav — kód 75
+          # NEZMĚŘENO znamená, že po běhu nezbyl žádný důkaz (zamrzl před souhrnem,
+          # report nevznikl). Opakovat má smysl přesně tenhle stav a OOM, který je
+          # poznat z výpisu; obojí je selhání MĚŘIDLA, ne kódu.
+          pokus() {
+            npm run test:gates 2>&1 | tee /tmp/gates-pokus.log
+            local kod=${PIPESTATUS[0]}
+            cat /tmp/gates-pokus.log >> /tmp/gates.log
+            return "$kod"
+          }
+          nezmereno() {
+            [ "$1" = "75" ] && return 0
+            grep -qiE "JavaScript heap out of memory|Worker exited unexpectedly|Channel closed|FATAL ERROR: Reached heap limit" /tmp/gates-pokus.log
+          }
+          kod=0; pokus || kod=$?
+          if [ "$kod" != "0" ]; then
+            if nezmereno "$kod"; then
+              echo "::warning::test:gates NEZMĚŘENO (kód $kod) — běh nenechal důkaz, jak testy dopadly; opakuji JEDNOU"
+              kod=0; pokus || kod=$?
+              if [ "$kod" != "0" ]; then
+                if nezmereno "$kod"; then
+                  echo "::error::test:gates NEZMĚŘENO dvakrát — zamrzá měřidlo, ne brány (celý výpis: /tmp/gates.log)"
+                else
+                  echo "::error::test:gates selhalo i při opakování (kód $kod) — padlé brány"
+                fi
+                exit 1
+              fi
+            else
+              echo "::error::test:gates selhalo (kód $kod) — padlé brány, běh se NEOPAKUJE"
+              exit "$kod"
+            fi
+          fi
+
+      - name: Scripts tests (generators + contract drift gates)
+        # scripts/**/*.test.mjs via vitest.scripts.config.mjs: the claude-app
+        # adapter/zip/compose specs + the DRIFT GATE asserting the standalone MCP
+        # server's inlined copies (bring-up contract, mergeSettingsJson) stay in
+        # lock-step with their SoT. Deps already installed above; the suite is tiny
+        # and deterministic, so no shard/retry dance is needed.
+        env:
+          VITEST_MAX_WORKERS: "2"
+          # Týž rozpočet jako u test:run: 2 workery × halda se SČÍTAJÍ, a runner
+          # pouští 4 joby naráz v jednom DinD (15 GB). Viz komentář u test:run.
+          NODE_OPTIONS: "--max-old-space-size=2048"
+        shell: bash
+        run: |
+          set -o pipefail
+          npm run test:scripts 2>&1 | tee -a /tmp/scripts-tests.log
+
+      - name: Surface failure cause (CI hygiene — runner logs unreachable via API)
+        if: failure()
+        shell: bash
+        env:
+          # github.token lacks comment/status:write on this Forgejo runner (the diag
+          # silently no-op'd on #283), so a full-scope API token secret is needed.
+          # ⛔ NAMĚŘENO 2026-09-12 06:08 UTC (token z `git credential fill`,
+          # Forgejo `GET /version` = 16.0.2+gitea-1.22.0, nezávisle 2×):
+          # `GET /repos/aisha/evymo-ai-orchestrator/actions/secrets` (100 jmen)
+          # má `FORGEJO_API_TOKEN` a NEMÁ `REPO_API_TOKEN`;
+          # `GET /orgs/aisha/actions/secrets` (1 jméno) má `REPO_API_TOKEN`.
+          # FetchActionSecrets (models/secret/secret.go) slévá owner + repo
+          # secrety bez filtru → neforkový běh dostane OBA, fork-PR běh ŽÁDNÝ.
+          # Dřívější tvrzení „Forgejo rezervuje prefix FORGEJO_,
+          # secrets.FORGEJO_API_TOKEN nemůže existovat" (2026-08-02, z HTTP 400
+          # na PUT) platí jen pro ZALOŽENÍ (ValidateName) — existující secret
+          # se doručuje. Tenhle krok čte org-scope jméno, které do neforkového
+          # běhu dorazí; jeho chování se tu nemění. Dluh mainu mimo tuhle větev:
+          # číst obě jména jako krok „Registr forků" výš, aby krok nezávisel na
+          # tom, ve kterém rozsahu jméno zrovna leží.
+          TOK: ${{ secrets.REPO_API_TOKEN }}
+          PRNUM: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          echo "::group::env / memory"
+          (free -m 2>/dev/null || true); (cat /sys/fs/cgroup/memory.max 2>/dev/null || true); node -v; npm -v
+          echo "::endgroup::"
+          echo "::group::test:run tail"
+          tail -60 /tmp/webtests.log 2>/dev/null || echo "(no test:run log — failed at npm ci or earlier)"
+          echo "::endgroup::"
+          echo "::group::test:gates tail"
+          tail -60 /tmp/gates.log 2>/dev/null || echo "(gates step not reached — failure was upstream)"
+          echo "::endgroup::"
+          echo "::group::failure signatures"
+          grep -iEn "Killed|heap out of memory|JS heap|FATAL ERROR|Test Files +[0-9]+ failed|onTaskUpdate|ECONN|ENOTFOUND|npm error|Cannot find module" /tmp/webtests.log /tmp/gates.log 2>/dev/null | tail -50 || true
+          echo "::endgroup::"
+          # Forgejo job logs are unreachable via the API, so a failing Web:Tests is
+          # otherwise undiagnosable. Post the failure cause where it gets SOLVED
+          # (majitel 08-02): a PR failure comments on the PR; a MAIN failure files
+          # an ISSUE — main has no PR thread, and a red main that nobody opens the
+          # runner for is exactly the failure this diag exists to surface.
+          # Permanent CI hygiene (#279) — keep it.
+          MEM=$( (free -m 2>/dev/null | sed -n '1,2p'); echo "cgroup.max=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo n/a)" )
+          # SHARD-FAILED* první, protože nese návratový kód — ten rozhoduje.
+          # `ECONN` bez konce chytalo `useWearableConnections` (grep je -i), proto
+          # jen skutečné kódy chyb; `Serialized`/`exceeded` zůstávají pro vitest.
+          SIG=$(grep -iEn "SHARD-FAILED[A-Z-]*|Killed|heap out of memory|JS heap|FATAL ERROR|Test Files +[0-9]+ failed|Tests +[0-9]+ failed|onTaskUpdate|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|npm error|Cannot find module|RangeError|must not conflict|Serialized|worker (exited|terminated)|exceeded" /tmp/webtests.log /tmp/gates.log 2>/dev/null | tail -25)
+          BODY=$(printf '### Web:Tests runner failure cause (temp #279 diag)\n\ncommit: %s\n\n**mem:**\n```\n%s\n```\n\n**signatures:**\n```\n%s\n```\n\n**webtests.log (last 30):**\n```\n%s\n```\n\n**gates.log (last 30):**\n```\n%s\n```\n' "${SHA:-${GITHUB_SHA:-?}}" "$MEM" "${SIG:-<none matched>}" "$(tail -30 /tmp/webtests.log 2>/dev/null)" "$(tail -30 /tmp/gates.log 2>/dev/null)")
+          if [ -n "${PRNUM:-}" ]; then
+            node -e 'const https=require("https");const data=JSON.stringify({body:process.argv[1]});const u=new URL(process.env.GITHUB_API_URL+"/repos/"+process.env.GITHUB_REPOSITORY+"/issues/"+process.env.PRNUM+"/comments");const r=https.request(u,{method:"POST",headers:{Authorization:"token "+process.env.TOK,"Content-Type":"application/json","Content-Length":Buffer.byteLength(data)}},res=>{res.resume();res.on("end",()=>console.log("comment posted:",res.statusCode))});r.on("error",e=>console.log("comment err:",e.message));r.write(data);r.end();' "$BODY"
+          else
+            # Main push — file an issue so the failure lands in the queue where
+            # work is picked up, not only in a red badge nobody clicks.
+            TITLE="Web:Tests selhal na main (${GITHUB_SHA:-?})"
+            node -e 'const https=require("https");const data=JSON.stringify({title:process.argv[1],body:process.argv[2]});const u=new URL(process.env.GITHUB_API_URL+"/repos/"+process.env.GITHUB_REPOSITORY+"/issues");const r=https.request(u,{method:"POST",headers:{Authorization:"token "+process.env.TOK,"Content-Type":"application/json","Content-Length":Buffer.byteLength(data)}},res=>{res.resume();res.on("end",()=>console.log("issue filed:",res.statusCode))});r.on("error",e=>console.log("issue err:",e.message));r.write(data);r.end();' "$TITLE" "$BODY"
+          fi
+          # also a commit status (github.token reliably has status:write) — readable via the combined-status API
+          if [ -n "${SHA:-}" ]; then
+            node -e 'const https=require("https");const d=JSON.stringify({state:"error",context:"diag/webtests-cause",description:(process.argv[1]||"no-signature").replace(/\s+/g," ").slice(0,240)});const u=new URL(process.env.GITHUB_API_URL+"/repos/"+process.env.GITHUB_REPOSITORY+"/statuses/"+process.env.SHA);const r=https.request(u,{method:"POST",headers:{Authorization:"token "+process.env.TOK,"Content-Type":"application/json","Content-Length":Buffer.byteLength(d)}},res=>{res.resume();res.on("end",()=>console.log("status set:",res.statusCode))});r.on("error",e=>console.log("status err:",e.message));r.write(d);r.end();' "${SIG:-no-signature-matched}"
+          fi
+
+  # ===========================================================================
+  # CI: Web App — Production build verification
+  # ===========================================================================
+  build-web:
+    name: "Web: Build"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [detect, test-web]
+    if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.app == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+
+      # vite's build pipeline loads the same rollup native binding — same
+      # npm/cli#4828 exposure as test-web; shared guard.
+      - name: Repair native optional deps (npm/cli#4828 guard)
+        run: bash scripts/ci/repair-native-deps.sh
+
+      - name: Production build
+        run: npm run build
+
+  # ===========================================================================
+  # CI: n8n Community Nodes — Test + Build + Lint
+  # ===========================================================================
+  test-n8n:
+    name: "n8n: Test & Build"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: detect
+    if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.n8n_nodes == 'true'
+    defaults:
+      run:
+        working-directory: packages/n8n-nodes-aisha
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.N8N_NODE_VERSION }}
+
+      - name: Install dependencies
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+
+      - name: TypeScript compile check
+        run: npx tsc --noEmit
+
+      - name: Run tests
+        run: npm test
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify dist files
+        run: |
+          echo "=== Checking dist structure ==="
+          ls -la dist/
+          ls -la dist/nodes/ || echo "No nodes dir"
+          ls -la dist/credentials/ || echo "No credentials dir"
+
+          # Verify every artifact n8n actually loads is present. package.json#n8n is
+          # the source of truth, so deriving the list here keeps this check from
+          # drifting on renames AND from going incomplete (the hardcoded list missed
+          # AishaLlmRouter/AishaAdminBridge/AishaGitHubApp + 4 credentials).
+          # Implemented in Node (not a shell for-loop) to avoid IFS/word-split fragility.
+          node -e '
+            const fs = require("fs");
+            const m = require("./package.json").n8n || {};
+            const declared = [...(m.nodes || []), ...(m.credentials || [])];
+            if (declared.length === 0) {
+              console.error("ERROR: package.json#n8n declares no nodes/credentials");
+              process.exit(1);
+            }
+            // Shared icon: most nodes reference file:../AishaRpc/aisha.svg, so a missing
+            // copy means copy-icons.mjs (the post-tsc build step) did not run.
+            const required = [...declared, "dist/nodes/AishaRpc/aisha.svg"];
+            const missing = required.filter((p) => !fs.existsSync(p));
+            if (missing.length > 0) {
+              console.error("ERROR: missing built artifact(s):\n  " + missing.join("\n  "));
+              process.exit(1);
+            }
+            console.log("OK: " + declared.length + " n8n nodes/credentials + shared icon present in dist/");
+          '
+
+      - name: Pack tarball (dry-run)
+        run: npm pack --dry-run
+
+  # ===========================================================================
+  # CI: VS Code Extension — Test
+  # ===========================================================================
+  test-extension:
+    name: "Extension: Test"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: detect
+    if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.extension == 'true'
+    defaults:
+      run:
+        working-directory: extensions/aisha-dirigent
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+
+      - name: Type check
+        run: npm run type-check
+
+      # ⛔ NAMĚŘENO 2026-08-20 bránou `lint-ma-kdo-spustit`: rozšíření má
+      # `scripts.lint`, ale nikdo ho nevolal — stejná vada jako u appky.
+      # V téhle úloze má ta třída chyb už jednu předchozí obět: `npm run
+      # build --if-present` tu byl tichý no-op, protože `build` skript
+      # neexistuje (viz komentář u kroku Compile níž). Slib bez měřidla.
+      #
+      # Ověřeno, že to není další no-op: `eslint src --ext ts` prohlédne
+      # všech 66 `.ts` souborů (`--format json`), ne nula.
+      - name: ESLint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test --if-present
+
+      # The extension is bundled by esbuild via `compile` (package.json has no
+      # `build` script). The old `npm run build --if-present` was a silent no-op —
+      # the bundle was never produced or verified in CI (extension-ci gate).
+      - name: Compile (esbuild bundle)
+        run: npm run compile
+
+  # ===========================================================================
+  # CI: Workbench rail — execution-rail-wired gate (root workbench CI, D7/W4-02)
+  #
+  # The workbench rail (svc-ai-chat ENQUEUES → the aisha-dirigent extension
+  # CLAIMS+RUNS+COMPLETES via @aisha/workbench-core) is guarded by the
+  # workbench-execution-rail-wired remediation gate. That gate rides in the
+  # general test:gates suite, which only runs on `app` changes — so an extension-
+  # or workbench-core-only PR that deleted the drainer or the @aisha/workbench-core
+  # import would slip through. This job runs JUST that gate whenever the extension
+  # or the shared core changes, keeping the rail wired end-to-end.
+  # ===========================================================================
+  workbench-rail:
+    name: "Workbench: rail gate"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: detect
+    if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.workbench == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+
+      # vitest loads the same rollup native binding as the web build — same
+      # npm/cli#4828 exposure; shared guard.
+      - name: Repair native optional deps (npm/cli#4828 guard)
+        run: bash scripts/ci/repair-native-deps.sh
+
+      - name: Workbench execution-rail gate
+        run: >-
+          AISHA_SKIP_ONLINE=1 npx vitest run --config vitest.gates.config.ts
+          src/tests/gates/remediation/workbench-execution-rail-wired.gate.test.ts
+
+  # ===========================================================================
+  # Deploy: Web SPA (Coolify — docker-compose.coolify-prebuilt.yml)
+  # ===========================================================================
+  deploy-extranet:
+    name: "Deploy: Extranet"
+    runs-on: ubuntu-latest
+    # (1 + NASAZENI_OPAKOVANI) × (FRONTA_S + TIMEOUT_S) + prodleva: pokus = fronta Coolify
+    # 30 min + práce 30 min, jedno opakování po doložené přechodné chybě, 2 min čekání
+    # — hlídá `opakovani-nasazeni-se-vejde-do-ulohy`.
+    timeout-minutes: 125
+    needs: [detect, check-web, test-web, build-web, governance-gate, surface-tests, deploy-koren]
+    # ⭐ `already_verified` NAHRAZUJE důkaz „testy byly zelené", NE otázku
+    # „týká se ta změna extranetu". Proto stojí UVNITŘ každé větve, ne před
+    # nimi: relevanci pořád rozhoduje detect, jen se místo výsledku úlohy uzná,
+    # že BAJTOVĚ TENTÝŽ strom byl zelený v běhu nad hlavou PR. Kdyby ta výjimka
+    # stála před nimi, nasazoval by se extranet i po merge, který se ho netýká.
+    # Proč to tu vůbec je: viz poznámka nad `deploy-core`.
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.detect.result == 'success'
+      && needs.deploy-koren.result != 'failure'
+      && needs.deploy-koren.result != 'cancelled'
+      && (needs.governance-gate.result == 'success' || needs.governance-gate.result == 'skipped')
+      && needs.check-web.result != 'failure'
+      && needs.check-web.result != 'cancelled'
+      && needs.test-web.result != 'failure'
+      && needs.test-web.result != 'cancelled'
+      && needs.surface-tests.result != 'failure'
+      && needs.surface-tests.result != 'cancelled'
+      && needs.build-web.result != 'failure'
+      && needs.build-web.result != 'cancelled'
+      && contains(needs.detect.outputs.deploy_apps, ',extranet,')
+      && (needs.detect.outputs.app != 'true'
+          || needs.detect.outputs.already_verified == 'true'
+          || (needs.build-web.result == 'success'
+              && needs.check-web.result == 'success'
+              && needs.test-web.result == 'success'))
+      && (needs.detect.outputs.surfaces != 'true'
+          || needs.detect.outputs.already_verified == 'true'
+          || needs.surface-tests.result == 'success')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/lib/coolify-resolve-uuid.sh
+            scripts/lib/coolify-project-scope.mjs
+            scripts/lib/coolify-instance-scope.mjs
+            scripts/lib/instance-overlay.mjs
+            scripts/lib/coolify-http.mjs
+            scripts/lib/povinne-promenne.mjs
+            scripts/lib/razeni.mjs
+            scripts/lib/compose-env-refs.mjs
+            scripts/lib/config-env-files.mjs
+            scripts/lib/env-hodnota.mjs
+            scripts/lib/cli-entry.mjs
+            scripts/ci/deploy-and-verify.sh
+            scripts/lib/nasazeni-prechodna-chyba.mjs
+            scripts/deploy/refresh-overlay-cachebust.sh
+            scripts/deploy/overlay-cachebust.sh
+            scripts/coolify-deploy-watch.mjs
+            scripts/lib/coolify-app-status.mjs
+            instances/
+
+      - name: Deploy extranet surface
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
+          # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
+          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
+          # deploy joby běží jen na push do main (kód z main), ne na PR.
+          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          GIT_SHA: ${{ github.sha }}
+          # Veřejná adresa pro sondu „odpovídá to?". Ze SECRETU, ne ze zdrojáku:
+          # adresa je vlastnost nasazení a každá instance má svou.
+          HEALTH_URL: ${{ secrets.DEPLOY_HEALTH_URL_EXTRANET }}
+          # Extranet stojí ZA DVEŘMI (naměřeno 2026-09-05: `extra.` jde přes
+          # edge-proxy a vrátný ho odmítá 403 s prázdným tělem). Sonda z CI
+          # tedy povrch změřit NEMŮŽE — ťuká vždy jen člověk.
+          HEALTH_ZA_DVERMI: 'ano'
+          # ⛔ KTEROU instanci nasazujeme, se ŘEKNE — neodvozuje se z toho, co
+          # náhodou leží ve stromu. Skript to dřív hádal z `ls instances/`;
+          # jakmile instanční data odešla do datového repa (#163), výpis se
+          # vyprázdnil a deploy nad `main` padal po 4 s. Táž proměnná, jakou už
+          # používá deploy.yml — jeden způsob, ne dva.
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+        # Jeden sdílený krok pro všechny deploy úlohy. Dřív tu stálo 40 řádků,
+        # které POUZE odeslaly požadavek — a skončily `exit 0` i tehdy, když
+        # chybělo pověření nebo appka v Coolify nebyla. Naměřeno 2026-08-08:
+        # po merge byly všechny deploy úlohy zelené a extranet servíroval
+        # bajtově týž bundle jako před opravou. Skript čeká na terminální stav
+        # a nahlas říká, co dokázal a co ne.
+        # `--verify-url` doplněno 2026-08-10 spolu se secretem. Bez něj krok
+        # o obsahu NIC netvrdí — a přesně tenhle stav 08-08 propustil extranet,
+        # který po zeleném nasazení servíroval bajtově týž bundle.
+        run: |
+          bash scripts/ci/deploy-and-verify.sh extranet \
+            --verify-url "${{ secrets.DEPLOY_VERIFY_URL_EXTRANET }}"
+
+  # ===========================================================================
+  # Deploy: Core stack (Supabase services + Edge Functions)
+  # ===========================================================================
+  # Docker images are built by Coolify during deploy.
+  # Coolify handles: git pull → docker build → env injection → deploy.
+  # ===========================================================================
+  # Deploy: Core — JEDNA aplikace, jedna úloha
+  # ===========================================================================
+  # Do 2026-08-08 tohle byly TŘI úlohy (Deploy: Web, Deploy: Core,
+  # Deploy: Keycloak) a všechny resolvovaly TUTÉŽ appku `${APP_PREFIX}-core`.
+  # Nebyly to tři nasazení — bylo to jedno, spuštěné třikrát, s NESTEJNÝMI
+  # předpoklady. A právě ta nestejnost dělala dvě díry:
+  #
+  #   1. `deploy-core` visel jen na `needs: [detect]`, takže push, který sáhl
+  #      na kód appky I na DB, nasadil obraz, zatímco testy appky ještě běžely.
+  #      (Dnešní merge #148 sahal přesně na obojí.)
+  #   2. `deploy-core` se spouštěl na `db_change` BEZ governance-gate — tedy
+  #      právě u změn, kvůli kterým ta brána existuje („mandatory for
+  #      DB/security-sensitive changes").
+  #
+  # Co appku nasadit MÁ, se odvozuje ZE ZMĚNY (detect), ne z toho, kolik úloh
+  # kdo napsal. Spouštěč je proto sjednocení všech šesti signálů a předpoklady
+  # jsou ta PŘÍSNĚJŠÍ varianta: dotkla-li se změna appky, musí být její testy
+  # zelené dřív, než se nasadí.
+  #
+  # ⛔ A PROČ TU JE `already_verified` (naměřeno 2026-08-08, po merge #152):
+  # ta přísnost sama o sobě dělala deploy NESPLNITELNÝM. `detect` umí prohlásit
+  # strom za už změřený (merge nepřinesl nic nad zelenou hlavu PR) a tím vypnout
+  # testovací úlohy — jenže `skipped` NENÍ `success`, takže podmínka výš padla
+  # právě tehdy, když úspora zabrala. Výsledek: ESDK se mergnul, všech 27 úloh
+  # svítilo zeleně, `Deploy: Extranet` skončil za 0 s a extranet servíroval starý
+  # bundle. Nasadilo se to až ručně o hodinu později.
+  #
+  # U `detect` přitom stálo napsané „deploy joby na tomhle výstupu záměrně
+  # nevisí". Nevisely — zato visely na VÝSLEDCÍCH úloh, které ten výstup vypíná.
+  # Záměr byl v komentáři, mechanismus dělal opak; a brána to nechytila, protože
+  # měřila PRAVOPIS (že se `already_verified` v deploy jobu nevyskytuje) místo
+  # VLASTNOSTI (že deploy pořád proběhne). Teď ji měří brána
+  # `deploy-se-nesmi-preskocit` tak, že podmínky VYHODNOTÍ.
+  #
+  # `already_verified` tedy nahrazuje důkaz „testy byly zelené" — ne otázku
+  # „týká se ta změna appky". Ta zůstává na detectu.
+  # ===========================================================================
+  deploy-core:
+    # ⛔ Ve jméně stálo „web ·" — a NEBYLA to pravda. Appka `<prefix>-core` staví
+    # z `docker-compose.coolify.yml`, jehož služba `web` nemá ŽÁDNÝ `args:` blok,
+    # takže web SPA odsud nevzniká. Bundle, který uživatel vidí, staví
+    # `<prefix>-edge` z `docker-compose.coolify-prebuilt.yml` — a ten do
+    # 2026-08-09 nenasazovala ŽÁDNÁ úloha (viz `deploy-edge` níž).
+    # Jméno úlohy je tvrzení o tom, co se nasadilo; nepravdivé jméno je horší
+    # než chybějící, protože se podle něj přestane hledat.
+    name: "Deploy: Core (keycloak · edge functions · db)"
+    runs-on: ubuntu-latest
+    # (1 + NASAZENI_OPAKOVANI) × (FRONTA_S + TIMEOUT_S) + prodleva: pokus = fronta Coolify
+    # 30 min + práce 30 min, jedno opakování po doložené přechodné chybě, 2 min čekání
+    # — hlídá `opakovani-nasazeni-se-vejde-do-ulohy`.
+    timeout-minutes: 125
+    needs: [detect, check-web, test-web, build-web, governance-gate, deploy-koren]
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.detect.result == 'success'
+      && needs.deploy-koren.result != 'failure'
+      && needs.deploy-koren.result != 'cancelled'
+      && contains(needs.detect.outputs.deploy_apps, ',core,')
+      && (needs.governance-gate.result == 'success' || needs.governance-gate.result == 'skipped')
+      && needs.check-web.result != 'failure'
+      && needs.check-web.result != 'cancelled'
+      && needs.test-web.result != 'failure'
+      && needs.test-web.result != 'cancelled'
+      && needs.build-web.result != 'failure'
+      && needs.build-web.result != 'cancelled'
+      && (needs.detect.outputs.app != 'true'
+          || needs.detect.outputs.already_verified == 'true'
+          || (needs.build-web.result == 'success'
+              && needs.check-web.result == 'success'
+              && needs.test-web.result == 'success'))
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/lib/coolify-resolve-uuid.sh
+            scripts/lib/coolify-project-scope.mjs
+            scripts/lib/coolify-instance-scope.mjs
+            scripts/lib/instance-overlay.mjs
+            scripts/lib/coolify-http.mjs
+            scripts/lib/povinne-promenne.mjs
+            scripts/lib/razeni.mjs
+            scripts/lib/compose-env-refs.mjs
+            scripts/lib/config-env-files.mjs
+            scripts/lib/env-hodnota.mjs
+            scripts/lib/cli-entry.mjs
+            scripts/ci/deploy-and-verify.sh
+            scripts/lib/nasazeni-prechodna-chyba.mjs
+            scripts/deploy/refresh-overlay-cachebust.sh
+            scripts/deploy/overlay-cachebust.sh
+            scripts/coolify-deploy-watch.mjs
+            scripts/lib/coolify-app-status.mjs
+            instances/
+
+      - name: Deploy core stack
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
+          # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
+          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
+          # deploy joby běží jen na push do main (kód z main), ne na PR.
+          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          GIT_SHA: ${{ github.sha }}
+          # Veřejná adresa pro sondu „odpovídá to?". Ze SECRETU, ne ze zdrojáku:
+          # adresa je vlastnost nasazení a každá instance má svou.
+          HEALTH_URL: ${{ secrets.DEPLOY_HEALTH_URL_CORE }}
+          # Jádro se vystavuje přes `api.`, které rovněž jde přes edge-proxy
+          # a vrátného (naměřeno 2026-09-05: 6/6 sond 403, prázdné tělo,
+          # `server: Caddy`; v logu svc-knock je každý dotaz na /dvere 403).
+          HEALTH_ZA_DVERMI: 'ano'
+          # Viz poznámka u extranetu: instance se DEKLARUJE, neodvozuje ze stromu.
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+        run: bash scripts/ci/deploy-and-verify.sh core
+
+  # ===========================================================================
+  # Deploy: Edge — TADY VZNIKÁ WEB, KTERÝ UŽIVATEL VIDÍ
+  # ===========================================================================
+  # ⛔ NAMĚŘENO 2026-08-09. `https://<web>/` servírovalo bundle s hlavičkou
+  # `last-modified: Fri, 07 Aug 2026 12:37:17 GMT` — DVA DNY starý, zatímco
+  # do mainu se ten den slilo deset PR a všechny deploy úlohy byly zelené.
+  #
+  # Příčina: appku `<prefix>-edge` NENASAZOVALA ŽÁDNÁ ÚLOHA.
+  #   <fork>-edge     → docker-compose.coolify-prebuilt.yml   ← služba `web` staví SPA
+  #   <fork>-core     → docker-compose.coolify.yml            ← `web` tu nemá `args:`
+  #   <fork>-extranet → docker-compose.coolify-extranet.yml
+  # Ověřeno přes Coolify API (`docker_compose_location` u všech tří appek), ne
+  # odhadem z názvu souboru.
+  #
+  # ⭐ Signál přitom EXISTOVAL a mířil vedle: `infra_web` se nastavuje z cesty
+  # `docker-compose.coolify-prebuilt.yml` — tedy z build vstupů EDGE stacku —
+  # ale spouštěl `deploy-core`. Filtr měřil správnou věc a výsledek se doručil
+  # špatné appce.
+  #
+  # Je to POČTVRTÉ táž třída (viz `deploy-job-nesmi-lhat.gate.test.ts`):
+  #   07-29 „Deploy: Web" volal /restart místo /deploy
+  #   07-30 extranet nebyl v žádné pipeline
+  #   08-08 zelené úlohy, extranet servíroval týž bundle
+  #   08-09 edge nebyl v žádné pipeline  ← tohle
+  # Pokaždé se opravil ten jeden výskyt. Proto tu nestačí přidat úlohu — brána
+  # `stack-bez-deploy-ulohy` níž měří VLASTNOST: compose, který něco staví,
+  # musí mít úlohu, která ho nasadí.
+  #
+  # Spouštěč: `edge` v `deploy_apps` — detektor ho vydá pro zdroj SPA (src/,
+  # packages/, vite.*, index.html, Dockerfile.web) i build vstupy edge stacku.
+  # Kvalitní brány webu jsou v `needs` ze stejného důvodu jako u core:
+  # nenasazovat rozbitý build.
+  deploy-edge:
+    name: "Deploy: Edge (web SPA · knock · edge-proxy)"
+    runs-on: ubuntu-latest
+    # (1 + NASAZENI_OPAKOVANI) × (FRONTA_S + TIMEOUT_S) + prodleva: pokus = fronta Coolify
+    # 30 min + práce 30 min, jedno opakování po doložené přechodné chybě, 2 min čekání
+    # — hlídá `opakovani-nasazeni-se-vejde-do-ulohy`.
+    timeout-minutes: 125
+    needs: [detect, check-web, test-web, build-web, governance-gate, deploy-koren]
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.detect.result == 'success'
+      && needs.deploy-koren.result != 'failure'
+      && needs.deploy-koren.result != 'cancelled'
+      && contains(needs.detect.outputs.deploy_apps, ',edge,')
+      && (needs.governance-gate.result == 'success' || needs.governance-gate.result == 'skipped')
+      && needs.check-web.result != 'failure'
+      && needs.check-web.result != 'cancelled'
+      && needs.test-web.result != 'failure'
+      && needs.test-web.result != 'cancelled'
+      && needs.build-web.result != 'failure'
+      && needs.build-web.result != 'cancelled'
+      && (needs.detect.outputs.app != 'true'
+          || needs.detect.outputs.already_verified == 'true'
+          || (needs.build-web.result == 'success'
+              && needs.check-web.result == 'success'
+              && needs.test-web.result == 'success'))
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/lib/coolify-resolve-uuid.sh
+            scripts/lib/coolify-project-scope.mjs
+            scripts/lib/coolify-instance-scope.mjs
+            scripts/lib/instance-overlay.mjs
+            scripts/lib/coolify-http.mjs
+            scripts/lib/povinne-promenne.mjs
+            scripts/lib/razeni.mjs
+            scripts/lib/compose-env-refs.mjs
+            scripts/lib/config-env-files.mjs
+            scripts/lib/env-hodnota.mjs
+            scripts/lib/cli-entry.mjs
+            scripts/ci/deploy-and-verify.sh
+            scripts/lib/nasazeni-prechodna-chyba.mjs
+            scripts/deploy/refresh-overlay-cachebust.sh
+            scripts/deploy/overlay-cachebust.sh
+            scripts/coolify-deploy-watch.mjs
+            scripts/lib/coolify-app-status.mjs
+            instances/
+
+      - name: Deploy edge stack
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
+          # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
+          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
+          # deploy joby běží jen na push do main (kód z main), ne na PR.
+          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          # Revizi bere `vite.config.ts` (define __GIT_SHA__) přes build arg
+          # `GIT_SHA`, který prebuilt compose PŘEDÁVÁ — na rozdíl od core compose.
+          GIT_SHA: ${{ github.sha }}
+          HEALTH_URL: ${{ secrets.DEPLOY_HEALTH_URL_EDGE }}
+          # Edge je PŘED dveřmi — doloženo měřením, ne úvahou: jeho sonda
+          # dostala z nezaklepaného runneru HTTP 200 (běh 226308, 2026-09-05).
+          # Tady tedy cokoli mimo 2xx/3xx JE pád, a to má zůstat.
+          HEALTH_ZA_DVERMI: 'ne'
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+        # `--verify-url` je tu ZÁMĚRNĚ: bez něj úloha dokáže jen „deploy doběhl",
+        # a přesně to dva dny mlčelo o starém bundlu. Adresa je vlastnost
+        # nasazení → ze secretu. Když secret není, skript to NAHLAS napíše
+        # („NEDOKÁZÁNO: že se změnil OBSAH artefaktu") místo tichého přeskočení.
+        run: |
+          bash scripts/ci/deploy-and-verify.sh edge \
+            --verify-url "${{ secrets.DEPLOY_VERIFY_URL_EDGE }}"
+
+  # ===========================================================================
+  deploy-n8n:
+    name: "Deploy: n8n Nodes"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [detect, test-n8n]
+    # `always()` tu není kosmetika: bez něj se úloha přeskočí UŽ TÍM, že se
+    # přeskočil `test-n8n` — podmínka níž by se ani nevyhodnotila. Táž vada jako
+    # u `deploy-core`, jen o jednu závislost dál.
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.detect.result == 'success'
+      && needs.detect.outputs.n8n_nodes == 'true'
+      && needs.test-n8n.result != 'failure'
+      && needs.test-n8n.result != 'cancelled'
+      && (needs.detect.outputs.already_verified == 'true'
+          || needs.test-n8n.result == 'success')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.N8N_NODE_VERSION }}
+
+      - name: Install & Build
+        working-directory: packages/n8n-nodes-aisha
+        run: |
+          bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+          npm run build
+
+      - name: Publish to Verdaccio
+        working-directory: packages/n8n-nodes-aisha
+        env:
+          VERDACCIO_TOKEN: ${{ secrets.VERDACCIO_TOKEN }}
+        run: |
+          if [ -z "$VERDACCIO_TOKEN" ]; then
+            echo "VERDACCIO_TOKEN not set — skipping publish"
+            exit 0
+          fi
+
+          VERDACCIO_HOST="${VERDACCIO_URL#https://}"; VERDACCIO_HOST="${VERDACCIO_HOST%/}"
+          echo "//${VERDACCIO_HOST}/:_authToken=${VERDACCIO_TOKEN}" > ~/.npmrc
+          npm publish --registry "${VERDACCIO_URL}" || echo "Version may already exist — skipping"
+
+      - name: Restart n8n to load new version
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          # Instance se DEKLARUJE (viz blok níž) — bez téhle proměnné krok neví,
+          # kterou Coolify appku nasadit, a padne s návodem místo hádání.
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+        run: |
+          set -uo pipefail
+          if [ -z "${COOLIFY_API_TOKEN:-}" ]; then
+            echo "::warning title=deploy je ručně::COOLIFY_API_TOKEN není nastaven — tahle úloha NIC nenasadila. Nasazuje se RUČNĚ: node scripts/aisha-redeploy.mjs --only=<app> (--status/--plan nasucho). Měřidlo je tag běžícího obrazu, NIKDY barva téhle úlohy."
+            exit 0
+          fi
+          export COOLIFY_URL="${COOLIFY_URL:?COOLIFY_URL must be set via repository secret}"
+          # ⛔ KTEROU instanci nasazujeme, se ŘEKNE — neodvozuje se ze stromu.
+          # Tenhle blok to dřív hádal z `ls instances/`. Jakmile instanční data
+          # odešla do datového repa (#163), výpis se vyprázdnil a KAŽDÝ z těchhle
+          # kroků padal po pár sekundách na „cannot derive the instance".
+          # #168 to opravil ve sdíleném `deploy-and-verify.sh`, ale tyhle tři
+          # inline kroky zůstaly na starém vzorci — oprava jednoho výskytu místo
+          # vlastnosti. Táž proměnná jako v `deploy.yml`: jeden způsob, ne dva.
+          APP_PREFIX="${APP_NAME_PREFIX:-}"
+          if [ -z "$APP_PREFIX" ]; then
+            echo "::error title=deploy neví, kterou instanci nasadit::APP_NAME_PREFIX není nastaven."
+            echo "Coolify appky se jmenují <prefix>-<role>. Prefix je DEKLARACE, ne odvozenina:"
+            echo "  nastav repo variable APP_NAME_PREFIX (Settings → Actions → Variables)."
+            exit 1
+          fi
+          # ⛔ Sufix je `-orchestration`, NE `-n8n`. Appka `<prefix>-n8n` neexistuje,
+          # takže resolver vracel ::notfound:: → warning → exit 0: úloha byla ZELENÁ
+          # a nenasadila nic. Naměřeno 2026-08-09 porovnáním cílů v ci.yml se
+          # skutečnými appkami v Coolify. `coolify-deploy-init.sh` obě jména zná
+          # (`n8n|orchestration)`), ale zakládá appku pod tím druhým.
+          UUID=$(bash scripts/lib/coolify-resolve-uuid.sh "${APP_PREFIX}-orchestration" 2>&1 || true)
+          # Dvě různá selhání, dva různé konce. "::notfound::" = appka v Coolify není
+          # (legitimní u instalace bez ní) → warning a jedeme dál. "::error::" =
+          # infrastruktura (API mlčí, chybí token nebo JSON runtime) → deploy PADÁ.
+          # 2026-08-02: obě větve končily warningem + exit 0, takže resolver bez `jq`
+          # v obrazu runneru odbyl KAŽDÝ deploy zeleně, aniž cokoli nasadil.
+          if printf '%s' "$UUID" | grep -q '::error::'; then
+            echo "::error title=deploy selhal::UUID se nepodařilo zjistit — infrastruktura, ne chybějící appka: $UUID"
+            exit 1
+          fi
+          if [ -z "$UUID" ] || printf '%s' "$UUID" | grep -q '::notfound::'; then
+            echo "::warning title=deploy je ručně::${APP_PREFIX}-orchestration v Coolify nenalezen — NIC se nenasadilo (nasazuje se ručně přes scripts/aisha-redeploy.mjs)."
+            exit 0
+          fi
+          printf 'Restarting ${APP_PREFIX}-orchestration (uuid=%s) — entrypoint installs latest from Verdaccio\n' "${UUID:0:12}"
+          curl -sS -X POST "${COOLIFY_URL}/api/v1/applications/${UUID}/restart" \
+            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            -H "Content-Type: application/json"
+          echo "n8n restart triggered"
+
+  # ===========================================================================
+  # Provision: n8n content (credentials + the 87 n8n/workflows/*.json)
+  #
+  # The missing deploy-path step behind "workflow_entity=0 in production":
+  # nodes were published (deploy-n8n) but nothing ever imported the workflow
+  # JSONs or created the credentials they reference by name. This job is the
+  # production equivalent of the local scripts/setup.sh provisioning block —
+  # idempotent (ensure-by-name), safe to re-run on every relevant push.
+  #
+  # One-time bootstrap (operator): create an n8n API key (n8n UI → Settings →
+  # API) and add repo secrets N8N_URL + N8N_API_KEY, plus the provider envs
+  # the credentials need (POSTGREST_SERVICE_TOKEN, OPENAI_API_KEY,
+  # ANTHROPIC_API_KEY, GOOGLE_AI_API_KEY, LANGFUSE_*). Until then the job
+  # skips with a warning instead of failing the pipeline.
+  # ===========================================================================
+  provision-n8n-content:
+    name: "Provision: n8n Content"
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [detect, deploy-n8n]
+    # Táž past ještě o krok dál: bez `always()` se tenhle krok přeskočil VŽDY,
+    # když se přeskočil `deploy-n8n` — tedy i u změny, která sahá JEN na
+    # workflowy (`n8n_workflow`), a to je přesně případ, pro který tu ta úloha
+    # je. Podmínka o tom mluvila, mechanismus ji nikdy nepustil ke slovu.
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.detect.result == 'success'
+      && (needs.detect.outputs.n8n_workflow == 'true'
+          || needs.detect.outputs.n8n_nodes == 'true')
+      && needs.deploy-n8n.result != 'failure'
+      && needs.deploy-n8n.result != 'cancelled'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.N8N_NODE_VERSION }}
+
+      - name: Provision credentials + workflows
+        env:
+          N8N_URL: ${{ secrets.N8N_URL }}
+          N8N_API_KEY: ${{ secrets.N8N_API_KEY }}
+          POSTGREST_SERVICE_TOKEN: ${{ secrets.POSTGREST_SERVICE_TOKEN }}
+          N8N_POSTGREST_URL: ${{ secrets.N8N_POSTGREST_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
+          FORGEJO_URL: ${{ secrets.N8N_FORGEJO_URL }}
+          # env name stays FORGEJO_API_TOKEN (consumer contract); the SECRET is
+          # REPO_API_TOKEN — org-scope (`GET /orgs/aisha/actions/secrets`, naměřeno
+          # 2026-09-12, Forgejo 16.0.2). Forgejo's FORGEJO_ prefix ban (ValidateName)
+          # applies to CREATING a secret only: an existing repo-scope
+          # FORGEJO_API_TOKEN exists and is delivered too — FetchActionSecrets
+          # merges owner + repo secrets, so non-fork runs receive both.
+          FORGEJO_API_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          GITHUB_API_TOKEN: ${{ secrets.N8N_GITHUB_API_TOKEN }}
+          LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
+          LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
+          LANGFUSE_SECRET_KEY: ${{ secrets.LANGFUSE_SECRET_KEY }}
+          NOCODB_URL: ${{ secrets.NOCODB_URL }}
+          NOCODB_API_TOKEN: ${{ secrets.NOCODB_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${N8N_URL:-}" ] || [ -z "${N8N_API_KEY:-}" ]; then
+            echo "::warning::N8N_URL / N8N_API_KEY secrets not set — n8n content provisioning skipped. See the one-time bootstrap note in this job's header."
+            exit 0
+          fi
+
+          echo "Waiting for n8n to be healthy after restart..."
+          for i in $(seq 1 30); do
+            if curl -sf --max-time 5 "${N8N_URL}/healthz" > /dev/null 2>&1; then
+              echo "n8n healthy."
+              break
+            fi
+            [ "$i" = "30" ] && { echo "::error::n8n did not become healthy in 150s"; exit 1; }
+            sleep 5
+          done
+
+          node scripts/n8n/provision-credentials.mjs
+          node scripts/deploy-workflows.mjs
+
+      - name: Verify Dirigent webhooks live
+        env:
+          N8N_URL: ${{ secrets.N8N_URL }}
+        run: |
+          set -uo pipefail
+          if [ -z "${N8N_URL:-}" ]; then exit 0; fi
+          # Active workflows answer on their production webhook paths (any
+          # HTTP status except 404 means the route is registered).
+          fail=0
+          for hook in dirigent-agent sentry-observe fix-proposer drift-now; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+              -X POST -H 'Content-Type: application/json' -d '{"ping":"ci-verify"}' \
+              "${N8N_URL}/webhook/${hook}" || echo 000)
+            if [ "$code" = "404" ]; then
+              echo "::error::webhook /${hook} → 404 (workflow not imported or not active)"
+              fail=1
+            else
+              echo "webhook /${hook} → ${code} (registered)"
+            fi
+          done
+          exit $fail
+
+  # ===========================================================================
+  # Deploy: Infrastructure stacks (Integration, Langfuse, Admin,
+  # + Phase 2 autopilot: LLM Gateway, OpenClaw — both opt-in tier=optional)
+  # ===========================================================================
+  # Deploy: podle manifestu a vln — JEDNA cesta pro všechny stacky
+  # ===========================================================================
+  # ⛔ NAMĚŘENO 2026-09-16. Úloha `deploy-infra` vyjmenovávala stacky ručně
+  # (integration, langfuse, admin, llm-gateway, openclaw, shared-redis,
+  # web-render), pět z nich jen `POST /restart` bez čekání, a visela jen na
+  # `detect` — nasazovala i bez zelených testů. Po merge #993 spadla na UUID
+  # a zbylých 22 stacků (ai-chat, domain-services, exec, ledger, local-ingest,
+  # model, realtime, keycloak, netbird, pki…) nenasazovala ŽÁDNÁ úloha — baseline
+  # `stack-bez-deploy-ulohy` je vedla jako „nasazují se ručně".
+  #
+  # Majitel týž den: nic ručně — CI nasazuje VŠECHNY dotčené stacky ve vlnách,
+  # trezor zůstává mimo CI. Které stacky, říká detektor (`deploy_apps` = stavba);
+  # v jakém pořadí, říká pole WAVES v aisha-redeploy.mjs (tentýž zdroj jako
+  # cold-start). Každý stack nasadí deploy-and-verify.sh (čeká, měří povinné
+  # proměnné a revizi). Chybí-li aplikaci proměnná z nového kontraktu, krok
+  # PADNE s návodem — doručení je věc cold-startu, ne CI.
+  #
+  # Dvě úlohy, protože Core/Edge/Extranet mají vlastní úlohy s ověřovacími
+  # adresami z tajemství: KOŘEN (vlny 0–2: netinit, registry, pki) musí stát
+  # dřív než ony, STACKY (vlny 3+) až po nich.
+  deploy-koren:
+    name: "Deploy: Kořen (vlny 0–2 · netinit · registry · pki)"
+    runs-on: ubuntu-latest
+    # Vlny 0–2 jdou po sobě; každá appka smí jednou opakovat doložený přechodný pád
+    # (deploy-and-verify.sh), proto rezerva nad dřívějších 60 min.
+    timeout-minutes: 90
+    needs: [detect, check-web, test-web, build-web, governance-gate, coldstart-db-gate, service-tests, blockchain-integration, av-integration-gate, surface-tests, surface-contract-gate, test-cosmos]
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.detect.result == 'success'
+      && needs.detect.outputs.deploy_apps != ',,'
+      && needs.check-web.result != 'failure'
+      && needs.check-web.result != 'cancelled'
+      && needs.test-web.result != 'failure'
+      && needs.test-web.result != 'cancelled'
+      && needs.build-web.result != 'failure'
+      && needs.build-web.result != 'cancelled'
+      && needs.governance-gate.result != 'failure'
+      && needs.governance-gate.result != 'cancelled'
+      && needs.coldstart-db-gate.result != 'failure'
+      && needs.coldstart-db-gate.result != 'cancelled'
+      && needs.service-tests.result != 'failure'
+      && needs.service-tests.result != 'cancelled'
+      && needs.blockchain-integration.result != 'failure'
+      && needs.blockchain-integration.result != 'cancelled'
+      && needs.av-integration-gate.result != 'failure'
+      && needs.av-integration-gate.result != 'cancelled'
+      && needs.surface-tests.result != 'failure'
+      && needs.surface-tests.result != 'cancelled'
+      && needs.surface-contract-gate.result != 'failure'
+      && needs.surface-contract-gate.result != 'cancelled'
+      && needs.test-cosmos.result != 'failure'
+      && needs.test-cosmos.result != 'cancelled'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/
+            instances/
+
+      - name: Nasadit dotčené stacky po vlnách (0-2)
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
+          # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
+          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
+          # deploy joby běží jen na push do main (kód z main), ne na PR.
+          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          GIT_SHA: ${{ github.sha }}
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+          DEPLOY_APPS: ${{ needs.detect.outputs.deploy_apps }}
+        run: |
+          bash scripts/ci/nasad-podle-vln.sh --aplikace "$DEPLOY_APPS" --vlny 0-2
+
+  # Vlny 3+ — po kořeni a po úlohách Core/Edge/Extranet (ty se vynechávají,
+  # nasazují je vlastní úlohy; brána stack-bez-deploy-ulohy hlídá, že seznam
+  # `--vynech` odpovídá úlohám, které je opravdu nasazují).
+  deploy-stacky:
+    name: "Deploy: Stacky po vlnách (vlny 3+)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    needs: [detect, check-web, test-web, build-web, governance-gate, coldstart-db-gate, service-tests, blockchain-integration, av-integration-gate, surface-tests, surface-contract-gate, test-cosmos, deploy-koren, deploy-core, deploy-edge, deploy-extranet]
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.detect.result == 'success'
+      && needs.detect.outputs.deploy_apps != ',,'
+      && needs.check-web.result != 'failure'
+      && needs.check-web.result != 'cancelled'
+      && needs.test-web.result != 'failure'
+      && needs.test-web.result != 'cancelled'
+      && needs.build-web.result != 'failure'
+      && needs.build-web.result != 'cancelled'
+      && needs.governance-gate.result != 'failure'
+      && needs.governance-gate.result != 'cancelled'
+      && needs.coldstart-db-gate.result != 'failure'
+      && needs.coldstart-db-gate.result != 'cancelled'
+      && needs.service-tests.result != 'failure'
+      && needs.service-tests.result != 'cancelled'
+      && needs.blockchain-integration.result != 'failure'
+      && needs.blockchain-integration.result != 'cancelled'
+      && needs.av-integration-gate.result != 'failure'
+      && needs.av-integration-gate.result != 'cancelled'
+      && needs.surface-tests.result != 'failure'
+      && needs.surface-tests.result != 'cancelled'
+      && needs.surface-contract-gate.result != 'failure'
+      && needs.surface-contract-gate.result != 'cancelled'
+      && needs.test-cosmos.result != 'failure'
+      && needs.test-cosmos.result != 'cancelled'
+      && needs.deploy-koren.result != 'failure'
+      && needs.deploy-koren.result != 'cancelled'
+      && needs.deploy-core.result != 'failure'
+      && needs.deploy-core.result != 'cancelled'
+      && needs.deploy-edge.result != 'failure'
+      && needs.deploy-edge.result != 'cancelled'
+      && needs.deploy-extranet.result != 'failure'
+      && needs.deploy-extranet.result != 'cancelled'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/
+            instances/
+
+      - name: Nasadit dotčené stacky po vlnách (3-)
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
+          # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
+          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
+          # deploy joby běží jen na push do main (kód z main), ne na PR.
+          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          GIT_SHA: ${{ github.sha }}
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+          DEPLOY_APPS: ${{ needs.detect.outputs.deploy_apps }}
+        run: |
+          bash scripts/ci/nasad-podle-vln.sh --aplikace "$DEPLOY_APPS" --vlny 3- \
+            --vynech core,edge,extranet
+
+  # ===========================================================================
+  # Governance Gate — mandatory for DB/security-sensitive changes
+  # Runs: validate:static + access-flow analysis (file-based, no DB needed)
+  # Blocks deploy-web when db_change or security_change is detected.
+  # ===========================================================================
+  governance-gate:
+    name: "Governance: DB & Security Gate"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: detect
+    if: >-
+      needs.detect.outputs.already_verified != 'true'
+      && (needs.detect.outputs.db_change == 'true'
+      || needs.detect.outputs.security_change == 'true')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+
+      - name: Static SQL validation
+        run: npm run validate:static
+
+      - name: Security access-flow analysis (file-based)
+        run: node scripts/db/db-manager/access.mjs --static
+
+      - name: Source-of-truth consistency check
+        run: node scripts/db/db-manager/source.mjs
+
+  # ===========================================================================
+  # Build-runner health (ALWAYS-ON) — the one job with NO detect gate, so a
+  # down build runner / DinD daemon turns CI RED on EVERY push/PR instead of
+  # being masked by the cold-start gate's skip→success (that masking hid the
+  # build daemon being down for weeks, 2026-05→06). Cheap: just pings the DinD
+  # daemon (docker:2375) the build jobs use. node ships in the runner image
+  # (node:20-bookworm) so there is no apt install.
+  # ===========================================================================
+  build-runner-health:
+    name: "Build-runner health (always-on)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Probe Docker the SAME way the build jobs actually reach it — `docker info`
+      # over the runner's real DOCKER_HOST (a mounted socket), NOT a hardcoded
+      # tcp://docker:2375 TCP endpoint. The old probe pinged docker:2375, which
+      # the runner doesn't expose, so it reported the build runner DOWN while
+      # cold-start + AV-integration jobs on the SAME runner built images fine —
+      # a permanent false-negative. This probe is true-positive: it observes the
+      # exact channel the build jobs use.
+      - name: Install docker CLI (best-effort)
+        continue-on-error: true
+        run: |
+          if command -v docker >/dev/null 2>&1; then docker --version; exit 0; fi
+          if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends ca-certificates curl gnupg
+          $SUDO install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/debian/gpg | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          $SUDO chmod a+r /etc/apt/keyrings/docker.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" | $SUDO tee /etc/apt/sources.list.d/docker.list >/dev/null
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends docker-ce-cli
+          docker --version
+      - name: Check DinD build daemon via runner DOCKER_HOST — fail fast if down
+        run: |
+          if ! command -v docker >/dev/null 2>&1; then
+            echo "::error::docker CLI could not be installed on the build-runner-health job — cannot verify the DinD daemon. Investigate the runner image."
+            exit 1
+          fi
+          if timeout 30 docker info >/dev/null 2>&1; then
+            echo "✅ DinD build daemon healthy (docker info OK via DOCKER_HOST=${DOCKER_HOST:-<socket>})"
+          else
+            echo "::error::Build-runner DinD daemon UNREACHABLE (docker info failed) — the aisha-ci-runner build daemon is DOWN; build / cold-start jobs cannot run. Restart the aisha-ci-runner on the build server via Coolify."
+            exit 1
+          fi
+
+      # ---------------------------------------------------------------------
+      # Address-pool headroom — the failure this catches is SILENT and looks
+      # like a network outage, so it has to be measured, not assumed.
+      #
+      # Every job gets its own WORKFLOW-* network. A runner killed mid-job
+      # (restart, OOM, host reboot) leaks that network and its container, and
+      # `act` never comes back to clean them. The daemon's first pool is
+      # 172.17.0.0/12 = 15 blocks of /16; once they are gone Docker silently
+      # falls back to its SECOND default pool, 192.168.0.0/16. Measured
+      # 2026-08-02 on this runner: the spill landed on 192.168.0.0/20, which
+      # CONTAINS the host's own resolver (192.168.2.1 in /etc/resolv.conf). The
+      # resolver then looks on-link to the job container, its queries never
+      # leave the bridge, and every checkout dies on
+      #     fatal: unable to access '…': Could not resolve host: repo.id3a.cz
+      # — 8 leaked networks accumulated since June before it crossed over.
+      #
+      # No addresses are pinned here: the check READS the daemon's own pools and
+      # counts what is free, so it stays true if the pools are ever reconfigured.
+      # Leaked networks are reaped only when nothing is attached to them, which
+      # is exactly the definition of a leak — a live job's network has its
+      # container and survives.
+      - name: Reap leaked job networks + fail on address-pool exhaustion
+        run: |
+          set -uo pipefail
+          reap=$(docker network prune -f --filter 'label!=keep' 2>/dev/null | tail -n +2 | grep -c . || true)
+          [ "${reap:-0}" -gt 0 ] && echo "reaped ${reap} leaked network(s) — a runner died mid-job at some point"
+
+          # Occupancy of the daemon's FIRST default pool, read from the daemon.
+          pool=$(docker network ls -q | xargs -r docker network inspect \
+                   --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}' 2>/dev/null | grep -c '^172\.' || true)
+          spill=$(docker network ls -q | xargs -r docker network inspect \
+                   --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}' 2>/dev/null | grep -c '^192\.168\.' || true)
+          echo "networks on the 172.16/12 pool: ${pool}/15 · already spilled to 192.168/16: ${spill}"
+
+          if [ "${spill:-0}" -gt 0 ]; then
+            echo "::error::A job network sits on 192.168.0.0/16 — the pool for LAN addresses. If the runner's resolver lives there, every job loses DNS and checkouts fail with 'Could not resolve host'. Reap the leaked networks on the build server (docker network prune inside the DinD) or give the daemon a default-address-pool that cannot collide with the LAN."
+            exit 1
+          fi
+          if [ "${pool:-0}" -ge 13 ]; then
+            echo "::error::Only $((15 - pool)) network block(s) left in the daemon's first address pool — the next runs will spill into 192.168.0.0/16 and lose DNS. Reap leaked WORKFLOW networks on the build server now."
+            exit 1
+          fi
+          echo "✅ address-pool headroom OK"
+
+  # ===========================================================================
+  # Cold-start DB gate — applies baseline + every delta to a REAL platform Postgres (the
+  # platform image: pgvector + pgaudit + substrate) and runs verify-cold-start-
+  # apply.sh. Catches the failure class static gates cannot: migration apply-order
+  # breakage, AND (step 5/5) SECURITY DEFINER RPCs left PUBLIC/anon-exposed on a
+  # FRESH deploy — the audience footgun fixed by 20260531000000. This is the live
+  # home for check-definer-rpc-security.mjs (catalog-authoritative; access.mjs
+  # --static above only sees aisha/db/sql/functions/). Runs on DB/security changes.
+  # ===========================================================================
+  coldstart-db-gate:
+    name: "Cold-start: apply + DB-security gate"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: detect
+    if: >-
+      needs.detect.outputs.already_verified != 'true'
+      && (needs.detect.outputs.db_change == 'true'
+      || needs.detect.outputs.security_change == 'true')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # migrate.mjs + check-definer-rpc-security.mjs are stdlib + psql only (no npm
+      # deps), so the heavy `npm ci` is unnecessary here — just the psql client.
+      - name: Install psql client
+        run: |
+          # The act-based Forgejo runner runs as root and has no `sudo`
+          # (nektos/act#107) — `sudo` would exit 127. A real GitHub runner is
+          # non-root and needs sudo. Use sudo only when it's actually present.
+          if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
+          $SUDO apt-get update && $SUDO apt-get install -y --no-install-recommends postgresql-client
+
+      - name: Install docker CLI (DinD daemon already reachable via the runner socket mount)
+        run: |
+          # node:20-bookworm has the DinD socket bound (CI runner config.yml) but
+          # no `docker` binary, so `docker build` below failed with
+          # "docker: command not found" (exit 127). Install the CLI with the same
+          # apt recipe the ci-runner image uses. Idempotent: a baked job image that
+          # already ships docker (the ci-docker label, once activated) short-circuits.
+          if command -v docker >/dev/null 2>&1; then docker --version; exit 0; fi
+          # act-based Forgejo runner is root (no sudo); a real GitHub runner needs it.
+          if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends ca-certificates curl gnupg
+          $SUDO install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/debian/gpg | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          $SUDO chmod a+r /etc/apt/keyrings/docker.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" | $SUDO tee /etc/apt/sources.list.d/docker.list >/dev/null
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends docker-ce-cli
+          docker --version
+
+      # Skip-clean (NOT hollow-green) when the single self-hosted runner has no
+      # usable DinD — the #279 OOM / 'docker:2375 503' / lost-daemon class that
+      # this heavy build job is most prone to. The gate's CONTENT is verified
+      # locally (verify-cold-start-apply.sh PASSES; self-eval 10/10); a genuinely
+      # DOWN build daemon is caught separately by the always-on build-runner-health
+      # canary. So skipping here on DinD-unavailability is correct: it stops a
+      # transient infra outage from masquerading as a DB-security gate failure.
+      - name: Detect DinD availability
+        id: dind
+        # Retry the reachability probe before failing loud. The soren build
+        # runner is SHARED (capacity 2 → two coldstart jobs hit ONE DinD
+        # concurrently); a single `docker info` can transiently time out when the
+        # daemon is momentarily saturated, which previously red-failed a
+        # code-correct PR (a false negative). Up to 5 attempts over ~50 s absorbs
+        # that blip WITHOUT masking a genuine outage: if DinD is truly down it
+        # still exits 1 after the last attempt (fail-loud contract preserved — no
+        # skip-to-green).
+        run: |
+          available=false
+          for attempt in 1 2 3 4 5; do
+            if command -v docker >/dev/null 2>&1 && timeout 30 docker info >/dev/null 2>&1; then
+              available=true
+              break
+            fi
+            echo "DinD probe attempt ${attempt}/5 failed (daemon saturated/unreachable) — retrying in 6 s…" >&2
+            sleep 6
+          done
+          if [ "$available" = "true" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error title=coldstart-db-gate::DinD daemon UNREACHABLE after 5 attempts — the cold-start apply + DB-security gate (incl. check-definer-rpc-security.mjs) CANNOT run and MUST NOT skip-to-green. DinD is a HARD requirement, guaranteed by the soren build runner in the Coolify stack. Restart the aisha-ci-runner DinD daemon; do not merge on a masked gate."
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+
+      - name: Build platform Postgres image (pgvector + pgaudit + substrate)
+        if: steps.dind.outputs.available == 'true'
+        # Context = infra/postgres (NOT repo root): the image only COPYs these 5
+        # files. Streaming the full 27 MB+ repo tar to the remote DinD daemon
+        # broke the pipe ("write: broken pipe" → cold-start CI failure); a ~40 KB
+        # context transfers reliably.
+        # Major verze = domov config/image-versions.env (táž, kterou env-doktor
+        # zapisuje novým instancím). CI měří verzi, která se nasazuje, ne dosazenou.
+        run: |
+          bash scripts/ci/registry-proxy-guard.sh
+          PG_MAJOR=$(node --input-type=module -e 'import {postgresMajor} from "./scripts/lib/postgres-major.mjs"; console.log(postgresMajor())')
+          echo "PostgreSQL major: $PG_MAJOR"
+          docker build --build-arg REGISTRY_PROXY="$REGISTRY_PROXY" --build-arg PG_MAJOR="$PG_MAJOR" \
+            -f infra/postgres/Dockerfile -t aisha-postgres-coldstart infra/postgres
+
+      # Service containers JOIN THE JOB'S NETWORK NAMESPACE: with the runner's
+      # dind-socket job mount, the job container and every `docker run`
+      # container are SIBLINGS on the shared DinD — `-p 5432:5432` publishes on
+      # the DinD host, which the job's `localhost` can never reach. Every
+      # coldstart run on the consolidated soren runner failed exactly here: PG
+      # logged "accepting connections" (unix-socket pg_isready inside the
+      # container) while the job's TCP psql got ECONNREFUSED.
+      #
+      # The job's OWN container id is resolved from /proc/self/mountinfo
+      # (the /containers/<64-hex>/ mount source — works on both the host
+      # docker layout AND the DinD named-volume layout _data/containers/) — NOT
+      # from $(hostname): act_runner can set
+      # a custom hostname/alias for the job container (run 1840 proved the
+      # hostname join silently produced a non-joined PG), while the mountinfo
+      # path is the daemon's ground truth for the running container.
+      #
+      # Container names carry ${{ github.run_id }}: the single consolidated
+      # runner (capacity 2) executes two runs' coldstart jobs CONCURRENTLY on
+      # ONE shared DinD — fixed names collide ("name already in use").
+      - name: Start cold-start Postgres
+        if: steps.dind.outputs.available == 'true'
+        run: |
+          CID=$( (grep -m1 -oE '/containers/[0-9a-f]{64}' /proc/self/mountinfo || true) | awk -F/ '{print $3}')
+          test -n "$CID" || { echo "::error::cannot resolve own container id from /proc/self/mountinfo"; exit 1; }
+          echo "job container id: ${CID:0:12}"
+          docker run -d --name "coldstart-${{ github.run_id }}" \
+            --network "container:${CID}" \
+            -e POSTGRES_PASSWORD=ci -e POSTGRES_DB=postgres -e JWT_SECRET=ci-coldstart \
+            -e VAULT_ENCRYPTION_KEY=ci-vault-encryption-key -e COLUMN_ENCRYPTION_KEY=ci-column-encryption-key \
+            aisha-postgres-coldstart
+          # Assert the join actually happened — a silent non-join is exactly the
+          # failure mode this step replaces; fail loudly instead of at psql.
+          MODE=$(docker inspect "coldstart-${{ github.run_id }}" --format '{{.HostConfig.NetworkMode}}')
+          case "$MODE" in container:*) echo "network join OK ($MODE)";; *) echo "::error::PG container did not join the job namespace (mode=$MODE)"; exit 1;; esac
+          for i in $(seq 1 60); do
+            pg_isready -h 127.0.0.1 -p 5432 -U postgres >/dev/null 2>&1 && break
+            docker exec "coldstart-${{ github.run_id }}" pg_isready -U postgres >/dev/null 2>&1 || true
+            sleep 1
+          done
+          pg_isready -h 127.0.0.1 -p 5432 -U postgres
+
+      - name: Apply baseline + all deltas + DB-security invariants (step 5/5)
+        if: steps.dind.outputs.available == 'true'
+        env:
+          AISHA_DB_URL: postgres://postgres:ci@localhost:5432/postgres
+        run: bash scripts/db/verify-cold-start-apply.sh
+
+      - name: Verify no deferred-migration overrides (baseline == cold-start fn bodies)
+        if: steps.dind.outputs.available == 'true'
+        run: |
+          # Same job-namespace join as the FULL container; both PGs share the
+          # job's network namespace, so BASE listens on 5433 via a server arg
+          # (the image CMD's config_file is preserved; `-p` publishing is
+          # meaningless under the namespace join — see the Start step note).
+          CID=$( (grep -m1 -oE '/containers/[0-9a-f]{64}' /proc/self/mountinfo || true) | awk -F/ '{print $3}')
+          test -n "$CID" || { echo "::error::cannot resolve own container id from /proc/self/mountinfo"; exit 1; }
+          docker run -d --name "coldstart-base-${{ github.run_id }}" \
+            --network "container:${CID}" \
+            -e POSTGRES_PASSWORD=ci -e POSTGRES_DB=postgres -e JWT_SECRET=ci-coldstart \
+            -e VAULT_ENCRYPTION_KEY=ci-vault-encryption-key -e COLUMN_ENCRYPTION_KEY=ci-column-encryption-key \
+            aisha-postgres-coldstart \
+            postgres -c config_file=/etc/postgresql/postgresql.conf -c port=5433
+          MODE=$(docker inspect "coldstart-base-${{ github.run_id }}" --format '{{.HostConfig.NetworkMode}}')
+          case "$MODE" in container:*) echo "network join OK ($MODE)";; *) echo "::error::BASE PG did not join the job namespace (mode=$MODE)"; exit 1;; esac
+          for i in $(seq 1 60); do
+            pg_isready -h 127.0.0.1 -p 5433 -U postgres >/dev/null 2>&1 && break
+            sleep 1
+          done
+          pg_isready -h 127.0.0.1 -p 5433 -U postgres
+          # BASE = substrate + baseline ONLY (== the SoT intent; no deferred deltas)
+          docker exec -i "coldstart-base-${{ github.run_id }}" psql -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 -q -f - < infra/postgres/000_init_roles_schemas.sql
+          docker exec -i "coldstart-base-${{ github.run_id }}" psql -p 5433 -U postgres -d postgres -v ON_ERROR_STOP=1 -q -f - < aisha/db/migrations/00000000000000_baseline.sql
+          BASE_DB_URL=postgres://postgres:ci@localhost:5433/postgres \
+          FULL_DB_URL=postgres://postgres:ci@localhost:5432/postgres \
+            node scripts/db/verify-no-deferred-override.mjs
+
+      # Upgrade-path gate — reproduce the failure class fe939cf1 hit in prod: a
+      # schema change folded into the baseline + needed by the seed reaches FRESH
+      # DBs but NOT existing ones (the baseline is never re-applied to an existing
+      # DB). On a throwaway probe DB on this same cluster, regress to the pre-fold
+      # state and prove the REAL runner (migrate.mjs → heals.sql) reconciles it
+      # and the REAL seed applies clean — exactly what a prod redeploy does. The
+      # fresh-only apply+seed steps above cannot see this; only an existing-DB
+      # upgrade can. See scripts/db/verify-upgrade-apply.sh.
+      - name: Upgrade-path gate — existing DB reconciles + seeds (heals.sql)
+        if: steps.dind.outputs.available == 'true'
+        env:
+          AISHA_DB_URL: postgres://postgres:ci@localhost:5432/postgres
+        run: bash scripts/db/verify-upgrade-apply.sh
+
+      # Seed the freshly-migrated DB (core incl. agent_catalog 'dirigent' + demo
+      # incl. the self-eval showcase fixture demo/04) so the functional RPC tests
+      # below exercise the lens + the proposal-outcome loop against real signals
+      # on a CLEAN, fully-seeded stack — the failure class contract gates cannot see.
+      - name: Seed core + demo (incl. self-eval showcase fixture)
+        if: steps.dind.outputs.available == 'true'
+        env:
+          AISHA_DB_URL: postgres://postgres:ci@localhost:5432/postgres
+        run: psql "$AISHA_DB_URL" -v ON_ERROR_STOP=1 -q -f aisha/db/seed.compiled.sql
+
+      # npm deps are intentionally absent above (migrate/verify are psql+stdlib),
+      # but the functional self-eval suite is vitest — install here, scoped to it.
+      - name: Install deps (functional self-eval RPC suite)
+        if: steps.dind.outputs.available == 'true'
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+
+      - name: Repair native optional deps (npm/cli#4828 guard)
+        if: steps.dind.outputs.available == 'true'
+        run: bash scripts/ci/repair-native-deps.sh
+
+      - name: Self-eval functional RPC tests (seeded clean stack)
+        if: steps.dind.outputs.available == 'true'
+        env:
+          AISHA_DB_HOST: localhost
+          AISHA_DB_PORT: "5432"
+          AISHA_DB_USER: postgres
+          AISHA_DB_PASSWORD: ci
+          AISHA_DB_NAME: postgres
+        run: npx vitest run src/tests/db/self-eval-rpc-runtime.test.ts
+
+      - name: Teardown
+        if: always()
+        run: docker rm -f "coldstart-${{ github.run_id }}" "coldstart-base-${{ github.run_id }}" || true
+
+  # ===========================================================================
+  # AV: real clamd + MinIO integration gate. Exercises the upload AV flow against
+  # LIVE backends (not mocks) — the av-scan INSTREAM client against a real clamd
+  # (incl. the EICAR signature) and scanAndPromote against real MinIO (S3
+  # get/copy/delete) through the orchestration. Uses `docker build` + `docker run`
+  # (same DinD primitives as coldstart-db-gate; no `docker compose` dependency).
+  # The Postgres leg is covered by coldstart-db-gate's document-av rpc-runtime test.
+  # Runs when the upload-AV surface changes, but SKIPS GRACEFULLY (not hollow-green) when the
+  # runner has no Docker/DinD (no docker CLI, or the DinD daemon is 503/unreachable) — same
+  # constraint that keeps Semgrep/Trivy/SBOM on-demand. The AV flow is fully covered locally
+  # (npm run test:integration:av, 6/6); this gate adds live-backend coverage only when DinD is up.
+  # ===========================================================================
+  av-integration-gate:
+    name: "AV: real clamd + MinIO integration"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Serialize after test-web like the other heavy DinD/test lanes — this gate was
+    # OOM-killed collaterally on a PR that merely touched a service (storage-auth),
+    # because it ran concurrently with test-web on the single runner (#279).
+    needs: [detect, test-web]
+    if: ${{ needs.detect.outputs.already_verified != 'true' && !cancelled() && needs.detect.outputs.av_change == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # node:20-bookworm has the DinD socket bound but no docker binary (same as
+      # coldstart-db-gate). Best-effort install; continue-on-error so a runner without
+      # Docker/network does not fail the job — the guarded step below skips cleanly instead.
+      - name: Install docker CLI (best-effort)
+        continue-on-error: true
+        run: |
+          if command -v docker >/dev/null 2>&1; then docker --version; exit 0; fi
+          if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends ca-certificates curl gnupg
+          $SUDO install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/debian/gpg | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          $SUDO chmod a+r /etc/apt/keyrings/docker.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" | $SUDO tee /etc/apt/sources.list.d/docker.list >/dev/null
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends docker-ce-cli
+          docker --version
+
+      - name: AV integration (real clamd + MinIO, EICAR) — skips if DinD unavailable
+        run: |
+          # DinD is a HARD requirement (soren build runner). Do NOT skip-to-green when it is
+          # unreachable — that masks the live clamd+MinIO AV gate. Fail loud so the daemon
+          # gets fixed. The AV flow is also covered locally (npm run test:integration:av, 6/6).
+          if ! command -v docker >/dev/null 2>&1 || ! timeout 30 docker info >/dev/null 2>&1; then
+            echo "::error title=av-integration::DinD daemon UNREACHABLE — the live clamd+MinIO integration CANNOT run and MUST NOT skip-to-green. DinD is guaranteed by the soren runner; restart the aisha-ci-runner DinD daemon."
+            exit 1
+          fi
+          # cwd-independent @aisha/@evymo → Verdaccio pin + fail-loud on empty URL
+          # (dependency-confusion class; the 2026-07-14 @aisha/observability 404).
+          bash scripts/ci/npm-scope-guard.sh
+          bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+          npm run build:packages   # storage-auth imports @aisha/* via built dist/
+          # clamd obraz staví infra/clamav/Dockerfile (FROM ${REGISTRY_PROXY}clamav/…),
+          # MinIO docker/minio/Dockerfile (ze zdroje přes Go proxy);
+          # run-av-integration.mjs předá REGISTRY_PROXY z prostředí jako build-arg.
+          bash scripts/ci/registry-proxy-guard.sh
+          # Retry once: heavy DinD job on a shared runner can take a transient OOM-kill.
+          if ! npm run test:integration:av; then
+            echo "::warning::av integration failed — retrying once (transient-OOM/DinD tolerance)"
+            npm run test:integration:av
+          fi
+
+  # ===========================================================================
+  # CI: Microservice unit/integration tests — per-service vitest
+  # ===========================================================================
+  # Runs `npm run test:services` (scripts/test/run-service-tests.mjs auto-discovers
+  # every services/svc-*/ with a vitest config + test script and runs them, one
+  # per-service summary line). Pure Node — no Docker/DinD needed: the suites that
+  # require a live backend (e.g. svc-blockchain *.integration.test.ts) self-skip
+  # when POSTGREST_URL is unset and are covered by the blockchain-integration job
+  # below. Gated on any services/ change (or the shared runner script).
+  # ===========================================================================
+  service-tests:
+    name: "Services: Tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Serialize AFTER the heaviest job (test-web) so the single self-hosted runner is
+    # not running test-web + service-tests + the other heavy jobs concurrently (#279
+    # OOM class — collateral OOM was sinking AV too). !cancelled() so a skipped/failed
+    # test-web does not skip us: `needs` here is for ORDERING, not a hard dependency.
+    needs: [detect, test-web]
+    if: ${{ needs.detect.outputs.already_verified != 'true' && !cancelled() && needs.detect.outputs.services_change == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+
+      # Service suites run under vitest (same rollup/@swc native-binding exposure
+      # as the web suites) — shared npm/cli#4828 guard.
+      - name: Repair native optional deps (npm/cli#4828 guard)
+        run: bash scripts/ci/repair-native-deps.sh
+
+      # Services import @aisha/* via their built dist/ — npm ci does NOT build the
+      # workspace libs, so without this they fail "Failed to resolve entry for @aisha/*".
+      - name: Build @aisha workspace packages
+        run: npm run build:packages
+
+      # ⛔ NAMĚŘENO 2026-09-03 V PROVOZU: `<fork>-core` se NENASADIL, protože
+      # `services/gateway/src/server.ts` měl DVĚ typové chyby (TS2367 + TS2345).
+      # CI byla přitom celá zelená — `Web: TypeScript & Lint` typuje kořenovou
+      # appku (`tsconfig.app.json`), `Mobile` mobilní strom, krok níž shelly.
+      # SLUŽBY v tom univerzu NEBYLY. Jejich `tsc` se poprvé spustil až
+      # v `docker build` při nasazení, tedy tam, kde už padá produkční deploy
+      # a rozbor stojí hodinu místo vteřiny.
+      #
+      # ⭐ Univerzum se HLEDÁ, nepíše rukou: bere se každý `services/*/tsconfig.json`,
+      # takže nová služba je pokrytá dnem svého vzniku. Ručně psaný seznam by
+      # zdědil díry svého autora — což je přesně vada, kterou tenhle krok hasí.
+      - name: TypeScript compile check — každá služba
+        run: |
+          CHYBY=0
+          for d in services/*/; do
+            [ -f "$d/tsconfig.json" ] || continue
+            echo "── $d"
+            npx tsc --noEmit -p "$d/tsconfig.json" || CHYBY=$((CHYBY+1))
+          done
+          if [ "$CHYBY" != "0" ]; then
+            echo "::error::$CHYBY služeb má typovou chybu — v produkci to padá až při docker build"
+            exit 1
+          fi
+
+      - name: Run per-service tests
+        # The single self-hosted runner can OOM-kill a heavy job mid-run when other
+        # jobs in the same run are also live (#279 class). Retry once to absorb a
+        # transient OOM — mirrors the Web: Tests shard retry. A real failure fails twice.
+        run: |
+          if ! npm run test:services; then
+            echo "::warning::test:services failed — retrying once (transient-OOM tolerance on the shared runner)"
+            npm run test:services
+          fi
+
+  # ===========================================================================
+  # CI: Surfaces — block contract + every shell against every overlay
+  # ===========================================================================
+  # These two steps used to hang off "Services: Tests", which is gated on
+  # services_change (services/, plugins/). A surfaces-only change sets neither
+  # that nor `app`, so the suites written to protect the shells did not run on
+  # the very PRs that touched them — the gate inherited the holes of its input
+  # list. Their own lane, gated on the extranet image's real build inputs.
+  # ===========================================================================
+  surface-tests:
+    name: "Surfaces: Contract & Overlays"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Ordering, not dependency (same reasoning as service-tests): keep the single
+    # self-hosted runner from holding test-web and this at once (#279 OOM class).
+    needs: [detect, test-web]
+    if: ${{ needs.detect.outputs.already_verified != 'true' && !cancelled() && needs.detect.outputs.surfaces == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+
+      # vitest pulls the same rollup native binding as the web build — npm/cli#4828.
+      - name: Repair native optional deps (npm/cli#4828 guard)
+        run: bash scripts/ci/repair-native-deps.sh
+
+      # The shells import @aisha/surface-blocks by its published entry, so its
+      # dist/ must exist before their tsc/vite runs — exactly as
+      # deploy/surface-host/Dockerfile does it.
+      - name: Build @aisha workspace packages
+        run: npm run build:packages
+
+      - name: Surface contract tests (surface-blocks + shells)
+        run: npm run test:surfaces
+
+      # A shell can compile for the overlay its author had open and fail for the
+      # next one; instance-independence is a property, so assert it on all of them.
+      - name: Build every instance overlay (both shells)
+        run: npm run surfaces:build:all
+
+  # ===========================================================================
+  # CI: Blockchain integration — real PostgREST + Postgres roundtrip
+  # ===========================================================================
+  # Runs `npm run test:integration:blockchain`, which self-provisions a throwaway
+  # PG17 + PostgREST (scripts/db/with-throwaway-db.mjs → with-throwaway-postgrest.mjs)
+  # and exercises the REAL HTTP → Fastify route → rpcService → PostgREST → Postgres
+  # chain for the svc-blockchain audit/ledger-sync routes (only the auth + Cosmos
+  # network are mocked). Needs Docker/DinD (same primitives as coldstart-db-gate /
+  # av-integration-gate). SKIPS GRACEFULLY (not hollow-green) when the runner has no
+  # usable Docker — the suite fails LOUD inside, via BLOCKCHAIN_INTEGRATION=1, if the
+  # throwaway PostgREST URL is missing once it IS provisioned, so a mis-wired lane
+  # cannot silently no-op. Gated on svc-blockchain or DB SoT changes.
+  # ===========================================================================
+  blockchain-integration:
+    name: "Blockchain: Integration (real PostgREST)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # Serialize the heavy lanes into a chain (test-web → service-tests → this) so the
+    # single self-hosted runner never runs two DinD/test-heavy jobs at once (#279 OOM).
+    # !cancelled() keeps us running even if an upstream is skipped/failed (order, not dep).
+    needs: [detect, test-web, service-tests]
+    if: ${{ needs.detect.outputs.already_verified != 'true' && !cancelled() && needs.detect.outputs.blockchain_change == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # node:20-bookworm has the DinD socket bound but no docker binary (same as
+      # coldstart-db-gate / av-integration-gate). Best-effort install; continue-on-error
+      # so a runner without Docker/network does not fail the job — the guarded step
+      # below skips cleanly instead.
+      - name: Install docker CLI (best-effort)
+        continue-on-error: true
+        run: |
+          if command -v docker >/dev/null 2>&1; then docker --version; exit 0; fi
+          if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends ca-certificates curl gnupg
+          $SUDO install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/debian/gpg | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          $SUDO chmod a+r /etc/apt/keyrings/docker.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" | $SUDO tee /etc/apt/sources.list.d/docker.list >/dev/null
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends docker-ce-cli
+          docker --version
+
+      - name: Blockchain integration (throwaway PG17 + PostgREST) — skips if DinD unavailable
+        env:
+          # Fail LOUD if the throwaway PostgREST URL is somehow missing once we are
+          # past the DinD guard — a mis-wired lane must not silently self-skip.
+          BLOCKCHAIN_INTEGRATION: "1"
+        run: |
+          # DinD is a HARD requirement (soren build runner). Do NOT skip-to-green when it is
+          # unreachable — that masks the live PostgREST+Postgres roundtrip gate. Fail loud.
+          # The roundtrip is also covered locally (npm run test:integration:blockchain).
+          if ! command -v docker >/dev/null 2>&1 || ! timeout 30 docker info >/dev/null 2>&1; then
+            echo "::error title=blockchain-integration::DinD daemon UNREACHABLE — the live PostgREST+Postgres roundtrip CANNOT run and MUST NOT skip-to-green. DinD is guaranteed by the soren runner; restart the aisha-ci-runner DinD daemon."
+            exit 1
+          fi
+          # The throwaway-DB chain (migrate.mjs + with-throwaway-db auth-settle/seed) drives
+          # the DB via `psql`, which is NOT in node:20-bookworm — install it now we know the
+          # lane is actually running (mirrors coldstart-db-gate's postgresql-client step).
+          # Without it auth-settle hangs the full 30s on a missing binary and reports
+          # "DB never accepted an authenticated connection".
+          if ! command -v psql >/dev/null 2>&1; then
+            if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
+            $SUDO apt-get update && $SUDO apt-get install -y --no-install-recommends postgresql-client
+          fi
+          psql --version
+          bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+          npm run build:packages   # svc-blockchain imports @aisha/* via built dist/
+          # Retry once: the throwaway PG17+PostgREST spin-up is heavy and the shared
+          # runner can OOM-kill it mid-run when other jobs are live (#279 class).
+          # A real failure fails twice; a transient OOM/DinD hiccup is absorbed.
+          if ! npm run test:integration:blockchain; then
+            echo "::warning::blockchain integration failed — retrying once (transient-OOM/DinD tolerance)"
+            npm run test:integration:blockchain
+          fi
+
+  # ===========================================================================
+  # Validate n8n Workflows — runs when n8n/workflows/ files change
+  # Checks JSON validity, node structure, onError settings.
+  # ===========================================================================
+  validate-n8n-workflows:
+    name: "Validate: n8n Workflows"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: detect
+    if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.n8n_workflow == 'true'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate workflow JSON files
+        run: |
+          FAIL=0
+          for f in n8n/workflows/*.json; do
+            python3 -c "import json; json.load(open('$f'))" 2>/dev/null \
+              && echo "OK: $f" \
+              || { echo "INVALID JSON: $f"; FAIL=1; }
+          done
+          [ $FAIL -eq 0 ] || exit 1
+
+      - name: Validate workflow node structure
+        run: |
+          python3 - << 'PYEOF'
+          import json, os, sys
+          workflows_dir = "n8n/workflows"
+          fail = False
+          for fname in sorted(os.listdir(workflows_dir)):
+              if not fname.endswith(".json"):
+                  continue
+              path = os.path.join(workflows_dir, fname)
+              try:
+                  with open(path) as f:
+                      wf = json.load(f)
+              except Exception as e:
+                  print(f"ERROR: {fname} — {e}")
+                  fail = True
+                  continue
+              nodes = wf.get("nodes", [])
+              if len(nodes) == 0:
+                  print(f"ERROR: {fname} has no nodes")
+                  fail = True
+                  continue
+              if not isinstance(wf.get("connections"), dict):
+                  print(f"ERROR: {fname} missing connections map")
+                  fail = True
+              # AISHA RPC nodes must have onError setting
+              for node in nodes:
+                  ntype = node.get("type", "")
+                  if ntype.startswith("n8n-nodes-aisha.") and "onError" not in node:
+                      print(f"WARNING: {fname} — node '{node.get('name','')}' ({ntype}) missing onError")
+              print(f"OK: {fname} ({len(nodes)} nodes)")
+          if fail:
+              sys.exit(1)
+          print("--- All workflow structure checks passed ---")
+          PYEOF
+
+  # ===========================================================================
+  # CI: Mobile App — TypeScript + Jest tests
+  # ===========================================================================
+  test-mobile:
+    name: "Mobile: TypeScript, Lint & Tests"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: detect
+    if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.mobile_app == 'true'
+    defaults:
+      run:
+        working-directory: mobile-app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Sdílený protokol se STAVÍ, než ho appka použije.
+      # `@aisha/knock-protocol` je `file:` závislost mířící do `dist/`, který je
+      # gitignorovaný. Jeho `prepare` by ho postavil, jenže k tomu potřebuje
+      # `tsc` — a devDependencies ZÁVISLOSTI si konzument neinstaluje. Lokálně
+      # to projde, protože tam `tsc` dodá nadřazený workspace; v CI ne.
+      # Proto se buildí výslovně, z kořene, kde jeho devDeps jsou.
+      - name: Build shared packages (knock-protocol → dist)
+        working-directory: ${{ github.workspace }}
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh" --ignore-scripts && npm --prefix packages/knock-protocol run build
+
+      - name: Install dependencies
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+
+      - name: TypeScript compile check
+        run: npm run type-check
+
+      # ⛔ NAMĚŘENO 2026-08-20: tenhle krok tu CHYBĚL. Web lintuje
+      # (`Web: TypeScript & Lint`), n8n-nodes lintuje, appka nikdy.
+      # Nešlo o kosmetiku — `npm run lint` v ní hlásil TŘI chyby a mezi
+      # nimi odkaz na pravidlo `react-hooks/exhaustive-deps`, které
+      # v konfiguraci appky vůbec nebylo. Tedy: lidé psali `eslint-disable`
+      # na pravidla, o kterých si mysleli, že platí, a nic jim neodporovalo.
+      # V React Native je `rules-of-hooks` to nejcennější pravidlo vůbec —
+      # podmíněně volaný hook se jinak pozná až pádem na zařízení.
+      #
+      # Že se na tenhle krok NEDÁ zapomenout u DALŠÍHO balíčku, hlídá brána
+      # `lint-ma-kdo-spustit` — odvozuje si univerzum z `package.json`
+      # a tvrdí, že každý `lint` skript má v CI svého spouštěče.
+      - name: ESLint
+        run: npm run lint
+
+      - name: Run Jest tests
+        run: npm test -- --runInBand --ci
+
+      # ⭐ JEDINÝ KROK, KTERÝ OVĚŘÍ, ŽE APLIKACE JDE ZABALIT.
+      #
+      # PROČ (naměřeno 2026-08-09, PR #162): `knock.ts` ležel v repu dlouho, ale
+      # importoval ho JEN jeho vlastní test. Jakmile ho obrazovka „Zaklepat"
+      # vtáhla do grafu balíčku poprvé, archiv do TestFlightu spadl na
+      # `Unable to resolve module @aisha/knock-protocol` — Metro nenásleduje
+      # symlinky mimo kořen projektu, na rozdíl od tsc a jest.
+      #
+      # ⚠️ CI byla u toho ZELENÁ, a správně: `type-check` i `jest` měří jiné
+      # vlastnosti. Ani jeden netvrdí nic o ROZLOŽITELNOSTI balíčku. Oprava #162
+      # (metro.config.js) si to sama napsala do komentáře — „žádná lane aplikaci
+      # nebalí" — a tenhle krok je to chybějící měřidlo k té opravě.
+      #
+      # OVĚŘENO OBOUSMĚRNĚ, ne jen že prochází:
+      #   metro.config.js PO  #162 → rc=0, iOS bundle 13,6 MB
+      #   metro.config.js PŘED #162 → rc=1, „Unable to resolve module …"
+      # Sonda, která nejde rozsvítit doČervena, neměří nic.
+      #
+      # CO TENHLE KROK NEDĚLÁ: nevyrábí podepsaný archiv — na to je potřeba Xcode
+      # a runner je x86 Linux. TestFlight zůstává ruční krok na Macu; jen už není
+      # PRVNÍM místem, kde se nerozložitelný import pozná.
+      #
+      # Výstup jde do `$RUNNER_TEMP`, ne do stromu: ověřovací krok nesmí mutovat
+      # to, co ověřuje (jinak by si další brány měřily vlastní odpad).
+      - name: Bundle the app (Metro) — ověří, že se to vůbec složí
+        env:
+          EXPO_NO_TELEMETRY: "1"
+        run: npx expo export --platform ios --output-dir "${RUNNER_TEMP:-/tmp}/expo-export"
+
+  # ===========================================================================
+  # CI: Cosmos Go chain — build + vet + test
+  # ===========================================================================
+  test-cosmos:
+    name: "Cosmos: Go Build & Test"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: detect
+    if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.cosmos == 'true'
+    defaults:
+      run:
+        working-directory: cosmos
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: cosmos/go.mod
+          cache: true
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...
+
+      - name: go test
+        run: go test ./... -v -count=1
+
+  # ===========================================================================
+  # Security: SAST + dependency/SBOM/CVE scanning — runs on every PR
+  # ===========================================================================
+  # Relocated from .github/workflows/{semgrep-sast,dependency-security}.yml
+  # (2026-05-30): the GitHub mirror is cost-only; all CI — incl. security
+  # scanning — runs on Forgejo. Folded into ci.yml (no standalone workflow
+  # files) per the new-file policy. Enforced by semgrep-sast.gate,
+  # sbom-coverage.gate, wp-3-8-supply-chain.gate, owasp-orchestrator-adoption.gate
+  # (all repointed to this file). Trivy emits SARIF as a CI artifact (Forgejo
+  # has no Security tab); CVE exit-code gating + MinIO SBOM mirror preserved.
+  semgrep:
+    name: Semgrep SAST
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    # SEC-02: runs on every push/PR. A SAST scanner gated behind
+    # `workflow_dispatch + run_supply_chain=yes` never fires on a PR — security
+    # theatre. NO `if:` here, so the scan runs on push and pull_request (the
+    # top-level triggers) as well as manual dispatch.
+    #
+    # Installed via a PINNED `pip install` — NOT `docker run` — because the
+    # Forgejo act_runner runs jobs in node:20-bookworm with NO docker CLI, so the
+    # old `docker run semgrep/semgrep` could never execute on push/PR. The pin
+    # tracks the semgrep/semgrep:1.103.0 image tag for reproducibility (same
+    # version, no `:latest`). Unlike SBOM/trivy/npm-audit (docker-bound, still
+    # on-demand via run_supply_chain), Semgrep is pure-Python and needs no docker.
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so the PR diff-aware baseline commit is reachable.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Semgrep (pinned — runner has no docker)
+        # Pin == semgrep/semgrep:1.103.0 for reproducibility. The runner image
+        # (node:20-bookworm) ships python3 WITHOUT pip ("No module named pip",
+        # "pip3: command not found" — act#107 class), so install pip+venv via apt
+        # first and use a venv (bookworm pip is PEP 668 externally-managed; a
+        # venv sidesteps --break-system-packages entirely).
+        run: |
+          if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
+          if ! python3 -m pip --version >/dev/null 2>&1; then
+            $SUDO apt-get update
+            $SUDO apt-get install -y --no-install-recommends python3-pip python3-venv
+          fi
+          python3 -m venv /tmp/semgrep-venv
+          /tmp/semgrep-venv/bin/pip install --disable-pip-version-check "semgrep==1.103.0"
+          /tmp/semgrep-venv/bin/semgrep --version
+          echo "/tmp/semgrep-venv/bin" >> "$GITHUB_PATH"
+
+      - name: Run Semgrep — OWASP + secrets + AISHA-local rules (diff-aware on PR)
+        # No `${{ ... }}` interpolation reaches the shell — the PR base SHA is
+        # passed via env (env values are not shell-evaluated), so there is no
+        # workflow-injection surface. Rulesets are hard-coded (registry IDs +
+        # repo-local path).
+        # ADVISORY: tolerate non-zero so the job CONCLUDES success while findings
+        # still print. On a pull_request the scan is DIFF-AWARE (--baseline-commit)
+        # so only findings NEW vs the PR base are surfaced; a full-tree scan runs
+        # on push.
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -uo pipefail
+          BASELINE_ARGS=""
+          if [ "$EVENT_NAME" = "pull_request" ] && [ -n "${PR_BASE_SHA:-}" ]; then
+            git fetch -q --no-tags origin "$PR_BASE_SHA" 2>/dev/null || true
+            BASELINE_ARGS="--baseline-commit $PR_BASE_SHA"
+            echo "Diff-aware Semgrep scan against PR base $PR_BASE_SHA"
+          fi
+          semgrep scan \
+            --config "p/owasp-top-ten" \
+            --config "p/typescript" \
+            --config "p/javascript" \
+            --config "p/secrets" \
+            --config "p/insecure-transport" \
+            --config ".semgrep/aisha-rules.yml" \
+            --severity ERROR \
+            --error \
+            --metrics off \
+            $BASELINE_ARGS \
+          || echo "::warning::semgrep findings or registry unavailable (advisory — see comment)"
+
+  # ===========================================================================
+  # CI: Kontrakt bloků povrchu — runtime, proti čerstvé DB ze SoT
+  # ===========================================================================
+  # Naměřeno 2026-08-01: 15 z 38 umístěných bloků nasazený povrch TIŠE ZAHODIL —
+  # sekce registrů byla prázdná, ačkoli DB za ní měla přes 1 500 řádků, a uživatel
+  # neviděl chybu, viděl „Zatím není co zobrazit." Kontrakt má dvě strany v tomhle
+  # repu (SQL producenta v aisha/db/sql/ a masku v packages/surface-blocks) a nic
+  # je nedrželo u sebe; 409 statických bran to vidět nemohlo, protože vada je
+  # v HODNOTĚ, kterou funkce vydá za běhu.
+  #
+  # Suita `test:db` jako celek zapojená NENÍ — 60 runtime testů dosud v CI nikdy
+  # neběželo a jejich stav není změřený; zapínat je naslepo by shodilo pipeline
+  # z důvodů, které s touhle bránou nesouvisí. Tahle lane pouští JEN bránu
+  # kontraktu bloků (`test:db:surfaces`). Rozšíření na celé `test:db` je vědomý
+  # další krok, ne vedlejší efekt.
+  #
+  # Dluh je v `src/tests/db/surface-block-contract.baseline.json` (týž idiom jako
+  # aisha-branding.baseline.json): brána je proto ZELENÁ na dnešním stavu a shodí
+  # se, jakmile přibude NOVÉ porušení. Dluh smí jen klesat.
+  #
+  # Potřebuje Docker/DinD (throwaway PG17) — stejné primitivy jako
+  # blockchain-integration. Když je DinD nedostupný, FAIL LOUD, ne skok do zelené.
+  # ===========================================================================
+  surface-contract-gate:
+    name: "DB: Kontrakt bloků povrchu (runtime)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Serializace těžkých lane na jednom runneru (#279 OOM) — stejný řetěz jako
+    # blockchain-integration. !cancelled() drží pořadí, ne závislost.
+    needs: [detect, test-web, service-tests]
+    if: >-
+      ${{ needs.detect.outputs.already_verified != 'true' && !cancelled() && (
+        needs.detect.outputs.db_change == 'true' ||
+        needs.detect.outputs.surfaces == 'true'
+      ) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # node:20-bookworm má DinD socket, ale ne docker binárku (viz blockchain-integration).
+      - name: Install docker CLI (best-effort)
+        continue-on-error: true
+        run: |
+          if command -v docker >/dev/null 2>&1; then docker --version; exit 0; fi
+          if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends ca-certificates curl gnupg
+          $SUDO install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/debian/gpg | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          $SUDO chmod a+r /etc/apt/keyrings/docker.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" | $SUDO tee /etc/apt/sources.list.d/docker.list >/dev/null
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends docker-ce-cli
+          docker --version
+
+      - name: Kontrakt bloků proti throwaway DB
+        run: |
+          # DinD je TVRDÝ požadavek: brána měří hodnotu, kterou vydá živá funkce.
+          # Skok do zelené by z ní udělal dekoraci — přesně to, čemu má bránit.
+          if ! command -v docker >/dev/null 2>&1 || ! timeout 30 docker info >/dev/null 2>&1; then
+            echo "::error title=surface-contract-gate::DinD daemon UNREACHABLE — runtime brána kontraktu NEMŮŽE běžet a NESMÍ skončit zeleně."
+            exit 1
+          fi
+          # Throwaway řetěz jede přes psql, který v node:20-bookworm není.
+          if ! command -v psql >/dev/null 2>&1; then
+            if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
+            $SUDO apt-get update && $SUDO apt-get install -y --no-install-recommends postgresql-client
+          fi
+          psql --version
+          bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+          npm run build:packages   # brána importuje @aisha/surface-blocks přes dist/
+          npm run test:db:surfaces
+
+      # Autorizace zapisovatele story entries. Sedí v téhle lane, protože jediná
+      # v pipeline drží živou DB — a měřit SECURITY DEFINER staticky nejde: RLS
+      # ho neomezuje, takže pravdu vydá jedině volání pod dvěma identitami.
+      - name: Autorství story entry proti throwaway DB
+        run: npm run test:db:story-entry
+
+      # Schválení návrhu zlepšení smí zapsat „applied" jen po SKUTEČNÉ změně agenta.
+      # Do 2026-09-28 prošel návrh bez typu (tak ho zakládá fn_create_improvement_proposal)
+      # větví ELSE NULL a přesto se označil jako aplikovaný — outcome review a rollback
+      # pak pracovaly se změnou, která nenastala. Rozhodnutí je uvnitř SECURITY DEFINER
+      # funkce, pravdu vydá jen živá DB (K-05).
+      - name: Schválení návrhu zlepšení proti throwaway DB
+        run: npm run test:db:navrh-aplikace
+
+      # Nárok na věž (řidič své běhy × admin všechny). Patří do TÉTO lane ze
+      # stejného důvodu jako sonda nad story entries: nárok drží SECURITY DEFINER
+      # funkce, kterou RLS neomezuje, takže pravdu vydá jedině volání pod dvěma
+      # identitami proti živé DB. Staticky se to změřit nedá.
+      #
+      # Jmenovitě, ne celá `test:db` — viz hlavička téhle lane: 60 runtime testů
+      # v CI nikdy neběželo a zapnout je naslepo by shodilo pipeline z cizích
+      # důvodů. Rozšíření zůstává vědomým dalším krokem.
+      - name: Nárok na timing tower proti throwaway DB
+        run: npm run test:db:tower
+      # Běh reflexe musí dostat kontext. Do 2026-09-29 chyběl výchozí profil
+      # learnings_enabled a runner neposílal žadatele → každý běh jel bez pravidel,
+      # KB i paměti a chyba se jen zalogovala. Profil a RBAC compose_context změří jen
+      # živá DB (K-26a).
+      - name: Běh reflexe dostane kontext proti throwaway DB
+        run: npm run test:db:reflexe-kontext
+      - name: Nárok na doklad proti throwaway DB
+        run: npm run test:db:doklad-narok
+      # Vstup do smyčky sebezměny: návrh zlepšení smí založit jen služba nebo správa.
+      # Do 2026-09-28 ho zakládal kdokoli přihlášený (definer bez stráže) a u plně
+      # autonomního agenta rovnou jako 'auto_approved'. Stráž uvnitř definer funkce
+      # změří jen volání pod čtyřmi identitami proti živé DB (K-15).
+      - name: Návrh zlepšení jen služba a správa proti throwaway DB
+        run: npm run test:db:navrh-straz
+      - name: Nárok u definer bloků proti throwaway DB
+        run: npm run test:db:narok-definer
+      # Predikát o třetí osobě je orákulum (naměřeno na guru 2026-09-19): definer
+      # funkce se subjektem (uuid osoby) odpovídá jen o volajícím, služba a správa
+      # na kohokoli — a RLS legitimního volajícího přitom dál funguje. Statická
+      # brána definer-subjekt-jen-volajici pozná jen TVAR stráže; co funkce vydá
+      # anonymovi, cizímu, vlastníkovi a službě, řekne jen živá DB.
+      - name: Definer se subjektem odpovídá jen o volajícím proti throwaway DB
+        run: npm run test:db:subjekt
+      # Běh hodnocení kvality zakládá služba (svc-ai-chat benchmark). Do 2026-09-29 stráž
+      # pouštěla jen správu, grant měla jen služba → funkce nikdy neprošla a chybu volající
+      # spolkl. Unit test runner RPC mockuje; pravdu vydá jen živá DB (K-25).
+      - name: Běh hodnocení založí služba proti throwaway DB
+        run: npm run test:db:beh-hodnoceni
+
+      # Otevření JEDNOHO kroku: dispečer na cizí dosáhne, řidič ne — a jméno
+      # účtu dostane jen dispečer, ne každý držitel sdílené role. Obojí je
+      # rozhodnutí uvnitř SECURITY DEFINER funkce, tedy zase mimo dosah statické
+      # kontroly. Sonda je mutačně ověřená: zrušení brány i vydání jména každému,
+      # kdo krok vidí, ji shodí (změřeno 2026-08-05).
+      - name: Nárok na detail kroku proti throwaway DB
+        run: npm run test:db:step-detail
+      # Čtečky zprávy pro hodnocení kvality (K-17): do 2026-09-29 neexistovaly a každé
+      # hodnocení odpovědi padlo. Jen služba smí číst cizí zprávy; to a správnou
+      # „předchozí otázku" změří jen živá DB.
+      - name: Hodnocení zprávy — čtečky a zápis skóre proti throwaway DB
+        run: npm run test:db:hodnoceni-zpravy
+
+      # Kalendář nad frontou. Tři pravidla, která selhávají TICHÝM PRÁZDNEM —
+      # fronta se vykreslí a je prázdná, což se nedá odlišit od „ten den se nic
+      # nevezlo". Statická kontrola na to nedosáhne; jediný důkaz je běh proti DB
+      # s daty rozprostřenými přes několik dní a stavů.
+      - name: Kalendář nad frontou proti throwaway DB
+        run: npm run test:db:kalendar
+      # Zakázaný nástroj agenta se nepoužije (K-36): route_task do 2026-10-01 slučoval jen
+      # allowed_tools, denied_tools nečetl nikdo za běhu. Co trasa vybere a odečte, závisí na
+      # rozhodovacím stromu a katalogu — změří jen živá DB.
+      - name: Trasa odečte zakázané nástroje proti throwaway DB
+        run: npm run test:db:zakazane-nastroje
+      # Zpětná vazba na odpověď AI jen ve VLASTNÍ konverzaci — a musí dotéct do tréninku.
+      # Do 2026-09-29 (INVOKER nad chat_messages, kterou čte jen správce) se k ní nikdy
+      # nedohledala konverzace, takže z ní nevznikl pár; a cizí message_id prošlo. Co
+      # vidí vlastník a co cizí, změří jen volání pod rolí authenticated (K-16).
+      - name: Zpětná vazba jen na vlastní zprávu proti throwaway DB
+        run: npm run test:db:zpetna-vazba
+
+      # Přesný klíč → entita + kanál `target`. Čtyři pravidla, která nejde
+      # změřit staticky: nejednoznačnost nesmí vrátit „ten první" (poslalo by to
+      # člověka na cizí doklad), nárok se nesmí obejít (jinak je z resolveru
+      # orákulum na cizí doklady), klíč se musí brát z KATALOGU (jinak je natvrdo
+      # v kódu) a `target` smí odejít jen tomu, kdo o něj požádal (Ajv je
+      # all-or-nothing). Mutačně ověřeno 2026-08-05.
+      - name: Přesný klíč a cíl odpovědi proti throwaway DB
+        run: npm run test:db:entity-ref
+      # Oprava uživatele (zpětná vazba) → trénovací pár. Do 2026-09-28 dávala
+      # process_feedback_to_training NULL do NOT NULL sloupců, první vhodná zpětná
+      # vazba shodila celou dávku a pár nikdy nevznikl. Porušení omezení tabulky
+      # vydá jen živá DB (K-02).
+      - name: Zpětná vazba na trénovací páry proti throwaway DB
+        run: npm run test:db:trenink-pary
+      # Tajemství jen v trezoru (2026-09-28): admin přes roli authenticated
+      # app_secrets nepřečte, set_api_key_admin nepíše nešifrovanou kopii,
+      # čtenáři berou trezor a převod starých řádků je idempotentní. Grant a
+      # zápis jsou vlastnosti živé DB (heals, výchozí oprávnění), staticky
+      # se nezměří celé.
+      - name: Tajemství jen v trezoru proti throwaway DB
+        run: npm run test:db:app-secrets
+      # Stav pohledávky má JEDEN slovník (invoice_state) pro kartu protistrany,
+      # stáří dluhu, faktury odběratele, dlužníky i Ask. Co se nedá změřit
+      # staticky: předepsaná faktura (vznik v budoucnu) není dluh, storno není
+      # nic, dobropis odečítá všude stejně, twin bez IČO dojde k týmž fakturám
+      # a otázka, kterou karta předvyplňuje, dostane odpověď o dluhu z týchž
+      # čteček. Naměřeno 2026-09-25 na produkci: karta 588 383 Kč místo 259 597 Kč.
+      - name: Stav pohledávky a identita protistrany proti throwaway DB
+        run: npm run test:db:pohledavka
+
+      # Snímek výkonu agenta uzavírá smyčku zlepšování (WF_IMPROVEMENT_EVAL po 24 h,
+      # WF_MODEL_ADVISORY týdně). Do 2026-09-28 padal při každém volání (spojoval
+      # neexistující ai_eval_runs.run_id), neměřenou kvalitu vracel jako 0 (→ falešný
+      # rollback) a jako SECURITY DEFINER neměl stráž. Co funkce vydá službě, správci,
+      # cizímu a anonymovi a že null zůstane null, řekne jen živá DB (K-01).
+      - name: Snímek výkonu agenta proti throwaway DB
+        run: npm run test:db:vykon-agenta
+
+  # ===========================================================================
+  # CI: Celá sada DB runtime testů — s rohatkou známých pádů
+  # ===========================================================================
+  # Lane „DB: Kontrakt bloků povrchu" pouští jen JMENOVANÉ DB soubory. Celá
+  # `test:db` v CI nikdy neběžela, a tak prošly zeleně dvě regrese: trigger kotvy
+  # běhu ke story (2026-07-26) a totální guardy (2026-08-04). Tři agentní runtime
+  # testy pak padaly dva měsíce, aniž by to kdo viděl (naměřeno 2026-09-27).
+  #
+  # Zapnout sadu naslepo by shodilo pipeline z cizích důvodů: na čisté bázi padá
+  # 13 testů v 7 souborech. Proto rohatka (`scripts/lib/rohatka-test-db.mjs`):
+  # NOVÝ pád shodí, známý dluh v `src/tests/db/test-db.baseline.json` se jen
+  # ohlásí a smí jen klesat. Soubory běží bez souběhu, protože sdílejí jednu DB.
+  # Report chybí nebo v něm chybí soubor sady → kód 75 NEZMĚŘENO, ne zelená.
+  #
+  # Samostatná úloha, ne krok lane kontraktu: celá sada trvá déle a má vlastní
+  # strop. Řetěz `needs` za surface-contract-gate drží serializaci těžkých lane
+  # na jednom runneru (#279 OOM), `!cancelled()` drží pořadí, ne závislost.
+  # ===========================================================================
+  db-runtime-rohatka:
+    name: "DB: runtime testy (celá test:db, rohatka)"
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [detect, surface-contract-gate]
+    # Jen na PR a NEHRADÍ nasazení. Rozhodnutí 2026-09-28 (Guru, rozbor #1113):
+    # na push do mainu by běžela skoro vždy (strom slití ≠ strom hlavy u 19 z 30
+    # mergí → already_verified ji nepřeskočí) a červená rohatka v needs
+    # deploy-koren/deploy-stacky by přeskočila kořen a stacky, zatímco
+    # deploy-core/-edge/-extranet berou „skipped" kořene jako v pořádku → ČÁSTEČNÉ
+    # nasazení (třída 404 z 2026-09-27: nový web proti starému backendu).
+    # Blokuje v pr-verdikt; hlídá brána test-db-rohatka.
+    if: >-
+      ${{ github.event_name == 'pull_request' && needs.detect.outputs.already_verified != 'true' && !cancelled() && (
+        needs.detect.outputs.db_change == 'true' ||
+        needs.detect.outputs.surfaces == 'true'
+      ) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # node:20-bookworm má DinD socket, ale ne docker binárku (viz blockchain-integration).
+      - name: Install docker CLI (best-effort)
+        continue-on-error: true
+        run: |
+          if command -v docker >/dev/null 2>&1; then docker --version; exit 0; fi
+          if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends ca-certificates curl gnupg
+          $SUDO install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/debian/gpg | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          $SUDO chmod a+r /etc/apt/keyrings/docker.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" | $SUDO tee /etc/apt/sources.list.d/docker.list
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends docker-ce-cli
+          docker --version
+
+      - name: Celá test:db proti throwaway DB (rohatka známých pádů)
+        run: |
+          # DinD je TVRDÝ požadavek: bez DB by sada nic nezměřila a skok do
+          # zelené by z rohatky udělal dekoraci.
+          if ! command -v docker >/dev/null 2>&1 || ! timeout 30 docker info >/dev/null 2>&1; then
+            echo "::error title=db-runtime-rohatka::DinD daemon UNREACHABLE — celá test:db NEMŮŽE běžet a NESMÍ skončit zeleně."
+            exit 1
+          fi
+          if ! command -v psql >/dev/null 2>&1; then
+            if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
+            $SUDO apt-get update && $SUDO apt-get install -y --no-install-recommends postgresql-client
+          fi
+          psql --version
+          bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+          npm run build:packages   # část sady importuje balíčky přes dist/
+          npm run test:db:rohatka
+
+      # Stráž story u pěti story-scoped RPC (can_access_story). Matice identit
+      # (service_role, admin, vlastník, člen, divák, cizí, bez sub) + cesta přes
+      # PostgREST: podvržená role service_role (cizí klíč / alg none) → 401,
+      # s kontrolním vzorkem platného service tokenu. Staticky nejde — SECURITY
+      # DEFINER RLS neomezuje a důvěra v claims stojí na ověření podpisu v PostgRESTu.
+      - name: Stráž story proti throwaway DB + PostgREST
+        run: npm run test:db:story-straz
+
+      # moderate_development_flow: skutečné kategorie (enum expert_rule_category)
+      # a compliance = pravidla připnutá ke story. Dřív 22P02 každému volajícímu
+      # (naměřeno 2026-09-14) — staticky se to neukáže, plpgsql neplatný literál
+      # enumu odhalí až při volání. Test volá každý session_type.
+      - name: Moderace vývoje (kategorie + compliance) proti throwaway DB
+        run: npm run test:db:moderace
+
+      # Sekvence nesmí zaostávat za daty. Seed vkládal delivery_transition_rules
+      # s pevnými id bez posunu sekvence → první INSERT bez id na čisté instanci
+      # padl na pkey (naměřeno 2026-09-14). Staticky nejde: sekvenci rozjede i heals
+      # nebo overlay a sekvence bez OWNED BY je pro pg_get_serial_sequence neviditelná.
+      - name: Sekvence po seedu proti throwaway DB
+        run: npm run test:db:sekvence
+
+  # ===========================================================================
+  # CI: Brány nad instančním overlayem — „zapojeno", ne „napsáno"
+  # ===========================================================================
+  # Overlay (privátní instance-data repo) drží deklarace, které platforma sama
+  # nezná: allowlist RPC a `title_key` bloků. Kontroly, které je čtou, UŽ EXISTUJÍ
+  # a jsou poctivé — samy hlásí, co neprohlédly. Jenže je nikdy nikdo nezapojil:
+  # naměřeno 2026-08-01, že `check:i18n` bez overlaye kontroluje 94 klíčů místo
+  # 111 a `allowlisted-rpc-has-source` přečte NULA deklarací. Zelená pak
+  # neznamená „nic tam není", ale „nic jsem nenašel".
+  #
+  # Přepínač je JEDEN: deklaruj secret `INSTANCE_OVERLAY_REPO` (host/cesta k
+  # overlay repu). Bez něj lane doběhne s viditelným varováním a NIC nepředstírá;
+  # s ním se overlay stáhne a `AISHA_OVERLAY_REQUIRED=1` udělá ze všech
+  # volitelných čtení povinná — kontrola bez overlaye pak spadne se jménem toho,
+  # kdo ho potřeboval, místo aby tiše prošla.
+  #
+  # Jméno instance v tomhle souboru ZÁMĚRNĚ není: cíl je secret, protože repozitář
+  # je generický a instanční data do něj nepatří (hlídá pre-commit brána).
+  # ===========================================================================
+  overlay-gates:
+    name: "Instance: brány nad overlayem"
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [detect]
+    if: >-
+      ${{ needs.detect.outputs.already_verified != 'true' && !cancelled() && (
+        needs.detect.outputs.app == 'true' ||
+        needs.detect.outputs.db_change == 'true' ||
+        needs.detect.outputs.surfaces == 'true' ||
+        needs.detect.outputs.ci_change == 'true'
+      ) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Získat instanční overlay (je-li deklarovaný)
+        id: overlay
+        env:
+          OVERLAY_REPO: ${{ secrets.INSTANCE_OVERLAY_REPO }}
+          # ⚠️ POŘADÍ TOKENŮ = KONVENCE ORGANIZACE NAPŘED.
+          # Naměřeno 2026-09-12 06:08 UTC (Forgejo 16.0.2+gitea-1.22.0):
+          # `REPO_API_TOKEN` je secret ORGANIZACE (`GET /orgs/aisha/actions/secrets`,
+          # jediný tam), `FORGEJO_API_TOKEN` je secret REPA (`GET /repos/aisha/
+          # evymo-ai-orchestrator/actions/secrets`, 100 jmen); FetchActionSecrets
+          # doručí neforkovému běhu oba, fork-PR běhu žádný. 2026-08-06 lane sáhla
+          # jen po `FORGEJO_API_TOKEN`, který tehdy v repu (33 secretů) nebyl,
+          # takže se klonovalo bez pověření a brány mlčky nezměřily nic.
+          # Sesterská brána v instančních datech si přitom v komentáři píše
+          # „konvence organizace (REPO_API_TOKEN, tak to má orchestrator)" —
+          # dvě brány, dvě různá jména pro touž věc, a obě slepé.
+          # Zkouší se proto obě, konvenční (org-scope) jako první.
+          OVERLAY_TOKEN_PRIMARY: ${{ secrets.REPO_API_TOKEN }}
+          OVERLAY_TOKEN_FALLBACK: ${{ secrets.FORGEJO_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${OVERLAY_REPO:-}" ]; then
+            echo "::warning title=overlay-gates::secret INSTANCE_OVERLAY_REPO není deklarovaný — brány nad overlayem NEBĚŽELY. Neprohlédnuto: allowlist RPC a title_key bloků. Tohle NENÍ zelená nad prázdnem, je to přiznaná díra: deklaruj secret a lane začne měřit."
+            echo "have=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Adresa overlaye zůstává SECRETEM schválně: nese jméno instance, a to
+          # v generickém kódu platformy stát nesmí (split-rule). Token je věc
+          # druhá — ten se jen zkouší v pořadí.
+          for T in "${OVERLAY_TOKEN_PRIMARY:-}" "${OVERLAY_TOKEN_FALLBACK:-}"; do
+            [ -n "$T" ] || continue
+            if git clone --depth 1 "https://oauth2:${T}@${OVERLAY_REPO}" "${RUNNER_TEMP}/overlay" 2>/dev/null; then
+              echo "have=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          done
+          echo "::warning title=overlay-gates::overlay je deklarovaný, ale ŽÁDNÝM z tokenů (REPO_API_TOKEN, FORGEJO_API_TOKEN) se nepodařilo naklonovat — brány nad overlayem NEBĚŽELY. Mlčení by vypadalo jako průchod; doplň platný token s právem číst instanční repo."
+          echo "have=false" >> "$GITHUB_OUTPUT"
+
+      # ⭐ LANE MUSÍ ŘÍCT, JESTLI PROHLÉDLA — a musí to říct tam, kam se dá dosáhnout.
+      #
+      # Naměřeno 2026-08-06: tahle lane hlásí `success` jak když brány opravdu
+      # proběhnou, tak když jen degraduje na warning a skončí `exit 0`. Ty dva
+      # případy NEJDE odlišit: souhrn statusů dá „success" u obou, `created_at`
+      # i `updated_at` jsou totožné (délku běhu tedy neposkytne) a logy Actions
+      # tenhle Forgejo přes API nevydává (`/actions/*` → 404, ověřeno).
+      # Zelená lane byla tedy k nerozeznání od no-opu — přesně to, co brány mají
+      # znemožňovat ostatním.
+      #
+      # Vlastní commit status to řeší tím JEDINÝM způsobem, který je odsud
+      # měřitelný: `/commits/{sha}/status` vrátí kontext `overlay-gates` a v
+      # popisu stojí, co se prohlédlo (nebo proč ne).
+      - name: Přiznat, co lane prohlédla
+        if: always()
+        env:
+          MEASURED: ${{ steps.overlay.outputs.have }}
+          TOK: ${{ secrets.REPO_API_TOKEN }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          set -uo pipefail
+          if [ "${MEASURED:-false}" = "true" ]; then
+            OVSHA=$(git -C "${RUNNER_TEMP}/overlay" rev-parse --short HEAD 2>/dev/null || echo "?")
+            STATE=success
+            DESC="prohlédnuto: overlay @ ${OVSHA}"
+          else
+            # NE 'failure': chybějící overlay je legitimní stav instalace bez
+            # něj. Ale musí být VIDĚT, že se neměřilo — proto vlastní kontext.
+            STATE=success
+            DESC="NEPROHLÉDNUTO — overlay nedostupný (viz warning v běhu)"
+          fi
+          if [ -z "${TOK:-}" ]; then
+            echo "::warning title=overlay-gates::stav nelze publikovat (chybí REPO_API_TOKEN) — $DESC"
+            exit 0
+          fi
+          curl -sS -X POST -H "Authorization: token ${TOK}" -H "Content-Type: application/json" \
+            "${SERVER}/api/v1/repos/${REPO}/statuses/${SHA}" \
+            -d "$(printf '{"state":"%s","context":"overlay-gates","description":"%s"}' "$STATE" "$DESC")" \
+            -o /dev/null -w 'status publikován: HTTP %%{http_code}\n' || \
+            echo "::warning title=overlay-gates::publikace stavu selhala — $DESC"
+
+      - name: Brány nad overlayem (režim vynucení)
+        if: steps.overlay.outputs.have == 'true'
+        env:
+          AISHA_INSTANCE_CONFIG_DIR: ${{ runner.temp }}/overlay
+          # Volitelná čtení se tu stávají povinnými: overlay JE k dispozici,
+          # takže jeho nepřítomnost by byla vada zapojení, ne stav světa.
+          AISHA_OVERLAY_REQUIRED: "1"
+          VITEST_MAX_WORKERS: "2"
+          # Týž rozpočet jako u test:run: 2 workery × halda se SČÍTAJÍ, a runner
+          # pouští 4 joby naráz v jednom DinD (15 GB). Viz komentář u test:run.
+          NODE_OPTIONS: "--max-old-space-size=2048"
+        run: |
+          set -o pipefail
+          bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+          npm run check:i18n
+          # ⛔ FILTR PŘES `npm run test:gates -- <jméno>` NEFILTRUJE.
+          # Skript má `src/tests/gates/` napevno v argumentech, takže přidané
+          # jméno je DRUHÝ filtr a vitest je OR-uje — pustí se všech 504 souborů.
+          # Naměřeno 2026-08-06, jakmile lane poprvé v životě opravdu běžela:
+          # celá sada se rozjela pod `AISHA_OVERLAY_REQUIRED=1` a spadla na
+          # `instance-subdomain-namespace`, která si env ZÁMĚRNĚ odebírá (testuje
+          # derive-domains na syntetických vstupech). Vypadalo to jako vada
+          # overlaye; ve skutečnosti lane měřila něco úplně jiného, než tvrdila.
+          # Ty tři brány nad ostrým overlayem projdou (ověřeno 5/5).
+          #
+          # Proto se volá vitest PŘÍMO a cestami — režim „vše povinné" smí platit
+          # jen pro brány, které o overlay opravdu stojí.
+          AISHA_SKIP_ONLINE=1 npx vitest run --config vitest.gates.config.ts \
+            src/tests/gates/allowlisted-rpc-has-source.gate.test.ts \
+            src/tests/gates/overlay-jde-jen-jednemi-dvermi.gate.test.ts \
+            src/tests/gates/overlay-tema-neztrati-klice.gate.test.ts \
+            src/tests/gates/money-agendy-odpovidaji-rosteru.gate.test.ts \
+            src/tests/gates/profil-instance-plni-schema.gate.test.ts
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # PR: VERDIKT — jediná kontrola, na které smí viset slití do mainu
+  #
+  # ⛔ NAMĚŘENO 2026-09-20 v nastavení větve `main`:
+  #     enable_status_check   = false     (slití nevisí na ŽÁDNÉ kontrole)
+  #     status_check_contexts = null
+  #     enable_push           = true      (přímý push do mainu je povolený)
+  #     required_approvals    = 0
+  # Držela to jen kázeň lidí a agentů, co PR slévají. Kázeň není záruka:
+  # stačí jeden unáhlený merge a do mainu se dostane červená.
+  #
+  # PROČ JEDNA ÚLOHA A NE SEZNAM: většina úloh je podmíněná cestami, takže se
+  # u PR bez webu / bez DB ZÁMĚRNĚ přeskočí. Přeskočená POVINNÁ kontrola ale
+  # v PR zůstane viset a slití zablokuje napořád — „povinné testy" nastavené
+  # naivně tedy nezvýší přísnost, jen zastaví práci. Proto visí main na jediném
+  # kontextu, který běží VŽDY a vezme verdikt za všechny ostatní.
+  #
+  # PŘESKOČENÁ ÚLOHA NENÍ VADA, ZRUŠENÁ ANO. `skipped` znamená „tahle změna se
+  # jí netýká"; `cancelled` znamená „nevíme, jak by dopadla" — a nevědět není
+  # totéž co být v pořádku.
+  pr-verdikt:
+    name: "PR: verdikt"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # ⛔ `always()` NENÍ POHODLÍ, JE TO PODMÍNKA EXISTENCE. Bez něj platí výchozí
+    # pravidlo „všechny `needs` musely uspět" — a protože se úlohy filtrují podle
+    # cest, většina se běžně PŘESKOČÍ (naměřeno na cizím PR: 13 z 22). Verdikt by
+    # se tedy sám přeskočil skoro vždycky, a přeskočená POVINNÁ kontrola je horší
+    # než žádná: buď slití zablokuje napořád, nebo se tiše počítá za úspěch.
+    #
+    # Agregátor musí umět rozlišit „neběželo to" od „prošlo to" — týž rozdíl,
+    # kvůli kterému v tomhle repu existuje kód 75. Rozhoduje se proto z
+    # `needs.*.result` uvnitř kroku, ne podmínkou nad úlohou.
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    needs:
+      - detect
+      - build-runner-health
+      - check-web
+      - test-web
+      - build-web
+      - secret-scan
+      - disclosure-scan
+      - semgrep
+      - governance-gate
+      - coldstart-db-gate
+      - overlay-gates
+      - service-tests
+      - surface-tests
+      - surface-contract-gate
+      - db-runtime-rohatka
+      - blockchain-integration
+      - av-integration-gate
+      - validate-n8n-workflows
+      - test-n8n
+      - test-extension
+      - test-mobile
+      - test-cosmos
+      - workbench-rail
+    steps:
+      - name: Verdikt nad všemi úlohami PR
+        shell: bash
+        env:
+          VYSLEDKY: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, sys
+
+          syrove = os.environ.get("VYSLEDKY", "")
+          # Bez vstupu se NEROZHODUJE. Prázdný `needs` by jinak znamenal
+          # „nic neselhalo", což je táž vada jako zelená z nezměřeného běhu.
+          if syrove.strip() in ("", "null", "{}"):
+              print("::error::PR: verdikt nedostal výsledky žádné úlohy — NEZMĚŘENO, ne zelená.")
+              sys.exit(1)
+          vysledky = json.loads(syrove)
+
+          for jmeno in sorted(vysledky):
+              print(f"  {vysledky[jmeno].get('result', '?'):>9}  {jmeno}")
+
+          # `skipped` = „tahle změna se jí netýká". `cancelled` = „nevíme, jak by
+          # dopadla" — a nevědět není totéž co být v pořádku.
+          spatne = sorted(
+              (jmeno, u.get("result"))
+              for jmeno, u in vysledky.items()
+              if u.get("result") in ("failure", "cancelled")
+          )
+          if spatne:
+              print("")
+              for jmeno, stav in spatne:
+                  print(f"::error::{jmeno}: {stav}")
+              # ⛔ ČERVENÁ MUSÍ ŘÍCT, CO S NÍ. „Selhalo" a „bylo zrušeno" vedou
+              # člověka OPAČNÝM směrem: u prvního se opravuje kód, u druhého se
+              # opakuje běh. Splácnout je do jedné věty je táž vada jako poslat
+              # někoho hledat vadu v kódu, když se jen nic nezměřilo.
+              padlo = [j for j, st in spatne if st == "failure"]
+              zruseno = [j for j, st in spatne if st == "cancelled"]
+              if padlo:
+                  print(f"::error::PR: verdikt je ČERVENÝ — {len(padlo)} úloh SELHALO. Oprav kód; "
+                        f"opakovat běh nepomůže.")
+              if zruseno and not padlo:
+                  print(f"::error::PR: verdikt je ČERVENÝ — {len(zruseno)} úloh bylo ZRUŠENO, nic "
+                        f"neselhalo. Běh se nedoměřil (nahrazen novým pushem, nebo zrušen ručně) — "
+                        f"ZOPAKUJ ho, nehledej vadu v kódu.")
+              elif zruseno:
+                  print(f"::error::…a dalších {len(zruseno)} úloh bylo zrušeno (o těch se nic neví).")
+              sys.exit(1)
+
+          print("")
+          print("PR: verdikt je ZELENÝ — žádná úloha neselhala ani nebyla zrušena.")
+          PY

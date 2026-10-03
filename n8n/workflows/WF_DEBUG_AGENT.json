@@ -1,0 +1,200 @@
+{
+  "name": "WF_DEBUG_AGENT",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "da-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare context for debug agent\nconst input = $input.item.json;\n\nconst chatInput = [\n  `[DEBUG AGENT] Analyze failure for run ${input.run_id}`,\n  `Task: ${input.task_kind}`,\n  `Failed Agent: ${input.failed_agent || 'unknown'}`,\n  `Step Index: ${input.step_index ?? 'N/A'}`,\n  `Risk Profile: ${input.risk_profile}`,\n  '',\n  'Error:',\n  input.error_message || 'No error message provided',\n  '',\n  'Previous pipeline results:',\n  JSON.stringify(input.previous_results || input.results || [], null, 2),\n  '',\n  'Instructions:',\n  '1. Analyze the root cause of the failure',\n  '2. Search knowledge base for similar issues and solutions',\n  '3. Determine if the issue is retryable',\n  '4. Propose a fix or workaround',\n  '5. Return: { diagnosis: string, proposed_fix: string, should_retry: boolean, severity: string }'\n].join('\\n');\n\nreturn {\n  json: {\n    chatInput,\n    run_id: input.run_id,\n    failed_agent: input.failed_agent,\n    agent_slug: 'debug_agent',\n    session_id: `debug-${input.run_id}`\n  }\n};"
+      },
+      "id": "da-prepare",
+      "name": "Prepare Debug Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are the **debug_agent** in the AISHA pipeline. Your role is to diagnose failures.\n\nWhen an agent in the pipeline fails, you:\n1. Analyze the error context and stack trace\n2. Search knowledge base for known issues\n3. Determine root cause (code bug, config issue, external dependency, insufficient context)\n4. Assess if the operation should be retried\n5. Propose a specific fix\n\nAlways be precise in your diagnosis. Reference specific patterns from knowledge base.\nClassify severity: low (cosmetic), medium (functional), high (blocking), critical (security/data).",
+          "maxIterations": 8
+        }
+      },
+      "id": "da-agent",
+      "name": "Debug Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "routingStrategy": "reasoning",
+        "options": {
+          "temperature": 0.1,
+          "maxOutputTokens": 4096,
+          "maxRetries": 2
+        }
+      },
+      "id": "da-llm",
+      "name": "Reasoning LLM",
+      "type": "n8n-nodes-aisha.aishaLlmRouter",
+      "typeVersion": 1,
+      "position": [
+        500,
+        520
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "__REMAP__",
+          "name": "OpenAi account"
+        },
+        "googlePalmApi": {
+          "id": "__REMAP__",
+          "name": "Google Gemini(PaLM) Api account"
+        },
+        "anthropicApi": {
+          "id": "__REMAP__",
+          "name": "Anthropic account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "toolName": "search_knowledge",
+        "toolDescription": "Search the AISHA knowledge base for debugging patterns and known issues",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/functions/v1/mcp-knowledge-server",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "body": "={{ JSON.stringify({ method: 'tools/call', params: { name: 'search_knowledge', arguments: { query: $fromAI('query', 'Search query for debugging patterns') } } }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "da-tool-kb",
+      "name": "Knowledge Search",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        520
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse debug agent output into structured result\nconst agentResult = $('Debug Agent').item.json;\nconst output = agentResult.output || agentResult.text || '';\n\nlet diagnosis = output;\nlet proposed_fix = '';\nlet should_retry = false;\nlet severity = 'medium';\n\n// Try to parse structured JSON from output\ntry {\n  const jsonMatch = output.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    const parsed = JSON.parse(jsonMatch[0]);\n    if (parsed.diagnosis) diagnosis = parsed.diagnosis;\n    if (parsed.proposed_fix) proposed_fix = parsed.proposed_fix;\n    if (typeof parsed.should_retry === 'boolean') should_retry = parsed.should_retry;\n    if (parsed.severity) severity = parsed.severity;\n  }\n} catch (e) {\n  // Not JSON, use raw output\n}\n\nreturn {\n  json: {\n    agent_slug: 'debug_agent',\n    diagnosis,\n    proposed_fix,\n    should_retry,\n    severity,\n    passed: true\n  }\n};"
+      },
+      "id": "da-result",
+      "name": "Build Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Debug Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Debug Context": {
+      "main": [
+        [
+          {
+            "node": "Debug Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reasoning LLM": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Debug Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Search": {
+      "ai_tool": [
+        [
+          {
+            "node": "Debug Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debug Agent": {
+      "main": [
+        [
+          {
+            "node": "Build Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Prague"
+  },
+  "tags": [
+    {
+      "name": "agent"
+    },
+    {
+      "name": "pipeline"
+    },
+    {
+      "name": "debug"
+    },
+    {
+      "name": "aisha"
+    }
+  ]
+}

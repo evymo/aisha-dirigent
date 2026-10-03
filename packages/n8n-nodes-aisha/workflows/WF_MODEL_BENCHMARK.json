@@ -1,0 +1,212 @@
+{
+  "name": "WF_MODEL_BENCHMARK",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "model-benchmark",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "benchmark-trigger",
+      "name": "Benchmark Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "model-benchmark-webhk01"
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * WF_MODEL_BENCHMARK — Build eval task matrix\n *\n * Input (webhook body):\n *   providers?: string[]   — which providers to test (default: all known)\n *   task_types?: string[]  — which task types (default: all)\n *   dry_run?: boolean      — if true, return matrix without executing\n *\n * This step generates 1 item per (provider × model × task_type) combination.\n */\nconst input = $input.first().json;\nconst body = input.body || input;\n\nconst ALL_PROVIDERS = [\n  { provider: 'openai', models: ['gpt-4o', 'gpt-4o-mini'] },\n  { provider: 'google', models: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'] },\n  { provider: 'anthropic', models: ['claude-sonnet-4-20250514', 'claude-3-5-haiku-20241022'] },\n  { provider: 'xai', models: ['grok-3-mini'] },\n];\n\nconst ALL_TASK_TYPES = [\n  'classification',\n  'summarization',\n  'translation',\n  'code_review',\n  'coding',\n  'reasoning',\n  'creative',\n  'chat',\n  'data_analysis',\n];\n\n// Standard eval prompts per task type\nconst EVAL_PROMPTS = {\n  classification: 'Classify the following support ticket into exactly one of these categories: billing, technical, account, general. Ticket: \"My invoice shows a charge I don\\'t recognize from last month.\" Return JSON: {\"category\": \"...\", \"confidence\": 0.0-1.0}',\n  summarization: 'Summarize the following text in exactly 2 sentences: \"The European Union has proposed new regulations for artificial intelligence systems. The AI Act would create a risk-based framework classifying AI applications into different tiers. High-risk applications like medical devices and autonomous vehicles would face stricter requirements including mandatory conformity assessments. The legislation aims to balance innovation with fundamental rights protection. Critics argue the rules could stifle European AI development while supporters call it a necessary safeguard.\"',\n  translation: 'Translate the following English text to Czech, maintaining professional tone: \"The quarterly financial report indicates a 15% increase in recurring revenue, driven primarily by enterprise customer expansion and improved retention metrics.\"',\n  code_review: 'Review this TypeScript code for bugs, security issues, and best practices. Return a JSON array of findings: ```typescript\\nconst getUserData = async (userId: any) => {\\n  const result = await fetch(`/api/users/${userId}`);\\n  const data = result.json();\\n  console.log(\"User data:\", data);\\n  return data;\\n}\\n```',\n  coding: 'Write a TypeScript function `parseCSV(input: string): Record<string, string>[]` that parses a CSV string with headers into an array of objects. Handle quoted fields containing commas. Do not use external libraries.',\n  reasoning: 'A farmer has a fox, a chicken, and a bag of grain. He must cross a river in a boat that can only carry him and one item at a time. If left alone, the fox will eat the chicken, and the chicken will eat the grain. What is the minimum number of trips across the river? Explain your reasoning step by step.',\n  creative: 'Write a haiku about debugging code at 3 AM. The haiku must follow the 5-7-5 syllable pattern.',\n  chat: 'I\\'m a new developer starting my first job next week. What are the three most important things I should focus on in my first month? Be concise.',\n  data_analysis: 'Given this data: Monthly sales (in thousands): Jan=120, Feb=135, Mar=128, Apr=142, May=155, Jun=148, Jul=162, Aug=170, Sep=158, Oct=175, Nov=190, Dec=210. Calculate the average monthly growth rate and identify the month with highest growth. Return JSON: {\"avg_growth_pct\": ..., \"peak_month\": \"...\", \"peak_growth_pct\": ...}',\n};\n\nconst requestedProviders = body.providers || ALL_PROVIDERS.map(p => p.provider);\nconst requestedTypes = body.task_types || ALL_TASK_TYPES;\nconst dryRun = body.dry_run === true;\n\nconst matrix = [];\nfor (const providerDef of ALL_PROVIDERS) {\n  if (!requestedProviders.includes(providerDef.provider)) continue;\n  for (const model of providerDef.models) {\n    for (const taskType of requestedTypes) {\n      matrix.push({\n        provider: providerDef.provider,\n        model,\n        task_type: taskType,\n        prompt: EVAL_PROMPTS[taskType] || EVAL_PROMPTS.chat,\n        dry_run: dryRun,\n        run_id: `bench_${Date.now()}`,\n      });\n    }\n  }\n}\n\nreturn matrix.map(item => ({ json: item }));"
+      },
+      "id": "build-matrix",
+      "name": "Build Eval Matrix",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "conditions": [
+            {
+              "id": "dry-run-check",
+              "leftValue": "={{ $json.dry_run }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "dry-run-gate",
+      "name": "Dry Run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Dry run — just return the matrix without executing\nconst items = $input.all();\nreturn [{ json: { dry_run: true, matrix_size: items.length, tasks: items.map(i => i.json) } }];"
+      },
+      "id": "dry-run-response",
+      "name": "Dry Run Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Execute single benchmark call via model-router webhook.\n * Measures latency, captures response, scores basic quality.\n */\nconst item = $input.first().json;\nconst baseUrl = $env.N8N_WEBHOOK_BASE_URL || 'http://localhost:5678';\n\nconst startTime = Date.now();\nlet response;\nlet error = null;\n\ntry {\n  const res = await fetch(`${baseUrl}/webhook/model-router`, {\n    method: 'POST',\n    headers: { 'Content-Type': 'application/json' },\n    body: JSON.stringify({\n      task: item.prompt,\n      provider: item.provider,\n      model: item.model,\n      max_tokens: 2048,\n      temperature: 0.3,\n      json_mode: item.task_type === 'classification' || item.task_type === 'data_analysis' || item.task_type === 'code_review',\n    }),\n  });\n  response = await res.json();\n} catch (e) {\n  error = e.message || String(e);\n}\n\nconst latencyMs = Date.now() - startTime;\nconst output = response?.result || response?.response || '';\nconst outputLength = typeof output === 'string' ? output.length : JSON.stringify(output).length;\n\n// Basic quality heuristics (0.0 - 1.0)\nlet qualityScore = 0.5; // baseline\nif (error) {\n  qualityScore = 0.0;\n} else if (outputLength < 10) {\n  qualityScore = 0.1; // too short\n} else if (outputLength > 50) {\n  qualityScore = 0.6;\n  // Bonus for JSON tasks returning valid JSON\n  if (['classification', 'data_analysis', 'code_review'].includes(item.task_type)) {\n    try { JSON.parse(typeof output === 'string' ? output : JSON.stringify(output)); qualityScore = 0.8; } catch { qualityScore = 0.5; }\n  }\n  // Bonus for code tasks containing function signatures\n  if (['coding', 'code_review'].includes(item.task_type) && typeof output === 'string' && (output.includes('function') || output.includes('=>'))) {\n    qualityScore = Math.max(qualityScore, 0.7);\n  }\n}\n\nreturn [{\n  json: {\n    provider: item.provider,\n    model: item.model,\n    task_type: item.task_type,\n    run_id: item.run_id,\n    latency_ms: latencyMs,\n    output_length: outputLength,\n    quality_score: qualityScore,\n    error,\n    completed_at: new Date().toISOString(),\n  }\n}];"
+      },
+      "id": "execute-benchmark",
+      "name": "Execute Benchmark",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "rpc",
+        "rpcFunction": "insert_model_benchmark",
+        "rpcParams": "={{ JSON.stringify({ p_model_id: $json.model, p_task_type: $json.task_type, p_score: $json.quality_score, p_latency_ms: $json.latency_ms, p_details: { provider: $json.provider, run_id: $json.run_id, output_length: $json.output_length, error: $json.error } }) }}",
+        "onError": "continueRegularOutput"
+      },
+      "id": "store-result",
+      "name": "Store Benchmark",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        420
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "supabase-cred",
+          "name": "AISHA PostgREST"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate results and build summary\nconst items = $input.all();\nconst results = items.map(i => i.json);\n\n// Group by provider\nconst byProvider = {};\nfor (const r of results) {\n  const key = `${r.provider}/${r.model}`;\n  if (!byProvider[key]) byProvider[key] = { scores: [], latencies: [], errors: 0 };\n  byProvider[key].scores.push(r.quality_score || 0);\n  byProvider[key].latencies.push(r.latency_ms || 0);\n  if (r.error) byProvider[key].errors++;\n}\n\nconst summary = Object.entries(byProvider).map(([key, data]) => ({\n  model: key,\n  avg_score: (data.scores.reduce((a, b) => a + b, 0) / data.scores.length).toFixed(3),\n  avg_latency_ms: Math.round(data.latencies.reduce((a, b) => a + b, 0) / data.latencies.length),\n  error_count: data.errors,\n  total_tasks: data.scores.length,\n}));\n\nsummary.sort((a, b) => parseFloat(b.avg_score) - parseFloat(a.avg_score));\n\nreturn [{ json: { benchmark_complete: true, total_evaluations: results.length, summary } }];"
+      },
+      "id": "aggregate-results",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Benchmark Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Eval Matrix",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Eval Matrix": {
+      "main": [
+        [
+          {
+            "node": "Dry Run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dry Run?": {
+      "main": [
+        [
+          {
+            "node": "Dry Run Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Execute Benchmark",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Benchmark": {
+      "main": [
+        [
+          {
+            "node": "Store Benchmark",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Benchmark": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": [
+    {
+      "name": "admin"
+    },
+    {
+      "name": "benchmark"
+    }
+  ],
+  "pinData": {}
+}

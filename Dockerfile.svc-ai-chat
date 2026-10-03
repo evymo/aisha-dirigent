@@ -1,0 +1,24 @@
+# syntax=docker/dockerfile:1
+# Dockerfile.svc-ai-chat — AI chat microservice (port 3011)
+# Standalone 2-stage Dockerfile to avoid Coolify's ARG injection explosion.
+# (Coolify adds ARG declarations + --mount=type=secret for every env var to
+# every stage; inline dockerfiles get serialized into the compose command and
+# exceed ARG_MAX. External files bypass this.)
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/node:22-alpine AS build
+WORKDIR /app
+COPY services/svc-ai-chat/package.json services/svc-ai-chat/package-lock.json* ./
+RUN npm ci --include=dev
+COPY services/svc-ai-chat/tsconfig.json ./
+COPY services/svc-ai-chat/src ./src
+RUN ./node_modules/.bin/tsc
+
+FROM ${REGISTRY_PROXY}library/node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+COPY services/svc-ai-chat/package.json services/svc-ai-chat/package-lock.json* ./
+RUN npm ci --ignore-scripts --omit=dev && npm cache clean --force
+COPY --from=build /app/dist ./dist
+EXPOSE 3011
+USER node
+CMD ["node", "dist/server.js"]

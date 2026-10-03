@@ -1,0 +1,347 @@
+{
+  "_note": "Translation values for every data-i18n-key this template references. Consumed by `npm --prefix services/svc-web-artifact run export-web-seed` → `translations` rows. EN + CS authored by hand; de/fr/ru/th filled by `node scripts/i18n/translate-template-i18n.mjs domains/templates/site-supervision` (DeepL + context review). The brand wordmark and the 100% stat are hand-set in all 6 locales so the filler leaves them untouched.",
+  "web.inspect.brand": {
+    "en": "Cornerstone Site Supervision",
+    "cs": "Cornerstone Site Supervision",
+    "de": "Cornerstone Site Supervision",
+    "fr": "Cornerstone Site Supervision",
+    "ru": "Cornerstone Site Supervision",
+    "th": "Cornerstone Site Supervision"
+  },
+  "web.inspect.footer.name": {
+    "en": "Cornerstone Site Supervision",
+    "cs": "Cornerstone Site Supervision",
+    "de": "Cornerstone Site Supervision",
+    "fr": "Cornerstone Site Supervision",
+    "ru": "Cornerstone Site Supervision",
+    "th": "Cornerstone Site Supervision"
+  },
+  "web.inspect.docs.statNum": {
+    "en": "100%",
+    "cs": "100%",
+    "de": "100%",
+    "fr": "100%",
+    "ru": "100%",
+    "th": "100%"
+  },
+  "web.inspect.title": {
+    "en": "Cornerstone Site Supervision — independent building inspection",
+    "cs": "Cornerstone Site Supervision — nezávislý stavební dozor",
+    "de": "Cornerstone Site Supervision – unabhängige Bauaufsicht",
+    "fr": "Cornerstone Site Supervision — inspection indépendante des chantiers",
+    "ru": "Cornerstone Site Supervision — независимый строительный надзор",
+    "th": "Cornerstone Site Supervision — การตรวจสอบอาคารอิสระ"
+  },
+  "web.inspect.description": {
+    "en": "Independent construction supervision and building inspection. Every finding backed by the standard it's measured against.",
+    "cs": "Nezávislý stavební dozor a kontrola staveb. Každé zjištění podložené normou, podle které se měří.",
+    "de": "Unabhängige Bauüberwachung und Bauabnahme. Jeder Befund wird durch die entsprechende Norm untermauert.",
+    "fr": "Supervision indépendante des travaux et contrôle des bâtiments. Chaque constat est étayé par la norme de référence utilisée pour l'évaluation.",
+    "ru": "Независимый надзор за строительством и инспектирование зданий. Каждый вывод подкрепляется соответствующим стандартом.",
+    "th": "การควบคุมงานก่อสร้างและการตรวจสอบอาคารโดยอิสระ ทุกข้อค้นพบต้องอ้างอิงมาตรฐานที่ใช้ในการวัด"
+  },
+  "web.inspect.nav.checks": {
+    "en": "What we check",
+    "cs": "Co kontrolujeme",
+    "de": "Was wir prüfen",
+    "fr": "Ce que nous vérifions",
+    "ru": "Что мы проверяем",
+    "th": "สิ่งที่เราตรวจสอบ"
+  },
+  "web.inspect.nav.reports": {
+    "en": "Our reports",
+    "cs": "Naše zprávy",
+    "de": "Unsere Berichte",
+    "fr": "Nos rapports",
+    "ru": "Наши отчеты",
+    "th": "รายงานของเรา"
+  },
+  "web.inspect.nav.contact": {
+    "en": "Request an inspection",
+    "cs": "Objednat kontrolu",
+    "de": "Eine Inspektion anfordern",
+    "fr": "Demander une inspection",
+    "ru": "Заказать осмотр",
+    "th": "ขอตรวจสอบ"
+  },
+  "web.inspect.hero.heading": {
+    "en": "An independent eye on your building",
+    "cs": "Nezávislý dohled nad vaší stavbou",
+    "de": "Ein unabhängiger Blick auf Ihr Gebäude",
+    "fr": "Un regard impartial sur votre immeuble",
+    "ru": "Независимый взгляд на ваше здание",
+    "th": "สายตาอิสระที่มองอาคารของคุณ"
+  },
+  "web.inspect.hero.body": {
+    "en": "We supervise construction and inspect finished work on your behalf — not the builder's. You get a clear, photographed report where every finding is tied to the standard it's measured against.",
+    "cs": "Dozorujeme stavbu a kontrolujeme hotovou práci za vás — ne za zhotovitele. Dostanete přehlednou zprávu s fotografiemi, kde je každé zjištění navázané na normu, podle které se posuzuje.",
+    "de": "Wir überwachen die Bauarbeiten und prüfen die fertiggestellten Arbeiten in Ihrem Auftrag – nicht im Auftrag des Bauunternehmers. Sie erhalten einen übersichtlichen, mit Fotos versehenen Bericht, in dem jeder Befund mit dem entsprechenden Standard verknüpft ist.",
+    "fr": "Nous supervisons les travaux et inspectons les travaux achevés pour votre compte — et non pour celui du constructeur. Vous recevez un rapport clair, illustré de photos, dans lequel chaque constat est mis en correspondance avec la norme de référence.",
+    "ru": "Мы контролируем ход строительства и проводим приемку готовых работ в ваших интересах, а не в интересах застройщика. Вы получаете наглядный отчет с фотографиями, в котором каждое замечание соотносится с соответствующим стандартом.",
+    "th": "เราควบคุมการก่อสร้างและตรวจสอบงานที่เสร็จสมบูรณ์แทนคุณ — ไม่ใช่ของผู้รับเหมา. คุณจะได้รับรายงานที่ชัดเจนพร้อมภาพถ่ายซึ่งทุกข้อค้นพบจะเชื่อมโยงกับมาตรฐานที่ใช้ในการวัด."
+  },
+  "web.inspect.hero.cta": {
+    "en": "Request an inspection",
+    "cs": "Objednat kontrolu",
+    "de": "Eine Inspektion anfordern",
+    "fr": "Demander une inspection",
+    "ru": "Заказать осмотр",
+    "th": "ขอตรวจสอบ"
+  },
+  "web.inspect.hero.trust": {
+    "en": "Chartered & independent · 20 years on site",
+    "cs": "Autorizovaní a nezávislí · 20 let na stavbách",
+    "de": "Zertifiziert und unabhängig · Seit 20 Jahren vor Ort",
+    "fr": "Société agréée et indépendante · 20 ans d'expérience sur place",
+    "ru": "Лицензированная и независимая компания · 20 лет работы на месте",
+    "th": "จดทะเบียนและอิสระ · 20 ปีในพื้นที่"
+  },
+  "web.inspect.checks.eyebrow": {
+    "en": "Scope",
+    "cs": "Rozsah",
+    "de": "Geltungsbereich",
+    "fr": "Champ d'application",
+    "ru": "Область применения",
+    "th": "ขอบเขต"
+  },
+  "web.inspect.checks.heading": {
+    "en": "What we check",
+    "cs": "Co kontrolujeme",
+    "de": "Was wir prüfen",
+    "fr": "Ce que nous vérifions",
+    "ru": "Что мы проверяем",
+    "th": "สิ่งที่เราตรวจสอบ"
+  },
+  "web.inspect.check.1.name": {
+    "en": "Structure & foundations",
+    "cs": "Konstrukce a základy",
+    "de": "Tragwerk & Fundamente",
+    "fr": "Structure et fondations",
+    "ru": "Конструкции и фундаменты",
+    "th": "โครงสร้างและฐานราก"
+  },
+  "web.inspect.check.1.desc": {
+    "en": "Movement, cracking and load paths, against the relevant structural codes.",
+    "cs": "Pohyby, trhliny a přenos zatížení podle příslušných statických norem.",
+    "de": "Bewegungen, Rissbildung und Lastverläufe im Vergleich zu den einschlägigen Bauvorschriften.",
+    "fr": "Déplacements, fissures et chemins de charge, conformément aux normes de construction applicables.",
+    "ru": "Деформации, растрескивание и линии передачи нагрузки в соответствии с действующими строительными нормами.",
+    "th": "การเคลื่อนไหว การแตกร้าว และเส้นทางการรับน้ำหนัก ตามมาตรฐานโครงสร้างที่เกี่ยวข้อง"
+  },
+  "web.inspect.check.2.name": {
+    "en": "Damp & weatherproofing",
+    "cs": "Vlhkost a odolnost proti počasí",
+    "de": "Feuchtigkeits- und Wetterschutz",
+    "fr": "Humidité et étanchéité",
+    "ru": "Влаго- и водонепроницаемость",
+    "th": "กันความชื้นและกันสภาพอากาศ"
+  },
+  "web.inspect.check.2.desc": {
+    "en": "Moisture readings, roof, flashing and seals — where water gets in, and why.",
+    "cs": "Měření vlhkosti, střecha, oplechování a spáry — kudy a proč zatéká.",
+    "de": "Feuchtigkeitsmessungen, Dach, Abdeckbleche und Dichtungen – wo Wasser eindringt und warum.",
+    "fr": "Mesures d'humidité, toiture, solins et joints : par où l'eau s'infiltre et pourquoi.",
+    "ru": "Показатели влажности, крыша, водосточные желоба и уплотнения — где проникает вода и почему.",
+    "th": "การอ่านค่าความชื้น หลังคา แผ่นปิดรอยต่อ และซีล — จุดที่น้ำสามารถซึมเข้าไปได้ และสาเหตุ"
+  },
+  "web.inspect.check.3.name": {
+    "en": "Services & safety",
+    "cs": "Instalace a bezpečnost",
+    "de": "Dienstleistungen & Sicherheit",
+    "fr": "Services et sécurité",
+    "ru": "Услуги и безопасность",
+    "th": "บริการและความปลอดภัย"
+  },
+  "web.inspect.check.3.desc": {
+    "en": "Electrical, gas and fire provisions checked against current regulations.",
+    "cs": "Elektro, plyn a požární opatření prověřené podle aktuálních předpisů.",
+    "de": "Die Elektro-, Gas- und Brandschutzvorrichtungen wurden auf ihre Übereinstimmung mit den geltenden Vorschriften überprüft.",
+    "fr": "Conformité des installations électriques, de gaz et des dispositifs anti-incendie aux réglementations en vigueur.",
+    "ru": "Проверка соответствия электрооборудования, газового оборудования и противопожарных систем действующим нормам.",
+    "th": "ตรวจสอบข้อกำหนดเกี่ยวกับไฟฟ้า แก๊ส และระบบป้องกันอัคคีภัยให้สอดคล้องกับข้อบังคับปัจจุบัน"
+  },
+  "web.inspect.check.4.name": {
+    "en": "Workmanship & finish",
+    "cs": "Provedení a finální úpravy",
+    "de": "Verarbeitung und Oberflächenbeschaffenheit",
+    "fr": "Finition et qualité de fabrication",
+    "ru": "Качество изготовления и отделка",
+    "th": "ฝีมือการผลิตและการตกแต่ง"
+  },
+  "web.inspect.check.4.desc": {
+    "en": "Snagging against the contract and the drawings, room by room.",
+    "cs": "Kontrola vad a nedodělků oproti smlouvě a výkresům, místnost po místnosti.",
+    "de": "Raum für Raum werden die Abweichungen vom Vertrag und den Zeichnungen abgeglichen.",
+    "fr": "Vérification minutieuse de la conformité par rapport au contrat et aux plans, pièce par pièce.",
+    "ru": "Проверка соответствия контракту и чертежам, комната за комнатой.",
+    "th": "ตรวจหาข้อบกพร่องตามสัญญาและแบบแปลน ทีละห้อง"
+  },
+  "web.inspect.docs.heading": {
+    "en": "Every finding, backed by the standard",
+    "cs": "Každé zjištění podložené normou",
+    "de": "Jeder Befund, gestützt auf die Norm",
+    "fr": "Chaque constat, étayé par la norme",
+    "ru": "Каждый вывод, подкреплённый стандартом",
+    "th": "ทุกข้อค้นพบที่สนับสนุนโดยมาตรฐาน"
+  },
+  "web.inspect.docs.body": {
+    "en": "A report is only as good as what stands behind it. Each item in ours cites the regulation, code or drawing it's measured against, with a photo and a reference you can look up yourself — so there's nothing to take on trust.",
+    "cs": "Zpráva je jen tak dobrá jako to, co za ní stojí. Každá položka v té naší odkazuje na předpis, normu nebo výkres, podle kterých se měří, doplněná fotografií a odkazem, který si můžete sami dohledat — takže nic nemusíte brát jen na slovo.",
+    "de": "Ein Bericht ist nur so gut wie die Informationen, auf denen er basiert. Jeder Punkt in unserem Bericht verweist auf die Vorschrift, den Normenkatalog oder die Zeichnung, anhand derer die Messung erfolgte, und enthält ein Foto sowie einen Verweis, den Sie selbst nachschlagen können – Sie müssen also nichts blind glauben.",
+    "fr": "La qualité d'un rapport dépend de la fiabilité des sources sur lesquelles il s'appuie. Chaque élément de notre rapport mentionne le règlement, la norme ou le plan sur lequel il se base, accompagné d'une photo et d'une référence que vous pouvez vérifier par vous-même — vous n'avez donc pas à vous fier aveuglément à nos affirmations.",
+    "ru": "Качество отчета зависит от того, на чем он основан. В каждом пункте нашего отчета указаны нормативные акты, стандарты или чертежи, на основании которых проводились измерения, а также прилагаются фотографии и ссылки, по которым вы можете самостоятельно проверить информацию — так что вам не придется полагаться на наши слова на слово.",
+    "th": "รายงานจะดีได้ก็ต่อเมื่อมีข้อมูลสนับสนุนที่เชื่อถือได้เท่านั้น ในแต่ละรายการของเรามีการอ้างอิงถึงข้อบังคับ รหัส หรือแบบแปลนที่ใช้เป็นเกณฑ์ในการวัด พร้อมภาพถ่ายและแหล่งอ้างอิงที่คุณสามารถตรวจสอบได้ด้วยตัวเอง — ดังนั้นจึงไม่มีอะไรที่ต้องเชื่อโดยปราศจากหลักฐาน"
+  },
+  "web.inspect.docs.cta": {
+    "en": "See a sample report",
+    "cs": "Prohlédnout ukázkovou zprávu",
+    "de": "Beispielbericht anzeigen",
+    "fr": "Consultez un exemple de rapport",
+    "ru": "Посмотреть пример отчета",
+    "th": "ดูตัวอย่างรายงาน"
+  },
+  "web.inspect.docs.statLabel": {
+    "en": "of findings cite their source",
+    "cs": "zjištění uvádí svůj zdroj",
+    "de": "der Befunde nennen ihre Quelle",
+    "fr": "de ces conclusions citent leur source",
+    "ru": "в выводах указывается их источник",
+    "th": "ของผลการค้นพบที่อ้างถึงแหล่งที่มา"
+  },
+  "web.inspect.creds.eyebrow": {
+    "en": "Why us",
+    "cs": "Proč my",
+    "de": "Warum wir?",
+    "fr": "Pourquoi nous choisir ?",
+    "ru": "Почему именно мы",
+    "th": "ทำไมเรา"
+  },
+  "web.inspect.creds.heading": {
+    "en": "Independent and qualified",
+    "cs": "Nezávislí a kvalifikovaní",
+    "de": "Unabhängig und qualifiziert",
+    "fr": "Indépendant et qualifié",
+    "ru": "Независимый и квалифицированный",
+    "th": "อิสระและมีคุณสมบัติครบถ้วน"
+  },
+  "web.inspect.cred.1": {
+    "en": "Chartered surveyors",
+    "cs": "Autorizovaní inspektoři",
+    "de": "Bausachverständige",
+    "fr": "Experts en bâtiment agréés",
+    "ru": "Дипломированные строительные эксперты",
+    "th": "ผู้ตรวจสอบอาคารที่ได้รับการรับรอง"
+  },
+  "web.inspect.cred.2": {
+    "en": "No ties to any builder",
+    "cs": "Žádné vazby na zhotovitele",
+    "de": "Keine Verbindungen zu Bauunternehmen",
+    "fr": "Aucun lien avec un constructeur",
+    "ru": "Не связан с каким-либо застройщиком",
+    "th": "ไม่มีความเกี่ยวข้องกับผู้รับเหมาใด ๆ"
+  },
+  "web.inspect.cred.3": {
+    "en": "20 years on real sites",
+    "cs": "20 let na reálných stavbách",
+    "de": "Seit 20 Jahren auf echten Baustellen",
+    "fr": "20 ans d'expérience sur le terrain",
+    "ru": "20 лет на реальных объектах",
+    "th": "20 ปีบนสถานที่จริง"
+  },
+  "web.inspect.projects.heading": {
+    "en": "Recent work",
+    "cs": "Z naší praxe",
+    "de": "Aktuelle Arbeiten",
+    "fr": "Travaux récents",
+    "ru": "Последние работы",
+    "th": "งานล่าสุด"
+  },
+  "web.inspect.project.1.title": {
+    "en": "Period terrace",
+    "cs": "Historický řadový dům",
+    "de": "Historisches Reihenhaus",
+    "fr": "Maison de ville d'époque",
+    "ru": "Старинный таунхаус",
+    "th": "บ้านแถวเก่าแก่"
+  },
+  "web.inspect.project.1.desc": {
+    "en": "Pre-purchase survey that caught hidden roof-spread before contracts.",
+    "cs": "Předkupní prohlídka, která odhalila skryté rozjíždění krovu ještě před podpisem smlouvy.",
+    "de": "Eine Begutachtung vor dem Kauf, bei der versteckte Schäden am Dach noch vor Vertragsabschluss entdeckt wurden.",
+    "fr": "Une expertise préalable à l'achat a permis de détecter des problèmes cachés au niveau de la toiture avant la signature des contrats.",
+    "ru": "Обследование перед покупкой, позволившее выявить скрытые повреждения кровли до заключения договора.",
+    "th": "การสำรวจก่อนซื้อที่ตรวจพบการขยายตัวที่ซ่อนอยู่ของหลังคา ก่อนทำสัญญา"
+  },
+  "web.inspect.project.2.title": {
+    "en": "New-build handover",
+    "cs": "Předání novostavby",
+    "de": "Übergabe des Neubaus",
+    "fr": "Remise des clés d'un logement neuf",
+    "ru": "Сдача новостройки",
+    "th": "การส่งมอบอาคารใหม่"
+  },
+  "web.inspect.project.2.desc": {
+    "en": "Snagging list of 90 items, all closed out before the client moved in.",
+    "cs": "Seznam 90 vad a nedodělků, všechny odstraněné ještě před nastěhováním klienta.",
+    "de": "Mängelliste mit 90 Punkten, die alle vor dem Einzug des Kunden behoben wurden.",
+    "fr": "Liste de 90 points à régler, tous résolus avant l'emménagement du client.",
+    "ru": "Список из 90 замечаний, все из которых были устранены до заселения клиента.",
+    "th": "รายการตรวจสอบข้อบกพร่อง 90 รายการ ทั้งหมดได้รับการแก้ไขเสร็จสิ้นก่อนที่ลูกค้าจะเข้าอยู่"
+  },
+  "web.inspect.project.3.title": {
+    "en": "Commercial unit",
+    "cs": "Komerční prostor",
+    "de": "Gewerbeeinheit",
+    "fr": "Local commercial",
+    "ru": "Коммерческое помещение",
+    "th": "หน่วยเชิงพาณิชย์"
+  },
+  "web.inspect.project.3.desc": {
+    "en": "Dilapidations assessment that settled a lease dispute without court.",
+    "cs": "Posouzení stavu nemovitosti na konci nájmu, které urovnalo spor bez soudu.",
+    "de": "Eine Zustandsbewertung, durch die ein Mietstreit außergerichtlich beigelegt wurde.",
+    "fr": "Une expertise des dégradations qui a permis de régler un litige locatif à l'amiable.",
+    "ru": "Оценка ущерба, позволившая урегулировать спор по договору аренды без обращения в суд.",
+    "th": "การประเมินความเสียหายที่นำไปสู่การยุติข้อพิพาทเรื่องสัญญาเช่าโดยไม่ต้องขึ้นศาล"
+  },
+  "web.inspect.contact.eyebrow": {
+    "en": "Get started",
+    "cs": "Začněte",
+    "de": "Los geht’s",
+    "fr": "Commencer",
+    "ru": "Начать",
+    "th": "เริ่มต้น"
+  },
+  "web.inspect.contact.heading": {
+    "en": "Request an inspection",
+    "cs": "Objednat kontrolu",
+    "de": "Eine Inspektion anfordern",
+    "fr": "Demander une inspection",
+    "ru": "Заказать осмотр",
+    "th": "ขอตรวจสอบ"
+  },
+  "web.inspect.contact.body": {
+    "en": "Tell us about the property and the stage you're at. We'll come back with scope, timing and a fixed fee.",
+    "cs": "Napište nám o nemovitosti a v jaké fázi jste. Ozveme se s rozsahem, termínem a pevnou cenou.",
+    "de": "Erzählen Sie uns etwas über die Immobilie und in welcher Phase Sie sich gerade befinden. Wir melden uns dann mit einem Leistungsumfang, einem Zeitplan und einem Festpreis bei Ihnen.",
+    "fr": "Parlez-nous de votre bien immobilier et de l'étape à laquelle vous en êtes. Nous vous proposerons ensuite le périmètre des travaux, le calendrier et un tarif forfaitaire.",
+    "ru": "Расскажите нам о вашем объекте и на каком этапе вы сейчас находитесь. Мы свяжемся с вами и предоставим вам перечень работ, сроки выполнения и фиксированную стоимость.",
+    "th": "กรุณาบอกเราเกี่ยวกับทรัพย์สินและขั้นตอนที่คุณอยู่ในตอนนี้ เราจะกลับมาพร้อมกับขอบเขต, ระยะเวลา และค่าธรรมเนียมที่แน่นอน"
+  },
+  "web.inspect.contact.note": {
+    "en": "We reply within one working day with a clear scope and fee.",
+    "cs": "Ozveme se do jednoho pracovního dne s jasným rozsahem a cenou.",
+    "de": "Wir melden uns innerhalb eines Werktags mit einem klaren Leistungsumfang und einem Kostenvoranschlag bei Ihnen.",
+    "fr": "Nous vous répondons dans un délai d'un jour ouvrable en vous indiquant clairement le périmètre de la mission et nos honoraires.",
+    "ru": "Мы отвечаем в течение одного рабочего дня, указав четкий объем работ и стоимость.",
+    "th": "เราจะตอบกลับภายในหนึ่งวันทำการ พร้อมขอบเขตงานและค่าบริการที่ชัดเจน"
+  },
+  "web.inspect.footer.note": {
+    "en": "Independent building inspection · Acting only for you",
+    "cs": "Nezávislá kontrola staveb · Jednáme jen za vás",
+    "de": "Unabhängige Bauinspektion · Wir vertreten ausschließlich Ihre Interessen",
+    "fr": "Inspection immobilière indépendante · Nous travaillons exclusivement pour vous",
+    "ru": "Независимая экспертиза зданий · Работаем исключительно в ваших интересах",
+    "th": "การตรวจสอบอาคารอิสระ · ดำเนินการในนามของคุณเท่านั้น"
+  }
+}

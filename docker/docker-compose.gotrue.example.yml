@@ -1,0 +1,100 @@
+# ==============================================================================
+# Docker Compose - GoTrue (supabase-auth) Email Configuration
+# ==============================================================================
+# 
+# Add this to your docker-compose.yml under the `auth` or `supabase-auth` service
+# 
+# Environment variables reference the .env.gotrue file
+# 
+# ==============================================================================
+
+# Example docker-compose.yml snippet for supabase-auth service:
+#
+# services:
+#   auth:
+#     image: supabase/gotrue:v2.xxx
+#     container_name: supabase-auth
+#     environment:
+#       # ... other GoTrue config ...
+#       
+#       # ─────────────────────────────────────────────────────────────────────
+#       # Email Templates (served from Supabase Storage bucket)
+#       # ─────────────────────────────────────────────────────────────────────
+#       GOTRUE_MAILER_TEMPLATES_INVITE: ${MAILER_TEMPLATES_INVITE}
+#       GOTRUE_MAILER_TEMPLATES_CONFIRMATION: ${MAILER_TEMPLATES_CONFIRMATION}
+#       GOTRUE_MAILER_TEMPLATES_RECOVERY: ${MAILER_TEMPLATES_RECOVERY}
+#       GOTRUE_MAILER_TEMPLATES_MAGIC_LINK: ${MAILER_TEMPLATES_MAGIC_LINK}
+#       GOTRUE_MAILER_TEMPLATES_EMAIL_CHANGE: ${MAILER_TEMPLATES_EMAIL_CHANGE}
+#       
+#       # ─────────────────────────────────────────────────────────────────────
+#       # Email Subject Lines
+#       # ─────────────────────────────────────────────────────────────────────
+#       GOTRUE_MAILER_SUBJECTS_CONFIRMATION: ${MAILER_SUBJECTS_CONFIRMATION}
+#       GOTRUE_MAILER_SUBJECTS_RECOVERY: ${MAILER_SUBJECTS_RECOVERY}
+#       GOTRUE_MAILER_SUBJECTS_MAGIC_LINK: ${MAILER_SUBJECTS_MAGIC_LINK}
+#       GOTRUE_MAILER_SUBJECTS_EMAIL_CHANGE: ${MAILER_SUBJECTS_EMAIL_CHANGE}
+#       GOTRUE_MAILER_SUBJECTS_INVITE: ${MAILER_SUBJECTS_INVITE}
+#       
+#       # ─────────────────────────────────────────────────────────────────────
+#       # SMTP Settings
+#       # ─────────────────────────────────────────────────────────────────────
+#       GOTRUE_SMTP_HOST: ${SMTP_HOST}
+#       GOTRUE_SMTP_PORT: ${SMTP_PORT}
+#       GOTRUE_SMTP_USER: ${SMTP_USER}
+#       GOTRUE_SMTP_PASS: ${SMTP_PASS}
+#       GOTRUE_SMTP_ADMIN_EMAIL: ${SMTP_ADMIN_EMAIL}
+#       GOTRUE_SMTP_SENDER_NAME: ${SMTP_SENDER_NAME}
+#       
+#       # ─────────────────────────────────────────────────────────────────────
+#       # Site URL (used in templates as {{ .SiteURL }})
+#       # ─────────────────────────────────────────────────────────────────────
+#       GOTRUE_SITE_URL: ${SITE_URL}
+#       GOTRUE_URI_ALLOW_LIST: ${URI_ALLOW_LIST}
+#
+#       # Public Auth API base URL (required for OAuth callbacks)
+#       API_EXTERNAL_URL: ${AUTH_EXTERNAL_URL}
+#
+#       # ─────────────────────────────────────────────────────────────────────
+#       # OAuth Providers (self-hosted)
+#       # ─────────────────────────────────────────────────────────────────────
+#       GOTRUE_EXTERNAL_APPLE_ENABLED: ${OAUTH_APPLE_ENABLED}
+#       GOTRUE_EXTERNAL_APPLE_CLIENT_ID: ${OAUTH_APPLE_CLIENT_ID}
+#       GOTRUE_EXTERNAL_APPLE_SECRET: ${OAUTH_APPLE_SECRET}
+#       GOTRUE_EXTERNAL_APPLE_REDIRECT_URI: ${OAUTH_APPLE_REDIRECT_URI}
+#
+#       GOTRUE_EXTERNAL_GOOGLE_ENABLED: ${OAUTH_GOOGLE_ENABLED}
+#       GOTRUE_EXTERNAL_GOOGLE_CLIENT_ID: ${OAUTH_GOOGLE_CLIENT_ID}
+#       GOTRUE_EXTERNAL_GOOGLE_SECRET: ${OAUTH_GOOGLE_SECRET}
+#       GOTRUE_EXTERNAL_GOOGLE_REDIRECT_URI: ${OAUTH_GOOGLE_REDIRECT_URI}
+#       
+#       # ─────────────────────────────────────────────────────────────────────
+#       # SMS/Phone Auth (optional)
+#       # ─────────────────────────────────────────────────────────────────────
+#       # GOTRUE_SMS_PROVIDER: ${SMS_PROVIDER:-twilio}
+#       # GOTRUE_SMS_TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID}
+#       # GOTRUE_SMS_TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN}
+#       # GOTRUE_SMS_TWILIO_MESSAGE_SERVICE_SID: ${TWILIO_MESSAGE_SERVICE_SID}
+
+# ==============================================================================
+# DEPLOYMENT WORKFLOW
+# ==============================================================================
+# 
+# 1. Generate templates from i18n:
+#    npm run supabase:email-templates:generate
+# 
+# 2. Upload to storage bucket:
+#    AISHA_POSTGREST_URL=https://xxx.supabase.co \
+#    AISHA_POSTGREST_SERVICE_KEY=xxx \
+#    npm run supabase:email-templates:upload
+# 
+# 3. Configure .env with template URLs (see .env.gotrue.example)
+# 
+# 4. Restart GoTrue container:
+#    docker compose restart auth
+#    # or
+#    docker restart supabase-auth
+# 
+# 5. Verify templates:
+#    curl -s ${SITE_URL}/storage/v1/object/public/email-templates/magic-link.html | head
+# 
+# ==============================================================================

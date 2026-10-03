@@ -1,0 +1,56 @@
+{
+  "flowboard": {
+    "palette": {
+      "title": "Palette des nœuds",
+      "subtitle": "= catalogue de plugins fédéré"
+    },
+    "kind": {
+      "trigger": "Déclencheurs",
+      "agent": "Agents",
+      "tool": "Outils MCP",
+      "action": "Actions",
+      "control": "Contrôle",
+      "gate": "Portails"
+    },
+    "canvas": {
+      "cannotConnect": "Impossible de relier {{from}} à {{to}}.",
+      "invalidConnection": "Connexion au port non valide.",
+      "valid": "valide",
+      "errors": "Erreurs {{count}}",
+      "descriptionPlaceholder": "Décrivez ce que le flux doit faire…",
+      "askAisha": "Demandez à AISHA",
+      "save": "Enregistrer"
+    },
+    "page": {
+      "savedFlows": "Flux enregistrés",
+      "newFlow": "Nouveau flux",
+      "empty": "Aucun flux pour l'instant",
+      "loading": "Chargement de la palette…",
+      "saved": "Débit enregistré",
+      "saveFailed": "Échec de l'enregistrement du flux",
+      "loadFailed": "Échec du chargement du flux",
+      "run": "Courir",
+      "running": "Je cours…",
+      "runStarted": "Le cycle de débit a commencé",
+      "runAwaitingApproval": "Exécution en pause — en attente de validation",
+      "runFailed": "Échec de l'exécution du flux",
+      "runResumed": "Le flux a repris"
+    },
+    "block": {
+      "consentTitle": "Autorisation requise",
+      "approved": "approuvé",
+      "awaiting": "en attente d'approbation",
+      "approveButton": "Approuver et poursuivre",
+      "runTitle": "Exécution de l'automatisation",
+      "stepTitle": "Étape d'automatisation",
+      "status": {
+        "executed": "terminé",
+        "approved": "approuvé",
+        "error": "erreur",
+        "running": "en cours",
+        "compliance_checkpoint": "vérification de conformité",
+        "awaiting_approval": "en attente d'approbation"
+      }
+    }
+  }
+}

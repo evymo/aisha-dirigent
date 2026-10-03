@@ -1,0 +1,373 @@
+/*
+ * Přihlašovací stránka — ROZVRŽENÍ. Generické pro každou instanci AISHA stacku.
+ * ---------------------------------------------------------------------------
+ * Třetí ze čtyř vrstev (pořadí drží theme.properties):
+ *   1. design-language.css — páteř jazyka + sémantická témata
+ *   2. esdk.css            — primitivy .es-card/.es-inp/.es-btn (@layer esdk)
+ *   3. TENHLE SOUBOR       — rozvržení stránky. ŽÁDNÁ hodnota značky.
+ *   4. brand.css           — hodnoty instance (overlay ji přepisuje)
+ *
+ * Zákon tohoto souboru: ani jedna barva, ani jedno `!important`. Barvy jsou
+ * v tokenech, primitivy jsou vrstvené (@layer), takže je nevrstvené pravidlo
+ * přebije samo. Kdyby se sem dostal hex, je to znamení, že se maluje mimo
+ * jazyk — patří to do tokenů nebo do ESDK, ne sem.
+ * (Výjimka: `#000` v `mask-image` níže není barva, ale krytí masky.)
+ *
+ * Texty jsou v message bundlu, ne tady ani v šabloně — instance je přepisuje
+ * překladem, ne kopií rozvržení.
+ */
+
+/* ── Stránka ─────────────────────────────────────────────────────────────── */
+.login-html { background: var(--bg); }
+
+.login-body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+
+/* Panel je v DOM první (odečítačka i klávesnice míří na formulář), mřížka ho
+   posadí do druhého sloupce — proto explicitní grid-column, ne `order`. */
+.login-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1.12fr) clamp(380px, 33vw, 520px);
+  min-height: 100dvh;
+}
+
+.login-shell__panel {
+  grid-column: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: clamp(var(--space-5), 4vw, var(--space-7));
+  background: var(--bg);
+}
+
+/* ── Hero ────────────────────────────────────────────────────────────────── */
+.login-hero {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--space-6);
+  padding: clamp(var(--space-5), 4vw, var(--space-7));
+  border-right: 1px solid var(--border);
+  background:
+    radial-gradient(900px 520px at 78% -8%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 60%),
+    linear-gradient(180deg, var(--surface), var(--bg));
+}
+
+.login-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: .5;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(680px 480px at 30% 40%, #000, transparent 75%);
+  mask-image: radial-gradient(680px 480px at 30% 40%, #000, transparent 75%);
+}
+
+.login-hero > * { position: relative; }
+
+.login-hero__brandrow { display: flex; align-items: center; gap: var(--space-2); }
+/* Rozměr natvrdo, ne `auto`: neplatné SVG by s `auto` mělo nulovou šířku
+   a rozvržení by se posunulo, aniž by cokoli hlásilo. */
+.login-hero__logo { width: 22px; height: 22px; flex: none; display: block; }
+.login-hero__wordmark {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 19px;
+  color: var(--text-strong);
+}
+.login-hero__suffix { color: var(--text-muted); }
+
+.login-hero__mid { max-width: 46ch; }
+.login-hero__kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+}
+.login-hero__kicker::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+}
+
+.login-hero__title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(30px, 3.4vw, 52px);
+  line-height: 1.06;
+  letter-spacing: -.02em;
+  color: var(--text-strong);
+  margin: 0 0 var(--space-5);
+}
+
+.login-hero__lead {
+  margin: 0;
+  font-size: clamp(14px, 1.1vw, 16px);
+  color: var(--text-muted);
+}
+
+.login-hero__stack { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* ── Karta ───────────────────────────────────────────────────────────────── */
+.login-header { margin-bottom: var(--space-3); }
+.login-header__text {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.login-card { box-shadow: var(--shadow-2); }
+
+/* `base` renderuje volbu jazyka PŘED nadpisem. Přerovnáváme pořadím, ne
+   zásahem do šablony — čím míň se od `base` lišíme, tím míň nás upgrade KC
+   překvapí. */
+.login-card__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+#kc-page-title { order: 0; }
+.login-locale { order: 1; }
+/* `min-width: 0` je nosné: bez něj má flexová položka `min-width: auto`,
+   jednoslovný nadpis se smrskne na nejužší slovo a vysází se svisle. */
+#kc-page-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(22px, 2vw, 28px);
+  line-height: 1.15;
+  color: var(--text-strong);
+}
+
+.login-field { margin-bottom: var(--space-4); }
+.login-label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.login-error {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: 12.5px;
+  color: var(--loss);
+}
+
+/* Pole heslo + oko jako jeden srostlý prvek. */
+.login-inputgroup { display: flex; align-items: stretch; }
+.login-inputgroup .es-inp {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+  border-right: 0;
+}
+.login-eye {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  background: var(--surface);
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-left: 0;
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+  cursor: pointer;
+}
+.login-eye:hover { color: var(--text); }
+
+/* Glyf oka. Kreslí se maskou z inline SVG, ne ikonovým fontem: téma stojí na
+   holém HTML (parent=base) a tahat kvůli dvěma stavům celý font by bylo dražší
+   než ta dvě data URI. `currentColor` drží barvu na tokenu, ne na hodnotě. */
+.login-eye__ico {
+  display: block;
+  width: 20px;
+  height: 20px;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+  -webkit-mask-position: center;  mask-position: center;
+  -webkit-mask-size: 20px 20px;   mask-size: 20px 20px;
+}
+.login-eye__ico--show {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");
+}
+.login-eye__ico--hide {
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3l18 18'/%3E%3Cpath d='M10.6 5.1A9.7 9.7 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.2 6.2A17 17 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 4-.85'/%3E%3Cpath d='M9.9 9.9a3 3 0 0 0 4.2 4.2'/%3E%3C/svg%3E");
+          mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 3l18 18'/%3E%3Cpath d='M10.6 5.1A9.7 9.7 0 0 1 12 5c6.5 0 10 7 10 7a17 17 0 0 1-3.2 4.1M6.2 6.2A17 17 0 0 0 2 12s3.5 7 10 7a9.6 9.6 0 0 0 4-.85'/%3E%3Cpath d='M9.9 9.9a3 3 0 0 0 4.2 4.2'/%3E%3C/svg%3E");
+}
+
+/* „Zkusit jiným způsobem" — base ho renderuje jako <a id="try-another-way"> BEZ
+   jakékoli třídy, takže na něj téma nemělo jak dosáhnout a zůstával holým
+   modrým odkazem uprostřed značky. Selektor přes id je tu jediná cesta; háček
+   v theme.properties pro tenhle prvek neexistuje. */
+#try-another-way {
+  display: inline-block;
+  margin-top: var(--space-3);
+  font-size: 13px;
+  color: var(--primary);
+  text-decoration: none;
+}
+#try-another-way:hover { text-decoration: underline; }
+
+.login-buttons { margin-top: var(--space-5); }
+.login-block { width: 100%; justify-content: center; }
+
+.login-options {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: calc(var(--space-2) * -1);
+}
+.login-setting { font-size: 13px; }
+
+a { color: var(--primary); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Hlášky ──────────────────────────────────────────────────────────────── */
+.login-alert {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--info);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  font-size: 13.5px;
+}
+.login-alert--error { border-left-color: var(--loss); }
+.login-alert--warning { border-left-color: var(--warning); }
+.login-alert--success { border-left-color: var(--gain); }
+
+/* ── Sociální přihlášení ─────────────────────────────────────────────────── */
+/* `:empty` schová obal, když realm nemá jediný IdP — jinak zbude čára pod
+   tlačítkem oddělující prázdno. */
+.login-social {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  /* Zkratky, ne `margin-top`/`padding-top`: `parent=base` je holé HTML, takže
+     `ul` si nese výchozí `padding-inline-start: 40px` a `margin-block: 1em`
+     prohlížeče. Naměřeno 2026-08-03 na nasazené stránce — pole šlo od 931 px,
+     ale tlačítka Google/Apple až od 971 px, tedy o 40 px mimo osu formuláře.
+     `.login-locale__list` to má správně od začátku; tady zůstal longhand.
+     Táž třída jako chybějící `box-sizing`: co si téma nevynuluje, to platí. */
+  margin: var(--space-5) 0 0;
+  padding: var(--space-5) 0 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+.login-social:empty { display: none; }
+.login-social li { flex: 1 1 160px; }
+.login-social__btn { width: 100%; justify-content: center; }
+
+.login-signup { margin-top: var(--space-4); font-size: 13px; color: var(--text-muted); }
+
+/* ── Volba jazyka — duch, ne pole ────────────────────────────────────────── */
+.login-locale { position: relative; flex: 0 0 auto; }
+.login-locale__dd > button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.login-locale__dd > button:hover { color: var(--text); }
+.login-locale__list {
+  position: absolute;
+  right: 0;
+  z-index: 10;
+  min-width: 140px;
+  margin: var(--space-2) 0 0;
+  padding: var(--space-1);
+  list-style: none;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-3);
+}
+.login-locale__dd > button[aria-expanded="false"] + .login-locale__list { display: none; }
+.login-locale__item {
+  display: block;
+  padding: var(--space-2) var(--space-3);
+  font-size: 13px;
+  color: var(--text);
+  border-radius: var(--radius-xs);
+}
+.login-locale__item:hover { background: var(--surface); text-decoration: none; }
+
+/* ── Pod kartou ──────────────────────────────────────────────────────────── */
+.login-assurance {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.login-assurance svg { color: var(--gain); flex: none; }
+
+.login-legal {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Zlomy ───────────────────────────────────────────────────────────────── */
+/* Tablet: hero se drží, ale panel dostane víc místa. */
+@media (max-width: 1100px) {
+  .login-shell { grid-template-columns: minmax(0, 1fr) clamp(340px, 42vw, 460px); }
+  .login-hero__title { font-size: clamp(26px, 4vw, 38px); }
+}
+
+/* Úzké okno: hero je uvítání, ne obsah — mizí první a formulář dostane vše. */
+@media (max-width: 860px) {
+  .login-shell { grid-template-columns: 1fr; }
+  .login-hero { display: none; }
+  .login-shell__panel {
+    grid-column: 1;
+    justify-content: flex-start;
+    padding: var(--space-5) var(--space-4);
+  }
+  /* Značka se přesune nad kartu, ať se stránka nepředstavuje jen zkratkou. */
+  .login-header__text::before {
+    content: "AISHA";
+    display: block;
+    margin-bottom: var(--space-1);
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text-strong);
+  }
+}
+
+@media (max-width: 480px) {
+  .login-shell__panel { padding: var(--space-4) var(--space-3); }
+  .login-card { padding: var(--space-4); }
+  .login-social li { flex: 1 1 100%; }
+}

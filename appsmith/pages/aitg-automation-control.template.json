@@ -1,0 +1,265 @@
+{
+  "$comment": "AITG Automation Control — operator-facing dashboard page for managing the cadence and mode of every AITG automation. Plugs into the existing AISHA Ops Appsmith app (see appsmith/dashboards/aisha-ops.template.json). All state changes go through audited RPCs so every operator toggle lands in audit_journal.",
+  "pageName": "AITG Automation Control",
+  "pageSlug": "aitg-automation",
+  "isHidden": false,
+  "isDefault": false,
+  "navigation": {
+    "icon": "settings",
+    "label": "AITG Automation",
+    "section": "Security"
+  },
+  "queries": [
+    {
+      "name": "listAutomations",
+      "datasource": "AISHA Postgres REST",
+      "actionConfiguration": {
+        "httpMethod": "POST",
+        "path": "/rpc/aitg_list_automations_audited",
+        "body": "{}"
+      },
+      "executeOnLoad": true,
+      "confirmBeforeExecute": false
+    },
+    {
+      "name": "updateAutomation",
+      "datasource": "AISHA Postgres REST",
+      "actionConfiguration": {
+        "httpMethod": "POST",
+        "path": "/rpc/aitg_update_automation_audited",
+        "body": "{{ { p_automation_id: editAutomationModal.data.automation_id, p_mode: editAutomationModal.data.mode, p_schedule_cron: editAutomationModal.data.schedule_cron || null, p_schedule_interval_minutes: editAutomationModal.data.schedule_interval_minutes ? Number(editAutomationModal.data.schedule_interval_minutes) : null, p_parameters: editAutomationModal.data.parameters_json ? JSON.parse(editAutomationModal.data.parameters_json) : null } }}"
+      },
+      "executeOnLoad": false,
+      "confirmBeforeExecute": true,
+      "onSuccess": ["listAutomations.run()", "editAutomationModal.close()"]
+    },
+    {
+      "name": "triggerAutomation",
+      "datasource": "AISHA Postgres REST",
+      "actionConfiguration": {
+        "httpMethod": "POST",
+        "path": "/rpc/aitg_trigger_automation_audited",
+        "body": "{{ { p_automation_id: automationsTable.selectedRow.automation_id, p_initiator: 'operator:' + appsmith.user.email } }}"
+      },
+      "executeOnLoad": false,
+      "confirmBeforeExecute": true,
+      "onSuccess": ["listAutomations.run()"]
+    },
+    {
+      "name": "getHealthSummary",
+      "datasource": "AISHA Postgres REST",
+      "actionConfiguration": {
+        "httpMethod": "POST",
+        "path": "/rpc/aitg_health_summary_audited",
+        "body": "{ \"p_window_hours\": 24 }"
+      },
+      "executeOnLoad": true
+    }
+  ],
+  "widgets": [
+    {
+      "type": "TextWidget",
+      "name": "pageTitle",
+      "props": {
+        "text": "AITG Automation Control",
+        "fontSize": "2rem",
+        "fontWeight": "700"
+      },
+      "position": { "row": 0, "col": 0, "rowSpan": 1, "colSpan": 24 }
+    },
+    {
+      "type": "TextWidget",
+      "name": "pageSubtitle",
+      "props": {
+        "text": "Operator control of every AITG cadence. Mode = automated / manual / disabled. Changes are audited; manual triggers and overrides land in audit_journal.",
+        "fontSize": "0.95rem",
+        "fontColor": "#6b7280"
+      },
+      "position": { "row": 1, "col": 0, "rowSpan": 1, "colSpan": 24 }
+    },
+    {
+      "type": "StatBoxWidget",
+      "name": "trustScoreStat",
+      "props": {
+        "label": "Trust Score (24h)",
+        "value": "{{ getHealthSummary.data?.trust_score?.toFixed(1) ?? '—' }}",
+        "icon": "shield",
+        "color": "{{ (getHealthSummary.data?.trust_score ?? 0) > 85 ? '#16a34a' : (getHealthSummary.data?.trust_score ?? 0) > 60 ? '#eab308' : '#dc2626' }}"
+      },
+      "position": { "row": 2, "col": 0, "rowSpan": 2, "colSpan": 6 }
+    },
+    {
+      "type": "StatBoxWidget",
+      "name": "openFindingsStat",
+      "props": {
+        "label": "Open Findings",
+        "value": "{{ getHealthSummary.data?.open_findings ?? 0 }}",
+        "icon": "alert-triangle",
+        "color": "{{ (getHealthSummary.data?.open_findings ?? 0) > 0 ? '#dc2626' : '#16a34a' }}"
+      },
+      "position": { "row": 2, "col": 6, "rowSpan": 2, "colSpan": 6 }
+    },
+    {
+      "type": "StatBoxWidget",
+      "name": "driftAlertsStat",
+      "props": {
+        "label": "Open Drift Alerts",
+        "value": "{{ getHealthSummary.data?.open_drift_alerts ?? 0 }}",
+        "icon": "trending-down",
+        "color": "{{ (getHealthSummary.data?.open_drift_alerts ?? 0) > 0 ? '#dc2626' : '#16a34a' }}"
+      },
+      "position": { "row": 2, "col": 12, "rowSpan": 2, "colSpan": 6 }
+    },
+    {
+      "type": "StatBoxWidget",
+      "name": "totalRunsStat",
+      "props": {
+        "label": "Runs (24h)",
+        "value": "{{ (getHealthSummary.data?.total_runs ?? 0) + ' (' + (getHealthSummary.data?.passed_runs ?? 0) + ' pass)' }}",
+        "icon": "activity",
+        "color": "#3b82f6"
+      },
+      "position": { "row": 2, "col": 18, "rowSpan": 2, "colSpan": 6 }
+    },
+    {
+      "type": "TableWidget",
+      "name": "automationsTable",
+      "props": {
+        "tableData": "{{ listAutomations.data }}",
+        "primaryColumnKey": "automation_id",
+        "columns": [
+          {
+            "key": "display_name",
+            "label": "Automation",
+            "cellAlignment": "left",
+            "horizontalAlignment": "left",
+            "width": 220
+          },
+          {
+            "key": "mode",
+            "label": "Mode",
+            "cellBackgroundColor": "{{ currentRow.mode === 'automated' ? '#dcfce7' : currentRow.mode === 'manual' ? '#fef3c7' : '#fee2e2' }}",
+            "cellTextColor": "{{ currentRow.mode === 'automated' ? '#166534' : currentRow.mode === 'manual' ? '#854d0e' : '#991b1b' }}",
+            "width": 110
+          },
+          {
+            "key": "schedule",
+            "label": "Schedule",
+            "computeValue": "{{ currentRow.schedule_cron ? 'cron: ' + currentRow.schedule_cron : currentRow.schedule_interval_minutes ? 'every ' + currentRow.schedule_interval_minutes + ' min' : 'event-driven' }}",
+            "width": 160
+          },
+          {
+            "key": "last_run_at",
+            "label": "Last Run",
+            "computeValue": "{{ currentRow.last_run_at ? moment(currentRow.last_run_at).fromNow() : 'never' }}",
+            "width": 130
+          },
+          {
+            "key": "last_run_status",
+            "label": "Status",
+            "cellBackgroundColor": "{{ currentRow.last_run_status === 'success' ? '#dcfce7' : currentRow.last_run_status === 'failed' ? '#fee2e2' : currentRow.last_run_status === 'skipped' ? '#e5e7eb' : '#fef3c7' }}",
+            "width": 110
+          },
+          {
+            "key": "workflow_id",
+            "label": "Workflow",
+            "width": 220
+          }
+        ],
+        "isVisible": true,
+        "isSortable": true,
+        "isFilterable": true,
+        "pageSize": 10
+      },
+      "position": { "row": 4, "col": 0, "rowSpan": 8, "colSpan": 24 }
+    },
+    {
+      "type": "ButtonWidget",
+      "name": "triggerButton",
+      "props": {
+        "text": "Trigger Now",
+        "buttonStyle": "PRIMARY_BUTTON",
+        "iconName": "play",
+        "isDisabled": "{{ !automationsTable.selectedRow || automationsTable.selectedRow.mode === 'disabled' }}",
+        "onClick": "{{ triggerAutomation.run() }}"
+      },
+      "position": { "row": 12, "col": 0, "rowSpan": 1, "colSpan": 4 }
+    },
+    {
+      "type": "ButtonWidget",
+      "name": "editButton",
+      "props": {
+        "text": "Edit Settings",
+        "buttonStyle": "SECONDARY_BUTTON",
+        "iconName": "edit",
+        "isDisabled": "{{ !automationsTable.selectedRow }}",
+        "onClick": "{{ editAutomationModal.open({ data: { ...automationsTable.selectedRow, parameters_json: JSON.stringify(automationsTable.selectedRow?.parameters ?? {}, null, 2) } }) }}"
+      },
+      "position": { "row": 12, "col": 4, "rowSpan": 1, "colSpan": 4 }
+    },
+    {
+      "type": "ButtonWidget",
+      "name": "disableButton",
+      "props": {
+        "text": "Disable",
+        "buttonStyle": "DANGER_BUTTON",
+        "iconName": "pause",
+        "isDisabled": "{{ !automationsTable.selectedRow || automationsTable.selectedRow.mode === 'disabled' }}",
+        "onClick": "{{ confirmDialog.open({ message: 'Disable automation ' + automationsTable.selectedRow.display_name + '?', onConfirm: () => updateAutomation.run({ override: { body: JSON.stringify({ p_automation_id: automationsTable.selectedRow.automation_id, p_mode: 'disabled' }) } }) }) }}"
+      },
+      "position": { "row": 12, "col": 8, "rowSpan": 1, "colSpan": 4 }
+    },
+    {
+      "type": "ModalWidget",
+      "name": "editAutomationModal",
+      "props": {
+        "title": "Edit AITG Automation",
+        "size": "MEDIUM",
+        "children": [
+          {
+            "type": "FormWidget",
+            "name": "editForm",
+            "fields": [
+              {
+                "type": "select",
+                "name": "mode",
+                "label": "Mode",
+                "options": [
+                  { "label": "Automated", "value": "automated" },
+                  { "label": "Manual only", "value": "manual" },
+                  { "label": "Disabled", "value": "disabled" }
+                ],
+                "defaultValue": "{{ editAutomationModal.data?.mode }}"
+              },
+              {
+                "type": "input",
+                "name": "schedule_cron",
+                "label": "Cron expression (5 fields)",
+                "placeholder": "0 6 * * *",
+                "defaultValue": "{{ editAutomationModal.data?.schedule_cron ?? '' }}",
+                "helpText": "Use cron OR interval, not both. Leave both empty for event-driven workflows."
+              },
+              {
+                "type": "input",
+                "name": "schedule_interval_minutes",
+                "label": "Interval (minutes, 1-1440)",
+                "inputType": "number",
+                "defaultValue": "{{ editAutomationModal.data?.schedule_interval_minutes ?? '' }}"
+              },
+              {
+                "type": "textarea",
+                "name": "parameters_json",
+                "label": "Parameters (JSON)",
+                "defaultValue": "{{ editAutomationModal.data?.parameters_json ?? '{}' }}",
+                "rows": 8,
+                "helpText": "Free-form per-automation knobs (queue_limit, drop_threshold_pp, etc.). Validated by the audited RPC."
+              }
+            ],
+            "submitText": "Apply",
+            "onSubmit": "{{ updateAutomation.run() }}"
+          }
+        ]
+      }
+    }
+  ]
+}

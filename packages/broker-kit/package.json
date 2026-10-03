@@ -1,0 +1,29 @@
+{
+  "name": "@aisha/broker-kit",
+  "version": "0.1.0",
+  "license": "Elastic-2.0",
+  "description": "The connector chassis: everything cross-cutting a source connector inherits (registry, read pipeline, driver-polymorphic ingest engine, controlled write-back saga, auth guard, PostgREST rpc, config). Per the AISHA connector doctrine — a connector is a thin driver over this thick chassis.",
+  "private": false,
+  "publishConfig": { "access": "restricted" },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "files": ["dist", "src"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "pretest": "test -d node_modules/vitest || npm install --no-fund --no-audit --prefer-offline",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aisha/audience-types": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.3"
+  }
+}

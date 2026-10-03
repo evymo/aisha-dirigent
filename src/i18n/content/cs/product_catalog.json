@@ -1,0 +1,14 @@
+{
+  "api-gateway.description": "Základní API Gateway pro routing a transformaci",
+  "api-gateway.name": "API Gateway",
+  "auth-module.description": "Modul pro ověření identity a oprávnění",
+  "auth-module.name": "Auth Module",
+  "caching.description": "Efektivní caching pro zlepšení odezvy",
+  "caching.name": "Caching",
+  "ci-pipeline.description": "CI Pipeline pro automatické testování a integraci",
+  "ci-pipeline.name": "CI Pipeline",
+  "load-balancer.description": "Modul pro balancování zátěže a výkon",
+  "load-balancer.name": "Load Balancer",
+  "monitoring.description": "Modul pro monitoring a sledování systémů",
+  "monitoring.name": "Monitoring"
+}

@@ -1,0 +1,127 @@
+{
+  "missionControl": {
+    "pageTitle": "Contrôle de la mission",
+    "pageSubtitle": "Vue en direct de la pile d'AISHA - agents, déploiements, dérives, retours en arrière, récits, audits.",
+    "liveAgents": {
+      "title": "Agents en direct",
+      "subtitle": "AISHA exécute en ce moment même.",
+      "running": "La course à pied",
+      "starting": "Commencer..",
+      "empty": "Aucun agent n'est en activité.",
+      "cancelled": "Exécution annulée.",
+      "cancelTooltip": "Annuler l'exécution",
+      "cancelTitle": "Annuler cette exécution ?",
+      "cancelConfirm": "Arrêter « {{agent}} » ? Cela interrompt l'exécution et est consigné dans le journal d'audit.",
+      "cancelConfirmAction": "Annuler l'exécution"
+    },
+    "deploy": {
+      "title": "État de déploiement",
+      "subtitle": "Emplacements bleus/verts actifs par application.",
+      "empty": "Pas d'applications suivies.",
+      "lockTooltip": "Commutation en cours"
+    },
+    "drift": {
+      "title": "Dérive",
+      "subtitle": "Constatations à risque non résolues ≥ {{minRisk}}."
+    },
+    "rollback": {
+      "title": "Retour en arrière",
+      "subtitle": "Approbation en cours + historique récent des retours en arrière.",
+      "empty": "Aucun recul récent."
+    },
+    "kanbanMini": {
+      "title": "Histoires kanban",
+      "subtitle": "les histoires tout au long du cycle de vie.",
+      "open": "Conseil d'administration ouvert"
+    },
+    "audit": {
+      "title": "Flux d'audit",
+      "subtitle": "Avertissements, erreurs et événements critiques du journal d'audit.",
+      "empty": "Pas d'entrées d'audit élevées - système silencieux."
+    },
+    "agentSessions": {
+      "title": "Sessions d'agent",
+      "subtitle": "Sessions de travail en direct sur les IDE, les interfaces en ligne de commande et les agents créés.",
+      "active": "Actif",
+      "empty": "Aucune session active.",
+      "noStory": "Pas d'histoire",
+      "aishaSpawned": "AISHA",
+      "collapseAgents": "Réduire les sous-agents",
+      "expandAgents": "Développer les sous-agents"
+    },
+    "spendApprovals": {
+      "title": "Autorisations de dépenses",
+      "subtitle": "Tâches en attente d'une décision concernant leur coût avant de pouvoir démarrer.",
+      "empty": "Rien n'est en attente d'approbation.",
+      "noStory": "Pas d'histoire",
+      "approve": "Approuver",
+      "reject": "Refuser",
+      "approved": "Dépense approuvée.",
+      "rejected": "Dépense refusée.",
+      "approveTitle": "Approuver cette dépense ?",
+      "approveConfirm": "Autoriser le lancement de « {{kind}} » (coût estimé à environ ${{estimate}}) ? Cette décision fait l'objet d'un contrôle.",
+      "raiseBudget": "Augmentez également le budget total de l'histoire de {{estimate}} dollars",
+      "rejectTitle": "Refuser cette dépense ?",
+      "rejectConfirm": "Annuler « {{kind}} » ? L'exécution ne démarrera pas."
+    },
+    "spendPolicies": {
+      "title": "Politiques en matière de dépenses",
+      "subtitle": "Seuils d'autorisation, de demande ou de refus par type de tâche. En l'absence de règle, les valeurs par défaut de la classe de coûts s'appliquent.",
+      "empty": "Aucune règle personnalisée — les paramètres par défaut du catalogue s'appliquent.",
+      "scopeGlobal": "mondial",
+      "allKinds": "toutes sortes",
+      "addRule": "Règle",
+      "dialogTitle": "Règle relative aux dépenses mondiales",
+      "dialogSubtitle": "Seuils en USD par rapport à l'estimation préalable. Champ vide = valeur par défaut du catalogue.",
+      "kind": "Type de tâche (vide = tous les types)",
+      "allowUnder": "Autoriser sous",
+      "askOver": "Demande-le",
+      "denyOver": "Refuser",
+      "saved": "Règle enregistrée.",
+      "activated": "Règle activée.",
+      "deactivated": "Règle désactivée.",
+      "activate": "Activer la règle",
+      "deactivate": "Désactiver la règle"
+    },
+    "spawnClaude": {
+      "button": "Lancer avec Claude",
+      "title": "Lancer une exécution d'agent Claude",
+      "description": "AISHA lance un agent Claude Code isolé sur un nouveau worktree pour cette tâche. Il s'exécute sur votre abonnement et est surveillé en direct ci-dessous.",
+      "promptLabel": "Tâche pour l'agent",
+      "promptPlaceholder": "Décrivez ce que l'agent doit faire…",
+      "cancel": "Annuler",
+      "submit": "Lancer l'exécution",
+      "spawning": "Lancement…",
+      "success": "Exécution Claude {{id}} en file — elle apparaîtra ci-dessous.",
+      "error": "Impossible de lancer l'exécution : {{msg}}"
+    },
+    "claudeApprovals": {
+      "title": "Approbations d'exécution CLI",
+      "subtitle": "Exécutions CLI d'agent en attente d'approbation (admission à haut risque).",
+      "empty": "Aucune exécution en attente d'approbation.",
+      "approve": "Approuver"
+    },
+    "resolverPolicy": {
+      "cost": "cost-match",
+      "title": "Poids de décision",
+      "subtitle": "Comment AISHA évalue les candidats lors du choix d'un modèle et d'un exécuteur. Réglage en temps réel ; aucune modification du code.",
+      "missing": "En l'absence de politique de décision globale, le résolveur affichera un message d'erreur bien visible. Relancez les opérations de démarrage à froid et de réparation.",
+      "bench": "banc",
+      "local": "local",
+      "tools": "outils",
+      "vision": "vision",
+      "costClass": "classe de coûts",
+      "budget": "budget",
+      "premium": "premium",
+      "batch": "lot",
+      "edit": "Accorder",
+      "saved": "Les coefficients de pondération ont été enregistrés.",
+      "dialogTitle": "Ajuster les coefficients de pondération",
+      "dialogSubtitle": "Pondérations globales de notation + seuils par classe de coût. Si le champ est vide, la valeur actuelle est conservée.",
+      "weightsGroup": "Coefficients de pondération",
+      "costGroup": "Seuils par classe de coût (USD)",
+      "budgetMax": "budget inférieur à",
+      "premiumMax": "prime par rapport à"
+    }
+  }
+}

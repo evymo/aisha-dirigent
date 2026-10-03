@@ -1,0 +1,1641 @@
+{
+  "realm": "${KEYCLOAK_REALM}",
+  "enabled": true,
+  "displayName": "AISHA ID",
+  "loginTheme": "aisha",
+  "accountTheme": "aisha",
+  "emailTheme": "aisha",
+  "sslRequired": "external",
+  "registrationAllowed": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 5,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      {
+        "name": "member",
+        "description": "Platform member (klient)"
+      },
+      {
+        "name": "practitioner",
+        "description": "Specialista / odborník"
+      },
+      {
+        "name": "staff",
+        "description": "Dirigent / koordinátor"
+      },
+      {
+        "name": "admin",
+        "description": "Platform administrator"
+      },
+      {
+        "name": "evaluator",
+        "description": "Data evaluator / hodnotitel"
+      },
+      {
+        "name": "studio_access",
+        "description": "Access to AISHA Studio dashboard (synced from app permissions)"
+      },
+      {
+        "name": "n8n_access",
+        "description": "Access to n8n workflow engine (synced from app permissions)"
+      },
+      {
+        "name": "openclaw_access",
+        "description": "Access to the OpenClaw advisory companion — AISHA operator/testing tool (synced from app permissions)"
+      },
+      {
+        "name": "pki_admin",
+        "description": "PKI CA Officer — full OpenXPKI CA management, key ceremonies, policy changes"
+      },
+      {
+        "name": "pki_operator",
+        "description": "PKI RA Operator — certificate enrollment, approval, revocation"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "aisha-app",
+      "name": "AISHA Application",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "https://${API_DOMAIN}/auth/v1/callback",
+        "https://${API_DOMAIN_PUBLIC}/auth/v1/callback",
+        "https://${APP_DOMAIN}/auth/callback",
+        "http://127.0.0.1:57421/auth/v1/callback",
+        "http://localhost:57421/auth/v1/callback",
+        "http://localhost:5173/auth/callback",
+        "http://127.0.0.1:4173/auth/callback",
+        "http://localhost:4173/auth/callback",
+        "aisha-dirigent://oauth-callback",
+        "vscode://aisha.aisha-dirigent/did-authenticate",
+        "vscode://aisha.aisha-dirigent/did-authenticate/",
+        "vscode://aisha.aisha-dirigent/did-authenticate*",
+        "vscode-insiders://aisha.aisha-dirigent/did-authenticate",
+        "vscode-insiders://aisha.aisha-dirigent/did-authenticate/",
+        "vscode-insiders://aisha.aisha-dirigent/did-authenticate*",
+        "http://127.0.0.1:*",
+        "http://localhost:*",
+        "https://vscode.dev/redirect*",
+        "https://insiders.vscode.dev/redirect*"
+      ],
+      "webOrigins": [
+        "https://${APP_DOMAIN}",
+        "https://${KEYCLOAK_DOMAIN_PUBLIC}",
+        "https://${API_DOMAIN_PUBLIC}",
+        "https://${MCP_DOMAIN}",
+        "https://${DIRIGENT_DOMAIN}",
+        "https://*.${INTERNAL_TLD}",
+        "http://localhost:5173",
+        "http://127.0.0.1:4173",
+        "http://localhost:4173",
+        "http://localhost:8080",
+        "http://localhost:8083"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "https://${APP_DOMAIN}/*##http://localhost:5173/*##http://127.0.0.1:4173/*##http://localhost:4173/*##http://localhost:8083/*##aisha-dirigent://*"
+      },
+      "protocolMappers": [
+        {
+          "name": "subject-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "config": {
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "realm-role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "postgrest-role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-hardcoded-claim-mapper",
+          "config": {
+            "claim.name": "role",
+            "claim.value": "authenticated",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "audience-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "aisha-app",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "appsmith-proxy",
+      "name": "Appsmith OAuth2 Proxy",
+      "description": "OAuth2 Proxy sidecar for Appsmith CE (no native OIDC in CE)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${APPSMITH_OIDC_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "https://${APPSMITH_DOMAIN}/oauth2/callback",
+        "http://localhost:4180/oauth2/callback",
+        "http://localhost:8090/oauth2/callback"
+      ],
+      "webOrigins": [
+        "https://${APPSMITH_DOMAIN}",
+        "https://${APP_DOMAIN}",
+        "http://localhost:8090",
+        "http://localhost:5173"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile",
+        "groups"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://${APPSMITH_DOMAIN}/*##http://localhost:8090/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "subject-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "config": {
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "realm-role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "appsmith-proxy",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "nocodb-proxy",
+      "name": "NocoDB OAuth2 Proxy",
+      "description": "OAuth2 Proxy sidecar for NocoDB OSS (no native OIDC in OSS)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${NOCODB_OIDC_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "https://${NOCODB_DOMAIN}/oauth2/callback",
+        "http://localhost:4181/oauth2/callback",
+        "http://localhost:8085/oauth2/callback"
+      ],
+      "webOrigins": [
+        "https://${NOCODB_DOMAIN}",
+        "http://localhost:8085",
+        "http://localhost:4181"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile",
+        "groups"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://${NOCODB_DOMAIN}/*##http://localhost:8085/*##http://localhost:4181/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "nocodb-proxy",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "langfuse",
+      "name": "Langfuse Observability",
+      "description": "OIDC SSO for Langfuse v3 (via AUTH_CUSTOM_* env vars)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${LANGFUSE_OIDC_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "https://${LANGFUSE_DOMAIN}/api/auth/callback/custom",
+        "http://localhost:3100/api/auth/callback/custom"
+      ],
+      "webOrigins": [
+        "https://${LANGFUSE_DOMAIN}",
+        "http://localhost:3100"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile",
+        "groups"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://${LANGFUSE_DOMAIN}/*##http://localhost:3100/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "studio-proxy",
+      "name": "AISHA Studio OAuth2 Proxy",
+      "description": "OAuth2 Proxy sidecar for AISHA Studio (no native OIDC)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${STUDIO_OIDC_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "https://${STUDIO_DOMAIN_DIRECT}/oauth2/callback",
+        "http://localhost:4182/oauth2/callback"
+      ],
+      "webOrigins": [
+        "https://${STUDIO_DOMAIN_DIRECT}",
+        "http://localhost:4182"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile",
+        "groups"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://${STUDIO_DOMAIN_DIRECT}/*##http://localhost:4182/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "studio-proxy",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "extranet-proxy",
+      "name": "AISHA Extranet OAuth2 Proxy",
+      "description": "OAuth2 Proxy sidecar pro extranet. Brani vydani bundlu neprihlasenemu; SPA si o svuj token zada az za nim.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${EXTRANET_OIDC_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "https://${EXTRANET_DOMAIN_PUBLIC}/oauth2/callback",
+        "http://localhost:4186/oauth2/callback"
+      ],
+      "webOrigins": [
+        "https://${EXTRANET_DOMAIN_PUBLIC}",
+        "http://localhost:4186"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile",
+        "groups"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://${EXTRANET_DOMAIN_PUBLIC}/*##http://localhost:4186/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "extranet-proxy",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "n8n-proxy",
+      "name": "n8n OAuth2 Proxy",
+      "description": "OAuth2 Proxy sidecar for n8n workflow engine (no native OIDC in OSS)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${N8N_OIDC_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "https://${N8N_DOMAIN}/oauth2/callback",
+        "https://${MCP_DOMAIN}/oauth2/callback",
+        "https://${DIRIGENT_DOMAIN}/oauth2/callback",
+        "http://localhost:4183/oauth2/callback"
+      ],
+      "webOrigins": [
+        "https://${N8N_DOMAIN}",
+        "https://${MCP_DOMAIN}",
+        "https://${DIRIGENT_DOMAIN}",
+        "http://localhost:4183"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile",
+        "groups"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://${N8N_DOMAIN}/*##https://${MCP_DOMAIN}/*##https://${DIRIGENT_DOMAIN}/*##http://localhost:4183/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "n8n-proxy",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "openclaw-proxy",
+      "name": "OpenClaw OAuth2 Proxy",
+      "description": "OAuth2 Proxy sidecar for the OpenClaw advisory companion public route (AISHA operator/testing tool, no per-user auth in the daemon itself)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${OPENCLAW_OIDC_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "https://${COMPANION_DOMAIN}/oauth2/callback",
+        "http://localhost:4186/oauth2/callback"
+      ],
+      "webOrigins": [
+        "https://${COMPANION_DOMAIN}",
+        "http://localhost:4186"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile",
+        "groups"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://${COMPANION_DOMAIN}/*##http://localhost:4186/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "openclaw-proxy",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "pki-proxy",
+      "name": "OpenXPKI OAuth2 Proxy",
+      "description": "OAuth2 Proxy sidecar for OpenXPKI WebUI (PKI management console)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "https://${PKI_DOMAIN}/oauth2/callback",
+        "http://localhost:4184/oauth2/callback"
+      ],
+      "webOrigins": [
+        "https://${PKI_DOMAIN}",
+        "http://localhost:4184"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile",
+        "groups"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://${PKI_DOMAIN}/*##http://localhost:4184/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "pki-proxy",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "appsmith-intranet-proxy",
+      "name": "Appsmith Intranet OAuth2 Proxy",
+      "description": "OAuth2 Proxy sidecar for Appsmith CE intranet access (all authenticated users, not just admin/staff)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${APPSMITH_INTRANET_OIDC_SECRET}",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "https://${INTRANET_DOMAIN}/oauth2/callback",
+        "http://localhost:4185/oauth2/callback"
+      ],
+      "webOrigins": [
+        "https://${INTRANET_DOMAIN}",
+        "https://${APP_DOMAIN}",
+        "http://localhost:4185"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile",
+        "groups"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://${INTRANET_DOMAIN}/*##http://localhost:4185/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "subject-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "config": {
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "realm-role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "appsmith-intranet-proxy",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "aisha-dirigent-device",
+      "name": "AISHA Dirigent Device Code",
+      "description": "RFC 8628 device authorization grant for VS Code extension (AISHA ID login)",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile"
+      ],
+      "attributes": {
+        "oauth2.device.authorization.grant.enabled": "true",
+        "oauth2.device.polling.interval": "5"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "netbird",
+      "name": "NetBird Dashboard",
+      "description": "OIDC client for NetBird Zero-Trust mesh — dashboard login + CLI device flow",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [
+        "https://${NETBIRD_DOMAIN}/*",
+        "http://localhost/*"
+      ],
+      "webOrigins": [
+        "https://${NETBIRD_DOMAIN}"
+      ],
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile",
+        "groups"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "https://${NETBIRD_DOMAIN}/*",
+        "oauth2.device.authorization.grant.enabled": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "netbird-backend",
+      "name": "NetBird Management API",
+      "description": "Service account for NetBird Management server — IDP user/group sync via Keycloak admin API",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${NETBIRD_MGMT_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [],
+      "webOrigins": [],
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile",
+        "roles"
+      ],
+      "attributes": {},
+      "protocolMappers": [
+        {
+          "name": "netbird-api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "netbird",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "aisha-pki-issuer",
+      "name": "AISHA PKI Issuer (mesh-cert issuance, client_credentials)",
+      "description": "Service account aisha-pki-renewer uses to issue *.mesh certs via pki-bridge (client_credentials, aud=pki-proxy). Declared here, not provisioned imperatively: the old in-cluster step ran a deploy wave before Keycloak existed.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${AISHA_PKI_ISSUER_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": false,
+      "redirectUris": [],
+      "webOrigins": [],
+      "defaultClientScopes": [
+        "openid",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "aisha-pki-issuer-pki-proxy-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "pki-proxy",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "aisha-bootstrap",
+      "secret": "${AISHA_BOOTSTRAP_CLIENT_SECRET}",
+      "name": "AISHA Bootstrap (cold-start ROPC)",
+      "description": "Cold-start ROPC client for NetBird account owner (full rationale in scripts/aisha-bootstrap-user-init.sh header).",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": false,
+      "redirectUris": [],
+      "webOrigins": [],
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile",
+        "roles"
+      ],
+      "attributes": {},
+      "protocolMappers": [
+        {
+          "name": "aisha-bootstrap-netbird-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "netbird",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "aisha-pki-bootstrap",
+      "secret": "${AISHA_PKI_BOOTSTRAP_CLIENT_SECRET}",
+      "name": "AISHA PKI Bootstrap (cert issuance ROPC)",
+      "description": "AISHA PKI ROPC client for cert issuance via OpenXPKI (full rationale in scripts/pki-issue-internal-cert.sh header).",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": false,
+      "redirectUris": [],
+      "webOrigins": [],
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile",
+        "roles"
+      ],
+      "attributes": {},
+      "protocolMappers": [
+        {
+          "name": "aisha-pki-bootstrap-pki-proxy-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "pki-proxy",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "aisha-user-admin",
+      "name": "AISHA User Administration",
+      "description": "Service account for admin-initiated user provisioning (invite + set-password email). Own identity on purpose — not netbird-backend, so audit and secret rotation stay separate. Realm-scoped, users only.",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": true,
+      "redirectUris": [],
+      "webOrigins": [],
+      "secret": "${KC_ADMIN_CLIENT_SECRET}",
+      "attributes": {}
+    }
+  ],
+  "clientScopes": [
+    {
+      "name": "openid",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "subject",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "id",
+            "claim.name": "sub",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "email",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "email",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "config": {
+            "user.attribute": "email",
+            "claim.name": "email",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "email verified",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "config": {
+            "user.attribute": "emailVerified",
+            "claim.name": "email_verified",
+            "jsonType.label": "boolean",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "profile",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true"
+      },
+      "protocolMappers": [
+        {
+          "name": "full name",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-full-name-mapper",
+          "config": {
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "groups",
+      "description": "Maps realm roles to groups claim for OAuth2 Proxy",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-roles-groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "groups",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "roles",
+      "description": "Maps realm and client roles into access token for service accounts (e.g. NetBird admin API)",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "realm_access.roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "client-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-client-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "resource_access.${client_id}.roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "cs",
+    "en"
+  ],
+  "defaultLocale": "cs",
+  "webAuthnPolicyRpEntityName": "AISHA ID",
+  "webAuthnPolicySignatureAlgorithms": [
+    "ES256",
+    "RS256"
+  ],
+  "webAuthnPolicyRpId": "",
+  "webAuthnPolicyAttestationConveyancePreference": "not specified",
+  "webAuthnPolicyAuthenticatorAttachment": "not specified",
+  "webAuthnPolicyRequireResidentKey": "not specified",
+  "webAuthnPolicyUserVerificationRequirement": "preferred",
+  "webAuthnPolicyCreateTimeout": 0,
+  "webAuthnPolicyAvoidSameAuthenticatorRegister": false,
+  "webAuthnPolicyAcceptableAaguids": [],
+  "webAuthnPolicyPasswordlessRpEntityName": "AISHA ID",
+  "webAuthnPolicyPasswordlessSignatureAlgorithms": [
+    "ES256",
+    "RS256"
+  ],
+  "webAuthnPolicyPasswordlessRpId": "",
+  "webAuthnPolicyPasswordlessAttestationConveyancePreference": "not specified",
+  "webAuthnPolicyPasswordlessAuthenticatorAttachment": "platform",
+  "webAuthnPolicyPasswordlessRequireResidentKey": "Yes",
+  "webAuthnPolicyPasswordlessUserVerificationRequirement": "required",
+  "webAuthnPolicyPasswordlessCreateTimeout": 0,
+  "webAuthnPolicyPasswordlessAvoidSameAuthenticatorRegister": false,
+  "webAuthnPolicyPasswordlessAcceptableAaguids": [],
+  "requiredActions": [
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 10,
+      "config": {
+        "_comment_wp_3_6": "Default action stays false (don't force on every new user). Admin/staff get a forced enrollment prompt on first login via the 'AISHA MFA Factor' flow's userSetupAllowed=true — Keycloak attaches CONFIGURE_TOTP or webauthn-register required action automatically when the flow demands a factor the user doesn't yet have."
+      }
+    },
+    {
+      "alias": "UPDATE_PASSWORD",
+      "name": "Update Password",
+      "providerId": "UPDATE_PASSWORD",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 20,
+      "config": {}
+    },
+    {
+      "alias": "VERIFY_EMAIL",
+      "name": "Verify Email",
+      "providerId": "VERIFY_EMAIL",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 30,
+      "config": {}
+    },
+    {
+      "alias": "UPDATE_PROFILE",
+      "name": "Update Profile",
+      "providerId": "UPDATE_PROFILE",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 40,
+      "config": {}
+    },
+    {
+      "alias": "webauthn-register",
+      "name": "WebAuthn Register",
+      "providerId": "webauthn-register",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 50,
+      "config": {}
+    },
+    {
+      "alias": "webauthn-register-passwordless",
+      "name": "WebAuthn Register Passwordless",
+      "providerId": "webauthn-register-passwordless",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 60,
+      "config": {}
+    }
+  ],
+  "identityProviders": [
+    {
+      "alias": "google",
+      "displayName": "Google",
+      "providerId": "google",
+      "enabled": false,
+      "trustEmail": true,
+      "storeToken": false,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "aisha first broker login",
+      "config": {
+        "clientId": "${OAUTH_GOOGLE_CLIENT_ID}",
+        "clientSecret": "${OAUTH_GOOGLE_CLIENT_SECRET}",
+        "defaultScope": "openid email profile",
+        "syncMode": "IMPORT",
+        "guiOrder": "1",
+        "useJwksUrl": "true"
+      }
+    },
+    {
+      "alias": "apple",
+      "displayName": "Apple",
+      "providerId": "apple",
+      "enabled": false,
+      "trustEmail": true,
+      "storeToken": false,
+      "linkOnly": false,
+      "firstBrokerLoginFlowAlias": "aisha first broker login",
+      "config": {
+        "clientId": "${OAUTH_APPLE_CLIENT_ID}",
+        "clientSecret": "${OAUTH_APPLE_CLIENT_SECRET}",
+        "defaultScope": "openid email name",
+        "syncMode": "IMPORT",
+        "guiOrder": "2",
+        "useJwksUrl": "true"
+      }
+    }
+  ],
+  "identityProviderMappers": [
+    {
+      "name": "google-email-mapper",
+      "identityProviderAlias": "google",
+      "identityProviderMapper": "hardcoded-attribute-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "attribute": "emailVerified",
+        "attribute.value": "true"
+      }
+    },
+    {
+      "name": "apple-email-mapper",
+      "identityProviderAlias": "apple",
+      "identityProviderMapper": "hardcoded-attribute-idp-mapper",
+      "config": {
+        "syncMode": "INHERIT",
+        "attribute": "emailVerified",
+        "attribute.value": "true"
+      }
+    }
+  ],
+  "authenticationFlows": [
+    {
+      "alias": "aisha first broker login",
+      "description": "First broker login: a new e-mail creates a user; an existing account is linked only after its owner confirms and proves it (e-mail or password). No auto-link. See docs/deploy/OAUTH_PROVIDERS.md",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "idp-review-profile",
+          "authenticatorFlow": false,
+          "requirement": "DISABLED",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "autheticatorFlow": true,
+          "flowAlias": "aisha handle existing user",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "aisha handle existing user",
+      "description": "Create the user when the brokered e-mail is new; otherwise the owner must confirm and verify the existing account (no silent linking).",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "idp-create-user-if-unique",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "autheticatorFlow": true,
+          "flowAlias": "aisha existing account verification",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "aisha existing account verification",
+      "description": "Existing account: the owner confirms the link, then proves ownership (e-mail or password).",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "idp-confirm-link",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "autheticatorFlow": true,
+          "flowAlias": "aisha account verification options",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "aisha account verification options",
+      "description": "Prove ownership of the existing account: e-mail link (needs realm SMTP) or re-authentication with its password.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "idp-email-verification",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "autheticatorFlow": true,
+          "flowAlias": "aisha verify by reauthentication",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "aisha verify by reauthentication",
+      "description": "Re-authenticate the existing account with its password (and OTP when configured).",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "idp-username-password-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "autheticatorFlow": true,
+          "flowAlias": "aisha first broker conditional otp",
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "aisha first broker conditional otp",
+      "description": "OTP when the existing account has it configured.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-configured",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "AISHA Browser",
+      "description": "Browser-based authentication with passkey support",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-cookie",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "identity-provider-redirector",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "ALTERNATIVE",
+          "priority": 30,
+          "flowAlias": "AISHA Browser Forms",
+          "autheticatorFlow": true,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticator": "webauthn-authenticator-passwordless",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 40,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "AISHA Browser Forms",
+      "description": "Username and password authentication sub-flow",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "auth-username-password-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "flowAlias": "AISHA MFA For Admin",
+          "autheticatorFlow": true,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "CONDITIONAL",
+          "priority": 30,
+          "flowAlias": "AISHA MFA For Staff",
+          "autheticatorFlow": true,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "AISHA MFA For Admin",
+      "description": "Phase 12 WP 3.6 — force MFA factor for users with the admin role. Conditional sub-flow skips silently for non-admin users.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-role",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorConfig": "aisha-mfa-condition-admin",
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "flowAlias": "AISHA MFA Factor",
+          "autheticatorFlow": true,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "AISHA MFA For Staff",
+      "description": "Phase 12 WP 3.6 — force MFA factor for users with the staff role. Conditional sub-flow skips silently for non-staff users.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "conditional-user-role",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorConfig": "aisha-mfa-condition-staff",
+          "autheticatorFlow": false,
+          "userSetupAllowed": false
+        },
+        {
+          "authenticatorFlow": true,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "flowAlias": "AISHA MFA Factor",
+          "autheticatorFlow": true,
+          "userSetupAllowed": false
+        }
+      ]
+    },
+    {
+      "alias": "AISHA MFA Factor",
+      "description": "Phase 12 WP 3.6 — second-factor choice (WebAuthn preferred, TOTP fallback). Shared by admin + staff conditional sub-flows.",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {
+          "authenticator": "webauthn-authenticator",
+          "authenticatorFlow": false,
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "autheticatorFlow": false,
+          "userSetupAllowed": true
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "authenticatorFlow": false,
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "autheticatorFlow": false,
+          "userSetupAllowed": true
+        }
+      ]
+    }
+  ],
+  "authenticatorConfig": [
+    {
+      "alias": "aisha-mfa-condition-admin",
+      "config": {
+        "condUserRole": "admin"
+      }
+    },
+    {
+      "alias": "aisha-mfa-condition-staff",
+      "config": {
+        "condUserRole": "staff"
+      }
+    }
+  ],
+  "browserFlow": "AISHA Browser",
+  "users": [
+    {
+      "username": "service-account-netbird-backend",
+      "enabled": true,
+      "serviceAccountClientId": "netbird-backend",
+      "clientRoles": {
+        "realm-management": [
+          "manage-users",
+          "view-users",
+          "query-users"
+        ]
+      }
+    },
+    {
+      "username": "aisha-bootstrap",
+      "email": "aisha-bootstrap@system.local",
+      "firstName": "AISHA",
+      "lastName": "Bootstrap",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": [
+        "member"
+      ],
+      "credentials": [],
+      "attributes": {
+        "aisha.passwordFrom": [
+          "AISHA_BOOTSTRAP_PASSWORD"
+        ]
+      }
+    },
+    {
+      "username": "aisha-pki-bootstrap",
+      "email": "aisha-pki-bootstrap@system.local",
+      "firstName": "AISHA",
+      "lastName": "PKI Bootstrap",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": [
+        "member",
+        "pki_operator"
+      ],
+      "credentials": [],
+      "attributes": {
+        "aisha.passwordFrom": [
+          "AISHA_PKI_BOOTSTRAP_PASSWORD"
+        ]
+      }
+    },
+    {
+      "username": "__PLATFORM_ADMIN_USERNAME__",
+      "email": "__PLATFORM_ADMIN_EMAIL__",
+      "firstName": "Platform",
+      "lastName": "Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "realmRoles": [
+        "admin",
+        "member",
+        "staff",
+        "studio_access",
+        "n8n_access",
+        "pki_admin",
+        "pki_operator"
+      ],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "__PLATFORM_ADMIN_PASSWORD__",
+          "temporary": true
+        }
+      ]
+    },
+    {
+      "username": "service-account-aisha-user-admin",
+      "enabled": true,
+      "serviceAccountClientId": "aisha-user-admin",
+      "clientRoles": {
+        "realm-management": [
+          "manage-users",
+          "view-users",
+          "query-users"
+        ]
+      }
+    }
+  ]
+}

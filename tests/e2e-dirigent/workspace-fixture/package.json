@@ -1,0 +1,9 @@
+{
+  "name": "e2e-workspace-fixture",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Synthetic workspace mounted into both code-server and claude-cli containers for supervisor e2e tests.",
+  "scripts": {
+    "noop": "echo workspace fixture — nothing to build"
+  }
+}

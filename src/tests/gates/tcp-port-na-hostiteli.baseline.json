@@ -1,0 +1,13 @@
+{
+  "$komentar": [
+    "Dluh brány tcp-port-na-hostiteli: TCP porty publikované na hostitele v nasazovaných compose.",
+    "Smí jen UBÝVAT. Klíč = soubor#služba#port kontejneru (hostitelská strana bývá proměnná).",
+    "Změřeno 2026-09-17 chůzí nad docker-compose.coolify*.yml (yaml parser, merge klíče)."
+  ],
+  "dluh": {
+    "docker-compose.coolify-livekit.yml#coturn#3478": "TURN přes TCP — klienti za UDP-blokujícím firewallem. Hostitelská strana je ruční deklarace instance (TURN_PORT), takže instance nekolidují; mimo výjimku „jen UDP“ je to kvůli protokolu, ne kvůli adrese.",
+    "docker-compose.coolify-livekit.yml#coturn#5349": "TURN TLS přes TCP — totéž jako 3478 (TURN_TLS_PORT je ruční deklarace instance).",
+    "docker-compose.coolify-matrix.yml#postmoogle#2525": "SMTP most (profil bridge-email) s PEVNÝM literálem 2525 — kolize instancí i cesta bokem. Kandidát na deklaraci per instance nebo vstup přes edge.",
+    "docker-compose.coolify-netbird.yml#netbird-internal-tls#33073": "Bootstrap enrollmentu meshe: agent se musí dostat k managementu DŘÍV, než mesh existuje. Port je odvozený per instance (NETBIRD_MESH_PORT), výchozí literál je dluh brány zadny-fallback."
+  }
+}

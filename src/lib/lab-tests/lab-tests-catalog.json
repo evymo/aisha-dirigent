@@ -1,0 +1,1779 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-02-04",
+  "currency": "CZK",
+  "categories": [
+    {
+      "id": "biochemistry_ions",
+      "name_key": "lab.categories.biochemistry_ions"
+    },
+    {
+      "id": "biochemistry_trace",
+      "name_key": "lab.categories.biochemistry_trace"
+    },
+    {
+      "id": "biochemistry_basic",
+      "name_key": "lab.categories.biochemistry_basic"
+    },
+    {
+      "id": "biochemistry_stool",
+      "name_key": "lab.categories.biochemistry_stool"
+    },
+    {
+      "id": "biochemistry_diabetes",
+      "name_key": "lab.categories.biochemistry_diabetes"
+    },
+    {
+      "id": "biochemistry_lipids",
+      "name_key": "lab.categories.biochemistry_lipids"
+    },
+    {
+      "id": "biochemistry_anemia",
+      "name_key": "lab.categories.biochemistry_anemia"
+    },
+    {
+      "id": "biochemistry_proteins",
+      "name_key": "lab.categories.biochemistry_proteins"
+    },
+    {
+      "id": "biochemistry_cardiac",
+      "name_key": "lab.categories.biochemistry_cardiac"
+    },
+    {
+      "id": "biochemistry_thyroid",
+      "name_key": "lab.categories.biochemistry_thyroid"
+    },
+    {
+      "id": "biochemistry_electrophoresis",
+      "name_key": "lab.categories.biochemistry_electrophoresis"
+    },
+    {
+      "id": "biochemistry_tumor_markers",
+      "name_key": "lab.categories.biochemistry_tumor_markers"
+    },
+    {
+      "id": "biochemistry_hormones",
+      "name_key": "lab.categories.biochemistry_hormones"
+    },
+    {
+      "id": "biochemistry_vitamins",
+      "name_key": "lab.categories.biochemistry_vitamins"
+    },
+    {
+      "id": "biochemistry_bone",
+      "name_key": "lab.categories.biochemistry_bone"
+    },
+    {
+      "id": "biochemistry_urine",
+      "name_key": "lab.categories.biochemistry_urine"
+    },
+    {
+      "id": "biochemistry_toxicology",
+      "name_key": "lab.categories.biochemistry_toxicology"
+    },
+    {
+      "id": "biochemistry_heavy_metals",
+      "name_key": "lab.categories.biochemistry_heavy_metals"
+    },
+    {
+      "id": "biochemistry_tdm",
+      "name_key": "lab.categories.biochemistry_tdm"
+    },
+    {
+      "id": "biochemistry_hepatitis",
+      "name_key": "lab.categories.biochemistry_hepatitis"
+    },
+    {
+      "id": "hematology_basic",
+      "name_key": "lab.categories.hematology_basic"
+    },
+    {
+      "id": "hematology_coagulation",
+      "name_key": "lab.categories.hematology_coagulation"
+    },
+    {
+      "id": "hematology_thrombophilia",
+      "name_key": "lab.categories.hematology_thrombophilia"
+    },
+    {
+      "id": "hematology_lupus",
+      "name_key": "lab.categories.hematology_lupus"
+    },
+    {
+      "id": "hematology_transfusion",
+      "name_key": "lab.categories.hematology_transfusion"
+    },
+    {
+      "id": "immunology_serology",
+      "name_key": "lab.categories.immunology_serology"
+    },
+    {
+      "id": "immunology_autoimmunity",
+      "name_key": "lab.categories.immunology_autoimmunity"
+    },
+    {
+      "id": "immunology_allergy",
+      "name_key": "lab.categories.immunology_allergy"
+    },
+    {
+      "id": "immunology_food_intolerance",
+      "name_key": "lab.categories.immunology_food_intolerance"
+    },
+    {
+      "id": "immunology_cellular",
+      "name_key": "lab.categories.immunology_cellular"
+    }
+  ],
+  "tests": [
+    {
+      "code": "NA",
+      "category": "biochemistry_ions",
+      "price": 20,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.NA"
+    },
+    {
+      "code": "K",
+      "category": "biochemistry_ions",
+      "price": 22,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.K"
+    },
+    {
+      "code": "CL",
+      "category": "biochemistry_ions",
+      "price": 15,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CL"
+    },
+    {
+      "code": "CA",
+      "category": "biochemistry_ions",
+      "price": 19,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CA"
+    },
+    {
+      "code": "P",
+      "category": "biochemistry_ions",
+      "price": 17,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.P"
+    },
+    {
+      "code": "MG",
+      "category": "biochemistry_ions",
+      "price": 20,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.MG"
+    },
+    {
+      "code": "MG_ERY",
+      "category": "biochemistry_ions",
+      "price": 130,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.MG_ERY"
+    },
+    {
+      "code": "SE",
+      "category": "biochemistry_trace",
+      "price": 490,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.SE"
+    },
+    {
+      "code": "ZN",
+      "category": "biochemistry_trace",
+      "price": 110,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ZN"
+    },
+    {
+      "code": "CU",
+      "category": "biochemistry_trace",
+      "price": 110,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CU"
+    },
+    {
+      "code": "GLU",
+      "category": "biochemistry_basic",
+      "price": 15,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.GLU"
+    },
+    {
+      "code": "UREA",
+      "category": "biochemistry_basic",
+      "price": 18,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.UREA"
+    },
+    {
+      "code": "CREA",
+      "category": "biochemistry_basic",
+      "price": 17,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CREA"
+    },
+    {
+      "code": "UA",
+      "category": "biochemistry_basic",
+      "price": 22,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.UA"
+    },
+    {
+      "code": "BILI",
+      "category": "biochemistry_basic",
+      "price": 16,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.BILI"
+    },
+    {
+      "code": "BILI_CONJ",
+      "category": "biochemistry_basic",
+      "price": 15,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.BILI_CONJ"
+    },
+    {
+      "code": "AST",
+      "category": "biochemistry_basic",
+      "price": 18,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.AST"
+    },
+    {
+      "code": "ALT",
+      "category": "biochemistry_basic",
+      "price": 18,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ALT"
+    },
+    {
+      "code": "ALP",
+      "category": "biochemistry_basic",
+      "price": 18,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ALP"
+    },
+    {
+      "code": "GGT",
+      "category": "biochemistry_basic",
+      "price": 22,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.GGT"
+    },
+    {
+      "code": "LDH",
+      "category": "biochemistry_basic",
+      "price": 22,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.LDH"
+    },
+    {
+      "code": "CK",
+      "category": "biochemistry_basic",
+      "price": 29,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CK"
+    },
+    {
+      "code": "AMYL",
+      "category": "biochemistry_basic",
+      "price": 37,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.AMYL"
+    },
+    {
+      "code": "LIPASE",
+      "category": "biochemistry_basic",
+      "price": 200,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.LIPASE"
+    },
+    {
+      "code": "LACTATE",
+      "category": "biochemistry_basic",
+      "price": 53,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.LACTATE"
+    },
+    {
+      "code": "CYSTATIN_C",
+      "category": "biochemistry_basic",
+      "price": 275,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CYSTATIN_C"
+    },
+    {
+      "code": "OSMOL",
+      "category": "biochemistry_basic",
+      "price": 65,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.OSMOL"
+    },
+    {
+      "code": "FOB",
+      "category": "biochemistry_stool",
+      "price": 140,
+      "sample_type": "stool",
+      "requires_fasting": false,
+      "name_key": "lab.tests.FOB"
+    },
+    {
+      "code": "CALPROTECTIN",
+      "category": "biochemistry_stool",
+      "price": 1080,
+      "sample_type": "stool",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CALPROTECTIN"
+    },
+    {
+      "code": "HBA1C",
+      "category": "biochemistry_diabetes",
+      "price": 210,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.HBA1C"
+    },
+    {
+      "code": "C_PEPTIDE",
+      "category": "biochemistry_diabetes",
+      "price": 190,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.C_PEPTIDE"
+    },
+    {
+      "code": "INSULIN",
+      "category": "biochemistry_diabetes",
+      "price": 158,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.INSULIN"
+    },
+    {
+      "code": "ACR",
+      "category": "biochemistry_diabetes",
+      "price": 147,
+      "sample_type": "urine",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ACR"
+    },
+    {
+      "code": "FRUCTOSAMINE",
+      "category": "biochemistry_diabetes",
+      "price": 106,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.FRUCTOSAMINE"
+    },
+    {
+      "code": "CHOL",
+      "category": "biochemistry_lipids",
+      "price": 23,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.CHOL"
+    },
+    {
+      "code": "TG",
+      "category": "biochemistry_lipids",
+      "price": 27,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.TG"
+    },
+    {
+      "code": "HDL",
+      "category": "biochemistry_lipids",
+      "price": 49,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.HDL"
+    },
+    {
+      "code": "LDL",
+      "category": "biochemistry_lipids",
+      "price": 60,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.LDL"
+    },
+    {
+      "code": "APO_A1",
+      "category": "biochemistry_lipids",
+      "price": 200,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.APO_A1"
+    },
+    {
+      "code": "APO_B",
+      "category": "biochemistry_lipids",
+      "price": 200,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.APO_B"
+    },
+    {
+      "code": "LP_A",
+      "category": "biochemistry_lipids",
+      "price": 120,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.LP_A"
+    },
+    {
+      "code": "FATTY_ACIDS",
+      "category": "biochemistry_lipids",
+      "price": 1900,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "note": "Not covered by insurance",
+      "name_key": "lab.tests.FATTY_ACIDS"
+    },
+    {
+      "code": "FE",
+      "category": "biochemistry_anemia",
+      "price": 19,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.FE"
+    },
+    {
+      "code": "TIBC",
+      "category": "biochemistry_anemia",
+      "price": 75,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.TIBC"
+    },
+    {
+      "code": "FERRITIN",
+      "category": "biochemistry_anemia",
+      "price": 230,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.FERRITIN"
+    },
+    {
+      "code": "TRANSFERRIN",
+      "category": "biochemistry_anemia",
+      "price": 170,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.TRANSFERRIN"
+    },
+    {
+      "code": "TSAT",
+      "category": "biochemistry_anemia",
+      "price": 94,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.TSAT"
+    },
+    {
+      "code": "STFR",
+      "category": "biochemistry_anemia",
+      "price": 310,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.STFR"
+    },
+    {
+      "code": "B12",
+      "category": "biochemistry_anemia",
+      "price": 250,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.B12"
+    },
+    {
+      "code": "FOLATE",
+      "category": "biochemistry_anemia",
+      "price": 240,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.FOLATE"
+    },
+    {
+      "code": "FOLATE_ERY",
+      "category": "biochemistry_anemia",
+      "price": 260,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.FOLATE_ERY"
+    },
+    {
+      "code": "EPO",
+      "category": "biochemistry_anemia",
+      "price": 620,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.EPO"
+    },
+    {
+      "code": "CRP",
+      "category": "biochemistry_proteins",
+      "price": 150,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CRP"
+    },
+    {
+      "code": "HS_CRP",
+      "category": "biochemistry_proteins",
+      "price": 150,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.HS_CRP"
+    },
+    {
+      "code": "ASLO",
+      "category": "biochemistry_proteins",
+      "price": 110,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ASLO"
+    },
+    {
+      "code": "RF",
+      "category": "biochemistry_proteins",
+      "price": 110,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.RF"
+    },
+    {
+      "code": "CB",
+      "category": "biochemistry_proteins",
+      "price": 15,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CB"
+    },
+    {
+      "code": "ALB",
+      "category": "biochemistry_proteins",
+      "price": 15,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ALB"
+    },
+    {
+      "code": "C3",
+      "category": "biochemistry_proteins",
+      "price": 160,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.C3"
+    },
+    {
+      "code": "C4",
+      "category": "biochemistry_proteins",
+      "price": 170,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.C4"
+    },
+    {
+      "code": "IGA",
+      "category": "biochemistry_proteins",
+      "price": 175,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.IGA"
+    },
+    {
+      "code": "IGG",
+      "category": "biochemistry_proteins",
+      "price": 175,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.IGG"
+    },
+    {
+      "code": "IGM",
+      "category": "biochemistry_proteins",
+      "price": 175,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.IGM"
+    },
+    {
+      "code": "A1AT",
+      "category": "biochemistry_proteins",
+      "price": 180,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.A1AT"
+    },
+    {
+      "code": "HAPTOGLOBIN",
+      "category": "biochemistry_proteins",
+      "price": 159,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.HAPTOGLOBIN"
+    },
+    {
+      "code": "PREALBUMIN",
+      "category": "biochemistry_proteins",
+      "price": 168,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.PREALBUMIN"
+    },
+    {
+      "code": "CERULOPLASMIN",
+      "category": "biochemistry_proteins",
+      "price": 225,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CERULOPLASMIN"
+    },
+    {
+      "code": "B2M",
+      "category": "biochemistry_proteins",
+      "price": 253,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.B2M"
+    },
+    {
+      "code": "SAA",
+      "category": "biochemistry_proteins",
+      "price": 290,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.SAA"
+    },
+    {
+      "code": "TROPONIN",
+      "category": "biochemistry_cardiac",
+      "price": 940,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.TROPONIN"
+    },
+    {
+      "code": "CK_MB",
+      "category": "biochemistry_cardiac",
+      "price": 40,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CK_MB"
+    },
+    {
+      "code": "MYOGLOBIN",
+      "category": "biochemistry_cardiac",
+      "price": 280,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.MYOGLOBIN"
+    },
+    {
+      "code": "NT_PROBNP",
+      "category": "biochemistry_cardiac",
+      "price": 815,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.NT_PROBNP"
+    },
+    {
+      "code": "TSH",
+      "category": "biochemistry_thyroid",
+      "price": 200,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.TSH"
+    },
+    {
+      "code": "FT4",
+      "category": "biochemistry_thyroid",
+      "price": 190,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.FT4"
+    },
+    {
+      "code": "FT3",
+      "category": "biochemistry_thyroid",
+      "price": 180,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.FT3"
+    },
+    {
+      "code": "T3",
+      "category": "biochemistry_thyroid",
+      "price": 130,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.T3"
+    },
+    {
+      "code": "T4",
+      "category": "biochemistry_thyroid",
+      "price": 130,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.T4"
+    },
+    {
+      "code": "ATPO",
+      "category": "biochemistry_thyroid",
+      "price": 420,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ATPO"
+    },
+    {
+      "code": "ATSH",
+      "category": "biochemistry_thyroid",
+      "price": 555,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ATSH"
+    },
+    {
+      "code": "TSI",
+      "category": "biochemistry_thyroid",
+      "price": 580,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.TSI"
+    },
+    {
+      "code": "ATG",
+      "category": "biochemistry_thyroid",
+      "price": 420,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ATG"
+    },
+    {
+      "code": "TG",
+      "category": "biochemistry_thyroid",
+      "price": 250,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.TG"
+    },
+    {
+      "code": "CEA",
+      "category": "biochemistry_tumor_markers",
+      "price": 340,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CEA"
+    },
+    {
+      "code": "CA15_3",
+      "category": "biochemistry_tumor_markers",
+      "price": 490,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CA15_3"
+    },
+    {
+      "code": "CA19_9",
+      "category": "biochemistry_tumor_markers",
+      "price": 490,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CA19_9"
+    },
+    {
+      "code": "CA125",
+      "category": "biochemistry_tumor_markers",
+      "price": 490,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CA125"
+    },
+    {
+      "code": "HE4",
+      "category": "biochemistry_tumor_markers",
+      "price": 958,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.HE4"
+    },
+    {
+      "code": "AFP",
+      "category": "biochemistry_tumor_markers",
+      "price": 180,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.AFP"
+    },
+    {
+      "code": "BHCG",
+      "category": "biochemistry_tumor_markers",
+      "price": 190,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.BHCG"
+    },
+    {
+      "code": "PSA",
+      "category": "biochemistry_tumor_markers",
+      "price": 250,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.PSA"
+    },
+    {
+      "code": "FPSA",
+      "category": "biochemistry_tumor_markers",
+      "price": 380,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.FPSA"
+    },
+    {
+      "code": "sensitive data",
+      "category": "biochemistry_tumor_markers",
+      "price": 1200,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.sensitive data"
+    },
+    {
+      "code": "NSE",
+      "category": "biochemistry_tumor_markers",
+      "price": 440,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.NSE"
+    },
+    {
+      "code": "CYFRA21_1",
+      "category": "biochemistry_tumor_markers",
+      "price": 620,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CYFRA21_1"
+    },
+    {
+      "code": "S100",
+      "category": "biochemistry_tumor_markers",
+      "price": 440,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.S100"
+    },
+    {
+      "code": "CHROMOGRANIN_A",
+      "category": "biochemistry_tumor_markers",
+      "price": 220,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CHROMOGRANIN_A"
+    },
+    {
+      "code": "FSH",
+      "category": "biochemistry_hormones",
+      "price": 170,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.FSH"
+    },
+    {
+      "code": "LH",
+      "category": "biochemistry_hormones",
+      "price": 170,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.LH"
+    },
+    {
+      "code": "PROGEST",
+      "category": "biochemistry_hormones",
+      "price": 180,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.PROGEST"
+    },
+    {
+      "code": "17_OH_PROGEST",
+      "category": "biochemistry_hormones",
+      "price": 260,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.17_OH_PROGEST"
+    },
+    {
+      "code": "ESTRADIOL",
+      "category": "biochemistry_hormones",
+      "price": 197,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ESTRADIOL"
+    },
+    {
+      "code": "PROLACTIN",
+      "category": "biochemistry_hormones",
+      "price": 175,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.PROLACTIN"
+    },
+    {
+      "code": "STH",
+      "category": "biochemistry_hormones",
+      "price": 200,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.STH"
+    },
+    {
+      "code": "IGF1",
+      "category": "biochemistry_hormones",
+      "price": 840,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.IGF1"
+    },
+    {
+      "code": "DHEA",
+      "category": "biochemistry_hormones",
+      "price": 145,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.DHEA"
+    },
+    {
+      "code": "DHEAS",
+      "category": "biochemistry_hormones",
+      "price": 145,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.DHEAS"
+    },
+    {
+      "code": "CORTISOL",
+      "category": "biochemistry_hormones",
+      "price": 190,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CORTISOL"
+    },
+    {
+      "code": "CORTISOL_SALIVA",
+      "category": "biochemistry_hormones",
+      "price": 190,
+      "sample_type": "saliva",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CORTISOL_SALIVA"
+    },
+    {
+      "code": "ANDROSTENEDIONE",
+      "category": "biochemistry_hormones",
+      "price": 260,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ANDROSTENEDIONE"
+    },
+    {
+      "code": "TESTOSTERONE",
+      "category": "biochemistry_hormones",
+      "price": 180,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.TESTOSTERONE"
+    },
+    {
+      "code": "FREE_TESTOSTERONE",
+      "category": "biochemistry_hormones",
+      "price": 290,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.FREE_TESTOSTERONE"
+    },
+    {
+      "code": "SHBG",
+      "category": "biochemistry_hormones",
+      "price": 265,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.SHBG"
+    },
+    {
+      "code": "DHT",
+      "category": "biochemistry_hormones",
+      "price": 450,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.DHT"
+    },
+    {
+      "code": "AMH",
+      "category": "biochemistry_hormones",
+      "price": 750,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.AMH"
+    },
+    {
+      "code": "PTH",
+      "category": "biochemistry_hormones",
+      "price": 558,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.PTH"
+    },
+    {
+      "code": "ACTH",
+      "category": "biochemistry_hormones",
+      "price": 390,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ACTH"
+    },
+    {
+      "code": "GASTRIN",
+      "category": "biochemistry_hormones",
+      "price": 260,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.GASTRIN"
+    },
+    {
+      "code": "CALCITONIN",
+      "category": "biochemistry_hormones",
+      "price": 350,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CALCITONIN"
+    },
+    {
+      "code": "PCT",
+      "category": "biochemistry_hormones",
+      "price": 690,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.PCT"
+    },
+    {
+      "code": "RENIN",
+      "category": "biochemistry_hormones",
+      "price": 250,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.RENIN"
+    },
+    {
+      "code": "ALDOSTERONE",
+      "category": "biochemistry_hormones",
+      "price": 170,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ALDOSTERONE"
+    },
+    {
+      "code": "METANEPHRINES",
+      "category": "biochemistry_hormones",
+      "price": 640,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.METANEPHRINES"
+    },
+    {
+      "code": "CATECHOLAMINES",
+      "category": "biochemistry_hormones",
+      "price": 960,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CATECHOLAMINES"
+    },
+    {
+      "code": "SEROTONIN",
+      "category": "biochemistry_hormones",
+      "price": 320,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.SEROTONIN"
+    },
+    {
+      "code": "VIT_A",
+      "category": "biochemistry_vitamins",
+      "price": 390,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.VIT_A"
+    },
+    {
+      "code": "VIT_B1",
+      "category": "biochemistry_vitamins",
+      "price": 1090,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.VIT_B1"
+    },
+    {
+      "code": "VIT_B2",
+      "category": "biochemistry_vitamins",
+      "price": 1090,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.VIT_B2"
+    },
+    {
+      "code": "VIT_B6",
+      "category": "biochemistry_vitamins",
+      "price": 590,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.VIT_B6"
+    },
+    {
+      "code": "VIT_B12_ACTIVE",
+      "category": "biochemistry_vitamins",
+      "price": 260,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.VIT_B12_ACTIVE"
+    },
+    {
+      "code": "VIT_C",
+      "category": "biochemistry_vitamins",
+      "price": 750,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.VIT_C"
+    },
+    {
+      "code": "VIT_D",
+      "category": "biochemistry_vitamins",
+      "price": 460,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.VIT_D"
+    },
+    {
+      "code": "VIT_D2",
+      "category": "biochemistry_vitamins",
+      "price": 850,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.VIT_D2"
+    },
+    {
+      "code": "VIT_D3",
+      "category": "biochemistry_vitamins",
+      "price": 850,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.VIT_D3"
+    },
+    {
+      "code": "VIT_E",
+      "category": "biochemistry_vitamins",
+      "price": 590,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.VIT_E"
+    },
+    {
+      "code": "COQ10",
+      "category": "biochemistry_vitamins",
+      "price": 1290,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.COQ10"
+    },
+    {
+      "code": "OSTEOCALCIN",
+      "category": "biochemistry_bone",
+      "price": 520,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.OSTEOCALCIN"
+    },
+    {
+      "code": "B_CROSSLAPS",
+      "category": "biochemistry_bone",
+      "price": 586,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.B_CROSSLAPS"
+    },
+    {
+      "code": "ALP_BONE",
+      "category": "biochemistry_bone",
+      "price": 320,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ALP_BONE"
+    },
+    {
+      "code": "P1NP",
+      "category": "biochemistry_bone",
+      "price": 441,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.P1NP"
+    },
+    {
+      "code": "CBC",
+      "category": "hematology_basic",
+      "price": 26,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CBC"
+    },
+    {
+      "code": "CBC_DIFF",
+      "category": "hematology_basic",
+      "price": 64,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CBC_DIFF"
+    },
+    {
+      "code": "RETICS",
+      "category": "hematology_basic",
+      "price": 65,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.RETICS"
+    },
+    {
+      "code": "ESR",
+      "category": "hematology_basic",
+      "price": 26,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ESR"
+    },
+    {
+      "code": "PT",
+      "category": "hematology_coagulation",
+      "price": 83,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.PT"
+    },
+    {
+      "code": "APTT",
+      "category": "hematology_coagulation",
+      "price": 90,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.APTT"
+    },
+    {
+      "code": "TT",
+      "category": "hematology_coagulation",
+      "price": 55,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.TT"
+    },
+    {
+      "code": "FIBRINOGEN",
+      "category": "hematology_coagulation",
+      "price": 215,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.FIBRINOGEN"
+    },
+    {
+      "code": "D_DIMER",
+      "category": "hematology_coagulation",
+      "price": 250,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.D_DIMER"
+    },
+    {
+      "code": "ANTI_XA",
+      "category": "hematology_coagulation",
+      "price": 350,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ANTI_XA"
+    },
+    {
+      "code": "PROC_GLOBAL",
+      "category": "hematology_thrombophilia",
+      "price": 316,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.PROC_GLOBAL"
+    },
+    {
+      "code": "APCR",
+      "category": "hematology_thrombophilia",
+      "price": 343,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.APCR"
+    },
+    {
+      "code": "PROTEIN_C",
+      "category": "hematology_thrombophilia",
+      "price": 731,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.PROTEIN_C"
+    },
+    {
+      "code": "PROTEIN_S",
+      "category": "hematology_thrombophilia",
+      "price": 736,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.PROTEIN_S"
+    },
+    {
+      "code": "ANTITHROMBIN",
+      "category": "hematology_thrombophilia",
+      "price": 180,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ANTITHROMBIN"
+    },
+    {
+      "code": "PLASMINOGEN",
+      "category": "hematology_thrombophilia",
+      "price": 266,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.PLASMINOGEN"
+    },
+    {
+      "code": "HOMOCYSTEINE",
+      "category": "hematology_thrombophilia",
+      "price": 500,
+      "sample_type": "blood",
+      "requires_fasting": true,
+      "name_key": "lab.tests.HOMOCYSTEINE"
+    },
+    {
+      "code": "MMA",
+      "category": "hematology_thrombophilia",
+      "price": 310,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.MMA"
+    },
+    {
+      "code": "BORRELIA_IGG",
+      "category": "immunology_serology",
+      "price": 370,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.BORRELIA_IGG"
+    },
+    {
+      "code": "BORRELIA_IGM",
+      "category": "immunology_serology",
+      "price": 370,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.BORRELIA_IGM"
+    },
+    {
+      "code": "H_PYLORI",
+      "category": "immunology_serology",
+      "price": 700,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.H_PYLORI"
+    },
+    {
+      "code": "TOXO_IGG_IGM",
+      "category": "immunology_serology",
+      "price": 700,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.TOXO_IGG_IGM"
+    },
+    {
+      "code": "EBV_PANEL",
+      "category": "immunology_serology",
+      "price": 1110,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.EBV_PANEL"
+    },
+    {
+      "code": "TBE_IGG_IGM",
+      "category": "immunology_serology",
+      "price": 740,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.TBE_IGG_IGM"
+    },
+    {
+      "code": "CMV_IGG_IGM",
+      "category": "immunology_serology",
+      "price": 800,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CMV_IGG_IGM"
+    },
+    {
+      "code": "CHLAMYDIA_PNEUM",
+      "category": "immunology_serology",
+      "price": 1050,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CHLAMYDIA_PNEUM"
+    },
+    {
+      "code": "CHLAMYDIA_TRACH",
+      "category": "immunology_serology",
+      "price": 700,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CHLAMYDIA_TRACH"
+    },
+    {
+      "code": "MYCOPLASMA_PNEUM",
+      "category": "immunology_serology",
+      "price": 1050,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.MYCOPLASMA_PNEUM"
+    },
+    {
+      "code": "HSV_IGG_IGM",
+      "category": "immunology_serology",
+      "price": 700,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.HSV_IGG_IGM"
+    },
+    {
+      "code": "VZV_IGG",
+      "category": "immunology_serology",
+      "price": 370,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.VZV_IGG"
+    },
+    {
+      "code": "VZV_IGM",
+      "category": "immunology_serology",
+      "price": 370,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.VZV_IGM"
+    },
+    {
+      "code": "COVID_IGG",
+      "category": "immunology_serology",
+      "price": 420,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.COVID_IGG"
+    },
+    {
+      "code": "ANA_IF",
+      "category": "immunology_autoimmunity",
+      "price": 331,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ANA_IF"
+    },
+    {
+      "code": "DS_DNA",
+      "category": "immunology_autoimmunity",
+      "price": 452,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.DS_DNA"
+    },
+    {
+      "code": "ENA_SCREEN",
+      "category": "immunology_autoimmunity",
+      "price": 520,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ENA_SCREEN"
+    },
+    {
+      "code": "ANA_ENA_TYPIZATION",
+      "category": "immunology_autoimmunity",
+      "price": 1420,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ANA_ENA_TYPIZATION"
+    },
+    {
+      "code": "ANCA_IF",
+      "category": "immunology_autoimmunity",
+      "price": 190,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ANCA_IF"
+    },
+    {
+      "code": "ANCA_PR3",
+      "category": "immunology_autoimmunity",
+      "price": 642,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ANCA_PR3"
+    },
+    {
+      "code": "ANCA_MPO",
+      "category": "immunology_autoimmunity",
+      "price": 642,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ANCA_MPO"
+    },
+    {
+      "code": "ACCP",
+      "category": "immunology_autoimmunity",
+      "price": 333,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ACCP"
+    },
+    {
+      "code": "ICA_IF",
+      "category": "immunology_autoimmunity",
+      "price": 483,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ICA_IF"
+    },
+    {
+      "code": "AGAD",
+      "category": "immunology_autoimmunity",
+      "price": 568,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.AGAD"
+    },
+    {
+      "code": "AIA2",
+      "category": "immunology_autoimmunity",
+      "price": 960,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.AIA2"
+    },
+    {
+      "code": "ACLA_SCREEN",
+      "category": "immunology_autoimmunity",
+      "price": 1167,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ACLA_SCREEN"
+    },
+    {
+      "code": "B2GP1",
+      "category": "immunology_autoimmunity",
+      "price": 494,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.B2GP1"
+    },
+    {
+      "code": "IGE_TOTAL",
+      "category": "immunology_allergy",
+      "price": 420,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.IGE_TOTAL"
+    },
+    {
+      "code": "ECP",
+      "category": "immunology_allergy",
+      "price": 800,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ECP"
+    },
+    {
+      "code": "TRYPTASE",
+      "category": "immunology_allergy",
+      "price": 710,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.TRYPTASE"
+    },
+    {
+      "code": "DAO",
+      "category": "immunology_allergy",
+      "price": 981,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.DAO"
+    },
+    {
+      "code": "INHALATION_PANEL",
+      "category": "immunology_allergy",
+      "price": 778,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.INHALATION_PANEL"
+    },
+    {
+      "code": "FOOD_PANEL",
+      "category": "immunology_allergy",
+      "price": 778,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.FOOD_PANEL"
+    },
+    {
+      "code": "ALEX",
+      "category": "immunology_allergy",
+      "price": 5180,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ALEX"
+    },
+    {
+      "code": "ALLERGY_Q",
+      "category": "immunology_allergy",
+      "price": 2500,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.ALLERGY_Q"
+    },
+    {
+      "code": "CELIAC_SCREEN",
+      "category": "immunology_food_intolerance",
+      "price": 570,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CELIAC_SCREEN"
+    },
+    {
+      "code": "DGP_IGA",
+      "category": "immunology_food_intolerance",
+      "price": 190,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.DGP_IGA"
+    },
+    {
+      "code": "DGP_IGG",
+      "category": "immunology_food_intolerance",
+      "price": 190,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.DGP_IGG"
+    },
+    {
+      "code": "EMA_IGA",
+      "category": "immunology_food_intolerance",
+      "price": 190,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.EMA_IGA"
+    },
+    {
+      "code": "TTG_IGA",
+      "category": "immunology_food_intolerance",
+      "price": 190,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.TTG_IGA"
+    },
+    {
+      "code": "TTG_IGG",
+      "category": "immunology_food_intolerance",
+      "price": 190,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.TTG_IGG"
+    },
+    {
+      "code": "FOX",
+      "category": "immunology_food_intolerance",
+      "price": 5990,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "note": "Not covered by insurance",
+      "name_key": "lab.tests.FOX"
+    },
+    {
+      "code": "HLA_B27",
+      "category": "immunology_cellular",
+      "price": 712,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.HLA_B27"
+    },
+    {
+      "code": "LYMPHOCYTE_PANEL",
+      "category": "immunology_cellular",
+      "price": 1655,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.LYMPHOCYTE_PANEL"
+    },
+    {
+      "code": "CD3_CD4_CD8",
+      "category": "immunology_cellular",
+      "price": 993,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.CD3_CD4_CD8"
+    },
+    {
+      "code": "PHAGOTEST",
+      "category": "immunology_cellular",
+      "price": 509,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.PHAGOTEST"
+    },
+    {
+      "code": "BTL",
+      "category": "immunology_cellular",
+      "price": 331,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.BTL"
+    },
+    {
+      "code": "QUANTIFERON",
+      "category": "immunology_cellular",
+      "price": 981,
+      "sample_type": "blood",
+      "requires_fasting": false,
+      "name_key": "lab.tests.QUANTIFERON"
+    }
+  ]
+}

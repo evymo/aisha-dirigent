@@ -1,0 +1,97 @@
+# =============================================================================
+# Per-Dockerfile ignore for e2e/Dockerfile.staging-parity
+# =============================================================================
+#
+# BuildKit looks for `<dockerfile>.dockerignore` next to the Dockerfile passed
+# to `-f` and, when present, uses it INSTEAD of the build-context-root
+# `.dockerignore` (it replaces, it does not merge). The patterns below are
+# still evaluated relative to the build context root (the repo root).
+#
+# Why this file exists:
+#
+#   The root .dockerignore excludes `e2e/` and `playwright.config.ts` so they
+#   never leak into PRODUCTION service images (correct hygiene). But THIS
+#   Dockerfile is the staging-parity TEST harness — it must COPY exactly those
+#   files (the spec + the playwright config). Without a per-Dockerfile ignore,
+#   the root rules win and `COPY playwright.config.ts` / `COPY e2e/*.spec.ts`
+#   fail with "not found" (empty build context).
+#
+#   This file is the root .dockerignore MINUS the two `e2e/` +
+#   `playwright.config.ts` exclusions, so the harness build sees the handful of
+#   test files it needs while every production-hygiene exclusion (node_modules,
+#   .git, .env secrets, dist, docs) is preserved verbatim. No regression to
+#   production image builds — those still use the root .dockerignore.
+# =============================================================================
+
+# ── Build artifacts ──
+dist/
+docs/api/
+docs/db-structure/
+playwright-report/
+workbench/
+trash/
+archive/
+mobile-app/
+.claude/
+*.tsbuildinfo
+
+# ── Dependencies (installed fresh in Docker) ──
+node_modules/
+**/node_modules/
+.npm/
+bun.lockb
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+
+# ── Version control ──
+.git/
+.gitignore
+**/.git
+
+# ── IDE / Editor ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Environment / Secrets ──
+.env
+.env.*
+!.env.example
+
+# ── Tests & Development ──
+# NOTE: `e2e/` and `playwright.config.ts` are deliberately NOT excluded here
+# (unlike the root .dockerignore) — the staging-parity harness COPYs them.
+src/tests/
+vitest.config.ts
+coverage/
+test-results/
+
+# ── Docker (prevent recursive context) ──
+docker-compose*.yml
+compose*.yml
+Dockerfile*
+.dockerignore
+
+# ── Logs ──
+*.log
+npm-debug.log*
+
+# ── OS files ──
+.DS_Store
+Thumbs.db
+
+# ── Documentation (not needed in image) ──
+docs/
+knowledge-extraction/
+AGENTS.md
+CONTRIBUTING.md
+README.md
+RULES.md
+
+# ── Supabase local dev (not needed in production image) ──
+supabase/.temp/
+supabase/.branches/

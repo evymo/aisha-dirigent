@@ -1,0 +1,28 @@
+label: Orchestration Plane mTLS Client
+
+validity:
+    # OpenXPKI offset is pair-encoded from the left: YY MM DD hh mm ss.
+    # "+000001" = 0y 0m 01d = 24h (short-lived service-mesh client cert).
+    # NOT "+0001", which would decode to 1 MONTH.
+    notafter: "+000001"
+
+style:
+    00_service_mesh_style:
+        label: Service-to-Service mTLS
+        description: Short-lived mTLS client cert for inter-service communication (24h)
+        ui:
+            subject:
+                - hostname
+                - application_name
+            info:
+                - requestor_realname
+                - requestor_email
+                - comment
+
+        subject:
+            dn: CN=[% hostname.lower %],O=${AISHA_OPERATOR_ORG},OU=Orchestration Plane Client
+
+        metadata:
+            requestor: "[% requestor_realname %]"
+            email: "[% requestor_email %]"
+            entity: "[% hostname FILTER lower %]"

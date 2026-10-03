@@ -1,0 +1,77 @@
+{
+  "$schema": "../profiles.schema.json",
+  "id": "local-dev",
+  "app_name_prefix": "local",
+  "description": "Developer machine (laptop). All services in Docker on one host. Abstract `*.local` domains via /etc/hosts or Coredns. Mesh prepend → `mesh.*.local` for testing mesh routing.",
+  "domain": {
+    "public_tld": "local",
+    "internal_tld": "local",
+    "internal_pattern": "{subdomain}.{internal_tld}",
+    "public_pattern": "{subdomain}.{public_tld}",
+    "mesh_tld": "mesh.local.internal",
+    "mesh_pattern": "{subdomain}.{mesh_tld}",
+    "_notes": "⛔ SJEDNOCENO S PRODUKCÍ 2026-08-25. Stálo tu `mesh_tld: local` + `mesh_pattern: mesh.{subdomain}.{mesh_tld}`, tedy `mesh.auth.local` — JINÝ TVAR než produkce (`<prefix>-auth.mesh.<instance>.internal`) a BEZ identity instance. Lokál a produkce tak pojmenovávaly touž službu dvěma způsoby a kód, který mezi nimi přechází (testy, fixtury, internalUrlFor), musel držet obě varianty — a právě to udržovalo při životě ploché tvary `http://<kontejner>:<port>`. Mesh je podmínka provozu AISHA stacku, ne volitelný režim, takže tvar jména musí být jeden. `.internal` navíc drží stejnou vlastnost jako v produkci: zóna, která se mimo mesh NEROZŘEŠÍ, tedy má failure mode."
+  },
+  "servers": [
+    "local"
+  ],
+  "service_overrides": {
+    "core": {
+      "placement": "local"
+    },
+    "keycloak": {
+      "placement": "local"
+    },
+    "pki": {
+      "placement": "local"
+    },
+    "integration": {
+      "placement": "local"
+    },
+    "orchestration": {
+      "placement": "local"
+    },
+    "observability": {
+      "placement": "local"
+    },
+    "admin": {
+      "placement": "local"
+    },
+    "edge": {
+      "placement": "local"
+    }
+  },
+  "tier_filter": [
+    "required",
+    "important"
+  ],
+  "include": [
+    "openclaw"
+  ],
+  "include_local_only": [
+    "vllm"
+  ],
+  "exclude": [
+    "netbird",
+    "messaging",
+    "ledger",
+    "exec",
+    "registry",
+    "monitoring"
+  ],
+  "mesh_default": false,
+  "oauth2": {
+    "cookie_domains": ".local",
+    "whitelist_domains": ".local"
+  },
+  "_notes": [
+    "Local-only services like vLLM CAN be included here (developer GPU/RAM).",
+    "Registry skipped — locally we don't hit Docker Hub rate-limits the same way.",
+    "monitoring excluded — Dozzle not needed, dev uses `docker logs`.",
+    "openclaw force-included (tier:optional, so the tier_filter would otherwise drop it) so the local stack mirrors cloud-multi: the topology emits OPENCLAW_URL → svc-ai-chat's adapter self-enables for end-to-end local verification of the executor path."
+  ],
+  "ai": {
+    "execution_mode": "cloud",
+    "_note": "Rezidence dat AI (local | hybrid | cloud). Šablona drží dnešní chování platformy; instance s modelem uvnitř meshe deklaruje local."
+  }
+}

@@ -1,0 +1,376 @@
+{
+  "builder": {
+    "panels": {
+      "blocks": "Knihovna bloků",
+      "properties": "Vlastnosti",
+      "activity": "Aktivita agentů"
+    },
+    "blocks": {
+      "install-grid": {
+        "title": "Instalační mřížka",
+        "description": "Mřížka karet instalačních a stahovacích kanálů"
+      },
+      "modes": {
+        "title": "Karty režimů",
+        "description": "Čtyři číslované karty režimů se štítky a odznaky"
+      },
+      "cost-pillars": {
+        "title": "Pilíře hodnoty",
+        "description": "Tři pilíře s výraznými statistickými údaji"
+      },
+      "hero": {
+        "title": "Hero sekce",
+        "description": "Banner přes celou šířku s nadpisem a CTA"
+      },
+      "features": {
+        "title": "Mřížka funkcí",
+        "description": "Mřížka karet s ikonami"
+      },
+      "pricing": {
+        "title": "Ceník",
+        "description": "Srovnávací cenové plány"
+      },
+      "cta": {
+        "title": "Výzva k akci",
+        "description": "Zvýrazněná sekce s akcí"
+      },
+      "testimonials": {
+        "title": "Reference",
+        "description": "Kolotoč recenzí zákazníků"
+      },
+      "faq": {
+        "title": "Často kladené otázky",
+        "description": "Akordeon s často kladenými otázkami"
+      },
+      "footer": {
+        "title": "Zápatí",
+        "description": "Zápatí stránky s odkazy a informacemi"
+      },
+      "contact": {
+        "title": "Kontaktní formulář",
+        "description": "Formulář pro sběr poptávek"
+      },
+      "trust-bar": {
+        "title": "Lišta důvěry",
+        "description": "Proužek s ikonami oborů"
+      },
+      "pillars": {
+        "title": "Pilíře",
+        "description": "Tři hodnotové karty"
+      },
+      "how-it-works": {
+        "title": "Jak to funguje",
+        "description": "Kroky procesu"
+      },
+      "about": {
+        "title": "O nás",
+        "description": "Hodnoty a mise firmy"
+      },
+      "specialist-guild": {
+        "title": "Cech specialistů",
+        "description": "Úrovně členství specialistů"
+      },
+      "hiring": {
+        "title": "Nábor",
+        "description": "Karty otevřených pozic"
+      },
+      "stats-counter": {
+        "title": "Počitadlo statistik",
+        "description": "Animované číselné statistiky"
+      },
+      "project-configurator": {
+        "title": "Konfigurátor projektu",
+        "description": "Interaktivní volba možností projektu"
+      },
+      "meeting": {
+        "title": "Blok schůzky",
+        "description": "Plánování a správa schůzek"
+      },
+      "questionnaire": {
+        "title": "Dotazník",
+        "description": "Dynamický blok průzkumu nebo formuláře"
+      },
+      "consent": {
+        "title": "Blok souhlasu",
+        "description": "Sdílení dat a souhlas s ochranou osobních údajů"
+      },
+      "action": {
+        "title": "Blok akce",
+        "description": "Požadavek na akci uživatele jako nahrání nebo plánování"
+      },
+      "info": {
+        "title": "Informační blok",
+        "description": "Statický informační obsah"
+      },
+      "hero-slides": {
+        "title": "Hero slajdy",
+        "description": "Dynamický karusel s hero slajdy z backendu"
+      },
+      "news-list": {
+        "title": "Seznam novinek",
+        "description": "Publikované novinky z backendu"
+      },
+      "contact-form": {
+        "title": "Kontaktní formulář",
+        "description": "Interaktivní kontaktní formulář s validací"
+      },
+      "archive-preview": {
+        "title": "Náhled archivu",
+        "description": "Seznam archivních dokumentů z backendu"
+      },
+      "knowledge-preview": {
+        "title": "Znalostní témata",
+        "description": "Seznam témat ze znalostní báze z backendu"
+      },
+      "faq-accordion": {
+        "title": "FAQ akordeon",
+        "description": "Často kladené otázky se sbalitelnými kategoriemi"
+      },
+      "timeline": {
+        "title": "Časová osa",
+        "description": "Vertikální časová osa s událostmi a milníky"
+      },
+      "data-table": {
+        "title": "Datová tabulka",
+        "description": "Tabulka se sloupci a řádky pro strukturovaná data"
+      },
+      "ordered-list": {
+        "title": "Číslovaný seznam",
+        "description": "Číslované kroky s nadpisy a popisy"
+      },
+      "product-catalog": {
+        "title": "Katalog produktů",
+        "description": "Mřížka produktů s cenami a štítky"
+      },
+      "news-browser": {
+        "title": "Prohlížeč novinek",
+        "description": "Kompletní výpis článků s kartami"
+      },
+      "knowledge-browser": {
+        "title": "Prohlížeč znalostí",
+        "description": "Znalostní témata s vyhledáváním a filtrem viditelnosti"
+      },
+      "archive-browser": {
+        "title": "Prohlížeč archivu",
+        "description": "Kompletní archiv se 4-osým filtrováním"
+      },
+      "studies-browser": {
+        "title": "Prohlížeč clusterů",
+        "description": "Výpis clusterů se záložkovým filtrováním a průběhem financování"
+      },
+      "guild-directory": {
+        "title": "Adresář Cechu",
+        "description": "Tržiště specialistů s filtry a stránkováním"
+      },
+      "process-loop": {
+        "title": "Procesní cyklus",
+        "description": "Neustálý cyklus jednotlivých kroků"
+      },
+      "layer-stack": {
+        "title": "Skládání vrstev",
+        "description": "Vrstvy, z nichž každá navazuje na tu pod ní"
+      },
+      "signal-cards": {
+        "title": "Signální karty",
+        "description": "Řada metrických signálních karet"
+      },
+      "announcement-bar": {
+        "title": "Oznamovací lišta",
+        "description": "Úzký banner přes celou šířku stránky s odkazem"
+      },
+      "aisha-pruvodce": {
+        "title": "AISHA Průvodce",
+        "description": "13slidový průvodce prvním seznámením s AI + pětiotázkový test (interaktivní deck)"
+      },
+      "discussion-thread": {
+        "title": "Diskuse",
+        "description": "Uživatelské příspěvky ve vláknech pod tímto obsahovým uzlem"
+      }
+    },
+    "traits": {
+      "variant": "Varianta",
+      "bgColor": "Barva pozadí",
+      "bgGradient": "Přechodové pozadí",
+      "sectionPadding": "Odsazení sekce",
+      "cssClass": "CSS třída",
+      "colorScheme": "Barevné schéma"
+    },
+    "traitGroups": {
+      "template": "Šablona",
+      "config": "Konfigurace",
+      "layout": "Rozložení",
+      "other": "Ostatní"
+    },
+    "categories": {
+      "web": "Webové bloky",
+      "workflow": "Workflow bloky"
+    },
+    "actions": {
+      "save": "Uložit plátno",
+      "publish": "Publikovat",
+      "preview": "Náhled",
+      "addBlock": "Přidat blok",
+      "removeBlock": "Odebrat blok",
+      "undo": "Zpět",
+      "redo": "Znovu"
+    },
+    "status": {
+      "saving": "Ukládání...",
+      "saved": "Všechny změny uloženy",
+      "error": "Uložení selhalo",
+      "loading": "Načítání plátna...",
+      "translationsDenied": "Uloženo, ale texty ne — na zápis textů je potřeba role admin nebo staff. Úpravy zůstaly jen v tomhle plátně."
+    },
+    "agents": {
+      "blockAdded": "{{agent}} přidal(a) {{block}}",
+      "propertyChanged": "{{agent}} změnil(a) {{property}} na {{block}}",
+      "blockRemoved": "{{agent}} odebral(a) {{block}}",
+      "approved": "{{agent}} schválil(a) {{block}}",
+      "rejected": "{{agent}} zamítl(a) {{block}}",
+      "occipitumProposal": "{{agent}} navrhl(a) nový design plátna"
+    },
+    "variants": {
+      "default": "Výchozí",
+      "hero": {
+        "splitLeft": "Rozdělený vlevo",
+        "minimal": "Minimální"
+      },
+      "trust-bar": {
+        "statBar": "Statistický panel"
+      },
+      "pillars": {
+        "borderList": "Seznam s okrajem"
+      },
+      "how-it-works": {
+        "timelineSteps": "Kroky na časové ose"
+      },
+      "about": {
+        "proseCentered": "Centrovaný text"
+      },
+      "specialist-guild": {
+        "horizontalBar": "Horizontální lišta"
+      },
+      "hiring": {
+        "listRows": "Řádkový seznam"
+      },
+      "stats-counter": {
+        "cardGrid": "Mřížka karet"
+      },
+      "features": {
+        "textRows": "Textové řádky"
+      },
+      "pricing": {
+        "horizontalCompare": "Horizontální porovnání"
+      },
+      "cta": {
+        "splitMedia": "Rozdělené s médiem"
+      },
+      "testimonials": {
+        "cardGrid": "Mřížka karet"
+      },
+      "faq": {
+        "twoColumn": "Dva sloupce"
+      },
+      "footer": {
+        "stacked": "Skládaný"
+      },
+      "contact": {
+        "splitInfo": "Rozdělené info"
+      },
+      "project-configurator": {
+        "stepWizard": "Průvodce kroky"
+      },
+      "timeline": {
+        "horizontal": "Horizontální"
+      },
+      "data-table": {
+        "stripedCompact": "Pruhovaný kompaktní"
+      },
+      "ordered-list": {
+        "cardSteps": "Kartové kroky"
+      }
+    },
+    "empty": {
+      "title": "Zatím žádné plátno",
+      "description": "Přetáhněte bloky z knihovny a začněte stavět"
+    },
+    "sidebar": {
+      "blocks": "Bloky",
+      "styles": "Styly",
+      "traits": "Nastavení",
+      "layers": "Vrstvy",
+      "i18n": "Překlady",
+      "selectElement": "Vyberte element pro úpravu jeho vlastností",
+      "emptyCanvas": "Plátno je prázdné"
+    },
+    "i18n": {
+      "injectTranslations": "Náhled překladů",
+      "noKeys": "Na plátně nejsou žádné překládatelné elementy",
+      "keysFound": "{{count}} překládatelných klíčů"
+    },
+    "devices": {
+      "desktop": "Stolní počítač",
+      "tablet": "Tablet",
+      "mobile": "Mobil"
+    },
+    "pageSettings": {
+      "background": "Pozadí stránky",
+      "backgroundPlaceholder": "např. #fafafa nebo linear-gradient(...)",
+      "className": "CSS třída stránky",
+      "classNamePlaceholder": "např. landing-page",
+      "styleJson": "JSON stylů stránky",
+      "styleJsonPlaceholder": "např. {\"maxWidth\":\"1200px\"}",
+      "invalidJson": "JSON stylů stránky musí být validní JSON objekt"
+    },
+    "schemes": {
+      "default": "Výchozí",
+      "warmSunset": "Teplý západ",
+      "coolOcean": "Chladný oceán",
+      "forestGreen": "Lesní zeleň",
+      "darkElegant": "Tmavá elegance",
+      "softLavender": "Jemná levandule",
+      "neutralSlate": "Neutrální břidlice"
+    },
+    "runtime": {
+      "limit": "Limit položek",
+      "columns": "Sloupce",
+      "autoplay": "Automatické přehrávání",
+      "interval": "Interval (ms)",
+      "skipHref": "Cíl odkazu „přeskočit\" (URL)",
+      "showFilters": "Zobrazit filtry",
+      "tag": "Připnout k tagu",
+      "nodeType": {
+        "label": "Typ uzlu",
+        "news_article": "Novinový článek",
+        "web_page": "Webová stránka"
+      },
+      "nodeId": "ID uzlu"
+    },
+    "versions": {
+      "title": "Historie verzí",
+      "restore": "Obnovit",
+      "restored": "Verze obnovena",
+      "restoredDesc": "Stránka byla obnovena z vybrané verze.",
+      "restoreError": "Nepodařilo se obnovit verzi.",
+      "none": "Zatím žádné verze"
+    },
+    "templates": {
+      "title": "Šablony stránek",
+      "saveAs": "Uložit jako šablonu",
+      "namePlaceholder": "Název šablony...",
+      "saved": "Šablona uložena",
+      "savedDesc": "Aktuální stránka uložena jako znovupoužitelná šablona.",
+      "saveError": "Nepodařilo se uložit šablonu.",
+      "apply": "Použít",
+      "applied": "Šablona použita",
+      "appliedDesc": "Šablona byla aplikována na tuto stránku.",
+      "applyError": "Nepodařilo se použít šablonu.",
+      "none": "Žádné šablony k dispozici"
+    },
+    "assets": {
+      "invalidType": "Nepodporovaný typ souboru",
+      "tooLarge": "Soubor je příliš velký (max 20 MB)",
+      "uploadFailed": "Nahrání assetu selhalo"
+    }
+  }
+}

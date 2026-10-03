@@ -1,0 +1,3 @@
+# Configuration template directory for AISHA Cosmos node
+# Custom CometBFT / app.toml overrides can be placed here.
+# Currently, init-node.sh generates all config programmatically.

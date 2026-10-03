@@ -1,0 +1,113 @@
+{
+  "$schema": "./servers.schema.json",
+  "_comment": "Example multi-server registry — source of truth for Coolify infrastructure. Copy to servers.json and replace hostnames, IPs, UUIDs and domains with your deployment's real values. All hostnames/domains below are generic placeholders.",
+  "servers": {
+    "frontend": {
+      "hostname": "frontend.internal.example.com",
+      "ip": "${FRONTEND_IP}",
+      "role": "production",
+      "coolify_uuid": "${COOLIFY_SERVER_UUID_FRONTEND}",
+      "is_build_server": false,
+      "has_traefik": true,
+      "cpu": 12,
+      "ram_gb": 24,
+      "disk_gb": 200,
+      "placement_rules": {
+        "accepts": ["http-frontend", "api-gateway", "admin-ui", "observability"],
+        "max_ram_per_stack_gb": 4,
+        "reserved_ram_gb": 4
+      },
+      "stacks": [
+        "core",
+        "web",
+        "keycloak",
+        "integration",
+        "langfuse",
+        "admin",
+        "n8n",
+        "pki",
+        "game-frontend",
+        "netbird"
+      ],
+      "domains": [
+        "web.aisha.example.com",
+        "api.aisha.example.com",
+        "db.aisha.example.com",
+        "auth.aisha.example.com",
+        "n8n.aisha.example.com",
+        "langfuse.aisha.example.com",
+        "nocodb.aisha.example.com",
+        "appsmith.aisha.example.com",
+        "pki.aisha.example.com",
+        "netbird.aisha.example.com",
+        "cache.aisha.example.com",
+        "npm.internal.example.com",
+        "game.internal.example.com",
+        "game-api.internal.example.com"
+      ]
+    },
+    "build": {
+      "hostname": "build.internal.example.com",
+      "ip": "${BUILD_IP}",
+      "role": "build",
+      "coolify_uuid": "${COOLIFY_SERVER_UUID_BUILD}",
+      "is_build_server": true,
+      "has_traefik": false,
+      "cpu": 4,
+      "ram_gb": 8,
+      "disk_gb": 64,
+      "stacks": [],
+      "domains": [],
+      "notes": "Dedicated Docker build server — no runtime containers"
+    },
+    "backend": {
+      "hostname": "backend.internal.example.com",
+      "ip": "${BACKEND_IP}",
+      "role": "backend",
+      "coolify_uuid": "${COOLIFY_SERVER_UUID_BACKEND}",
+      "is_build_server": false,
+      "has_traefik": false,
+      "has_gpu": false,
+      "cpu": 6,
+      "ram_gb": 12,
+      "disk_gb": 100,
+      "placement_rules": {
+        "accepts": ["database", "game-server", "headless-backend"],
+        "max_ram_per_stack_gb": 8,
+        "reserved_ram_gb": 2
+      },
+      "stacks": [
+        "integration-backend",
+        "game-backend"
+      ],
+      "domains": [],
+      "notes": "Internal backend runtime — no public domains, no Traefik. 12 GB RAM = comfortable for DB + game servers."
+    },
+    "experimental": {
+      "hostname": "experimental.internal.example.com",
+      "ip": "${EXPERIMENTAL_IP}",
+      "role": "staging",
+      "coolify_uuid": "${COOLIFY_SERVER_UUID_EXPERIMENTAL}",
+      "is_build_server": false,
+      "has_traefik": false,
+      "has_gpu": false,
+      "cpu": 4,
+      "ram_gb": 8,
+      "disk_gb": 80,
+      "placement_rules": {
+        "accepts": ["ai-inference", "ml-model", "staging"],
+        "max_ram_per_stack_gb": 6,
+        "reserved_ram_gb": 2
+      },
+      "stacks": [
+        "staging",
+        "game-ai",
+        "cosmos"
+      ],
+      "domains": [
+        "staging.internal.example.com"
+      ],
+      "notes": "Staging + AI hosting + Cosmos chain node — isolated from production"
+    }
+  }
+}

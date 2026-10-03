@@ -1,0 +1,105 @@
+{
+  "storyDetail": {
+    "missingId": "Missing story id in URL",
+    "notFound": "Story not found.",
+    "backToList": "All stories",
+    "stackBadge": "Stack default",
+    "studyLink": "Linked study",
+    "stackRedirectError": "Failed to resolve the stack-default story id: {{message}}",
+    "stackRedirectEmpty": "ensure_stack_default_story returned no id; check service permissions.",
+    "tabs": {
+      "overview": "Overview",
+      "timeline": "Timeline",
+      "knowledge": "Knowledge",
+      "rulesets": "Rulesets",
+      "bindings": "Bindings",
+      "hippocampus": "Hippocampus"
+    },
+    "timeline": {
+      "feedTitle": "Activity feed",
+      "railTitle": "Branch + deploy",
+      "empty": "No events recorded for this story yet. AISHA will populate this feed as she works.",
+      "railEmpty": "No deployed apps linked to this story yet.",
+      "branch": "Branch",
+      "active": "Active",
+      "lastSwitch": "Last switch",
+      "lastRollback": "Last rollback",
+      "noActivity": "No deploy activity yet"
+    },
+    "overview": {
+      "summary": "Summary",
+      "summaryHint": "Current state of the story. Live-updated from partner_stories.",
+      "meta": "Meta",
+      "starred": "Starred",
+      "branch": "Branch",
+      "noBranch": "No branch linked",
+      "lastActivity": "Last activity"
+    },
+    "knowledge": {
+      "empty": "No knowledge items yet. Add one to give AISHA story-specific context to retrieve from.",
+      "create": "Add knowledge item",
+      "edit": "Edit",
+      "archive": "Archive",
+      "save": "Save",
+      "cancel": "Cancel",
+      "title": "Title",
+      "titlePlaceholder": "Short descriptive title",
+      "itemType": "Type",
+      "category": "Category",
+      "categoryPlaceholder": "e.g. ux, security, deploy",
+      "tags": "Tags (comma separated)",
+      "body": "Body (markdown)",
+      "bodyPlaceholderCreate": "## Heading\n\nFull markdown body that AISHA can retrieve from.",
+      "bodyPlaceholderEdit": "Leave empty to keep existing body; type new content to replace.",
+      "editorTitleCreate": "New knowledge item",
+      "editorTitleEdit": "Edit knowledge item",
+      "editorHint": "All fields are audited. Body is markdown; tags are stored as ai_context_tags[] for retrieval boost.",
+      "noTags": "No tags",
+      "verified": "verified",
+      "verifiedTooltip": "Reviewed and verified",
+      "quarantined": "quarantined",
+      "quarantinedTooltip": "Excluded from retrieval until human review",
+      "fileUploadTitle": "Upload file to Ragnarok KB",
+      "fileUploadHint": "Documents are processed by Ragnarok into chunks + embeddings scoped to this story.",
+      "uploading": "Uploading…"
+    },
+    "rulesets": {
+      "empty": "No ruleset bindings yet. AISHA attaches rulesets automatically when she runs against this story.",
+      "bindingTitle": "Ruleset binding",
+      "bindingBy": "by",
+      "noRules": "No rules in this binding"
+    },
+    "bindings": {
+      "empty": "No bot↔KB bindings configured for this story yet. Bind expert rules to agents to shape AISHA's behavior.",
+      "active": "active",
+      "agentHint": "Expert rules attached to this agent",
+      "priority": "priority",
+      "global": "global",
+      "globalTooltip": "Global binding (applies across all stories)",
+      "enable": "Enable",
+      "disable": "Disable"
+    },
+    "faithfulness": {
+      "title": "Faithfulness — last 50 turns",
+      "noData": "No faithfulness data yet. Scores accumulate as AISHA processes story turns.",
+      "error": "Could not load faithfulness data.",
+      "noScore": "—",
+      "high": "High confidence",
+      "medium": "Medium confidence",
+      "low": "Low confidence — review",
+      "noData_tier": "No data",
+      "avg": "Average"
+    },
+    "hippocampus": {
+      "empty": "No hippocampus signals captured for this story yet. AISHA writes here as she learns from interactions.",
+      "agentHint": "Memory signals captured by this hippocampus agent",
+      "avgImportance": "Average importance",
+      "expires": "expires",
+      "reveal": "Reveal",
+      "hide": "Hide",
+      "promote": "Promote",
+      "suspend": "Suspend",
+      "forget": "Forget"
+    }
+  }
+}

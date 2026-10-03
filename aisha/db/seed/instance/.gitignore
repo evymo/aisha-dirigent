@@ -1,0 +1,10 @@
+# Private instance seed layer — real deployment data must NEVER reach the OSS mirror.
+# (See README.md: instance content lives in a private repo/submodule; the public
+# orchestrator keeps this directory empty except for the guard + README.)
+#
+# Track ONLY this guard and the neutral OSS README. Everything else here is
+# private instance content (real stories, rules, KB, infra hints) and stays local
+# / in the private instance repo.
+*
+!.gitignore
+!README.md

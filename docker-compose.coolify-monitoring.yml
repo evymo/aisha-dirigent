@@ -1,0 +1,106 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify-monitoring.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+x-v2-common: &v2-common
+  restart: unless-stopped
+
+services:
+  dozzle:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    image: ${IMAGE_DOZZLE}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-dozzle
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      DOZZLE_NO_ANALYTICS: "true"
+      DOZZLE_BASE: /
+      DOZZLE_ADDR: 0.0.0.0:8080
+      DOZZLE_LEVEL: info
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "/dozzle", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-dozzle
+      mesh-dns:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-dozzle
+  dozzle-auth:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    <<: *v2-common
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1-alpine
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-dozzle-auth
+    extra_hosts:
+      - "${KEYCLOAK_DOMAIN_PUBLIC}:host-gateway"
+      # Druhé jméno MUSÍ být různé (extra_hosts je mapa, duplicita = „must be a
+      # mapping“); resolver vydá přímou doménu, nebo .invalid sentinel — výklad:
+      # docs/compose-notes/docker-compose.coolify-pki.yml.md
+      - "${KEYCLOAK_EXTRA_HOST_ALIAS:?vydává derive-domains; bez něj by extra_hosts nesl duplicitu nebo prázdné jméno}:host-gateway"
+    environment:
+      OAUTH2_PROXY_PROVIDER: keycloak-oidc
+      OAUTH2_PROXY_CLIENT_ID: ${OIDC_CLIENT_PREFIX:-}studio-proxy
+      OAUTH2_PROXY_CLIENT_SECRET: ${STUDIO_OIDC_SECRET}
+      OAUTH2_PROXY_OIDC_ISSUER_URL: https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}
+      OAUTH2_PROXY_SKIP_OIDC_DISCOVERY: "true"
+      OAUTH2_PROXY_LOGIN_URL: https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth
+      OAUTH2_PROXY_REDEEM_URL: https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token
+      OAUTH2_PROXY_OIDC_JWKS_URL: https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs
+      OAUTH2_PROXY_PROFILE_URL: https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/userinfo
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4181
+      OAUTH2_PROXY_UPSTREAMS: http://${APP_NAME_PREFIX:?identita instance}-dozzle:8080
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_COOKIE_SECRET: ${STUDIO_COOKIE_SECRET}
+      OAUTH2_PROXY_COOKIE_SECURE: "true"
+      OAUTH2_PROXY_COOKIE_NAME: _aisha_dozzle_proxy
+      OAUTH2_PROXY_COOKIE_DOMAINS: ${OAUTH2_COOKIE_DOMAINS_FRONTEND}
+      OAUTH2_PROXY_COOKIE_SAMESITE: lax
+      OAUTH2_PROXY_REDIRECT_URL: https://${DOZZLE_DOMAIN}/oauth2/callback
+      OAUTH2_PROXY_ALLOWED_GROUPS: studio_access
+      OAUTH2_PROXY_OIDC_GROUPS_CLAIM: roles
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
+      OAUTH2_PROXY_SILENCE_PING_LOGGING: "true"
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+    expose:
+      - "4181"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:4181/ping || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      dozzle:
+        condition: service_healthy
+    networks:
+      - internal
+      - coolify
+      - mesh-dns
+    labels:
+      - "coolify.managed=true"
+      - "traefik.docker.network=coolify"
+      - "traefik.enable=true"
+
+networks:
+  internal:
+    external: true
+    name: ${APP_NAME_PREFIX:?identita instance}-shared-net
+  coolify:
+    external: true
+    name: coolify
+  mesh-dns:
+    external: true
+    name: ${MESH_DNS_NETWORK:?vydává generate-secrets}

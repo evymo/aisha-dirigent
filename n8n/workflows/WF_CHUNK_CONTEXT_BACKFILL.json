@@ -1,0 +1,209 @@
+{
+  "name": "WF_CHUNK_CONTEXT_BACKFILL",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                0
+              ],
+              "triggerAtHour": 3,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "ctx-backfill-cron",
+      "name": "Weekly Schedule (Sun 03:00 UTC)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const maxBatches = Number($env.RAG_CONTEXT_BACKFILL_MAX_BATCHES || 50);\nconst batchSize = Number($env.RAG_CONTEXT_BACKFILL_BATCH_SIZE || 20);\nreturn Array.from({ length: maxBatches }, (_, i) => ({\n  json: {\n    iteration: i + 1,\n    batch_size: batchSize,\n    started_at: new Date().toISOString()\n  }\n}));"
+      },
+      "id": "ctx-backfill-iter",
+      "name": "Plan Iterations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SVC_MCP_KNOWLEDGE_URL || 'http://svc-mcp-knowledge:3017' }}/embeddings/contextual-backfill",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ batch_size: $json.batch_size }) }}",
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "ctx-backfill-call",
+      "name": "Run Backfill Batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        690,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $json;\n// If the route reports 0 chunks needing prefix, we've drained the queue:\n// emit a marker so downstream can stop iterating early.\nconst drained = (r.processed === 0);\nreturn [{\n  json: {\n    ...r,\n    iteration: $('Plan Iterations').first()?.json?.iteration,\n    drained\n  }\n}];"
+      },
+      "id": "ctx-backfill-aggregate",
+      "name": "Aggregate Batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        910,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const all = $input.all().map((i) => i.json);\nconst totalProcessed = all.reduce((s, a) => s + (a.processed || 0), 0);\nconst totalEnriched = all.reduce((s, a) => s + (a.enriched || 0), 0);\nconst totalFailed = all.reduce((s, a) => s + (a.failed || 0), 0);\nconst severity = totalFailed > totalEnriched * 0.2 ? 'warn' : 'info';\nreturn [{\n  json: {\n    workflow: 'WF_CHUNK_CONTEXT_BACKFILL',\n    timestamp: new Date().toISOString(),\n    iterations: all.length,\n    total_processed: totalProcessed,\n    total_enriched: totalEnriched,\n    total_failed: totalFailed,\n    severity,\n    message: `Backfill: ${totalEnriched} chunks enriched, ${totalFailed} failed across ${all.length} batches`\n  }\n}];"
+      },
+      "id": "ctx-backfill-summary",
+      "name": "Summarize Run",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1130,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.POSTGREST_URL || 'http://postgrest:3000' }}/rpc/log_integration_action",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "params=single-object"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_action: 'knowledge.context_backfill_completed', p_metadata: { iterations: $json.iterations, processed: $json.total_processed, enriched: $json.total_enriched, failed: $json.total_failed, severity: $json.severity, message: $json.message } }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "ctx-backfill-audit",
+      "name": "Audit Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1350,
+        300
+      ],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Weekly Schedule (Sun 03:00 UTC)": {
+      "main": [
+        [
+          {
+            "node": "Plan Iterations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Plan Iterations": {
+      "main": [
+        [
+          {
+            "node": "Run Backfill Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Backfill Batch": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Batch": {
+      "main": [
+        [
+          {
+            "node": "Summarize Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Run": {
+      "main": [
+        [
+          {
+            "node": "Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

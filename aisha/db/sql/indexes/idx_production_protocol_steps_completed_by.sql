@@ -1,0 +1,4 @@
+-- Index: idx_production_protocol_steps_completed_by
+-- Table: production_protocol_steps
+
+CREATE INDEX IF NOT EXISTS idx_production_protocol_steps_completed_by ON public.production_protocol_steps(completed_by);

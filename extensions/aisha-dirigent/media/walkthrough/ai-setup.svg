@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="280" viewBox="0 0 400 280">
+  <defs>
+    <linearGradient id="aiBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0E0E10"/>
+      <stop offset="100%" stop-color="#1C1C21"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="280" rx="12" fill="url(#aiBg)"/>
+
+  <!-- Title -->
+  <text x="200" y="32" text-anchor="middle" fill="#E55A10" font-family="system-ui" font-size="14" font-weight="600">AI Modely</text>
+
+  <!-- Brain/neural icon center -->
+  <circle cx="200" cy="110" r="35" fill="none" stroke="#FF6A1A" stroke-width="2" opacity="0.3"/>
+  <circle cx="200" cy="110" r="22" fill="none" stroke="#FF6A1A" stroke-width="1.5" opacity="0.5"/>
+  <!-- Neural nodes -->
+  <circle cx="200" cy="110" r="6" fill="#FF6A1A"/>
+  <circle cx="178" cy="98" r="3" fill="#E55A10"/>
+  <circle cx="222" cy="98" r="3" fill="#E55A10"/>
+  <circle cx="178" cy="122" r="3" fill="#E55A10"/>
+  <circle cx="222" cy="122" r="3" fill="#E55A10"/>
+  <!-- Connections -->
+  <line x1="200" y1="110" x2="178" y2="98" stroke="#E55A10" stroke-width="1" opacity="0.5"/>
+  <line x1="200" y1="110" x2="222" y2="98" stroke="#E55A10" stroke-width="1" opacity="0.5"/>
+  <line x1="200" y1="110" x2="178" y2="122" stroke="#E55A10" stroke-width="1" opacity="0.5"/>
+  <line x1="200" y1="110" x2="222" y2="122" stroke="#E55A10" stroke-width="1" opacity="0.5"/>
+
+  <!-- 4 model provider cards -->
+  <!-- Ollama -->
+  <rect x="30" y="165" width="76" height="56" rx="8" fill="#1C1C21" stroke="#4ade80" stroke-width="1.5"/>
+  <circle cx="48" cy="182" r="5" fill="#4ade80"/>
+  <text x="58" y="186" fill="#EDEDEF" font-family="system-ui" font-size="10" font-weight="600">Ollama</text>
+  <text x="68" y="203" text-anchor="middle" fill="#9A9A9E" font-family="system-ui" font-size="8">llama3, gemma2</text>
+  <text x="68" y="214" text-anchor="middle" fill="#4ade80" font-family="system-ui" font-size="7">:11434</text>
+
+  <!-- Docker AI -->
+  <rect x="116" y="165" width="76" height="56" rx="8" fill="#1C1C21" stroke="#60a5fa" stroke-width="1.5"/>
+  <circle cx="134" cy="182" r="5" fill="#60a5fa"/>
+  <text x="144" y="186" fill="#EDEDEF" font-family="system-ui" font-size="10" font-weight="600">Docker</text>
+  <text x="154" y="203" text-anchor="middle" fill="#9A9A9E" font-family="system-ui" font-size="8">Docker AI</text>
+  <text x="154" y="214" text-anchor="middle" fill="#60a5fa" font-family="system-ui" font-size="7">Desktop</text>
+
+  <!-- LM Studio -->
+  <rect x="202" y="165" width="76" height="56" rx="8" fill="#1C1C21" stroke="#E55A10" stroke-width="1.5"/>
+  <circle cx="220" cy="182" r="5" fill="#E55A10"/>
+  <text x="230" y="186" fill="#EDEDEF" font-family="system-ui" font-size="10" font-weight="600">LM Studio</text>
+  <text x="240" y="203" text-anchor="middle" fill="#9A9A9E" font-family="system-ui" font-size="8">OpenAI compat</text>
+  <text x="240" y="214" text-anchor="middle" fill="#E55A10" font-family="system-ui" font-size="7">:1234</text>
+
+  <!-- Cloud -->
+  <rect x="288" y="165" width="82" height="56" rx="8" fill="#1C1C21" stroke="#FF6A1A" stroke-width="1.5"/>
+  <circle cx="306" cy="182" r="5" fill="#FF6A1A"/>
+  <text x="316" y="186" fill="#EDEDEF" font-family="system-ui" font-size="10" font-weight="600">AISHA</text>
+  <text x="329" y="203" text-anchor="middle" fill="#9A9A9E" font-family="system-ui" font-size="8">Cloud API</text>
+  <text x="329" y="214" text-anchor="middle" fill="#FF6A1A" font-family="system-ui" font-size="7">dirigent-api</text>
+
+  <!-- Bottom hint -->
+  <text x="200" y="248" text-anchor="middle" fill="#6E6E73" font-family="system-ui" font-size="9">Automaticky detekováno • můžete přepínat kdykoli</text>
+  <text x="200" y="264" text-anchor="middle" fill="#9A9A9E" font-family="system-ui" font-size="10" font-weight="500">Vaše data zůstávají u vás — lokální AI jako default</text>
+</svg>

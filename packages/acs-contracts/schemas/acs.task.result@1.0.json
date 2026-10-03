@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "acs.task.result@1.0",
+  "title": "Task result",
+  "description": "Reports task completion. Output travels by reference; derived outputs carry provenance (R3/IP-7). Status is a closed enum — never parsed from prose (R2).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "intent_ref", "output_ref", "metrics"],
+  "properties": {
+    "status": { "enum": ["completed", "failed", "partial", "aborted"] },
+    "intent_ref": { "type": "string", "pattern": "^int_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "output_ref": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "enum": ["message", "document", "run", "artifact"] },
+        "id": { "type": "string", "maxLength": 256 }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["derived", "source_ref", "method"],
+      "properties": {
+        "derived": { "type": "boolean" },
+        "source_ref": { "type": ["string", "null"], "maxLength": 256 },
+        "method": { "type": ["string", "null"], "enum": ["summary", "extraction", "translation", "synthesis", "verbatim", null] }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["duration_ms"],
+      "properties": {
+        "duration_ms": { "type": "integer", "minimum": 0 },
+        "tokens_in": { "type": "integer", "minimum": 0 },
+        "tokens_out": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "error": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["code"],
+      "properties": {
+        "code": { "type": "string", "pattern": "^[a-z0-9_]+$", "maxLength": 64 },
+        "message": { "type": "string", "maxLength": 2000 }
+      }
+    }
+  }
+}

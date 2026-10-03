@@ -1,0 +1,141 @@
+# =============================================================================
+# Synapse Homeserver Configuration — Evymo Production
+# =============================================================================
+# Docs: https://element-hq.github.io/synapse/latest/usage/configuration/config_documentation.html
+#
+# Sensitive values reference environment variables set via Coolify.
+# Database: shared ${APP_NAME_PREFIX}-db with dedicated 'synapse' database (LOCALE C).
+# OIDC: Keycloak at ${KEYCLOAK_DOMAIN_PUBLIC}/realms/aisha
+# =============================================================================
+
+server_name: "${SYNAPSE_SERVER_NAME}"
+public_baseurl: "https://${SYNAPSE_SERVER_NAME}/"
+pid_file: /data/homeserver.pid
+
+# ─── Listeners ────────────────────────────────────────────────
+listeners:
+  - port: 8008
+    tls: false
+    type: http
+    x_forwarded: true
+    bind_addresses: ["0.0.0.0"]
+    resources:
+      - names: [client, federation]
+        compress: false
+
+# ─── Database (shared ${APP_NAME_PREFIX}-db, dedicated synapse database) ──
+database:
+  name: psycopg2
+  txn_limit: 10000
+  args:
+    user: synapse_user
+    password: "${SYNAPSE_DB_PASSWORD}"
+    database: synapse
+    host: ${APP_NAME_PREFIX}-db
+    port: 5432
+    options: "-c search_path=synapse_hs"
+    cp_min: 5
+    cp_max: 10
+
+# ─── Logging ──────────────────────────────────────────────────
+log_config: "/data/log.config"
+
+# ─── Media ────────────────────────────────────────────────────
+media_store_path: "/data/media_store"
+max_upload_size: 50M
+url_preview_enabled: true
+url_preview_ip_range_blacklist:
+  - "127.0.0.0/8"
+  - "10.0.0.0/8"
+  - "172.16.0.0/12"
+  - "192.168.0.0/16"
+  - "100.64.0.0/10"
+  - "192.0.0.0/24"
+  - "169.254.0.0/16"
+  - "::1/128"
+  - "fe80::/10"
+  - "fc00::/7"
+
+# ─── Registration ────────────────────────────────────────────
+# enable_registration: false → public signup off; users come via Keycloak SSO.
+# registration_shared_secret is intentionally present for svc-matrix only: it
+# lets the internal token-exchange service provision Matrix users after verifying
+# a Keycloak JWT. Public signup remains disabled.
+enable_registration: false
+enable_registration_without_verification: false
+registration_shared_secret: "${SYNAPSE_REGISTRATION_SECRET}"
+
+# ─── Secrets ──────────────────────────────────────────────────
+macaroon_secret_key: "${SYNAPSE_MACAROON_SECRET}"
+form_secret: "${SYNAPSE_FORM_SECRET}"
+signing_key_path: "/data/${SYNAPSE_SERVER_NAME}.signing.key"
+
+# ─── OIDC — Keycloak SSO ─────────────────────────────────────
+oidc_providers:
+  - idp_id: keycloak
+    idp_name: "Evymo SSO"
+    idp_brand: "org.matrix.msc3866.keycloak"
+    issuer: "https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}"
+    client_id: "synapse"
+    client_secret: "${SYNAPSE_OIDC_CLIENT_SECRET}"
+    scopes: ["openid", "profile", "email"]
+    authorization_endpoint: "https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth"
+    token_endpoint: "https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token"
+    userinfo_endpoint: "https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/userinfo"
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.preferred_username }}"
+        display_name_template: "{{ user.name }}"
+        email_template: "{{ user.email }}"
+    backchannel_logout_enabled: true
+    allow_existing_users: true
+
+# ─── Trusted Key Servers ─────────────────────────────────────
+trusted_key_servers:
+  - server_name: "matrix.org"
+suppress_key_server_warning: true
+
+# ─── Caching ─────────────────────────────────────────────────
+caches:
+  global_factor: 0.5
+
+# ─── Rate Limiting ───────────────────────────────────────────
+rc_message:
+  per_second: 5
+  burst_count: 15
+
+rc_login:
+  address:
+    per_second: 0.5
+    burst_count: 3
+  account:
+    per_second: 0.5
+    burst_count: 3
+
+# ─── Federation ──────────────────────────────────────────────
+# Disabled for now (internal Evymo use only). Enable when needed.
+federation_domain_whitelist: []
+
+# ─── Appservice Registrations (bridges) ──────────────────────
+app_service_config_files:
+  - /data/bridge-registrations/mautrix-telegram-registration.yaml
+  - /data/bridge-registrations/mautrix-whatsapp-registration.yaml
+  - /data/bridge-registrations/mautrix-signal-registration.yaml
+  - /data/bridge-registrations/mautrix-discord-registration.yaml
+  - /data/bridge-registrations/mautrix-slack-registration.yaml
+  - /data/bridge-registrations/mautrix-meta-registration.yaml
+  - /data/bridge-registrations/postmoogle-registration.yaml
+  - /data/appservices/aisha-appservice.yaml
+
+# ─── Metrics ─────────────────────────────────────────────────
+enable_metrics: false
+report_stats: false
+
+# ─── Retention ───────────────────────────────────────────────
+retention:
+  enabled: true
+  default_policy:
+    min_lifetime: 1d
+    max_lifetime: 365d
+  allowed_lifetime_min: 1d
+  allowed_lifetime_max: 365d

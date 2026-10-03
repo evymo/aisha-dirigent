@@ -1,0 +1,386 @@
+{
+  "name": "WF_AITG_PR_GATE",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveDataSuccessExecution": "all",
+    "saveDataErrorExecution": "all"
+  },
+  "nodes": [
+    {
+      "name": "Forgejo PR Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "authentication": "headerAuth",
+        "path": "aitg-pr-gate",
+        "httpMethod": "POST",
+        "responseMode": "responseNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      }
+    },
+    {
+      "name": "Validate Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const body = $input.first().json;\nconst sha = body?.pull_request?.head?.sha ?? body?.after;\nconst prNumber = body?.pull_request?.number ?? null;\nif (!sha || sha.length < 7) {\n  throw new Error('AITG_PR_GATE_INVALID_SHA');\n}\nreturn [{ json: { buildSha: sha, prNumber, action: body?.action ?? 'unknown' } }];"
+      }
+    },
+    {
+      "name": "Read Automation Setting",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        480,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_get_automation_audited",
+        "rpcArgs": "={ \"p_automation_id\": \"pr_gate\" }",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Should Run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.mode }}",
+              "rightValue": "automated",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Record Skipped",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        960,
+        180
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_record_automation_run_audited",
+        "rpcArgs": "={ \"p_automation_id\": \"pr_gate\", \"p_status\": \"skipped\", \"p_details\": { \"reason\": \"mode_\" + $node['Read Automation Setting'].json.mode } }",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Run Static Gates",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        960,
+        -240
+      ],
+      "parameters": {
+        "command": "npm run --silent test:gates -- src/tests/gates/aitg/"
+      }
+    },
+    {
+      "name": "Run Runtime Probes",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        960,
+        -60
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_get_coverage_audited",
+        "rpcArgs": "={ \"p_window_days\": 1 }",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Aggregate",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1200,
+        -120
+      ],
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "multiplex"
+      }
+    },
+    {
+      "name": "Decide",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        -120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.criticalFailures ?? 0 }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Block Merge",
+      "type": "n8n-nodes-aisha.aishaAdminBridge",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        -240
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "operation": "forgejo.setPrStatus",
+        "ref": "={{ $node['Validate Payload'].json.buildSha }}",
+        "state": "failure",
+        "context": "aitg/pr-gate",
+        "description": "={{ 'AITG ' + ($node['Read Automation Setting'].json.parameters?.block_severity ?? 'high') + '+ failures — see aitg_findings for detail' }}",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Approve Merge",
+      "type": "n8n-nodes-aisha.aishaAdminBridge",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "operation": "forgejo.setPrStatus",
+        "ref": "={{ $node['Validate Payload'].json.buildSha }}",
+        "state": "success",
+        "context": "aitg/pr-gate",
+        "description": "AITG static + runtime probes passed",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Record Success",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        -120
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_record_automation_run_audited",
+        "rpcArgs": "={ \"p_automation_id\": \"pr_gate\", \"p_status\": \"success\", \"p_details\": { \"buildSha\": $node['Validate Payload'].json.buildSha, \"blocked\": $node['Decide'].json.criticalFailures > 0 } }",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Webhook Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2160,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { sha: $node['Validate Payload'].json.buildSha, gateResult: $json } }}"
+      }
+    }
+  ],
+  "connections": {
+    "Forgejo PR Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Payload": {
+      "main": [
+        [
+          {
+            "node": "Read Automation Setting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Automation Setting": {
+      "main": [
+        [
+          {
+            "node": "Should Run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Run?": {
+      "main": [
+        [
+          {
+            "node": "Run Static Gates",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Run Runtime Probes",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Static Gates": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Runtime Probes": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Decide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide": {
+      "main": [
+        [
+          {
+            "node": "Block Merge",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Approve Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Block Merge": {
+      "main": [
+        [
+          {
+            "node": "Record Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approve Merge": {
+      "main": [
+        [
+          {
+            "node": "Record Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Success": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Skipped": {
+      "main": [
+        [
+          {
+            "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

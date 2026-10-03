@@ -1,0 +1,28 @@
+# ==============================================================================
+# Coolify Story Manifest — netbird (Zero-Trust mesh control plane)
+# ==============================================================================
+# NetBird self-hosted control plane on Frontend.
+# Deploy AFTER aisha core stack (depends on aisha-db and Keycloak).
+#
+# Prerequisites:
+#   - aisha-db running (core stack)
+#   - Keycloak running with netbird + netbird-backend clients imported
+#   - DNS: A netbird.aisha.guru → Frontend IP
+#   - coturn.conf updated with NETBIRD_TURN_USERNAME/NETBIRD_TURN_PASSWORD
+#
+# Usage:
+#   bash scripts/coolify-story-init.sh --manifest coolify/manifests/netbird.manifest
+#
+# Required Coolify env vars (set before deploying):
+#   NETBIRD_DOMAIN, NETBIRD_OIDC_CLIENT_ID, NETBIRD_OIDC_SECRET,
+#   NETBIRD_MGMT_SECRET, NETBIRD_RELAY_SECRET, NETBIRD_DB_PASSWORD,
+#   NETBIRD_TURN_USERNAME, NETBIRD_TURN_PASSWORD, TURN_REALM,
+#   KEYCLOAK_DOMAIN, POSTGRES_PASSWORD
+# ==============================================================================
+
+story: netbird
+repo: aisha/evymo-ai-orchestrator
+branch: main
+
+# ── Frontend (control plane — management, signal, dashboard, relay) ──────────────
+app: netbird:frontend:docker-compose.coolify-netbird.yml

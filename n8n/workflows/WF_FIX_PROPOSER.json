@@ -1,0 +1,135 @@
+{
+  "name": "WF_FIX_PROPOSER",
+  "meta": {
+    "purpose": "Incident-driven fix proposal. Receives a sentry/drift signal and creates an improvement_proposal via fn_create_improvement_proposal (gated inside: anomaly_key dedup + 3/h rate-limit + risk eval + auto-approve only low-risk/full-autonomy, else pending). LLM patch rendering is a downstream factory step (deferred, mirrors AISHA_SELF_TOOLING factory).",
+    "trigger": "POST /webhook/fix-proposer (from WF_SENTRY_OBSERVER propose_fix + WF_DRIFT_OBSERVER)",
+    "design_doc": "docs/architecture/STORY_SELF_EVALUATION_LOOP.md (PR 4)"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "fix-proposer",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "wh",
+      "name": "Fix Proposer webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize an incident signal into fn_create_improvement_proposal params.\n// Input (WF_SENTRY_OBSERVER propose_fix / WF_DRIFT_OBSERVER):\n//   { app, signal_type:'sentry'|'drift', exception_class?, release?, pattern?, drift_kind?, story_id?, evidence? }\nconst body = $input.first().json.body || $input.first().json;\nconst signal = String(body.signal_type || (body.drift_kind ? 'drift' : 'sentry')).toLowerCase();\nconst app = body.app || 'unknown';\nconst category = signal === 'drift' ? 'infrastructure_drift' : 'bug_fix';\nconst key = body.exception_class || body.drift_kind || body.pattern || 'unknown';\nconst anomaly_key = signal + ':' + app + ':' + key;\nconst title = '[' + signal + '] ' + app + ' — ' + key;\nlet desc = 'Incident-driven fix proposal from ' + signal + ' observer.\\nApp: ' + app;\nif (body.release) desc += '\\nRelease: ' + body.release;\nif (body.exception_class) desc += '\\nException: ' + body.exception_class;\nif (body.pattern) desc += '\\nPattern: ' + body.pattern;\nif (body.evidence) desc += '\\nEvidence: ' + JSON.stringify(body.evidence);\nreturn { json: {\n  agent_slug: body.agent_slug || 'dirigent',\n  category, title, description: desc,\n  metadata: { anomaly_key, signal_type: signal, app, story_id: body.story_id || null,\n    exception_class: body.exception_class || null, drift_kind: body.drift_kind || null,\n    release: body.release || null, source: 'wf_fix_proposer' }\n}};"
+      },
+      "id": "normalize",
+      "name": "Normalize incident",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "fn_create_improvement_proposal",
+        "rpcParams": "={{ JSON.stringify({ p_agent_slug: $json.agent_slug, p_category: $json.category, p_description: $json.description, p_metadata: $json.metadata, p_title: $json.title }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 8000,
+          "auditTrail": true
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "create-proposal",
+      "name": "Create Proposal",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        640,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ proposal_id: $('Create Proposal').first().json.proposal_id || null, risk_level: $('Create Proposal').first().json.risk_level || null, status: $('Create Proposal').first().json.status || $('Create Proposal').first().json.error || 'unknown' }) }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        860,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Fix Proposer webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize incident",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize incident": {
+      "main": [
+        [
+          {
+            "node": "Create Proposal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Proposal": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Prague"
+  },
+  "tags": [
+    "aisha",
+    "self-improvement",
+    "fix-proposer",
+    "self-driving"
+  ]
+}

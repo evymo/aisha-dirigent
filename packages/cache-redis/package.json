@@ -1,0 +1,49 @@
+{
+  "name": "@aisha/cache-redis",
+  "version": "0.1.6",
+  "license": "Elastic-2.0",
+  "description": "Shared Redis client for AISHA services. Wraps ioredis with DB-index isolation, AUTH from URL userinfo or env (username+password), and named primitives for: caching (WP 2.1), JWT revocation (WP 3.5), and realtime state (WP 13.4). Connects to the aisha-shared-redis ACL instance from docker-compose.coolify-shared-redis.yml (Phase 1).",
+  "private": false,
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
+    },
+    "./revocation": {
+      "types": "./dist/revocation.d.ts",
+      "default": "./dist/revocation.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "pretest": "test -d node_modules/ioredis || npm install --no-fund --no-audit --prefer-offline",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ioredis": "^5.4.1",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.3"
+  }
+}

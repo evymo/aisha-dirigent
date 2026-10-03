@@ -1,0 +1,51 @@
+# =============================================================================
+# Orchestration Plane — Certificate Profile Defaults
+# =============================================================================
+# Services: n8n, Edge Functions, Ragnarok, Kong, PostgREST, Realtime, Storage
+# Focus: service-to-service mTLS, short-lived auto-renewing certs
+# Key: EC P-384 (CNSA 2.0), Validity: server 72h, client 24h
+
+key:
+    alg:
+      - ec
+
+    enc:
+      - aes256
+
+    generate: both
+
+    ec:
+        curve_name:
+          - secp384r1
+
+validity:
+    # OpenXPKI offset is pair-encoded from the left: YY MM DD hh mm ss.
+    # "+000003" = 0y 0m 03d = 72h (server certs, 72h auto-renew).
+    # NOT "+0003", which would decode to 3 MONTHS.
+    notafter: "+000003"
+
+digest: sha384
+
+extensions:
+    authority_info_access:
+        critical: 0
+        ca_issuers: http://${PKI_DOMAIN}/download/orchestration-ca.pem
+        ocsp: http://${PKI_DOMAIN}/ocsp/orchestration-plane/
+
+    crl_distribution_points:
+        critical: 0
+        uri:
+          - http://${PKI_DOMAIN}/download/[% ISSUER.CN.0.replace('[^\w-]','_') %].crl
+
+    policy_identifier:
+        critical: 0
+        oid: 1.3.6.1.4.1.311.21.8
+
+    authority_key_identifier:
+        critical: 0
+        keyid:  1
+        issuer: 1
+
+    subject_key_identifier:
+        critical: 0
+        hash: 1

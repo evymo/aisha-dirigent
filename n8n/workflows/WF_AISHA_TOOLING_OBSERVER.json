@@ -1,0 +1,394 @@
+{
+  "name": "WF_AISHA_TOOLING_OBSERVER",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24,
+              "triggerAtHour": 2,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Daily 02:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "get_audit_aggregates",
+        "rpcParams": "={{ JSON.stringify({ p_window_days: 7, p_min_occurrences: 5 }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 30000,
+          "auditTrail": true
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "fetch-aggregates",
+      "name": "Fetch Audit Aggregates",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        440,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pattern detection: classify each action aggregate into proposal kind\n//\n// Heuristics:\n//   - Action ending in '_failed' / '_error' that has corresponding success → propose hook (block + suggest)\n//   - Action sequence with high occurrence + success rate → propose skill\n//   - Frequently-paired actions (A always followed by B) → propose command\n//\n// This is a v1 stub — replace with proper pattern miner per\n// docs/AISHA_SELF_TOOLING.md.\n\nconst aggregates = $input.all().map(i => i.json);\nconst proposals = [];\n\nfor (const agg of aggregates) {\n  const action = agg.action;\n  const count = agg.occurrence_count;\n  const successRate = parseFloat(agg.success_rate || 0);\n\n  // Skip system/internal actions\n  if (action.startsWith('aisha_self_') || action.includes('audit')) continue;\n\n  // Pattern: high-frequency action with high success → skill candidate\n  if (count >= 10 && successRate >= 0.8) {\n    proposals.push({\n      pattern_kind: 'recurring_procedure',\n      target_factory: 'WF_AISHA_SKILL_FACTORY',\n      pattern: {\n        action,\n        occurrence_count: count,\n        success_rate: successRate,\n        unique_users: agg.unique_users,\n        first_seen: agg.first_seen,\n        last_seen: agg.last_seen,\n        recent_metadata: agg.recent_metadata,\n      },\n    });\n  }\n\n  // Pattern: action with low success rate → hook candidate\n  if (count >= 5 && successRate < 0.5) {\n    proposals.push({\n      pattern_kind: 'repeated_mistake',\n      target_factory: 'WF_AISHA_HOOK_FACTORY',\n      pattern: {\n        action,\n        occurrence_count: count,\n        success_rate: successRate,\n        recent_metadata: agg.recent_metadata,\n      },\n    });\n  }\n\n  // Pattern: multi-step action sequence → command candidate\n  // Heuristic: action_name contains both verb + noun (e.g., 'deploy_story', 'restore_app_state')\n  // and the metadata indicates step_index/sequence_number → likely a procedure\n  const isMultiStep = /^(deploy|restore|bootstrap|migrate|switch|rotate|configure|provision)_/.test(action);\n  if (isMultiStep && count >= 6 && successRate >= 0.7) {\n    proposals.push({\n      pattern_kind: 'paired_sequence',\n      target_factory: 'WF_AISHA_COMMAND_FACTORY',\n      pattern: {\n        action,\n        actions: [action],\n        occurrence_count: count,\n        success_rate: successRate,\n        recent_metadata: agg.recent_metadata,\n      },\n    });\n  }\n}\n\nreturn proposals.map(p => ({ json: p }));"
+      },
+      "id": "detect-patterns",
+      "name": "Detect Patterns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "split-proposals",
+      "name": "Split Proposals",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.target_factory }}",
+                    "rightValue": "WF_AISHA_SKILL_FACTORY",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "skill"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.target_factory }}",
+                    "rightValue": "WF_AISHA_HOOK_FACTORY",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "hook"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.target_factory }}",
+                    "rightValue": "WF_AISHA_COMMAND_FACTORY",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "command"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "route-to-factory",
+      "name": "Route To Factory",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_URL }}/webhook/aisha-skill-factory",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"pattern\": {{ JSON.stringify($json.pattern) }}, \"target_factory\": \"WF_AISHA_SKILL_FACTORY\" }",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "invoke-skill-factory",
+      "name": "Invoke Skill Factory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_URL }}/webhook/aisha-hook-factory",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"pattern\": {{ JSON.stringify($json.pattern) }}, \"target_factory\": \"WF_AISHA_HOOK_FACTORY\" }",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "invoke-hook-factory",
+      "name": "Invoke Hook Factory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_URL }}/webhook/aisha-command-factory",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"pattern\": {{ JSON.stringify($json.pattern) }}, \"target_factory\": \"WF_AISHA_COMMAND_FACTORY\" }",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "invoke-command-factory",
+      "name": "Invoke Command Factory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_integration_action",
+        "rpcParams": "={{ JSON.stringify({ p_service_name: 'n8n', p_action: 'aisha_tooling_observer_completed', p_action_detail: { proposals_dispatched: $('Detect Patterns').all().length }, p_status: 'success' }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 5000,
+          "auditTrail": true
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "log-completion",
+      "name": "Log Completion",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1540,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Daily 02:30": {
+      "main": [
+        [
+          {
+            "node": "Fetch Audit Aggregates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Audit Aggregates": {
+      "main": [
+        [
+          {
+            "node": "Detect Patterns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Patterns": {
+      "main": [
+        [
+          {
+            "node": "Split Proposals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Proposals": {
+      "main": [
+        [
+          {
+            "node": "Route To Factory",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route To Factory": {
+      "main": [
+        [
+          {
+            "node": "Invoke Skill Factory",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invoke Hook Factory",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Invoke Command Factory",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invoke Skill Factory": {
+      "main": [
+        [
+          {
+            "node": "Log Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invoke Hook Factory": {
+      "main": [
+        [
+          {
+            "node": "Log Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Invoke Command Factory": {
+      "main": [
+        [
+          {
+            "node": "Log Completion",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

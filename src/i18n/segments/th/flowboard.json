@@ -1,0 +1,56 @@
+{
+  "flowboard": {
+    "palette": {
+      "title": "พาเลตต์โหนด",
+      "subtitle": "= เฟเดอเรต plugin_catalog"
+    },
+    "kind": {
+      "trigger": "ตัวกระตุ้น",
+      "agent": "ตัวแทน",
+      "tool": "เครื่องมือ MCP",
+      "action": "การกระทำ",
+      "control": "การควบคุม",
+      "gate": "ประตู"
+    },
+    "canvas": {
+      "cannotConnect": "ไม่สามารถเชื่อมต่อ {{from}} → {{to}}.",
+      "invalidConnection": "การเชื่อมต่อพอร์ตไม่ถูกต้อง",
+      "valid": "ถูกต้อง",
+      "errors": "ข้อผิดพลาด {{count}}",
+      "descriptionPlaceholder": "อธิบายว่ากระบวนการควรทำอะไรบ้าง…",
+      "askAisha": "ถามอาอิชา",
+      "save": "บันทึก"
+    },
+    "page": {
+      "savedFlows": "บันทึกโฟลว์",
+      "newFlow": "การไหลใหม่",
+      "empty": "ยังไม่มีข้อมูลไหล",
+      "loading": "กำลังโหลดพาเลท...",
+      "saved": "บันทึกการไหล",
+      "saveFailed": "ไม่สามารถบันทึกการไหลได้",
+      "loadFailed": "ไม่สามารถโหลดโฟลว์ได้",
+      "run": "วิ่ง",
+      "running": "วิ่ง...",
+      "runStarted": "การรันโฟลว์เริ่มต้นแล้ว",
+      "runAwaitingApproval": "กำลังรันอยู่ — รอการอนุมัติ",
+      "runFailed": "ไม่สามารถรันโฟลว์ได้",
+      "runResumed": "การไหลกลับเป็นปกติ"
+    },
+    "block": {
+      "consentTitle": "ต้องการการอนุมัติ",
+      "approved": "อนุมัติแล้ว",
+      "awaiting": "รอการอนุมัติ",
+      "approveButton": "อนุมัติ & ดำเนินการต่อ",
+      "runTitle": "การทำงานอัตโนมัติ",
+      "stepTitle": "ขั้นตอนการอัตโนมัติ",
+      "status": {
+        "executed": "เสร็จแล้ว",
+        "approved": "อนุมัติแล้ว",
+        "error": "ข้อผิดพลาด",
+        "running": "วิ่ง",
+        "compliance_checkpoint": "การตรวจสอบการปฏิบัติตามข้อกำหนด",
+        "awaiting_approval": "รอการอนุมัติ"
+      }
+    }
+  }
+}

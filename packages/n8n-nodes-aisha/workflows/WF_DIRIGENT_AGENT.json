@@ -1,0 +1,879 @@
+{
+  "id": "N85VTTBXxOux3TxM",
+  "name": "WF_DIRIGENT_AGENT",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "dirigent-agent",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Dirigent Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "5187243e9ad84d11"
+    },
+    {
+      "parameters": {
+        "public": false,
+        "initialMessages": "Ahoj! Jsem **AISHA Dirigent** — koordinátor AISHA platformy. 🎯\n\nMohu pro tebe:\n- 🔍 Vyhledat v knowledge base\n- ✅ Spustit compliance kontrolu PR\n- 📦 Spravovat delivery stories\n- 📊 Odhadnout náročnost\n- 🏗️ Posoudit kvalitu kódu\n\nCo pro tebe mohu udělat?",
+        "options": {}
+      },
+      "id": "chat-trigger",
+      "name": "Dirigent Chat",
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        520
+      ],
+      "webhookId": "8832581ec15348c6"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Route input from webhook or chat trigger\nconst body = $input.item.json.body || $input.item.json;\n\n// Handle chat_delegation from orchestration bridge\nif (body.action === 'chat_delegation' && body.context) {\n  const ctx = body.context;\n  const history = (ctx.conversation_history || [])\n    .map(m => `[${m.role}]: ${(m.content || '').substring(0, 300)}`)\n    .join('\\n');\n\n  const chatInput = `[CHAT DELEGATION] Uživatel napsal v AI chatu a systém tě žádá o reakci jako Aisha Dirigent.\\n\\nUživatelova zpráva: \"${ctx.user_message}\"\\nOdpověď asistenta: \"${(ctx.assistant_response || '').substring(0, 500)}\"\\nKategorie: ${ctx.category || 'general'}\\nEskalační signály: ${(ctx.escalation_signals || []).join(', ') || 'žádné'}\\nJazyk: ${ctx.language || 'cs'}${history ? '\\n\\nHistorie konverzace:\\n' + history : ''}\\n\\nJako Aisha Dirigent se rozhodni: máš co hodnotného přidat? Pokud ano, odpověz stručně v jazyce uživatele. Pokud ne, odpověz prázdným řetězcem.`;\n\n  return {\n    json: {\n      chatInput,\n      session_id: 'chat-delegation-' + (ctx.conversation_id || Date.now()),\n      source: 'chat_delegation',\n      metadata: {\n        user_id: ctx.user_id,\n        conversation_id: ctx.conversation_id,\n        category: ctx.category,\n        escalation_signals: ctx.escalation_signals,\n      },\n      _delegation: true,\n    }\n  };\n}\n\nconst chatInput = body.chatInput || body.query || body.message || body.text || body.action || '';\n\nreturn {\n  json: {\n    chatInput,\n    session_id: body.session_id || body.sessionId || 'dirigent-' + Date.now(),\n    source: body.source || 'webhook',\n    metadata: {\n      user_id: body.user_id,\n      story_id: body.story_id,\n      pr_number: body.pr_number,\n    }\n  }\n};"
+      },
+      "id": "prepare-webhook-input",
+      "name": "Prepare Webhook Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=Jsi **AISHA Dirigent** — autonomní orchestrátor AISHA platformy.\n\nNejsi chatbot. Jsi **řídící systém** celého delivery lifecycle. Přijímáš signály ze subsystémů, rozhoduješ o akcích a řídíš tok práce napříč agenty.\n\n---\n\n## ŘÍDÍCÍ PROTOKOL\n\n### 1. Signálová matice — Rozpoznání a reakce\n\nKaždý request analyzuj: odkud přišel, co chce, jaká je severity.\n\n| Signál v requestu | Zdroj | Tvá reakce |\n|---|---|---|\n| `action: 'story_created'` + `story_id` | Platform/webhook | → PLAYBOOK: Onboarding story |\n| `action: 'pr_opened'` + `pr_number` | GitHub webhook | → DELEGUJ Compliance Agent |\n| Compliance Agent vrátí `verdict: 'fail'` | Subsystém | → PLAYBOOK: Compliance enforcement |\n| `action: 'escalation'` + `severity` | orchestrationBridge | → TRIAGE podle severity |\n| `action: 'notification'` + `event` | async notification | → VYHODNOŤ relevanci, loguj, příp. reaguj |\n| `action: 'nightly_audit_result'` | Nightly Audit | → PLAYBOOK: Audit response |\n| `action: 'stuck_story'` + `story_id` | scheduled/manual | → PLAYBOOK: Deblokace |\n| Chat/konverzace od uživatele | Chat trigger | → ODPOVĚZ s využitím nástrojů |\n| `action: 'proposal_request'` + `scope` | manual/auto | → PLAYBOOK: Proposal Generation |\n| `action: 'knowledge_gap'` + `domain` | Knowledge Agent | → PLAYBOOK: Proposal Generation |\n| `action: 'self_deploy_report'` | Self-Deploy WF | → PLAYBOOK: Self-Deploy Response |\n| `action: 'workflow_drift_detected'` | Health Monitor | → Trigger `trigger_self_deploy` |\n| `action: 'chat_delegation'` + `context` | orchestrationBridge (AI Chat) | → PLAYBOOK: Chat Delegation Response |\n\n### 2. Playbooks — Autonomní akční sekvence\n\n#### PLAYBOOK: Onboarding nové story\n1. `get_story_context({ story_id })` — zjisti stav\n2. `compose_context({ story_id, context_profile_slug: 'planning_heavy' })` — sestav kontext\n3. `match_experts` s relevantním domain/tech kontextem\n4. `suggest_next_step` pro doporučení prvního kroku\n5. `generate_copilot_instructions({ story_id })` — připrav dev instrukce\n6. Vrať strukturovaný onboarding plán\n\n#### PLAYBOOK: PR Compliance Gate\n1. DELEGUJ na **Compliance Agent** (compliance_check tool) s `{ pr_number, repo, story_id }`\n2. Vyhodnoť verdict (pass/fail/escalate)\n3. Pokud PASS → informuj, navrhni `transition_delivery_status → in_review`\n4. Pokud FAIL → `get_story_context` pro kontext, navrhni opravy\n5. Pokud ESCALATE → eskaluj na lidského admina\n\n#### PLAYBOOK: Compliance Enforcement\n1. `validate_compliance({ story_id })` — celý ruleset\n2. Klasifikuj porušení: critical / major / minor\n3. Critical → `transition_delivery_status → blocked` + eskalace\n4. Major → sestav opravný plán, informuj tým\n5. Minor → zaloguj varování, pokračuj\n\n#### PLAYBOOK: Audit Response\n1. Parsuj výsledky auditu (violations_count, stories_checked)\n2. Pro každou story s violations: `get_story_context` + severity assessment\n3. Critical violations → označ story jako blocked\n4. Sestav souhrnný report\n\n#### PLAYBOOK: Deblokace stuck story\n1. `get_story_context({ story_id })` + `get_delivery_timeline({ story_id })`\n2. `get_allowed_transitions({ story_id })` — co je možné\n3. `suggest_next_step` — návrh dalšího postupu\n4. Pokud je story blocked >3 dny → eskaluj na lidského admina\n\n#### PLAYBOOK: Self-Deploy & Drift Healing\n1. `admin_n8n_workflows(operation: 'compare')` → porovnej repo vs. n8n server\n2. Pokud DRIFT → `trigger_self_deploy({ reason: 'drift_detected' })` → spusť Self-Deploy workflow\n3. Po dokončení: parsuj report z Self-Deploy\n4. Pokud deploy OK → `admin_log_action` + zaloguj úspěch\n5. Pokud deploy FAIL → `notify_expert` (severity: HIGH) + retry jednou\n6. Pokud retry FAIL → CRITICAL eskalace, zablokuj závislé operace\n7. Pravidelně (1x denně nebo po push): automaticky spusť compare\n\n#### PLAYBOOK: Chat Delegation Response (Aisha jako třetí strana v chatu)\nKdyž přijde signál `[CHAT DELEGATION]`, jsi volána jako **třetí participant** v AI chatu uživatele.\n\n**Kontext:** Uživatel komunikuje s AI asistentem v platformě. Systém detekoval, že bys měla reagovat (explicitní zmínka Aishy, eskalační signály, nebo relevantní téma).\n\n**Tvá role:** Nejsi hlavní asistent — jsi **Dirigent** který vstupuje do konverzace jako expert. Reaguj POUZE když máš co hodnotného přidat.\n\n**Pravidla:**\n1. Odpovídej STRUČNĚ (1-3 věty), pokud není potřeba víc\n2. Odpovídej v jazyce uživatele\n3. Pokud detekuješ compliance/security problém, prefixuj odpověď `[ESKALACE]`\n4. Pokud AI asistent odpověděl špatně a chceš opravit, prefixuj `[OVERRIDE]`\n5. Pokud nemáš co přidat, odpověz PRÁZDNÝM ŘETĚZCEM (ne 'nemám co dodat')\n6. Odkazuj se na knowledge base když je relevantní (`search_knowledge`)\n7. Nikdy neopakuj to co AI asistent už řekl\n8. Představ se jako 'Aisha Dirigent' — ne jako robot\n\n**Příklady reakcí:**\n- Uživatel se ptá na compliance → `search_knowledge` a odpověz s konkrétními pravidly\n- Uživatel zmiňuje Aishu → Odpověz přímo, představ se\n- AI asistent dal špatnou radu → `[OVERRIDE]` + tvá lepší rada s referencí\n- Uživatel se ptá na počasí → Prázdný řetězec (nemáš co dodat)\n\n### 3. Rozhodovací pravidla — Autonomie vs. eskalace\n\n| Severity | Akce | Příklad |\n|---|---|---|\n| LOW | Jednej autonomně, zaloguj | minor warning, info request |\n| MEDIUM | Jednej, informuj uživatele | story transition, compliance pass |\n| HIGH | Navrhni akci, čekej na potvrzení | story blocking, major violation |\n| CRITICAL | STOP — eskaluj na lidského admina | security incident, data breach, opakovaný fail |\n\n**Pravidla autonomie:**\n- Můžeš autonomně: číst data, vyhledávat, sestavovat kontext, navrhovat\n- Můžeš s oznámením: přesouvat story stavy (non-blocking), spouštět compliance checks\n- Musíš se zeptat: blocking transitions, mazání, změny rulesetů\n- NIKDY sám: merge PR, úprava credentials, přístup k health datům\n\n### 4. Delegace na subsystémy\n\n| Potřebuješ | Deleguj na | Tool |\n|---|---|---|\n| Hloubkový knowledge research | **Knowledge Agent** | `knowledge_research` |\n| PR/story compliance check | **Compliance Agent** | `compliance_check` |\n| Story transitions, timelines | **Delivery Agent** | `delivery_management` |\n| Plný audit všech stories | **Nightly Audit** | `run_nightly_audit` |\n| Workflow sync & self-deploy | **Self-Deploy** | `trigger_self_deploy` |\n\nPro rychlé dotazy (search, context) použij své MCP tools přímo.\nPro komplexní úlohy DELEGUJ — subsystém vrátí strukturovaný výsledek.\n\n### 5. Formát subsystémových odpovědí\n\nPo každé akci vrať strukturovanou odpověď:\n```\n{\n  action_taken: string,\n  result: 'success' | 'partial' | 'failed' | 'escalated',\n  severity: 'low' | 'medium' | 'high' | 'critical',\n  next_steps: string[],\n  requires_human: boolean,\n  signal?: { type: string, story_id?: string, details: string }\n}\n```\n\n### 6. Komunikace\n- Buď stručný ale informativní\n- Při delegaci: 'Deleguju na [Agent] — [důvod]'\n- Při autonomní akci: 'Provádím: [akce] — [důvod]'\n- Odpovídej v jazyce uživatele (čeština / angličtina)\n\n### 7. Infrastruktura & Admin Bridge\n\nMáš přístup k admin nástrojům přes MCP. Používej je pro:\n\n| Nástroj | Použij když |\n|---|---|\n| `admin_list_services` | Potřebuješ zjistit stav všech integrovaných služeb |\n| `admin_health_check` | Chceš aktivně ověřit dostupnost služeb (NocoDB, Langfuse, n8n) |\n| `admin_nocodb_query` | Potřebuješ číst data z NocoDB (approval requests, performance reports) |\n| `admin_nocodb_manage` | Potřebuješ CRUD operace v NocoDB (create/update/delete) |\n| `admin_langfuse_traces` | Chceš analyzovat výkon AI agentů (traces, sessions, scores) |\n| `admin_log_action` | Potřebuješ zalogovat admin akci do audit trail |\n| `admin_n8n_workflows` | Správa n8n workflows: list, deploy, update, activate/deactivate, compare (drift detection) |\n\n#### PLAYBOOK: Admin Health Alert\n1. `admin_health_check` → zkontroluj živé endpointy\n2. Pokud služba `degraded` → `admin_log_action` + loguj varování\n3. Pokud služba `down` → eskaluj přes `notify_expert` (severity: HIGH)\n4. Pokud 2+ služby down → `notify_expert` (severity: CRITICAL) + zablokuj závislé operace\n\n#### PLAYBOOK: Performance Review\n1. `admin_langfuse_traces` (type: traces, limit: 100) → poslední traces\n2. Analyzuj: průměrná latence, error rate, token usage\n3. Pokud latence >5s nebo error rate >10% → `admin_log_action` + `notify_expert` (severity: MEDIUM)\n4. Sestav report do NocoDB přes `admin_nocodb_manage` (create record)\n\n#### PLAYBOOK: Approval Gate Response\n1. Když přijde `action: 'approval_response'` + `approval_id` + `decision`\n2. `admin_nocodb_query` → načti původní request\n3. Pokud `approved` → proveď odloženou akci\n4. Pokud `rejected` → zaloguj + informuj\n5. Pokud `timeout` (>4h bez odpovědi) → auto-eskaluj na CRITICAL\n\n#### PLAYBOOK: Self-Deploy Response\n1. Parsuj report ze Self-Deploy (deployed, updated, failed, in_sync counts)\n2. Pokud vše OK (`severity: 'LOW'`) → `admin_log_action` + 'sync complete'\n3. Pokud partial fails → retry jen failed workflows přes `admin_n8n_workflows(deploy/update)`\n4. Pokud severity HIGH → `notify_expert` + sestav diagnostický report\n5. Zapiš výsledek do NocoDB: `admin_nocodb_manage` (deploy_reports tabulka)\n\n### 8. Eskalace & Notifikace\n\n**Doručování notifikací:**\n- `notify_expert` tool → odešle notifikaci lidskému expertovi přes WF_EXPERT_NOTIFICATION\n- `request_approval` tool → vytvoří approval request a čeká na potvrzení přes WF_APPROVAL_GATE\n\n**Severity → Kanál:**\n| Severity | Kanál | Auto-akce |\n|---|---|---|\n| LOW | Jen log | Autonomní řešení |\n| MEDIUM | Log + email digest | Autonomní + denní souhrn expertovi |\n| HIGH | Email immediate + log | Navrhni akci, čekej na approval |\n| CRITICAL | Email + webhook + Slack | STOP vše, okamžitá eskalace |\n\n### 8.5 Guidance Profile Protocol — Adaptace dle profilu vedení\n\nKaždý request může obsahovat `expertise_level` (z VS Code extension nebo MCP toolů).\nHodnota určuje tvůj styl odpovědi — NE úroveň IQ uživatele, ale kolik decision-support potřebuje.\n\n| Profil (wire value) | Produktový label | Tvé chování |\n|---|---|---|\n| `beginner` | **Educating** | Drž celkový kontext projektu za uživatele. Rámuj každé rozhodnutí: co se řeší, jaké jsou varianty, jaké jsou kompromisy, kde jsou slabiny a co je třeba ještě ověřit. Vysvětluj proč, ne jen co. Ptej se na chybějící omezení. Před high-impact změnami žádej potvrzení. Vrať verification checkpoint. |\n| `intermediate` | **Collaborative** | Vyváženě doporučuj. Vysvětluj kompromisy u netriviálních rozhodnutí. Ptej se na chybějící omezení. Před high-impact změnami žádej potvrzení. |\n| `advanced` | **Autonomous** | Stručně, pattern-focused. Alternativy ukazuj jen když existují reálně lepší. Bez vysvětlování proč, pokud to není bezpečnostní nebo architekturální výjimka. |\n| `expert` | **Supervisory** | Minimální výstup. Zasahuj jen při compliance/security porušení, architekturální chybě nebo výjimce. |\n\n**Klíčová pravidla:**\n- Educating NENÍ \"zjednodušený mode\" — je to seniorská opora pro uživatele, který nedrží celý kontext projektu sám\n- Educating odpověď má vždy obsahovat: decision_frame, context_summary, tradeoffs, failure_modes, recommendation, verification_checkpoint\n- NIKDY neinfantilizuj — uživatel v Educating je schopný programátor, jen potřebuje guidance na projektové úrovni\n- Guidance kontrakt přijde z `build_guidance_contract()` nebo z `expertise_hints` v moderation session\n- Pokud expertise_level chybí, použij `intermediate` (Collaborative)\n\n### 9. Bezpečnostní invarianty\n- NIKDY nesdílej tokeny, credentials, API klíče\n- NIKDY neloguj health data ani PII\n- Security dotazy → VŽDY eskaluj na lidského admina\n- Všechny akce se logují přes ai_trace_events\n- Admin bridge operace vyžadují audit trail přes `admin_log_action`\n- Destruktivní operace (DELETE) → VŽDY vyžaduj approval gate\n\n### 10. Advisor Mode — Kooperace s dalšími AI agenty\n\nKdyž přijde request se signálem `[ADVISOR REQUEST]` nebo `session_id: 'copilot-advisor'`, přepni do **Advisor Mode**:\n\n**Tvá role:** Máš hlubokou znalost AISHA platformy (expert rules, compliance, architektura, delivery procesy). Jiný AI agent (např. GitHub Copilot) implementuje kód. Ty ho kontroluješ a radíš mu.\n\n**Protokol:**\n1. Přečti kontext (co agent dělá, jaké soubory mění, jaká rozhodnutí dělá)\n2. Vyhodnoť oproti své knowledge base:\n   - Je to v souladu s architekturou? (RPC-only, audit, RLS)\n   - Odpovídá to expert rules a compliance pravidlům?\n   - Jsou bezpečnostní invarianty dodrženy?\n   - Je to konzistentní s existujícími patterns?\n3. Vrať strukturovanou odpověď:\n\n```json\n{\n  \"mode\": \"advisor\",\n  \"assessment\": \"aligned | concerns | blocked\",\n  \"feedback\": \"stručné shrnutí\",\n  \"suggestions\": [\"konkrétní návrh 1\", \"konkrétní návrh 2\"],\n  \"knowledge_used\": [\"expert_rule: ...\", \"compliance: ...\"],\n  \"severity\": \"low | medium | high\"\n}\n```\n\n**Pravidla advisor mode:**\n- Buď konstruktivní — ne \"to je špatně\", ale \"navrhuju toto protože...\"\n- Odkazuj na konkrétní rules/patterns ze své knowledge (search_knowledge, get_expert_rule)\n- Pokud si nejsi jistá, řekni to — raději přiznej nejistotu než dej špatnou radu\n- Při concerns/blocked vždy vysvětli PROČ a navrhni alternativu\n- Assessment \"blocked\" pouze pro security/compliance violations\n\n**Příklady:**\n- Agent píše `.from('users').select('*')` → assessment: \"blocked\", AISHA vyžaduje RPC-only pattern\n- Agent vytváří hook bez TSDoc → assessment: \"concerns\", doporuč přidat dokumentaci\n- Agent navrhuje Dockerfile → assessment: \"aligned\" pokud sleduje established patterns\n\n### 11. Kooperační protokol — AISHA + AI Agenty\n\n**Evoluce kooperace (3 fáze):**\n\n**Fáze 1 — Advisor (aktuální):**\n- Jiný agent pracuje, AISHA radí a kontroluje\n- AISHA vyhodnocuje oproti knowledge base\n- Feedback jde zpět agentovi, on se rozhoduje\n\n**Fáze 2 — Proposer:**\n- AISHA proaktivně navrhuje změny na základě knowledge\n- Format: strukturovaný návrh s odůvodněním a referencemi\n- Agent/člověk schvaluje nebo odmítá\n\n**Fáze 3 — Negotiator:**\n- AISHA a agent si rozdělí práci dle domén\n- AISHA: delivery, compliance, knowledge, orchestrace\n- Agent: implementace, testy, migrace, build\n- Při překryvu se dohodnou na přístupu\n\n**Aktuální stav: Fáze 1**\nRegistruj každý advisor request do trace events. Sleduj kvalitu vlastních rad — pokud agent opakovaně ignoruje tvoje návrhy, zeptej se proč.\n\n\n### 12. Proposer Mode — Fáze 2 kooperace (AISHA navrhuje změny)\n\nKdyž přijde signál `action: 'proposal_request'` nebo `[PROPOSAL REQUEST]`, přepni do **Proposer Mode**:\n\n**Tvá role:** Proaktivně identifikuješ příležitosti ke zlepšení a navrhuješ konkrétní změny. Neimplementuješ — navrhuješ a zdůvodňuješ.\n\n#### PLAYBOOK: Proposal Generation\n1. Přijmi kontext: co se děje, jaká oblast, jaký scope\n2. `search_knowledge` — hledej relevantní expert rules, compliance patterns, best practices\n3. `get_expert_rule` — získej specifická pravidla pro danou doménu\n4. Analyzuj: co by se mělo zlepšit, co chybí, co neodpovídá pravidlům\n5. Vygeneruj strukturovaný návrh (viz formát níže)\n6. Vrať s odůvodněním a referencemi na knowledge base\n\n**Formát proposal response:**\n```json\n{\n  \"mode\": \"proposer\",\n  \"proposal_id\": \"PROP-YYYYMMDD-NNN\",\n  \"change_description\": \"Co navrhuji změnit\",\n  \"justification\": \"Proč — s referencí na knowledge base\",\n  \"expected_impact\": \"Co to zlepší, jaký efekt\",\n  \"implementation_steps\": [\n    \"Krok 1: ...\",\n    \"Krok 2: ...\",\n    \"Krok 3: ...\"\n  ],\n  \"affected_files\": [\"cesta/k/souboru.ts\"],\n  \"review_status\": \"pending\",\n  \"priority\": \"low | medium | high\",\n  \"knowledge_references\": [\"rule: ...\", \"pattern: ...\"]\n}\n```\n\n**Triggery pro Proposer Mode:**\n| Trigger | Kdy | Příklad |\n|---|---|---|\n| `action: 'proposal_request'` + `scope` | Explicitní žádost | \"Navrhni zlepšení pro auth modul\" |\n| `action: 'nightly_audit_result'` + violations | Po auditu | Audit najde 3 violations → 3 proposals |\n| `action: 'compliance_fail'` + `pr_number` | PR compliance fail | Navrhni konkrétní opravy |\n| `[PROPOSAL REQUEST]` v message | Z advisor session | \"Navrhni jak vyřešit tento problém\" |\n| `action: 'knowledge_gap'` + `domain` | Identifikovaná mezera | Navrhni nové expert rules |\n\n**Pravidla proposals:**\n- Každý proposal musí mít `justification` s referencí na konkrétní knowledge\n- Proposals neprovádíš — jen navrhuješ. Implementace je na agentovi/člověku\n- Můžeš navrhnout i změny v sobě samé (system prompt, playbooks, tools)\n- Proposals se logují do trace events pro audit trail\n- Priority: HIGH = security/compliance, MEDIUM = quality/performance, LOW = nice-to-have\n",
+          "maxIterations": 15
+        }
+      },
+      "id": "ai-agent",
+      "name": "AISHA Dirigent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        700,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "routingStrategy": "auto",
+        "modelOverride": "",
+        "options": {
+          "temperature": 0.4,
+          "maxOutputTokens": 4096,
+          "topP": 0.9,
+          "maxRetries": 2
+        }
+      },
+      "type": "n8n-nodes-aisha.aishaLlmRouter",
+      "typeVersion": 1,
+      "position": [
+        500,
+        620
+      ],
+      "id": "llm-router",
+      "name": "LLM Router",
+      "credentials": {
+        "openAiApi": {
+          "id": "__REMAP__",
+          "name": "OpenAi account"
+        },
+        "googlePalmApi": {
+          "id": "__REMAP__",
+          "name": "Google Gemini(PaLM) Api account"
+        },
+        "anthropicApi": {
+          "id": "__REMAP__",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.session_id || $json.sessionId || 'dirigent-default' }}",
+        "contextWindowLength": 20
+      },
+      "id": "memory",
+      "name": "Dirigent Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        700,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "name": "knowledge_research",
+        "description": "Delegate a knowledge research task to the specialized Knowledge Agent. Use for deep knowledge base research, expert matching, and project context assembly. Input: { query: string, session_id?: string }. Returns the agent's response with relevant expert rules and recommendations.",
+        "workflowId": "=As6fJYFlD8glBSJ0"
+      },
+      "id": "workflow-tool-knowledge",
+      "name": "Knowledge Agent Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        900,
+        680
+      ]
+    },
+    {
+      "parameters": {
+        "name": "compliance_check",
+        "description": "Delegate a compliance check to the Compliance Agent. Use for PR validation, story compliance, and rule enforcement. Input: { pr_number?: number, repo?: string, head_sha?: string, story_id?: string, task?: string }. Returns verdict (pass/fail/escalate) with violations and recommendations.",
+        "workflowId": "=MGTNBckfKk6j0Brc"
+      },
+      "id": "workflow-tool-compliance",
+      "name": "Compliance Agent Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "name": "delivery_management",
+        "description": "Delegate a delivery management task to the Delivery Agent. Use for story transitions, timeline viewing, environment management, and effort estimation. Input: { story_id?: string, action?: string, query?: string, target_status?: string }. Returns delivery status and operation results.",
+        "workflowId": "=DMdVCFhKeH8lJrid"
+      },
+      "id": "workflow-tool-delivery",
+      "name": "Delivery Agent Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        680
+      ]
+    },
+    {
+      "parameters": {
+        "name": "run_nightly_audit",
+        "description": "Trigger the nightly story audit workflow manually. Checks all active stories for compliance and quality. No input required. Returns audit results with violations and summary.",
+        "workflowId": "=IfxeDo3he1nfXnxX"
+      },
+      "id": "workflow-tool-audit",
+      "name": "Nightly Audit Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format Dirigent response for API consumers\nconst agentOutput = $input.item.json;\nconst rawOutput = agentOutput.output || agentOutput.text || '';\n\n// Check if this was a chat delegation request\nconst prepareData = $('Prepare Webhook Input').first()?.json || {};\nconst isDelegation = prepareData._delegation === true;\n\nlet action = 'comment';\nif (isDelegation) {\n  const text = typeof rawOutput === 'string' ? rawOutput : '';\n  if (!text || text.trim().length === 0) {\n    action = 'silent';\n  } else if (/\\[(eskal|escalat)/i.test(text)) {\n    action = 'escalate';\n  } else if (/\\[(override|přepiš)/i.test(text)) {\n    action = 'override';\n  }\n}\n\nconst content = typeof rawOutput === 'string' ? rawOutput : JSON.stringify(rawOutput);\n\nreturn {\n  json: {\n    success: true,\n    agent: 'dirigent',\n    content: content,\n    response: content,\n    action: action,\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "format-webhook-output",
+      "name": "Format Webhook Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env?.AISHA_POSTGREST_URL || '' }}/rest/v1/rpc/log_n8n_trace_event",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"p_event_type\": \"dirigent_action\",\n  \"p_agent_slug\": \"dirigent\",\n  \"p_operation\": \"dirigent_agent\",\n  \"p_status\": \"ok\",\n  \"p_request_summary\": {\n    \"agent\": \"dirigent\",\n    \"source\": \"{{ $json.source || 'chat' }}\",\n    \"session\": \"{{ $json.session_id || '' }}\",\n    \"query_preview\": \"{{ ($json.query || $json.chatInput || '').substring(0, 200) }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "log-trace",
+      "name": "Log Trace",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        500
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Z7oSSowoqk0ZgB8X",
+          "name": "AISHA Supabase (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "route_task",
+        "description": "Router Service: takes a task envelope describing WHAT needs to be done, evaluates risk + domain + tech context, and returns a route plan with an ordered agent pipeline, tool allowlist, and stop conditions. Creates an ai_run for observability tracking.\n\nInput: JSON object. Parameters:\n  - task_kind (required): string — Type of task being requested.\n  - risk_profile (optional): string — Risk assessment level. High risk = stronger models + mandatory compliance gate + human approval.\n  - domain (optional): array — Domain tags for specialized rule matching (e.g. ['healthcare', 'compliance']).\n  - tech (optional): array — Technology stack tags (e.g. ['react', 'supabase', 'typescript']).\n  - story_id (optional): string — UUID of the partner story to associate with this run.\n  - constraints (optional): object — Additional constraints: { maxBudgetUsd, deadline, requiredAgents, etc. }",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: route_task\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'route_task', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-route_task",
+      "name": "MCP: route_task",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "name": "compose_context",
+        "description": "Context Composer: assembles a context bundle for an agent from up to 4 layers (project_context, ruleset, kb_retrieval, memory) according to a context profile. Respects token budgets and layer priority ordering. Use after route_task to prepare context for each agent in the pipeline.\n\nInput: JSON object. Parameters:\n  - story_id (required): string — UUID of the partner story to load context for.\n  - context_profile_slug (optional): string — Context profile to use. Available: rules_only, repo_plus_rules, planning_heavy, evidence_strict, cha\n  - run_id (optional): string — UUID of the current ai_run (enables memory layer — trace events as context).\n  - query (optional): string — Optional search query for the kb_retrieval layer (semantic + text search).",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: compose_context\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'compose_context', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-compose_context",
+      "name": "MCP: compose_context",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "name": "suggest_next_step",
+        "description": "Dirigent next step: analyzes current development context and suggests what to do next. Creates a chat_flow session and returns contextual guidance based on file paths, story context, and expertise level.\n\nInput: JSON object. Parameters:\n  - tech_stack (optional): array — Technology tags.\n  - file_paths (optional): array — Currently active file paths.\n  - story_id (optional): string — Optional story UUID for project context.\n  - expertise_level (optional): string — Developer expertise level.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: suggest_next_step\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'suggest_next_step', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-suggest_next_step",
+      "name": "MCP: suggest_next_step",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "name": "estimate_effort",
+        "description": "Dirigent effort estimation: estimates development hours for a task based on file count, complexity factors, and developer expertise. Returns hours, confidence level, breakdown, and risk assessment.\n\nInput: JSON object. Parameters:\n  - session_id (required): string — UUID of an active moderation session.\n  - task_description (required): string — Description of the development task.\n  - affected_files (required): array — File paths that will be modified.\n  - complexity_factors (optional): object — Complexity flags: has_migration (bool), has_rpc (bool), has_tests (bool).",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: estimate_effort\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'estimate_effort', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-estimate_effort",
+      "name": "MCP: estimate_effort",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "name": "generate_copilot_instructions",
+        "description": "Auto-generate a .github/copilot-instructions.md file from the story's active ruleset. Groups expert rules by category and includes AI instructions, project metadata, and a PR checklist. Output is ready to commit to the repo.\n\nInput: JSON object. Parameters:\n  - story_id (required): string — UUID of the partner story",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: generate_copilot_instructions\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'generate_copilot_instructions', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-generate_copilot_instructions",
+      "name": "MCP: generate_copilot_instructions",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "name": "get_story_context",
+        "description": "Get the full delivery context for a partner story, including repository details, ruleset fingerprint, build configuration, participants and active expert rules preview.\n\nInput: JSON object. Parameters:\n  - story_id (required): string — UUID of the partner story",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: get_story_context\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'get_story_context', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-get_story_context",
+      "name": "MCP: get_story_context",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        1100
+      ]
+    },
+    {
+      "parameters": {
+        "name": "get_project_context",
+        "description": "Compose a comprehensive knowledge context for a project. Combines expert rules by expertise area, context tags, and optional agent bindings into a single knowledge document. Ideal for bootstrapping AI agents or scaffolding project environments.\n\nInput: JSON object. Parameters:\n  - project_description (required): string — Brief description of the project to contextualize knowledge.\n  - expertise_areas (optional): array — Expertise area slugs relevant to the project.\n  - context_tags (optional): array — Technology/domain tags for the project.\n  - agent_slug (optional): string — Optional: include knowledge bound to this agent configuration.\n  - max_rules_per_area (optional): number — Max rules to include per expertise area. Default: 5.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: get_project_context\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'get_project_context', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-get_project_context",
+      "name": "MCP: get_project_context",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        1200
+      ]
+    },
+    {
+      "parameters": {
+        "name": "search_knowledge",
+        "description": "Search the AISHA Guild of Experts knowledge base. Supports text search, category filtering, expertise area filtering, and AI context tag matching. Returns ranked results.\n\nInput: JSON object. Parameters:\n  - query (optional): string — Text to search for in rule titles, summaries, body, and AI instructions.\n  - category (optional): string — Filter by rule category.\n  - expertise_area (optional): string — Filter by expertise area slug (e.g., 'frontend', 'backend', 'ai', 'security').\n  - context_tags (optional): array — AI context tags to match against (e.g., ['react', 'typescript', 'testing']). Rules with overlapping \n  - include_ai_instructions (optional): boolean — Whether to include AI-specific instructions in results. Default: true.\n  - limit (optional): number — Maximum number of results (1–50). Default: 20.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: search_knowledge\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'search_knowledge', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-search_knowledge",
+      "name": "MCP: search_knowledge",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        1300
+      ]
+    },
+    {
+      "parameters": {
+        "name": "validate_compliance",
+        "description": "Quality Governor compliance gate: loads the full ruleset for a story and returns all expert rules with their AI instructions and body. Use this to verify that generated code, documentation, or deliverables conform to the pinned ruleset. Returns structured compliance context.\n\nInput: JSON object. Parameters:\n  - story_id (required): string — UUID of the partner story to check compliance for.\n  - severity_threshold (optional): number — Minimum severity level for rules to include (1=all, 2=important+, 3=critical only). Default: 1.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: validate_compliance\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'validate_compliance', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-validate_compliance",
+      "name": "MCP: validate_compliance",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        1400
+      ]
+    },
+    {
+      "parameters": {
+        "name": "transition_delivery_status",
+        "description": "Transition a story's delivery_status using the validated state machine. Checks allowed transitions, role requirements, records the transition, and creates an audit log entry.\n\nInput: JSON object. Parameters:\n  - story_id (required): string — UUID of the partner story.\n  - new_status (required): string — Target delivery status. Allowed values: analyzing, matched, scaffolding, ready, in_progress, blocked\n  - trigger_source (optional): string — What triggered this transition (manual, workflow, webhook, extension, system).\n  - metadata (optional): object — Optional metadata to attach to the transition record.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: transition_delivery_status\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'transition_delivery_status', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-transition_delivery_status",
+      "name": "MCP: transition_delivery_status",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        900,
+        1500
+      ]
+    },
+    {
+      "parameters": {
+        "name": "admin_list_services",
+        "description": "List all registered integration services with their health status, URLs, and configuration. Use to get an overview of the admin infrastructure (NocoDB, Langfuse, n8n, etc.). No input required.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: admin_list_services\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'admin_list_services', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-admin_list_services",
+      "name": "MCP: admin_list_services",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        1260,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "name": "admin_health_check",
+        "description": "Run a live health check against all registered integration services by pinging their health endpoints. Returns status (healthy/degraded/down), response times, and error details for each service. No input required.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: admin_health_check\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'admin_health_check', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-admin_health_check",
+      "name": "MCP: admin_health_check",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        1260,
+        680
+      ]
+    },
+    {
+      "parameters": {
+        "name": "admin_nocodb_query",
+        "description": "Query data from NocoDB tables. Use for reading approval requests, performance reports, structured operational data. Input: { table_id: string, where?: string, sort?: string, fields?: string, limit?: number, offset?: number }.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: admin_nocodb_query\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'admin_nocodb_query', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-admin_nocodb_query",
+      "name": "MCP: admin_nocodb_query",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        1260,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "name": "admin_nocodb_manage",
+        "description": "Create, update, or delete records in NocoDB. Use for storing performance reports, managing approval requests, and operational data. Input: { table_id: string, action: 'create'|'update'|'delete', record_id?: string, data?: object }.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: admin_nocodb_manage\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'admin_nocodb_manage', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-admin_nocodb_manage",
+      "name": "MCP: admin_nocodb_manage",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        1260,
+        920
+      ]
+    },
+    {
+      "parameters": {
+        "name": "admin_langfuse_traces",
+        "description": "Query Langfuse observability data — traces, sessions, generations, scores. Use for performance analysis, anomaly detection, and quality monitoring. Input: { type: 'traces'|'sessions'|'generations'|'scores', limit?: number, name?: string, user_id?: string }.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: admin_langfuse_traces\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'admin_langfuse_traces', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-admin_langfuse_traces",
+      "name": "MCP: admin_langfuse_traces",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        1260,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "name": "admin_log_action",
+        "description": "Log an admin action to the audit trail (integration_service_logs table). Use for recording all admin bridge operations, escalation events, approval requests/responses. Input: { service_name: string, action: string, detail?: object, status?: string, duration_ms?: number }.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: admin_log_action\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'admin_log_action', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-admin_log_action",
+      "name": "MCP: admin_log_action",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        1260,
+        1160
+      ]
+    },
+    {
+      "parameters": {
+        "name": "notify_expert",
+        "description": "Send a notification to the human expert via the Expert Notification workflow. Use for escalations, alerts, and status reports. Input: { severity: 'low'|'medium'|'high'|'critical', subject: string, message: string, context?: object, requires_response?: boolean }.",
+        "workflowId": "=GszFeqkLeOrGe1bO"
+      },
+      "id": "workflow-tool-notify-expert",
+      "name": "Expert Notification Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        1280
+      ]
+    },
+    {
+      "parameters": {
+        "name": "request_approval",
+        "description": "Request human approval for a high-severity action via the Approval Gate workflow. Creates an approval request, notifies the expert, and returns the approval_id. Use for: story blocking, destructive operations, security-related changes. Input: { action_description: string, severity: 'high'|'critical', context: object, timeout_hours?: number }.",
+        "workflowId": "=2NYIKW4Z1XNrIFTN"
+      },
+      "id": "workflow-tool-approval-gate",
+      "name": "Approval Gate Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        1260,
+        1400
+      ]
+    },
+    {
+      "parameters": {
+        "name": "=admin_n8n_workflows",
+        "description": "Manage n8n workflows autonomously: list all workflows on server, deploy new workflows from repo, update existing, activate/deactivate, and compare local vs server for drift detection. Operations: list, get, deploy, update, activate, deactivate, compare. Input: { operation: string, workflow_id?: string, workflow_name?: string, workflow_json?: object }.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: admin_n8n_workflows\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'admin_n8n_workflows', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-admin_n8n_workflows",
+      "name": "MCP: admin_n8n_workflows",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        1380,
+        1160
+      ]
+    },
+    {
+      "parameters": {
+        "name": "trigger_self_deploy",
+        "description": "Trigger the Self-Deploy workflow to sync all workflow JSONs from the GitHub repository to the n8n server. Compares local definitions with server state, deploys missing workflows, updates drifted ones, and reports results. Use when: health monitor detects workflow drift, after repository updates, or on manual request. Input: { reason?: string, force?: boolean }.",
+        "workflowId": "=nVev4gsxUECIJFcx"
+      },
+      "id": "workflow-tool-self-deploy",
+      "name": "Self-Deploy Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        1280
+      ]
+    }
+  ],
+  "connections": {
+    "Dirigent Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Webhook Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dirigent Chat": {
+      "main": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Webhook Input": {
+      "main": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AISHA Dirigent": {
+      "main": [
+        [
+          {
+            "node": "Format Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dirigent Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Agent Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Compliance Agent Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Delivery Agent Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 3
+          }
+        ]
+      ]
+    },
+    "Nightly Audit Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 4
+          }
+        ]
+      ]
+    },
+    "MCP: route_task": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: compose_context": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: suggest_next_step": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: estimate_effort": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: generate_copilot_instructions": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: get_story_context": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: get_project_context": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: search_knowledge": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: validate_compliance": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: transition_delivery_status": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: admin_list_services": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: admin_health_check": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: admin_nocodb_query": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: admin_nocodb_manage": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: admin_langfuse_traces": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: admin_log_action": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expert Notification Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 5
+          }
+        ]
+      ]
+    },
+    "Approval Gate Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 6
+          }
+        ]
+      ]
+    },
+    "MCP: admin_n8n_workflows": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Self-Deploy Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_tool",
+            "index": 7
+          }
+        ]
+      ]
+    },
+    "LLM Router": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AISHA Dirigent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

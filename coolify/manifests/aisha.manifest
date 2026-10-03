@@ -1,0 +1,190 @@
+# ==============================================================================
+# Coolify Story Manifest — aisha (production stack v3 cold-start)
+# ==============================================================================
+# Plný produkční AISHA stack. Používá se při cold-start orchestraci:
+#   bash scripts/coolify-story-init.sh --manifest coolify/manifests/aisha.manifest
+#   bash scripts/coolify-deploy-init.sh
+#
+# Architektura v3 (2026-04-24):
+#   Frontend = public edge (Traefik, TLS terminace) + Netbird mesh management
+#   Backend  = backend (DB, identity, orchestration, observability, integration)
+#   Experimental = isolated execution plane (svc-agent-runner s Kata) + ledger
+#   Build = build-only (mimo Coolify)
+#
+# Apps (16 total) — všechny .yml jsou v root repa:
+#   ── Frontend (3) ──────────────────────────────────────────────────────────────
+#    1. aisha-registry      Frontend  registry:2 pull-through cache pro Docker Hub
+#    2. aisha-edge          Frontend  Web SPA (nginx prebuilt) — web.aisha.guru
+#    3. aisha-netbird       Frontend  Netbird mesh (mgmt+signal+relay+dashboard)
+#   ── Backend (11) ─────────────────────────────────────────────────────────────
+#    +. aisha-shared-redis  Backend   Redis 7 + ACL users (core/langfuse/n8n/admin)
+#                                  — WS db_changes fabric + @aisha/cache-redis;
+#                                  alias aisha-shared-redis on coolify net (Phase 1)
+#    4. aisha-core          Backend   PG17+PostgREST+aisha-gateway+MinIO+Redis+
+#                                  imgproxy+svc-plugin-system+svc-mcp-knowledge+
+#                                  netbird-agent (mesh sidecar)+migrate
+#                                  (auth via keycloak; jediná auth vrstva stacku)
+#    5. aisha-keycloak      Backend   Keycloak OIDC (auth.aisha.guru)
+#    6. aisha-pki           Backend   OpenXPKI (pki.aisha.guru)
+#    7. aisha-orchestration Backend   n8n workflow engine (n8n.aisha.guru)
+#    8. aisha-messaging     Backend   Matrix Synapse + Element
+#    9. aisha-observability Backend   Langfuse (langfuse.aisha.guru)
+#   10. aisha-admin         Backend   NocoDB + Appsmith
+#   11. aisha-integration   Backend   Ragnarok RAG + Elasticsearch + RabbitMQ
+#   12. aisha-llm-gateway   Backend   theopenco/llmgateway — IDE proxy +
+#                                  /v1/batches passthrough (Phase 2D autopilot)
+#                                  optional/opt-in tier
+#   13. aisha-openclaw      Backend   OpenClaw advisory planner + sandbox +
+#                                  multi-channel notify (Phase 2B autopilot)
+#                                  optional/opt-in tier
+#   ── Experimental (2) ──────────────────────────────────────────────────────────────
+#   14. aisha-ledger        Experimental  Cosmos SDK validator (RPC public)
+#   15. aisha-exec          Experimental  svc-agent-runner s Kata (kata-fc + kata-dragonball)
+#                                  — Vyžaduje Experimental prereq: infra/ansible/experimental-kata.yml
+#                                  — Cold-start MŮŽE být úspěšný i bez Kata runtime
+# ==============================================================================
+
+story: aisha
+repo: aisha/evymo-ai-orchestrator
+branch: main
+
+# ── Frontend (public edge — Traefik, TLS) ───────────────────────────────────────
+# REGISTRY MUSÍ BÝT PRVNÍ — pull-through cache pro Docker Hub. Bez něj
+# ostatní stacky narazí na anonymous rate-limit (100 pull / 6h / IP).
+app: registry:frontend:docker-compose.coolify-registry.yml
+app: edge:frontend:docker-compose.coolify-prebuilt.yml
+# web-render: předgenerování publikovaných stránek do statického HTML.
+# VLASTNÍ aplikace, ne kontejner v edge — tier:optional, vlna 10 (za edge).
+# Sdílí s `edge` hostitelské adresáře TÉTO instance (WEB_RENDER_STATIC_HOST_DIR,
+# WEB_RENDER_SHELL_HOST_DIR — odvozené z identity), proto MUSÍ běžet na témže
+# stroji (frontend): hostitelský adresář hranici stroje nepřekročí.
+# Jako kontejner uvnitř edge by po limitu restartů shodil přes StopApplication
+# celou veřejnou tvář — web, api, auth i extranet (naměřeno 2026-08-31, 2×).
+app: web-render:frontend:docker-compose.coolify-web-render.yml
+app: netbird:backend:docker-compose.coolify-netbird.yml
+# monitoring: Dozzle log viewer + dozzle-auth (Keycloak OIDC via studio-proxy).
+# tier:optional ops surface; https://${DOZZLE_DOMAIN} → dozzle-auth:4181. Waved in
+# wave 6 (self-contained) + SOFT_DEPLOY_APPS in aisha-redeploy.mjs.
+app: monitoring:frontend:docker-compose.coolify-monitoring.yml
+
+# ── Shared infra (Redis 7 + ACL) ────────────────────────────────────────────
+# shared-redis: ACL users core/langfuse/n8n/admin on an entrypoint-generated
+# users.acl (`user default off`). Only `core` is wired today (WS db_changes
+# fabric: event-worker PUBLISH / ws-gateway SUBSCRIBE; @aisha/cache-redis
+# consumers svc-ide-context db3 + svc-mcp-knowledge db1). Reached cross-stack
+# via the explicit `aisha-shared-redis` alias on the shared `coolify` network.
+# Pure infra, no deps → deploys in WAVE 1 (before core/realtime consumers).
+app: shared-redis:backend:docker-compose.coolify-shared-redis.yml
+
+# ── Backend (backend — internal-only, reached via Netbird mesh) ─────────────────
+# Tag suffix `bluegreen=on` opt-in per app — story-init pak vytvoří 2 Coolify apps
+# (X-blue + X-green), promote řízeno přes n8n WF_BLUE_GREEN_ORCHESTRATOR + smoke
+# test v exec sandbox. Bez flagu = standardní single-app deploy.
+app: core:backend:docker-compose.coolify.yml
+# pgadmin (DB admin UI + OIDC proxy) — extracted from core to keep core compose
+# under the Coolify ARG_MAX gate (2026-07-15). Co-located with core (reaches db
+# on the shared internal network); routed at STUDIO_DOMAIN / STUDIO_DOMAIN_DIRECT.
+app: pgadmin:backend:docker-compose.coolify-pgadmin.yml
+app: keycloak:backend:docker-compose.coolify-keycloak.yml:bluegreen=on
+app: pki:backend:docker-compose.coolify-pki.yml
+app: orchestration:backend:docker-compose.coolify-n8n.yml
+app: messaging:backend:docker-compose.coolify-matrix.yml
+app: observability:backend:docker-compose.coolify-langfuse.yml
+app: admin:backend:docker-compose.coolify-admin.yml
+app: integration:backend:docker-compose.coolify-integration.yml
+
+# ── AI orchestration + realtime fabric (extracted from core: ARG_MAX ceiling) ─
+# ai-chat: svc-ai-chat (:3011) — the gateway's /functions/v1/ai-* routes target
+#   http://svc-ai-chat:3011 via the cross-stack network alias. Internal-only.
+# realtime: event-worker (PG LISTEN→Redis) + ws-gateway (Redis→WS :3002) +
+#   svc-ide-context (:3050). Restores the fabric trimmed in the early-Coolify
+#   argv-limit era (240488b2, c2ac47f5). Internal aliases keep the gateway's
+#   ws-gateway:3002 proxy target working.
+app: ai-chat:backend:docker-compose.coolify-ai-chat.yml
+app: realtime:backend:docker-compose.coolify-realtime.yml
+
+# ── Phase 2 autopilot capabilities (opt-in, tier=optional) ───────────────────
+# Both are AGPLv3 self-hosted; backend (svc-ai-chat) NEVER routes through
+# llm-gateway in autonomous AISHA path — gateway serves IDE dev traffic +
+# batch endpoint passthrough only. openclaw is advisory-only (planner +
+# sandbox + outbound notify) — n8n workflows remain the execution layer.
+app: llm-gateway:backend:docker-compose.coolify-llm-gateway.yml
+app: openclaw:backend:docker-compose.coolify-openclaw.yml
+
+# ── Federation broker (opt-in, tier=optional) ───────────────────────────────
+# svc-source-broker: federates an EXTERNAL source app's users into an aisha
+# session (source OTP + mantra → broker → gateway /token-exchange → role=
+# authenticated). coolify-story-init.sh creates this app ONLY when SOURCE_API_URL
+# is configured, so non-federated forks never get it. Deps: core (db) + keycloak
+# (admin-guard JWKS) — joins redeploy wave 4. SOFT: failure doesn't block waves.
+app: source-broker:backend:docker-compose.coolify-source-broker.yml
+
+# ── Webdispečink fleet import (opt-in, tier=optional) ───────────────────────
+# ── T-cars fleet/machine import (opt-in, tier=optional) ─────────────────────
+app: domain-services:backend:docker-compose.coolify-domain-services.yml
+
+# ── Verified ingestion + flow-runtime loop (opt-in, tier=optional) ──────────
+# svc-local-ingest: generický offline dokumentový ingest engine (3-gate
+# validátor: schema + source-span + confidence). Zapisuje POUZE soubory —
+# export bundly drainuje source-broker li-driver; DB se nikdy nedotkne.
+# coolify-story-init.sh vytvoří app JEN když je INGEST_BUNDLE_GIT_URL
+# nastaveno (instance data bundle). Placement experimental (izolovaná
+# AI/staging plane, resource caps v compose). SOFT: failure doesn't block waves.
+app: local-ingest:experimental:docker-compose.coolify-local-ingest.yml
+
+# extranet: zákaznický povrch (surface-host SPA). VLASTNÍ kontejner a compose
+# jako každý jiný stack — edge jen ROUTUJE jeho veřejný host (extra.<PUBLIC_TLD>),
+# nehostuje ho. Instance je pouze build arg (SHELL_APP + INSTANCE_DIR), takže
+# tenhle řádek nejmenuje žádnou instanci. Do 2026-07-29 existoval v Coolify, ale
+# v ŽÁDNÉM registru — nenasazoval ho nikdo a stál na commitu z předchozí noci,
+# zatímco kolem promergovaly tři PR. SOFT: failure doesn't block waves.
+app: extranet:frontend:docker-compose.coolify-extranet.yml
+
+# svc-model: lokální OpenAI-kompat serving (tuned chat + embeddings); opt-in —
+# provisioned only when CHAT_GGUF_URL is set (services.json provision_when_env).
+# SOFT: failure doesn't block waves.
+app: model:experimental:docker-compose.coolify-model.yml
+# svc-potok: flow-definition runtime (FDL → verification gates + budgets +
+# provenance ledger). Generace jde přes governed Omni /v1 (svc-ai-chat za
+# core gateway), learning triggeruje WF_FINE_TUNE_JOB — nikdy netrénuje
+# in-process. coolify-story-init.sh vytvoří app JEN když je POTOK_ENABLED
+# nastaveno. Deps: core + keycloak. SOFT: failure doesn't block waves.
+app: potok:backend:docker-compose.coolify-potok.yml
+
+# Shared antivirus sidecar (clamd) — flow-through malware scan for uploads + (later)
+# mail attachments before promotion/vectorization. tier=optional, non-HTTP (alias `clamd`).
+app: clamav:backend:docker-compose.coolify-clamav.yml
+
+# svc-playwright-runner: E2E runner (polluje frontu, spouští specy). tier=optional.
+# Do 2026-08-21 existoval v Coolify, ale v ŽÁDNÉM registru — přesně třída vady,
+# kterou hlídá brána stack-bez-deploy-ulohy (stack mimo manifest je neviditelný
+# pro cold-start, doctor, redeploy i sync-envs). Přibyl sem s konverzí na mesh
+# (netbird-agent + mesh-ingress potřebují pki-init, tedy `build:`). SOFT.
+app: playwright:backend:docker-compose.coolify-playwright.yml
+
+# Warmup — zakládá hostitelské sítě instance a skončí. Jedna na každé umístění,
+# protože Coolify aplikace běží na JEDNOM serveru. Cold-start je po rolloutu maže
+# (montují docker.sock, takže nesmí zůstat stát).
+app: netinit-frontend:frontend:docker-compose.coolify-netinit.yml
+app: netinit-backend:backend:docker-compose.coolify-netinit.yml
+app: netinit-experimental:experimental:docker-compose.coolify-netinit.yml
+
+# Mesh resolver — JEDEN NA STROJ (⛔ naměřeno 2026-09-06).
+# Resolver bydlel jen ve stacku `edge` (placement frontend), takže na ostatních
+# strojích pin .250 nedržel NIKDO a jejich kontejnery měly `dns:` do prázdna —
+# mesh jména odtud nešla přeložit, a protože většina služeb své protějšky stejně
+# nachází aliasem vlastní sítě, tvářilo se všechno zdravě. Táž logika jako u
+# netinit: aplikace Coolify běží na JEDNOM serveru, kdežto resolver je zdroj
+# HOSTITELE, takže se rozpadá po rolích. Soubory generuje scripts/gen-mesh-router.mjs.
+app: mesh-router-backend:backend:docker-compose.coolify-mesh-router-backend.yml
+app: mesh-router-experimental:experimental:docker-compose.coolify-mesh-router-experimental.yml
+
+# Phase 12 — observability stack (Loki + Prometheus + Grafana behind OAuth2 Proxy).
+# Tier=optional opt-in: surfaces logs + metrics for the rest of the stack; not
+# required for runtime correctness, but recommended for SRE visibility.
+app: observability-stack:backend:docker-compose.coolify-observability.yml
+app: livekit:backend:docker-compose.coolify-livekit.yml
+
+# ── Experimental (execution + ledger) ───────────────────────────────────────────────
+app: ledger:experimental:docker-compose.coolify-cosmos.yml
+app: exec:experimental:docker-compose.coolify-exec.yml

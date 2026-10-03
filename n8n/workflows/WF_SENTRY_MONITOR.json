@@ -1,0 +1,314 @@
+{
+  "name": "WF_SENTRY_MONITOR",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/get_sentry_monitor_configs",
+        "authentication": "genericCredentialType",
+        "sendHeaders": false,
+        "options": {},
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "fetch-configs",
+      "name": "Fetch Sentry Configs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "split-projects",
+      "name": "Split Projects",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/functions/v1/sentry-monitor?action=issues&project={{ $json.project_slug }}",
+        "authentication": "genericCredentialType",
+        "sendHeaders": false,
+        "options": {
+          "timeout": 15000
+        },
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "fetch-issues",
+      "name": "Fetch Sentry Issues",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-critical",
+              "leftValue": "={{ $json.issues.filter(i => ['fatal', 'error'].includes(i.level)).length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-critical",
+      "name": "Has Critical Issues?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/functions/v1/sentry-monitor",
+        "authentication": "genericCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "analyze"
+            },
+            {
+              "name": "issue_id",
+              "value": "={{ $json.issues.filter(i => ['fatal', 'error'].includes(i.level))[0].id }}"
+            },
+            {
+              "name": "project_slug",
+              "value": "={{ $json.issues[0].project_slug }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        },
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "trigger-analysis",
+      "name": "Trigger AISHA Analysis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/functions/v1/send-push-notification",
+        "authentication": "genericCredentialType",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "category",
+              "value": "security_alert"
+            },
+            {
+              "name": "title",
+              "value": "Sentry: New critical issue"
+            },
+            {
+              "name": "body",
+              "value": "={{ $json.issues.filter(i => ['fatal', 'error'].includes(i.level))[0].title }}"
+            },
+            {
+              "name": "target_roles",
+              "value": "[\"admin\", \"staff\"]"
+            }
+          ]
+        },
+        "options": {},
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "send-push",
+      "name": "Push Notification",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "no-critical",
+      "name": "No Critical Issues",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1320,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Fetch Sentry Configs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Sentry Configs": {
+      "main": [
+        [
+          {
+            "node": "Split Projects",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Projects": {
+      "main": [
+        [
+          {
+            "node": "Fetch Sentry Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Sentry Issues": {
+      "main": [
+        [
+          {
+            "node": "Has Critical Issues?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Critical Issues?": {
+      "main": [
+        [
+          {
+            "node": "Trigger AISHA Analysis",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Critical Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger AISHA Analysis": {
+      "main": [
+        [
+          {
+            "node": "Push Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

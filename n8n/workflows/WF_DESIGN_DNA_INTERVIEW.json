@@ -1,0 +1,179 @@
+{
+  "name": "WF_DESIGN_DNA_INTERVIEW",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "design-dna-interview",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Design DNA Interview Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate input parameters\nconst body = $input.first().json.body ?? $input.first().json;\nconst partner_id = body.partner_id;\nconst session_id = body.session_id;\nconst user_answers = body.answers ?? [];\n\nif (!partner_id) {\n  throw new Error('partner_id is required');\n}\n\nreturn [{ json: { partner_id, session_id, user_answers } }];"
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Load existing design profile via MCP\nconst { partner_id } = $input.first().json;\n\nconst mcpUrl = $env.AISHA_POSTGREST_URL + '/functions/v1/mcp-knowledge-server';\nconst mcpToken = $env.AISHA_ACCESS_TOKEN;\n\nconst response = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': `Bearer ${mcpToken}`\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: 1,\n    method: 'tools/call',\n    params: {\n      name: 'get_design_profile',\n      arguments: { partner_id }\n    }\n  })\n});\n\nconst result = await response.json();\nconst profile = result?.result?.content?.[0]?.text ?? null;\nconst existingProfile = profile ? JSON.parse(profile) : null;\n\nreturn [{ json: { ...$input.first().json, existing_profile: existingProfile } }];"
+      },
+      "id": "load-profile",
+      "name": "Load Existing Profile",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Load personality context from Hippocampus via compose_context\nconst { partner_id } = $input.first().json;\n\nconst mcpUrl = $env.AISHA_POSTGREST_URL + '/functions/v1/mcp-knowledge-server';\nconst mcpToken = $env.AISHA_ACCESS_TOKEN;\n\nconst response = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': `Bearer ${mcpToken}`\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: 2,\n    method: 'tools/call',\n    params: {\n      name: 'compose_context',\n      arguments: {\n        agent_slug: 'occipitum',\n        context_profile_slug: 'chat_lightweight',\n        query: 'design DNA interview personality context'\n      }\n    }\n  })\n});\n\nconst result = await response.json();\nconst context = result?.result?.content?.[0]?.text ?? '';\n\nreturn [{ json: { ...$input.first().json, personality_context: context } }];"
+      },
+      "id": "load-personality",
+      "name": "Load Personality Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate adaptive interview questions based on existing profile gaps\nconst { existing_profile, user_answers, personality_context } = $input.first().json;\n\nconst profile = existing_profile?.profile ?? null;\nconst hasProfile = existing_profile?.status === 'ok';\n\n// Determine what's missing from the profile\nconst gaps = [];\nif (!hasProfile || !profile?.brand_dna?.personality) gaps.push('brand_personality');\nif (!hasProfile || !profile?.brand_dna?.tone_of_voice) gaps.push('tone_of_voice');\nif (!hasProfile || !profile?.ux_persona?.goals?.length) gaps.push('user_goals');\nif (!hasProfile || !profile?.ux_persona?.emotional_expectations?.length) gaps.push('emotional_expectations');\nif (!hasProfile || !profile?.style_preferences?.liked_styles?.length) gaps.push('style_preferences');\nif (!hasProfile || !profile?.style_preferences?.vibe_words?.length) gaps.push('vibe_words');\nif (!hasProfile || !profile?.design_constraints?.accessibility_level) gaps.push('accessibility');\n\n// How many answers do we have already?\nconst answeredCount = user_answers?.length ?? 0;\nconst maxQuestions = 8;\nconst remainingQuestions = Math.max(0, maxQuestions - answeredCount);\n\n// If all gaps filled or max questions reached, we're done\nconst isComplete = gaps.length === 0 || remainingQuestions === 0;\n\nreturn [{ json: {\n  ...$input.first().json,\n  gaps,\n  is_complete: isComplete,\n  remaining_questions: remainingQuestions,\n  answered_count: answeredCount\n} }];"
+      },
+      "id": "analyze-gaps",
+      "name": "Analyze Profile Gaps",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-5",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "={{$json.system_prompt}}"
+            },
+            {
+              "role": "user",
+              "content": "={{$json.user_prompt}}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.85,
+          "maxTokens": 2048
+        }
+      },
+      "id": "generate-questions",
+      "name": "Generate Interview Questions",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1,
+      "position": [1340, 300],
+      "notes": "Generates poetic, adaptive interview questions. System prompt from SYSTEM_PROMPTS.md OCCIPITUM_INTERVIEW section."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract design DNA from all collected answers\nconst { user_answers, existing_profile, partner_id } = $input.first().json;\n\n// Build structured profile from LLM-extracted answers\n// The LLM response contains extracted_dna JSON\nconst llmResponse = $input.first().json.llm_response;\nlet extractedDna;\ntry {\n  extractedDna = typeof llmResponse === 'string' ? JSON.parse(llmResponse) : llmResponse;\n} catch {\n  extractedDna = { brand_dna: {}, ux_persona: {}, style_preferences: {} };\n}\n\nreturn [{ json: {\n  partner_id,\n  brand_dna: extractedDna.brand_dna ?? {},\n  ux_persona: extractedDna.ux_persona ?? {},\n  style_preferences: extractedDna.style_preferences ?? {},\n  design_constraints: extractedDna.design_constraints ?? {}\n} }];"
+      },
+      "id": "extract-dna",
+      "name": "Extract Design DNA",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Upsert design profile via MCP\nconst { partner_id, brand_dna, ux_persona, style_preferences, design_constraints } = $input.first().json;\n\nconst mcpUrl = $env.AISHA_POSTGREST_URL + '/functions/v1/mcp-knowledge-server';\nconst mcpToken = $env.AISHA_ACCESS_TOKEN;\n\nconst response = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': `Bearer ${mcpToken}`\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: 3,\n    method: 'tools/call',\n    params: {\n      name: 'upsert_design_profile',\n      arguments: {\n        partner_id,\n        brand_dna,\n        ux_persona,\n        style_preferences,\n        design_constraints\n      }\n    }\n  })\n});\n\nconst result = await response.json();\n\nreturn [{ json: {\n  partner_id,\n  upsert_result: result?.result?.content?.[0]?.text ?? JSON.stringify(result)\n} }];"
+      },
+      "id": "upsert-profile",
+      "name": "Upsert Design Profile",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "fn_log_ai_trace_event",
+        "rpcParams": "={\n  \"p_event_type\": \"n8n_workflow\",\n  \"p_agent_slug\": \"occipitum\",\n  \"p_operation\": \"occipitum_interview_complete\",\n  \"p_status\": \"ok\",\n  \"p_request_summary\": {{ JSON.stringify({ partner_id: $json.partner_id }) }}\n}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "log-trace",
+      "name": "Log Trace Event",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [2000, 300],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format final response\nconst result = $input.first().json;\n\nreturn [{ json: {\n  success: true,\n  signal: 'design_dna_interview_complete',\n  partner_id: result.partner_id,\n  upsert_result: result.upsert_result\n} }];"
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2220, 300]
+    }
+  ],
+  "connections": {
+    "Design DNA Interview Webhook": {
+      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
+    },
+    "Validate Input": {
+      "main": [[{ "node": "Load Existing Profile", "type": "main", "index": 0 }]]
+    },
+    "Load Existing Profile": {
+      "main": [[{ "node": "Load Personality Context", "type": "main", "index": 0 }]]
+    },
+    "Load Personality Context": {
+      "main": [[{ "node": "Analyze Profile Gaps", "type": "main", "index": 0 }]]
+    },
+    "Analyze Profile Gaps": {
+      "main": [[{ "node": "Generate Interview Questions", "type": "main", "index": 0 }]]
+    },
+    "Generate Interview Questions": {
+      "main": [[{ "node": "Extract Design DNA", "type": "main", "index": 0 }]]
+    },
+    "Extract Design DNA": {
+      "main": [[{ "node": "Upsert Design Profile", "type": "main", "index": 0 }]]
+    },
+    "Upsert Design Profile": {
+      "main": [[{ "node": "Log Trace Event", "type": "main", "index": 0 }]]
+    },
+    "Log Trace Event": {
+      "main": [[{ "node": "Format Response", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

@@ -1,0 +1,171 @@
+{
+  "_note": "Translation values for every data-i18n-key this template references. Consumed by `npm --prefix services/svc-web-artifact run export-web-seed` → emitted as `translations` rows. EN + CS authored by hand; de/fr/ru/th filled by `node scripts/i18n/translate-template-i18n.mjs domains/templates/farm-shop` (DeepL + context review). Prices, the stat number and the brand wordmark are hand-set in all 6 locales so the filler leaves them untouched.",
+  "web.farm.title": {
+    "en": "Maple Hollow Farm — shop & growing guides",
+    "cs": "Maple Hollow Farm — obchod a návody na pěstování",
+    "de": "Maple Hollow Farm – Shop & Anleitungen",
+    "fr": "Maple Hollow Farm — boutique et guides de culture",
+    "ru": "Maple Hollow Farm — магазин и руководства по выращиванию",
+    "th": "Maple Hollow Farm — ร้านค้าและคู่มือการปลูก"
+  },
+  "web.farm.description": {
+    "en": "A small family farm: fresh produce in the shop, and open growing guides to learn from.",
+    "cs": "Malá rodinná farma: čerstvé produkty v obchodě a otevřené návody na pěstování, ze kterých se můžete učit.",
+    "de": "Ein kleiner Familienbetrieb: frische Produkte im Laden und frei zugängliche Anleitungen zum Nachmachen.",
+    "fr": "Une petite exploitation familiale : des produits frais à la boutique et des guides de culture à disposition pour s'informer.",
+    "ru": "Небольшая семейная ферма: свежие продукты в магазине и доступные руководства по выращиванию, из которых можно почерпнуть полезную информацию.",
+    "th": "ฟาร์มครอบครัวขนาดเล็ก: ผักผลไม้สดในร้าน พร้อมคู่มือการเพาะปลูกให้ศึกษา"
+  },
+  "web.farm.brand": {
+    "en": "Maple Hollow Farm",
+    "cs": "Maple Hollow Farm",
+    "de": "Maple Hollow Farm",
+    "fr": "Maple Hollow Farm",
+    "ru": "Maple Hollow Farm",
+    "th": "Maple Hollow Farm"
+  },
+  "web.farm.nav.shop": {
+    "en": "Shop",
+    "cs": "Obchod",
+    "de": "Shop",
+    "fr": "Boutique",
+    "ru": "Магазин",
+    "th": "ร้านค้า"
+  },
+  "web.farm.nav.guides": {
+    "en": "Growing guides",
+    "cs": "Návody na pěstování",
+    "de": "Anzuchtanleitungen",
+    "fr": "Guides de culture",
+    "ru": "Руководства по выращиванию",
+    "th": "คู่มือการเพาะปลูก"
+  },
+  "web.farm.nav.visit": {
+    "en": "Visit",
+    "cs": "Návštěva",
+    "de": "Besuchen",
+    "fr": "Visitez",
+    "ru": "Посетите",
+    "th": "เยี่ยมชม"
+  },
+  "web.farm.hero.heading": {
+    "en": "Grown with care, sold the same week",
+    "cs": "Vypěstováno s péčí, prodáno ještě týž týden",
+    "de": "Mit Sorgfalt angebaut, noch in derselben Woche verkauft",
+    "fr": "Cultivés avec soin, vendus la même semaine",
+    "ru": "Выращено с заботой, продано в ту же неделю",
+    "th": "ปลูกด้วยความใส่ใจ ขายในสัปดาห์เดียวกัน"
+  },
+  "web.farm.hero.body": {
+    "en": "We farm a few good acres and sell what we pick. Browse the shop for this week's harvest — or borrow our growing guides and raise it yourself.",
+    "cs": "Hospodaříme na pár dobrých hektarech a prodáváme, co sklidíme. Projděte si obchod s tento týden sklizenou úrodou — nebo si půjčte naše návody a vypěstujte si ji sami.",
+    "de": "Wir bewirtschaften ein paar Hektar Land und verkaufen unsere Ernte. Stöbern Sie in unserem Shop nach der Ernte dieser Woche – oder leihen Sie sich unsere Anleitungen aus und bauen Sie die Pflanzen selbst an.",
+    "fr": "Nous cultivons quelques bons hectares et vendons ce que nous récoltons. Découvrez dans notre boutique la récolte de cette semaine — ou empruntez nos guides de culture pour cultiver vous-même.",
+    "ru": "Мы возделываем несколько гектаров земли и продаем то, что вырастили. Загляните в наш магазин, чтобы посмотреть урожай этой недели, — или возьмите у нас руководства по выращиванию и вырастите все сами.",
+    "th": "เราทำฟาร์มบนที่ดินที่ดีไม่กี่เอเคอร์และขายสิ่งที่เราเก็บได้ ลองดูสินค้าในร้านสำหรับผลผลิตประจำสัปดาห์นี้ — หรือยืมคู่มือการปลูกของเราและปลูกเองก็ได้"
+  },
+  "web.farm.hero.cta": {
+    "en": "Shop the harvest",
+    "cs": "Nakoupit úrodu",
+    "de": "Ernteprodukte kaufen",
+    "fr": "Profitez des produits de saison",
+    "ru": "Купить урожай",
+    "th": "ช้อปผลผลิตจากไร่"
+  },
+  "web.farm.shop.eyebrow": {
+    "en": "From our fields",
+    "cs": "Z našich polí",
+    "de": "Von unseren Feldern",
+    "fr": "De nos champs",
+    "ru": "С наших полей",
+    "th": "จากทุ่งของเรา"
+  },
+  "web.farm.shop.heading": {
+    "en": "This week in the shop",
+    "cs": "Tento týden v obchodě",
+    "de": "Diese Woche im Laden",
+    "fr": "Cette semaine en boutique",
+    "ru": "На этой неделе в магазине",
+    "th": "สัปดาห์นี้ในร้าน"
+  },
+  "web.farm.know.heading": {
+    "en": "Grow it yourself — ask our guides",
+    "cs": "Vypěstujte si to sami — zeptejte se našich návodů",
+    "de": "Selber anbauen – fragen Sie unsere Anleitungen",
+    "fr": "Cultivez-le vous-même — demandez conseil à nos guides",
+    "ru": "Вырастите сами — обратитесь к нашим руководствам",
+    "th": "ปลูกเอง — ถามคู่มือของเรา"
+  },
+  "web.farm.know.body": {
+    "en": "Twelve seasons of sowing dates, soil notes and what-went-wrong are written down and searchable. Ask in plain language — \"when do I start my tomatoes?\" — and get an answer drawn straight from our field notes.",
+    "cs": "Dvanáct sezón termínů výsevu, poznámek o půdě a toho, co se nepovedlo, máme zapsané a prohledávatelné. Zeptejte se běžným jazykem — „kdy mám předpěstovat rajčata?“ — a dostanete odpověď přímo z našich poznámek z pole.",
+    "de": "Zwölf Saisons voller Aussaattermine, Bodenbeschreibungen und Fehleranalysen sind festgehalten und können durchsucht werden. Fragen Sie einfach in Alltagssprache – „Wann soll ich mit dem Anbau meiner Tomaten beginnen?“ – und erhalten Sie eine Antwort, die direkt aus unseren Feldnotizen stammt.",
+    "fr": "Douze saisons de dates de semis, de notes sur le sol et de problèmes rencontrés sont consignées et consultables. Posez une question en langage simple — « Quand dois-je commencer à semer mes tomates ? » — et obtenez une réponse tirée directement de nos notes de terrain.",
+    "ru": "Данные о сроках посева, заметки о почве и информацию о возможных проблемах за двенадцать сезонов занесены в базу данных и доступны для поиска. Задайте вопрос простым языком — «Когда начинать сажать помидоры?» — и получите ответ, основанный на наших полевых записях.",
+    "th": "บันทึกการเพาะปลูกตลอดสิบสองฤดูกาล รายละเอียดดิน และข้อผิดพลาดต่าง ๆ ถูกบันทึกไว้และสามารถค้นหาได้ เพียงถามด้วยภาษาที่เข้าใจง่าย เช่น \"ฉันควรเริ่มปลูกมะเขือเทศเมื่อไหร่?\" คุณจะได้รับคำตอบที่อ้างอิงโดยตรงจากบันทึกภาคสนามของเรา"
+  },
+  "web.farm.know.cta": {
+    "en": "Ask a growing question",
+    "cs": "Zeptat se na pěstování",
+    "de": "Stellen Sie eine Frage zum Anbau",
+    "fr": "Posez une question sur la culture",
+    "ru": "Задайте вопрос о выращивании",
+    "th": "ถามคำถามเรื่องการปลูก"
+  },
+  "web.farm.know.statNum": {
+    "en": "12",
+    "cs": "12",
+    "de": "12",
+    "fr": "12",
+    "ru": "12",
+    "th": "12"
+  },
+  "web.farm.know.statLabel": {
+    "en": "seasons of field notes, searchable",
+    "cs": "sezón poznámek z pole, prohledávatelných",
+    "de": "Saisons voller Feldnotizen, durchsuchbar",
+    "fr": "saisons de notes de terrain, consultables",
+    "ru": "сезонов полевых заметок, с возможностью поиска",
+    "th": "ฤดูกาลของบันทึกภาคสนาม ค้นหาได้"
+  },
+  "web.farm.visit.heading": {
+    "en": "Come see the farm",
+    "cs": "Přijďte se na farmu podívat",
+    "de": "Schauen Sie sich den Bauernhof an",
+    "fr": "Venez découvrir la ferme",
+    "ru": "Приходите посмотреть на ферму",
+    "th": "มาดูฟาร์มกันเถอะ"
+  },
+  "web.farm.visit.body": {
+    "en": "The shop is open Saturday mornings, and we love showing people around. Bring a basket.",
+    "cs": "Obchod je otevřený v sobotu dopoledne a rádi lidi provedeme. Vezměte si košík.",
+    "de": "Der Laden hat samstagsvormittags geöffnet, und wir führen gerne Besucher herum. Bringen Sie einen Korb mit.",
+    "fr": "La boutique est ouverte le samedi matin, et nous adorons faire visiter les lieux. N'oubliez pas d'apporter un panier.",
+    "ru": "Магазин открыт по субботам утром, и мы с удовольствием проводим для посетителей экскурсии. Не забудьте взять с собой корзинку.",
+    "th": "ร้านเปิดเฉพาะเช้าวันเสาร์ และเรายินดีเป็นอย่างยิ่งที่จะพาทุกท่านชมร้าน อย่าลืมนำตะกร้ามาด้วยนะคะ"
+  },
+  "web.farm.visit.button": {
+    "en": "Plan a visit",
+    "cs": "Naplánovat návštěvu",
+    "de": "Besuch planen",
+    "fr": "Organisez votre visite",
+    "ru": "Запланируйте визит",
+    "th": "วางแผนการเยี่ยมชม"
+  },
+  "web.farm.footer.name": {
+    "en": "Maple Hollow Farm",
+    "cs": "Maple Hollow Farm",
+    "de": "Maple Hollow Farm",
+    "fr": "Maple Hollow Farm",
+    "ru": "Maple Hollow Farm",
+    "th": "Maple Hollow Farm"
+  },
+  "web.farm.footer.note": {
+    "en": "Grown without shortcuts, sold with a handshake.",
+    "cs": "Vypěstováno bez zkratek, prodáno se stiskem ruky.",
+    "de": "Ohne Abstriche angebaut, mit einem Handschlag verkauft.",
+    "fr": "Cultivé sans compromis, vendu sur la base d'une poignée de main.",
+    "ru": "Выращено без ухищрений, продается на честное слово.",
+    "th": "ปลูกโดยไม่ใช้ทางลัด ขายด้วยการจับมือ"
+  }
+}

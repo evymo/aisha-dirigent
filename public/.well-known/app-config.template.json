@@ -1,0 +1,15 @@
+{
+  "_comment": "Template — cold-start renders to app-config.json by substituting ${VAR} from env / config/domains.env (operator SoT). The gateway also serves a fresh-from-env copy at /.well-known/app-config.json — this static file is the SPA bundle fallback.",
+  "aisha_url": "https://${API_DOMAIN_PUBLIC}",
+  "ask_url": "https://${GATEWAY_DOMAIN_PUBLIC}/v1",
+  "anon_key": "${ANON_KEY}",
+  "keycloak_url": "https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}",
+  "redirect_url": "aisha-dirigent://oauth-callback",
+  "matrix_homeserver_url": "https://${MATRIX_DOMAIN}",
+  "matrix_service_url": "https://${API_DOMAIN_PUBLIC}/functions/v1/matrix-token-exchange",
+  "mcp_url": "https://${API_DOMAIN_PUBLIC}/functions/v1/mcp-knowledge-server",
+  "orchestration_url": "https://${DIRIGENT_DOMAIN}",
+  "n8n_trigger_url": "https://${API_DOMAIN_PUBLIC}/admin/n8n-trigger",
+  "web_url": "https://${APP_DOMAIN}",
+  "version": 3
+}

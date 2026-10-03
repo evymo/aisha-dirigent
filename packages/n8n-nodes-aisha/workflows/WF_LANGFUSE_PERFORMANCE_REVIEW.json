@@ -1,0 +1,316 @@
+{
+  "name": "WF_LANGFUSE_PERFORMANCE_REVIEW",
+  "id": "LangfusePerformance001",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 3
+            }
+          ]
+        }
+      },
+      "id": "daily-3am",
+      "name": "Daily at 3 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env?.AISHA_POSTGREST_URL || '' }}/functions/v1/mcp-knowledge-server",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'admin_langfuse_traces', arguments: { query_type: 'traces', limit: 100 } } }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "fetch-traces",
+      "name": "Fetch Recent Traces",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Z7oSSowoqk0ZgB8X",
+          "name": "AISHA Supabase (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analyze Langfuse traces for performance anomalies\nconst response = $input.item.json;\nlet traces = [];\n\ntry {\n  const result = response?.result?.content?.[0]?.text;\n  if (result) traces = JSON.parse(result);\n} catch (e) {\n  // If parsing fails, continue with empty traces\n}\n\nconst now = new Date();\nconst oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);\n\n// Performance metrics\nlet totalLatency = 0;\nlet totalCost = 0;\nlet traceCount = traces.length;\nlet highLatencyTraces = [];\nlet highCostTraces = [];\nlet lowScoreTraces = [];\nlet errorTraces = [];\n\nconst LATENCY_THRESHOLD_MS = 10000; // 10s\nconst COST_THRESHOLD = 0.50; // $0.50 per trace\nconst SCORE_THRESHOLD = 0.5; // below 50%\n\nfor (const trace of traces) {\n  const latency = trace.latency || trace.duration || 0;\n  const cost = trace.totalCost || trace.cost || 0;\n  const score = trace.scores?.length > 0 \n    ? trace.scores.reduce((a, s) => a + (s.value || 0), 0) / trace.scores.length \n    : null;\n\n  totalLatency += latency;\n  totalCost += cost;\n\n  if (latency > LATENCY_THRESHOLD_MS) {\n    highLatencyTraces.push({ id: trace.id, name: trace.name, latency, timestamp: trace.timestamp });\n  }\n  if (cost > COST_THRESHOLD) {\n    highCostTraces.push({ id: trace.id, name: trace.name, cost, timestamp: trace.timestamp });\n  }\n  if (score !== null && score < SCORE_THRESHOLD) {\n    lowScoreTraces.push({ id: trace.id, name: trace.name, score, timestamp: trace.timestamp });\n  }\n  if (trace.status === 'ERROR' || trace.statusMessage) {\n    errorTraces.push({ id: trace.id, name: trace.name, error: trace.statusMessage, timestamp: trace.timestamp });\n  }\n}\n\nconst avgLatency = traceCount > 0 ? Math.round(totalLatency / traceCount) : 0;\nconst anomalyCount = highLatencyTraces.length + highCostTraces.length + lowScoreTraces.length + errorTraces.length;\n\n// Determine severity\nlet severity = 'low';\nif (errorTraces.length >= 5 || highLatencyTraces.length >= 10) severity = 'critical';\nelse if (errorTraces.length >= 2 || highLatencyTraces.length >= 5 || highCostTraces.length >= 3) severity = 'high';\nelse if (anomalyCount >= 3) severity = 'medium';\n\nconst report = {\n  period: { from: oneDayAgo.toISOString(), to: now.toISOString() },\n  summary: {\n    totalTraces: traceCount,\n    avgLatencyMs: avgLatency,\n    totalCost: Math.round(totalCost * 100) / 100,\n    anomalyCount,\n    severity\n  },\n  anomalies: {\n    highLatency: { count: highLatencyTraces.length, threshold: LATENCY_THRESHOLD_MS + 'ms', items: highLatencyTraces.slice(0, 5) },\n    highCost: { count: highCostTraces.length, threshold: '$' + COST_THRESHOLD, items: highCostTraces.slice(0, 5) },\n    lowScore: { count: lowScoreTraces.length, threshold: (SCORE_THRESHOLD * 100) + '%', items: lowScoreTraces.slice(0, 5) },\n    errors: { count: errorTraces.length, items: errorTraces.slice(0, 5) }\n  },\n  hasAnomalies: anomalyCount > 0\n};\n\nreturn [{ json: report }];"
+      },
+      "id": "analyze-performance",
+      "name": "Analyze Performance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env?.AISHA_POSTGREST_URL || '' }}/functions/v1/mcp-knowledge-server",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'admin_nocodb_manage', arguments: { operation: 'create', table_name: 'performance_reports', data: { report_date: $json.period.to, severity: $json.summary.severity, total_traces: $json.summary.totalTraces, avg_latency_ms: $json.summary.avgLatencyMs, total_cost: $json.summary.totalCost, anomaly_count: $json.summary.anomalyCount, report_json: JSON.stringify($json) } } } }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "store-report-nocodb",
+      "name": "Store Report in NocoDB",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Z7oSSowoqk0ZgB8X",
+          "name": "AISHA Supabase (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env?.AISHA_POSTGREST_URL || '' }}/rest/v1/rpc/log_integration_action",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_service_name: 'langfuse', p_action: 'performance_review', p_action_detail: { period: $('Analyze Performance').item.json.period, summary: $('Analyze Performance').item.json.summary }, p_status: 'success', p_duration_ms: 0 }) }}"
+      },
+      "id": "log-review",
+      "name": "Log Performance Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Z7oSSowoqk0ZgB8X",
+          "name": "AISHA Supabase (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $('Analyze Performance').item.json.hasAnomalies }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "has-anomalies",
+      "name": "Has Anomalies?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env?.N8N_URL || '' }}/webhook/dirigent-agent",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: 'performance_review_complete', severity: $('Analyze Performance').item.json.summary.severity, report: { period: $('Analyze Performance').item.json.period, summary: $('Analyze Performance').item.json.summary, anomalies: $('Analyze Performance').item.json.anomalies }, source: 'langfuse_performance_review' }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "notify-dirigent-anomaly",
+      "name": "Notify Dirigent (Anomaly)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        300
+      ],
+      "notes": "Sends performance anomaly alert to Dirigent for autonomous triage"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('Analyze Performance').item.json.summary.severity }}",
+              "operation": "equals",
+              "value2": "critical"
+            }
+          ]
+        }
+      },
+      "id": "is-critical",
+      "name": "Is Critical?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env?.N8N_URL || '' }}/webhook/expert-notification",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ severity: 'critical', subject: 'Critical AI Performance Anomaly — Daily Report', message: 'Critical performance anomalies detected in Langfuse traces:\\n\\n' + 'Period: ' + $('Analyze Performance').item.json.period.from + ' — ' + $('Analyze Performance').item.json.period.to + '\\n' + 'Total traces: ' + $('Analyze Performance').item.json.summary.totalTraces + '\\n' + 'Anomaly count: ' + $('Analyze Performance').item.json.summary.anomalyCount + '\\n' + 'Errors: ' + $('Analyze Performance').item.json.anomalies.errors.count + '\\n' + 'High latency: ' + $('Analyze Performance').item.json.anomalies.highLatency.count + '\\n' + 'High cost: ' + $('Analyze Performance').item.json.anomalies.highCost.count + '\\n' + 'Low score: ' + $('Analyze Performance').item.json.anomalies.lowScore.count, context: $('Analyze Performance').item.json, source: 'langfuse_performance_review' }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "escalate-critical-performance",
+      "name": "Escalate to Expert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1780,
+        500
+      ],
+      "notes": "CRITICAL anomalies immediately notify human expert"
+    },
+    {
+      "parameters": {
+        "jsCode": "// No anomalies — log clean status\nreturn [{ json: { status: 'clean', message: 'No performance anomalies detected in the last 24 hours', timestamp: new Date().toISOString() } }];"
+      },
+      "id": "all-clear",
+      "name": "All Clear",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        500
+      ]
+    }
+  ],
+  "connections": {
+    "Daily at 3 AM": {
+      "main": [
+        [
+          {
+            "node": "Fetch Recent Traces",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Recent Traces": {
+      "main": [
+        [
+          {
+            "node": "Analyze Performance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Performance": {
+      "main": [
+        [
+          {
+            "node": "Store Report in NocoDB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Report in NocoDB": {
+      "main": [
+        [
+          {
+            "node": "Log Performance Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Performance Review": {
+      "main": [
+        [
+          {
+            "node": "Has Anomalies?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Anomalies?": {
+      "main": [
+        [
+          {
+            "node": "Notify Dirigent (Anomaly)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Is Critical?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "All Clear",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Critical?": {
+      "main": [
+        [
+          {
+            "node": "Escalate to Expert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {}
+}

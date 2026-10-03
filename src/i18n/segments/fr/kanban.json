@@ -1,0 +1,32 @@
+{
+  "kanban": {
+    "pageTitle": "Histoires kanban",
+    "pageSubtitle": "Faites glisser une histoire à travers les colonnes pour changer son statut kanban. Les règles de transition et les règles d'administration sont appliquées côté serveur.",
+    "moving": "Une histoire émouvante..",
+    "lane": {
+      "stack": "Pile",
+      "userStories": "Histoires d'utilisateurs"
+    },
+    "column": {
+      "empty": "Pas d'histoires ici"
+    },
+    "card": {
+      "priorityTooltip": "Priorité",
+      "agentTooltip": "Agent actuel / dernier agent",
+      "branchTooltip": "Branche par défaut",
+      "runningLive": "En cours d'exécution",
+      "costTooltip": "Coût IA à ce jour",
+      "liveSessionTooltip": "Session en direct {{source}} — {{phase}}"
+    },
+    "budget": {
+      "setTooltip": "Définir le budget IA",
+      "setShort": "Budget",
+      "dialogTitle": "Définir le budget IA",
+      "dialogDescription": "Plafond de dépenses IA à vie pour « {{title}} ». Laisser vide pour supprimer le plafond.",
+      "costLimitLabel": "Limite de coût (USD)",
+      "costLimitPlaceholder": "ex. 5.00",
+      "invalid": "Saisissez un montant non négatif.",
+      "saved": "Budget mis à jour."
+    }
+  }
+}

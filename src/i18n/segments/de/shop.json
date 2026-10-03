@@ -1,0 +1,575 @@
+{
+  "orderReview": {
+    "websitePlaceholder": "https://",
+    "title": "Bewerten Sie Ihre Bestellung",
+    "editTitle": "Bewertung bearbeiten",
+    "description": "Teilen Sie Ihre Erfahrungen mit dieser Bestellung",
+    "rating": "Bewertung",
+    "comment": "Kommentar (optional)",
+    "commentPlaceholder": "Erzählen Sie uns von Ihren Erfahrungen...",
+    "ratingRequired": "Bitte wählen Sie eine Bewertung aus",
+    "createSuccess": "Vielen Dank für Ihre Bewertung!",
+    "updateSuccess": "Bewertung erfolgreich aktualisiert",
+    "yourReview": "Ihre Bewertung",
+    "leaveReview": "Bewertung abgeben",
+    "availableIn": "Bewertung in {{days}} Tagen verfügbar",
+    "website": "Website"
+  },
+  "productReviews": {
+    "title": "Kundenbewertungen",
+    "basedOn": "Basierend auf {{count}} Bewertungen",
+    "basedOn_one": "Basierend auf {{count}} Bewertung",
+    "showingLatest": "Zeige {{shown}} von {{total}} Bewertungen"
+  },
+  "shop": {
+    "sectionLabel": "Platform von RTN",
+    "productsTitle": "Unsere Präparate",
+    "productsSubtitle": "Entdecken Sie unser Sortiment an Plattform-Werkzeugen, die auf bewährten Branchenpraktiken beruhen. Qualitätsorientierte Werkzeuge zur Unterstützung von Lieferung und Zuverlässigkeit.",
+    "cleanIngredients": "Reine Inhaltsstoffe",
+    "euCompliant": "Entspricht den EU-Standards",
+    "preorderNotice": "Präparate sind nur für registrierte Mitglieder zur Vorbestellung verfügbar. Die Mitgliedschaft umfasst den Zugang zu unseren Forschungsstudien und exklusiven Produktangeboten.",
+    "membersOnly": "Nur für Mitglieder",
+    "partnersOnly": "Nur für Partner",
+    "learnMore": "Erfahren Sie mehr",
+    "viewProduct": "Präparat anzeigen",
+    "outOfStock": "Nicht auf Lager",
+    "noProducts": "Noch keine Präparate verfügbar.",
+    "backToShop": "Zurück zum Shop",
+    "productNotFound": "Präparat nicht gefunden.",
+    "addToCart": "Zur Ritual hinzufügen",
+    "aboutProduct": "Über dieses Präparat",
+    "signInToPurchase": "Melden Sie sich an, um vorzubestellen und Ihren Warenkorb zu verwalten.",
+    "bridgeTitle": "Vom Archiv bis heute",
+    "bridgeSubtitle": "Unsere Präparate werden auf der Grundlage historischer Forschung entwickelt und mit modernen Sicherheits- und Qualitätsstandards neu gestaltet.",
+    "methodsStandards": "Lesen Sie unsere Methoden & Standards",
+    "membershipCtaTitle": "Interessiert an einer Vorbestellung?",
+    "membershipCtaDescription": "Treten Sie unserem Mitgliedsprogramm bei, um Zugang zu Vorbestellungen, Teilnahme an Forschungsstudien und exklusive Mitgliederbenefits zu erhalten.",
+    "becomeMember": "Mitglied werden",
+    "exploreStudies": "Studien erkunden",
+    "complianceNote": "Diese Präparate sind Nahrungsergänzungsmittel und nicht dazu bestimmt, Krankheiten zu diagnostizieren, zu behandeln, zu heilen oder zu verhindern. Konsultieren Sie immer einen Gesundheitsfachmann, bevor Sie ein neues Nahrungsergänzungsmittel einnehmen.",
+    "originSource": "Quelle",
+    "originProduction": "Herstellung",
+    "access": {
+      "viewOnly": "Nur ansehen",
+      "preorder": "Vorbestellen",
+      "canOrder": "Bestellen",
+      "autoApprove": "Automatische Genehmigung",
+      "signInForAccess": "Melden Sie sich an, um Ihre Zugriffsrechte zu sehen"
+    },
+    "emptyState": "Keine Produkte gefunden",
+    "viewDetail": "Detail ansehen"
+  },
+  "shopBridge": {
+    "sectionLabel": "Vom Archiv bis heute",
+    "title": "Wie wir historische Präparate übersetzen",
+    "subtitle": "Historische Zubereitungen informieren unsere modernen Ergänzungen. So überbrücken wir die Kluft — mit Integrität, Sicherheit und Transparenz.",
+    "historicalRecord": "Historischer Bericht",
+    "historicalDescription": "Ursprüngliche Präparate, die in Archiven der 1930er–1970er Jahre dokumentiert sind",
+    "modernStandards": "Moderne Standards",
+    "modernDescription": "GMP-Produktion, EU-Konformität, Sicherheitstests, klare Kennzeichnung",
+    "principles": {
+      "noMedicalClaims": {
+        "title": "Keine medizinischen Ansprüche",
+        "description": "Als Nahrungsergänzungsmittel gekennzeichnet, nicht als Medikamente"
+      },
+      "qualitySources": {
+        "title": "Qualitätsquellen",
+        "description": "Bio-Kräuter, kontrollierte tierische Quellen"
+      },
+      "fullTransparency": {
+        "title": "Vollständige Transparenz",
+        "description": "Archivlinks auf jeder Produktseite"
+      }
+    },
+    "viewProducts": "Moderne Ergänzungen ansehen",
+    "chooseExplore": "Wenn Sie sich entscheiden, unsere modernen Präsentationen zu erkunden:"
+  },
+  "subscription": {
+    "authRequired": "Authentifizierung erforderlich",
+    "authRequiredDesc": "Bitte melden Sie sich an, um ein Abonnement anzufordern.",
+    "activated": "Abonnement aktiviert",
+    "activatedDesc": "Ihr {{name}}-Abonnement ist jetzt aktiv.",
+    "purchaseFailed": "Abonnementanfrage fehlgeschlagen",
+    "purchaseFailedDesc": "Abonnementanfrage konnte nicht gesendet werden.",
+    "requested": "Abonnement angefordert",
+    "requestedDesc": "Ihre Anfrage für {{name}} wurde eingereicht und wartet auf Genehmigung.",
+    "requestFailed": "Anfrage fehlgeschlagen",
+    "requestFailedDesc": "Fehler beim Einreichen der Abonnementanfrage.",
+    "awaitingApproval": "Warten auf Genehmigung",
+    "approved": "Genehmigt - Warten auf Zahlung",
+    "payNow": "Jetzt bezahlen",
+    "checkoutStarted": "Checkout-Seite geöffnet",
+    "checkoutStartedDesc": "Schließen Sie die Zahlung im neuen Fenster ab.",
+    "checkoutFailed": "Checkout konnte nicht gestartet werden",
+    "portalFailed": "Abonnementverwaltung konnte nicht geöffnet werden",
+    "checkout": {
+      "selectPaymentType": "Zahlungsart wählen",
+      "oneTimePayment": "Einmalzahlung",
+      "oneTimeDesc": "Zahlen Sie den gesamten Betrag im Voraus für die gesamte Laufzeit des Abonnements.",
+      "recurringPayment": "Wiederkehrende Zahlung",
+      "recurringDesc": "Automatisch in regelmäßigen Abständen abgebucht.",
+      "recommended": "Empfohlen",
+      "billingFull": "Für die gesamte Laufzeit abgerechnet",
+      "billingMinimum": "Mindestbindung von {{months}} Monaten",
+      "billingInterval": "Abrechnung alle {{months}} Monate"
+    }
+  },
+  "orders": {
+    "title": "Meine Bestellungen",
+    "subtitle": "Übersicht über Ihre Bestellungen und deren Status.",
+    "noOrders": "Noch keine Bestellungen",
+    "noOrdersDescription": "Sie haben noch keine Bestellungen aufgegeben. Durchstöbern Sie unseren Shop!",
+    "browseShop": "Shop durchstöbern",
+    "orderNumber": "Bestellung",
+    "noOrdersDesc": "Sie haben noch keine Bestellungen aufgegeben. Durchstöbern Sie unseren Shop!",
+    "order": "Bestellung",
+    "product": "Präparat",
+    "total": "Gesamt",
+    "status": {
+      "pending": "Ausstehend",
+      "processing": "Wird bearbeitet",
+      "shipped": "Versandt",
+      "delivered": "Zugestellt",
+      "cancelled": "Storniert",
+      "refunded": "Erstattet"
+    },
+    "paymentMethod": {
+      "card": "Karte",
+      "bankTransfer": "Banküberweisung"
+    },
+    "paymentStatus": {
+      "pending": "Ausstehend",
+      "paid": "Bezahlt",
+      "failed": "Fehlgeschlagen",
+      "refunded": "Erstattet"
+    },
+    "invoice": {
+      "label": "Rechnung",
+      "download": "Rechnung herunterladen",
+      "printError": "Rechnung konnte nicht geöffnet werden"
+    },
+    "bankTransfer": {
+      "awaitingPayment": "Warten auf Banküberweisung",
+      "variableSymbol": "Variabelsymbol",
+      "dueDate": "Fälligkeitsdatum",
+      "viewDetails": "Zahlungsdetails anzeigen"
+    }
+  },
+  "cart": {
+    "title": "Ihr Ritual",
+    "signInToView": "Anmelden, um Ihren Warenkorb anzuzeigen",
+    "signInDescription": "Erstellen Sie ein Konto oder melden Sie sich an, um Artikel zu Ihrem Ritual hinzuzufügen.",
+    "empty": "Ihr Warenkorb ist leer",
+    "emptyDescription": "Durchstöbern Sie unsere Präparate und fügen Sie sie Ihrem Ritual hinzu.",
+    "browseProducts": "Präparate durchstöbern",
+    "total": "Gesamt",
+    "proceedToCheckout": "Zur Kasse",
+    "shippingCalculated": "Versand wird an der Kasse berechnet",
+    "qty": "Menge",
+    "added": "Zum Ritual hinzugefügt",
+    "addedDescription": "Artikel wurde Ihrem Warenkorb hinzugefügt.",
+    "removed": "Entfernt",
+    "removedDescription": "Artikel wurde aus dem Warenkorb entfernt."
+  },
+  "checkout": {
+    "title": "Kasse",
+    "cartEmpty": "Ihr Warenkorb ist leer",
+    "cartEmptyDescription": "Fügen Sie einige Präparate zu Ihrem Warenkorb hinzu, bevor Sie zur Kasse gehen.",
+    "continueShopping": "Weiter stöbern",
+    "contactInfo": "Kontakt & Adresse",
+    "firstName": "Vorname",
+    "lastName": "Nachname",
+    "email": "E-Mail",
+    "phone": "Telefonnummer",
+    "phonePlaceholder": "+420...",
+    "shippingMethod": "Versandmethode",
+    "selectPickupPoint": "Abholpunkt auswählen",
+    "selectedPickupPoint": "Ausgewählter Abholpunkt",
+    "noPickupPoints": "Keine Abholpunkte für dieses Land verfügbar",
+    "deliveryMethod": "Lieferung",
+    "shippingAddress": "Lieferadresse",
+    "address": "Adresse",
+    "city": "Stadt",
+    "postalCode": "Postleitzahl",
+    "country": "Land",
+    "stripeSecure": "Sichere Zahlung über Stripe. Ihre Kartendaten sind verschlüsselt und werden niemals auf unseren Servern gespeichert.",
+    "proceedToPayment": "Zur Zahlung fortfahren",
+    "processing": "Wird verarbeitet...",
+    "payment": {
+      "title": "Zahlungsmethode",
+      "card": "Kredit-/Debitkarte",
+      "cardDesc": "Sichere Kartenzahlung über Stripe.",
+      "bankTransfer": "Banküberweisung",
+      "bankTransferDesc": "Zahlung per Banküberweisung mit Variablen-Symbol. Bestellung wird nach Zahlungseingang bearbeitet.",
+      "bankTransferSecure": "Nach Bestellaufgabe erhalten Sie die Bankverbindung für die Überweisung.",
+      "placeOrderBankTransfer": "Bestellung aufgeben"
+    },
+    "bankTransfer": {
+      "orderCreated": "Bestellung erfolgreich erstellt",
+      "orderCreatedDesc": "Bitte führen Sie die Überweisung mit den unten stehenden Daten durch.",
+      "orderRef": "Bestellnummer:",
+      "paymentDetails": "Zahlungsdaten",
+      "paymentDetailsDesc": "Verwenden Sie die folgenden Daten für Ihre Überweisung.",
+      "iban": "IBAN",
+      "bic": "BIC/SWIFT",
+      "variableSymbol": "Variablen-Symbol",
+      "amount": "Betrag",
+      "dueDate": "Fälligkeitsdatum",
+      "copied": "Kopiert",
+      "copiedDesc": "{{field}} in die Zwischenablage kopiert.",
+      "importantTitle": "Wichtig",
+      "importantDesc": "Bitte geben Sie bei der Überweisung das exakte Variablen-Symbol an, damit die Zahlung automatisch zugeordnet werden kann.",
+      "goToOrders": "Meine Bestellungen",
+      "continueShopping": "Weiter einkaufen",
+      "orderNotFound": "Bestellung nicht gefunden",
+      "orderNotFoundDesc": "Die gesuchte Bestellung existiert nicht oder Sie haben keinen Zugriff darauf.",
+      "qrCode": {
+        "title": "QR-Zahlungscode",
+        "description": "Scannen Sie diesen QR-Code mit Ihrer Mobile-Banking-App, um die Zahlungsdaten automatisch auszufüllen.",
+        "scanToPay": "Zum Bezahlen scannen",
+        "ariaLabel": "QR-Code für Banküberweisungszahlung"
+      }
+    },
+    "consents": {
+      "title": "Rechtliche Einwilligungen"
+    },
+    "orderSummary": "Bestellübersicht",
+    "subtotal": "Zwischensumme",
+    "shipping": {
+      "title": "Versand",
+      "free": "Kostenlos",
+      "packetaPickup": "Zásilkovna Abholpunkt",
+      "packetaPickupDesc": "Holen Sie Ihre Bestellung an über 7.000 Standorten in ganz Europa ab",
+      "packetaHome": "Hauszustellung (Zásilkovna)",
+      "packetaHomeDesc": "Innerhalb von 2-4 Werktagen an Ihre Adresse geliefert",
+      "personalPickup": "Persönliche Abholung",
+      "personalPickupDesc": "Abholung in unserem Büro in Prag (Karlín)",
+      "pickup": "Abholpunkt",
+      "pickupDesc": "Holen Sie Ihre Bestellung an Tausenden Standorten ab",
+      "zbox": "Z-BOX Paketautomat",
+      "zboxDesc": "24/7 Selbstbedienungs-Paketautomaten-Netzwerk",
+      "homeDelivery": "Hauszustellung",
+      "homeDeliveryDesc": "Zustellung an Ihre Adresse durch Kurier",
+      "deliverToSameAddress": "An die oben angegebene Adresse liefern",
+      "deliverToDifferentAddress": "An eine andere Adresse liefern",
+      "deliveringTo": "Lieferung an:",
+      "carrierPickup": "Abholpunkt des Spediteurs",
+      "carrierHome": "Kurier-Hauszustellung",
+      "deliveryLocation": "Lieferort",
+      "postalCodePlaceholder": "z.B. 110 00",
+      "freeShippingEarned": "Sie haben kostenlosen Versand erhalten!",
+      "freeShippingRemaining": "Noch {{amount}} für kostenlosen Versand hinzufügen",
+      "freeShippingProgress": "Kostenloser Versand ab {{threshold}}",
+      "searchPickupPoint": "Nach Name oder Adresse suchen...",
+      "searchZBox": "Z-BOXen nach Name oder Adresse suchen...",
+      "selectedPoint": "Ausgewählter Abholpunkt",
+      "selectedZBox": "Ausgewählte Z-BOX",
+      "noPickupPointsFound": "Keine Abholpunkte für Ihre Suche gefunden",
+      "noZBoxesFound": "Keine Z-BOXen für Ihre Suche gefunden",
+      "noCarriersAvailable": "Keine Spediteure für dieses Land verfügbar",
+      "selectCarrier": "Spediteur auswählen",
+      "maxWeight": "Max. {{weight}} kg",
+      "noCod": "Nachnahme nicht verfügbar",
+      "showingOfTotal": "{{showing}} von {{total}} angezeigt",
+      "open247": "24/7",
+      "withKeypad": "Mit Tastatur",
+      "km": "km"
+    },
+    "validation": {
+      "firstNameRequired": "Vorname ist erforderlich",
+      "lastNameRequired": "Nachname ist erforderlich",
+      "emailInvalid": "Ungültige E-Mail-Adresse",
+      "phoneRequired": "Telefonnummer ist erforderlich",
+      "addressRequired": "Adresse ist erforderlich",
+      "cityRequired": "Stadt ist erforderlich",
+      "postalCodeInvalid": "Ungültiges Format der Postleitzahl",
+      "countryRequired": "Land ist erforderlich",
+      "consentsRequired": "Bitte akzeptieren Sie alle erforderlichen Einwilligungen."
+    },
+    "countries": {
+      "CZ": "Tschechische Republik",
+      "SK": "Slowakei",
+      "DE": "Deutschland",
+      "AT": "Österreich",
+      "PL": "Polen"
+    },
+    "messages": {
+      "success": "Bestellung erfolgreich aufgegeben",
+      "successDesc": "Vielen Dank für Ihre Bestellung! Wir senden Ihnen in Kürze eine Bestätigungs-E-Mail.",
+      "error": "Checkout fehlgeschlagen",
+      "errorDesc": "Bei der Verarbeitung Ihrer Bestellung ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+      "validationError": "Validierungsfehler",
+      "validationErrorDesc": "Bitte überprüfen Sie das Formular auf Fehler.",
+      "selectPickupPoint": "Bitte wählen Sie einen Abholpunkt",
+      "addressRequired": "Bitte füllen Sie die Lieferadresse aus",
+      "paymentSuccess": "Zahlung erfolgreich!",
+      "paymentSuccessDesc": "Ihre Bestellung wurde bestätigt. Sie erhalten in Kürze eine Bestätigungs-E-Mail.",
+      "paymentCancelled": "Zahlung abgebrochen",
+      "paymentCancelledDesc": "Ihre Zahlung wurde abgebrochen. Ihre Warenkorbartikel sind weiterhin gespeichert.",
+      "consentsRequired": "Bitte akzeptieren Sie alle erforderlichen Einwilligungen."
+    },
+    "voucher": {
+      "title": "Gutschein / Rabattcode",
+      "placeholder": "Code eingeben",
+      "apply": "Anwenden",
+      "remove": "Entfernen",
+      "applied": "Gutschein angewendet",
+      "appliedDesc": "Ihr Gutschein wurde erfolgreich auf die Bestellung angewendet.",
+      "invalid": "Ungültiger Gutschein",
+      "invalidDesc": "Der eingegebene Code ist ungültig, abgelaufen oder nicht anwendbar.",
+      "invalidProduct": "Produkt nicht im Warenkorb",
+      "invalidProductDesc": "Dieser Gutschein gilt für ein Produkt, das sich nicht in Ihrem Warenkorb befindet.",
+      "discount": "Gutscheinrabatt"
+    }
+  },
+  "products": {
+    "viewInShop": "Im Shop ansehen",
+    "viewArchive": "Archivdokumente anzeigen",
+    "exploreShop": "Shop erkunden",
+    "joinStudy": "An der Studie teilnehmen",
+    "preOrder": "Vorbestellen",
+    "ctaTitle": "Interessiert an RTN-Präparaten?",
+    "ctaDescription": "Entdecken Sie unser vollständiges Sortiment an Gewebepräparaten oder nehmen Sie an unserer Beobachtungsstudie teil, um zur laufenden Forschung beizutragen.",
+    "disclaimer": "Dies ist ein Nahrungsergänzungsmittel. Es ist kein Medikament und nicht dazu bestimmt, Krankheiten zu diagnostizieren, zu behandeln, zu heilen oder vorzubeugen. Konsultieren Sie vor der Anwendung einen Gesundheitsfachmann.",
+    "purchaseRequirements": {
+      "qualificationRequired": "Sie müssen den Qualifikationstest bestehen, um Präparate zu bestellen.",
+      "consentRequired": "Sie müssen die informierte Einwilligung unterzeichnen, um Präparate zu bestellen."
+    },
+    "retisin": {
+      "name": "Demo Product 1 (WERKZEUG-33)",
+      "badge": "Nukleoprotein Immunmodulator",
+      "tagline": "Stoffwechselbeschleuniger und regenerative Unterstützung",
+      "description": "Aus molekularbiologischer Sicht zielt Retisin auf die grundlegende Wiederherstellung der Zellenergie und der Immunüberwachung ab. Sein Hauptvorteil ist die Modulation des „Terrains” des Organismus – die Optimierung der Umgebung für regenerative Prozesse. Es wirkt als starkes Stärkungsmittel, das nachweislich die allgemeine Widerstandsfähigkeit des Organismus erhöht und fermentative Prozesse (die häufig mit dem Warburg-Effekt in pathologischem Gewebe in Verbindung gebracht werden) zugunsten des oxidativen Stoffwechsels unterdrückt. Es ist ideal bei Erschöpfungszuständen, zur Genesung nach invasiven Eingriffen oder Strahlentherapie und zur Unterstützung der Hämatopoese.",
+      "imageAlt": "Demo Product 1 30ml Tropfen",
+      "origin": {
+        "title": "Herkunft und Produktion",
+        "description": "Entproteinierter Ethanolextrakt aus Rindergewebe mit einem spezifischen Spektrum an niedermolekularen bioaktiven Substanzen.",
+        "source": {
+          "title": "Rinder-Gewebe",
+          "description": "Bezogen von zertifizierten Bio-Betrieben mit strengen Qualitätskontrollen."
+        },
+        "production": {
+          "title": "Auszug",
+          "description": "Spezifische Ethanol-Extraktion unter Erhalt niedermolekularer bioaktiver Substanzen."
+        }
+      },
+      "benefitsTitle": "Wichtigste Vorteile",
+      "benefits": {
+        "energy": {
+          "title": "Wiederherstellung der zellulären Energie",
+          "description": "Zielt auf die grundlegende Wiederherstellung der Zellenergie und die Optimierung der Stoffwechselprozesse ab."
+        },
+        "immunity": {
+          "title": "Überwachung des Immunsystems",
+          "description": "Moduliert das „Terrain“ des Organismus und optimiert die Umgebung für Regenerationsprozesse."
+        },
+        "resistance": {
+          "title": "Erhöhte Resistenz",
+          "description": "Historisch nachgewiesene Steigerung der Widerstandsfähigkeit des gesamten Organismus und Unterdrückung fermentativer Prozesse."
+        },
+        "recovery": {
+          "title": "Rekonvaleszenz",
+          "description": "Ideal bei Erschöpfung, nach invasiven Eingriffen oder Strahlentherapie und zur Unterstützung der Hämatopoese."
+        }
+      },
+      "compositionTitle": "Aktive Inhaltsstoffe",
+      "substances": {
+        "nucleotides": "Free nucleotides and nucleosides (AMP, CMP, IMP, GMP, UMP) - essential for DNA/RNA synthesis and energy (ATP)",
+        "peptides": "Bioaktive Peptide und Oligopeptide (Defensine, Hämocidine) mit immunmodulatorischer Funktion",
+        "aminoAcids": "Spektrum freier Aminosäuren und Derivate (Taurin) für die neuroendokrine Regulation"
+      },
+      "usageTitle": "Gebrauchsanweisung",
+      "usage": {
+        "application": {
+          "title": "Anmeldung",
+          "description": "Zum Einnehmen. Die Anwendung unter der Zunge wird empfohlen, um eine schnelle Aufnahme über die Schleimhaut zu erreichen und den Leberstoffwechsel (First-Pass-Effekt) zu umgehen. Form: 30 ml Tropfen (Lösung)."
+        },
+        "distribution": {
+          "title": "Vertrieb",
+          "description": "Die Standard-Productierung umfasst 1–2 ml täglich (ca. 20–40 Tropfen), idealerweise auf nüchternen Magen oder außerhalb der Mahlzeiten, um die Aufnahme der Peptidkomponenten zu maximieren."
+        },
+        "chronic": {
+          "title": "Langfristige Nutzung",
+          "description": "Geeignet für die langfristige Anwendung in Zyklen (z. B. 3 Monate Anwendung, 1 Monat Pause), um die Empfindlichkeit der Rezeptoren aufrechtzuerhalten."
+        }
+      }
+    },
+    "floristen": {
+      "name": "Demo Product 2 (DEMO-02)",
+      "badge": "Phytochemischer Entzündungshemmer",
+      "tagline": "Selektive Extraktion bei chronischen Entzündungen",
+      "description": "Floristen stellt einen einzigartigen Ansatz in der Phytotherapie bei chronischen Entzündungen dar. Im Gegensatz zu herkömmlichen Johanniskrautextrakten wurde dieses Präparat entwickelt, um phototoxische Komponenten zu eliminieren und unspezifische entzündungshemmende Wirkungen zu maximieren. Der Wirkmechanismus besteht in der Hemmung proliferativer Entzündungsprozesse und der Unterstützung der Resorption von Infiltraten (Entzündungsherden). Historisch bewährt bei chronischen gynäkologischen Entzündungen und antibiotikaresistenten Erkrankungen, wirkt es als „pflanzlicher Schutzschild” und unterstützt die Gewebevaskularisierung.",
+      "imageAlt": "Demo Product 2 30ml Tropfen",
+      "origin": {
+        "title": "Herkunft und Produktion",
+        "description": "Speziell hergestellter hydroalkoholischer Extrakt aus Hypericum perforatum (Johanniskraut), mit Schwerpunkt auf der wasserlöslichen Fraktion.",
+        "source": {
+          "title": "Hypericum perforatum",
+          "description": "Johanniskraut"
+        },
+        "production": {
+          "title": "Selektive Extraktion",
+          "description": "Eliminierung phototoxischer Komponenten, Maximierung der unspezifischen entzündungshemmenden Wirkung."
+        }
+      },
+      "benefitsTitle": "Wichtigste Vorteile",
+      "benefits": {
+        "antiInflammatory": {
+          "title": "Entzündungshemmende Wirkung",
+          "description": "Maximierte unspezifische entzündungshemmende Wirkung, Hemmung proliferativer Entzündungsprozesse."
+        },
+        "resorption": {
+          "title": "Unterstützung der Resorption",
+          "description": "Unterstützung der Resorption von Infiltraten (Entzündungsherden)."
+        },
+        "shield": {
+          "title": "Pflanzenschutzschild",
+          "description": "Wirkt bei chronischen Erkrankungen als pflanzlicher Schutzschild und unterstützt die Gewebevaskularisierung."
+        },
+        "safety": {
+          "title": "Sicherheit",
+          "description": "Entwickelt, um phototoxische Bestandteile zu eliminieren, die in Johanniskrautextrakten häufig vorkommen."
+        }
+      },
+      "compositionTitle": "Aktive Inhaltsstoffe",
+      "substances": {
+        "flavonoids": "Flavonoide (Quercetin, Rutin, Hyperosid, Amentoflavon) – starke antioxidative Wirkung, Entzündungsmodulation",
+        "phloroglucinols": "Phloroglucinole (begrenztes, modifiziertes Hyperforin/Adhyperforin) – erhaltenes antimikrobielles Potenzial, minimierte Wechselwirkungen",
+        "naphthodianthrones": "Naphthodianthrone (begrenzt, minimiertes Hypericin) – verringertes Risiko der Lichtempfindlichkeit, erhaltenes antivirales Potenzial"
+      },
+      "usageTitle": "Gebrauchsanweisung",
+      "usage": {
+        "application": {
+          "title": "Anmeldung",
+          "description": "Zum Einnehmen, in etwas Wasser gemischt oder direkt aufgetragen. Form: 30 ml Tropfen (Lösung)."
+        },
+        "distribution": {
+          "title": "Vertrieb",
+          "description": "Standardmäßig 20–30 Tropfen 2–3× täglich. Bei chronischen Erkrankungen ist eine langfristige Einnahme (mindestens 6–8 Wochen) entscheidend für die Sättigung des Gewebes mit Flavonoiden."
+        },
+        "warning": {
+          "title": "Warnung",
+          "description": "Obwohl der Extrakt modifiziert ist, wird bei Sonneneinstrahlung Vorsicht empfohlen und bei Einnahme von Immunsuppressiva oder hormonellen Verhütungsmitteln die Konsultation eines Arztes."
+        }
+      }
+    },
+    "lyastin": {
+      "name": "Demo Product 3 (DEMO-03)",
+      "badge": "Lipidomischer Regenerator",
+      "tagline": "Gefäßschutz und Membranregeneration",
+      "description": "Lyastin wirkt auf die Integrität der Zellmembranen und die Mikrozirkulation. Sein Hauptvorteil besteht in der Verbesserung der Ernährung (Trophik) ischämischer Gewebe und der Unterstützung der Regeneration des Gefäßendothels. Es wirkt, indem es wichtige Bausteine für die Reparatur der Zellwände liefert und als Vasodilatator und Spasmolytikum wirkt. Es ist indiziert zur Unterstützung der peripheren Durchblutung, zur Regeneration nach vaskulären Ereignissen und bei Erkrankungen, die mit einer Gewebedegeneration aufgrund von Hypoxie (Sauerstoffmangel) einhergehen.",
+      "imageAlt": "Demo Product 3 30ml Tropfen",
+      "origin": {
+        "title": "Herkunft und Produktion",
+        "description": "Ethanol-Ether-Extrakt aus Rindergewebe mit Schwerpunkt auf der Lipidfraktion.",
+        "source": {
+          "title": "Rinder-Gewebe",
+          "description": "Lipidfraktion"
+        },
+        "production": {
+          "title": "Auszug",
+          "description": "Ethanol-Äther-Extrakt"
+        }
+      },
+      "benefitsTitle": "Wichtigste Vorteile",
+      "benefits": {
+        "membrane": {
+          "title": "Integrität der Membranen",
+          "description": "Zielt auf die Integrität der Zellmembran ab und liefert Bausteine für die Reparatur."
+        },
+        "circulation": {
+          "title": "Mikrozirkulation und Trophik",
+          "description": "Verbesserung der Ernährung ischämischer Gewebe, Unterstützung der Regeneration des Gefäßendothels."
+        },
+        "vasodilation": {
+          "title": "Vasodilatation",
+          "description": "Wirkt als Vasodilatator und Spasmolytikum."
+        },
+        "indications": {
+          "title": "Indikationen",
+          "description": "Unterstützung der peripheren Durchblutung, Regeneration nach vaskulären Ereignissen, Erkrankungen im Zusammenhang mit Hypoxie."
+        }
+      },
+      "compositionTitle": "Aktive Inhaltsstoffe",
+      "substances": {
+        "phospholipids": "Phospholipide (Phosphatidylcholine, Sphingomyeline, Phosphoethanolamine) – entscheidend für die Fluidität und Funktion der Membran",
+        "lipoproteins": "Lipoproteine und Sterole – unterstützen den Lipidtransport und die Membranstabilität",
+        "fattyAcids": "Fettsäuren (optimiertes Verhältnis von n-3 und n-6) – Regulierung der Entzündungsreaktion auf Membranebene"
+      },
+      "usageTitle": "Gebrauchsanweisung",
+      "usage": {
+        "application": {
+          "title": "Anmeldung",
+          "description": "Oral. Aufgrund der Lipidbeschaffenheit wird empfohlen, das Produkt zur besseren Aufnahme zusammen mit fetthaltigen Lebensmitteln oder direkt einzunehmen. Form: 30 ml Tropfen (Lösung)."
+        },
+        "distribution": {
+          "title": "Vertrieb",
+          "description": "1–2 ml täglich (ca. 20–40 Tropfen). Bei Erkrankungen, die eine intensive Geweberegeneration erfordern (z. B. posttraumatische Zustände, Dekubitus), kann die Dosierung kurzfristig erhöht werden."
+        },
+        "synergy": {
+          "title": "Kombination",
+          "description": "Zeigt historisch gesehen eine starke Synergie mit Floristen (bei entzündlichen und nekrotischen Prozessen)."
+        }
+      }
+    },
+    "rtnDuo": {
+      "name": "Demo Product 4 (Demo Product 1 + Demo Product 2)",
+      "badge": "Synergistischer immunmetabolischer Komplex",
+      "tagline": "Stoffwechselanregung und entzündungshemmender Schutz",
+      "description": "Dieses Kombinationspräparat nutzt die Synergie zwischen Stoffwechselanregung (Retisin) und entzündungshemmendem Schutzschild (Floristen). Während Retisin „Brennstoff“ und Signalmoleküle für Immunzellen (Nukleotide, Peptide) liefert, moduliert Floristen das Entzündungsumfeld und reduziert oxidativen Stress. Die Sprayform ermöglicht eine schnelle Anwendung über die Mundschleimhaut und gewährleistet eine sofortige Verfügbarkeit für die Schleimhautimmunität (IgA) und den systemischen Kreislauf. Ideal zur akuten Unterstützung des Immunsystems, bei ersten Anzeichen einer Viruserkrankung oder zur Vorbeugung in Stressphasen.",
+      "imageAlt": "Demo Product 4 Spray",
+      "origin": {
+        "title": "Herkunft und Zusammensetzung",
+        "description": "Kombination der bioaktiven Spektren beider Ausgangsprodukte (Retisin + Floristen) in Sprayform.",
+        "source": {
+          "title": "Kombinierte Quelle",
+          "description": "Nukleoproteinfraktion aus Retisin und Flavonoidfraktion aus Floristen."
+        },
+        "production": {
+          "title": "Synergistische Formulierung",
+          "description": "Sprayform für maximale Bioverfügbarkeit und sofortige Resorption über die Schleimhaut."
+        }
+      },
+      "benefitsTitle": "Wichtigste Vorteile",
+      "benefits": {
+        "synergy": {
+          "title": "Synergistische Wirkung",
+          "description": "Die Kombination unterstützt die Sauerstoffverwertung im Gewebe und unterdrückt gleichzeitig die pathologische Proliferation."
+        },
+        "metabolic": {
+          "title": "Metabolische Unterstützung",
+          "description": "Liefert „Brennstoff“ und Signalmoleküle für Immunzellen (aus Retisin)."
+        },
+        "inflammation": {
+          "title": "Modulation von Entzündungen",
+          "description": "Moduliert das Entzündungsmilieu und reduziert oxidativen Stress (von Floristen)."
+        },
+        "absorption": {
+          "title": "Schnelle Absorption",
+          "description": "Das Spray ermöglicht eine schnelle Anwendung über die Schleimhaut, wobei der Verdauungstrakt und der Abbau umgangen werden."
+        }
+      },
+      "compositionTitle": "Aktive Inhaltsstoffe",
+      "substances": {
+        "nucleoproteins": "Nukleoproteinfraktion (aus Retisin) – DNA-Regeneration, Proteinsynthese in Immunzellen",
+        "flavonoids": "Flavonoidfraktion (von Floristen) – Quercetin und Rutin zur Stabilisierung der Kapillaren und Bekämpfung freier Radikale",
+        "complex": "Synergistischer Komplex – starke regenerative und schützende Wirkung"
+      },
+      "usageTitle": "Gebrauchsanweisung",
+      "usage": {
+        "application": {
+          "title": "Anmeldung",
+          "description": "Sublingual (unter der Zunge) oder auf die Rachenschleimhaut mit einem Zerstäuber. Vor Gebrauch schütteln. Form: 30 ml Spray (kombinierte Lösung)."
+        },
+        "distribution": {
+          "title": "Vertrieb",
+          "description": "Vorbeugend: 2× täglich 3–5 Sprühstöße. Akute Unterstützung: 5 Sprühstöße alle 3–4 Stunden während der ersten Tage der Belastung."
+        },
+        "note": {
+          "title": "Hinweis",
+          "description": "Die Sprayform wurde für maximale Verträglichkeit und Bioverfügbarkeit entwickelt und umgeht den Abbau im Verdauungstrakt."
+        }
+      }
+    }
+  }
+}

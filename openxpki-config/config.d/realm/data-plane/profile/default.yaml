@@ -1,0 +1,49 @@
+# =============================================================================
+# Data Plane — Certificate Profile Defaults
+# =============================================================================
+# Services: PostgreSQL, Elasticsearch, ClickHouse, Redis, MinIO, RabbitMQ
+# Focus: data-at-transit encryption, DB connection TLS
+# Key: EC P-384 (CNSA 2.0), Validity: server 6m, client 90d
+# OpenXPKI validity format: +YYMMDD (e.g. +01 = 1 year, +0006 = 6 months)
+
+key:
+    alg:
+      - ec
+
+    enc:
+      - aes256
+
+    generate: both
+
+    ec:
+        curve_name:
+          - secp384r1
+
+validity:
+    notafter: "+0006"
+
+digest: sha384
+
+extensions:
+    authority_info_access:
+        critical: 0
+        ca_issuers: http://${PKI_DOMAIN}/download/data-ca.pem
+        ocsp: http://${PKI_DOMAIN}/ocsp/data-plane/
+
+    crl_distribution_points:
+        critical: 0
+        uri:
+          - http://${PKI_DOMAIN}/download/[% ISSUER.CN.0.replace('[^\w-]','_') %].crl
+
+    policy_identifier:
+        critical: 0
+        oid: 1.3.6.1.4.1.311.21.8
+
+    authority_key_identifier:
+        critical: 0
+        keyid:  1
+        issuer: 1
+
+    subject_key_identifier:
+        critical: 0
+        hash: 1

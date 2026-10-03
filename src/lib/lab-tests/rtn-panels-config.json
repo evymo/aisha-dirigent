@@ -1,0 +1,1119 @@
+{
+  "version": "2.2",
+  "last_updated": "2026-02-04",
+  "i18n_namespace": "labTests",
+  "products": {
+    "retisin": {
+      "id": "retisin",
+      "i18n_key": "retisin",
+      "active_substances": [
+        "adenosine_monophosphate_AMP",
+        "cytidine_monophosphate_CMP",
+        "inosine_monophosphate_IMP",
+        "guanosine_monophosphate_GMP",
+        "uridine_monophosphate_UMP",
+        "free_amino_acids",
+        "defensins"
+      ],
+      "biochemical_category": "nucleotide_monophosphates",
+      "source": "bovine_blood_pigment",
+      "historical_indications": [
+        "anemia",
+        "regeneration",
+        "immunity",
+        "cancer_palliative"
+      ],
+      "target_biomarkers": [
+        "hemoglobin",
+        "RBC",
+        "WBC",
+        "lymphocytes",
+        "ATP_levels"
+      ]
+    },
+    "lyastin": {
+      "id": "lyastin",
+      "i18n_key": "lyastin",
+      "active_substances": [
+        "glycerophospholipids",
+        "sphingomyelins",
+        "phosphatidylcholines",
+        "phosphoethanolamines",
+        "triacylglycerides",
+        "sterols",
+        "lysophospholipids"
+      ],
+      "biochemical_category": "phospholipids_membrane_fragments",
+      "source": "spleen_lipid_extract",
+      "historical_indications": [
+        "ischemia",
+        "Buergers_disease",
+        "atherosclerosis",
+        "frostbite",
+        "peripheral_circulation"
+      ],
+      "target_biomarkers": [
+        "cholesterol",
+        "LDL",
+        "HDL",
+        "triglycerides",
+        "omega3_omega6_ratio",
+        "homocysteine"
+      ]
+    },
+    "floristen": {
+      "id": "floristen",
+      "i18n_key": "floristen",
+      "active_substances": [
+        "hypericin",
+        "hyperforin",
+        "quercetin",
+        "myricetin",
+        "flavonoids",
+        "water_soluble_plant_metabolites"
+      ],
+      "biochemical_category": "plant_polyphenols_flavonoids",
+      "source": "hypericum_perforatum_upper_parts",
+      "historical_indications": [
+        "chronic_inflammation",
+        "gynecological_inflammation",
+        "venous_issues",
+        "pancreatitis"
+      ],
+      "target_biomarkers": [
+        "CRP",
+        "ESR",
+        "IL6",
+        "TNF_alpha",
+        "oxidative_stress_markers"
+      ]
+    },
+    "silexil": {
+      "id": "silexil",
+      "i18n_key": "silexil",
+      "active_substances": [
+        "silicon_compounds",
+        "marine_minerals",
+        "trace_elements",
+        "collagen_precursors"
+      ],
+      "biochemical_category": "marine_mineral_complex",
+      "source": "marine_complex",
+      "historical_indications": [
+        "arthrosis",
+        "joint_pain",
+        "connective_tissue_issues"
+      ],
+      "target_biomarkers": [
+        "calcium",
+        "phosphorus",
+        "magnesium",
+        "silicon",
+        "collagen_markers"
+      ]
+    }
+  },
+  "panels": {
+    "baseline": {
+      "id": "baseline",
+      "i18n_key": "baseline",
+      "is_mandatory": true,
+      "timing": "pre_program",
+      "applicable_products": [
+        "retisin",
+        "lyastin",
+        "floristen",
+        "silexil"
+      ],
+      "tests": [
+        {
+          "code": "CBC_DIFF",
+          "priority": "required",
+          "reason_key": "CBC_DIFF"
+        },
+        {
+          "code": "CRP",
+          "priority": "required",
+          "reason_key": "CRP"
+        },
+        {
+          "code": "HS_CRP",
+          "priority": "recommended",
+          "reason_key": "HS_CRP"
+        },
+        {
+          "code": "ESR",
+          "priority": "recommended",
+          "reason_key": "ESR"
+        },
+        {
+          "code": "AST",
+          "priority": "required",
+          "reason_key": "AST"
+        },
+        {
+          "code": "ALT",
+          "priority": "required",
+          "reason_key": "ALT"
+        },
+        {
+          "code": "GGT",
+          "priority": "required",
+          "reason_key": "GGT"
+        },
+        {
+          "code": "CREA",
+          "priority": "required",
+          "reason_key": "CREA"
+        },
+        {
+          "code": "UREA",
+          "priority": "recommended",
+          "reason_key": "UREA"
+        },
+        {
+          "code": "GLU",
+          "priority": "required",
+          "reason_key": "GLU"
+        },
+        {
+          "code": "HBA1C",
+          "priority": "recommended",
+          "reason_key": "HBA1C"
+        },
+        {
+          "code": "CHOL",
+          "priority": "required",
+          "reason_key": "CHOL"
+        },
+        {
+          "code": "TG",
+          "priority": "required",
+          "reason_key": "TG"
+        },
+        {
+          "code": "HDL",
+          "priority": "required",
+          "reason_key": "HDL"
+        },
+        {
+          "code": "LDL",
+          "priority": "required",
+          "reason_key": "LDL"
+        },
+        {
+          "code": "TSH",
+          "priority": "required",
+          "reason_key": "TSH"
+        },
+        {
+          "code": "FT4",
+          "priority": "recommended",
+          "reason_key": "FT4"
+        },
+        {
+          "code": "VIT_D",
+          "priority": "required",
+          "reason_key": "VIT_D"
+        },
+        {
+          "code": "FERRITIN",
+          "priority": "required",
+          "reason_key": "FERRITIN"
+        },
+        {
+          "code": "B12",
+          "priority": "recommended",
+          "reason_key": "B12"
+        },
+        {
+          "code": "FOLATE",
+          "priority": "recommended",
+          "reason_key": "FOLATE"
+        }
+      ],
+      "total_estimated_price": 3200
+    },
+    "immune_deep": {
+      "id": "immune_deep",
+      "i18n_key": "immune_deep",
+      "is_mandatory": false,
+      "timing": "on_indication",
+      "applicable_products": [
+        "retisin"
+      ],
+      "conditions": [
+        "autoimmune_disease",
+        "chronic_inflammation",
+        "recurrent_infections"
+      ],
+      "tests": [
+        {
+          "code": "LYMPHOCYTE_PANEL",
+          "priority": "required",
+          "reason_key": "LYMPHOCYTE_PANEL"
+        },
+        {
+          "code": "IGA",
+          "priority": "required",
+          "reason_key": "IGA"
+        },
+        {
+          "code": "IGG",
+          "priority": "required",
+          "reason_key": "IGG"
+        },
+        {
+          "code": "IGM",
+          "priority": "required",
+          "reason_key": "IGM"
+        },
+        {
+          "code": "C3",
+          "priority": "recommended",
+          "reason_key": "C3"
+        },
+        {
+          "code": "C4",
+          "priority": "recommended",
+          "reason_key": "C4"
+        },
+        {
+          "code": "ANA_IF",
+          "priority": "conditional",
+          "reason_key": "ANA_IF"
+        },
+        {
+          "code": "RF",
+          "priority": "conditional",
+          "reason_key": "RF"
+        },
+        {
+          "code": "ACCP",
+          "priority": "conditional",
+          "reason_key": "ACCP"
+        }
+      ],
+      "total_estimated_price": 4500
+    },
+    "metabolic_deep": {
+      "id": "metabolic_deep",
+      "i18n_key": "metabolic_deep",
+      "is_mandatory": false,
+      "timing": "on_indication",
+      "applicable_products": [
+        "lyastin"
+      ],
+      "conditions": [
+        "fatigue",
+        "metabolic_syndrome",
+        "weight_issues",
+        "performance_optimization"
+      ],
+      "tests": [
+        {
+          "code": "INSULIN",
+          "priority": "required",
+          "reason_key": "INSULIN"
+        },
+        {
+          "code": "C_PEPTIDE",
+          "priority": "recommended",
+          "reason_key": "C_PEPTIDE"
+        },
+        {
+          "code": "HOMOCYSTEINE",
+          "priority": "required",
+          "reason_key": "HOMOCYSTEINE"
+        },
+        {
+          "code": "LP_A",
+          "priority": "recommended",
+          "reason_key": "LP_A"
+        },
+        {
+          "code": "APO_B",
+          "priority": "recommended",
+          "reason_key": "APO_B"
+        },
+        {
+          "code": "CORTISOL",
+          "priority": "required",
+          "reason_key": "CORTISOL"
+        },
+        {
+          "code": "DHEAS",
+          "priority": "recommended",
+          "reason_key": "DHEAS"
+        },
+        {
+          "code": "IGF1",
+          "priority": "conditional",
+          "reason_key": "IGF1"
+        },
+        {
+          "code": "COQ10",
+          "priority": "optional",
+          "reason_key": "COQ10"
+        },
+        {
+          "code": "MG_ERY",
+          "priority": "recommended",
+          "reason_key": "MG_ERY"
+        },
+        {
+          "code": "ZN",
+          "priority": "recommended",
+          "reason_key": "ZN"
+        },
+        {
+          "code": "SE",
+          "priority": "recommended",
+          "reason_key": "SE"
+        }
+      ],
+      "total_estimated_price": 5800
+    },
+    "gut_health": {
+      "id": "gut_health",
+      "i18n_key": "gut_health",
+      "is_mandatory": false,
+      "timing": "on_indication",
+      "applicable_products": [
+        "floristen"
+      ],
+      "conditions": [
+        "ibs",
+        "ibd",
+        "food_intolerance",
+        "bloating",
+        "dysbiosis"
+      ],
+      "tests": [
+        {
+          "code": "CALPROTECTIN",
+          "priority": "required",
+          "reason_key": "CALPROTECTIN"
+        },
+        {
+          "code": "FOB",
+          "priority": "required",
+          "reason_key": "FOB"
+        },
+        {
+          "code": "CELIAC_SCREEN",
+          "priority": "required",
+          "reason_key": "CELIAC_SCREEN"
+        },
+        {
+          "code": "TTG_IGA",
+          "priority": "conditional",
+          "reason_key": "TTG_IGA"
+        },
+        {
+          "code": "DGP_IGG",
+          "priority": "conditional",
+          "reason_key": "DGP_IGG"
+        },
+        {
+          "code": "H_PYLORI",
+          "priority": "recommended",
+          "reason_key": "H_PYLORI"
+        },
+        {
+          "code": "DAO",
+          "priority": "optional",
+          "reason_key": "DAO"
+        },
+        {
+          "code": "ZONULIN",
+          "priority": "optional",
+          "reason_key": "ZONULIN",
+          "note": "External lab required"
+        }
+      ],
+      "total_estimated_price": 3200
+    },
+    "liver_detox": {
+      "id": "liver_detox",
+      "i18n_key": "liver_detox",
+      "is_mandatory": false,
+      "timing": "on_indication",
+      "applicable_products": [
+        "silexil"
+      ],
+      "conditions": [
+        "liver_disease",
+        "toxin_exposure",
+        "medication_load",
+        "fatty_liver"
+      ],
+      "tests": [
+        {
+          "code": "AST",
+          "priority": "required",
+          "reason_key": "AST"
+        },
+        {
+          "code": "ALT",
+          "priority": "required",
+          "reason_key": "ALT"
+        },
+        {
+          "code": "GGT",
+          "priority": "required",
+          "reason_key": "GGT"
+        },
+        {
+          "code": "ALP",
+          "priority": "required",
+          "reason_key": "ALP"
+        },
+        {
+          "code": "BILI",
+          "priority": "required",
+          "reason_key": "BILI"
+        },
+        {
+          "code": "BILI_CONJ",
+          "priority": "recommended",
+          "reason_key": "BILI_CONJ"
+        },
+        {
+          "code": "ALB",
+          "priority": "required",
+          "reason_key": "ALB"
+        },
+        {
+          "code": "PT",
+          "priority": "required",
+          "reason_key": "PT"
+        },
+        {
+          "code": "AFP",
+          "priority": "conditional",
+          "reason_key": "AFP"
+        },
+        {
+          "code": "FERRITIN",
+          "priority": "required",
+          "reason_key": "FERRITIN"
+        },
+        {
+          "code": "CERULOPLASMIN",
+          "priority": "conditional",
+          "reason_key": "CERULOPLASMIN"
+        },
+        {
+          "code": "A1AT",
+          "priority": "conditional",
+          "reason_key": "A1AT"
+        }
+      ],
+      "total_estimated_price": 2100
+    },
+    "followup_3m": {
+      "id": "followup_3m",
+      "i18n_key": "followup_3m",
+      "is_mandatory": true,
+      "timing": "month_3",
+      "applicable_products": [
+        "retisin",
+        "lyastin",
+        "floristen",
+        "silexil"
+      ],
+      "tests": [
+        {
+          "code": "CBC_DIFF",
+          "priority": "required",
+          "reason_key": "CBC_DIFF"
+        },
+        {
+          "code": "CRP",
+          "priority": "required",
+          "reason_key": "CRP"
+        },
+        {
+          "code": "AST",
+          "priority": "required",
+          "reason_key": "AST"
+        },
+        {
+          "code": "ALT",
+          "priority": "required",
+          "reason_key": "ALT"
+        },
+        {
+          "code": "CREA",
+          "priority": "required",
+          "reason_key": "CREA"
+        },
+        {
+          "code": "VIT_D",
+          "priority": "recommended",
+          "reason_key": "VIT_D"
+        },
+        {
+          "code": "FERRITIN",
+          "priority": "recommended",
+          "reason_key": "FERRITIN"
+        }
+      ],
+      "total_estimated_price": 950
+    },
+    "followup_6m": {
+      "id": "followup_6m",
+      "i18n_key": "followup_6m",
+      "is_mandatory": true,
+      "timing": "month_6",
+      "applicable_products": [
+        "retisin",
+        "lyastin",
+        "floristen",
+        "silexil"
+      ],
+      "tests": [
+        {
+          "code": "CBC_DIFF",
+          "priority": "required",
+          "reason_key": "CBC_DIFF"
+        },
+        {
+          "code": "CRP",
+          "priority": "required",
+          "reason_key": "CRP"
+        },
+        {
+          "code": "HS_CRP",
+          "priority": "recommended",
+          "reason_key": "HS_CRP"
+        },
+        {
+          "code": "AST",
+          "priority": "required",
+          "reason_key": "AST"
+        },
+        {
+          "code": "ALT",
+          "priority": "required",
+          "reason_key": "ALT"
+        },
+        {
+          "code": "GGT",
+          "priority": "required",
+          "reason_key": "GGT"
+        },
+        {
+          "code": "CREA",
+          "priority": "required",
+          "reason_key": "CREA"
+        },
+        {
+          "code": "GLU",
+          "priority": "required",
+          "reason_key": "GLU"
+        },
+        {
+          "code": "HBA1C",
+          "priority": "recommended",
+          "reason_key": "HBA1C"
+        },
+        {
+          "code": "CHOL",
+          "priority": "required",
+          "reason_key": "CHOL"
+        },
+        {
+          "code": "TG",
+          "priority": "required",
+          "reason_key": "TG"
+        },
+        {
+          "code": "HDL",
+          "priority": "required",
+          "reason_key": "HDL"
+        },
+        {
+          "code": "LDL",
+          "priority": "required",
+          "reason_key": "LDL"
+        },
+        {
+          "code": "TSH",
+          "priority": "recommended",
+          "reason_key": "TSH"
+        },
+        {
+          "code": "VIT_D",
+          "priority": "required",
+          "reason_key": "VIT_D"
+        },
+        {
+          "code": "FERRITIN",
+          "priority": "required",
+          "reason_key": "FERRITIN"
+        },
+        {
+          "code": "B12",
+          "priority": "recommended",
+          "reason_key": "B12"
+        }
+      ],
+      "total_estimated_price": 1800
+    },
+    "thyroid_deep": {
+      "id": "thyroid_deep",
+      "i18n_key": "thyroid_deep",
+      "is_mandatory": false,
+      "timing": "on_indication",
+      "applicable_products": [
+        "retisin",
+        "lyastin"
+      ],
+      "conditions": [
+        "hypothyroidism",
+        "hyperthyroidism",
+        "thyroid_nodules",
+        "hashimoto",
+        "graves"
+      ],
+      "tests": [
+        {
+          "code": "TSH",
+          "priority": "required",
+          "reason_key": "TSH"
+        },
+        {
+          "code": "FT4",
+          "priority": "required",
+          "reason_key": "FT4"
+        },
+        {
+          "code": "FT3",
+          "priority": "required",
+          "reason_key": "FT3"
+        },
+        {
+          "code": "ATPO",
+          "priority": "required",
+          "reason_key": "ATPO"
+        },
+        {
+          "code": "ATG",
+          "priority": "recommended",
+          "reason_key": "ATG"
+        },
+        {
+          "code": "ATSH",
+          "priority": "conditional",
+          "reason_key": "ATSH"
+        },
+        {
+          "code": "SE",
+          "priority": "recommended",
+          "reason_key": "SE"
+        },
+        {
+          "code": "ZN",
+          "priority": "recommended",
+          "reason_key": "ZN"
+        }
+      ],
+      "total_estimated_price": 2600
+    },
+    "anemia_workup": {
+      "id": "anemia_workup",
+      "i18n_key": "anemia_workup",
+      "is_mandatory": false,
+      "timing": "on_indication",
+      "applicable_products": [
+        "lyastin",
+        "retisin"
+      ],
+      "conditions": [
+        "anemia",
+        "fatigue",
+        "iron_deficiency",
+        "b12_deficiency"
+      ],
+      "tests": [
+        {
+          "code": "CBC_DIFF",
+          "priority": "required",
+          "reason_key": "CBC_DIFF"
+        },
+        {
+          "code": "RETICS",
+          "priority": "required",
+          "reason_key": "RETICS"
+        },
+        {
+          "code": "FE",
+          "priority": "required",
+          "reason_key": "FE"
+        },
+        {
+          "code": "FERRITIN",
+          "priority": "required",
+          "reason_key": "FERRITIN"
+        },
+        {
+          "code": "TIBC",
+          "priority": "required",
+          "reason_key": "TIBC"
+        },
+        {
+          "code": "TSAT",
+          "priority": "required",
+          "reason_key": "TSAT"
+        },
+        {
+          "code": "TRANSFERRIN",
+          "priority": "recommended",
+          "reason_key": "TRANSFERRIN"
+        },
+        {
+          "code": "B12",
+          "priority": "required",
+          "reason_key": "B12"
+        },
+        {
+          "code": "FOLATE",
+          "priority": "required",
+          "reason_key": "FOLATE"
+        },
+        {
+          "code": "CRP",
+          "priority": "required",
+          "reason_key": "CRP"
+        },
+        {
+          "code": "LDH",
+          "priority": "recommended",
+          "reason_key": "LDH"
+        },
+        {
+          "code": "HAPTOGLOBIN",
+          "priority": "conditional",
+          "reason_key": "HAPTOGLOBIN"
+        },
+        {
+          "code": "EPO",
+          "priority": "conditional",
+          "reason_key": "EPO"
+        }
+      ],
+      "total_estimated_price": 2400
+    },
+    "cardiovascular_risk": {
+      "id": "cardiovascular_risk",
+      "i18n_key": "cardiovascular_risk",
+      "is_mandatory": false,
+      "timing": "on_indication",
+      "applicable_products": [
+        "lyastin",
+        "silexil"
+      ],
+      "conditions": [
+        "hypertension",
+        "dyslipidemia",
+        "family_cvd_history",
+        "diabetes",
+        "obesity"
+      ],
+      "tests": [
+        {
+          "code": "CHOL",
+          "priority": "required",
+          "reason_key": "CHOL"
+        },
+        {
+          "code": "TG",
+          "priority": "required",
+          "reason_key": "TG"
+        },
+        {
+          "code": "HDL",
+          "priority": "required",
+          "reason_key": "HDL"
+        },
+        {
+          "code": "LDL",
+          "priority": "required",
+          "reason_key": "LDL"
+        },
+        {
+          "code": "APO_B",
+          "priority": "required",
+          "reason_key": "APO_B"
+        },
+        {
+          "code": "APO_A1",
+          "priority": "recommended",
+          "reason_key": "APO_A1"
+        },
+        {
+          "code": "LP_A",
+          "priority": "required",
+          "reason_key": "LP_A"
+        },
+        {
+          "code": "HS_CRP",
+          "priority": "required",
+          "reason_key": "HS_CRP"
+        },
+        {
+          "code": "HOMOCYSTEINE",
+          "priority": "required",
+          "reason_key": "HOMOCYSTEINE"
+        },
+        {
+          "code": "FIBRINOGEN",
+          "priority": "recommended",
+          "reason_key": "FIBRINOGEN"
+        },
+        {
+          "code": "NT_PROBNP",
+          "priority": "conditional",
+          "reason_key": "NT_PROBNP"
+        },
+        {
+          "code": "HBA1C",
+          "priority": "required",
+          "reason_key": "HBA1C"
+        },
+        {
+          "code": "INSULIN",
+          "priority": "recommended",
+          "reason_key": "INSULIN"
+        }
+      ],
+      "total_estimated_price": 3200
+    }
+  },
+  "condition_mappings": {
+    "autoimmune_disease": {
+      "i18n_key": "autoimmune_disease",
+      "suggested_panels": [
+        "immune_deep",
+        "thyroid_deep"
+      ],
+      "icd10_codes": [
+        "M05",
+        "M06",
+        "M32",
+        "M35",
+        "E06.3"
+      ]
+    },
+    "chronic_inflammation": {
+      "i18n_key": "chronic_inflammation",
+      "suggested_panels": [
+        "immune_deep",
+        "cardiovascular_risk"
+      ],
+      "icd10_codes": [
+        "R50",
+        "K50",
+        "K51",
+        "M45"
+      ]
+    },
+    "recurrent_infections": {
+      "i18n_key": "recurrent_infections",
+      "suggested_panels": [
+        "immune_deep"
+      ],
+      "icd10_codes": [
+        "D80",
+        "D83",
+        "D84"
+      ]
+    },
+    "fatigue": {
+      "i18n_key": "fatigue",
+      "suggested_panels": [
+        "metabolic_deep",
+        "thyroid_deep",
+        "anemia_workup"
+      ],
+      "icd10_codes": [
+        "R53",
+        "G93.3"
+      ]
+    },
+    "metabolic_syndrome": {
+      "i18n_key": "metabolic_syndrome",
+      "suggested_panels": [
+        "metabolic_deep",
+        "cardiovascular_risk"
+      ],
+      "icd10_codes": [
+        "E88.81"
+      ]
+    },
+    "weight_issues": {
+      "i18n_key": "weight_issues",
+      "suggested_panels": [
+        "metabolic_deep",
+        "thyroid_deep"
+      ],
+      "icd10_codes": [
+        "E66",
+        "R63.4",
+        "R63.6"
+      ]
+    },
+    "ibs": {
+      "i18n_key": "ibs",
+      "suggested_panels": [
+        "gut_health"
+      ],
+      "icd10_codes": [
+        "K58"
+      ]
+    },
+    "ibd": {
+      "i18n_key": "ibd",
+      "suggested_panels": [
+        "gut_health",
+        "immune_deep",
+        "anemia_workup"
+      ],
+      "icd10_codes": [
+        "K50",
+        "K51"
+      ]
+    },
+    "food_intolerance": {
+      "i18n_key": "food_intolerance",
+      "suggested_panels": [
+        "gut_health"
+      ],
+      "icd10_codes": [
+        "K90.0",
+        "K90.4"
+      ]
+    },
+    "liver_disease": {
+      "i18n_key": "liver_disease",
+      "suggested_panels": [
+        "liver_detox"
+      ],
+      "icd10_codes": [
+        "K70",
+        "K73",
+        "K74",
+        "K76"
+      ]
+    },
+    "fatty_liver": {
+      "i18n_key": "fatty_liver",
+      "suggested_panels": [
+        "liver_detox",
+        "metabolic_deep"
+      ],
+      "icd10_codes": [
+        "K76.0"
+      ]
+    },
+    "hypothyroidism": {
+      "i18n_key": "hypothyroidism",
+      "suggested_panels": [
+        "thyroid_deep"
+      ],
+      "icd10_codes": [
+        "E03"
+      ]
+    },
+    "hashimoto": {
+      "i18n_key": "hashimoto",
+      "suggested_panels": [
+        "thyroid_deep",
+        "immune_deep"
+      ],
+      "icd10_codes": [
+        "E06.3"
+      ]
+    },
+    "anemia": {
+      "i18n_key": "anemia",
+      "suggested_panels": [
+        "anemia_workup"
+      ],
+      "icd10_codes": [
+        "D50",
+        "D51",
+        "D52",
+        "D53",
+        "D64"
+      ]
+    },
+    "hypertension": {
+      "i18n_key": "hypertension",
+      "suggested_panels": [
+        "cardiovascular_risk"
+      ],
+      "icd10_codes": [
+        "I10",
+        "I11",
+        "I12",
+        "I13"
+      ]
+    },
+    "dyslipidemia": {
+      "i18n_key": "dyslipidemia",
+      "suggested_panels": [
+        "cardiovascular_risk"
+      ],
+      "icd10_codes": [
+        "E78"
+      ]
+    },
+    "diabetes": {
+      "i18n_key": "diabetes",
+      "suggested_panels": [
+        "metabolic_deep",
+        "cardiovascular_risk"
+      ],
+      "icd10_codes": [
+        "E10",
+        "E11",
+        "E13",
+        "E14"
+      ]
+    }
+  },
+  "priority_definitions": {
+    "required": {
+      "i18n_key": "required"
+    },
+    "recommended": {
+      "i18n_key": "recommended"
+    },
+    "conditional": {
+      "i18n_key": "conditional"
+    },
+    "optional": {
+      "i18n_key": "optional"
+    }
+  },
+  "timing_definitions": {
+    "pre_program": {
+      "i18n_key": "pre_program"
+    },
+    "month_3": {
+      "i18n_key": "month_3"
+    },
+    "month_6": {
+      "i18n_key": "month_6"
+    },
+    "month_12": {
+      "i18n_key": "month_12"
+    },
+    "on_indication": {
+      "i18n_key": "on_indication"
+    }
+  }
+}

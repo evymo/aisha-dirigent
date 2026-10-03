@@ -1,0 +1,203 @@
+{
+  "_note": "Translation values for every data-i18n-key this template references. Consumed by `npm --prefix services/svc-web-artifact run export-web-seed` → emitted as `translations` rows. EN + CS authored by hand; de/fr/ru/th filled by `node scripts/i18n/translate-template-i18n.mjs domains/templates/legal-advisory` (DeepL + context review).",
+  "web.legal.title": {
+    "en": "Hartwell & Roe — legal advisory",
+    "cs": "Hartwell & Roe — právní poradna",
+    "de": "Hartwell & Roe – Rechtsberatung",
+    "fr": "Hartwell & Roe — conseil juridique",
+    "ru": "Hartwell & Roe — юридические консультации",
+    "th": "Hartwell & Roe — ที่ปรึกษากฎหมาย"
+  },
+  "web.legal.description": {
+    "en": "A modern law practice with answers grounded in our own case files and documents.",
+    "cs": "Moderní advokátní praxe s odpověďmi podloženými vlastními spisy a dokumenty.",
+    "de": "Eine moderne Anwaltskanzlei, deren Antworten auf unseren eigenen Fallakten und Unterlagen basieren.",
+    "fr": "Un cabinet d'avocats moderne qui s'appuie sur ses propres dossiers et documents pour apporter des réponses.",
+    "ru": "Современная юридическая практика, основанная на наших собственных судебных делах и документах.",
+    "th": "สำนักงานกฎหมายสมัยใหม่ที่มีคำตอบซึ่งมีรากฐานมาจากแฟ้มคดีและเอกสารของเราเอง"
+  },
+  "web.legal.brand": {
+    "en": "Hartwell & Roe",
+    "cs": "Hartwell & Roe",
+    "de": "Hartwell & Roe",
+    "fr": "Hartwell & Roe",
+    "ru": "Hartwell & Roe",
+    "th": "Hartwell & Roe"
+  },
+  "web.legal.nav.areas": {
+    "en": "Practice areas",
+    "cs": "Oblasti praxe",
+    "de": "Tätigkeitsbereiche",
+    "fr": "Domaines d'activité",
+    "ru": "Сферы деятельности",
+    "th": "สาขาการปฏิบัติงาน"
+  },
+  "web.legal.nav.knowledge": {
+    "en": "Knowledge base",
+    "cs": "Znalostní báze",
+    "de": "Wissensdatenbank",
+    "fr": "Base de connaissances",
+    "ru": "База знаний",
+    "th": "ฐานความรู้"
+  },
+  "web.legal.nav.contact": {
+    "en": "Contact",
+    "cs": "Kontakt",
+    "de": "Kontakt",
+    "fr": "Contact",
+    "ru": "Контакты",
+    "th": "ติดต่อ"
+  },
+  "web.legal.hero.heading": {
+    "en": "Clear advice, grounded in the documents that matter",
+    "cs": "Jasné rady, podložené dokumenty, na kterých záleží",
+    "de": "Klare Beratung, gestützt auf die maßgeblichen Dokumente",
+    "fr": "Des conseils clairs, fondés sur les documents pertinents",
+    "ru": "Четкие рекомендации, основанные на важных документах",
+    "th": "คำแนะนำที่ชัดเจน มีพื้นฐานจากเอกสารที่สำคัญ"
+  },
+  "web.legal.hero.body": {
+    "en": "We pair experienced counsel with a searchable knowledge base built from our own contracts, filings and precedents — so the answer you get is precise, fast and traceable.",
+    "cs": "Spojujeme zkušené právníky s prohledávatelnou znalostní bází z našich smluv, podání a precedentů — odpověď je tak přesná, rychlá a dohledatelná.",
+    "de": "Wir kombinieren die Expertise erfahrener Rechtsberater mit einer durchsuchbaren Wissensdatenbank, die auf unseren eigenen Verträgen, Schriftsätzen und Präzedenzfällen basiert – so erhalten Sie präzise, schnelle und nachvollziehbare Antworten.",
+    "fr": "Nous associons l'expertise de juristes chevronnés à une base de connaissances consultable, constituée à partir de nos propres contrats, documents déposés et précédents, afin que la réponse que vous obtenez soit précise, rapide et traçable.",
+    "ru": "Мы объединяем опыт наших юристов с базой знаний, по которой можно осуществлять поиск и которая создана на основе наших собственных договоров, документов и прецедентов — благодаря чему вы получаете точный, оперативный и прозрачный ответ.",
+    "th": "เราจับคู่ที่ปรึกษามากประสบการณ์กับฐานความรู้ที่สามารถค้นหาได้ซึ่งสร้างขึ้นจากสัญญา การยื่นเอกสาร และบรรทัดฐานของเราเอง — เพื่อให้คำตอบที่คุณได้รับมีความแม่นยำ รวดเร็ว และสามารถตรวจสอบย้อนกลับได้"
+  },
+  "web.legal.hero.cta": {
+    "en": "Book a consultation",
+    "cs": "Objednat konzultaci",
+    "de": "Beratungstermin vereinbaren",
+    "fr": "Prendre rendez-vous pour une consultation",
+    "ru": "Записаться на консультацию",
+    "th": "จองการปรึกษา"
+  },
+  "web.legal.areas.eyebrow": {
+    "en": "What we do",
+    "cs": "Co děláme",
+    "de": "Was wir tun",
+    "fr": "Ce que nous faisons",
+    "ru": "Чем мы занимаемся",
+    "th": "สิ่งที่เราทำ"
+  },
+  "web.legal.areas.heading": {
+    "en": "Practice areas",
+    "cs": "Oblasti praxe",
+    "de": "Tätigkeitsbereiche",
+    "fr": "Domaines d'activité",
+    "ru": "Сферы деятельности",
+    "th": "สาขาการปฏิบัติงาน"
+  },
+  "web.legal.area.1.name": {
+    "en": "Contracts & commercial",
+    "cs": "Smlouvy a obchodní právo",
+    "de": "Verträge & Handelsrecht",
+    "fr": "Contrats et droit commercial",
+    "ru": "Договоры и коммерческое право",
+    "th": "สัญญาและกฎหมายพาณิชย์"
+  },
+  "web.legal.area.1.desc": {
+    "en": "Drafting, review and negotiation — with clause precedents at our fingertips.",
+    "cs": "Příprava, revize a vyjednávání — s precedenty klauzulí po ruce.",
+    "de": "Entwurf, Prüfung und Verhandlung – mit Musterklauseln immer griffbereit.",
+    "fr": "Rédaction, révision et négociation — avec des modèles de clauses à portée de main.",
+    "ru": "Составление, проверка и ведение переговоров — с готовыми шаблонами положений под рукой.",
+    "th": "การร่าง การตรวจสอบ และการเจรจาต่อรอง — พร้อมตัวอย่างข้อกำหนดที่พร้อมใช้งานในทันที"
+  },
+  "web.legal.area.2.name": {
+    "en": "Employment",
+    "cs": "Pracovní právo",
+    "de": "Arbeitsrecht",
+    "fr": "Droit du travail",
+    "ru": "Трудовое право",
+    "th": "กฎหมายแรงงาน"
+  },
+  "web.legal.area.2.desc": {
+    "en": "Agreements, policies and disputes, handled with care and current case law.",
+    "cs": "Smlouvy, vnitřní předpisy a spory, řešené pečlivě a podle aktuální judikatury.",
+    "de": "Verträge, Richtlinien und Rechtsstreitigkeiten – sorgfältig und unter Berücksichtigung der aktuellen Rechtsprechung behandelt.",
+    "fr": "Contrats, politiques et litiges, traités avec soin et en tenant compte de la jurisprudence actuelle.",
+    "ru": "Договоры, политики и споры, рассматриваемые с учетом всех нюансов и актуальной судебной практики.",
+    "th": "ข้อตกลง นโยบาย และข้อพิพาท ดำเนินการด้วยความระมัดระวังและตามกฎหมายปัจจุบัน"
+  },
+  "web.legal.area.3.name": {
+    "en": "Property & real estate",
+    "cs": "Nemovitosti",
+    "de": "Immobilien",
+    "fr": "Immobilier",
+    "ru": "Недвижимость",
+    "th": "ทรัพย์สินและอสังหาริมทรัพย์"
+  },
+  "web.legal.area.3.desc": {
+    "en": "Transactions, leases and due diligence, mapped against our document archive.",
+    "cs": "Převody, nájmy a due diligence, navázané na náš archiv dokumentů.",
+    "de": "Transaktionen, Mietverträge und Due-Diligence-Prüfungen, abgeglichen mit unserem Dokumentenarchiv.",
+    "fr": "Transactions, baux et vérifications préalables, mis en correspondance avec nos archives documentaires.",
+    "ru": "Сделки, договоры аренды и комплексная проверка, сопоставленные с нашим архивом документов.",
+    "th": "ธุรกรรม การเช่า และการตรวจสอบวิเคราะห์สถานะ ที่จัดเก็บไว้ในคลังเอกสารของเรา"
+  },
+  "web.legal.area.4.name": {
+    "en": "Disputes & resolution",
+    "cs": "Spory a jejich řešení",
+    "de": "Streitigkeiten und deren Beilegung",
+    "fr": "Litiges et résolution",
+    "ru": "Споры и их урегулирование",
+    "th": "ข้อพิพาทและการแก้ไข"
+  },
+  "web.legal.area.4.desc": {
+    "en": "Pragmatic strategy backed by a searchable record of past matters.",
+    "cs": "Pragmatická strategie opřená o prohledávatelný záznam minulých případů.",
+    "de": "Eine pragmatische Strategie, gestützt auf eine durchsuchbare Datenbank mit früheren Fällen.",
+    "fr": "Une stratégie pragmatique s'appuyant sur un historique consultable des affaires passées.",
+    "ru": "Прагматичная стратегия, подкрепленная доступной для поиска информацией о предыдущих делах.",
+    "th": "กลยุทธ์เชิงปฏิบัติที่สนับสนุนด้วยบันทึกที่สามารถค้นหาได้ของเรื่องที่ผ่านมา"
+  },
+  "web.legal.kb.heading": {
+    "en": "Ask our knowledge base",
+    "cs": "Zeptejte se naší znalostní báze",
+    "de": "Schauen Sie in unserer Wissensdatenbank nach",
+    "fr": "Consultez notre base de connaissances",
+    "ru": "Обратитесь к нашей базе знаний",
+    "th": "ถามฐานความรู้ของเรา"
+  },
+  "web.legal.cta.heading": {
+    "en": "Talk to a lawyer",
+    "cs": "Promluvte si s právníkem",
+    "de": "Sprechen Sie mit einem Anwalt",
+    "fr": "Consultez un avocat",
+    "ru": "Обратитесь к юристу",
+    "th": "คุยกับทนายความ"
+  },
+  "web.legal.cta.body": {
+    "en": "Tell us what you're facing. We'll reply within one business day with clear next steps.",
+    "cs": "Řekněte nám, co řešíte. Odpovíme do jednoho pracovního dne s jasnými dalšími kroky.",
+    "de": "Teilen Sie uns mit, womit Sie zu kämpfen haben. Wir melden uns innerhalb eines Werktags mit konkreten nächsten Schritten bei Ihnen.",
+    "fr": "Dites-nous quel est votre problème. Nous vous répondrons dans un délai d'un jour ouvrable en vous indiquant clairement la marche à suivre.",
+    "ru": "Расскажите нам о своей проблеме. Мы ответим в течение одного рабочего дня и предложим четкий план дальнейших действий.",
+    "th": "แจ้งให้เราทราบว่าคุณกำลังเผชิญกับอะไร เราจะตอบกลับภายในหนึ่งวันทำการ พร้อมขั้นตอนต่อไปที่ชัดเจน"
+  },
+  "web.legal.cta.button": {
+    "en": "Book a consultation",
+    "cs": "Objednat konzultaci",
+    "de": "Beratungstermin vereinbaren",
+    "fr": "Prendre rendez-vous pour une consultation",
+    "ru": "Записаться на консультацию",
+    "th": "จองการปรึกษา"
+  },
+  "web.legal.footer.name": {
+    "en": "Hartwell & Roe Legal Advisory",
+    "cs": "Hartwell & Roe — právní poradna",
+    "de": "Hartwell & Roe Rechtsberatung",
+    "fr": "Cabinet de conseil juridique Hartwell & Roe",
+    "ru": "Hartwell & Roe — юридические консультации",
+    "th": "Hartwell & Roe — ที่ปรึกษากฎหมาย"
+  },
+  "web.legal.footer.note": {
+    "en": "Information only — not legal advice until we are engaged.",
+    "cs": "Pouze informativní — nejde o právní poradenství, dokud nejsme pověřeni.",
+    "de": "Dies dient lediglich der Information – es handelt sich nicht um Rechtsberatung, solange wir nicht beauftragt sind.",
+    "fr": "À titre informatif uniquement — ces informations ne constituent pas un avis juridique tant que nous n'avons pas été mandatés.",
+    "ru": "Данная информация носит исключительно информационный характер и не является юридической консультацией до момента заключения договора с нами.",
+    "th": "ข้อมูลเท่านั้น — ไม่ถือเป็นคำแนะนำทางกฎหมายจนกว่าเราจะได้รับการว่าจ้าง"
+  }
+}

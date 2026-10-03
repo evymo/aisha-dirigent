@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 320" fill="none">
+  <rect width="480" height="320" rx="16" fill="#0E0E10"/>
+
+  <!-- Environment detection visual -->
+  <g transform="translate(100, 25)">
+    <!-- Radar/scan circle -->
+    <circle cx="140" cy="100" r="80" stroke="#FF6A1A" stroke-width="1" stroke-opacity="0.15" fill="none"/>
+    <circle cx="140" cy="100" r="60" stroke="#FF6A1A" stroke-width="1" stroke-opacity="0.2" fill="none"/>
+    <circle cx="140" cy="100" r="40" stroke="#FF6A1A" stroke-width="1" stroke-opacity="0.3" fill="none"/>
+    <circle cx="140" cy="100" r="20" stroke="#FF6A1A" stroke-width="1.5" stroke-opacity="0.5" fill="none"/>
+
+    <!-- Radar sweep -->
+    <path d="M140 100 L140 20" stroke="#FF6A1A" stroke-width="1.5" opacity="0.6"/>
+    <path d="M140 100 L200 50" stroke="#FF6A1A" stroke-width="1" opacity="0.3"/>
+
+    <!-- Detected services (dots on the radar) -->
+    <!-- Supabase -->
+    <circle cx="115" cy="70" r="8" fill="#3ECF8E" opacity="0.9"/>
+    <text x="115" y="74" text-anchor="middle" fill="#fff" font-size="8" font-weight="bold">S</text>
+
+    <!-- Docker -->
+    <circle cx="170" cy="80" r="8" fill="#2496ED" opacity="0.9"/>
+    <text x="170" y="84" text-anchor="middle" fill="#fff" font-size="8" font-weight="bold">D</text>
+
+    <!-- Ollama -->
+    <circle cx="155" cy="130" r="8" fill="#E55A10" opacity="0.9"/>
+    <text x="155" y="134" text-anchor="middle" fill="#fff" font-size="8" font-weight="bold">AI</text>
+
+    <!-- n8n -->
+    <circle cx="105" cy="120" r="8" fill="#FF6D5A" opacity="0.9"/>
+    <text x="105" y="124" text-anchor="middle" fill="#fff" font-size="8" font-weight="bold">n8</text>
+
+    <!-- Center AISHA eye -->
+    <circle cx="140" cy="100" r="6" fill="#FF6A1A"/>
+    <circle cx="141.5" cy="98.5" r="2" fill="#fff" opacity="0.8"/>
+  </g>
+
+  <!-- Status list -->
+  <g transform="translate(55, 210)">
+    <circle cx="12" cy="10" r="5" fill="#3ECF8E"/><text x="24" y="14" fill="#9A9A9E" font-family="system-ui" font-size="11">Supabase CLI (localhost:54321)</text>
+    <circle cx="142" cy="10" r="5" fill="#2496ED"/><text x="154" y="14" fill="#9A9A9E" font-family="system-ui" font-size="11">Docker Desktop</text>
+    <circle cx="12" cy="30" r="5" fill="#E55A10"/><text x="24" y="34" fill="#9A9A9E" font-family="system-ui" font-size="11">Ollama (localhost:11434)</text>
+    <circle cx="142" cy="30" r="5" fill="#FF6D5A"/><text x="154" y="34" fill="#9A9A9E" font-family="system-ui" font-size="11">n8n workflows</text>
+  </g>
+
+  <!-- Title -->
+  <text x="240" y="275" text-anchor="middle" fill="#FFFFFF" font-family="system-ui, sans-serif" font-size="20" font-weight="600">
+    Detekce prostředí
+  </text>
+  <text x="240" y="298" text-anchor="middle" fill="#9A9A9E" font-family="system-ui, sans-serif" font-size="12">
+    AISHA automaticky najde vaše lokální služby a AI modely
+  </text>
+</svg>

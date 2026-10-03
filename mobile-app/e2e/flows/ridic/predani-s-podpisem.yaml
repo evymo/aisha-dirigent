@@ -1,0 +1,114 @@
+# Předání dodávky s podpisem — TO, CO ŘIDIČ SKUTEČNĚ DĚLÁ.
+#
+# ⛔ PROČ TENHLE SCÉNÁŘ VZNIKL (2026-09-04)
+# Mobilní e2e mělo do dneška tři scénáře: přihlášení, odhlášení a přepínání
+# záložek. Tedy nic z řidičovy práce. Přitom právě tudy vede jediná cesta,
+# kterou se dodávka odbaví — a jediná, kde selhání znamená, že řidič stojí
+# u rampy a nemůže dál.
+#
+# ⭐ HÁČKY UŽ V APPCE BYLY. `kroky-podat-k-podpisu`, `moment-podpisu`,
+# `moment-podpisu-kdo`, `kroky-podepsano`, `kroky-submit` — chyběl scénář,
+# ne připravenost. Táž třída jako všude jinde: schopnost existuje, chybí
+# poslední článek.
+#
+# ⭐ SNÍMKY JSOU VEDLEJŠÍ PRODUKT, ne účel. Ostatní scénáře je berou taky —
+# slouží zároveň jako podklady do obchodu.
+appId: ${APP_ID}
+---
+- launchApp
+- waitForAnimationToEnd
+
+# Přihlášení heslem — týž postup jako `auth/login-success.yaml`.
+- extendedWaitUntil:
+    visible:
+      id: auth-login-screen
+    timeout: 30000
+# ⛔ PŘIHLÁŠENÍ HESLEM V APPCE NENÍ. Tenhle scénář ho zkoušel od
+# `a3caa5dc3`, jenže `c0c237f69` („migrate mobile app auth to Keycloak OIDC")
+# ho odstranil — a scénář zůstal. Nikdo si toho nevšiml, protože se
+# NESPOUŠTĚL: `login-email-input` ani `auth-switch-password` v `src/`
+# neexistují. Opraveno 2026-09-04 na skutečnou cestu: poskytovatel identity.
+- tapOn:
+    id: auth-oauth-keycloak
+
+# Obrazovka kroků = řidičova fronta práce.
+- extendedWaitUntil:
+    visible:
+      id: kroky-screen
+    timeout: 30000
+- takeScreenshot: ${SHOT_DIR}/ridic-01-fronta
+
+# ⛔ BEZ KROKU NENÍ CO PŘEDÁVAT. Když fronta prázdná, scénář KONČÍ ZDE a řekne
+# proč — je to stav dat, ne vada appky. Tiché "prošlo" by tvrdilo, že předání
+# funguje, ačkoli se nikdy nespustilo.
+#
+# ⭐ 2026-09-29 (bod 3 vizuálu): předání je LIST o dvou krocích podle makety —
+# `kroky-predat` → 1 Kontrola (`predani-dal`) → 2 Podpis → razítko `predano`.
+# Háčky jména, podpisu a potvrzení (`kroky-recipient`, `kroky-podat-k-podpisu`,
+# `kroky-podepsano`, `kroky-submit`) zůstaly, jen žijí ve druhém kroku listu.
+- runFlow:
+    when:
+      notVisible:
+        id: kroky-predat
+    commands:
+      - evalScript: ${output.preskoceno = "fronta je prázdná — není co předat"}
+      - takeScreenshot: ${SHOT_DIR}/ridic-01b-prazdna-fronta
+
+- runFlow:
+    when:
+      visible:
+        id: kroky-predat
+    commands:
+      - tapOn:
+          id: kroky-predat
+      - extendedWaitUntil:
+          visible:
+            id: predani-list
+          timeout: 15000
+      # 1 Kontrola: co se veze a komu. Souhlas je stisk, nesouhlas výhrada.
+      - takeScreenshot: ${SHOT_DIR}/ridic-02-kontrola
+      - tapOn:
+          id: predani-dal
+
+      # 2 Podpis: bez jména a podpisu potvrdit NEJDE a list řekne proč.
+      - assertVisible:
+          id: predani-duvod
+      - tapOn:
+          id: kroky-recipient
+      - inputText: ${E2E_PREJIMAJICI}
+      - takeScreenshot: ${SHOT_DIR}/ridic-03-prijemce
+
+      - tapOn:
+          id: kroky-podat-k-podpisu
+      - extendedWaitUntil:
+          visible:
+            id: moment-podpisu
+          timeout: 15000
+      - takeScreenshot: ${SHOT_DIR}/ridic-04-moment-podpisu
+
+      # Podpis je PŘEDÁNÍ OBRAZOVKY druhé straně: podepisuje příjemce, ne řidič.
+      - assertVisible:
+          id: moment-podpisu-kdo
+      - swipe:
+          start: 30%, 60%
+          end: 70%, 60%
+      - tapOn:
+          id: moment-podpisu-hotovo
+
+      # Po podpisu musí být vidět, že je hotovo — jinak řidič neví, na čem je.
+      - extendedWaitUntil:
+          visible:
+            id: kroky-podepsano
+          timeout: 15000
+      - takeScreenshot: ${SHOT_DIR}/ridic-05-podepsano
+
+      - tapOn:
+          id: kroky-submit
+      # Razítko „Předáno": odesláno, nebo bezpečně ve frontě — obojí je konec úkonu.
+      - extendedWaitUntil:
+          visible:
+            id: predano
+          timeout: 30000
+      - takeScreenshot: ${SHOT_DIR}/ridic-06-predano
+      - tapOn:
+          id: predano-pokracovat

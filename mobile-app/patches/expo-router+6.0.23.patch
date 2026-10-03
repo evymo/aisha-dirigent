@@ -1,0 +1,86 @@
+diff --git a/node_modules/expo-router/ios/LinkPreview/LinkPreviewNativeNavigation.mm b/node_modules/expo-router/ios/LinkPreview/LinkPreviewNativeNavigation.mm
+index f20d576..583ae92 100644
+--- a/node_modules/expo-router/ios/LinkPreview/LinkPreviewNativeNavigation.mm
++++ b/node_modules/expo-router/ios/LinkPreview/LinkPreviewNativeNavigation.mm
+@@ -9,6 +9,12 @@
+ @implementation LinkPreviewNativeNavigationObjC {
+ }
+ 
++// The current Expo 54 / expo-router 6.x stack in this app archives against a
++// react-native-screens build that does not expose the native bottom-tabs
++// component view classes used by Expo Router link preview internals.
++// Keep stack-based preview helpers intact, but no-op the bottom-tabs branch so
++// iOS archive is not blocked by unavailable symbols.
++
+ + (BOOL)isRNSScreenStackView:(UIView *)view {
+   if (view != nil) {
+     return [view isKindOfClass:[RNSScreenStackView class]];
+@@ -18,55 +24,19 @@
+ }
+ 
+ + (BOOL)isRNSBottomTabsScreenComponentView:(UIView *)view {
+-  if (view != nil) {
+-    return [view isKindOfClass:[RNSBottomTabsScreenComponentView class]];
+-  }
+-
+   return NO;
+ }
+ 
+ + (BOOL)isRNSBottomTabsHostComponentView:(UIView *)view {
+-  if (view != nil) {
+-    return [view isKindOfClass:[RNSBottomTabsHostComponentView class]];
+-  }
+-
+   return NO;
+ }
+ 
+ + (nullable UITabBarController *)getBottomTabControllerFromView:(UIView *)view {
+-  if ([view isKindOfClass:[RNSBottomTabsScreenComponentView class]]) {
+-    RNSBottomTabsScreenComponentView *bottomTabsView =
+-        (RNSBottomTabsScreenComponentView *)view;
+-    UIViewController *reactVC = [bottomTabsView reactViewController];
+-    if (reactVC != nil &&
+-        [reactVC.tabBarController isKindOfClass:[RNSTabBarController class]]) {
+-      RNSTabBarController *tabBarController =
+-          (RNSTabBarController *)reactVC.tabBarController;
+-      return tabBarController;
+-    }
+-  }
+-  if ([view isKindOfClass:[RNSBottomTabsHostComponentView class]]) {
+-    RNSBottomTabsHostComponentView *bottomTabsView =
+-        (RNSBottomTabsHostComponentView *)view;
+-    return [bottomTabsView controller];
+-  }
+   return nil;
+ }
+ 
+ + (nullable UIView *)getTab:(UITabBarController *)controller
+                     withKey:(NSString *)key {
+-  if (controller != nil) {
+-    for (UIViewController *subcontroller in controller.viewControllers) {
+-      if ([subcontroller.view
+-              isKindOfClass:[RNSBottomTabsScreenComponentView class]]) {
+-        if (((RNSBottomTabsScreenComponentView *)subcontroller.view).tabKey ==
+-            key) {
+-          return subcontroller.view;
+-        }
+-      }
+-    }
+-  }
+-
+   return nil;
+ }
+ 
+@@ -95,12 +65,6 @@
+ }
+ 
+ + (nonnull NSString *)getTabKey:(UIView *)view {
+-  if (view != nil &&
+-      [view isKindOfClass:[RNSBottomTabsScreenComponentView class]]) {
+-    RNSBottomTabsScreenComponentView *tabScreenView =
+-        (RNSBottomTabsScreenComponentView *)view;
+-    return tabScreenView.tabKey;
+-  }
+   return @"";
+ }
+ 

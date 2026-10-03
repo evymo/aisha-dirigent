@@ -1,0 +1,24 @@
+{
+  "name": "@aisha/e2e-dirigent",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Containerized e2e suite for AISHA Dirigent supervisor (VS Code via code-server + Claude Code CLI).",
+  "type": "module",
+  "scripts": {
+    "start:mock-backend": "tsx mock-backend/server.ts",
+    "test": "npm run test:vscode && npm run test:cli",
+    "test:vscode": "playwright test --config=playwright.config.ts",
+    "test:cli": "node --test cli/*.spec.mjs",
+    "compose:up": "docker compose up -d --build",
+    "compose:down": "docker compose down -v",
+    "compose:logs": "docker compose logs -f"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "@types/node": "^20.11.0",
+    "fastify": "^4.29.1",
+    "node-pty": "^1.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

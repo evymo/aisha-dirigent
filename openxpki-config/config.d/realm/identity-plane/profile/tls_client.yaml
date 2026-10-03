@@ -1,0 +1,28 @@
+label: Identity Plane mTLS Client
+
+validity:
+    # OpenXPKI offset is pair-encoded from the left, FIRST pair = YEARS.
+    # "+000090" = 0y 0m 90d = 90 days (a short-lived mTLS client cert).
+    # NOT "+90", which would decode to 90 YEARS.
+    notafter: "+000090"
+
+style:
+    00_backchannel_style:
+        label: OIDC Backchannel mTLS
+        description: mTLS client cert for OAuth2 Proxy / GoTrue backchannel to Keycloak
+        ui:
+            subject:
+                - hostname
+                - application_name
+            info:
+                - requestor_realname
+                - requestor_email
+                - comment
+
+        subject:
+            dn: CN=[% hostname.lower %],O=${AISHA_OPERATOR_ORG},OU=Identity Plane Client
+
+        metadata:
+            requestor: "[% requestor_realname %]"
+            email: "[% requestor_email %]"
+            entity: "[% hostname FILTER lower %]"

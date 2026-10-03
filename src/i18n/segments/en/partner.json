@@ -1,0 +1,1704 @@
+{
+  "partners": {
+    "sectionLabel": "Collaboration",
+    "title": "Partners & Contributors",
+    "subtitle": "The Evymo Archive is a living project. We welcome collaboration with developers, organizations, and individuals who share our commitment to transparency and open source.",
+    "certifiedProvider": "Certified Guild Member",
+    "certifiedPartner": "Certified partner",
+    "categories": {
+      "academic": {
+        "title": "Academic Institutions",
+        "description": "Universities and research centers interested in accessing archive materials for historical, technological, or platform history research.",
+        "examples": [
+          "History of technology programs",
+          "Platform history research",
+          "Central European studies"
+        ]
+      },
+      "research": {
+        "title": "Research Organizations",
+        "description": "Independent researchers and organizations studying the history of platform governance, orchestration, or early-stage AI development.",
+        "examples": [
+          "Technology historians",
+          "Platform studies scholars",
+          "Documentary filmmakers"
+        ]
+      },
+      "cultural": {
+        "title": "Cultural Institutions",
+        "description": "Museums, archives, and cultural organizations that may wish to feature or collaborate on exhibitions or public programs.",
+        "examples": [
+          "Technology museums",
+          "National archives",
+          "Historical societies"
+        ]
+      },
+      "community": {
+        "title": "Community Contributors",
+        "description": "Individuals with personal connections to the Evymo story — former contributors, members, community members — who may have materials or stories to share.",
+        "examples": [
+          "Family archives",
+          "Personal photographs",
+          "Oral histories"
+        ]
+      }
+    },
+    "howWeWork": {
+      "title": "How We Work Together",
+      "subtitle": "Our collaboration approach prioritizes mutual benefit and shared standards.",
+      "openAccess": {
+        "title": "Open Access Research",
+        "description": "All archive materials are freely accessible. Researchers may use them for academic purposes with appropriate citation. No gatekeeping, no fees for educational use."
+      },
+      "contributions": {
+        "title": "Material Contributions",
+        "description": "If you have documents, screenshots, or other materials related to Evymo history, we welcome contributions. All contributors are credited, and originals can be returned after digitization."
+      },
+      "oralHistory": {
+        "title": "Oral History Program",
+        "description": "We're collecting oral histories from individuals with firsthand knowledge of Evymo operations, development, or platform services. If you or a team member has stories to share, we'd love to hear from you."
+      }
+    },
+    "currentCollaborators": "Current Collaborators",
+    "currentCollaboratorsSubtitle": "Organizations and individuals who have contributed to the archive project.",
+    "partnerLogo": "Partner Logo",
+    "getInTouch": {
+      "title": "Get in Touch",
+      "subtitle": "Whether you're a researcher seeking access, an institution interested in collaboration, or someone with materials to contribute, we'd love to hear from you."
+    },
+    "searchPlaceholder": "Search partners...",
+    "allCities": "All cities",
+    "noPartners": "No partners found",
+    "becomeFirst": "Be the first to join our network of certified partners.",
+    "online": "Online",
+    "inPerson": "In Person",
+    "bookAppointment": "Book Appointment",
+    "viewProfile": "View Profile",
+    "signInToViewDetails": "Sign in to view details",
+    "signInForMore": {
+      "title": "Want to see more?",
+      "description": "Sign in to view all partners, their full profiles, services, and book appointments.",
+      "descriptionWithCount": "Sign in to view all {{count}} partners, their full profiles, services, and book appointments."
+    },
+    "badges": {
+      "provider": "Guild Member",
+      "partner": "Certified Partner"
+    },
+    "becomePartner": {
+      "title": "Become a Partner",
+      "description": "Join our network of certified practitioners and Guild Members. Get trained on platform protocols and connect with members seeking guidance.",
+      "button": "Get Certified"
+    },
+    "booking": {
+      "title": "Book with {{name}}",
+      "selectDate": "Select a date for your appointment.",
+      "selectTime": "Select an available time slot.",
+      "enterDetails": "Enter appointment details.",
+      "noTimes": "No available times on this date.",
+      "appointmentType": "Appointment Type",
+      "service": "Service",
+      "selectService": "Select a service...",
+      "notes": "Notes (optional)",
+      "notesPlaceholder": "Any additional information...",
+      "confirm": "Confirm Booking",
+      "confirmed": "Booking Confirmed",
+      "thankYou": "Thank you!",
+      "confirmationSent": "Your appointment request has been sent.",
+      "success": "Appointment Booked",
+      "successDesc": "Your appointment request has been submitted.",
+      "error": "Failed to book appointment. Please try again.",
+      "shareTrackingData": "Share my sensitive data with this partner",
+      "shareTrackingDataDesc": "Allow the partner to view your profile and documents for better consultation.",
+      "confirmPassword": "Confirm your identity",
+      "confirmPasswordDesc": "Enter your password to access and share your sensitive data.",
+      "unlockTrackingData": "Unlock Sensitive Data",
+      "healthDataUnlocked": "Sensitive data access enabled",
+      "unlockSecureFirst": "Please unlock sensitive data access first by entering your password.",
+      "unlockPhiFirst": "Please enable secure mode first to share sensitive data."
+    }
+  },
+  "partnerCertification": {
+    "noQuestionsAvailable": "No questions available. Please contact support.",
+    "results": {
+      "passed": "Congratulations!",
+      "notPassed": "Test Not Passed",
+      "passedDesc": "You achieved {{score}}% and are now a certified partner.",
+      "notPassedDesc": "You achieved {{score}}%. You need at least {{required}}% to pass.",
+      "correctAnswers": "{{correct}} of {{total}} correct answers",
+      "viewDirectory": "View Partner Directory",
+      "goToPortal": "Go to Portal",
+      "tryAgain": "Try Again"
+    },
+    "title": "Partner Certification",
+    "subtitle": "Become a certified Evymo partner and offer services to members",
+    "loginRequired": "Please sign in to access partner certification.",
+    "qualificationRequired": {
+      "title": "Assessment required",
+      "description": "Complete the assessment test before starting the certification test.",
+      "goToQualification": "Go to assessment test"
+    },
+    "steps": {
+      "type": "Partner Type",
+      "profile": "Profile",
+      "test": "Certification Test"
+    },
+    "intro": {
+      "title": "Partner Certification Program",
+      "description": "Complete this certification to join the Evymo partner network and be listed in our partner directory.",
+      "alreadyCertified": "You are already a certified partner.",
+      "selectType": "Select your partner type:",
+      "whatYouGet": "What you get as a certified partner:",
+      "benefit1": "Listed in the partner directory",
+      "benefit2": "Ability to receive appointment bookings from members",
+      "benefit3": "Access to partner resources and training",
+      "benefit4": "Official Evymo partner certification badge",
+      "startButton": "Start Certification"
+    },
+    "alreadyCertified": {
+      "title": "You Are Certified",
+      "description": "You have successfully completed the partner certification.",
+      "certified": "Certified Partner",
+      "score": "Your score: {{score}}%",
+      "completedAt": "Completed on {{date}}",
+      "goToDashboard": "Go to Partner Dashboard",
+      "viewNetwork": "View Partner Network"
+    },
+    "types": {
+      "individual": {
+        "title": "Individual Partner",
+        "description": "Private individuals interested in platform protocols",
+        "badge": "Certified Partner"
+      },
+      "provider": {
+        "title": "Guild Member",
+        "description": "Licensed professionals and organizations",
+        "badge": "Certified Guild Member"
+      }
+    },
+    "profile": {
+      "title": "Partner Profile",
+      "subtitle": "This information will be displayed in the partner directory.",
+      "displayName": "Display Name",
+      "displayNamePlaceholder": "Your name or alias",
+      "businessName": "Business/Organization Name",
+      "businessNamePlaceholder": "Your organization or business name",
+      "city": "City",
+      "cityPlaceholder": "e.g. Prague",
+      "country": "Country",
+      "email": "Contact Email",
+      "phone": "Phone",
+      "phonePlaceholder": "+420...",
+      "description": "About You",
+      "descriptionPlaceholder": "Briefly describe your background and services...",
+      "services": "Services Offered",
+      "continueToTest": "Continue to Test"
+    },
+    "services": {
+      "consultation": "Consultation",
+      "screening": "Screening",
+      "diagnostics": "Analysis",
+      "therapy": "Implementation",
+      "coaching": "Coaching",
+      "education": "Education",
+      "assessment": "Assessment",
+      "training": "Training",
+      "nutrition": "Nutrition",
+      "fitness": "Fitness",
+      "wellness": "Monitoring",
+      "lifestyle": "Lifestyle",
+      "medical": "Technical"
+    },
+    "test": {
+      "question": "Question",
+      "toPass": "to pass",
+      "submit": "Submit Test"
+    },
+    "messages": {
+      "fillRequired": "Please fill in all required fields.",
+      "congratulations": "Congratulations!",
+      "certificationPassed": "You are now a certified Evymo partner.",
+      "submitError": "Failed to submit certification. Please try again."
+    }
+  },
+  "partnerDashboard": {
+    "title": "Partner Dashboard",
+    "subtitle": "Manage your appointments and availability",
+    "templates": "Templates",
+    "statusUpdated": "Appointment status updated",
+    "statusUpdateFailed": "Failed to update appointment status",
+    "stats": {
+      "pending": "Pending",
+      "upcoming": "Upcoming",
+      "completed": "Completed",
+      "total": "Total",
+      "studies": "Clusters",
+      "users": "Members",
+      "alerts": "Alerts"
+    },
+    "tabs": {
+      "overview": "Overview",
+      "mentoring": "Mentoring",
+      "studies": "Clusters",
+      "alerts": "Alerts",
+      "calendar": "Calendar",
+      "pending": "Pending",
+      "upcoming": "Upcoming",
+      "availability": "Availability",
+      "invitations": "Invitations",
+      "earnings": "Earnings",
+      "pricing": "Pricing",
+      "profile": "My Profile"
+    },
+    "overview": {
+      "studiesTitle": "My Clusters",
+      "studiesDesc": "Clusters where you are a consultant",
+      "noStudies": "You are not assigned to any clusters yet",
+      "users": "members",
+      "viewAll": "View all",
+      "alertsTitle": "Recent Activity",
+      "alertsDesc": "New data from your members",
+      "noAlerts": "No recent activity",
+      "upcomingTitle": "Upcoming Appointments"
+    },
+    "studies": {
+      "title": "Consultant Clusters",
+      "description": "Clusters where you are registered as a consultant",
+      "none": "You haven't applied to any clusters as a consultant",
+      "browse": "Browse Clusters",
+      "assignedUsers": "assigned members"
+    },
+    "alertsTab": {
+      "title": "Member Alerts",
+      "description": "Recent check-ins and test results from your members",
+      "none": "No new alerts - all caught up!"
+    },
+    "availability": {
+      "title": "Working Hours",
+      "description": "Set your available time slots for appointments",
+      "online": "Online",
+      "inPerson": "In-person",
+      "addSlot": "Add Time Slot",
+      "newSlot": "New Time Slot",
+      "day": "Day",
+      "startTime": "Start Time",
+      "endTime": "End Time",
+      "type": "Type",
+      "noSlots": "No availability set",
+      "added": "Time slot added",
+      "removed": "Time slot removed",
+      "bookingSettings": {
+        "title": "Booking Settings",
+        "description": "Configure slot duration and buffer between appointments",
+        "slotDuration": "Slot Duration",
+        "slotDurationDescription": "Length of each bookable time slot (minutes)",
+        "bufferTime": "Buffer Time",
+        "bufferTimeDescription": "Minimum gap between end of one appointment and start of next (minutes)",
+        "minutes": "min",
+        "saved": "Booking settings saved",
+        "errors": {
+          "saveFailed": "Failed to save booking settings",
+          "loadFailed": "Failed to load booking settings"
+        }
+      },
+      "errors": {
+        "addFailed": "Failed to add time slot",
+        "removeFailed": "Failed to remove time slot",
+        "updateFailed": "Failed to update time slot"
+      }
+    },
+    "profile": {
+      "title": "Partner Profile",
+      "description": "Your public partner information",
+      "edit": "Edit Profile",
+      "displayName": "Display Name",
+      "businessName": "Business Name",
+      "location": "Location",
+      "email": "Email",
+      "phone": "Phone",
+      "visibility": "Visibility",
+      "visible": "Public",
+      "hidden": "Hidden",
+      "about": "About",
+      "services": "Services",
+      "certificationScore": "Certification Score",
+      "certificationLevel": "Certification Level",
+      "certifiedOn": "Certified on"
+    },
+    "calendar": {
+      "title": "Select Date",
+      "selectDate": "Click a date to view appointments",
+      "appointments": "appointments",
+      "noAppointments": "No appointments on this day"
+    },
+    "pending": {
+      "title": "Pending Requests",
+      "description": "Appointment requests waiting for your confirmation",
+      "none": "No pending appointment requests"
+    },
+    "upcoming": {
+      "title": "Upcoming Appointments",
+      "description": "Your confirmed upcoming appointments",
+      "none": "No upcoming appointments"
+    },
+    "appointmentType": {
+      "online": "Online consultation",
+      "inPerson": "In-person visit"
+    },
+    "service": "Service",
+    "status": {
+      "pending": "Pending",
+      "confirmed": "Confirmed",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "no_show": "No show",
+      "rescheduled": "Rescheduled"
+    },
+    "actions": {
+      "confirm": "Confirm",
+      "cancel": "Cancel",
+      "complete": "Mark as Completed"
+    },
+    "notes": {
+      "show": "Show notes",
+      "hide": "Hide notes",
+      "none": "No notes",
+      "loadFailed": "Failed to load notes"
+    },
+    "member": "Member",
+    "viewUsers": "View Members",
+    "mentoring": {
+      "certificationRequired": {
+        "title": "Mentoring is available only for certified partners.",
+        "description": "Complete the certification course to access mentoring and client assignment features.",
+        "cta": "Start certification →"
+      }
+    },
+    "unclaimedUsers": {
+      "title": "Users without mentor",
+      "titleWithCount": "Users without mentor ({{count}})",
+      "description": "New users waiting for mentor assignment",
+      "descriptionLong": "These users have completed onboarding and are waiting to be assigned a certified mentor",
+      "loading": "Loading...",
+      "empty": {
+        "title": "No users without assigned mentor",
+        "description": "There are currently no users without an assigned mentor. Great work! 🎉"
+      },
+      "buttons": {
+        "claim": "Assign me",
+        "claiming": "Assigning..."
+      },
+      "wellbeing": {
+        "overallFeeling": "Overall feeling",
+        "energy": "Energy"
+      },
+      "sections": {
+        "concern": "What troubles them:",
+        "goal": "Their goal:"
+      },
+      "badges": {
+        "years": "years old",
+        "communication": "communication",
+        "prefersMale": "Prefers male",
+        "prefersFemale": "Prefers female",
+        "communicationFrequent": "Frequent",
+        "communicationModerate": "Moderate",
+        "communicationMinimal": "Minimal"
+      },
+      "toasts": {
+        "fetchFailed": {
+          "title": "Loading error",
+          "description": "Failed to load users without mentor"
+        },
+        "claimSuccess": {
+          "charts": {
+            "checkIns": "Check-ins"
+          },
+          "title": "User assigned! 🎉",
+          "description": "{{email}} is now in your team. Schedule an introductory call with them."
+        },
+        "claimFailed": {
+          "title": "Assignment failed",
+          "description": "User may already have a mentor or you don't have permission."
+        }
+      }
+    },
+    "myClients": {
+      "title": "My Clients",
+      "count": "My Clients ({{count}})",
+      "description": "Users you are mentoring",
+      "descriptionShort": "Users you have assigned as mentor",
+      "loading": "Loading...",
+      "loadingDetails": "Loading...",
+      "loadError": "Loading error",
+      "noClients": "You don't have any assigned clients yet. Assign someone from the \"Users without mentor\" section above.",
+      "assignedAgo": "Assigned {{time}}",
+      "relinquishReason": "Partner voluntarily relinquished access",
+      "toasts": {
+        "fetchFailed": {
+          "title": "Loading error",
+          "description": "Failed to load your clients"
+        },
+        "detailsFetchFailed": {
+          "title": "Details loading error",
+          "description": "Failed to load client details"
+        },
+        "requestSent": {
+          "title": "Request sent",
+          "description": "{{email}} will receive a notification requesting data sharing."
+        },
+        "requestFailed": {
+          "title": "Request sending error",
+          "description": "Please try again."
+        },
+        "accessRelinquished": {
+          "title": "Access terminated",
+          "description": "You have relinquished access to {{email}}'s sensitive data."
+        },
+        "relinquishFailed": {
+          "title": "Access termination error",
+          "description": "Please try again."
+        }
+      },
+      "consent": {
+        "label": "Consent:",
+        "requestMessage": "I would like to have access to your sensitive data so I can better help you.",
+        "noConsent": {
+          "title": "Client has not approved data sharing.",
+          "description": "To access detailed sensitive information, you must request data sharing consent."
+        },
+        "waitingForResponse": "Waiting for user response"
+      },
+      "buttons": {
+        "details": "Details",
+        "requestConsent": "Request consent",
+        "renewConsent": "Renew consent",
+        "requestAgain": "Request again",
+        "relinquishAccess": "Relinquish access",
+        "cancel": "Cancel",
+        "confirmRelinquish": "Yes, relinquish access",
+        "requesting": "Sending...",
+        "relinquishing": "Terminating..."
+      },
+      "status": {
+        "completed": "Completed",
+        "afterCall": "After call",
+        "callScheduled": "Call scheduled",
+        "waitingForCall": "Waiting for call"
+      },
+      "consentStatus": {
+        "granted": "Granted",
+        "pending": "Pending approval",
+        "expired": "Expired",
+        "revoked": "Revoked",
+        "none": "Not granted"
+      },
+      "dialog": {
+        "clientDetail": {
+          "title": "Client Details"
+        },
+        "wellbeing": {
+          "overallFeeling": "Overall Feeling",
+          "energy": "Energy",
+          "mentalWellbeing": "Mental State",
+          "sleep": "Sleep"
+        },
+        "sections": {
+          "concerns": "What troubles them:",
+          "secondaryConcerns": "Additional concerns:",
+          "mainGoal": "Main goal:",
+          "chronicCondition": "Chronic condition:",
+          "preferences": "Preferences:",
+          "concern": "Concern:",
+          "goal": "Goal:"
+        },
+        "preferences": {
+          "years": "years",
+          "communication": {
+            "frequent": "Frequent",
+            "moderate": "Moderate",
+            "minimal": "Minimal",
+            "label": "communication"
+          },
+          "goalLabel": "Goal:"
+        },
+        "relinquishAccess": {
+          "title": "Relinquish access to sensitive data?",
+          "description": "You are about to terminate your access to <strong>{{email}}</strong>'s sensitive data.",
+          "consequences": "This action:",
+          "bullet1": "Will immediately terminate your access to their sensitive information",
+          "bullet2": "The user will be notified about the access termination",
+          "bullet3": "You will need to request new consent if you want to restore access"
+        }
+      }
+    },
+    "invitations": {
+      "title": "My Invitations",
+      "subtitle": "Manage invitations for new members",
+      "info": "Create invitations for new members. Each invited member will be automatically assigned to you as their mentor.",
+      "createDesc": "Create an invitation for a new member",
+      "empty": "You don't have any invitations yet",
+      "emptyDesc": "Create your first invitation and start inviting new members",
+      "total": "Total invitations",
+      "active": "Active",
+      "used": "Used",
+      "prefillTitle": "Profile prefill (optional)",
+      "internalNotes": "Internal notes",
+      "notesPlaceholder": "Notes about the contact...",
+      "notesHint": "Only you can see these notes",
+      "hasPrefill": "Profile prefilled"
+    }
+  },
+  "partnerUsers": {
+    "title": "My Members",
+    "subtitle": "View and manage sensitive data for your assigned members",
+    "backToDashboard": "Back to Dashboard",
+    "privacyNotice": {
+      "title": "Member Privacy Protected",
+      "description": "You can only view detailed sensitive data for members who have explicitly granted you access. All other member data is shown only as anonymized aggregate statistics."
+    },
+    "searchPlaceholder": "Search by name, email, focus area...",
+    "filterByStudy": "Filter by cluster",
+    "filterByStatus": "Filter by status",
+    "allStudies": "All Clusters",
+    "allStatuses": "All Statuses",
+    "stats": {
+      "total": "Total Members",
+      "consented": "With Access",
+      "anonymous": "Anonymous",
+      "active": "Active",
+      "completed": "Completed",
+      "filtered": "Showing"
+    },
+    "status": {
+      "screening": "Screening",
+      "enrolled": "Enrolled",
+      "active": "Active",
+      "completed": "Completed",
+      "withdrawn": "Withdrawn"
+    },
+    "noUsers": {
+      "title": "No Members Assigned",
+      "description": "You don't have any members assigned to you yet. Members will appear here once they are enrolled in clusters you consult."
+    },
+    "noResults": {
+      "title": "No members found",
+      "description": "Try adjusting your search or filter criteria."
+    },
+    "list": {
+      "title": "Members",
+      "count": "member(s)"
+    },
+    "unknownUser": "Unknown Member",
+    "selectUser": "Select a member to view their sensitive data",
+    "dob": "DOB",
+    "diagnosis": "Focus Area",
+    "enrolled": "Enrolled",
+    "tabs": {
+      "consented": "Members with Access",
+      "cohort": "Cohort Statistics",
+      "longevity": "Reliability Scores",
+      "checkIns": "Check-ins",
+      "labs": "Labs",
+      "dosing": "Dosing",
+      "forms": "Forms",
+      "consents": "Consents"
+    },
+    "noConsentedUsers": {
+      "title": "No Data Access Granted",
+      "description": "None of your assigned members have granted you access to their detailed sensitive data yet. You can still view anonymized cohort statistics in the 'Cohort Statistics' tab."
+    },
+    "noData": "No sensitive data available",
+    "noCheckIns": "No check-ins recorded",
+    "noLabs": "No test results recorded",
+    "noDosing": "No dosing logs recorded",
+    "noQuestionnaires": "No questionnaire responses recorded",
+    "noConsents": "No consents recorded",
+    "chart": {
+      "title": "Trends (Last 30 Days)"
+    },
+    "labChart": {
+      "title": "Test Trends"
+    },
+    "avgPain": "Avg Pain",
+    "avgEnergy": "Avg Energy",
+    "avgMood": "Avg Mood",
+    "avgSleep": "Avg Sleep",
+    "completed": "Completed",
+    "granted": "Granted",
+    "denied": "Denied",
+    "cohort": {
+      "anonymousNotice": {
+        "title": "Anonymized Data",
+        "description": "This view shows aggregate statistics across all members in your clusters. Individual member data is not displayed. {{count}} of {{total}} members have not granted detailed access."
+      },
+      "noStudies": {
+        "title": "No Clusters",
+        "description": "You are not assigned to any clusters yet."
+      },
+      "aggregateStatistics": "Aggregate statistics for this cluster cohort",
+      "totalParticipants": "Total Participants",
+      "activeParticipants": "Active",
+      "completedParticipants": "Completed",
+      "averageTrackingMetrics": "Average Metrics",
+      "pain": "Pain",
+      "energy": "Energy",
+      "mood": "Mood",
+      "sleepQuality": "Sleep Quality",
+      "sleepHours": "Sleep Hours",
+      "averageLabValues": "Average Test Values",
+      "activityCounts": "Activity Counts",
+      "totalCheckIns": "Check-ins",
+      "totalLabResults": "Test Results",
+      "totalDosingLogs": "Dosing Logs",
+      "noData": "No data available for this cluster yet.",
+      "noTrendData": "No trend data available",
+      "trackingTrends": "Trends (Last 12 Weeks)",
+      "labTrends": "Test Trends (Last 12 Months)",
+      "weeklyAverages": "Weekly averages across all cohort participants",
+      "monthlyAverages": "Monthly averages across all cohort participants"
+    },
+    "biomarkers": {
+      "crp": "CRP (mg/L)",
+      "vitaminD": "Vitamin D (ng/mL)",
+      "glucose": "Glucose (mg/dL)"
+    },
+    "labels": {
+      "pain": "Pain",
+      "energy": "Energy",
+      "mood": "Mood",
+      "sleep": "Sleep",
+      "crp": "CRP",
+      "glucose": "Glucose",
+      "vitD": "Vit D"
+    }
+  },
+  "partnerProfile": {
+    "notFound": "Partner not found",
+    "notFoundDescription": "This partner profile could not be found or is no longer available.",
+    "reviews": "reviews",
+    "about": "About",
+    "notesForVisitors": "Notes for Visitors",
+    "services": "Services",
+    "availability": "Availability",
+    "availabilityDescription": "Regular working hours when appointments can be booked",
+    "noAvailability": "No availability set",
+    "acceptsOnline": "Accepts online consultations",
+    "acceptsInPerson": "Accepts in-person visits",
+    "reviewsTitle": "Reviews",
+    "reviewsCount": "{{count}} reviews",
+    "noReviewsYet": "No reviews yet",
+    "certification": "Certification",
+    "testScore": "Test Score",
+    "certifiedSince": "Certified Since",
+    "certifiedProvider": "Certified Guild Member",
+    "certifiedPartner": "Certified Partner",
+    "contact": "Contact",
+    "visitWebsite": "Visit website",
+    "bookAppointment": "Book Appointment",
+    "languages": "Communication Languages"
+  },
+  "partnerProfileEdit": {
+    "title": "Edit Public Profile",
+    "subtitle": "Customize how your profile appears to visitors",
+    "saveSuccess": "Profile saved successfully",
+    "saveError": "Failed to save profile",
+    "visibility": {
+      "title": "Profile Visibility",
+      "description": "Control whether your profile is visible in the partner directory",
+      "label": "Show in partner directory",
+      "hint": "When enabled, your profile will be visible to all visitors"
+    },
+    "basicInfo": {
+      "title": "Basic Information",
+      "displayName": "Display Name",
+      "businessName": "Business Name",
+      "businessNameHint": "Optional - name of your organization or practice",
+      "description": "About You",
+      "descriptionHint": "Describe your experience, specializations, and approach",
+      "notesForVisitors": "Notes for Visitors",
+      "notesForVisitorsHint": "Special instructions, parking info, or anything visitors should know"
+    },
+    "location": {
+      "title": "Location",
+      "city": "City",
+      "country": "Country",
+      "address": "Full Address",
+      "addressHint": "Shown to visitors for in-person appointments"
+    },
+    "contact": {
+      "title": "Contact Information",
+      "email": "Email",
+      "phone": "Phone",
+      "website": "Website",
+      "websitePlaceholder": "https://"
+    },
+    "services": {
+      "title": "Services Offered",
+      "description": "Select the services you provide"
+    },
+    "appointments": {
+      "title": "Appointment Types",
+      "description": "What types of appointments do you accept?",
+      "online": "Online appointments",
+      "inPerson": "In-person appointments"
+    },
+    "languages": {
+      "title": "Communication Languages",
+      "description": "Languages you communicate with clients in",
+      "czech": "Czech",
+      "english": "English",
+      "german": "German",
+      "russian": "Russian",
+      "slovak": "Slovak",
+      "polish": "Polish",
+      "french": "French",
+      "spanish": "Spanish",
+      "italian": "Italian",
+      "chinese": "Chinese",
+      "japanese": "Japanese",
+      "korean": "Korean",
+      "vietnamese": "Vietnamese",
+      "other": "Other",
+      "cs": "Cs",
+      "en": "En",
+      "de": "De",
+      "sk": "Sk",
+      "pl": "Pl",
+      "hu": "Hu",
+      "ru": "Ru",
+      "uk": "Uk",
+      "fr": "Fr",
+      "es": "Es",
+      "it": "It",
+      "pt": "Pt"
+    }
+  },
+  "consultantDashboard": {
+    "title": "Member Dashboard",
+    "subtitle": "View sensitive data for your assigned members",
+    "backToPartner": "Back to Partner Dashboard",
+    "stats": {
+      "totalUsers": "Total Members",
+      "activeUsers": "Active Members",
+      "completedUsers": "Completed"
+    },
+    "noUsers": {
+      "title": "No Members Assigned",
+      "description": "You don't have any members assigned to you yet. Members will appear here once they are enrolled in clusters you consult."
+    },
+    "userList": {
+      "title": "Members",
+      "description": "Select a member to view their sensitive data"
+    },
+    "unknownUser": "Unknown Member",
+    "selectUser": "Select a member to view their sensitive data",
+    "dob": "DOB",
+    "diagnosis": "Focus Area",
+    "enrolled": "Enrolled",
+    "tabs": {
+      "users": "Members",
+      "checkIns": "Check-ins",
+      "labs": "Labs",
+      "dosing": "Dosing",
+      "questionnaires": "Forms",
+      "consents": "Consents"
+    },
+    "avgPain": "Avg Pain",
+    "avgEnergy": "Avg Energy",
+    "avgMood": "Avg Mood",
+    "avgSleep": "Avg Sleep",
+    "noCheckIns": "No check-ins recorded",
+    "noLabResults": "No test results recorded",
+    "noDosingLogs": "No dosing logs recorded",
+    "noQuestionnaires": "No questionnaire responses",
+    "noConsents": "No consent records",
+    "noData": "No sensitive data available",
+    "questionnaireCompleted": "Questionnaire Completed",
+    "granted": "Granted",
+    "denied": "Denied",
+    "chart": {
+      "title": "Trends (Last 30 Days)",
+      "pain": "Pain",
+      "energy": "Energy",
+      "sleep": "Sleep",
+      "mood": "Mood",
+      "noData": "Not enough data to display chart"
+    },
+    "labChart": {
+      "title": "Performance Trends (Platform Protocol)",
+      "noData": "No test results to display",
+      "inflammation": "Inflammation",
+      "metabolic": "Metabolic",
+      "lipids": "Lipids",
+      "vitamins": "Vitamins",
+      "liver": "Liver",
+      "immune": "Immune",
+      "advanced": "Advanced",
+      "inflammationTitle": "Inflammation Markers",
+      "inflammationDesc": "CRP & ESR - Key indicators for quality protocol",
+      "metabolicTitle": "Metabolic Panel",
+      "metabolicDesc": "Glucose & HbA1c - Key indicators for platform protocol",
+      "lipidsTitle": "Lipid Profile",
+      "lipidsDesc": "Cholesterol panel - Key indicators for optimization protocol",
+      "vitaminsTitle": "Vitamin Status",
+      "vitaminsDesc": "Vitamin D & B12 - Baseline reliability markers",
+      "liverTitle": "Liver Function",
+      "liverDesc": "AST & ALT - System health monitoring",
+      "immuneTitle": "Immune Panel",
+      "immuneDesc": "NK cells & Lymphocytes - Key indicators for quality protocol",
+      "advancedTitle": "Advanced Reliability Markers",
+      "advancedDesc": "NAD/NADH ratio & Omega-3 - Deep personalization markers for platform protocol"
+    },
+    "biomarkers": {
+      "crp": "CRP",
+      "glucose": "Glucose",
+      "vitD": "Vit D",
+      "chol": "Chol",
+      "hba1c": "HbA1c",
+      "hdl": "HDL",
+      "ldl": "LDL",
+      "ast": "AST"
+    }
+  },
+  "storyloop": {
+    "title": "StoryLoop",
+    "days": "{{count}} days",
+    "days_one": "{{count}} day",
+    "description": "Partner workspace for member case management",
+    "unknownUser": "Unknown Member",
+    "newStory": {
+      "title": "New Story",
+      "description": "Create a new case for your member",
+      "memberDescription": "Create a new StoryLoop case for yourself within your active cluster",
+      "user": "Member",
+      "selectUser": "Select a member",
+      "noUsers": "No members with consent",
+      "study": "Cluster",
+      "selectStudy": "Select a cluster",
+      "noEligibleStudies": "No active or enrolled clusters available",
+      "storyTitle": "Title (optional)",
+      "titlePlaceholder": "E.g. Initial consultation",
+      "titleHint": "A short title to help identify this case",
+      "create": "Create Story",
+      "error": "Error",
+      "errorDescription": "Failed to create story. Please try again.",
+      "success": "Story created",
+      "successDescription": "New case has been created successfully"
+    },
+    "addEntry": {
+      "title": "Add Entry",
+      "description": "Add a record to a member's timeline",
+      "selectMember": "Select member",
+      "selectStory": "Select case",
+      "noActiveStories": "No active cases for this member",
+      "selectEntryType": "Entry type",
+      "content": "Note (optional)",
+      "contentPlaceholder": "Additional note...",
+      "submit": "Add entry",
+      "success": "Entry added",
+      "successDescription": "Entry was added to the member's timeline",
+      "error": "Error",
+      "errorDescription": "Failed to add entry. Please try again.",
+      "entryTypes": {
+        "note": "Note",
+        "meeting_request": "Meeting request",
+        "questionnaire_request": "Questionnaire",
+        "consent_request": "Consent request",
+        "lab_order": "Test order",
+        "distribution_adjustment": "Distribution adjustment",
+        "email": "Email"
+      }
+    },
+    "newDiscussion": {
+      "title": "New Discussion",
+      "description": "Start a new knowledge discussion topic",
+      "topicTitle": "Topic title",
+      "topicTitlePlaceholder": "E.g. Best practices for product protocols",
+      "summary": "Summary (optional)",
+      "summaryPlaceholder": "Brief description of the topic...",
+      "firstPost": "Opening post",
+      "firstPostPlaceholder": "Write the opening post...",
+      "visibility": "Visibility",
+      "visibilityPublic": "Public",
+      "visibilityMembers": "Members only",
+      "create": "Create topic",
+      "success": "Discussion created",
+      "successDescription": "New discussion topic has been created",
+      "error": "Error",
+      "errorDescription": "Failed to create discussion. Please try again."
+    },
+    "all": "All",
+    "active": "Active",
+    "inbox": "Inbox",
+    "inProgress": "In Progress",
+    "scheduled": "Scheduled",
+    "starred": "Starred",
+    "archived": "Archived",
+    "trash": "Trash",
+    "labels": "Labels",
+    "search": "Search cases...",
+    "noStories": "No cases",
+    "selectStory": "Select a member thread from the list",
+    "markRead": "Mark as read",
+    "star": "Star",
+    "archive": "Archive",
+    "restore": "Restore",
+    "delete": "Delete",
+    "moveTo": "Move to",
+    "addNote": "Add note",
+    "addAction": "Add action",
+    "internalNote": "Internal",
+    "internal": "Internal",
+    "entryAdded": "Entry added",
+    "composerPlaceholder": "Write a note or message...",
+    "memberComposerPlaceholder": "Add a note to your timeline...",
+    "composerHint": "Ctrl+Enter to send",
+    "hideHeader": "Hide header",
+    "showHeader": "Show header",
+    "loadPreview": "Load preview",
+    "previewNotAvailable": "Preview not available",
+    "imageLoadFailed": "Failed to load image",
+    "documentLinkCopied": "Document link copied to clipboard",
+    "blocks": {
+      "meetingRequest": "Meeting Request",
+      "meetingRequestDesc": "Schedule a meeting with member",
+      "questionnaireRequest": "Questionnaire Request",
+      "questionnaireRequestDesc": "Ask member to fill a questionnaire",
+      "consentRequest": "Consent Request",
+      "consentRequestDesc": "Ask member for consent",
+      "labOrder": "Test Order",
+      "labOrderDesc": "Order assessment tests",
+      "distributionAdjustment": "Distribution Adjustment",
+      "distributionAdjustmentDesc": "Change platform service distribution",
+      "bloodMatrixAnalysis": "Performance Matrix Analysis",
+      "bloodMatrixAnalysisDesc": "Record 3x3 performance matrix and generate report",
+      "email": "Send Email",
+      "emailDesc": "Compose and send an email to the member",
+      "productLog": "Log Product",
+      "productLogDesc": "Record product intake",
+      "healthLog": "Log State",
+      "trackingLogDesc": "Record issue severity"
+    },
+    "addBlock": "Block",
+    "insertBlock": "Insert Block",
+    "blockAdded": "Block added",
+    "meetingType": {
+      "onboarding": "Onboarding",
+      "consultation": "Consultation",
+      "check_in": "Check-in",
+      "urgent": "Urgent",
+      "other": "Other",
+      "initial": "Initial",
+      "follow_up": "Follow up",
+      "assessment": "Assessment",
+      "closing": "Closing"
+    },
+    "meetingStatus": {
+      "pending": "Pending confirmation",
+      "accepted": "Confirmed",
+      "declined": "Declined",
+      "rescheduled": "Rescheduled",
+      "completed": "Completed",
+      "scheduled": "Scheduled",
+      "cancelled": "Cancelled",
+      "no_show": "No show"
+    },
+    "location": {
+      "video": "Video call",
+      "phone": "Phone",
+      "in_person": "In person",
+      "online": "Online"
+    },
+    "proposedTimes": "Proposed times",
+    "proposedTimesLabel": "Proposed times",
+    "acceptMeeting": "Accept",
+    "declineMeeting": "Decline",
+    "rescheduleMeeting": "Reschedule",
+    "meetingTypeLabel": "Meeting type",
+    "locationLabel": "Location",
+    "selectLocation": "Select location",
+    "addProposedTime": "Add time slot",
+    "notesLabel": "Notes",
+    "meetingNotesPlaceholder": "Optional notes for the meeting...",
+    "createMeetingRequest": "Create request",
+    "meetingRequestContent": "Meeting request",
+    "questionnaireStatus": {
+      "pending": "Pending",
+      "started": "In progress",
+      "completed": "Completed",
+      "expired": "Expired",
+      "in_progress": "In progress",
+      "skipped": "Skipped"
+    },
+    "questionnaireLoadError": "Failed to load questionnaire",
+    "noQuestionnairesAvailable": "No questionnaires available",
+    "noStudySelected": "No cluster selected",
+    "dueDate": "Due date",
+    "dueDateLabel": "Due date",
+    "dueDateHint": "Optional. Member will receive a reminder before the due date.",
+    "overdue": "Overdue",
+    "completedAt": "Completed",
+    "viewResults": "View results",
+    "responseDetail": {
+      "title": "Response detail",
+      "description": "Detailed view of the questionnaire response",
+      "score": "Score",
+      "answers": "Answers",
+      "noAnswers": "No answers recorded",
+      "loadError": "Failed to load response detail",
+      "questionnaireVersion": "Questionnaire v{{version}}",
+      "responseVersion": "Response v{{version}}"
+    },
+    "consentDetail": {
+      "title": "Consent detail",
+      "description": "Detailed view of the consent record",
+      "loadError": "Failed to load consent detail",
+      "consentType": "Consent type",
+      "study": "Cluster",
+      "version": "Version {{version}}",
+      "statusGranted": "Granted",
+      "statusRevoked": "Revoked",
+      "statusPending": "Pending",
+      "grantedAt": "Granted at",
+      "revokedAt": "Revoked at",
+      "createdAt": "Created at",
+      "viewDocument": "View document",
+      "types": {
+        "data_processing": "Data processing",
+        "observation": "Observation",
+        "operational_trial": "Operational trial",
+        "wearables": "Sentry data",
+        "marketing": "Marketing",
+        "informed_consent": "Informed consent"
+      }
+    },
+    "labResultDetail": {
+      "title": "Test result detail",
+      "description": "Detailed view of the test result",
+      "loadError": "Failed to load test result detail",
+      "unknownTestType": "Unknown test",
+      "labName": "Source",
+      "testDate": "Test date",
+      "resultDate": "Result date",
+      "statusPending": "Pending",
+      "statusCompleted": "Completed",
+      "statusReviewed": "Reviewed",
+      "biomarkers": "Biomarkers",
+      "biomarkerName": "Name",
+      "biomarkerValue": "Value",
+      "biomarkerUnit": "Unit",
+      "notes": "Notes",
+      "reviewedBy": "Reviewed by {{name}}",
+      "viewDocument": "View document",
+      "biomarkerLabels": {
+        "alt": "ALT",
+        "ast": "AST",
+        "cd4_count": "CD4 count",
+        "cd8_count": "CD8 count",
+        "cholesterol_total": "Total cholesterol",
+        "creatinine": "Creatinine",
+        "crp": "CRP",
+        "esr": "ESR",
+        "glucose": "Glucose",
+        "hba1c": "HbA1c",
+        "hdl": "HDL",
+        "hemoglobin": "Hemoglobin",
+        "il_4": "IL-4",
+        "il_6": "IL-6",
+        "insulin": "Insulin",
+        "ldl": "LDL",
+        "nad_nadh_ratio": "NAD/NADH ratio",
+        "nk_cells": "NK cells",
+        "omega3_index": "Omega-3 index",
+        "platelets": "Platelets",
+        "rbc": "RBC",
+        "tnf_alpha": "TNF-alpha",
+        "triglycerides": "Triglycerides",
+        "urea": "Urea",
+        "vitamin_b12": "Vitamin B12",
+        "vitamin_d": "Vitamin D",
+        "wbc": "WBC"
+      }
+    },
+    "sendReminder": "Send reminder",
+    "questionnaireLabel": "Questionnaire",
+    "selectQuestionnaire": "Select questionnaire",
+    "sendQuestionnaire": "Send questionnaire",
+    "questionnaireRequestContent": "Questionnaire request: {{name}}",
+    "consentStatus": {
+      "pending": "Pending signature",
+      "signed": "Signed",
+      "declined": "Declined",
+      "expired": "Expired",
+      "granted": "Granted",
+      "revoked": "Revoked"
+    },
+    "requiresSignature": "Requires signature",
+    "noSignatureRequired": "No signature required",
+    "signedAt": "Signed",
+    "consentDeclined": "Consent was declined",
+    "viewConsent": "View consent",
+    "resendRequest": "Resend",
+    "consentLabel": "Consent type",
+    "selectConsent": "Select consent type",
+    "requireSignature": "Require signature",
+    "requireSignatureHint": "Member will need to digitally sign the consent",
+    "sendConsentRequest": "Send request",
+    "consentRequestContent": "Consent request: {{name}}",
+    "labOrder": "Test order",
+    "labPreset": {
+      "custom": "Custom selection",
+      "respiratory_baseline": "Quality baseline (CBC, hs-CRP, ESR, Ferritin)",
+      "respiratory_extension": "Quality extension (Fibrinogen, SAA)",
+      "respiratory_immunity": "Resilience map (CD3/CD4/CD8, Lymphocyte panel)",
+      "respiratory_metabolic": "Performance reserve (HbA1c, Cystatin C, Homocysteine)",
+      "respiratory_endocrine": "System check (TSH, f-T4)"
+    },
+    "labStatus": {
+      "ordered": "Ordered",
+      "scheduled": "Scheduled",
+      "completed": "Completed",
+      "results_ready": "Results ready",
+      "reviewed": "Reviewed",
+      "pending": "Pending",
+      "cancelled": "Cancelled"
+    },
+    "orderedTests": "Ordered tests",
+    "selectLabTest": "Select test from catalog",
+    "addTest": "Add test",
+    "selectedTests": "Selected tests",
+    "noTestsSelected": "No tests selected yet",
+    "scheduledFor": "Scheduled for",
+    "viewLabResults": "View results",
+    "distributionAdjustment": "Distribution adjustment",
+    "distributionChange": "Change",
+    "previousDose": "Previous",
+    "newDose": "New",
+    "effectiveFrom": "Effective from",
+    "tokenRewardTooltip": "You'll earn {{amount}} tokens for completing this",
+    "reprice": {
+      "title": "Reprice proposal",
+      "awaiting": "Awaiting confirmation",
+      "confirmed": "Confirmed",
+      "rejected": "Rejected",
+      "confirmButton": "Confirm",
+      "rejectButton": "Reject",
+      "confirmedToast": "Reprice confirmed",
+      "rejectedToast": "Reprice rejected"
+    },
+    "blockActions": {
+      "meetingAccepted": "Meeting accepted",
+      "meetingDeclined": "Meeting declined",
+      "meetingRescheduled": "Meeting marked for rescheduling",
+      "reminderSent": "Reminder sent",
+      "consentResent": "Consent request resent",
+      "actionFailed": "Action failed. Please try again.",
+      "viewingResults": "Opening results…",
+      "viewingConsent": "Opening consent…",
+      "viewingLabResults": "Opening test results…"
+    },
+    "user": {
+      "context": "Member context",
+      "timeline": "Timeline",
+      "recentCheckIns": "Recent check-ins",
+      "sharedDocuments": "Shared documents"
+    },
+    "aisha": {
+      "name": "Aisha",
+      "title": "Consult with Aisha",
+      "consult": "Consult",
+      "recap": "Recap",
+      "translate": "Translate",
+      "recommend": "Suggest steps",
+      "analyze": "Analyze trends",
+      "contextInfo": "Aisha has access to member context",
+      "excludeHealth": "Exclude data",
+      "generating": "Generating response...",
+      "comingSoon": "AI consultation coming soon.",
+      "placeholder": "Type your question...",
+      "startConversation": "Start a conversation or use quick actions above.",
+      "errorGenerating": "Failed to generate response.",
+      "contextDescription": "Aisha has access to case timeline, check-ins and shared documents (if consent was granted).",
+      "clearHistory": "Clear history",
+      "thinkingChat": "Thinking…",
+      "thinkingRecap": "Summarizing timeline…",
+      "thinkingTranslate": "Translating…",
+      "thinkingRecommend": "Preparing recommendations…",
+      "thinkingAnalyze": "Analyzing data…"
+    },
+    "entry": {
+      "note": "Note",
+      "action": "Action",
+      "system": "System",
+      "healthEvent": "Status event",
+      "health_event": "Status event",
+      "request": "Request",
+      "message": "Message",
+      "aiRecap": "AI recap",
+      "ai_recap": "AI recap",
+      "document": "Document",
+      "appointment": "Appointment",
+      "translation": "Translation",
+      "meeting_request": "Meeting request",
+      "questionnaire_request": "Questionnaire request",
+      "consent_request": "Consent request",
+      "lab_order": "Test order",
+      "distribution_adjustment": "Distribution adjustment",
+      "title": "Title",
+      "content": "Content",
+      "status": "Status",
+      "blood_matrix_analysis": "Performance matrix analysis",
+      "email": "Email",
+      "health_snapshot": "Status snapshot",
+      "product_info": "Product info"
+    },
+    "sentAt": "Sent at",
+    "emailRecipient": "Recipient",
+    "emailRecipientType": {
+      "user": "Member",
+      "partner": "Partner",
+      "system": "System"
+    },
+    "emailStatus": {
+      "draft": "Draft",
+      "sent": "Sent",
+      "delivered": "Delivered",
+      "failed": "Failed"
+    },
+    "reminders": {
+      "upcoming": "Reminders",
+      "complete": "Complete",
+      "setReminder": "Set reminder",
+      "overdue": "Overdue"
+    },
+    "email": {
+      "to": "To",
+      "toPlaceholder": "recipient@example.com",
+      "subject": "Subject",
+      "subjectPlaceholder": "Email subject...",
+      "body": "Message",
+      "bodyPlaceholder": "Write your email...",
+      "send": "Send Email"
+    },
+    "memberCard": {
+      "anonymizedOnly": "Anonymized member",
+      "fullAccess": "Full access",
+      "limitedAccess": "Limited access",
+      "anonymizedAccess": "Anonymized data",
+      "noAccess": "No access",
+      "fullAccessDesc": "You have access to all shared data",
+      "limitedAccessDesc": "You have access to some data categories",
+      "anonymizedDesc": "You only see anonymized aggregate data",
+      "noAccessDesc": "You have no access to any data",
+      "accessLevel": "Access level",
+      "consentGranted": "Consent granted",
+      "consentPending": "Pending consent",
+      "consentRevoked": "Consent revoked",
+      "consentExpired": "Consent expired",
+      "consentNeverAsked": "Consent not requested",
+      "memberSince": "Member since",
+      "lastActivity": "Last activity",
+      "sharedWith": "Shared with",
+      "requestAccess": "Request access",
+      "healthData": "Member data",
+      "healthcheckins": "Check-ins",
+      "checkIns": "Check-ins",
+      "labresults": "Test results",
+      "labResults": "Test results",
+      "documents": "Documents",
+      "assessments": "Assessments",
+      "dosinglogs": "Dosing logs",
+      "studydata": "Cluster data",
+      "studyRegistration": "Cluster registration",
+      "status": "Status",
+      "consent": {
+        "pending": "Pending",
+        "granted": "Granted",
+        "revoked": "Revoked"
+      },
+      "access": "Access"
+    },
+    "trackingPanel": {
+      "title": "Member Data",
+      "last7Days": "Last 7 days",
+      "pain": "Pain",
+      "energy": "Energy",
+      "mood": "Mood",
+      "sleep": "Sleep",
+      "avgPain": "Avg. Pain",
+      "avgEnergy": "Avg. Energy",
+      "avgMood": "Avg. Mood",
+      "avgSleep": "Avg. Sleep",
+      "dayStreak": "{{count}}-day streak",
+      "dayStreak_one": "{{count}}-day streak",
+      "lastCheckIn": "Last check-in",
+      "tookMeds": "Took meds",
+      "wearablesData": "Sentry",
+      "steps": "Steps",
+      "bpm": "BPM",
+      "activeMin": "Active min",
+      "noData": "No sensitive data available yet",
+      "noCheckIns": "No check-ins recorded",
+      "noMeds": "No service logs",
+      "noSymptoms": "No issue logs recorded",
+      "unknownSymptom": "Unknown issue",
+      "symptomSeverity": "Severity",
+      "symptomOngoing": "Ongoing",
+      "symptomDurationHours": "{{count}}h",
+      "symptomDurationHours_one": "{{count}}h",
+      "symptomDurationDays": "{{count}}d",
+      "symptomDurationDays_one": "{{count}}d",
+      "doseCount": "{{count}}× doses",
+      "doseCount_one": "{{count}}× dose",
+      "unknownProduct": "Unknown platform service",
+      "noWearables": "No Sentry data",
+      "noConsent": "No Data Access",
+      "noConsentDesc": "This member has not granted you access to their sensitive data.",
+      "relative": {
+        "today": "Today",
+        "yesterday": "Yesterday"
+      },
+      "tabs": {
+        "overview": "Overview",
+        "checkIns": "Check-ins",
+        "symptoms": "Issues",
+        "meds": "Services",
+        "wearables": "Sentry"
+      }
+    },
+    "trackingSummary": {
+      "label": "Status",
+      "improving": "Improving",
+      "stable": "Stable",
+      "declining": "Declining"
+    },
+    "status": "Status",
+    "bloodMatrix": {
+      "title": "Performance Matrix 3x3 Analysis",
+      "content": "Performance matrix analysis",
+      "sourceLabel": "Analysis source",
+      "source": {
+        "manual": "Manual evaluation",
+        "ai_photo": "AI from sample photo",
+        "hybrid": "Hybrid (AI + manual)"
+      },
+      "sampleDate": "Sample date",
+      "squares": {
+        "1": {
+          "title": "Rouleaux (erythrocyte stacks)"
+        },
+        "2": {
+          "title": "Bacterial load"
+        },
+        "3": {
+          "title": "Fungi / Crystals"
+        },
+        "4": {
+          "title": "Fibrin / Liver burden"
+        },
+        "5": {
+          "title": "Erythrocyte deviations"
+        },
+        "6": {
+          "title": "Protozoa / atypical forms"
+        },
+        "7": {
+          "title": "Erythrocyte clusters"
+        },
+        "8": {
+          "title": "Reserve / artifacts"
+        },
+        "9": {
+          "title": "Parasites / eggs"
+        }
+      },
+      "notePlaceholder": "Observation note",
+      "noNote": "No note",
+      "summaryNote": "Therapist note",
+      "summaryPlaceholder": "Overall context and recommendations...",
+      "nextCheck": "Next check",
+      "aiSummary": "AI summary",
+      "aiSummaryPlaceholder": "Optional AI interpretation for final report",
+      "weightedScore": "Weighted score",
+      "severity": {
+        "low": "Low severity: hydration and baseline support",
+        "moderate": "Moderate severity: add gut and microbial balancing",
+        "elevated": "Elevated severity: structured detox and close follow-up",
+        "high": "High severity: full phased protocol and expert follow-up"
+      },
+      "recommendedDuration": "Suggested duration: {{min}}-{{max}} days",
+      "parasiteSignal": "High-grade protozoa/parasite signal detected - consider supervised follow-up and differential diagnostics.",
+      "protocolTitle": "Recommended protocol steps",
+      "protocol": {
+        "hydration": "Hydration and electrolytes",
+        "gut_support": "Gut barrier and digestive support",
+        "microbial_balance": "Microbial/parasite balancing",
+        "liver_detox": "Liver support and elimination",
+        "membrane_rebuild": "Membrane and micronutrient rebuild"
+      },
+      "productsTitle": "Suggested generic products",
+      "noProductRecommendation": "No product recommendation for current findings",
+      "products": {
+        "hydration_electrolytes": "Electrolytes + mineral hydration",
+        "omega3": "Omega-3 (EPA/DHA)",
+        "phosphatidylcholine": "Phosphatidylcholine / lecithin",
+        "probiotic": "Multi-strain probiotic",
+        "digestive_enzymes": "Digestive enzymes",
+        "berberine_oregano": "Berberine / oregano antimicrobial support",
+        "liver_support": "Liver support complex (e.g., silymarin/artichoke)",
+        "nac": "N-acetylcysteine (NAC)",
+        "magnesium": "Magnesium (glycinate/citrate)",
+        "vitamin_d3_k2": "Vitamin D3 + K2",
+        "zinc_selenium": "Zinc + selenium",
+        "fiber_prebiotic": "Fiber + prebiotic support",
+        "antiparasitic_botanicals": "Botanical antiparasitic blend"
+      },
+      "priority": {
+        "core": "Core",
+        "support": "Support",
+        "optional": "Optional"
+      },
+      "reasonFromSquare": "from {{square}}",
+      "presetLoaded": "Sample AI matrix loaded",
+      "loadPreset": "Load sample AI finding",
+      "reset": "Reset matrix",
+      "report": {
+        "preview": "Report preview",
+        "title": "ANALYSIS REPORT"
+      },
+      "reportCopied": "Report copied to clipboard",
+      "copyReport": "Copy report",
+      "aiPromptTitle": "AI prompt for final interpretation",
+      "aiPromptCopied": "AI prompt copied",
+      "copyAiPrompt": "Copy AI prompt",
+      "notes": {
+        "mild_bacterial_load": "mild bacterial load",
+        "mycotic_biofilm": "mycotic biofilm",
+        "active_fibrin": "active fibrin",
+        "echinocyte_pattern": "echinocyte pattern",
+        "protozoa_activity": "protozoa activity",
+        "mild_aggregation": "mild aggregation",
+        "helminth_egg_signal": "possible helminth egg signal"
+      }
+    },
+    "discussions": {
+      "title": "Discussions",
+      "selectThread": "Select a knowledge thread",
+      "topicInfo": "Topic Information",
+      "posts": "Thread posts",
+      "beFirstToPost": "Be the first to post...",
+      "postAdded": "Post added",
+      "postError": "Failed to add post",
+      "composerPlaceholder": "Write a reply...",
+      "postsCount": "{{count}} posts",
+      "postsCount_one": "{{count}} post"
+    },
+    "threadModes": {
+      "stories": "Member threads",
+      "discussions": "Knowledge threads"
+    },
+    "bookmarks": {
+      "title": "Bookmarks",
+      "empty": "No bookmarks yet",
+      "open": "Open bookmarked post",
+      "add": "Add bookmark",
+      "remove": "Remove bookmark"
+    },
+    "participants": {
+      "title": "Participants",
+      "addParticipant": "Add Participant",
+      "addParticipantDescription": "Invite a certified partner to collaborate on this story",
+      "removeParticipant": "Remove Participant",
+      "removeConfirmTitle": "Remove participant?",
+      "removeConfirmDesc": "This participant will lose access to this story",
+      "leaveStory": "Leave Story",
+      "leaveConfirmTitle": "Leave story?",
+      "leaveConfirmDesc": "You will lose access to this story",
+      "searchPartner": "Search certified partners...",
+      "noParticipants": "No additional participants",
+      "owner": "Owner",
+      "shared": "Shared",
+      "sharedWith": "Shared with {{count}} participants",
+      "sharedWith_one": "Shared with {{count}} participant",
+      "inviteSent": "Invitation sent",
+      "inviteSentDescription": "The partner has been invited to collaborate",
+      "participantRemoved": "Participant removed",
+      "participantRemovedDescription": "The participant has been removed from this story",
+      "leftStory": "Left story",
+      "leftStoryDescription": "You have left this story",
+      "error": "Error",
+      "addError": "Failed to add participant",
+      "removeError": "Failed to remove participant",
+      "notCertified": "Only certified partners can be invited",
+      "alreadyParticipant": "This user is already a participant",
+      "cannotRemoveLastOwner": "Cannot remove the last owner",
+      "role": {
+        "partner": "Owner",
+        "member": "Member",
+        "guild_expert": "Guild Expert",
+        "aisha": "AISHA"
+      },
+      "certificationLevel": {
+        "certified_partner": "Certified Partner",
+        "certified_provider": "Certified Guild Member"
+      }
+    }
+  },
+  "partnerTemplates": {
+    "title": "StoryLoop Templates",
+    "description": "Create templates to automate member communication",
+    "create": "Create template",
+    "edit": "Edit template",
+    "delete": "Delete template",
+    "empty": "No templates yet",
+    "emptyHint": "Create your first template to streamline member workflows",
+    "saved": "Template saved",
+    "noDescription": "No description",
+    "updated": "Updated",
+    "deleteConfirmTitle": "Delete template?",
+    "deleteConfirmDesc": "This action cannot be undone. The template will be permanently deleted."
+  },
+  "delivery": {
+    "panel": {
+      "title": "Delivery Context",
+      "noContext": "No delivery context available for this story",
+      "riskProfile": "Risk",
+      "rulesCount": "{{count}} rules pinned",
+      "rulesCount_one": "{{count}} rule pinned",
+      "pinnedRules": "Pinned rules",
+      "participants": "{{count}} participants",
+      "participants_one": "{{count}} participant",
+      "manageRuleset": "Manage Ruleset",
+      "preview": {
+        "title": "Project Preview",
+        "summary": "Summary",
+        "summaryPlaceholder": "Short project summary",
+        "goals": "Goals",
+        "constraints": "Constraints",
+        "successCriteria": "Success criteria",
+        "listPlaceholder": "One item per line",
+        "save": "Save draft",
+        "publish": "Publish",
+        "saveSuccess": "Project preview saved",
+        "publishSuccess": "Project preview published",
+        "saveError": "Failed to save project preview"
+      }
+    },
+    "status": {
+      "analyzing": "Analyzing",
+      "matched": "Matched",
+      "scaffolding": "Scaffolding",
+      "ready": "Ready",
+      "in_progress": "In Progress",
+      "blocked": "Blocked",
+      "qa": "QA",
+      "delivering": "Delivering",
+      "delivered": "Delivered",
+      "archived": "Archived",
+      "maintenance": "Maintenance"
+    },
+    "ruleset": {
+      "title": "Manage Story Ruleset",
+      "description": "Select expert rules to pin to this story. A deterministic fingerprint will be computed from the selected rules.",
+      "searchPlaceholder": "Search rules by title, category or tag...",
+      "noRules": "No published rules available",
+      "selectedCount": "{{count}} rules selected",
+      "selectedCount_one": "{{count}} rule selected",
+      "save": "Pin Rules",
+      "saveSuccess": "Ruleset created successfully",
+      "saveError": "Failed to create ruleset"
+    },
+    "earnings": {
+      "title": "Earnings",
+      "subtitle": "Track your revenue and payouts",
+      "totalEarned": "Total earned",
+      "totalPending": "Pending",
+      "grossRevenue": "Gross revenue",
+      "totalProjects": "Projects",
+      "period": {
+        "month": "This month",
+        "quarter": "This quarter",
+        "year": "This year",
+        "all": "All time"
+      },
+      "noEarnings": "No earnings yet",
+      "noEarningsDescription": "Complete consultations to start earning",
+      "table": {
+        "title": "Earnings history",
+        "date": "Date",
+        "project": "Project",
+        "type": "Type",
+        "gross": "Gross",
+        "net": "Your split",
+        "yourSplit": "Your split",
+        "splitPct": "Split %",
+        "status": "Status",
+        "noData": "No earnings for this period",
+        "page": "Page {{page}}"
+      },
+      "type": {
+        "consultation": "Consultation",
+        "project": "Project",
+        "maintenance": "Maintenance"
+      },
+      "status": {
+        "pending": "Pending",
+        "completed": "Completed",
+        "processing": "Processing",
+        "settled": "Settled",
+        "failed": "Failed",
+        "refunded": "Refunded"
+      }
+    },
+    "pricing": {
+      "title": "Pricing Settings",
+      "description": "Set your hourly rate and booking preferences",
+      "subtitle": "Set your hourly rate and booking preferences",
+      "hourlyRate": "Hourly rate (CZK)",
+      "minBlock": "Minimum block (hours)",
+      "maxConcurrent": "Max concurrent projects",
+      "instantBooking": "Enable instant booking",
+      "instantBookingDescription": "Clients can book without your manual confirmation",
+      "instantBookingHelp": "Clients can book without your manual confirmation",
+      "active": "Accepting bookings",
+      "save": "Save pricing",
+      "saved": "Pricing updated",
+      "saveSuccess": "Pricing updated",
+      "saveError": "Failed to update pricing"
+    }
+  },
+  "design": {
+    "interview": {
+      "trigger": "Design DNA",
+      "title": "Design DNA Interview",
+      "description": "Let Occipitum understand your visual identity through a brief conversation.",
+      "welcomeQuestion": "Let's begin. Close your eyes for a moment — if your brand were a place, what would it feel like to walk through it?",
+      "q2": "When someone visits your site for the first time, what emotion should linger after they leave?",
+      "q3": "Imagine your ideal client's desk. What objects are on it? What colors surround them?",
+      "q4": "If your services were a piece of music, what genre and tempo would they be?",
+      "q5": "Think of a website you secretly admire — not a competitor, something unexpected. What draws you to it?",
+      "q6": "What visual cliché in your industry makes you cringe the most?",
+      "q7": "Your brand has a rhythm — is it the sharp staccato of a typewriter or the flowing curves of handwritten script?",
+      "q8": "Name three words that should never appear on your website. Why?",
+      "analyzing": "Thank you. I'm now weaving your answers into a design DNA profile...",
+      "complete": "Your design DNA has been captured. Occipitum can now generate canvas proposals that resonate with your identity.",
+      "error": "Something went wrong during the analysis. Please try again.",
+      "placeholder": "Type your answer...",
+      "processing": "Processing your response...",
+      "progress": "{{current}} of {{total}} questions"
+    },
+    "occipitum": {
+      "trigger": "Occipitum",
+      "description": "Generate an innovative canvas proposal powered by your design DNA. Each generation uses a unique creativity seed for fresh, non-stereotypical results.",
+      "generate": "Generate Design",
+      "generating": "Occipitum is imagining your canvas...",
+      "proposal": "New",
+      "proposalReady": "Canvas proposal ready",
+      "proposalApplied": "Design proposal applied",
+      "proposalAppliedDescription": "A new Occipitum design proposal was loaded into your canvas.",
+      "accept": "Apply",
+      "reject": "Discard",
+      "variant": "Try variant"
+    }
+  }
+}

@@ -1,0 +1,108 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Evymo Multi-Server Registry",
+  "description": "Source of truth for Coolify server infrastructure — capacities, roles, stack placement",
+  "type": "object",
+  "required": ["servers"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "_comment": { "type": "string" },
+    "servers": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/Server"
+      }
+    }
+  },
+  "definitions": {
+    "Server": {
+      "type": "object",
+      "required": ["hostname", "role", "coolify_uuid", "cpu", "ram_gb", "stacks"],
+      "properties": {
+        "hostname": {
+          "type": "string",
+          "description": "FQDN of the server (e.g. frontend.id3a.cz)"
+        },
+        "ip": {
+          "type": "string",
+          "description": "IP address or env var reference (e.g. ${FRONTEND_IP})"
+        },
+        "role": {
+          "type": "string",
+          "enum": ["production", "build", "backend", "staging"],
+          "description": "Server role determines what workloads can be placed here"
+        },
+        "coolify_uuid": {
+          "type": "string",
+          "description": "Coolify server UUID (or env var reference)"
+        },
+        "is_build_server": {
+          "type": "boolean",
+          "default": false,
+          "description": "If true, server is used only for Docker builds (no runtime)"
+        },
+        "cpu": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of CPU cores"
+        },
+        "ram_gb": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total RAM in GB"
+        },
+        "disk_gb": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Total disk in GB"
+        },
+        "has_traefik": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether Traefik runs on this server (public HTTP routing)"
+        },
+        "has_gpu": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether the server has GPU available for ML inference"
+        },
+        "stacks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of stack names deployed on this server"
+        },
+        "domains": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Public domains routed to this server via Traefik"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Human-readable notes about the server"
+        },
+        "placement_rules": {
+          "type": "object",
+          "properties": {
+            "accepts": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["http-frontend", "api-gateway", "database", "game-server", "ai-inference", "ml-model", "staging", "admin-ui", "observability", "headless-backend", "app-primary"]
+              },
+              "description": "Workload types this server accepts"
+            },
+            "max_ram_per_stack_gb": {
+              "type": "number",
+              "description": "Maximum RAM a single stack should consume on this server"
+            },
+            "reserved_ram_gb": {
+              "type": "number",
+              "default": 2,
+              "description": "RAM reserved for OS + Docker overhead (do not allocate)"
+            }
+          }
+        }
+      }
+    }
+  }
+}

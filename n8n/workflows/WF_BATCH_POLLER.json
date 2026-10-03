@@ -1,0 +1,338 @@
+{
+  "name": "WF_BATCH_POLLER",
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "node-trigger",
+      "name": "Every 15 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/get_pending_batch_jobs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"p_limit\": 50, \"p_min_poll_interval_seconds\": 300}",
+        "options": {}
+      },
+      "id": "node-list-pending",
+      "name": "List Pending Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        420,
+        280
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "node-split",
+      "name": "Split Per Job",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        620,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "anthropic-route",
+                    "leftValue": "={{ $json.provider }}",
+                    "rightValue": "anthropic",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "anthropic"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "openai-route",
+                    "leftValue": "={{ $json.provider }}",
+                    "rightValue": "openai",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "openai"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "node-route",
+      "name": "Route By Provider",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        820,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.anthropic.com/v1/messages/batches/{{ $json.external_batch_id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "message-batches-2024-09-24"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-poll-anthropic",
+      "name": "Poll Anthropic Batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        180
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.openai.com/v1/batches/{{ $json.external_batch_id }}",
+        "authentication": "predefinedCredentialType",
+        "sendHeaders": false,
+        "options": {},
+        "nodeCredentialType": "openAiApi"
+      },
+      "id": "node-poll-openai",
+      "name": "Poll OpenAI Batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        380
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "__REMAP__",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize provider batch response to update_batch_job_status RPC shape.\n// Anthropic: { id, processing_status (in_progress|ended|...), request_counts: { succeeded, errored, ... }, results_url }\n// OpenAI:    { id, status (validating|in_progress|completed|expired|failed|cancelled), request_counts: { completed, failed, total }, output_file_id, error_file_id }\nconst input = $input.first().json;\nconst originalJob = $('Split Per Job').first().json;\nconst provider = originalJob.provider;\nlet status = 'in_progress';\nlet resultUrl = null;\nlet succeeded = null;\nlet errored = null;\n\nif (provider === 'anthropic') {\n  const ps = input.processing_status;\n  if (ps === 'in_progress') status = 'in_progress';\n  else if (ps === 'canceling') status = 'in_progress';\n  else if (ps === 'ended') {\n    // Map ended -> completed/expired/failed by inspecting request_counts\n    const rc = input.request_counts || {};\n    if ((rc.errored || 0) > 0 && (rc.succeeded || 0) === 0) status = 'failed';\n    else if (rc.expired > 0) status = 'expired';\n    else status = 'completed';\n  } else if (ps === 'canceled') status = 'cancelled';\n  succeeded = (input.request_counts || {}).succeeded ?? null;\n  errored = (input.request_counts || {}).errored ?? null;\n  resultUrl = input.results_url ?? null;\n} else if (provider === 'openai') {\n  const s = input.status;\n  if (s === 'validating' || s === 'in_progress' || s === 'finalizing') status = 'in_progress';\n  else if (s === 'completed') status = 'completed';\n  else if (s === 'expired') status = 'expired';\n  else if (s === 'failed') status = 'failed';\n  else if (s === 'cancelled' || s === 'cancelling') status = 'cancelled';\n  succeeded = (input.request_counts || {}).completed ?? null;\n  errored = (input.request_counts || {}).failed ?? null;\n  // OpenAI hosts results as a file id; downstream consumer must call /v1/files/{id}/content\n  resultUrl = input.output_file_id ? `openai-file://${input.output_file_id}` : null;\n}\n\nreturn [{ json: { provider, external_batch_id: originalJob.external_batch_id, status, result_url: resultUrl, succeeded_count: succeeded, errored_count: errored } }];"
+      },
+      "id": "node-normalize",
+      "name": "Normalize Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1320,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/update_batch_job_status",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"p_provider\": \"{{ $json.provider }}\", \"p_external_batch_id\": \"{{ $json.external_batch_id }}\", \"p_status\": \"{{ $json.status }}\", \"p_result_url\": {{ $json.result_url === null ? 'null' : ('\"' + $json.result_url + '\"') }}, \"p_succeeded_count\": {{ $json.succeeded_count === null ? 'null' : $json.succeeded_count }}, \"p_errored_count\": {{ $json.errored_count === null ? 'null' : $json.errored_count }}}",
+        "options": {}
+      },
+      "id": "node-update-status",
+      "name": "Update Job Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        280
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 15 Minutes": {
+      "main": [
+        [
+          {
+            "node": "List Pending Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Pending Jobs": {
+      "main": [
+        [
+          {
+            "node": "Split Per Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Per Job": {
+      "main": [
+        [
+          {
+            "node": "Route By Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route By Provider": {
+      "main": [
+        [
+          {
+            "node": "Poll Anthropic Batch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Poll OpenAI Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll Anthropic Batch": {
+      "main": [
+        [
+          {
+            "node": "Normalize Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Poll OpenAI Batch": {
+      "main": [
+        [
+          {
+            "node": "Normalize Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Status": {
+      "main": [
+        [
+          {
+            "node": "Update Job Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

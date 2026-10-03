@@ -1,0 +1,29 @@
+# =============================================================================
+# Evymo PKI Realms — 3 Security Planes
+# =============================================================================
+# Each realm maps to a security domain with distinct certificate policies.
+# CA hierarchy: Root CA (offline) → 3 Intermediate CAs (online, per-realm)
+
+identity-plane:
+    label: Identity Plane CA
+    baseurl: https://${PKI_DOMAIN}/webui/identity-plane/
+    description: >
+      OIDC/OAuth2 trust chain — Keycloak, OAuth2 Proxy, GoTrue.
+      Manages TLS server certs for identity services and mTLS client certs
+      for OIDC backchannel communication.
+
+data-plane:
+    label: Data Plane CA
+    baseurl: https://${PKI_DOMAIN}/webui/data-plane/
+    description: >
+      Data-at-transit encryption — PostgreSQL, Elasticsearch, ClickHouse,
+      Redis, MinIO, RabbitMQ. Manages DB connection TLS and message broker
+      TLS certificates.
+
+orchestration-plane:
+    label: Orchestration Plane CA
+    baseurl: https://${PKI_DOMAIN}/webui/orchestration-plane/
+    description: >
+      Service-to-service mTLS — n8n, Edge Functions, Ragnarok FastAPI,
+      Kong, PostgREST, Realtime, Storage. Short-lived auto-renewing
+      certificates for API gateway and service mesh.

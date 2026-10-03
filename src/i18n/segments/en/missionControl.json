@@ -1,0 +1,127 @@
+{
+  "missionControl": {
+    "pageTitle": "Mission control",
+    "pageSubtitle": "Live view of AISHA's stack — agents, deploys, drift, rollback, stories, audit.",
+    "liveAgents": {
+      "title": "Live agents",
+      "subtitle": "AISHA runs that are executing right now.",
+      "running": "Running",
+      "starting": "Starting…",
+      "empty": "No agents running.",
+      "cancelled": "Run cancelled.",
+      "cancelTooltip": "Cancel run",
+      "cancelTitle": "Cancel this run?",
+      "cancelConfirm": "Stop \"{{agent}}\"? This halts the run and is recorded in the audit journal.",
+      "cancelConfirmAction": "Cancel run"
+    },
+    "deploy": {
+      "title": "Deploy state",
+      "subtitle": "Active blue/green slots per app.",
+      "empty": "No tracked apps.",
+      "lockTooltip": "Switch in progress"
+    },
+    "drift": {
+      "title": "Drift",
+      "subtitle": "Unresolved findings at risk ≥ {{minRisk}}."
+    },
+    "rollback": {
+      "title": "Rollback",
+      "subtitle": "Pending approval + recent rollback history.",
+      "empty": "No recent rollbacks."
+    },
+    "kanbanMini": {
+      "title": "Stories kanban",
+      "subtitle": "{{total}} stories across the lifecycle.",
+      "open": "Open board"
+    },
+    "audit": {
+      "title": "Audit feed",
+      "subtitle": "Warnings, errors, and critical events from audit_journal.",
+      "empty": "No elevated audit entries — quiet system."
+    },
+    "agentSessions": {
+      "title": "Agent sessions",
+      "subtitle": "Live work sessions across IDEs, CLIs and spawned agents.",
+      "active": "Active",
+      "empty": "No active sessions.",
+      "noStory": "No story",
+      "aishaSpawned": "AISHA",
+      "collapseAgents": "Collapse sub-agents",
+      "expandAgents": "Expand sub-agents"
+    },
+    "spendApprovals": {
+      "title": "Spend approvals",
+      "subtitle": "Tasks waiting for a cost decision before they start.",
+      "empty": "Nothing awaiting approval.",
+      "noStory": "No story",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approved": "Spend approved.",
+      "rejected": "Spend rejected.",
+      "approveTitle": "Approve this spend?",
+      "approveConfirm": "Allow \"{{kind}}\" (estimated ~${{estimate}}) to start? The decision is audited.",
+      "raiseBudget": "Also raise the story lifetime budget by ${{estimate}}",
+      "rejectTitle": "Reject this spend?",
+      "rejectConfirm": "Cancel \"{{kind}}\"? The run will not start."
+    },
+    "spendPolicies": {
+      "title": "Spend policies",
+      "subtitle": "Allow / ask / deny thresholds per task kind. No rule = cost-class defaults.",
+      "empty": "No custom rules — catalog defaults apply.",
+      "scopeGlobal": "global",
+      "allKinds": "all kinds",
+      "addRule": "Rule",
+      "dialogTitle": "Global spend rule",
+      "dialogSubtitle": "Thresholds in USD against the pre-flight estimate. Empty field = catalog default.",
+      "kind": "Task kind (empty = all kinds)",
+      "allowUnder": "Allow under",
+      "askOver": "Ask over",
+      "denyOver": "Deny over",
+      "saved": "Rule saved.",
+      "activated": "Rule activated.",
+      "deactivated": "Rule deactivated.",
+      "activate": "Activate rule",
+      "deactivate": "Deactivate rule"
+    },
+    "spawnClaude": {
+      "button": "Run with Claude",
+      "title": "Spawn a Claude agent run",
+      "description": "AISHA starts an isolated Claude Code agent on a fresh worktree for this task. It runs on your subscription and is monitored live below.",
+      "promptLabel": "Task for the agent",
+      "promptPlaceholder": "Describe what the agent should do…",
+      "cancel": "Cancel",
+      "submit": "Spawn run",
+      "spawning": "Spawning…",
+      "success": "Claude run {{id}} queued — it will appear below shortly.",
+      "error": "Could not spawn the run: {{msg}}"
+    },
+    "claudeApprovals": {
+      "title": "CLI run approvals",
+      "subtitle": "Agent CLI runs held pending approval (high-risk admission).",
+      "empty": "No runs awaiting approval.",
+      "approve": "Approve"
+    },
+    "resolverPolicy": {
+      "title": "Decision weights",
+      "subtitle": "How AISHA weighs candidates when choosing a model + executor. Tuned live; no code change.",
+      "missing": "No global decision policy — the resolver will fail loud. Re-run cold-start / heals.",
+      "bench": "bench",
+      "local": "local",
+      "cost": "cost-match",
+      "tools": "tools",
+      "vision": "vision",
+      "costClass": "cost class",
+      "budget": "budget",
+      "premium": "premium",
+      "batch": "batch",
+      "edit": "Tune",
+      "saved": "Decision weights saved.",
+      "dialogTitle": "Tune decision weights",
+      "dialogSubtitle": "Global scoring weights + cost-class cutoffs. Empty field keeps the current value.",
+      "weightsGroup": "Scoring weights",
+      "costGroup": "Cost-class cutoffs (USD)",
+      "budgetMax": "budget under",
+      "premiumMax": "premium over"
+    }
+  }
+}

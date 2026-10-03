@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "acs.workflow.graph@1.0",
+  "title": "Reflection workflow graph contract",
+  "description": "Control-flow contract for ai_workflow_definitions.graph (IP-11). Mirrors reflection/types.ts GraphNodeSchema/GraphEdgeSchema so a graph is validated at seed/load — today the DB column is free JSONB with no CHECK.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["nodes", "edges"],
+  "properties": {
+    "version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "type": { "type": "string", "pattern": "^[a-z0-9_]+$", "maxLength": 64, "description": "Must exist in the NODE_HANDLERS registry (NodeTypeSchema) of the executing engine version." },
+          "config": { "type": "object" }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to"],
+        "properties": {
+          "from": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "to": { "type": "string", "minLength": 1, "maxLength": 128 },
+          "condition": { "type": ["string", "null"], "maxLength": 256, "description": "Flat routing value (e.g. tot_action=expand) — closed vocabulary, never free prose (R2)." }
+        }
+      }
+    }
+  }
+}

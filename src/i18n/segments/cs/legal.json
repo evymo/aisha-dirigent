@@ -1,0 +1,208 @@
+{
+  "legal": {
+    "privacyPolicy": {
+      "title": "Zásady ochrany osobních údajů",
+      "lastUpdated": "Poslední aktualizace: 4. července 2026",
+      "fullText": "## 1. Kdo je správcem údajů\n\nPlatformu AISHA na adrese aisha.guru („Služba“) provozuje společnost **Evymo** („my“, „Provozovatel“), která je správcem vašich osobních údajů. Ve všech záležitostech ochrany osobních údajů nás kontaktujte na **ask@aisha.guru**.\n\nSlužba je v současnosti poskytována jako **veřejná preview verze**. Tyto zásady popisují, jak s osobními údaji nakládáme po dobu preview provozu.\n\n## 2. Jaké osobní údaje zpracováváme\n\n- **Údaje o účtu** — jméno, e-mailová adresa a záznamy o přihlášení. Identitu a přihlašování spravuje naše vlastní (self-hosted) instance Keycloak; údaje o účtu nesdílíme s externími poskytovateli identity, pokud se přes ně sami nerozhodnete přihlásit.\n- **Obsah, který vytvoříte** — projekty, dokumenty, záznamy ve znalostní bázi a další materiály, které ve Službě uložíte.\n- **Data o interakci s AI** — zadané dotazy (prompty), vygenerované odpovědi a související metadata (časové značky, zvolený model). Tato data jsou nezbytná pro poskytování Služby a řešení závad.\n- **Auditní a bezpečnostní záznamy** — privilegované a bezpečnostně relevantní akce se zaznamenávají do auditního žurnálu na ochranu Služby a jejích uživatelů.\n\nNepoužíváme **žádné** analytické nástroje třetích stran, reklamní trackery ani fingerprinting. Webová aplikace ukládá ve vašem prohlížeči pouze jazykovou předvolbu a přihlašovací relaci.\n\n## 3. Účely a právní základy (čl. 6 GDPR)\n\n- Poskytování Služby, ke které jste se zaregistrovali — plnění smlouvy (čl. 6 odst. 1 písm. b)).\n- Bezpečnost, prevence zneužití a auditní záznamy — náš oprávněný zájem (čl. 6 odst. 1 písm. f)).\n- Volitelné funkce, ke kterým se přihlásíte (např. novinky) — váš souhlas (čl. 6 odst. 1 písm. a)), který můžete kdykoli odvolat.\n- Plnění právních povinností (čl. 6 odst. 1 písm. c)).\n\n## 4. Poskytovatelé AI jako zpracovatelé\n\nPři využití AI funkcí je obsah vašeho požadavku (a nezbytný kontext) předán přes naši LLM bránu poskytovateli AI modelu nakonfigurovanému pro vaši instanci, který vystupuje jako náš zpracovatel. Vaše data neprodáváme a nedovolujeme jejich využití pro reklamu. Pokud nakonfigurovaný poskytovatel zpracovává data mimo EU/EHP, jsou předání kryta vhodnými zárukami, například standardními smluvními doložkami EU.\n\n## 5. Kde jsou vaše data uložena\n\nAplikační data jsou uložena v self-hosted databázi PostgreSQL a identitní data v self-hosted instanci Keycloak, na infrastruktuře umístěné v Evropské unii (Česká republika).\n\n## 6. Doba uchování\n\n- **Údaje o účtu a obsah**: po dobu existence vašeho účtu.\n- **Smazání účtu**: o výmaz můžete kdykoli požádat na stránce **/account-deletion**. Žádost má 30denní ochrannou lhůtu (během níž ji můžete zrušit); po jejím uplynutí jsou účet a obsah vymazány.\n- **Auditní a bezpečnostní záznamy**: uchováváme po omezenou dobu nezbytnou pro bezpečnost a plnění právních povinností, poté je mažeme.\n- **Zálohy**: vymazaná data mizí ze záloh v rámci jejich pravidelné rotace.\n\n## 7. Vaše práva\n\nPodle GDPR máte právo na přístup, opravu, výmaz, omezení zpracování, přenositelnost údajů a námitku a právo kdykoli odvolat souhlas. Výmaz můžete uplatnit přímo na stránce **/account-deletion** a přenositelnost prostřednictvím funkce exportu dat; s ostatními požadavky se obraťte na **ask@aisha.guru**. Máte rovněž právo podat stížnost u dozorového úřadu — v České republice u Úřadu pro ochranu osobních údajů (uoou.gov.cz).\n\n## 8. Zabezpečení\n\nPřístup k datům se řídí principem minimálních oprávnění, je chráněn zabezpečením na úrovni řádků databáze (row-level security), přenosy jsou šifrovány a privilegované akce se zaznamenávají do auditního žurnálu.\n\n## 9. Změny těchto zásad\n\nTyto zásady můžeme aktualizovat, zejména s vývojem preview verze směrem k ostrému provozu. Podstatné změny oznámíme ve Službě.\n\nDotazy? **ask@aisha.guru**"
+    },
+    "termsOfService": {
+      "title": "Podmínky užívání služby",
+      "lastUpdated": "Poslední aktualizace: 4. července 2026",
+      "fullText": "## 1. Kdo jsme a co tyto Podmínky upravují\n\nTyto podmínky užívání („Podmínky“) upravují používání platformy AISHA na adrese aisha.guru („Služba“), kterou provozuje společnost **Evymo** („my“, „Provozovatel“). Kontakt: **ask@aisha.guru**. Vytvořením účtu nebo používáním Služby s těmito Podmínkami souhlasíte.\n\n## 2. Veřejná preview verze\n\nSlužba je poskytována jako **veřejná preview verze**:\n\n- dostupnost, funkce ani výkon **nejsou garantovány** a mohou se změnit bez předchozího upozornění;\n- data v preview verzi **mohou být resetována**; před plánovaným resetem vás ve Službě v přiměřeném předstihu upozorníme;\n- funkce mohou být kdykoli přidány, změněny nebo odebrány.\n\nDůležitý obsah si prosím uchovávejte i ve vlastních kopiích — k tomu slouží funkce exportu dat.\n\n## 3. Váš účet\n\nÚčty spravuje naše vlastní (self-hosted) identitní služba (Keycloak). Odpovídáte za utajení svých přihlašovacích údajů a za veškerou aktivitu pod svým účtem. Jste povinni uvádět pravdivé údaje a být způsobilí k uzavření této smlouvy.\n\n## 4. Pravidla přijatelného užití\n\nNesmíte: (a) používat Službu k protiprávní činnosti; (b) pokoušet se o neoprávněný přístup k datům, účtům nebo infrastruktuře; (c) testovat, skenovat nebo narušovat Službu jinak než odpovědným nahlášením zranitelnosti na ask@aisha.guru; (d) používat Službu k vytváření nebo šíření malwaru, spamu nebo obsahu porušujícího práva třetích osob; (e) přeprodávat hostovanou Službu nebo ji poskytovat třetím osobám jako spravovanou službu. Účty porušující tyto Podmínky můžeme pozastavit nebo zrušit.\n\n## 5. Váš obsah\n\nVeškerá práva k obsahu, který vytvoříte nebo nahrajete, zůstávají vám. Udělujete nám nevýhradní licenci k hostování, ukládání, zpracování a zobrazování tohoto obsahu výhradně v rozsahu nezbytném pro provoz a poskytování Služby. Váš obsah nepoužíváme pro reklamu.\n\n## 6. Výstupy generované AI\n\nSlužba vytváří výstupy pomocí velkých jazykových modelů. Výstupy AI mohou být nepřesné, neúplné nebo zkreslené a slouží pouze k vašemu posouzení — viz Právní upozornění. Za kontrolu výstupů AI před jejich použitím nebo sdílením odpovídáte vy.\n\n## 7. Licence platformy\n\nZdrojový kód platformy AISHA je licencován pod **Elastic License 2.0 (ELv2)** — viz soubory LICENSE a NOTICE ve zdrojovém repozitáři. Tyto Podmínky upravují užívání hostované Služby; k zdrojovému kódu nezakládají žádná práva nad rámec licence ELv2.\n\n## 8. Ochrana osobních údajů\n\nZpracování osobních údajů popisují Zásady ochrany osobních údajů. O výmaz účtu můžete požádat na stránce /account-deletion.\n\n## 9. Záruky a odpovědnost\n\nPreview verze Služby je poskytována **„tak, jak je“ a „dle dostupnosti“**, bez jakýchkoli záruk, v maximálním rozsahu povoleném právními předpisy. Ve stejném rozsahu neodpovídáme za nepřímé či následné škody, ztrátu dat nebo ušlý zisk vzniklé užíváním preview verze Služby. Žádné ustanovení těchto Podmínek nevylučuje odpovědnost, kterou podle platného práva vyloučit nelze.\n\n## 10. Ukončení\n\nSlužbu můžete kdykoli přestat používat a svůj účet smazat na stránce /account-deletion. Přístup můžeme pozastavit nebo ukončit při porušení těchto Podmínek nebo z bezpečnostních důvodů; je-li to přiměřené, budeme vás informovat.\n\n## 11. Změny těchto Podmínek\n\nPo dobu preview provozu můžeme tyto Podmínky aktualizovat. Podstatné změny oznámíme ve Službě; pokračováním v užívání po datu účinnosti vyjadřujete souhlas s aktualizovanými Podmínkami.\n\n## 12. Rozhodné právo\n\nTyto Podmínky se řídí právem České republiky. Kogentní ustanovení na ochranu spotřebitele země vašeho bydliště tím nejsou dotčena.\n\nKontakt: **ask@aisha.guru**"
+    },
+    "accountDeletion": {
+      "title": "Smazání účtu",
+      "description": "Trvale smazat váš účet a data s ním spojená.",
+      "warning": "Tato akce je nevratná. Po uplynutí 30denní ochranné lhůty budou váš účet a data nenávratně smazány.",
+      "consequences": {
+        "title": "Co se stane po smazání účtu",
+        "items": [
+          "Váš profil a přihlašovací účet (spravovaný naší identitní službou) budou trvale smazány.",
+          "Veškerý obsah, který jste vytvořili — projekty, dokumenty a záznamy ve znalostní bázi — bude smazán.",
+          "Historie vašich konverzací s AI a záznamy interakcí budou smazány.",
+          "Vaše aktivní relace a API tokeny budou zneplatněny a přístup ke Službě odebrán.",
+          "Sdílení a pozvánky spojené s vaším účtem budou zrušeny.",
+          "Po uplynutí 30denní ochranné lhůty je smazání konečné a nelze jej vzít zpět."
+        ]
+      },
+      "dataRetention": {
+        "title": "Uchování dat po smazání",
+        "content": "Vaše žádost o smazání má 30denní ochrannou lhůtu, během níž ji můžete na této stránce zrušit. Po uplynutí lhůty jsou vaše data vymazána. Minimální záznam o žádosti o smazání a bezpečnostní/auditní záznamy mohou být uchovány, pokud to vyžaduje zákon nebo ochrana Služby, jak popisují Zásady ochrany osobních údajů."
+      },
+      "confirmation": {
+        "title": "Potvrzení smazání",
+        "instructions": "Pro potvrzení zadejte e-mailovou adresu svého účtu. Můžete nám také sdělit, proč odcházíte — pomůže nám to Službu zlepšit.",
+        "emailLabel": "E-mail vašeho účtu",
+        "emailPlaceholder": "jmeno@priklad.cz",
+        "emailMismatch": "E-mail se neshoduje s e-mailovou adresou vašeho účtu.",
+        "reasonLabel": "Důvod odchodu (nepovinné)",
+        "reasonPlaceholder": "Chcete nám ještě něco sdělit? (nepovinné)",
+        "reasons": {
+          "notUseful": "Služba pro mě nebyla užitečná",
+          "privacyConcerns": "Obavy o soukromí",
+          "tooComplicated": "Služba je příliš složitá",
+          "foundAlternative": "Našel/našla jsem alternativu",
+          "temporaryBreak": "Potřebuji si jen dát pauzu",
+          "other": "Jiný důvod"
+        }
+      },
+      "buttons": {
+        "delete": "Požádat o smazání účtu",
+        "deleting": "Odesílám žádost…",
+        "cancel": "Zrušit žádost o smazání",
+        "goBack": "Zpět"
+      },
+      "success": {
+        "title": "Žádost přijata",
+        "message": "Vaši žádost jsme přijali. Účet bude smazán po uplynutí 30denní ochranné lhůty, pokud žádost nezrušíte."
+      },
+      "error": {
+        "title": "Žádost se nezdařila",
+        "message": "Žádost o smazání se nepodařilo odeslat. Zkuste to prosím znovu.",
+        "contactSupport": "Pokud potíže přetrvávají, kontaktujte nás na ask@aisha.guru."
+      },
+      "requestSubmitted": {
+        "title": "Žádost o smazání odeslána",
+        "message": "Váš účet je naplánován ke smazání po uplynutí 30denní ochranné lhůty. Žádost můžete kdykoli před plánovaným datem zrušit návratem na tuto stránku."
+      },
+      "banner": {
+        "title": "Čeká se na smazání účtu",
+        "message": "Váš účet je naplánován ke smazání dne {{date}}.",
+        "daysRemaining": "Zbývá dní: {{count}}",
+        "daysRemaining_other": "Zbývá dní: {{count}}",
+        "cancelRequest": "Zrušit smazání",
+        "cancelling": "Ruším…",
+        "cancelled": "Žádost o smazání byla zrušena."
+      }
+    },
+    "dataExport": {
+      "title": "Export vašich dat",
+      "description": "Stáhněte si kopii osobních údajů a obsahu spojeného s vaším účtem (přenositelnost údajů podle čl. 20 GDPR).",
+      "button": "Požádat o export",
+      "processing": "Připravuji export…",
+      "ready": "Váš export je připraven.",
+      "download": "Stáhnout export",
+      "includes": {
+        "title": "Export obsahuje",
+        "items": [
+          "Údaje o vašem profilu a účtu",
+          "Obsah, který jste ve Službě vytvořili",
+          "Historii vašich konverzací s AI",
+          "Záznamy o udělených souhlasech",
+          "Vaše nastavení a předvolby",
+          "Přehled akcí souvisejících s vaším účtem"
+        ]
+      },
+      "format": "Export je poskytován jako strojově čitelný archiv (JSON).",
+      "success": "Export byl úspěšně vytvořen.",
+      "error": "Export se nepodařilo vytvořit. Zkuste to prosím znovu, nebo napište na ask@aisha.guru."
+    },
+    "consents": {
+      "gdpr": "Souhlasím se zpracováním svých osobních údajů společností {{operatorName}} v rozsahu popsaném v Zásadách ochrany osobních údajů.",
+      "terms": "Přečetl/a jsem si Podmínky užívání služby a souhlasím s nimi.",
+      "professional": "Potvrzuji, že mnou uvedené údaje jsou pravdivé, a případně že jednám v rámci své odborné činnosti.",
+      "notMedicalAdvice": "Beru na vědomí, že obsah poskytovaný Službou, včetně výstupů generovaných AI, nepředstavuje lékařskou, právní ani jinou odbornou radu.",
+      "marketing": "Souhlasím se zasíláním občasných novinek a informací o produktech od {{operatorName}} (nepovinné, lze kdykoli odvolat).",
+      "research": "Souhlasím s tím, aby má data byla v anonymizované podobě využita pro výzkum a zlepšování služby (nepovinné).",
+      "knowledgeCheck": "Potvrzuji, že jsem si poskytnuté informace přečetl/a a porozuměl/a jim.",
+      "informedConsent": "Uděluji informovaný souhlas s účastí v {{studyName}}, kterou pořádá {{organizerName}}, jak je popsáno v informacích pro účastníky.",
+      "commitment": "Zavazuji se dodržovat poskytnuté pokyny a užívat Službu v souladu s Podmínkami užívání služby."
+    },
+    "orderConfirmation": {
+      "title": "Potvrzení objednávky",
+      "subtitle": "Děkujeme za vaši objednávku.",
+      "protocolNumber": "Číslo protokolu",
+      "date": "Datum",
+      "operatorSection": {
+        "title": "Provozovatel platformy",
+        "content": "Platformu provozuje společnost Evymo. Kontakt: ask@aisha.guru."
+      },
+      "organizerSection": {
+        "title": "Pořadatel",
+        "content": "Údaje o pořadateli jsou uvedeny v přiložené dokumentaci k objednávce."
+      },
+      "processorSection": {
+        "title": "Zpracovatel údajů",
+        "content": "Údaje o zpracovateli osobních údajů jsou uvedeny v přiložené dokumentaci k objednávce."
+      },
+      "orderDetails": {
+        "title": "Podrobnosti objednávky",
+        "tableHeaders": {
+          "product": "Produkt",
+          "internalCode": "Interní kód",
+          "gtin": "GTIN",
+          "quantity": "Množství",
+          "unitPrice": "Cena za kus",
+          "total": "Celkem"
+        },
+        "subtotal": "Mezisoučet",
+        "shipping": "Doprava",
+        "totalAmount": "Celková částka"
+      },
+      "shippingInfo": {
+        "title": "Doprava",
+        "packetaPickup": "Výdejní místo Zásilkovny",
+        "packetaHome": "Doručení Zásilkovnou na adresu",
+        "personalPickup": "Osobní odběr"
+      },
+      "consentsSection": {
+        "title": "Udělené souhlasy",
+        "description": "V rámci této objednávky byly uděleny následující souhlasy:",
+        "signedAt": "Podepsáno dne"
+      },
+      "studyNote": "Je-li tato objednávka součástí studie, řídí se účast dokumentací studie a udělenými souhlasy.",
+      "disclaimer": "Toto potvrzení bylo vygenerováno elektronicky a je platné bez podpisu."
+    },
+    "manufacturingProtocol": {
+      "title": "Výrobní protokol",
+      "subtitle": "Záznam o výrobě šarže a kontrole kvality",
+      "protocolNumber": "Číslo protokolu",
+      "batchInfo": {
+        "title": "Informace o šarži",
+        "batchCode": "Kód šarže",
+        "productName": "Název produktu",
+        "internalCode": "Interní kód",
+        "gtin": "GTIN",
+        "batchLot": "Šarže/LOT",
+        "productionDate": "Datum výroby",
+        "expiryDate": "Datum expirace",
+        "serialNumber": "Sériové číslo",
+        "consumerVariant": "Spotřebitelská varianta",
+        "certificationRef": "Odkaz na certifikaci"
+      },
+      "production": {
+        "title": "Výroba",
+        "rawMaterialLot": "LOT suroviny",
+        "supplier": "Dodavatel",
+        "yieldPercent": "Výtěžnost (%)"
+      },
+      "qualityControl": {
+        "title": "Kontrola kvality",
+        "approved": "Schváleno",
+        "approvedAt": "Schváleno dne",
+        "inspector": "Kontrolor",
+        "notes": "Poznámky",
+        "statusApproved": "Schváleno",
+        "statusRejected": "Zamítnuto",
+        "statusPending": "Čeká na kontrolu"
+      },
+      "gs1Barcode": {
+        "title": "Čárový kód GS1",
+        "description": "GS1 DataMatrix kódující identifikaci produktu a údaje o šarži.",
+        "encodedString": "Kódovaný řetězec"
+      },
+      "signatures": {
+        "title": "Podpisy",
+        "productionManager": "Vedoucí výroby",
+        "qualityManager": "Vedoucí kvality",
+        "date": "Datum",
+        "signature": "Podpis"
+      }
+    },
+    "legalDisclaimer": {
+      "title": "Právní upozornění",
+      "lastUpdated": "Poslední aktualizace: 4. července 2026",
+      "fullText": "## Obsah generovaný AI\n\nPlatforma AISHA vytváří obsah pomocí velkých jazykových modelů (AI). Výstupy AI mohou být **nepřesné, neúplné, zastaralé nebo zkreslené** a mohou působit sebejistě i tehdy, když jsou chybné. Důležité informace si před jednáním na jejich základě vždy ověřte ze spolehlivých nezávislých zdrojů.\n\n## Nejde o odbornou radu\n\nNic z toho, co Služba poskytuje — včetně výstupů generovaných AI — nepředstavuje právní, lékařskou, finanční, daňovou ani jinou odbornou radu. Potřebujete-li odbornou radu, obraťte se na kvalifikovaného odborníka v příslušném oboru.\n\n## Vaše odpovědnost\n\nZa způsob využití výstupů Služby odpovídáte vy. Nepoužívejte výstupy AI jako jediný podklad pro rozhodnutí s právními, zdravotními, finančními nebo jinými významnými důsledky. Před sdílením nebo dalším využitím výstupy zkontrolujte a ověřte.\n\n## Stav preview\n\nSlužba je poskytována jako veřejná preview verze: dostupnost a chování se mohou měnit a výsledky se mohou lišit mezi verzemi modelů a konfiguracemi.\n\n## Hlášení problémů\n\nPokud Služba vytvoří škodlivý, protiprávní nebo závažně zavádějící výstup, nahlaste jej prosím na **ask@aisha.guru**, abychom jej mohli prošetřit.\n\nProvozovatel: **Evymo** · Kontakt: **ask@aisha.guru**"
+    }
+  }
+}

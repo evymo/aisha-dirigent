@@ -1,0 +1,3 @@
+-- RLS: orders
+
+ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;

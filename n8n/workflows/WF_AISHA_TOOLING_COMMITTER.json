@@ -1,0 +1,530 @@
+{
+  "name": "WF_AISHA_TOOLING_COMMITTER",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "aisha-tooling-committer",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "committer-trigger",
+      "name": "Committer Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate webhook input + extract proposal_id\n//\n// Trigger: po WF_APPROVAL_GATE 'approved' callback s { proposal_id, approved_by }\n//\n// Output: payload pro Forgejo branch + commit + PR creation\n\nconst body = $input.first().json.body || $input.first().json;\nconst proposalId = body.proposal_id;\nconst approvedBy = body.approved_by;\n\nif (!proposalId) throw new Error('proposal_id required');\n\nreturn [{\n  json: {\n    proposal_id: proposalId,\n    approved_by: approvedBy || null,\n    branch_name: `aisha/tooling/${proposalId}`,\n    requested_at: new Date().toISOString(),\n  },\n}];"
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/aisha_tooling_proposals?id=eq.{{ $json.proposal_id }}&select=artifact_content,artifact_path,artifact_name,proposal_kind,approval_status,trigger_pattern,metadata",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": false,
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "fetch-content",
+      "name": "Fetch Artifact Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Governance guard: resolve the proposal directly by id (no dependency on the\n// pending-only RPC) and enforce that ONLY an 'approved' proposal may be committed.\n//\n// The human approval gate lives here: a proposal must have been moved to\n// approval_status='approved' by an admin (update_tooling_proposal_status) before\n// this committer will create a Forgejo branch/file/PR. Any other status aborts.\n\nconst proposalId = $('Validate Input').item.json.proposal_id;\nconst rows = $('Fetch Artifact Content').item.json;\nconst row = Array.isArray(rows) ? rows[0] : (rows && rows[0]);\n\nif (!row) {\n  throw new Error(`Proposal ${proposalId} not found in aisha_tooling_proposals`);\n}\nif (row.approval_status !== 'approved') {\n  throw new Error(\n    `Proposal ${proposalId} has status '${row.approval_status}', expected 'approved' \\u2014 only approved proposals may be committed`\n  );\n}\n\nreturn [{\n  json: {\n    ...$('Validate Input').item.json,\n    proposal_meta: row,\n  },\n}];"
+      },
+      "id": "guard-approved",
+      "name": "Guard Approved",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/branches",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"new_branch_name\": \"{{ $('Validate Input').item.json.branch_name }}\",\n  \"old_branch_name\": \"main\"\n}",
+        "options": {
+          "timeout": 15000
+        },
+        "alwaysOutputData": true
+      },
+      "id": "create-branch",
+      "name": "Create Forgejo Branch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "Forgejo API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/contents/{{ $('Fetch Artifact Content').item.json[0].artifact_path }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"branch\": \"{{ $('Validate Input').item.json.branch_name }}\",\n  \"new_branch\": \"{{ $('Validate Input').item.json.branch_name }}\",\n  \"message\": \"feat(aisha-tooling): {{ $('Fetch Artifact Content').item.json[0].proposal_kind }} {{ $('Fetch Artifact Content').item.json[0].artifact_name }}\\n\\nProposed by AISHA tooling factory.\\n\\nProposal ID: {{ $('Validate Input').item.json.proposal_id }}\\nApproved by: {{ $('Validate Input').item.json.approved_by }}\\n\\nCo-authored-by: AISHA <noreply@{{ $env?.PUBLIC_TLD || '' }}>\",\n  \"content\": \"{{ Buffer.from($('Fetch Artifact Content').item.json[0].artifact_content).toString('base64') }}\"\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "write-file",
+      "name": "Write Artifact File",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "Forgejo API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "is-hook-kind",
+              "leftValue": "={{ $('Fetch Artifact Content').item.json[0].proposal_kind }}",
+              "rightValue": "hook",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "is-hook-proposal",
+      "name": "Is Hook Proposal?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1740,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/contents/.claude/settings.json?ref={{ $('Validate Input').item.json.branch_name }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": false,
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "read-settings",
+      "name": "Read Settings JSON",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1740,
+        520
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "Forgejo API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Hook-kind proposals need a SECOND artifact beyond the .sh file.\n//\n// Writing only `.claude/hooks/<name>.sh` is inert — Claude Code only fires a hook\n// that is also registered in `.claude/settings.json` (an event entry with a matcher\n// + a command pointing at the script). This node reads the branch's current\n// settings.json (from the Forgejo contents GET), idempotently merges in the new\n// hook entry, and re-encodes it base64 for the follow-up commit.\n//\n// Event + matcher resolution (most specific wins):\n//   1. metadata.settings_patch  { event, matcher, command }  (factory-rendered patch)\n//   2. metadata.hook_event / metadata.hook_matcher\n//   3. trigger_pattern.event / trigger_pattern.matcher\n//   4. default: PreToolUse on Edit|Write|MultiEdit\n\nconst settingsResp = $input.first().json; // Forgejo contents API GET response\nconst sha = settingsResp.sha;\nconst raw = Buffer.from(settingsResp.content || '', 'base64').toString('utf-8');\n\nlet settings;\ntry {\n  settings = JSON.parse(raw);\n} catch (e) {\n  throw new Error('.claude/settings.json on branch is not valid JSON: ' + e.message);\n}\n\nconst meta = $('Fetch Artifact Content').item.json[0];\nconst proposalId = $('Validate Input').item.json.proposal_id;\nconst artifactPath = meta.artifact_path; // e.g. .claude/hooks/prevent-x.sh\nconst triggerPattern = meta.trigger_pattern || {};\nconst metadata = meta.metadata || {};\n\nconst VALID_EVENTS = [\n  'PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification',\n  'Stop', 'SubagentStop', 'SessionStart', 'SessionEnd', 'PreCompact',\n];\n\nconst patch = (metadata && typeof metadata.settings_patch === 'object' && metadata.settings_patch) || {};\nlet event = patch.event || metadata.hook_event || triggerPattern.event || 'PreToolUse';\nif (!VALID_EVENTS.includes(event)) event = 'PreToolUse';\nconst matcher = patch.matcher || metadata.hook_matcher || triggerPattern.matcher || 'Edit|Write|MultiEdit';\nconst command = patch.command || ('${CLAUDE_PROJECT_DIR}/' + artifactPath);\n\n// Idempotent merge — never double-add the same command under the same matcher.\nsettings.hooks = settings.hooks || {};\nconst eventArr = settings.hooks[event] = settings.hooks[event] || [];\nlet group = eventArr.find((g) => g && g.matcher === matcher);\nconst newHook = {\n  type: 'command',\n  command,\n  _aisha: { kind: 'self-tooling', managed: true, proposal_id: proposalId },\n};\nlet changed = false;\nif (!group) {\n  eventArr.push({ matcher, hooks: [newHook] });\n  changed = true;\n} else {\n  group.hooks = group.hooks || [];\n  if (!group.hooks.some((h) => h && h.command === command)) {\n    group.hooks.push(newHook);\n    changed = true;\n  }\n}\n\nconst merged = JSON.stringify(settings, null, 2) + '\\n';\n\nreturn [{\n  json: {\n    settings_sha: sha,\n    settings_content_base64: Buffer.from(merged).toString('base64'),\n    settings_changed: changed,\n    hook_event: event,\n    hook_matcher: matcher,\n    hook_command: command,\n  },\n}];"
+      },
+      "id": "merge-hook-entry",
+      "name": "Merge Hook Entry",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1960,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/contents/.claude/settings.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"branch\": \"{{ $('Validate Input').item.json.branch_name }}\",\n  \"sha\": \"{{ $('Merge Hook Entry').item.json.settings_sha }}\",\n  \"message\": \"feat(aisha-tooling): register hook {{ $('Fetch Artifact Content').item.json[0].artifact_name }} in settings.json\\n\\nWires {{ $('Fetch Artifact Content').item.json[0].artifact_path }} into .claude/settings.json ({{ $('Merge Hook Entry').item.json.hook_event }} / {{ $('Merge Hook Entry').item.json.hook_matcher }}) so the hook actually fires.\\n\\nProposal ID: {{ $('Validate Input').item.json.proposal_id }}\\n\\nCo-authored-by: AISHA <noreply@{{ $env?.PUBLIC_TLD || '' }}>\",\n  \"content\": \"{{ $('Merge Hook Entry').item.json.settings_content_base64 }}\"\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "patch-settings",
+      "name": "Patch Settings JSON",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2180,
+        520
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "Forgejo API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/pulls",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": \"AISHA tooling: {{ $('Fetch Artifact Content').item.json[0].proposal_kind }} {{ $('Fetch Artifact Content').item.json[0].artifact_name }}\",\n  \"body\": \"AISHA navrhuje nový **{{ $('Fetch Artifact Content').item.json[0].proposal_kind }}** artifact.\\n\\n## Path\\n`{{ $('Fetch Artifact Content').item.json[0].artifact_path }}`\\n\\n## Trigger pattern\\nViz `aisha_tooling_proposals.id = {{ $('Validate Input').item.json.proposal_id }}`\\n\\n## Approval\\nSchváleno admin user_id: `{{ $('Validate Input').item.json.approved_by }}`\\n\\n---\\n\\n_Auto-generated PR via WF_AISHA_TOOLING_COMMITTER_\",\n  \"head\": \"{{ $('Validate Input').item.json.branch_name }}\",\n  \"base\": \"main\",\n  \"assignees\": [{{ JSON.stringify($env.FORGEJO_DEFAULT_ASSIGNEE || 'admin') }}]\n}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "create-pr",
+      "name": "Create Pull Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2400,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "Forgejo API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "update_tooling_proposal_status",
+        "rpcParams": "={{ JSON.stringify({\n  p_proposal_id: $('Validate Input').item.json.proposal_id,\n  p_new_status: 'committed',\n  p_committed_sha: $('Write Artifact File').item.json.commit?.sha || null\n}) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": true
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "mark-committed",
+      "name": "Mark Proposal Committed",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        2620,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_integration_action",
+        "rpcParams": "={{ JSON.stringify({\n  p_service_name: 'n8n',\n  p_action: 'aisha_tooling_committed',\n  p_action_detail: {\n    proposal_id: $('Validate Input').item.json.proposal_id,\n    pr_url: $('Create Pull Request').item.json.html_url,\n    pr_number: $('Create Pull Request').item.json.number,\n    branch: $('Validate Input').item.json.branch_name,\n    artifact_path: $('Fetch Artifact Content').item.json[0].artifact_path\n  },\n  p_status: 'success'\n}) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 5000,
+          "auditTrail": true
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "log-success",
+      "name": "Log Success",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        2840,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"proposal_id\": \"{{ $('Validate Input').item.json.proposal_id }}\", \"pr_url\": \"{{ $('Create Pull Request').item.json.html_url }}\", \"pr_number\": {{ $('Create Pull Request').item.json.number }}, \"branch\": \"{{ $('Validate Input').item.json.branch_name }}\" }",
+        "options": {}
+      },
+      "id": "respond-ok",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        3060,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Committer Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Fetch Artifact Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Artifact Content": {
+      "main": [
+        [
+          {
+            "node": "Guard Approved",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guard Approved": {
+      "main": [
+        [
+          {
+            "node": "Create Forgejo Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Forgejo Branch": {
+      "main": [
+        [
+          {
+            "node": "Write Artifact File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Artifact File": {
+      "main": [
+        [
+          {
+            "node": "Is Hook Proposal?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Hook Proposal?": {
+      "main": [
+        [
+          {
+            "node": "Read Settings JSON",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Pull Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Settings JSON": {
+      "main": [
+        [
+          {
+            "node": "Merge Hook Entry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Hook Entry": {
+      "main": [
+        [
+          {
+            "node": "Patch Settings JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Patch Settings JSON": {
+      "main": [
+        [
+          {
+            "node": "Create Pull Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Pull Request": {
+      "main": [
+        [
+          {
+            "node": "Mark Proposal Committed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Proposal Committed": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Success": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "_comment": [
+    "Známý dluh k 2026-08-01: definer funkce povrchu, které se ptají jen na přihlášení,",
+    "ne na nárok. Dluh smí jen KLESAT — co v seznamu není, bránu shodí.",
+    "Pět z nich prokazatelně vydalo obsah bezrolovému uživateli (měřeno pod authenticated,",
+    "obě identity); zbytek byl k 2026-08-01 latentní, nad prázdnými daty.",
+    "",
+    "AKTUALIZACE 2026-08-03 — get_timing_tower_block UŽ NENÍ LATENTNÍ.",
+    "Do té doby měl podmínku podle členství, takže nevracel nikomu nic (naměřeno",
+    "na nasazeném extranetu: 20 599 běhů v production_batches, blok hlásil",
+    "'Aktivní: 0'). Podmínka byla ODSTRANĚNA na výslovné rozhodnutí majitele",
+    "('teď mi jde o to, že přihlášený vidí vše, omezení budeme řešit v dalším",
+    "kroku'), takže blok teď vydává celý korpus každému přihlášenému — stejně",
+    "jako jeho sourozenec get_workflow_progress_block nad týmiž daty.",
+    "Je to VĚDOMÝ mezistav, ne opomenutí. Cílový stav: nárok odvozený z pozice",
+    "uživatele jako twin v organizaci, ne z členství a ne z role.",
+    "",
+    "Vzor opravy: aisha/db/sql/functions/get_answer_block.sql (commit 087e60ce).",
+    "2026-09-11: sedm položek SPLACENO — guard ověřoval jen PŘIHLÁŠENÍ, ne nárok; naměřeno diferenciální sondou (admin × uživatel bez rolí nad týmiž daty). Hlídá runtime brána definer-narok-ne-jen-prihlaseni.",
+    "",
+    "2026-09-12 — RAČNA NA NULE. Poslední dvě položky doměřeny fixturou se DVĚMA běhy (svůj × cizí), která v předchozích pokusech chyběla: admin viděl oba, řidič jen svůj. Vnější guard obou zní „jsi přihlášen?\", ale nárok vymáhají NÍŽ — get_workflow_progress_block filtrem `(prog->>'ok')` z get_batch_workflow_progress, get_timing_tower_block přes workflow_step_visible_to. Mezistav z 2026-08-03 („přihlášený vidí vše\") tedy už neplatí; rozhodnuto MĚŘENÍM, ne čtením. Hlídá to runtime brána definer-narok-ne-jen-prihlaseni (tvrzení „admin vidí oba běhy, řidič jen svůj\")."
+  ],
+  "generated_at": "2026-08-01",
+  "functions": []
+}

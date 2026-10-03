@@ -1,0 +1,194 @@
+{
+  "name": "WF_FINE_TUNE_JOB",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "fine-tune-job",
+        "options": {
+          "responseMode": "lastNode"
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "ft-trigger",
+      "name": "Job Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        280,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate and create training job.\nconst body = $json.body || {};\n\nif (!body.dataset_id) throw new Error('dataset_id required');\n\nconst config = {\n  lora_rank: body.lora_rank || 8,\n  lora_alpha: body.lora_alpha || 16,\n  learning_rate: body.learning_rate || '1e-4',\n  epochs: body.epochs || 3,\n  batch_size: body.batch_size || 4,\n  max_seq_length: body.max_seq_length || 2048,\n  min_quality: body.min_quality || 0.6\n};\n\nreturn [{\n  json: {\n    dataset_id: body.dataset_id,\n    base_model: body.base_model || 'mlx-community/Qwen2.5-Coder-7B-Instruct-4bit',\n    adapter_type: body.adapter_type || 'lora',\n    config\n  }\n}];"
+      },
+      "id": "ft-validate",
+      "name": "Validate & Configure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/training_jobs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ dataset_id: $json.dataset_id, base_model: $json.base_model, adapter_type: $json.adapter_type, config: $json.config, status: 'exporting' }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "ft-create-job",
+      "name": "Create Job Record",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_BASE_URL || 'http://localhost:5678' }}/webhook/training-export",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ dataset_id: $('Validate & Configure').first().json.dataset_id, job_id: $json[0]?.id || $json.id, min_quality: $('Validate & Configure').first().json.config.min_quality }) }}"
+      },
+      "id": "ft-export",
+      "name": "Export Training Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        940,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Write JSONL to temp file and invoke train-lora.sh.\n// In production, this would use SSH Execute or a dedicated training worker.\nconst exportResult = $json;\nconst job = $('Create Job Record').first().json;\nconst jobId = Array.isArray(job) ? job[0]?.id : job.id;\nconst config = $('Validate & Configure').first().json.config;\nconst baseModel = $('Validate & Configure').first().json.base_model;\n\n// For local execution: write JSONL to /tmp\nconst fs = require('fs');\nconst dataDir = `/tmp/aisha-training/${jobId}`;\nfs.mkdirSync(dataDir, { recursive: true });\n\nif (exportResult.sft_jsonl) {\n  fs.writeFileSync(`${dataDir}/train.jsonl`, exportResult.sft_jsonl);\n}\nif (exportResult.dpo_jsonl) {\n  fs.writeFileSync(`${dataDir}/dpo.jsonl`, exportResult.dpo_jsonl);\n}\n\n// Prepare training command (would be executed via SSH or local shell)\nconst trainCmd = [\n  './scripts/ai/train-lora.sh',\n  `--data ${dataDir}/train.jsonl`,\n  `--output ${dataDir}/output`,\n  `--model ${baseModel}`,\n  `--rank ${config.lora_rank}`,\n  `--alpha ${config.lora_alpha}`,\n  `--epochs ${config.epochs}`,\n  `--lr ${config.learning_rate}`,\n  `--batch ${config.batch_size}`,\n  `--max-seq ${config.max_seq_length}`\n].join(' ');\n\nreturn [{\n  json: {\n    job_id: jobId,\n    data_dir: dataDir,\n    sft_count: exportResult.sft_count || 0,\n    dpo_count: exportResult.dpo_count || 0,\n    train_command: trainCmd,\n    status: 'ready_for_training'\n  }\n}];"
+      },
+      "id": "ft-prepare",
+      "name": "Prepare Training",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return job status.\nconst prep = $json;\n\nreturn [{\n  json: {\n    success: true,\n    job_id: prep.job_id,\n    status: prep.status,\n    sft_examples: prep.sft_count,\n    dpo_examples: prep.dpo_count,\n    train_command: prep.train_command,\n    message: `Training job ${prep.job_id} prepared with ${prep.sft_count} SFT + ${prep.dpo_count} DPO examples. Execute train_command on Apple Silicon host.`\n  }\n}];"
+      },
+      "id": "ft-respond",
+      "name": "Return Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Job Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate & Configure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Configure": {
+      "main": [
+        [
+          {
+            "node": "Create Job Record",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Job Record": {
+      "main": [
+        [
+          {
+            "node": "Export Training Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Export Training Data": {
+      "main": [
+        [
+          {
+            "node": "Prepare Training",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Training": {
+      "main": [
+        [
+          {
+            "node": "Return Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

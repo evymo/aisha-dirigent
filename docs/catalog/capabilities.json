@@ -1,0 +1,2811 @@
+{
+  "generatedAt": "2026-07-28T18:58:00.801Z",
+  "schemaVersion": 1,
+  "summary": {
+    "services": 27,
+    "packages": 23,
+    "plugins": 4,
+    "domainTemplates": 8,
+    "agentCommands": 33,
+    "agentSkills": 8,
+    "mcpTools": 39,
+    "n8nWorkflows": 93,
+    "dbCatalogs": 18,
+    "npmScripts": 50,
+    "total": 303
+  },
+  "categories": {
+    "services": [
+      {
+        "id": "@aisha/event-worker",
+        "name": "event-worker",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/event-worker",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/gateway",
+        "name": "gateway",
+        "description": "",
+        "version": "1.0.0",
+        "location": "services/gateway",
+        "dockerfile": "Dockerfile.gateway",
+        "usage": "microservice — viz docker-compose.*.yml (Dockerfile.gateway)"
+      },
+      {
+        "id": "@aisha/storage-auth",
+        "name": "storage-auth",
+        "description": "",
+        "version": "1.0.0",
+        "location": "services/storage-auth",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-agent-runner",
+        "name": "svc-agent-runner",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-agent-runner",
+        "dockerfile": "Dockerfile.svc-agent-runner",
+        "usage": "microservice — viz docker-compose.*.yml (Dockerfile.svc-agent-runner)"
+      },
+      {
+        "id": "@aisha/svc-ai-chat",
+        "name": "svc-ai-chat",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-ai-chat",
+        "dockerfile": "Dockerfile.svc-ai-chat",
+        "usage": "microservice — viz docker-compose.*.yml (Dockerfile.svc-ai-chat)"
+      },
+      {
+        "id": "@aisha/svc-aisha-kronos-shim",
+        "name": "svc-aisha-kronos-shim",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-aisha-kronos-shim",
+        "dockerfile": "Dockerfile.svc-aisha-kronos-shim",
+        "usage": "microservice — viz docker-compose.*.yml (Dockerfile.svc-aisha-kronos-shim)"
+      },
+      {
+        "id": "@aisha/svc-aitg-probes",
+        "name": "svc-aitg-probes",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-aitg-probes",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-blockchain",
+        "name": "svc-blockchain",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-blockchain",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-communications",
+        "name": "svc-communications",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-communications",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-fio-bank",
+        "name": "svc-fio-bank",
+        "description": "",
+        "version": "1.0.0",
+        "location": "services/svc-fio-bank",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-github-app",
+        "name": "svc-github-app",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-github-app",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-health-ai",
+        "name": "svc-health-ai",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-health-ai",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-homeassistant",
+        "name": "svc-homeassistant",
+        "description": "",
+        "version": "1.0.0",
+        "location": "services/svc-homeassistant",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-ide-context",
+        "name": "svc-ide-context",
+        "description": "Backend single-source-of-truth for dynamic agent instruction broadcasting across IDEs (Claude Code, Cursor, Copilot, JetBrains future). Phase 13.1 of canonical 90-day plan.",
+        "version": "0.1.0",
+        "location": "services/svc-ide-context",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-livekit",
+        "name": "svc-livekit",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-livekit",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-matrix",
+        "name": "svc-matrix",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-matrix",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-mcp-knowledge",
+        "name": "svc-mcp-knowledge",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-mcp-knowledge",
+        "dockerfile": "Dockerfile.svc-mcp-knowledge",
+        "usage": "microservice — viz docker-compose.*.yml (Dockerfile.svc-mcp-knowledge)"
+      },
+      {
+        "id": "@aisha/svc-openclaw",
+        "name": "svc-openclaw",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-openclaw",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-packeta",
+        "name": "svc-packeta",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-packeta",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-pki-bridge",
+        "name": "svc-pki-bridge",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-pki-bridge",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-playwright-runner",
+        "name": "svc-playwright-runner",
+        "description": "Polling worker: get_next_playwright_run → npx playwright test against deployed env → record_playwright_result + upload report.",
+        "version": "0.1.0",
+        "location": "services/svc-playwright-runner",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-plugin-system",
+        "name": "svc-plugin-system",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-plugin-system",
+        "dockerfile": "Dockerfile.svc-plugin-system",
+        "usage": "microservice — viz docker-compose.*.yml (Dockerfile.svc-plugin-system)"
+      },
+      {
+        "id": "@aisha/svc-push",
+        "name": "svc-push",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-push",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-source-broker",
+        "name": "svc-source-broker",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-source-broker",
+        "dockerfile": "Dockerfile.svc-source-broker",
+        "usage": "microservice — viz docker-compose.*.yml (Dockerfile.svc-source-broker)"
+      },
+      {
+        "id": "@aisha/svc-stripe",
+        "name": "svc-stripe",
+        "description": "",
+        "version": "1.0.0",
+        "location": "services/svc-stripe",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/svc-web-artifact",
+        "name": "svc-web-artifact",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/svc-web-artifact",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      },
+      {
+        "id": "@aisha/ws-gateway",
+        "name": "ws-gateway",
+        "description": "",
+        "version": "0.1.0",
+        "location": "services/ws-gateway",
+        "dockerfile": null,
+        "usage": "microservice — viz docker-compose.*.yml"
+      }
+    ],
+    "packages": [
+      {
+        "id": "@aisha/acs-contracts",
+        "name": "acs-contracts",
+        "description": "Agent Communication Standard — contract registry source of truth. JSON Schema (2020-12) documents for the ACS envelope and every message type, plus typed exports. Schemas are the canonical, versioned, diffable artefacts (docs/AGENT_COMMUNI…",
+        "version": "1.0.0",
+        "location": "packages/acs-contracts",
+        "usage": "import z \"@aisha/acs-contracts\""
+      },
+      {
+        "id": "@aisha/acs-sdk",
+        "name": "acs-sdk",
+        "description": "Agent Communication Standard SDK — the ONLY sanctioned way to create, sign, validate, send and receive inter-agent messages (docs/AGENT_COMMUNICATION_STANDARD.md, IP-2/IP-4). Envelope building (ULID ids, correlation/causation, intent ancho…",
+        "version": "1.0.0",
+        "location": "packages/acs-sdk",
+        "usage": "import z \"@aisha/acs-sdk\""
+      },
+      {
+        "id": "@aisha/ide-bridge",
+        "name": "aisha-ide-bridge",
+        "description": "Client-side bridge between IDE workspaces (Claude Code, Cursor, GitHub Copilot) and AISHA svc-ide-context. Syncs CLAUDE.md/.cursorrules/copilot-instructions.md with safe-write semantics — preserves user-authored sections, backs up before w…",
+        "version": "0.1.1",
+        "location": "packages/aisha-ide-bridge",
+        "usage": "import z \"@aisha/ide-bridge\""
+      },
+      {
+        "id": "@aisha/aitg",
+        "name": "aitg",
+        "description": "OWASP AI Testing Guide (AITG) v1 — primitives shared across orchestrator services. Catalog metadata, Zod schemas, classifiers, the run emitter, and the `withAitgGuard()` call-site middleware live here so any service touching an LLM call ca…",
+        "version": "0.1.1",
+        "location": "packages/aitg",
+        "usage": "import z \"@aisha/aitg\""
+      },
+      {
+        "id": "@aisha/api-core",
+        "name": "api-core",
+        "description": "Platform-agnostic HTTP/Realtime client shared between web and mobile (replaces the legacy hosted-BaaS JS client).",
+        "version": "0.1.1",
+        "location": "packages/api-core",
+        "usage": "import z \"@aisha/api-core\""
+      },
+      {
+        "id": "@aisha/audience-types",
+        "name": "audience-types",
+        "description": "Universal audience module — TypeScript domain types, IDataSource contract, tier derivation, scope rules. Shared between svc-source-broker, future broker services, and Appsmith bindings.",
+        "version": "0.1.6",
+        "location": "packages/audience-types",
+        "usage": "import z \"@aisha/audience-types\""
+      },
+      {
+        "id": "@aisha/cache-redis",
+        "name": "cache-redis",
+        "description": "Shared Redis client for AISHA services. Wraps ioredis with DB-index isolation, AUTH from URL userinfo or env (username+password), and named primitives for: caching (WP 2.1), JWT revocation (WP 3.5), and realtime state (WP 13.4). Connects t…",
+        "version": "0.1.3",
+        "location": "packages/cache-redis",
+        "usage": "import z \"@aisha/cache-redis\""
+      },
+      {
+        "id": "@aisha/capture-ui",
+        "name": "capture-ui",
+        "description": "Field-capture primitives shared by every surface: what only a person can supply (a signature, later a photo or a reading). Dependency-light on purpose — React only, no component library and no i18n, so a shell without either can use it. Up…",
+        "version": "0.1.0",
+        "location": "packages/capture-ui",
+        "usage": "import z \"@aisha/capture-ui\""
+      },
+      {
+        "id": "design-tokens",
+        "name": "design-tokens",
+        "description": "",
+        "version": null,
+        "location": "packages/design-tokens",
+        "usage": "workspace balíček"
+      },
+      {
+        "id": "@aisha/dirigent-core",
+        "name": "dirigent-core",
+        "description": "Editor-neutral AISHA Dirigent contracts for IDE clients, sidecars, and ZEDBENCH.",
+        "version": "0.1.0",
+        "location": "packages/dirigent-core",
+        "usage": "import z \"@aisha/dirigent-core\""
+      },
+      {
+        "id": "@aisha/flowboard-core",
+        "name": "flowboard-core",
+        "description": "Engine-agnostic AISHA Flowboard core (ports, registry, graph+validation, engine router, n8n/sandbox compilers, provenance, recipes) shared by the web app and services.",
+        "version": "0.1.4",
+        "location": "packages/flowboard-core",
+        "usage": "import z \"@aisha/flowboard-core\""
+      },
+      {
+        "id": "insight",
+        "name": "insight",
+        "description": "",
+        "version": null,
+        "location": "packages/insight",
+        "usage": "workspace balíček"
+      },
+      {
+        "id": "@aisha/llm-dispatch",
+        "name": "llm-dispatch",
+        "description": "Multi-provider LLM dispatch — the BackendRegistry + per-provider InferenceBackend implementations (OpenAI, Gemini native generateContent, Anthropic /v1/messages, vLLM/Ollama, llm-gateway, maestro). Shared so every service that resolves a b…",
+        "version": "0.2.3",
+        "location": "packages/llm-dispatch",
+        "usage": "import z \"@aisha/llm-dispatch\""
+      },
+      {
+        "id": "local-ingest",
+        "name": "local-ingest",
+        "description": "",
+        "version": null,
+        "location": "packages/local-ingest",
+        "usage": "workspace balíček"
+      },
+      {
+        "id": "@aisha/local-signals",
+        "name": "local-signals",
+        "description": "",
+        "version": "0.1.2",
+        "location": "packages/local-signals",
+        "usage": "import z \"@aisha/local-signals\""
+      },
+      {
+        "id": "n8n-nodes-aisha",
+        "name": "n8n-nodes-aisha",
+        "description": "AISHA Platform custom n8n community nodes — AISHA gateway RPC, MCP integration, audit, delivery, self-orchestration",
+        "version": "0.5.13",
+        "location": "packages/n8n-nodes-aisha",
+        "usage": "import z \"n8n-nodes-aisha\""
+      },
+      {
+        "id": "@aisha/observability",
+        "name": "observability",
+        "description": "OpenTelemetry bootstrap + Prometheus metrics adapter for AISHA orchestrator services. Single instrumentation surface, exporter routes to Langfuse OTLP (sole traces backend per Phase 12 plan, no Tempo).",
+        "version": "0.1.2",
+        "location": "packages/observability",
+        "usage": "import z \"@aisha/observability\""
+      },
+      {
+        "id": "@aisha/postgrest-client",
+        "name": "postgrest-client",
+        "description": "The ONE PostgREST RPC call contract shared by every AISHA orchestrator service. Replaces the divergent hand-rolled services/*/src/postgrest.ts copies (SVC-01 / D11) with a single canonical client: rpcService / rpcUser / rpcUserClaims + tab…",
+        "version": "0.1.1",
+        "location": "packages/postgrest-client",
+        "usage": "import z \"@aisha/postgrest-client\""
+      },
+      {
+        "id": "potok",
+        "name": "potok",
+        "description": "",
+        "version": null,
+        "location": "packages/potok",
+        "usage": "workspace balíček"
+      },
+      {
+        "id": "@aisha/security",
+        "name": "security",
+        "description": "OWASP Top 10 hardening primitives shared across all AISHA orchestrator services (Fastify + PostgREST stack). Maps 1:1 to OWASP 2021 categories A01-A10.",
+        "version": "0.3.0",
+        "location": "packages/security",
+        "usage": "import z \"@aisha/security\""
+      },
+      {
+        "id": "@aisha/source-adapter-money-s5",
+        "name": "source-adapter-money-s5",
+        "description": "Generic svc-source-broker adapter for Money (Seyfor) S5 API — operational documents (delivery notes '.', issued invoices './invoices') over OAuth2 client_credentials + GraphQL. First-party ecosystem connector; any instance binds its own Mo…",
+        "version": "0.1.0",
+        "location": "packages/source-adapter-money-s5",
+        "usage": "import z \"@aisha/source-adapter-money-s5\""
+      },
+      {
+        "id": "@aisha/surface-blocks",
+        "name": "surface-blocks",
+        "description": "Surface-agnostic block contract: schema-versioned view-models with mandatory provenance, fail-closed sensitivity, signed read-only snapshots. Upstream candidate (PR-7/PR-9 payload part).",
+        "version": "0.1.0",
+        "location": "packages/surface-blocks",
+        "usage": "import z \"@aisha/surface-blocks\""
+      },
+      {
+        "id": "@aisha/workbench-core",
+        "name": "workbench-core",
+        "description": "Shared types, interfaces, and platform-agnostic adapters for AISHA Workbench and extensions",
+        "version": "0.1.4",
+        "location": "packages/workbench-core",
+        "usage": "import z \"@aisha/workbench-core\""
+      }
+    ],
+    "plugins": [
+      {
+        "id": "eurowag-telematics",
+        "name": "Eurowag Telematics",
+        "description": "Reads vehicle state, trips and drivers from the Eurowag Telematics customer API (the successor to the Webdispečink SOAP endpoint) and promotes them onto the raw signal lane. Optional by construction: a deployment that never touches Eurowag…",
+        "version": "0.1.0",
+        "kind": "data_source",
+        "trustTier": "internal",
+        "capabilityCount": 5,
+        "location": "plugins/eurowag-telematics/manifest.json",
+        "usage": "plugin id: eurowag-telematics"
+      },
+      {
+        "id": "partner-metrics",
+        "name": "Partner Metrics Dashboard",
+        "description": "Reference full_stack plugin. Aggregates partner KPIs, generates AI summaries, exposes API routes for a metrics dashboard.",
+        "version": "0.1.0",
+        "kind": "full_stack",
+        "trustTier": "internal",
+        "capabilityCount": 7,
+        "location": "plugins/partner-metrics/manifest.json",
+        "usage": "plugin id: partner-metrics"
+      },
+      {
+        "id": "tcars-fleet",
+        "name": "T-cars Fleet",
+        "description": "Reads vehicles, people, groups and the journey log from the T-cars SOAP WebService v2 and promotes them onto the raw signal lane. Optional by construction: a deployment without a T-cars contract simply does not install it.",
+        "version": "0.1.0",
+        "kind": "data_source",
+        "trustTier": "internal",
+        "capabilityCount": 2,
+        "location": "plugins/tcars-fleet/manifest.json",
+        "usage": "plugin id: tcars-fleet"
+      },
+      {
+        "id": "webdispecink-fleet",
+        "name": "Webdispečink Fleet",
+        "description": "Reads vehicles, drivers, positions and the log book from the Webdispečink SOAP API 2.0 and promotes them onto the raw signal lane. Kept alongside the Eurowag plugin rather than replaced by it: measured against the same tenant, this endpoin…",
+        "version": "0.1.0",
+        "kind": "backend_provider",
+        "trustTier": "internal",
+        "capabilityCount": 6,
+        "location": "plugins/webdispecink-fleet/manifest.json",
+        "usage": "plugin id: webdispecink-fleet"
+      }
+    ],
+    "domainTemplates": [
+      {
+        "id": "aisha.guru",
+        "name": "aisha.guru",
+        "description": "",
+        "location": "domains/templates/aisha.guru",
+        "usage": "šablona domény: aisha.guru"
+      },
+      {
+        "id": "cafe-shop",
+        "name": "cafe-shop",
+        "description": "",
+        "location": "domains/templates/cafe-shop",
+        "usage": "šablona domény: cafe-shop"
+      },
+      {
+        "id": "company-wiki",
+        "name": "company-wiki",
+        "description": "",
+        "location": "domains/templates/company-wiki",
+        "usage": "šablona domény: company-wiki"
+      },
+      {
+        "id": "electrician-trade",
+        "name": "electrician-trade",
+        "description": "",
+        "location": "domains/templates/electrician-trade",
+        "usage": "šablona domény: electrician-trade"
+      },
+      {
+        "id": "farm-shop",
+        "name": "farm-shop",
+        "description": "",
+        "location": "domains/templates/farm-shop",
+        "usage": "šablona domény: farm-shop"
+      },
+      {
+        "id": "garden-blog",
+        "name": "garden-blog",
+        "description": "",
+        "location": "domains/templates/garden-blog",
+        "usage": "šablona domény: garden-blog"
+      },
+      {
+        "id": "legal-advisory",
+        "name": "legal-advisory",
+        "description": "",
+        "location": "domains/templates/legal-advisory",
+        "usage": "šablona domény: legal-advisory"
+      },
+      {
+        "id": "site-supervision",
+        "name": "site-supervision",
+        "description": "",
+        "location": "domains/templates/site-supervision",
+        "usage": "šablona domény: site-supervision"
+      }
+    ],
+    "agentCommands": [
+      {
+        "id": "aisha-advise",
+        "name": "AISHA Dirigent — Manual Advisor Review",
+        "description": "Invoke the read-only AISHA Dirigent expert advisor subagent to review the",
+        "autoGenerated": true,
+        "location": ".claude/commands/aisha-advise.md",
+        "usage": "/aisha-advise"
+      },
+      {
+        "id": "aisha-compliance",
+        "name": "AISHA Compliance Gate",
+        "description": "Check PR/branch compliance against platform standards before merge.",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-compliance.md",
+        "usage": "/aisha-compliance"
+      },
+      {
+        "id": "aisha-cooldowns",
+        "name": "AISHA Dirigent — Cooldown Manager",
+        "description": "List or clear active cooldown timers for advisory hooks. Each advisory rule",
+        "autoGenerated": true,
+        "location": ".claude/commands/aisha-cooldowns.md",
+        "usage": "/aisha-cooldowns"
+      },
+      {
+        "id": "aisha-db",
+        "name": "AISHA Database Operations",
+        "description": "Run database management operations.",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-db.md",
+        "usage": "/aisha-db"
+      },
+      {
+        "id": "aisha-deploy-flow",
+        "name": "AISHA — Deploy Flow Operations",
+        "description": "Provádí operace na 4-fázovém samořídicím deploy flow (drift, B/G, Sentry, dashboard).",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-deploy-flow.md",
+        "usage": "/aisha-deploy-flow"
+      },
+      {
+        "id": "aisha-deploy",
+        "name": "AISHA Deployment Workflow",
+        "description": "Guide through the deployment process with pre-flight validation.",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-deploy.md",
+        "usage": "/aisha-deploy"
+      },
+      {
+        "id": "aisha-document",
+        "name": "AISHA — Documentation (Diataxis, from code)",
+        "description": "Generate or refresh docs that actually match what shipped, using the Diataxis",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-document.md",
+        "usage": "/aisha-document"
+      },
+      {
+        "id": "aisha-estimate",
+        "name": "AISHA Effort Estimation",
+        "description": "Estimate development effort for a task.",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-estimate.md",
+        "usage": "/aisha-estimate"
+      },
+      {
+        "id": "aisha-health",
+        "name": "AISHA System Health Check",
+        "description": "Check connectivity and status of all platform services.",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-health.md",
+        "usage": "/aisha-health"
+      },
+      {
+        "id": "aisha-migrate-new",
+        "name": "AISHA — Scaffold New Migration",
+        "description": "Vytvoří novou migraci s SoT párem podle AISHA pravidel.",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-migrate-new.md",
+        "usage": "/aisha-migrate-new"
+      },
+      {
+        "id": "aisha-next",
+        "name": "AISHA Next Step",
+        "description": "Suggest what to do next based on current project context.",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-next.md",
+        "usage": "/aisha-next"
+      },
+      {
+        "id": "aisha-propose-rule",
+        "name": "/aisha-propose-rule — turn local customizations into rule proposals",
+        "description": "description: Scan generated IDE instruction files (CLAUDE.md, .cursorrules, copilot-instructions.md, …) for user-section customizations and queue them as rule proposals for the AISHA Dirigent knowledge base. Read-only by default — nothing …",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-propose-rule.md",
+        "usage": "/aisha-propose-rule"
+      },
+      {
+        "id": "aisha-qa",
+        "name": "AISHA — QA (real browser, real flows)",
+        "description": "Exercise the app the way a user would, find bugs, fix them with atomic commits,",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-qa.md",
+        "usage": "/aisha-qa"
+      },
+      {
+        "id": "aisha-quality",
+        "name": "AISHA Code Quality Audit",
+        "description": "Assess code quality against AISHA platform standards.",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-quality.md",
+        "usage": "/aisha-quality"
+      },
+      {
+        "id": "aisha-review",
+        "name": "AISHA — Staff Engineer Review",
+        "description": "Find the bugs that pass CI but blow up in production. The companion to",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-review.md",
+        "usage": "/aisha-review"
+      },
+      {
+        "id": "aisha-router-config",
+        "name": "/aisha-router-config — switch slot profile",
+        "description": "description: Switch AISHA router slot profile (budget / balanced / maxQuality) for the current dev session. Updates .aisha/dirigent.json locally; never pushes prod env. Use when router-coach advisory suggests profile change due to cost ove…",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-router-config.md",
+        "usage": "/aisha-router-config"
+      },
+      {
+        "id": "aisha-security",
+        "name": "AISHA — Security Review (OWASP + STRIDE)",
+        "description": "An adversarial security pass over a change. Leans on the platform's existing",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-security.md",
+        "usage": "/aisha-security"
+      },
+      {
+        "id": "aisha-setup",
+        "name": "AISHA Claude Code Setup",
+        "description": "Interactive onboarding for new developers. Run this after `git clone` + `npm install`.",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-setup.md",
+        "usage": "/aisha-setup"
+      },
+      {
+        "id": "aisha-story",
+        "name": "AISHA Story Context",
+        "description": "Manage the active story/project context.",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-story.md",
+        "usage": "/aisha-story"
+      },
+      {
+        "id": "aisha-supervise",
+        "name": "AISHA Dirigent — Supervisor Status",
+        "description": "Show the current state of the AISHA Dirigent runtime supervision overlay:",
+        "autoGenerated": true,
+        "location": ".claude/commands/aisha-supervise.md",
+        "usage": "/aisha-supervise"
+      },
+      {
+        "id": "aisha-test",
+        "name": "AISHA Test Strategy",
+        "description": "Evaluate and run test strategy for the specified file or hook.",
+        "autoGenerated": false,
+        "location": ".claude/commands/aisha-test.md",
+        "usage": "/aisha-test"
+      },
+      {
+        "id": "os-ads",
+        "name": "Ads Agent — delegate to the `os-ads` agent",
+        "description": "Creates ad concepts and campaign assets. (creative → campaigns)",
+        "autoGenerated": true,
+        "location": ".claude/commands/os-ads.md",
+        "usage": "/os-ads"
+      },
+      {
+        "id": "os-content",
+        "name": "Content Agent — delegate to the `os-content` agent",
+        "description": "Turns ideas into posts, scripts, and visual briefs. (ideas → posts)",
+        "autoGenerated": true,
+        "location": ".claude/commands/os-content.md",
+        "usage": "/os-content"
+      },
+      {
+        "id": "os-docs",
+        "name": "Docs Agent — delegate to the `os-docs` agent",
+        "description": "Organizes docs, SOPs, and knowledge bases. (docs → memory)",
+        "autoGenerated": true,
+        "location": ".claude/commands/os-docs.md",
+        "usage": "/os-docs"
+      },
+      {
+        "id": "os-finance",
+        "name": "Finance Agent — delegate to the `os-finance` agent",
+        "description": "Tracks revenue, pricing, and cash decisions. (revenue → decisions)",
+        "autoGenerated": true,
+        "location": ".claude/commands/os-finance.md",
+        "usage": "/os-finance"
+      },
+      {
+        "id": "os-leads",
+        "name": "Leads Agent — delegate to the `os-leads` agent",
+        "description": "Finds leads, buyers, and partnership targets. (leads → buyers)",
+        "autoGenerated": true,
+        "location": ".claude/commands/os-leads.md",
+        "usage": "/os-leads"
+      },
+      {
+        "id": "os-ops",
+        "name": "Ops Agent — delegate to the `os-ops` agent",
+        "description": "Runs workflows, SOPs, and weekly planning. (tasks → systems)",
+        "autoGenerated": true,
+        "location": ".claude/commands/os-ops.md",
+        "usage": "/os-ops"
+      },
+      {
+        "id": "os-product",
+        "name": "Product Agent — delegate to the `os-product` agent",
+        "description": "Turns customer pain into roadmap items. (pain → roadmap)",
+        "autoGenerated": true,
+        "location": ".claude/commands/os-product.md",
+        "usage": "/os-product"
+      },
+      {
+        "id": "os-research",
+        "name": "Research Agent — delegate to the `os-research` agent",
+        "description": "Finds market signals and source-backed research. (signals → patterns)",
+        "autoGenerated": true,
+        "location": ".claude/commands/os-research.md",
+        "usage": "/os-research"
+      },
+      {
+        "id": "os-review",
+        "name": "Review Agent — delegate to the `os-review` agent",
+        "description": "Checks voice, accuracy, and ship quality. (quality → ship/no-ship)",
+        "autoGenerated": true,
+        "location": ".claude/commands/os-review.md",
+        "usage": "/os-review"
+      },
+      {
+        "id": "os-sales",
+        "name": "Sales Agent — delegate to the `os-sales` agent",
+        "description": "Writes outreach, follow-ups, and deal notes. (outreach → deals)",
+        "autoGenerated": true,
+        "location": ".claude/commands/os-sales.md",
+        "usage": "/os-sales"
+      },
+      {
+        "id": "os-ship",
+        "name": "Ship gate — the \"anyone test\" before anything leaves the company",
+        "description": "Run the fleet's review agent (`os-review`) on an artifact before",
+        "autoGenerated": true,
+        "location": ".claude/commands/os-ship.md",
+        "usage": "/os-ship"
+      },
+      {
+        "id": "os-weekly",
+        "name": "Weekly brief — plan the week with the fleet",
+        "description": "The `/os-weekly` ritual keeps `company-os/brain/weekly-brief.md` the live",
+        "autoGenerated": true,
+        "location": ".claude/commands/os-weekly.md",
+        "usage": "/os-weekly"
+      }
+    ],
+    "agentSkills": [
+      {
+        "id": "aisha-deploy-flow",
+        "name": "aisha-deploy-flow",
+        "description": "Operate the AISHA 4-phase autonomous deploy flow — drift detection (Phase 1), blue/green orchestration (Phase 2), Sentry-driven rollback (Phase 3), and Appsmith dashboard regeneration (Phase 4). Use when investigating drift, triggering man…",
+        "location": ".claude/skills/aisha-deploy-flow/SKILL.md",
+        "usage": "skill: aisha-deploy-flow"
+      },
+      {
+        "id": "aisha-edge-fn",
+        "name": "aisha-edge-fn",
+        "description": "Create or modify a Fastify route (\"edge function\") in an AISHA orchestrator microservice (services/svc-*/src/routes/*.ts) with applySecurity, JWT auth, Zod validation, audited RPC calls, AITG guard on every LLM call, and SSRF-safe outbound…",
+        "location": ".claude/skills/aisha-edge-fn/SKILL.md",
+        "usage": "skill: aisha-edge-fn"
+      },
+      {
+        "id": "aisha-migration",
+        "name": "aisha-migration",
+        "description": "Create database migrations for the AISHA platform with proper SoT (source-of-truth) pairing. Use when adding new tables, RPC functions, indexes, RLS policies, or modifying schema. Triggers on \"create migration\", \"add table\", \"new RPC\", \"sc…",
+        "location": ".claude/skills/aisha-migration/SKILL.md",
+        "usage": "skill: aisha-migration"
+      },
+      {
+        "id": "aisha-n8n-workflow",
+        "name": "aisha-n8n-workflow",
+        "description": "Create n8n workflows for the AISHA platform with proper aishaRpc integration, audit trail, approval gate routing, and idempotent execution. Use when creating new n8n workflows (WF_*), modifying existing ones, or designing autonomous loops.…",
+        "location": ".claude/skills/aisha-n8n-workflow/SKILL.md",
+        "usage": "skill: aisha-n8n-workflow"
+      },
+      {
+        "id": "aisha-router-tuning",
+        "name": "aisha-router-tuning",
+        "description": "Tune AISHA's Soulforge slot routing + Dirigent router-coach advisory + LLM Gateway profile. Use when developer wants to switch slot profile (budget/balanced/maxQuality), debug rolling cost in dev session, configure ANTHROPIC_BASE_URL for t…",
+        "location": ".claude/skills/aisha-router-tuning/SKILL.md",
+        "usage": "skill: aisha-router-tuning"
+      },
+      {
+        "id": "aisha-rpc",
+        "name": "aisha-rpc",
+        "description": "Write Postgres RPC functions for the AISHA platform with SECURITY DEFINER + REVOKE/GRANT pattern, audit trail, decision provenance, and proper search_path isolation. Use when creating new RPC functions, modifying existing ones, or auditing…",
+        "location": ".claude/skills/aisha-rpc/SKILL.md",
+        "usage": "skill: aisha-rpc"
+      },
+      {
+        "id": "aisha-supervisor",
+        "name": "aisha-supervisor",
+        "description": "AISHA Dirigent runtime supervision overlay for Claude Code agents. Use when working in this repo to understand how the agent is being advised in real time (PreToolUse / PostToolUse / Stop hooks), how to read advisory output, how to invoke …",
+        "location": ".claude/skills/aisha-supervisor/SKILL.md",
+        "usage": "skill: aisha-supervisor"
+      },
+      {
+        "id": "aisha-surfaces",
+        "name": "aisha-surfaces",
+        "description": "Work on the extranet surfaces — sections, block masks, and deploying a surface SPA. Use when adding or changing a section (porada, workbench, registry, ask, mission_control), adding a block type, wiring a block to a data RPC, or provisioni…",
+        "location": ".claude/skills/aisha-surfaces/SKILL.md",
+        "usage": "skill: aisha-surfaces"
+      }
+    ],
+    "mcpTools": [
+      {
+        "id": "admin_health_check",
+        "name": "admin_health_check",
+        "description": "Return MCP adapter and knowledge-store health details.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: admin_health_check"
+      },
+      {
+        "id": "aitg_auto_close_findings",
+        "name": "aitg_auto_close_findings",
+        "description": "Auto-close findings whose subsequent runs show N consecutive passes. Keeps the open-findings list signal-rich.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_auto_close_findings"
+      },
+      {
+        "id": "aitg_classify_response",
+        "name": "aitg_classify_response",
+        "description": "Run a heuristic AITG classifier (prompt injection / canary leak / toxicity) on arbitrary text without persisting. Use for self-review before sending.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_classify_response"
+      },
+      {
+        "id": "aitg_detect_drift",
+        "name": "aitg_detect_drift",
+        "description": "Run WoW pass-rate drift detection. Creates aitg_drift_alerts rows when a test drops below threshold.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_detect_drift"
+      },
+      {
+        "id": "aitg_get_automation",
+        "name": "aitg_get_automation",
+        "description": "Fetch one automation by id (continuous_heartbeat, daily_reflection, nightly_full_sweep, drift_detection, auto_close_findings, runtime_sentinel, pr_gate, callsite_guard_default).",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_get_automation"
+      },
+      {
+        "id": "aitg_get_coverage",
+        "name": "aitg_get_coverage",
+        "description": "Read pass-rate per AITG test over a sliding window. Use for periodic self-assessment.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_get_coverage"
+      },
+      {
+        "id": "aitg_get_trust_score",
+        "name": "aitg_get_trust_score",
+        "description": "Single weighted trust score (0..100) across all enabled AITG tests. Use as the headline metric for self-evaluation.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_get_trust_score"
+      },
+      {
+        "id": "aitg_health_summary",
+        "name": "aitg_health_summary",
+        "description": "One-shot self-orientation: trust score, total runs, open findings, open drift alerts, last reflection. Call at session start.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_health_summary"
+      },
+      {
+        "id": "aitg_list_automations",
+        "name": "aitg_list_automations",
+        "description": "List every AITG automation with mode (automated/manual/disabled), schedule, parameters, last run. Operator-side: read-only view of the DB-controlled cadence.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_list_automations"
+      },
+      {
+        "id": "aitg_list_open_findings",
+        "name": "aitg_list_open_findings",
+        "description": "List failed AITG findings without remediation, ordered by severity. Use to discover what to fix next.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_list_open_findings"
+      },
+      {
+        "id": "aitg_next_in_queue",
+        "name": "aitg_next_in_queue",
+        "description": "Read the adaptive scheduling queue: which tests should run next based on staleness × severity + recent failures + open drifts.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_next_in_queue"
+      },
+      {
+        "id": "aitg_observe_trend",
+        "name": "aitg_observe_trend",
+        "description": "Read your own reflection history (chronological). Use to remember your trajectory across sessions.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_observe_trend"
+      },
+      {
+        "id": "aitg_propose_payload",
+        "name": "aitg_propose_payload",
+        "description": "Propose a new adversarial payload to the corpus. Stays pending until admin approval; does NOT activate without human review.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_propose_payload"
+      },
+      {
+        "id": "aitg_propose_remediation",
+        "name": "aitg_propose_remediation",
+        "description": "Attach a remediation proposal to an open finding. Proposal goes through the existing approval gate before any code change.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_propose_remediation"
+      },
+      {
+        "id": "aitg_record_automation_run",
+        "name": "aitg_record_automation_run",
+        "description": "Workflow callback after execution: updates last_run_at + last_run_status. Not for direct user invocation.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_record_automation_run"
+      },
+      {
+        "id": "aitg_record_reflection",
+        "name": "aitg_record_reflection",
+        "description": "Append a reflection diary entry: short narrative + proposed actions. Auto-populates trust delta and counts from the live state.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_record_reflection"
+      },
+      {
+        "id": "aitg_request_waiver",
+        "name": "aitg_request_waiver",
+        "description": "Request a time-bound waiver for a failing test. Auto-expires; requires justification ≥ 20 chars.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_request_waiver"
+      },
+      {
+        "id": "aitg_run_test",
+        "name": "aitg_run_test",
+        "description": "Execute a single AITG runtime probe (AITG-APP-01/03/12, AITG-DAT-02) by dispatching svc-aitg-probes. Use to verify a specific suspected weakness.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_run_test"
+      },
+      {
+        "id": "aitg_trigger_automation",
+        "name": "aitg_trigger_automation",
+        "description": "Manual trigger — invokes the automation regardless of schedule. Returns trigger_id.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_trigger_automation"
+      },
+      {
+        "id": "aitg_update_automation",
+        "name": "aitg_update_automation",
+        "description": "Admin-only. Change mode, cron, interval, or parameters.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: aitg_update_automation"
+      },
+      {
+        "id": "compose_context",
+        "name": "compose_context",
+        "description": "Compose a multi-layer AI context bundle for a story and context profile.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: compose_context"
+      },
+      {
+        "id": "draft_flow",
+        "name": "draft_flow",
+        "description": "AISHA drafts a Flowboard graph (nodes+edges JSON) from an intent. Beta: the help@ inbox recipe. The user finishes it on the canvas; compiled app-side to n8n or the governed sandbox.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: draft_flow"
+      },
+      {
+        "id": "get_agent_knowledge",
+        "name": "get_agent_knowledge",
+        "description": "Load knowledge bindings for an AISHA agent slug.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: get_agent_knowledge"
+      },
+      {
+        "id": "get_design_profile",
+        "name": "get_design_profile",
+        "description": "Load the design DNA (brand/UX profile) for a partner id.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: get_design_profile"
+      },
+      {
+        "id": "get_expert_rule",
+        "name": "get_expert_rule",
+        "description": "Load one published expert rule by slug.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: get_expert_rule"
+      },
+      {
+        "id": "get_expertise_areas",
+        "name": "get_expertise_areas",
+        "description": "List active expertise areas and rule counts.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: get_expertise_areas"
+      },
+      {
+        "id": "get_flowboard_registry",
+        "name": "get_flowboard_registry",
+        "description": "Federated Flowboard palette feed: active agent_catalog agents. The frontend merges this with builtin + MCP-tool + n8n node providers.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: get_flowboard_registry"
+      },
+      {
+        "id": "get_knowledge_item",
+        "name": "get_knowledge_item",
+        "description": "Load one knowledge item by id or source slug.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: get_knowledge_item"
+      },
+      {
+        "id": "get_knowledge_stats",
+        "name": "get_knowledge_stats",
+        "description": "Return knowledge base counts and embedding coverage.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: get_knowledge_stats"
+      },
+      {
+        "id": "get_knowledge_topics_localized",
+        "name": "get_knowledge_topics_localized",
+        "description": "List knowledge topics with localized title/summary for a locale.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: get_knowledge_topics_localized"
+      },
+      {
+        "id": "get_model_registry",
+        "name": "get_model_registry",
+        "description": "List AI model registry entries, optionally filtered by provider / eval status.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: get_model_registry"
+      },
+      {
+        "id": "get_public_chat_channel_config",
+        "name": "get_public_chat_channel_config",
+        "description": "Load the active public-chat channel configuration by channel slug.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: get_public_chat_channel_config"
+      },
+      {
+        "id": "get_story_context",
+        "name": "get_story_context",
+        "description": "Load a story context bundle by story id.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: get_story_context"
+      },
+      {
+        "id": "list_public_chat_channels",
+        "name": "list_public_chat_channels",
+        "description": "List the public-chat channel registry.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: list_public_chat_channels"
+      },
+      {
+        "id": "match_experts",
+        "name": "match_experts",
+        "description": "Find experts matching an expertise area or context tags.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: match_experts"
+      },
+      {
+        "id": "route_task",
+        "name": "route_task",
+        "description": "Route a task kind/risk profile to the AISHA agent pipeline.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: route_task"
+      },
+      {
+        "id": "search_knowledge",
+        "name": "search_knowledge",
+        "description": "Search expert rules and AISHA knowledge by text, category, expertise area, or context tags.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: search_knowledge"
+      },
+      {
+        "id": "search_knowledge_v2",
+        "name": "search_knowledge_v2",
+        "description": "Hybrid AISHA knowledge search using text fallback and optional metadata filters.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: search_knowledge_v2"
+      },
+      {
+        "id": "validate_compliance",
+        "name": "validate_compliance",
+        "description": "Run lightweight AISHA platform compliance checks for a code or design snippet.",
+        "location": "services/svc-mcp-knowledge/src/routes/mcp.ts",
+        "usage": "MCP tool: validate_compliance"
+      }
+    ],
+    "n8nWorkflows": [
+      {
+        "id": "WF_ADMIN_HEALTH_MONITOR",
+        "name": "WF_ADMIN_HEALTH_MONITOR",
+        "description": "",
+        "nodeCount": 19,
+        "location": "n8n/workflows/WF_ADMIN_HEALTH_MONITOR.json",
+        "usage": "n8n workflow: WF_ADMIN_HEALTH_MONITOR"
+      },
+      {
+        "id": "WF_ADMIN_ORCHESTRATION",
+        "name": "WF_ADMIN_ORCHESTRATION",
+        "description": "",
+        "nodeCount": 11,
+        "location": "n8n/workflows/WF_ADMIN_ORCHESTRATION.json",
+        "usage": "n8n workflow: WF_ADMIN_ORCHESTRATION"
+      },
+      {
+        "id": "WF_AISHA_COMMAND_FACTORY",
+        "name": "WF_AISHA_COMMAND_FACTORY",
+        "description": "",
+        "nodeCount": 11,
+        "location": "n8n/workflows/WF_AISHA_COMMAND_FACTORY.json",
+        "usage": "n8n workflow: WF_AISHA_COMMAND_FACTORY"
+      },
+      {
+        "id": "WF_AISHA_HOOK_FACTORY",
+        "name": "WF_AISHA_HOOK_FACTORY",
+        "description": "",
+        "nodeCount": 11,
+        "location": "n8n/workflows/WF_AISHA_HOOK_FACTORY.json",
+        "usage": "n8n workflow: WF_AISHA_HOOK_FACTORY"
+      },
+      {
+        "id": "WF_AISHA_SKILL_FACTORY",
+        "name": "WF_AISHA_SKILL_FACTORY",
+        "description": "",
+        "nodeCount": 11,
+        "location": "n8n/workflows/WF_AISHA_SKILL_FACTORY.json",
+        "usage": "n8n workflow: WF_AISHA_SKILL_FACTORY"
+      },
+      {
+        "id": "WF_AISHA_TOOLING_COMMITTER",
+        "name": "WF_AISHA_TOOLING_COMMITTER",
+        "description": "",
+        "nodeCount": 14,
+        "location": "n8n/workflows/WF_AISHA_TOOLING_COMMITTER.json",
+        "usage": "n8n workflow: WF_AISHA_TOOLING_COMMITTER"
+      },
+      {
+        "id": "WF_AISHA_TOOLING_OBSERVER",
+        "name": "WF_AISHA_TOOLING_OBSERVER",
+        "description": "",
+        "nodeCount": 9,
+        "location": "n8n/workflows/WF_AISHA_TOOLING_OBSERVER.json",
+        "usage": "n8n workflow: WF_AISHA_TOOLING_OBSERVER"
+      },
+      {
+        "id": "WF_AITG_CONTINUOUS",
+        "name": "WF_AITG_CONTINUOUS",
+        "description": "",
+        "nodeCount": 10,
+        "location": "n8n/workflows/WF_AITG_CONTINUOUS.json",
+        "usage": "n8n workflow: WF_AITG_CONTINUOUS"
+      },
+      {
+        "id": "WF_AITG_DAILY_REFLECTION",
+        "name": "WF_AITG_DAILY_REFLECTION",
+        "description": "",
+        "nodeCount": 9,
+        "location": "n8n/workflows/WF_AITG_DAILY_REFLECTION.json",
+        "usage": "n8n workflow: WF_AITG_DAILY_REFLECTION"
+      },
+      {
+        "id": "WF_AITG_NIGHTLY_FULL",
+        "name": "WF_AITG_NIGHTLY_FULL",
+        "description": "",
+        "nodeCount": 10,
+        "location": "n8n/workflows/WF_AITG_NIGHTLY_FULL.json",
+        "usage": "n8n workflow: WF_AITG_NIGHTLY_FULL"
+      },
+      {
+        "id": "WF_AITG_PR_GATE",
+        "name": "WF_AITG_PR_GATE",
+        "description": "",
+        "nodeCount": 13,
+        "location": "n8n/workflows/WF_AITG_PR_GATE.json",
+        "usage": "n8n workflow: WF_AITG_PR_GATE"
+      },
+      {
+        "id": "WF_AITG_RUNTIME_SENTINEL",
+        "name": "WF_AITG_RUNTIME_SENTINEL",
+        "description": "",
+        "nodeCount": 11,
+        "location": "n8n/workflows/WF_AITG_RUNTIME_SENTINEL.json",
+        "usage": "n8n workflow: WF_AITG_RUNTIME_SENTINEL"
+      },
+      {
+        "id": "WF_ALE_FEEDBACK_PROCESSOR",
+        "name": "WF_ALE_FEEDBACK_PROCESSOR",
+        "description": "",
+        "nodeCount": 10,
+        "location": "n8n/workflows/WF_ALE_FEEDBACK_PROCESSOR.json",
+        "usage": "n8n workflow: WF_ALE_FEEDBACK_PROCESSOR"
+      },
+      {
+        "id": "WF_APPROVAL_GATE",
+        "name": "WF_APPROVAL_GATE",
+        "description": "",
+        "nodeCount": 17,
+        "location": "n8n/workflows/WF_APPROVAL_GATE.json",
+        "usage": "n8n workflow: WF_APPROVAL_GATE"
+      },
+      {
+        "id": "WF_APPSMITH_DASHBOARD_BUILDER",
+        "name": "WF_APPSMITH_DASHBOARD_BUILDER",
+        "description": "",
+        "nodeCount": 7,
+        "location": "n8n/workflows/WF_APPSMITH_DASHBOARD_BUILDER.json",
+        "usage": "n8n workflow: WF_APPSMITH_DASHBOARD_BUILDER"
+      },
+      {
+        "id": "WF_BATCH_POLLER",
+        "name": "WF_BATCH_POLLER",
+        "description": "",
+        "nodeCount": 8,
+        "location": "n8n/workflows/WF_BATCH_POLLER.json",
+        "usage": "n8n workflow: WF_BATCH_POLLER"
+      },
+      {
+        "id": "WF_BATCH_RESUMER",
+        "name": "WF_BATCH_RESUMER",
+        "description": "",
+        "nodeCount": 10,
+        "location": "n8n/workflows/WF_BATCH_RESUMER.json",
+        "usage": "n8n workflow: WF_BATCH_RESUMER"
+      },
+      {
+        "id": "WF_BLOCKCHAIN_SYNC",
+        "name": "WF_BLOCKCHAIN_SYNC",
+        "description": "",
+        "nodeCount": 4,
+        "location": "n8n/workflows/WF_BLOCKCHAIN_SYNC.json",
+        "usage": "n8n workflow: WF_BLOCKCHAIN_SYNC"
+      },
+      {
+        "id": "WF_BLUE_GREEN_ORCHESTRATOR",
+        "name": "WF_BLUE_GREEN_ORCHESTRATOR",
+        "description": "",
+        "nodeCount": 17,
+        "location": "n8n/workflows/WF_BLUE_GREEN_ORCHESTRATOR.json",
+        "usage": "n8n workflow: WF_BLUE_GREEN_ORCHESTRATOR"
+      },
+      {
+        "id": "WF_CHUNK_CONTEXT_BACKFILL",
+        "name": "WF_CHUNK_CONTEXT_BACKFILL",
+        "description": "",
+        "nodeCount": 6,
+        "location": "n8n/workflows/WF_CHUNK_CONTEXT_BACKFILL.json",
+        "usage": "n8n workflow: WF_CHUNK_CONTEXT_BACKFILL"
+      },
+      {
+        "id": "WF_COMPLIANCE_AGENT",
+        "name": "WF_COMPLIANCE_AGENT",
+        "description": "",
+        "nodeCount": 17,
+        "location": "n8n/workflows/WF_COMPLIANCE_AGENT.json",
+        "usage": "n8n workflow: WF_COMPLIANCE_AGENT"
+      },
+      {
+        "id": "WF_COMPLIANCE_REROUTE",
+        "name": "WF_COMPLIANCE_REROUTE",
+        "description": "",
+        "nodeCount": 10,
+        "location": "n8n/workflows/WF_COMPLIANCE_REROUTE.json",
+        "usage": "n8n workflow: WF_COMPLIANCE_REROUTE"
+      },
+      {
+        "id": "WF_DEBUG_AGENT",
+        "name": "WF_DEBUG_AGENT",
+        "description": "",
+        "nodeCount": 6,
+        "location": "n8n/workflows/WF_DEBUG_AGENT.json",
+        "usage": "n8n workflow: WF_DEBUG_AGENT"
+      },
+      {
+        "id": "WF_DELIVERY_AGENT",
+        "name": "WF_DELIVERY_AGENT",
+        "description": "",
+        "nodeCount": 13,
+        "location": "n8n/workflows/WF_DELIVERY_AGENT.json",
+        "usage": "n8n workflow: WF_DELIVERY_AGENT"
+      },
+      {
+        "id": "WF_DEPLOY_STORY",
+        "name": "WF_DEPLOY_STORY",
+        "description": "",
+        "nodeCount": 9,
+        "location": "n8n/workflows/WF_DEPLOY_STORY.json",
+        "usage": "n8n workflow: WF_DEPLOY_STORY"
+      },
+      {
+        "id": "WF_DESIGN_DNA_INTERVIEW",
+        "name": "WF_DESIGN_DNA_INTERVIEW",
+        "description": "",
+        "nodeCount": 10,
+        "location": "n8n/workflows/WF_DESIGN_DNA_INTERVIEW.json",
+        "usage": "n8n workflow: WF_DESIGN_DNA_INTERVIEW"
+      },
+      {
+        "id": "WF_DEV_PATCH",
+        "name": "WF_DEV_PATCH",
+        "description": "",
+        "nodeCount": 7,
+        "location": "n8n/workflows/WF_DEV_PATCH.json",
+        "usage": "n8n workflow: WF_DEV_PATCH"
+      },
+      {
+        "id": "WF_DIRIGENT_AGENT",
+        "name": "WF_DIRIGENT_AGENT",
+        "description": "",
+        "nodeCount": 32,
+        "location": "n8n/workflows/WF_DIRIGENT_AGENT.json",
+        "usage": "n8n workflow: WF_DIRIGENT_AGENT"
+      },
+      {
+        "id": "WF_DIRIGENT_AGENT_WATCHDOG",
+        "name": "WF_DIRIGENT_AGENT_WATCHDOG",
+        "description": "",
+        "nodeCount": 3,
+        "location": "n8n/workflows/WF_DIRIGENT_AGENT_WATCHDOG.json",
+        "usage": "n8n workflow: WF_DIRIGENT_AGENT_WATCHDOG"
+      },
+      {
+        "id": "WF_DIRIGENT_BRIEFING",
+        "name": "WF_DIRIGENT_BRIEFING",
+        "description": "",
+        "nodeCount": 7,
+        "location": "n8n/workflows/WF_DIRIGENT_BRIEFING.json",
+        "usage": "n8n workflow: WF_DIRIGENT_BRIEFING"
+      },
+      {
+        "id": "WF_DIRIGENT_CLI_SPAWNER",
+        "name": "WF_DIRIGENT_CLI_SPAWNER",
+        "description": "",
+        "nodeCount": 5,
+        "location": "n8n/workflows/WF_DIRIGENT_CLI_SPAWNER.json",
+        "usage": "n8n workflow: WF_DIRIGENT_CLI_SPAWNER"
+      },
+      {
+        "id": "WF_DIRIGENT_COMPLIANCE_ENFORCEMENT",
+        "name": "WF_DIRIGENT_COMPLIANCE_ENFORCEMENT",
+        "description": "",
+        "nodeCount": 6,
+        "location": "n8n/workflows/WF_DIRIGENT_COMPLIANCE_ENFORCEMENT.json",
+        "usage": "n8n workflow: WF_DIRIGENT_COMPLIANCE_ENFORCEMENT"
+      },
+      {
+        "id": "WF_DIRIGENT_COMPLIANCE_PRE_CHECK",
+        "name": "WF_DIRIGENT_COMPLIANCE_PRE_CHECK",
+        "description": "",
+        "nodeCount": 4,
+        "location": "n8n/workflows/WF_DIRIGENT_COMPLIANCE_PRE_CHECK.json",
+        "usage": "n8n workflow: WF_DIRIGENT_COMPLIANCE_PRE_CHECK"
+      },
+      {
+        "id": "WF_DIRIGENT_GOAL_EVALUATOR",
+        "name": "WF_DIRIGENT_GOAL_EVALUATOR",
+        "description": "",
+        "nodeCount": 6,
+        "location": "n8n/workflows/WF_DIRIGENT_GOAL_EVALUATOR.json",
+        "usage": "n8n workflow: WF_DIRIGENT_GOAL_EVALUATOR"
+      },
+      {
+        "id": "WF_DIRIGENT_INTENT_ADVISOR",
+        "name": "WF_DIRIGENT_INTENT_ADVISOR",
+        "description": "",
+        "nodeCount": 4,
+        "location": "n8n/workflows/WF_DIRIGENT_INTENT_ADVISOR.json",
+        "usage": "n8n workflow: WF_DIRIGENT_INTENT_ADVISOR"
+      },
+      {
+        "id": "WF_DRIFT_OBSERVER",
+        "name": "WF_DRIFT_OBSERVER",
+        "description": "",
+        "nodeCount": 11,
+        "location": "n8n/workflows/WF_DRIFT_OBSERVER.json",
+        "usage": "n8n workflow: WF_DRIFT_OBSERVER"
+      },
+      {
+        "id": "WF_EMBEDDING_REFRESH",
+        "name": "WF_EMBEDDING_REFRESH",
+        "description": "",
+        "nodeCount": 4,
+        "location": "n8n/workflows/WF_EMBEDDING_REFRESH.json",
+        "usage": "n8n workflow: WF_EMBEDDING_REFRESH"
+      },
+      {
+        "id": "WF_EXPERT_NOTIFICATION",
+        "name": "WF_EXPERT_NOTIFICATION",
+        "description": "",
+        "nodeCount": 13,
+        "location": "n8n/workflows/WF_EXPERT_NOTIFICATION.json",
+        "usage": "n8n workflow: WF_EXPERT_NOTIFICATION"
+      },
+      {
+        "id": "WF_FINE_TUNE_JOB",
+        "name": "WF_FINE_TUNE_JOB",
+        "description": "",
+        "nodeCount": 6,
+        "location": "n8n/workflows/WF_FINE_TUNE_JOB.json",
+        "usage": "n8n workflow: WF_FINE_TUNE_JOB"
+      },
+      {
+        "id": "WF_FIX_PROPOSER",
+        "name": "WF_FIX_PROPOSER",
+        "description": "",
+        "nodeCount": 4,
+        "location": "n8n/workflows/WF_FIX_PROPOSER.json",
+        "usage": "n8n workflow: WF_FIX_PROPOSER"
+      },
+      {
+        "id": "WF_GRAPH_EXTRACT_NIGHTLY",
+        "name": "WF_GRAPH_EXTRACT_NIGHTLY",
+        "description": "",
+        "nodeCount": 5,
+        "location": "n8n/workflows/WF_GRAPH_EXTRACT_NIGHTLY.json",
+        "usage": "n8n workflow: WF_GRAPH_EXTRACT_NIGHTLY"
+      },
+      {
+        "id": "WF_GUILD_MATCH",
+        "name": "WF_GUILD_MATCH",
+        "description": "",
+        "nodeCount": 11,
+        "location": "n8n/workflows/WF_GUILD_MATCH.json",
+        "usage": "n8n workflow: WF_GUILD_MATCH"
+      },
+      {
+        "id": "WF_IMPROVEMENT_EVAL",
+        "name": "WF_IMPROVEMENT_EVAL",
+        "description": "",
+        "nodeCount": 8,
+        "location": "n8n/workflows/WF_IMPROVEMENT_EVAL.json",
+        "usage": "n8n workflow: WF_IMPROVEMENT_EVAL"
+      },
+      {
+        "id": "WF_INSIGHT_DIALOG_EVAL",
+        "name": "WF_INSIGHT_DIALOG_EVAL",
+        "description": "",
+        "nodeCount": 5,
+        "location": "n8n/workflows/WF_INSIGHT_DIALOG_EVAL.json",
+        "usage": "n8n workflow: WF_INSIGHT_DIALOG_EVAL"
+      },
+      {
+        "id": "WF_INTRANET_TEMPLATE_SYNC",
+        "name": "WF_INTRANET_TEMPLATE_SYNC",
+        "description": "",
+        "nodeCount": 7,
+        "location": "n8n/workflows/WF_INTRANET_TEMPLATE_SYNC.json",
+        "usage": "n8n workflow: WF_INTRANET_TEMPLATE_SYNC"
+      },
+      {
+        "id": "WF_INTRANET_USER_ONBOARD",
+        "name": "WF_INTRANET_USER_ONBOARD",
+        "description": "",
+        "nodeCount": 11,
+        "location": "n8n/workflows/WF_INTRANET_USER_ONBOARD.json",
+        "usage": "n8n workflow: WF_INTRANET_USER_ONBOARD"
+      },
+      {
+        "id": "WF_KB_COMPLIANCE_GATE",
+        "name": "WF_KB_COMPLIANCE_GATE",
+        "description": "",
+        "nodeCount": 13,
+        "location": "n8n/workflows/WF_KB_COMPLIANCE_GATE.json",
+        "usage": "n8n workflow: WF_KB_COMPLIANCE_GATE"
+      },
+      {
+        "id": "WF_KB_RAGNAROK_SYNC",
+        "name": "WF_KB_RAGNAROK_SYNC",
+        "description": "",
+        "nodeCount": 12,
+        "location": "n8n/workflows/WF_KB_RAGNAROK_SYNC.json",
+        "usage": "n8n workflow: WF_KB_RAGNAROK_SYNC"
+      },
+      {
+        "id": "WF_KNOWLEDGE_AGENT",
+        "name": "WF_KNOWLEDGE_AGENT",
+        "description": "",
+        "nodeCount": 14,
+        "location": "n8n/workflows/WF_KNOWLEDGE_AGENT.json",
+        "usage": "n8n workflow: WF_KNOWLEDGE_AGENT"
+      },
+      {
+        "id": "WF_LANGFUSE_PERFORMANCE_REVIEW",
+        "name": "WF_LANGFUSE_PERFORMANCE_REVIEW",
+        "description": "",
+        "nodeCount": 10,
+        "location": "n8n/workflows/WF_LANGFUSE_PERFORMANCE_REVIEW.json",
+        "usage": "n8n workflow: WF_LANGFUSE_PERFORMANCE_REVIEW"
+      },
+      {
+        "id": "WF_LEDGER_CHAIN_ANCHOR",
+        "name": "WF_LEDGER_CHAIN_ANCHOR",
+        "description": "",
+        "nodeCount": 3,
+        "location": "n8n/workflows/WF_LEDGER_CHAIN_ANCHOR.json",
+        "usage": "n8n workflow: WF_LEDGER_CHAIN_ANCHOR"
+      },
+      {
+        "id": "WF_LEDGER_CHAIN_VERIFY",
+        "name": "WF_LEDGER_CHAIN_VERIFY",
+        "description": "",
+        "nodeCount": 5,
+        "location": "n8n/workflows/WF_LEDGER_CHAIN_VERIFY.json",
+        "usage": "n8n workflow: WF_LEDGER_CHAIN_VERIFY"
+      },
+      {
+        "id": "WF_MAESTRO_DIALOG_AGENT",
+        "name": "WF_MAESTRO_DIALOG_AGENT",
+        "description": "",
+        "nodeCount": 4,
+        "location": "n8n/workflows/WF_MAESTRO_DIALOG_AGENT.json",
+        "usage": "n8n workflow: WF_MAESTRO_DIALOG_AGENT"
+      },
+      {
+        "id": "WF_MATRIX_AISHA_TRIAGE",
+        "name": "WF_MATRIX_AISHA_TRIAGE",
+        "description": "",
+        "nodeCount": 6,
+        "location": "n8n/workflows/WF_MATRIX_AISHA_TRIAGE.json",
+        "usage": "n8n workflow: WF_MATRIX_AISHA_TRIAGE"
+      },
+      {
+        "id": "WF_MCP_BRIDGE",
+        "name": "WF_MCP_BRIDGE",
+        "description": "",
+        "nodeCount": 4,
+        "location": "n8n/workflows/WF_MCP_BRIDGE.json",
+        "usage": "n8n workflow: WF_MCP_BRIDGE"
+      },
+      {
+        "id": "WF_MCP_PROBE",
+        "name": "WF_MCP_PROBE",
+        "description": "",
+        "nodeCount": 6,
+        "location": "n8n/workflows/WF_MCP_PROBE.json",
+        "usage": "n8n workflow: WF_MCP_PROBE"
+      },
+      {
+        "id": "WF_MODEL_ADVISORY",
+        "name": "WF_MODEL_ADVISORY",
+        "description": "",
+        "nodeCount": 9,
+        "location": "n8n/workflows/WF_MODEL_ADVISORY.json",
+        "usage": "n8n workflow: WF_MODEL_ADVISORY"
+      },
+      {
+        "id": "WF_MODEL_BENCHMARK",
+        "name": "WF_MODEL_BENCHMARK",
+        "description": "",
+        "nodeCount": 7,
+        "location": "n8n/workflows/WF_MODEL_BENCHMARK.json",
+        "usage": "n8n workflow: WF_MODEL_BENCHMARK"
+      },
+      {
+        "id": "WF_MODEL_ROUTER",
+        "name": "WF_MODEL_ROUTER",
+        "description": "",
+        "nodeCount": 9,
+        "location": "n8n/workflows/WF_MODEL_ROUTER.json",
+        "usage": "n8n workflow: WF_MODEL_ROUTER"
+      },
+      {
+        "id": "WF_NIGHTLY_STORY_AUDIT",
+        "name": "WF_NIGHTLY_STORY_AUDIT",
+        "description": "",
+        "nodeCount": 10,
+        "location": "n8n/workflows/WF_NIGHTLY_STORY_AUDIT.json",
+        "usage": "n8n workflow: WF_NIGHTLY_STORY_AUDIT"
+      },
+      {
+        "id": "WF_NODE_FACTORY",
+        "name": "WF_NODE_FACTORY",
+        "description": "",
+        "nodeCount": 13,
+        "location": "n8n/workflows/WF_NODE_FACTORY.json",
+        "usage": "n8n workflow: WF_NODE_FACTORY"
+      },
+      {
+        "id": "WF_OCCIPITUM_DESIGN",
+        "name": "WF_OCCIPITUM_DESIGN",
+        "description": "",
+        "nodeCount": 10,
+        "location": "n8n/workflows/WF_OCCIPITUM_DESIGN.json",
+        "usage": "n8n workflow: WF_OCCIPITUM_DESIGN"
+      },
+      {
+        "id": "WF_OCCIPITUM_REDESIGN",
+        "name": "WF_OCCIPITUM_REDESIGN",
+        "description": "",
+        "nodeCount": 6,
+        "location": "n8n/workflows/WF_OCCIPITUM_REDESIGN.json",
+        "usage": "n8n workflow: WF_OCCIPITUM_REDESIGN"
+      },
+      {
+        "id": "WF_OPENCLAW_NOTIFY",
+        "name": "WF_OPENCLAW_NOTIFY",
+        "description": "",
+        "nodeCount": 7,
+        "location": "n8n/workflows/WF_OPENCLAW_NOTIFY.json",
+        "usage": "n8n workflow: WF_OPENCLAW_NOTIFY"
+      },
+      {
+        "id": "WF_OPENCLAW_SANDBOX_RUNNER",
+        "name": "WF_OPENCLAW_SANDBOX_RUNNER",
+        "description": "",
+        "nodeCount": 6,
+        "location": "n8n/workflows/WF_OPENCLAW_SANDBOX_RUNNER.json",
+        "usage": "n8n workflow: WF_OPENCLAW_SANDBOX_RUNNER"
+      },
+      {
+        "id": "WF_OUTCOME_ROLLUP",
+        "name": "WF_OUTCOME_ROLLUP",
+        "description": "",
+        "nodeCount": 2,
+        "location": "n8n/workflows/WF_OUTCOME_ROLLUP.json",
+        "usage": "n8n workflow: WF_OUTCOME_ROLLUP"
+      },
+      {
+        "id": "WF_PIPELINE_EXECUTOR",
+        "name": "WF_PIPELINE_EXECUTOR",
+        "description": "",
+        "nodeCount": 17,
+        "location": "n8n/workflows/WF_PIPELINE_EXECUTOR.json",
+        "usage": "n8n workflow: WF_PIPELINE_EXECUTOR"
+      },
+      {
+        "id": "WF_PKI_CERT_ROTATION",
+        "name": "WF_PKI_CERT_ROTATION",
+        "description": "",
+        "nodeCount": 15,
+        "location": "n8n/workflows/WF_PKI_CERT_ROTATION.json",
+        "usage": "n8n workflow: WF_PKI_CERT_ROTATION"
+      },
+      {
+        "id": "WF_PLAYWRIGHT_RUN",
+        "name": "WF_PLAYWRIGHT_RUN",
+        "description": "",
+        "nodeCount": 5,
+        "location": "n8n/workflows/WF_PLAYWRIGHT_RUN.json",
+        "usage": "n8n workflow: WF_PLAYWRIGHT_RUN"
+      },
+      {
+        "id": "WF_PROPOSAL_OUTCOME_REVIEW",
+        "name": "WF_PROPOSAL_OUTCOME_REVIEW",
+        "description": "",
+        "nodeCount": 5,
+        "location": "n8n/workflows/WF_PROPOSAL_OUTCOME_REVIEW.json",
+        "usage": "n8n workflow: WF_PROPOSAL_OUTCOME_REVIEW"
+      },
+      {
+        "id": "WF_PROVIDER_HEALTH_PROBE",
+        "name": "WF_PROVIDER_HEALTH_PROBE",
+        "description": "",
+        "nodeCount": 7,
+        "location": "n8n/workflows/WF_PROVIDER_HEALTH_PROBE.json",
+        "usage": "n8n workflow: WF_PROVIDER_HEALTH_PROBE"
+      },
+      {
+        "id": "WF_PR_COMPLIANCE_GATE",
+        "name": "WF_PR_COMPLIANCE_GATE",
+        "description": "",
+        "nodeCount": 11,
+        "location": "n8n/workflows/WF_PR_COMPLIANCE_GATE.json",
+        "usage": "n8n workflow: WF_PR_COMPLIANCE_GATE"
+      },
+      {
+        "id": "WF_PUBLIC_CHATBOT",
+        "name": "WF_PUBLIC_CHATBOT",
+        "description": "",
+        "nodeCount": 10,
+        "location": "n8n/workflows/WF_PUBLIC_CHATBOT.json",
+        "usage": "n8n workflow: WF_PUBLIC_CHATBOT"
+      },
+      {
+        "id": "WF_PUSH_CAMPAIGN_CRON",
+        "name": "WF_PUSH_CAMPAIGN_CRON",
+        "description": "",
+        "nodeCount": 2,
+        "location": "n8n/workflows/WF_PUSH_CAMPAIGN_CRON.json",
+        "usage": "n8n workflow: WF_PUSH_CAMPAIGN_CRON"
+      },
+      {
+        "id": "WF_PUSH_REMINDER_CRON",
+        "name": "WF_PUSH_REMINDER_CRON",
+        "description": "",
+        "nodeCount": 2,
+        "location": "n8n/workflows/WF_PUSH_REMINDER_CRON.json",
+        "usage": "n8n workflow: WF_PUSH_REMINDER_CRON"
+      },
+      {
+        "id": "WF_RAGNAROK_AGENT",
+        "name": "WF_RAGNAROK_AGENT",
+        "description": "",
+        "nodeCount": 9,
+        "location": "n8n/workflows/WF_RAGNAROK_AGENT.json",
+        "usage": "n8n workflow: WF_RAGNAROK_AGENT"
+      },
+      {
+        "id": "WF_RAG_EVAL_NIGHTLY",
+        "name": "WF_RAG_EVAL_NIGHTLY",
+        "description": "",
+        "nodeCount": 9,
+        "location": "n8n/workflows/WF_RAG_EVAL_NIGHTLY.json",
+        "usage": "n8n workflow: WF_RAG_EVAL_NIGHTLY"
+      },
+      {
+        "id": "WF_RETRY_FAILED_EVENTS",
+        "name": "WF_RETRY_FAILED_EVENTS",
+        "description": "",
+        "nodeCount": 10,
+        "location": "n8n/workflows/WF_RETRY_FAILED_EVENTS.json",
+        "usage": "n8n workflow: WF_RETRY_FAILED_EVENTS"
+      },
+      {
+        "id": "WF_RULE_PROPAGATION",
+        "name": "WF_RULE_PROPAGATION",
+        "description": "",
+        "nodeCount": 7,
+        "location": "n8n/workflows/WF_RULE_PROPAGATION.json",
+        "usage": "n8n workflow: WF_RULE_PROPAGATION"
+      },
+      {
+        "id": "WF_RUNTIME_HEALTH_PROBE",
+        "name": "WF_RUNTIME_HEALTH_PROBE",
+        "description": "",
+        "nodeCount": 8,
+        "location": "n8n/workflows/WF_RUNTIME_HEALTH_PROBE.json",
+        "usage": "n8n workflow: WF_RUNTIME_HEALTH_PROBE"
+      },
+      {
+        "id": "WF_SELF_DEPLOY",
+        "name": "WF_SELF_DEPLOY",
+        "description": "",
+        "nodeCount": 13,
+        "location": "n8n/workflows/WF_SELF_DEPLOY.json",
+        "usage": "n8n workflow: WF_SELF_DEPLOY"
+      },
+      {
+        "id": "WF_SELF_LEARNING_LOOP",
+        "name": "WF_SELF_LEARNING_LOOP",
+        "description": "",
+        "nodeCount": 10,
+        "location": "n8n/workflows/WF_SELF_LEARNING_LOOP.json",
+        "usage": "n8n workflow: WF_SELF_LEARNING_LOOP"
+      },
+      {
+        "id": "WF_SELF_LEARNING_TRIGGER",
+        "name": "WF_SELF_LEARNING_TRIGGER",
+        "description": "",
+        "nodeCount": 8,
+        "location": "n8n/workflows/WF_SELF_LEARNING_TRIGGER.json",
+        "usage": "n8n workflow: WF_SELF_LEARNING_TRIGGER"
+      },
+      {
+        "id": "WF_SENTRY_MONITOR",
+        "name": "WF_SENTRY_MONITOR",
+        "description": "",
+        "nodeCount": 8,
+        "location": "n8n/workflows/WF_SENTRY_MONITOR.json",
+        "usage": "n8n workflow: WF_SENTRY_MONITOR"
+      },
+      {
+        "id": "WF_SENTRY_OBSERVER",
+        "name": "WF_SENTRY_OBSERVER",
+        "description": "",
+        "nodeCount": 12,
+        "location": "n8n/workflows/WF_SENTRY_OBSERVER.json",
+        "usage": "n8n workflow: WF_SENTRY_OBSERVER"
+      },
+      {
+        "id": "WF_SLA_AUTO_ESCALATION",
+        "name": "WF_SLA_AUTO_ESCALATION",
+        "description": "",
+        "nodeCount": 5,
+        "location": "n8n/workflows/WF_SLA_AUTO_ESCALATION.json",
+        "usage": "n8n workflow: WF_SLA_AUTO_ESCALATION"
+      },
+      {
+        "id": "WF_STATIC_DEFENSE_COMMITTER",
+        "name": "WF_STATIC_DEFENSE_COMMITTER",
+        "description": "",
+        "nodeCount": 9,
+        "location": "n8n/workflows/WF_STATIC_DEFENSE_COMMITTER.json",
+        "usage": "n8n workflow: WF_STATIC_DEFENSE_COMMITTER"
+      },
+      {
+        "id": "WF_STORY_REMINDER_CRON",
+        "name": "WF_STORY_REMINDER_CRON",
+        "description": "",
+        "nodeCount": 4,
+        "location": "n8n/workflows/WF_STORY_REMINDER_CRON.json",
+        "usage": "n8n workflow: WF_STORY_REMINDER_CRON"
+      },
+      {
+        "id": "WF_STORY_SCAFFOLD",
+        "name": "WF_STORY_SCAFFOLD",
+        "description": "",
+        "nodeCount": 11,
+        "location": "n8n/workflows/WF_STORY_SCAFFOLD.json",
+        "usage": "n8n workflow: WF_STORY_SCAFFOLD"
+      },
+      {
+        "id": "WF_TRAINING_EXPORT",
+        "name": "WF_TRAINING_EXPORT",
+        "description": "",
+        "nodeCount": 5,
+        "location": "n8n/workflows/WF_TRAINING_EXPORT.json",
+        "usage": "n8n workflow: WF_TRAINING_EXPORT"
+      },
+      {
+        "id": "WF_VERIFIER",
+        "name": "WF_VERIFIER",
+        "description": "",
+        "nodeCount": 6,
+        "location": "n8n/workflows/WF_VERIFIER.json",
+        "usage": "n8n workflow: WF_VERIFIER"
+      },
+      {
+        "id": "WF_VULNERABILITY_SCAN",
+        "name": "WF_VULNERABILITY_SCAN",
+        "description": "",
+        "nodeCount": 6,
+        "location": "n8n/workflows/WF_VULNERABILITY_SCAN.json",
+        "usage": "n8n workflow: WF_VULNERABILITY_SCAN"
+      },
+      {
+        "id": "WF_WEB_ARTIFACT_INGEST",
+        "name": "WF_WEB_ARTIFACT_INGEST",
+        "description": "",
+        "nodeCount": 5,
+        "location": "n8n/workflows/WF_WEB_ARTIFACT_INGEST.json",
+        "usage": "n8n workflow: WF_WEB_ARTIFACT_INGEST"
+      }
+    ],
+    "dbCatalogs": [
+      {
+        "id": "agent_catalog",
+        "name": "agent_catalog",
+        "description": "katalog tabulka",
+        "location": "aisha/db/sql/tables/agent_catalog.sql",
+        "usage": "tabulka: agent_catalog"
+      },
+      {
+        "id": "agent_phase_catalog",
+        "name": "agent_phase_catalog",
+        "description": "katalog tabulka",
+        "location": "aisha/db/sql/tables/agent_phase_catalog.sql",
+        "usage": "tabulka: agent_phase_catalog"
+      },
+      {
+        "id": "ai_cost_class_catalog",
+        "name": "ai_cost_class_catalog",
+        "description": "katalog tabulka",
+        "location": "aisha/db/sql/tables/ai_cost_class_catalog.sql",
+        "usage": "tabulka: ai_cost_class_catalog"
+      },
+      {
+        "id": "ai_model_registry",
+        "name": "ai_model_registry",
+        "description": "registry tabulka",
+        "location": "aisha/db/sql/tables/ai_model_registry.sql",
+        "usage": "tabulka: ai_model_registry"
+      },
+      {
+        "id": "ai_provider_registry",
+        "name": "ai_provider_registry",
+        "description": "registry tabulka",
+        "location": "aisha/db/sql/tables/ai_provider_registry.sql",
+        "usage": "tabulka: ai_provider_registry"
+      },
+      {
+        "id": "ai_runtime_registry",
+        "name": "ai_runtime_registry",
+        "description": "registry tabulka",
+        "location": "aisha/db/sql/tables/ai_runtime_registry.sql",
+        "usage": "tabulka: ai_runtime_registry"
+      },
+      {
+        "id": "ai_task_kind_registry",
+        "name": "ai_task_kind_registry",
+        "description": "registry tabulka",
+        "location": "aisha/db/sql/tables/ai_task_kind_registry.sql",
+        "usage": "tabulka: ai_task_kind_registry"
+      },
+      {
+        "id": "aitg_test_catalog",
+        "name": "aitg_test_catalog",
+        "description": "katalog tabulka",
+        "location": "aisha/db/sql/tables/aitg_test_catalog.sql",
+        "usage": "tabulka: aitg_test_catalog"
+      },
+      {
+        "id": "auth_provider_registry",
+        "name": "auth_provider_registry",
+        "description": "registry tabulka",
+        "location": "aisha/db/sql/tables/auth_provider_registry.sql",
+        "usage": "tabulka: auth_provider_registry"
+      },
+      {
+        "id": "custom_node_registry",
+        "name": "custom_node_registry",
+        "description": "registry tabulka",
+        "location": "aisha/db/sql/tables/custom_node_registry.sql",
+        "usage": "tabulka: custom_node_registry"
+      },
+      {
+        "id": "data_sensitivity_registry",
+        "name": "data_sensitivity_registry",
+        "description": "registry tabulka",
+        "location": "aisha/db/sql/tables/data_sensitivity_registry.sql",
+        "usage": "tabulka: data_sensitivity_registry"
+      },
+      {
+        "id": "document_registry",
+        "name": "document_registry",
+        "description": "registry tabulka",
+        "location": "aisha/db/sql/tables/document_registry.sql",
+        "usage": "tabulka: document_registry"
+      },
+      {
+        "id": "li_source_registry",
+        "name": "li_source_registry",
+        "description": "registry tabulka",
+        "location": "aisha/db/sql/tables/li_source_registry.sql",
+        "usage": "tabulka: li_source_registry"
+      },
+      {
+        "id": "mcp_server_registry",
+        "name": "mcp_server_registry",
+        "description": "registry tabulka",
+        "location": "aisha/db/sql/tables/mcp_server_registry.sql",
+        "usage": "tabulka: mcp_server_registry"
+      },
+      {
+        "id": "plugin_catalog",
+        "name": "plugin_catalog",
+        "description": "katalog tabulka",
+        "location": "aisha/db/sql/tables/plugin_catalog.sql",
+        "usage": "tabulka: plugin_catalog"
+      },
+      {
+        "id": "product_catalog",
+        "name": "product_catalog",
+        "description": "katalog tabulka",
+        "location": "aisha/db/sql/tables/product_catalog.sql",
+        "usage": "tabulka: product_catalog"
+      },
+      {
+        "id": "symptom_catalog",
+        "name": "symptom_catalog",
+        "description": "katalog tabulka",
+        "location": "aisha/db/sql/tables/symptom_catalog.sql",
+        "usage": "tabulka: symptom_catalog"
+      },
+      {
+        "id": "web_tracking_registry",
+        "name": "web_tracking_registry",
+        "description": "registry tabulka",
+        "location": "aisha/db/sql/tables/web_tracking_registry.sql",
+        "usage": "tabulka: web_tracking_registry"
+      }
+    ],
+    "npmScripts": [
+      {
+        "id": "ai",
+        "name": "ai:*",
+        "description": "6 skript(ů)",
+        "count": 6,
+        "scripts": [
+          "ai:auto",
+          "ai:mode",
+          "ai:mode:cloud",
+          "ai:mode:hybrid",
+          "ai:mode:local",
+          "ai:status"
+        ],
+        "usage": "npm run ai:auto"
+      },
+      {
+        "id": "aisha",
+        "name": "aisha:*",
+        "description": "43 skript(ů)",
+        "count": 43,
+        "scripts": [
+          "aisha:ale:test",
+          "aisha:bridge:deploy",
+          "aisha:chat:interactive",
+          "aisha:chat:interactive:prod",
+          "aisha:chat:test",
+          "aisha:chat:test:local",
+          "aisha:chat:test:prod",
+          "aisha:chat:test:verbose",
+          "aisha:e2e:local",
+          "aisha:e2e:local:quick",
+          "aisha:integration",
+          "aisha:integration:local",
+          "aisha:integration:prod",
+          "aisha:integration:smoke",
+          "aisha:nocodb:views",
+          "aisha:nocodb:views:dry",
+          "aisha:nocodb:views:status",
+          "aisha:nodes:api",
+          "aisha:nodes:deploy",
+          "aisha:nodes:publish",
+          "aisha:prompts:deploy",
+          "aisha:prompts:diff",
+          "aisha:provision",
+          "aisha:provision:dry",
+          "aisha:setup",
+          "aisha:setup:check",
+          "aisha:setup:verify",
+          "aisha:smoke:prod",
+          "aisha:tools:deploy",
+          "aisha:tools:rollback",
+          "aisha:tools:status",
+          "aisha:tools:test",
+          "aisha:watchdogs:activate",
+          "aisha:watchdogs:status",
+          "aisha:webhooks:test",
+          "aisha:workflows:creds",
+          "aisha:workflows:dedup",
+          "aisha:workflows:deploy",
+          "aisha:workflows:deploy:force",
+          "aisha:workflows:executions",
+          "aisha:workflows:purge-test",
+          "aisha:workflows:sync",
+          "aisha:workflows:verify"
+        ],
+        "usage": "npm run aisha:ale:test"
+      },
+      {
+        "id": "appsmith",
+        "name": "appsmith:*",
+        "description": "1 skript(ů)",
+        "count": 1,
+        "scripts": [
+          "appsmith:provision"
+        ],
+        "usage": "npm run appsmith:provision"
+      },
+      {
+        "id": "audit",
+        "name": "audit:*",
+        "description": "1 skript(ů)",
+        "count": 1,
+        "scripts": [
+          "audit:repo"
+        ],
+        "usage": "npm run audit:repo"
+      },
+      {
+        "id": "build",
+        "name": "build:*",
+        "description": "2 skript(ů)",
+        "count": 2,
+        "scripts": [
+          "build:dev",
+          "build:packages"
+        ],
+        "usage": "npm run build:dev"
+      },
+      {
+        "id": "check",
+        "name": "check:*",
+        "description": "1 skript(ů)",
+        "count": 1,
+        "scripts": [
+          "check:i18n"
+        ],
+        "usage": "npm run check:i18n"
+      },
+      {
+        "id": "cockpit",
+        "name": "cockpit:*",
+        "description": "1 skript(ů)",
+        "count": 1,
+        "scripts": [
+          "cockpit:host"
+        ],
+        "usage": "npm run cockpit:host"
+      },
+      {
+        "id": "cold-start",
+        "name": "cold-start:*",
+        "description": "2 skript(ů)",
+        "count": 2,
+        "scripts": [
+          "cold-start:verify",
+          "cold-start:verify:json"
+        ],
+        "usage": "npm run cold-start:verify"
+      },
+      {
+        "id": "company-os",
+        "name": "company-os:*",
+        "description": "2 skript(ů)",
+        "count": 2,
+        "scripts": [
+          "company-os:agent-spec",
+          "company-os:init"
+        ],
+        "usage": "npm run company-os:agent-spec"
+      },
+      {
+        "id": "coolify",
+        "name": "coolify:*",
+        "description": "5 skript(ů)",
+        "count": 5,
+        "scripts": [
+          "coolify:domains:apply",
+          "coolify:domains:check",
+          "coolify:watch",
+          "coolify:watch:live",
+          "coolify:watch:wait"
+        ],
+        "usage": "npm run coolify:domains:apply"
+      },
+      {
+        "id": "db",
+        "name": "db:*",
+        "description": "29 skript(ů)",
+        "count": 29,
+        "scripts": [
+          "db:convergence:verify",
+          "db:init:generate",
+          "db:migrate",
+          "db:migrate:dry",
+          "db:migrate:local",
+          "db:migration:register",
+          "db:migrations:lint",
+          "db:migrations:lint:baseline",
+          "db:migrations:lint:report",
+          "db:rpc:inventory",
+          "db:schema:docs",
+          "db:schema:gaps",
+          "db:schema:gaps:baseline",
+          "db:schema:gaps:report",
+          "db:schema:test",
+          "db:schema:test:report",
+          "db:seed",
+          "db:seed:compile",
+          "db:seed:instance",
+          "db:seed:instance:local",
+          "db:seed:local",
+          "db:seed:reflection-graphs",
+          "db:status",
+          "db:status:local",
+          "db:types:gen",
+          "db:types:gen:local",
+          "db:types:preview",
+          "db:types:refresh:local",
+          "db:types:refresh:throwaway"
+        ],
+        "usage": "npm run db:convergence:verify"
+      },
+      {
+        "id": "db-mgr",
+        "name": "db-mgr:*",
+        "description": "4 skript(ů)",
+        "count": 4,
+        "scripts": [
+          "db-mgr:access",
+          "db-mgr:flow",
+          "db-mgr:lint",
+          "db-mgr:source"
+        ],
+        "usage": "npm run db-mgr:access"
+      },
+      {
+        "id": "debug",
+        "name": "debug:*",
+        "description": "1 skript(ů)",
+        "count": 1,
+        "scripts": [
+          "debug:verify"
+        ],
+        "usage": "npm run debug:verify"
+      },
+      {
+        "id": "deploy",
+        "name": "deploy:*",
+        "description": "4 skript(ů)",
+        "count": 4,
+        "scripts": [
+          "deploy:init",
+          "deploy:init:dry",
+          "deploy:wipe",
+          "deploy:wipe:dry"
+        ],
+        "usage": "npm run deploy:init"
+      },
+      {
+        "id": "dev",
+        "name": "dev:*",
+        "description": "5 skript(ů)",
+        "count": 5,
+        "scripts": [
+          "dev:e2e",
+          "dev:stack",
+          "dev:stack:down",
+          "dev:stack:full",
+          "dev:stack:status"
+        ],
+        "usage": "npm run dev:e2e"
+      },
+      {
+        "id": "dirigent",
+        "name": "dirigent:*",
+        "description": "4 skript(ů)",
+        "count": 4,
+        "scripts": [
+          "dirigent:bootstrap",
+          "dirigent:bootstrap:mcp",
+          "dirigent:skill:install",
+          "dirigent:source-pack"
+        ],
+        "usage": "npm run dirigent:bootstrap"
+      },
+      {
+        "id": "docker",
+        "name": "docker:*",
+        "description": "5 skript(ů)",
+        "count": 5,
+        "scripts": [
+          "docker:ai:setup",
+          "docker:ai:setup:check",
+          "docker:ai:status",
+          "docker:ai:test",
+          "docker:ai:warm"
+        ],
+        "usage": "npm run docker:ai:setup"
+      },
+      {
+        "id": "docs",
+        "name": "docs:*",
+        "description": "1 skript(ů)",
+        "count": 1,
+        "scripts": [
+          "docs:build"
+        ],
+        "usage": "npm run docs:build"
+      },
+      {
+        "id": "env",
+        "name": "env:*",
+        "description": "4 skript(ů)",
+        "count": 4,
+        "scripts": [
+          "env:doctor",
+          "env:doctor:dry",
+          "env:doctor:omni",
+          "env:doctor:report"
+        ],
+        "usage": "npm run env:doctor"
+      },
+      {
+        "id": "evymo",
+        "name": "evymo:*",
+        "description": "8 skript(ů)",
+        "count": 8,
+        "scripts": [
+          "evymo:db",
+          "evymo:deploy",
+          "evymo:dirigent",
+          "evymo:health",
+          "evymo:next",
+          "evymo:quality",
+          "evymo:story-sync",
+          "evymo:test"
+        ],
+        "usage": "npm run evymo:db"
+      },
+      {
+        "id": "ext",
+        "name": "ext:*",
+        "description": "5 skript(ů)",
+        "count": 5,
+        "scripts": [
+          "ext:build",
+          "ext:build:force",
+          "ext:install",
+          "ext:install:force",
+          "ext:watch"
+        ],
+        "usage": "npm run ext:build"
+      },
+      {
+        "id": "func",
+        "name": "func:*",
+        "description": "3 skript(ů)",
+        "count": 3,
+        "scripts": [
+          "func:list",
+          "func:list:live",
+          "func:validate"
+        ],
+        "usage": "npm run func:list"
+      },
+      {
+        "id": "gate",
+        "name": "gate:*",
+        "description": "5 skript(ů)",
+        "count": 5,
+        "scripts": [
+          "gate:branding",
+          "gate:branding:baseline",
+          "gate:owasp",
+          "gate:workarounds",
+          "gate:workarounds:baseline"
+        ],
+        "usage": "npm run gate:branding"
+      },
+      {
+        "id": "gen",
+        "name": "gen:*",
+        "description": "19 skript(ů)",
+        "count": 19,
+        "scripts": [
+          "gen:catalog",
+          "gen:catalog:check",
+          "gen:claude-app",
+          "gen:claude-app:offline",
+          "gen:company-os",
+          "gen:company-os:check",
+          "gen:frontend-typecheck:baseline",
+          "gen:frontend-typecheck:check",
+          "gen:icons",
+          "gen:ide",
+          "gen:ide:offline",
+          "gen:ide:save",
+          "gen:service-typecheck:baseline",
+          "gen:service-typecheck:check",
+          "gen:static-defense",
+          "gen:static-defense:check",
+          "gen:static-defense:from-seed",
+          "gen:static-defense:offline",
+          "gen:tokens"
+        ],
+        "usage": "npm run gen:catalog"
+      },
+      {
+        "id": "i18n",
+        "name": "i18n:*",
+        "description": "13 skript(ů)",
+        "count": 13,
+        "scripts": [
+          "i18n:bracket-check",
+          "i18n:bracket-check:strict",
+          "i18n:check",
+          "i18n:content:build",
+          "i18n:content:check",
+          "i18n:content:dump",
+          "i18n:content:dump:local",
+          "i18n:content:extract",
+          "i18n:rename-value",
+          "i18n:segments:build",
+          "i18n:segments:check",
+          "i18n:segments:translate-missing",
+          "i18n:sql:check"
+        ],
+        "usage": "npm run i18n:bracket-check"
+      },
+      {
+        "id": "insight",
+        "name": "insight:*",
+        "description": "4 skript(ů)",
+        "count": 4,
+        "scripts": [
+          "insight:down",
+          "insight:logs",
+          "insight:revalidate",
+          "insight:up"
+        ],
+        "usage": "npm run insight:down"
+      },
+      {
+        "id": "lint",
+        "name": "lint:*",
+        "description": "1 skript(ů)",
+        "count": 1,
+        "scripts": [
+          "lint:console"
+        ],
+        "usage": "npm run lint:console"
+      },
+      {
+        "id": "mesh",
+        "name": "mesh:*",
+        "description": "4 skript(ů)",
+        "count": 4,
+        "scripts": [
+          "mesh:discover",
+          "mesh:discover:json",
+          "mesh:sync",
+          "mesh:sync:apply"
+        ],
+        "usage": "npm run mesh:discover"
+      },
+      {
+        "id": "mlx",
+        "name": "mlx:*",
+        "description": "8 skript(ů)",
+        "count": 8,
+        "scripts": [
+          "mlx:serve",
+          "mlx:serve:bg",
+          "mlx:setup",
+          "mlx:setup:check",
+          "mlx:setup:safe",
+          "mlx:status",
+          "mlx:stop",
+          "mlx:validate"
+        ],
+        "usage": "npm run mlx:serve"
+      },
+      {
+        "id": "models",
+        "name": "models:*",
+        "description": "3 skript(ů)",
+        "count": 3,
+        "scripts": [
+          "models:check",
+          "models:preset",
+          "models:wizard"
+        ],
+        "usage": "npm run models:check"
+      },
+      {
+        "id": "n8n",
+        "name": "n8n:*",
+        "description": "7 skript(ů)",
+        "count": 7,
+        "scripts": [
+          "n8n:publish",
+          "n8n:release",
+          "n8n:release:dry",
+          "n8n:release:major",
+          "n8n:release:minor",
+          "n8n:restart",
+          "n8n:status"
+        ],
+        "usage": "npm run n8n:publish"
+      },
+      {
+        "id": "ollama",
+        "name": "ollama:*",
+        "description": "7 skript(ů)",
+        "count": 7,
+        "scripts": [
+          "ollama:serve",
+          "ollama:serve:bg",
+          "ollama:setup",
+          "ollama:setup:check",
+          "ollama:status",
+          "ollama:stop",
+          "ollama:test"
+        ],
+        "usage": "npm run ollama:serve"
+      },
+      {
+        "id": "operator",
+        "name": "operator:*",
+        "description": "4 skript(ů)",
+        "count": 4,
+        "scripts": [
+          "operator:inputs:json",
+          "operator:setup",
+          "operator:setup:check",
+          "operator:setup:verify"
+        ],
+        "usage": "npm run operator:inputs:json"
+      },
+      {
+        "id": "package",
+        "name": "package:*",
+        "description": "2 skript(ů)",
+        "count": 2,
+        "scripts": [
+          "package:claude-app",
+          "package:claude-app:check"
+        ],
+        "usage": "npm run package:claude-app"
+      },
+      {
+        "id": "pre-deploy",
+        "name": "pre-deploy:*",
+        "description": "2 skript(ů)",
+        "count": 2,
+        "scripts": [
+          "pre-deploy:check",
+          "pre-deploy:full"
+        ],
+        "usage": "npm run pre-deploy:check"
+      },
+      {
+        "id": "redeploy",
+        "name": "redeploy:*",
+        "description": "3 skript(ů)",
+        "count": 3,
+        "scripts": [
+          "redeploy:heal",
+          "redeploy:plan",
+          "redeploy:status"
+        ],
+        "usage": "npm run redeploy:heal"
+      },
+      {
+        "id": "regen",
+        "name": "regen:*",
+        "description": "1 skript(ů)",
+        "count": 1,
+        "scripts": [
+          "regen:check"
+        ],
+        "usage": "npm run regen:check"
+      },
+      {
+        "id": "root",
+        "name": "(top-level)",
+        "description": "16 skript(ů)",
+        "count": 16,
+        "scripts": [
+          "allinone",
+          "build",
+          "cockpit",
+          "db-mgr",
+          "dev",
+          "gate",
+          "lint",
+          "preinstall",
+          "prepare",
+          "preview",
+          "redeploy",
+          "regen",
+          "setup",
+          "test",
+          "type-check",
+          "warmup"
+        ],
+        "usage": "npm run allinone"
+      },
+      {
+        "id": "setup",
+        "name": "setup:*",
+        "description": "8 skript(ů)",
+        "count": 8,
+        "scripts": [
+          "setup:backend",
+          "setup:full",
+          "setup:insight",
+          "setup:n8n",
+          "setup:reset",
+          "setup:status",
+          "setup:vllm",
+          "setup:worktree-hooks"
+        ],
+        "usage": "npm run setup:backend"
+      },
+      {
+        "id": "smoke",
+        "name": "smoke:*",
+        "description": "4 skript(ů)",
+        "count": 4,
+        "scripts": [
+          "smoke:autopilot",
+          "smoke:insight",
+          "smoke:routing",
+          "smoke:routing:canonical"
+        ],
+        "usage": "npm run smoke:autopilot"
+      },
+      {
+        "id": "sso",
+        "name": "sso:*",
+        "description": "4 skript(ů)",
+        "count": 4,
+        "scripts": [
+          "sso:check",
+          "sso:provision",
+          "sso:provision:local",
+          "sso:provision:prod"
+        ],
+        "usage": "npm run sso:check"
+      },
+      {
+        "id": "stack",
+        "name": "stack:*",
+        "description": "6 skript(ů)",
+        "count": 6,
+        "scripts": [
+          "stack:bringup",
+          "stack:health",
+          "stack:health:json",
+          "stack:health:local",
+          "stack:health:prod",
+          "stack:health:wait"
+        ],
+        "usage": "npm run stack:bringup"
+      },
+      {
+        "id": "story",
+        "name": "story:*",
+        "description": "1 skript(ů)",
+        "count": 1,
+        "scripts": [
+          "story:sync:pull"
+        ],
+        "usage": "npm run story:sync:pull"
+      },
+      {
+        "id": "surfaces",
+        "name": "surfaces:*",
+        "description": "1 skript(ů)",
+        "count": 1,
+        "scripts": [
+          "surfaces:build:all"
+        ],
+        "usage": "npm run surfaces:build:all"
+      },
+      {
+        "id": "test",
+        "name": "test:*",
+        "description": "56 skript(ů)",
+        "count": 56,
+        "scripts": [
+          "test:claude-app",
+          "test:claude-cli:local",
+          "test:cosmos",
+          "test:cosmos:init",
+          "test:coverage",
+          "test:db",
+          "test:e2e",
+          "test:e2e:container",
+          "test:e2e:debug",
+          "test:e2e:devstack",
+          "test:e2e:dirigent",
+          "test:e2e:dirigent:build",
+          "test:e2e:dirigent:down",
+          "test:e2e:dirigent:up",
+          "test:e2e:headed",
+          "test:e2e:local",
+          "test:e2e:raw",
+          "test:e2e:report",
+          "test:e2e:tokenomics:container",
+          "test:e2e:tokenomics:local",
+          "test:e2e:ui",
+          "test:flowboard:fullenv",
+          "test:flowboard:n8n",
+          "test:flowboard:realllm",
+          "test:gates",
+          "test:gates:mutation",
+          "test:gates:online",
+          "test:integration:ai-chat:realstack",
+          "test:integration:av",
+          "test:integration:blockchain",
+          "test:integration:cosmos",
+          "test:integration:rag-eval",
+          "test:integration:rag-v2",
+          "test:mobile",
+          "test:mobile:init",
+          "test:plugins",
+          "test:reflection:fullenv",
+          "test:reflection:realllm",
+          "test:repo:all",
+          "test:repo:coverage",
+          "test:repo:db",
+          "test:repo:e2e",
+          "test:repo:fast",
+          "test:repo:full",
+          "test:repo:quality",
+          "test:run",
+          "test:scripts",
+          "test:security",
+          "test:security:watch",
+          "test:services",
+          "test:stack",
+          "test:stack:ci",
+          "test:stack:full",
+          "test:surfaces",
+          "test:ui",
+          "test:watch"
+        ],
+        "usage": "npm run test:claude-app"
+      },
+      {
+        "id": "typecheck",
+        "name": "typecheck:*",
+        "description": "1 skript(ů)",
+        "count": 1,
+        "scripts": [
+          "typecheck:repo"
+        ],
+        "usage": "npm run typecheck:repo"
+      },
+      {
+        "id": "validate",
+        "name": "validate:*",
+        "description": "1 skript(ů)",
+        "count": 1,
+        "scripts": [
+          "validate:static"
+        ],
+        "usage": "npm run validate:static"
+      },
+      {
+        "id": "verify",
+        "name": "verify:*",
+        "description": "5 skript(ů)",
+        "count": 5,
+        "scripts": [
+          "verify:claude-app",
+          "verify:from-zero",
+          "verify:from-zero:db",
+          "verify:redis:acl",
+          "verify:redis:acl:heal"
+        ],
+        "usage": "npm run verify:claude-app"
+      },
+      {
+        "id": "warmup",
+        "name": "warmup:*",
+        "description": "7 skript(ů)",
+        "count": 7,
+        "scripts": [
+          "warmup:all",
+          "warmup:dry",
+          "warmup:local",
+          "warmup:local:down",
+          "warmup:local:status",
+          "warmup:quick",
+          "warmup:status"
+        ],
+        "usage": "npm run warmup:all"
+      },
+      {
+        "id": "workbench",
+        "name": "workbench:*",
+        "description": "2 skript(ů)",
+        "count": 2,
+        "scripts": [
+          "workbench:build",
+          "workbench:dev"
+        ],
+        "usage": "npm run workbench:build"
+      }
+    ]
+  }
+}

@@ -1,0 +1,466 @@
+/* ============================================================================
+   AISHA surface design language — structural tokens + component styles.
+
+   LAYERING (the whole point of this file):
+
+   1. STRUCTURE (here) — type scale, spacing, radii, shadows, motion. The
+      "machined" DNA of the language. Instances do not touch these.
+   2. FUNCTIONAL colour (here) — gain/loss/warning/info scales. Reserved by the
+      language itself: red means loss, green means gain, everywhere, always
+      paired with a sign. An instance re-branding these would change MEANING,
+      not looks, so they live with the structure.
+   3. SEMANTIC tokens (here, as defaults) — --bg, --surface, --text, --primary…
+      This is THE instance override point. Every component below consumes ONLY
+      semantic (or functional/structural) tokens — never a named brand scale —
+      so an instance re-brands the whole surface by overriding these in its
+      public/tokens.css overlay and ships no code.
+   4. BRAND palette (NOT here) — the named scales an instance may define for
+      its own chrome (its neutrals, its signal colour, its sector tints) belong
+      to instances/<slug>/public/tokens.css. This package must not know them.
+
+   Every token block is wrapped in :where() → zero specificity → the instance
+   overlay wins with a plain :root/[data-theme] rule REGARDLESS of stylesheet
+   load order. (The built bundle's CSS loads after /tokens.css, so without
+   :where() the defaults here would silently beat the instance.)
+
+   Two first-class themes, pure CSS via data-theme: "carbon" (dark cockpit
+   default) and "daylight" (light surface for documents and reports). Nestable.
+
+   Fonts: the language speaks Archivo (display), Inter (UI) and IBM Plex Mono
+   (all figures — tabular). LOADING them is the instance/deploy concern
+   (overlay tokens.css); here they are named with safe fallbacks only, so a
+   surface with no webfonts still renders honestly.
+   ========================================================================== */
+
+/* ── Structural tokens ───────────────────────────────────────────────────── */
+/* ── Baseline: box-sizing ────────────────────────────────────────────────────
+   Musí být TADY, ne u konzumenta. Naměřeno 2026-08-02 na přihlašovací stránce
+   Keycloaku: pole i sociální tlačítka přetékala z karty (#username pravý okraj
+   534 px vs. karta 525; Apple tlačítko 544 px při viewportu 541). Příčina je
+   `width: 100%` nad výchozím `content-box` — padding a rámeček se přičtou NAVRCH.
+
+   Proč to nikdo nechytil dřív: povrchy, které jazyk konzumují, si reset vozí
+   samy (nasazený bundle extranetu ho má). Přihlašovací téma dědí `parent=base`,
+   což je HOLÉ HTML bez jakéhokoli resetu — na rozdíl od PatternFly, ze kterého
+   se odcházelo. Jazyk, který se spoléhá na reset konzumenta, tedy není celý:
+   první povrch bez vlastního resetu ho usvědčí. Proto je baseline součástí
+   páteře, ne rozvržení přihlášení — opravuje to třídu, ne jeden výskyt.
+
+   `:where()` drží nulovou specificitu jako u zbytku souboru, takže konzument
+   s vlastním resetem se nezmění (u extranetu je to no-op — táž hodnota). */
+:where(*, *::before, *::after) {
+  box-sizing: border-box;
+}
+
+:where(:root) {
+  /* Type */
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "JetBrains Mono", SFMono-Regular, Menlo, monospace;
+
+  /* Spacing (8px base, 4px half-step) */
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px; --space-5: 24px;
+  --space-6: 32px; --space-7: 48px; --space-8: 64px; --space-9: 96px; --space-10: 128px;
+
+  /* Type scale — the sizes the utility classes below already use, named so a
+     consumer can reach them without re-deciding. Sibling of the spacing and
+     radius scales. */
+  --text-xs: 12px; --text-sm: 14px; --text-md: 16px;
+
+  /* Radius — sharp / machined. Never pill-round except status dots. */
+  --radius-none: 0; --radius-xs: 2px; --radius-sm: 4px; --radius-md: 6px; --radius-lg: 10px; --radius-pill: 999px;
+
+  /* Elevation — edges over shadows (cool-tinted) */
+  --shadow-1: 0 1px 2px rgba(12,14,17,.06), 0 1px 1px rgba(12,14,17,.04);
+  --shadow-2: 0 4px 12px rgba(12,14,17,.10);
+  --shadow-3: 0 16px 40px rgba(12,14,17,.16);
+
+  /* Motion — fast / mechanical; honour prefers-reduced-motion below */
+  --ease-precise: cubic-bezier(0.2,0,0,1); --ease-standard: cubic-bezier(0.4,0,0.2,1);
+  --dur-micro: 100ms; --dur-base: 160ms; --dur-enter: 240ms;
+
+  /* Functional — reserved by the language (gain/loss/warning/info) */
+  --gain-700: #0C6B40; --gain-500: #14935A; --gain-400: #34C281;
+  --loss-700: #C2333A; --loss-500: #E5484D; --loss-400: #FF6168;
+  --warning-700: #8A6A00; --warning-500: #E8B11C; --warning-400: #F2C94C;
+  --info-700: #2A648F; --info-500: #3B82C4; --info-400: #5AA9E6;
+}
+
+/* ── Semantic tokens — the instance override point ───────────────────────────
+   Defaults are the language's own neutral "cool steel" spine with the amber
+   signal — i.e. what the product mockups (workbench, mission control, daily
+   briefing) show before any instance branding. Values are literals on purpose:
+   naming a brand scale here would drag a brand into the generic channel. */
+/* `den`/`noc` jsou slovník extranet-sdk-ui (jeho README i ThemeProvider je tak
+   dokumentují), `daylight`/`carbon` slovník tohoto jazyka. Byly to dvě jména
+   pro tutéž věc, která se nikde nepotkala: povrch, co nasadil SDK a napsal
+   `noc`, dostal TICHO — výchozí světlé hodnoty místo značky. Přijímáme obě
+   jména na jednom místě, aby se ta past nedala zopakovat. */
+:where(:root), :where([data-theme="daylight"], [data-theme="den"]) {
+  --bg: #F7F8FA; --surface: #FCFCFD; --surface-raised: #fff; --border: #DDE1E7;
+  --text: #232830; --text-strong: #0C0E11; --text-muted: #5A6472;
+  /* ⛔ Do 2026-08-09 tu stálo #F26B1F / #D4540F — Ignition, tedy značka forku,
+     v PLATFORMNÍ default projekci. Jiná instance by nasadila AISHA a dostala
+     cizí značku. Hodnoty jsou teď z packages/design-tokens/tokens.json
+     (color.primary / color.primaryDark). Fork svou Ignition dál má — z overlaye
+     (surfaces/<fork>/public/tokens.css), který přebíjí `:where()` vyšší
+     specificitou, takže na pořadí načtení nezáleží. */
+  --primary: #FF6A1A; --primary-strong: #E55A10; --primary-accent: #A8410B;
+  --primary-ink: #0C0E11; --focus-ring: rgba(255,106,26,.45);
+  --gain: var(--gain-700); --loss: var(--loss-700); --warning: var(--warning-700); --info: var(--info-700);
+  --loss-ink: #fff;
+}
+
+/* Carbon (dark) — the cockpit signature. `noc` = totéž jméno ze slovníku SDK. */
+:where([data-theme="carbon"], [data-theme="noc"]) {
+  /* ⛔ Tenhle blok byl brandovaný CELÝ: #121519 / #1E232B / #252B34 / #2A3039 /
+     #E6E9ED / #8B95A2 je Carbon, #F26B1F Ignition. Platformní default tedy
+     nesl kompletní paletu jedné instance. Hodnoty jsou teď z
+     packages/design-tokens/tokens.json:
+       bg0 · surface · surfaceLight · border · text · textSecondary
+       primary · primaryDark · secondary
+     `--text-muted` bere `textSecondary` (#9A9AA2), ne `textMuted` (#6A6A72):
+     role je „tlumený, ale čitelný text", a na tmavém podkladu je k původnímu
+     #8B95A2 blíž ten první. */
+  --bg: #0E0E10; --surface: #141417; --surface-raised: #1F1F24; --border: #26262B;
+  --text: #FFFFFF; --text-strong: #F4F6F8; --text-muted: #9A9AA2;
+  --primary: #FF6A1A; --primary-strong: #E55A10; --primary-accent: #FF8A4D;
+  --primary-ink: #0C0E11; --focus-ring: rgba(255,138,77,.5);
+  --gain: var(--gain-400); --loss: var(--loss-400); --warning: var(--warning-400); --info: var(--info-400);
+  --loss-ink: #fff;
+}
+
+/* ── Theme surface ───────────────────────────────────────────────────────── */
+.rdl-theme {
+  font-family: var(--font-sans);
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.6;
+}
+.rdl-theme--bare { background: transparent; }
+.rdl-theme--pad { padding: var(--space-6); }
+
+/* ── Typography utilities ────────────────────────────────────────────────── */
+.rdl-display {
+  font-family: var(--font-display); font-weight: 600; font-size: 60px; line-height: 1;
+  letter-spacing: -.02em; color: var(--text-strong); font-variant-numeric: tabular-nums;
+}
+.rdl-h1 { font-family: var(--font-display); font-weight: 600; font-size: 44px; line-height: 1.15; letter-spacing: -.015em; color: var(--text-strong); margin: 0; }
+.rdl-h2 { font-family: var(--font-display); font-weight: 600; font-size: 32px; line-height: 1.15; letter-spacing: -.01em; color: var(--text-strong); margin: 0; }
+.rdl-h3 { font-family: var(--font-display); font-weight: 600; font-size: 22px; line-height: 1.2; letter-spacing: -.005em; color: var(--text-strong); margin: 0; }
+.rdl-lead { font-size: 20px; line-height: 1.5; color: var(--text); }
+.rdl-body { font-size: var(--text-md); line-height: 1.6; color: var(--text); }
+.rdl-small { font-size: var(--text-sm); line-height: 1.45; color: var(--text); }
+.rdl-muted { color: var(--text-muted); }
+.rdl-mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.rdl-overline {
+  font-family: var(--font-sans); font-size: var(--text-xs); font-weight: 600; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-muted);
+}
+.rdl-stat {
+  font-family: var(--font-display); font-weight: 600; font-size: 40px; line-height: 1;
+  letter-spacing: -.02em; font-variant-numeric: tabular-nums; color: var(--text-strong);
+}
+
+/* ── Card (base surface) ─────────────────────────────────────────────────── */
+.rdl-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: var(--space-5); transition: box-shadow var(--dur-base), border-color var(--dur-base);
+}
+.rdl-card--hoverable:hover { box-shadow: var(--shadow-2); }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+.rdl-btn {
+  font-family: var(--font-sans); font-weight: 600; font-size: 15px; border-radius: var(--radius-sm);
+  padding: 10px 18px; border: 1px solid transparent; cursor: pointer;
+  transition: all var(--dur-base) var(--ease-standard); display: inline-flex; align-items: center;
+  gap: 8px; line-height: 1;
+}
+.rdl-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+.rdl-btn:disabled { opacity: .5; cursor: not-allowed; }
+.rdl-btn--primary { background: var(--primary); color: var(--primary-ink); }
+.rdl-btn--primary:hover:not(:disabled) { background: var(--primary-strong); }
+.rdl-btn--secondary { background: transparent; color: var(--text); border-color: var(--border); }
+.rdl-btn--secondary:hover:not(:disabled) { border-color: var(--text); }
+/* --primary-accent flips per theme, so no [data-theme] override is needed here. */
+.rdl-btn--ghost { background: transparent; color: var(--primary-accent); padding-left: 0; padding-right: 0; }
+.rdl-btn--ghost:hover:not(:disabled) { text-decoration: underline; }
+.rdl-btn--danger { background: var(--loss-500); color: var(--loss-ink); }
+.rdl-btn--danger:hover:not(:disabled) { background: var(--loss-700); }
+
+/* ── Form field / input ──────────────────────────────────────────────────── */
+.rdl-field { display: flex; flex-direction: column; gap: 6px; }
+.rdl-field__label { font-size: 13px; font-weight: 600; color: var(--text-strong); }
+.rdl-input {
+  font-family: var(--font-sans); font-size: 15px; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--radius-xs); padding: 10px 12px;
+  transition: all var(--dur-base); width: 100%;
+}
+.rdl-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--focus-ring); }
+.rdl-input::placeholder { color: var(--text-muted); }
+
+/* ── Segmented control ───────────────────────────────────────────────────── */
+.rdl-segmented { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-xs); overflow: hidden; }
+.rdl-segmented__btn {
+  font-family: var(--font-sans); font-size: 13px; font-weight: 600; padding: 8px 14px;
+  background: transparent; color: var(--text-muted); border: 0; border-right: 1px solid var(--border); cursor: pointer;
+}
+.rdl-segmented__btn:last-child { border-right: 0; }
+.rdl-segmented__btn.is-on { background: var(--primary); color: var(--primary-ink); }
+
+/* ── Live indicator + dot ────────────────────────────────────────────────── */
+.rdl-live {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted);
+}
+.rdl-dot { width: 7px; height: 7px; border-radius: var(--radius-pill); background: var(--primary); display: inline-block; }
+.rdl-dot--pulse { animation: rdl-pulse 1.8s var(--ease-standard) infinite; }
+@keyframes rdl-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 color-mix(in srgb, var(--primary) 50%, transparent); }
+  50% { opacity: .6; box-shadow: 0 0 0 5px transparent; }
+}
+
+/* ── KPI tile ────────────────────────────────────────────────────────────── */
+.rdl-kpi__cap { margin-bottom: 10px; }
+.rdl-kpi__val {
+  font-family: var(--font-display); font-weight: 600; font-size: 40px; letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums; color: var(--text-strong); line-height: 1;
+}
+.rdl-kpi__delta { margin-top: 8px; }
+/* Jednotka NENÍ číslo: nesmí nést displayovou velikost hodnoty, jinak se
+   dlaždice zalomí na dva řádky a „89 smluv" vypadá jako dvě tvrzení.
+   (Naměřeno 2026-08-08: hodnota s jednotkou měla 80 px výšky místo 40.) */
+.rdl-kpi__unit {
+  font-family: var(--font-sans); font-size: .42em; font-weight: 500;
+  color: var(--text-muted); letter-spacing: 0; margin-left: .28em; white-space: nowrap;
+}
+.rdl-kpi__val { display: flex; align-items: baseline; flex-wrap: wrap; gap: 0; }
+.rdl-spark { margin-top: 12px; width: 100%; height: 34px; display: block; }
+
+/* ── Delta (signed change) ───────────────────────────────────────────────── */
+.rdl-delta {
+  font-family: var(--font-mono); font-size: 13px; font-weight: 600; display: inline-flex; gap: 5px; align-items: center;
+}
+.rdl-delta--up { color: var(--gain); }
+.rdl-delta--down { color: var(--loss); }
+.rdl-delta__note { font-weight: 400; color: var(--text-muted); }
+
+/* ── Status chip ─────────────────────────────────────────────────────────── */
+.rdl-chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600;
+  padding: 3px 9px; border-radius: var(--radius-pill); border: 1px solid var(--border);
+}
+.rdl-chip__d { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
+.rdl-chip--run { color: var(--gain); } .rdl-chip--run .rdl-chip__d { background: var(--gain); }
+.rdl-chip--idle { color: var(--warning); } .rdl-chip--idle .rdl-chip__d { background: var(--warning); }
+.rdl-chip--fault { color: var(--loss); } .rdl-chip--fault .rdl-chip__d { background: var(--loss); }
+.rdl-chip--plan { color: var(--info); } .rdl-chip--plan .rdl-chip__d { background: var(--info); }
+.rdl-chip--unknown { color: var(--text-muted); } .rdl-chip--unknown .rdl-chip__d { background: var(--text-muted); }
+
+/* ── Provenance badge ────────────────────────────────────────────────────── */
+.rdl-prov {
+  display: inline-flex; align-items: center; gap: 7px; font-family: var(--font-mono); font-size: 11px;
+  color: var(--text-muted); border: 1px solid var(--border); border-radius: var(--radius-xs);
+  padding: 3px 8px; background: var(--surface);
+}
+.rdl-prov__src { color: var(--text); }
+.rdl-prov--stale { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 50%, var(--border)); }
+
+/* ── Sector / portfolio card ─────────────────────────────────────────────── */
+.rdl-sector-card { position: relative; overflow: hidden; }
+.rdl-sector-card::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 2px; background: var(--primary);
+  transform: scaleX(0); transform-origin: left; transition: transform var(--dur-base) var(--ease-precise);
+}
+.rdl-sector-card:hover::before { transform: scaleX(1); }
+.rdl-sector-mark {
+  width: 30px; height: 30px; border-radius: var(--radius-xs); display: grid; place-items: center;
+  border: 1px solid var(--border); margin-bottom: 12px; font-size: 16px;
+}
+.rdl-sector-figs { display: flex; gap: var(--space-5); margin: 14px 0 16px; }
+.rdl-sector-figs__n { font-family: var(--font-mono); font-weight: 600; font-size: 18px; color: var(--text-strong); font-variant-numeric: tabular-nums; }
+.rdl-sector-figs__l { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+
+/* ── Data table (compact) ────────────────────────────────────────────────── */
+/* ⛔ `overflow: hidden` TIŠE OŘEZÁVAL SLOUPCE. Naměřeno 2026-08-08: tabulka
+   smluv chtěla 985 px, dostala 743 px v hlavním sloupci dashboardu — a poslední
+   dva sloupce (nájem, stav) prostě zmizely. Bez posuvníku, bez náznaku. Uživatel
+   nemá jak poznat, že se dívá na useknutá data; to je horší než ošklivý layout.
+   Vodorovný posun je proto POVOLENÝ (svislý zůstává skrytý, ať drží zaoblení). */
+.rdl-tablewrap {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  overflow-x: auto; overflow-y: hidden; background: var(--surface);
+}
+.rdl-table { width: 100%; border-collapse: collapse; font-size: 14px; font-family: var(--font-sans); }
+.rdl-table thead th {
+  text-align: left; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--text-muted); background: var(--surface-raised); padding: 11px 14px; border-bottom: 1px solid var(--border); white-space: nowrap;
+}
+.rdl-table tbody td { padding: 11px 14px; border-bottom: 1px solid var(--border); color: var(--text); }
+/* Řaditelná hlavička: celá buňka je tlačítko, aby šla ovládat i klávesnicí —
+ * tabulka, kterou přeřadí jen myš, je pro půlku uživatelů jen dlouhý seznam.
+ * Šipka drží vlastní šířku, takže se řádek hlavičky při přepnutí směru neposouvá. */
+.rdl-th--sortable { padding: 0; }
+.rdl-th--sortable .rdl-th__btn {
+  display: flex; align-items: center; gap: 6px; width: 100%;
+  padding: 11px 14px; background: none; border: 0; cursor: pointer;
+  font: inherit; color: inherit; letter-spacing: inherit; text-transform: inherit; text-align: inherit;
+}
+.rdl-th--sortable.rdl-num .rdl-th__btn { justify-content: flex-end; }
+.rdl-th--sortable .rdl-th__btn:hover { color: var(--text); background: color-mix(in srgb, var(--text) 6%, transparent); }
+.rdl-th--sortable .rdl-th__btn:focus-visible { outline: 2px solid var(--primary-accent); outline-offset: -2px; }
+.rdl-th__dir { display: inline-block; min-width: 1em; font-size: 9px; opacity: .8; }
+.rdl-table tbody tr:last-child td { border-bottom: 0; }
+.rdl-table tbody tr { transition: background var(--dur-micro); }
+.rdl-table tbody tr:hover { background: color-mix(in srgb, var(--text) 5%, transparent); }
+/* A row that opens a record announces itself: pointer, and a visible focus ring
+   so the keyboard path is not a hidden one. */
+.rdl-table tbody tr.rdl-row--link { cursor: pointer; }
+.rdl-table tbody tr.rdl-row--link:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.rdl-table .rdl-num, .rdl-table th.rdl-num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.rdl-table .rdl-cell-mono { font-family: var(--font-mono); }
+.rdl-gain { color: var(--gain); font-family: var(--font-mono); font-weight: 600; }
+.rdl-loss { color: var(--loss); font-family: var(--font-mono); font-weight: 600; }
+
+/* ── Ask-data panel ──────────────────────────────────────────────────────── */
+.rdl-ask { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; }
+.rdl-ask__head { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.rdl-ask__q { padding: 14px 16px; font-weight: 500; color: var(--text-strong); font-family: var(--font-sans); }
+.rdl-ask__a { padding: 0 16px 14px; color: var(--text); font-family: var(--font-sans); line-height: 1.6; }
+.rdl-ask__figs { display: flex; gap: var(--space-5); margin: 12px 0; }
+.rdl-ask__n { font-family: var(--font-mono); font-weight: 600; font-size: 20px; color: var(--text-strong); }
+.rdl-ask__n--up { color: var(--gain); }
+.rdl-ask__l { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+.rdl-ask__foot {
+  padding: 10px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; flex-wrap: wrap;
+  align-items: center; background: var(--surface-raised);
+}
+.rdl-ask__input { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+.rdl-ask__input .rdl-input { flex: 1; }
+
+/* ── Chart card ──────────────────────────────────────────────────────────── */
+.rdl-chartcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: var(--space-5); }
+.rdl-chartcard__head { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: var(--space-4); gap: var(--space-4); }
+
+/* ── Top bar (cockpit shell) ─────────────────────────────────────────────── */
+.rdl-topbar {
+  background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+.rdl-topbar__in { display: flex; align-items: center; gap: var(--space-4); height: 56px; padding: 0 var(--space-6); }
+.rdl-brand { font-family: var(--font-display); font-weight: 700; letter-spacing: .04em; color: var(--text-strong); font-size: 18px; }
+.rdl-brand b { color: var(--primary); }
+.rdl-spacer { flex: 1; }
+
+/* ── Theme toggle ────────────────────────────────────────────────────────── */
+.rdl-theme-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius-xs); overflow: hidden; }
+.rdl-theme-toggle__btn {
+  font-family: var(--font-sans); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
+  padding: 7px 12px; background: transparent; color: var(--text-muted); border: 0; cursor: pointer; transition: all var(--dur-micro);
+}
+.rdl-theme-toggle__btn.is-active { background: var(--primary); color: var(--primary-ink); }
+
+/* ── Footer ──────────────────────────────────────────────────────────────── */
+.rdl-footer { padding: var(--space-7) var(--space-6); color: var(--text-muted); font-size: 13px; font-family: var(--font-sans); background: var(--bg); }
+.rdl-footer__legal { display: flex; gap: var(--space-4); flex-wrap: wrap; margin-bottom: 8px; }
+.rdl-footer__legal a, .rdl-footer__legal span { color: var(--text-muted); text-decoration: none; cursor: pointer; }
+
+/* ── Misc layout helpers ─────────────────────────────────────────────────── */
+.rdl-row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rdl-dot--pulse { animation: none !important; }
+  .rdl-btn, .rdl-card, .rdl-input, .rdl-sector-card::before, .rdl-table tbody tr { transition: none !important; }
+}
+
+/* ── Skeleton ─────────────────────────────────────────────────────────────
+   Placeholders occupy the grid the real content will, so nothing jumps when
+   data lands. Motion is a slow sweep, not a pulse — a cockpit should look
+   like it is working, not like it is alarming. */
+.rdl-skel { display: flex; flex-direction: column; gap: var(--space-5); }
+.rdl-skel__kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-4); }
+.rdl-skel__kpi,
+.rdl-skel__card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rdl-skel__kpi { min-height: 132px; }
+.rdl-skel__card { min-height: 148px; }
+.rdl-skel__line {
+  display: block;
+  height: 10px;
+  border-radius: 3px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--text) 7%, transparent) 25%,
+    color-mix(in srgb, var(--text) 14%, transparent) 37%,
+    color-mix(in srgb, var(--text) 7%, transparent) 63%
+  );
+  background-size: 400% 100%;
+  animation: rdl-skel-sweep 1.4s ease-in-out infinite;
+}
+.rdl-skel__line--cap { width: 42%; height: 8px; }
+.rdl-skel__line--num { width: 62%; height: 28px; }
+.rdl-skel__line--title { width: 34%; height: 12px; }
+.rdl-skel__line--short { width: 58%; }
+@keyframes rdl-skel-sweep { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+/* Respect a reader who asked for stillness: keep the shape, drop the motion. */
+@media (prefers-reduced-motion: reduce) { .rdl-skel__line { animation: none; } }
+
+/* ── PendingPanel ─────────────────────────────────────────────────────────
+   Declared, not yet connected. Muted — never hidden, never faking a figure:
+   a placeholder number is worse than an empty panel, because it is believed. */
+.rdl-pending {
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  color: var(--text-muted);
+}
+.rdl-pending__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); }
+.rdl-pending__title {
+  margin: 0; font-family: var(--font-display); font-size: 20px; font-weight: 600;
+  letter-spacing: -.005em; color: var(--text);
+}
+.rdl-pending__reason { margin: 0; font-size: 14px; line-height: 1.6; max-width: 68ch; }
+.rdl-pending__next { display: flex; flex-direction: column; gap: var(--space-2); }
+.rdl-pending__steps {
+  margin: 0; padding-left: 1.25em; display: flex; flex-direction: column; gap: 6px;
+  font-size: 14px; line-height: 1.55;
+}
+.rdl-pending__steps li::marker { color: var(--primary); font-family: var(--font-mono); }
+
+/* ── Okruh ───────────────────────────────────────────────────────────────────
+ * Trať se zatáčkami, po které se pohybují běhy. Tvar je věc designu (viz
+ * Circuit.tsx); tenhle blok řeší jen barvy a tloušťky — a všechny ze
+ * sémantických tokenů, aby okruh držel značku instance bez zásahu do kódu. */
+.rdl-circuit { width: 100%; }
+.rdl-circuit svg { width: 100%; height: auto; display: block; overflow: visible; }
+.rdl-circuit__verge {
+  fill: none; stroke: var(--surface-raised); stroke-width: 11;
+  stroke-linejoin: round; stroke-linecap: round;
+}
+.rdl-circuit__track {
+  fill: none; stroke: var(--border); stroke-width: 7;
+  stroke-linejoin: round; stroke-linecap: round;
+}
+.rdl-circuit__start { stroke: var(--text-muted); stroke-width: 1.2; }
+.rdl-circuit__car circle { stroke: var(--surface); stroke-width: 1.2; }
+.rdl-circuit__car text {
+  font-size: 4px; font-family: var(--font-mono, monospace);
+  fill: var(--text); paint-order: stroke; stroke: var(--surface); stroke-width: 1.6;
+}
+.rdl-circuit__car.is-gain circle    { fill: var(--gain); }
+.rdl-circuit__car.is-loss circle    { fill: var(--loss); }
+.rdl-circuit__car.is-warning circle { fill: var(--warning); }
+.rdl-circuit__car.is-info circle    { fill: var(--info); }
+.rdl-circuit__car.is-muted circle   { fill: var(--text-muted); }

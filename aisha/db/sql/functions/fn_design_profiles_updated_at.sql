@@ -1,0 +1,15 @@
+-- Function: fn_design_profiles_updated_at
+
+CREATE OR REPLACE FUNCTION public.fn_design_profiles_updated_at()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  NEW.updated_at = now();
+  RETURN NEW;
+END;
+$function$
+
+;
+
+REVOKE ALL ON FUNCTION fn_design_profiles_updated_at() FROM PUBLIC;

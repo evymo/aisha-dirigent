@@ -1,0 +1,21 @@
+{
+  "name": "@aisha/svc-playwright-runner",
+  "version": "0.1.0",
+  "license": "Elastic-2.0",
+  "private": true,
+  "type": "module",
+  "description": "Polling worker: get_next_playwright_run → npx playwright test against deployed env → record_playwright_result + upload report.",
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit",
+    "start": "node dist/worker.js"
+  },
+  "dependencies": {
+    "@aisha/security": "file:../../packages/security",
+    "@playwright/test": "1.59.1"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^5.7.0"
+  }
+}

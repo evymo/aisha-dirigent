@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "acs.envelope@1.0",
+  "title": "ACS message envelope",
+  "description": "Every inter-agent message travels inside this envelope (R6). Control plane is closed: unknown fields are rejected, never coerced (R4). Natural-language content may only appear inside payload — never in envelope fields (R2).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["envelope", "payload"],
+  "properties": {
+    "envelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message_id", "schema", "intent_id", "correlation_id", "sender", "recipient", "sent_at", "trust"],
+      "properties": {
+        "message_id": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$", "description": "ULID, unique per message — replay/dedup key." },
+        "schema": { "type": "string", "pattern": "^[a-z0-9_.-]+@[0-9]+\\.[0-9]+$", "description": "Payload contract reference, e.g. acs.task.assign@1.0." },
+        "intent_id": { "type": "string", "pattern": "^int_[0-9A-HJKMNP-TV-Z]{26}$", "description": "Canonical immutable intent this message serves (R3). Mandatory — no message exists without a lineage anchor." },
+        "correlation_id": { "type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$", "description": "Groups all messages of one task run." },
+        "causation_id": { "type": ["string", "null"], "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$", "description": "message_id of the direct cause; null only for run-opening messages." },
+        "sender": { "type": "string", "pattern": "^[a-z0-9-]+(\\.[a-z0-9_-]+)*$", "maxLength": 128, "description": "service.component identity, e.g. svc-ai-chat.planner." },
+        "recipient": { "type": "string", "pattern": "^[a-z0-9-]+(\\.[a-z0-9_-]+)*$", "maxLength": 128 },
+        "sent_at": { "type": "string", "format": "date-time" },
+        "signature": { "type": ["string", "null"], "pattern": "^ed25519:[A-Za-z0-9+/=]+$", "description": "Ed25519 over canonical JSON of envelope-without-signature + payload hash. Null tolerated only in shadow mode." },
+        "trust": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source_class", "derived", "source_ref"],
+          "properties": {
+            "source_class": { "enum": ["internal", "partner", "byod", "public"], "description": "Classification per docs/enterprise/SOURCE_ONBOARDING_CONTRACT.md — governs payload handling policy." },
+            "derived": { "type": "boolean", "description": "True when payload is a transformation (summary, extraction) of another artefact (R3/IP-7)." },
+            "source_ref": { "type": ["string", "null"], "maxLength": 256, "description": "Reference to the original artefact when derived=true." }
+          }
+        }
+      }
+    },
+    "payload": { "type": "object", "description": "Validated separately against the contract named in envelope.schema." }
+  }
+}

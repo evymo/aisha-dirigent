@@ -1,0 +1,155 @@
+{
+  "id": "webdispecink-fleet",
+  "version": "0.3.0",
+  "name": "Webdispečink Fleet",
+  "description": "Reads vehicles, drivers, positions and the log book from the Webdispečink SOAP API 2.0 and WRITES them onto the raw signal lane via wd_upsert_*_audited. Kept alongside the Eurowag plugin rather than replaced by it: measured against the same tenant, this endpoint returns every vehicle (14 vs 6) and the driver identity the successor omits — Dallas chip, personnel number, division, assigned plate. Optional by construction: a deployment that never touches Webdispečink simply does not install it.",
+  "author": "Evymo",
+  "kind": "data_source",
+  "trust_tier": "internal",
+  "source_spec": {
+    "source_slug": "webdispecink-fleet",
+    "namespace": "telematics/webdispecink",
+    "adapter_entry": "plugins/webdispecink-fleet/src/index.ts",
+    "default_config": {
+      "positionPollSeconds": 300,
+      "fleetSyncCron": "0 3 * * *",
+      "rideSyncCron": "40 3 * * *",
+      "rideBackfillDays": 30,
+      "ridePauseMs": 200,
+      "rideCallBudget": 0,
+      "worktimeSyncCron": "50 3 * * *",
+      "worktimeBackfillDays": 30,
+      "rideOverlapHours": 48,
+      "worktimeOverlapHours": 48,
+      "projectionWindowMin": 180,
+      "overspeedSyncCron": "55 3 * * *",
+      "driverStatsSyncCron": "5 4 * * *",
+      "driverStatsWindowDays": 7
+    }
+  },
+  "capabilities": [
+    "http.GET./cars",
+    "http.GET./drivers",
+    "http.GET./positions",
+    "http.GET./logbook",
+    "cron.poll_positions",
+    "cron.sync_fleet",
+    "cron.sync_rides",
+    "cron.sync_worktime",
+    "cron.sync_overspeed",
+    "cron.sync_driver_stats"
+  ],
+  "config_schema": {
+    "type": "object",
+    "required": ["kodf", "username", "password"],
+    "properties": {
+      "url": {
+        "type": "string",
+        "default": "https://api.webdispecink.cz/code/WebDispecinkServiceNet.php",
+        "description": "SOAP 2.0 endpoint (rpc/literal). There is no REST surface; every operation is a POST here."
+      },
+      "kodf": {
+        "type": "string",
+        "secret": true,
+        "description": "Customer code. Sent on EVERY call together with username and pass — the API keeps no session, so there is nothing to log in to once."
+      },
+      "username": { "type": "string", "secret": true, "description": "API user." },
+      "password": {
+        "type": "string",
+        "secret": true,
+        "description": "Password OR a user token — the vendor accepts a token in place of the password, in the same field (not as a bearer header)."
+      },
+      "positionPollSeconds": {
+        "type": "number",
+        "default": 300,
+        "description": "How often to read all vehicle positions. Positions change continuously; the log book does not, and is pulled on demand."
+      },
+      "fleetSyncCron": {
+        "type": "string",
+        "default": "0 3 * * *",
+        "description": "Vehicles and drivers are a codebook, not a stream: daily is enough."
+      },
+      "geocodePositions": {
+        "type": "boolean",
+        "default": false,
+        "description": "Ask the vendor to resolve each position to an address. Billed per lookup on their side, so off unless someone asks for it."
+      },
+      "includeDisabledDrivers": {
+        "type": "boolean",
+        "default": true,
+        "description": "Keep drivers the vendor flagged disabled. A past trip still belongs to whoever drove it, so dropping them would orphan history."
+      },
+      "rideSyncCron": {
+        "type": "string",
+        "default": "40 3 * * *",
+        "description": "When to pull the log book. Deliberately AFTER fleetSyncCron: the work list for rides is the vehicle registry, so a ride sync over an empty registry would have nothing to read."
+      },
+      "rideBackfillDays": {
+        "type": "number",
+        "default": 30,
+        "description": "How far back the FIRST run reaches when no cursor exists yet. Later runs read from the stored cursor, so history is not re-fetched every night."
+      },
+      "ridePauseMs": {
+        "type": "number",
+        "default": 200,
+        "description": "Pause between per-vehicle log book calls. The log book is per vehicle, so the fleet size IS the request count — this is courtesy toward someone else's production system, not our own throttling."
+      },
+      "rideCallBudget": {
+        "type": "number",
+        "default": 0,
+        "description": "Hard ceiling on log book calls per tick, 0 = none. A grown fleet or a misread cursor must not turn one tick into hundreds of vendor requests. When the budget stops a run, the cursor is held back so the window is retried rather than skipped."
+      },
+      "worktimeSyncCron": {
+        "type": "string",
+        "default": "50 3 * * *",
+        "description": "When to pull driver tachograph worktime (_getDriverWorkTacho). After the ride sync — worktime is per driver, keyed on the driver codebook. Reuses ridePauseMs / rideCallBudget for the per-driver call discipline."
+      },
+      "worktimeBackfillDays": {
+        "type": "number",
+        "default": 30,
+        "description": "How far back the FIRST worktime run reaches when no cursor exists yet. Later runs read from the stored cursor."
+      },
+      "overspeedSyncCron": {
+        "type": "string",
+        "default": "55 3 * * *",
+        "description": "When to pull overspeed segments (_getCarOverSpeed). Per vehicle, reuses ride cursor/pause/budget discipline."
+      },
+      "driverStatsSyncCron": {
+        "type": "string",
+        "default": "5 4 * * *",
+        "description": "When to pull driver statistics (_getStaDrivers) — fleet-wide, one call. Stores one snapshot per driver."
+      },
+      "driverStatsWindowDays": {
+        "type": "number",
+        "default": 7,
+        "description": "Rolling window (days) the driver-stats snapshot aggregates over — align with the surface's worktime window so the two match."
+      },
+      "rideOverlapHours": {
+        "type": "number",
+        "default": 48,
+        "description": "Each daily ride sync re-reads this many hours before the stored cursor, so rides the vendor edited after the fact (private/business, corrected distance) are picked up. Costs rows, not calls (one call per vehicle either way)."
+      },
+      "worktimeOverlapHours": {
+        "type": "number",
+        "default": 48,
+        "description": "Same overlap for daily tachograph work summaries: the current day is still growing and verified days arrive later."
+      },
+      "projectionWindowMin": {
+        "type": "number",
+        "default": 180,
+        "description": "Rides and work days touched by sync within this many minutes are re-offered to the twin projection, which writes only what actually changed."
+      }
+    }
+  },
+  "lifecycle": {
+    "backend_entry": "src/index.ts",
+    "load_strategy": "hot"
+  },
+  "sandbox": {
+    "timeout_ms": 20000,
+    "network_allowlist": ["api.webdispecink.cz"],
+    "max_memory_mb": 64,
+    "rpc_allowlist": ["wd_list_sync_vehicle_ids", "wd_project_rides", "wd_project_worktime", "wd_propose_identity", "wd_upsert_driver_stats_audited", "wd_upsert_drivers_audited", "wd_upsert_overspeed_audited", "wd_upsert_positions_audited", "wd_upsert_rides_audited", "wd_upsert_vehicles_audited", "wd_upsert_worktime_audited"]
+  },
+  "dependencies": { "fast-xml-parser": "5.7.3" }
+}

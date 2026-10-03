@@ -1,0 +1,376 @@
+{
+  "builder": {
+    "panels": {
+      "blocks": "Block Library",
+      "properties": "Properties",
+      "activity": "Agent Activity"
+    },
+    "blocks": {
+      "process-loop": {
+        "title": "Process Loop",
+        "description": "A continuous cycle of numbered steps"
+      },
+      "layer-stack": {
+        "title": "Layer Stack",
+        "description": "Stacked layers, each building on the one below"
+      },
+      "signal-cards": {
+        "title": "Signal Cards",
+        "description": "A row of metric signal cards"
+      },
+      "announcement-bar": {
+        "title": "Announcement Bar",
+        "description": "A slim full-width banner with a link"
+      },
+      "install-grid": {
+        "title": "Install Grid",
+        "description": "Grid of install / download channel cards"
+      },
+      "modes": {
+        "title": "Mode Cards",
+        "description": "Four numbered mode cards with tags and chips"
+      },
+      "cost-pillars": {
+        "title": "Value Pillars",
+        "description": "Three pillars with large stat callouts"
+      },
+      "hero": {
+        "title": "Hero Section",
+        "description": "Full-width banner with headline and CTA"
+      },
+      "features": {
+        "title": "Features Grid",
+        "description": "Grid of feature cards with icons"
+      },
+      "pricing": {
+        "title": "Pricing Table",
+        "description": "Comparison pricing plans"
+      },
+      "cta": {
+        "title": "Call to Action",
+        "description": "Highlighted action section"
+      },
+      "testimonials": {
+        "title": "Testimonials",
+        "description": "Customer reviews carousel"
+      },
+      "faq": {
+        "title": "FAQ",
+        "description": "Frequently asked questions accordion"
+      },
+      "footer": {
+        "title": "Footer",
+        "description": "Page footer with links and info"
+      },
+      "contact": {
+        "title": "Contact Form",
+        "description": "Form for collecting inquiries"
+      },
+      "trust-bar": {
+        "title": "Trust Bar",
+        "description": "Domain icons credibility strip"
+      },
+      "pillars": {
+        "title": "Pillars",
+        "description": "Three-column value proposition cards"
+      },
+      "how-it-works": {
+        "title": "How It Works",
+        "description": "Step-by-step process flow"
+      },
+      "about": {
+        "title": "About",
+        "description": "Company values and mission cards"
+      },
+      "specialist-guild": {
+        "title": "Specialist Guild",
+        "description": "Tier-based specialist membership section"
+      },
+      "hiring": {
+        "title": "Hiring",
+        "description": "Open role cards for recruitment"
+      },
+      "stats-counter": {
+        "title": "Stats Counter",
+        "description": "Animated number statistics"
+      },
+      "project-configurator": {
+        "title": "Project Configurator",
+        "description": "Interactive project option selector"
+      },
+      "meeting": {
+        "title": "Meeting Block",
+        "description": "Schedule and manage meetings"
+      },
+      "questionnaire": {
+        "title": "Questionnaire",
+        "description": "Dynamic survey or form block"
+      },
+      "consent": {
+        "title": "Consent Block",
+        "description": "Data sharing and privacy consent"
+      },
+      "action": {
+        "title": "Action Block",
+        "description": "User action request such as upload or schedule"
+      },
+      "info": {
+        "title": "Info Block",
+        "description": "Static informational content"
+      },
+      "hero-slides": {
+        "title": "Hero Slides",
+        "description": "Dynamic carousel with hero slides from backend"
+      },
+      "news-list": {
+        "title": "News List",
+        "description": "Published news articles from backend"
+      },
+      "contact-form": {
+        "title": "Contact Form",
+        "description": "Interactive contact form with validation"
+      },
+      "archive-preview": {
+        "title": "Archive Preview",
+        "description": "Archive document listing from backend"
+      },
+      "knowledge-preview": {
+        "title": "Knowledge Topics",
+        "description": "Knowledge base topic listing from backend"
+      },
+      "faq-accordion": {
+        "title": "FAQ Accordion",
+        "description": "Frequently asked questions with collapsible categories"
+      },
+      "timeline": {
+        "title": "Timeline",
+        "description": "Vertical timeline with events and milestones"
+      },
+      "data-table": {
+        "title": "Data Table",
+        "description": "Table with columns and rows for structured data"
+      },
+      "ordered-list": {
+        "title": "Ordered List",
+        "description": "Numbered steps with titles and descriptions"
+      },
+      "product-catalog": {
+        "title": "Product Catalog",
+        "description": "Shop products grid with prices and badges"
+      },
+      "news-browser": {
+        "title": "News Browser",
+        "description": "Full news article listing with cards"
+      },
+      "knowledge-browser": {
+        "title": "Knowledge Browser",
+        "description": "Knowledge topics with search and visibility filter"
+      },
+      "archive-browser": {
+        "title": "Archive Browser",
+        "description": "Full archive with 4-axis filtering"
+      },
+      "studies-browser": {
+        "title": "Clusters Browser",
+        "description": "Clusters listing with tab filtering and funding progress"
+      },
+      "guild-directory": {
+        "title": "Guild Directory",
+        "description": "Specialist marketplace with filters and pagination"
+      },
+      "aisha-pruvodce": {
+        "title": "AISHA Guide",
+        "description": "13-slide first-visit AI guide + five-question quiz (interactive deck)"
+      },
+      "discussion-thread": {
+        "title": "Discussion",
+        "description": "User posts threaded under this content node"
+      }
+    },
+    "traits": {
+      "variant": "Variant",
+      "bgColor": "Background Color",
+      "bgGradient": "Background Gradient",
+      "sectionPadding": "Section Padding",
+      "cssClass": "CSS Class",
+      "colorScheme": "Color Scheme"
+    },
+    "traitGroups": {
+      "template": "Template",
+      "config": "Configuration",
+      "layout": "Layout",
+      "other": "Other"
+    },
+    "categories": {
+      "web": "Web Blocks",
+      "workflow": "Workflow Blocks"
+    },
+    "actions": {
+      "save": "Save Canvas",
+      "publish": "Publish",
+      "preview": "Preview",
+      "addBlock": "Add Block",
+      "removeBlock": "Remove Block",
+      "undo": "Undo",
+      "redo": "Redo"
+    },
+    "status": {
+      "saving": "Saving...",
+      "saved": "All changes saved",
+      "error": "Save failed",
+      "loading": "Loading canvas...",
+      "translationsDenied": "Saved, but the texts were not — writing texts needs the admin or staff role. Your edits stay only in this canvas."
+    },
+    "agents": {
+      "blockAdded": "{{agent}} added {{block}}",
+      "propertyChanged": "{{agent}} changed {{property}} on {{block}}",
+      "blockRemoved": "{{agent}} removed {{block}}",
+      "approved": "{{agent}} approved {{block}}",
+      "rejected": "{{agent}} rejected {{block}}",
+      "occipitumProposal": "{{agent}} proposed a new canvas design"
+    },
+    "variants": {
+      "default": "Default",
+      "hero": {
+        "splitLeft": "Split Left",
+        "minimal": "Minimal"
+      },
+      "trust-bar": {
+        "statBar": "Stat Bar"
+      },
+      "pillars": {
+        "borderList": "Border List"
+      },
+      "how-it-works": {
+        "timelineSteps": "Timeline Steps"
+      },
+      "about": {
+        "proseCentered": "Prose Centered"
+      },
+      "specialist-guild": {
+        "horizontalBar": "Horizontal Bar"
+      },
+      "hiring": {
+        "listRows": "List Rows"
+      },
+      "stats-counter": {
+        "cardGrid": "Card Grid"
+      },
+      "features": {
+        "textRows": "Text Rows"
+      },
+      "pricing": {
+        "horizontalCompare": "Horizontal Compare"
+      },
+      "cta": {
+        "splitMedia": "Split Media"
+      },
+      "testimonials": {
+        "cardGrid": "Card Grid"
+      },
+      "faq": {
+        "twoColumn": "Two Column"
+      },
+      "footer": {
+        "stacked": "Stacked"
+      },
+      "contact": {
+        "splitInfo": "Split Info"
+      },
+      "project-configurator": {
+        "stepWizard": "Step Wizard"
+      },
+      "timeline": {
+        "horizontal": "Horizontal"
+      },
+      "data-table": {
+        "stripedCompact": "Striped Compact"
+      },
+      "ordered-list": {
+        "cardSteps": "Card Steps"
+      }
+    },
+    "empty": {
+      "title": "No canvas yet",
+      "description": "Drag blocks from the library to start building"
+    },
+    "sidebar": {
+      "blocks": "Blocks",
+      "styles": "Styles",
+      "traits": "Settings",
+      "layers": "Layers",
+      "i18n": "Translations",
+      "selectElement": "Select an element to edit its properties",
+      "emptyCanvas": "Canvas is empty"
+    },
+    "i18n": {
+      "injectTranslations": "Preview translations",
+      "noKeys": "No translatable elements on canvas",
+      "keysFound": "{{count}} translatable keys"
+    },
+    "devices": {
+      "desktop": "Desktop",
+      "tablet": "Tablet",
+      "mobile": "Mobile"
+    },
+    "pageSettings": {
+      "background": "Page Background",
+      "backgroundPlaceholder": "e.g. #fafafa or linear-gradient(...)",
+      "className": "Page CSS Class",
+      "classNamePlaceholder": "e.g. landing-page",
+      "styleJson": "Page Style JSON",
+      "styleJsonPlaceholder": "e.g. {\"maxWidth\":\"1200px\"}",
+      "invalidJson": "Page Style JSON must be a valid JSON object"
+    },
+    "schemes": {
+      "default": "Default",
+      "warmSunset": "Warm Sunset",
+      "coolOcean": "Cool Ocean",
+      "forestGreen": "Forest Green",
+      "darkElegant": "Dark Elegant",
+      "softLavender": "Soft Lavender",
+      "neutralSlate": "Neutral Slate"
+    },
+    "runtime": {
+      "limit": "Items Limit",
+      "columns": "Columns",
+      "autoplay": "Autoplay",
+      "interval": "Interval (ms)",
+      "skipHref": "“Skip” link target (URL)",
+      "showFilters": "Show filters",
+      "tag": "Pin to tag",
+      "nodeType": {
+        "label": "Node Type",
+        "news_article": "News Article",
+        "web_page": "Web Page"
+      },
+      "nodeId": "Node ID"
+    },
+    "versions": {
+      "title": "Version History",
+      "restore": "Restore",
+      "restored": "Version Restored",
+      "restoredDesc": "The page has been restored from the selected version.",
+      "restoreError": "Failed to restore from version.",
+      "none": "No versions yet"
+    },
+    "templates": {
+      "title": "Page Templates",
+      "saveAs": "Save as Template",
+      "namePlaceholder": "Template name...",
+      "saved": "Template Saved",
+      "savedDesc": "Current page saved as a reusable template.",
+      "saveError": "Failed to save template.",
+      "apply": "Apply",
+      "applied": "Template Applied",
+      "appliedDesc": "The template has been applied to this page.",
+      "applyError": "Failed to apply template.",
+      "none": "No templates available"
+    },
+    "assets": {
+      "invalidType": "Unsupported file type",
+      "tooLarge": "File is too large (max 20 MB)",
+      "uploadFailed": "Asset upload failed"
+    }
+  }
+}

@@ -1,0 +1,313 @@
+{
+  "name": "WF_RUNTIME_HEALTH_PROBE",
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "node-trigger",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        300
+      ],
+      "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/get_runtimes_due_health_probe",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"p_min_interval_seconds\": 300, \"p_limit\": 50}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "node-list-runtimes",
+      "name": "List Runtimes Due Probe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        420,
+        300
+      ],
+      "onError": "stopWorkflow",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "node-split",
+      "name": "Split Per Runtime",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        620,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Resolve a probe target per runtime_kind. Most runtimes have NO external\n// service to probe — they run in-process (direct_llm = the model router) or via\n// the DB rail (hermes = evaluate_story_self) or ARE the workflow engine itself\n// (workflow = this n8n). Those are 'self-healthy': mark healthy without an HTTP\n// call. Only runtimes backed by an external service are HTTP-probed:\n//   * openclaw → $env.OPENCLAW_URL + $env.OPENCLAW_HEALTH_PATH (default /health)\n//   * cli      → $env.AGENT_RUNNER_URL + /health (svc-agent-runner), if configured\n// A runtime whose external service env is absent is recorded 'down' (the WF can't\n// reach it, so the resolver must not pick it) — fail-loud at the registry layer.\n\nconst input = $input.first().json;\nconst kind = String(input.runtime_kind || '');\n\nconst selfHealthy = (detail) => [{ json: {\n  slug: input.slug, runtime_kind: kind,\n  skip_http: true, status: 'healthy', latency_ms: 0, detail,\n  probe_url: '', auth_header_name: 'X-Probe', auth_header_value: 'self',\n} }];\n\nconst httpProbe = (url, detail) => [{ json: {\n  slug: input.slug, runtime_kind: kind,\n  skip_http: false, probe_url: url, probe_started_at: Date.now(), detail,\n  auth_header_name: 'X-Probe', auth_header_value: 'runtime',\n} }];\n\nconst down = (detail) => [{ json: {\n  slug: input.slug, runtime_kind: kind,\n  skip_http: true, status: 'down', latency_ms: 0, detail,\n  probe_url: '', auth_header_name: 'X-Probe', auth_header_value: 'self',\n} }];\n\nif (kind === 'direct_llm' || kind === 'hermes' || kind === 'workflow') {\n  return selfHealthy(`${kind}: in-process / DB-rail / workflow engine — no external service`);\n}\nif (kind === 'openclaw') {\n  const base = String(process.env.OPENCLAW_URL || '').replace(/\\/+$/, '');\n  if (!base) return down('openclaw: OPENCLAW_URL not configured');\n  const path = process.env.OPENCLAW_HEALTH_PATH || '/health';\n  return httpProbe(`${base}${path}`, 'openclaw health endpoint');\n}\nif (kind === 'cli') {\n  const base = String(process.env.AGENT_RUNNER_URL || '').replace(/\\/+$/, '');\n  if (!base) return down('cli: AGENT_RUNNER_URL not configured');\n  return httpProbe(`${base}/health`, 'svc-agent-runner health endpoint');\n}\nreturn down(`${kind}: no probe strategy`);"
+      },
+      "id": "node-resolve-probe",
+      "name": "Resolve Probe Target",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.skip_http }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "node-needs-http",
+      "name": "Self-healthy?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.probe_url }}",
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "node-probe",
+      "name": "HTTP Probe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1260,
+        380
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Classify an HTTP runtime probe into adapter_health enum: healthy|degraded|down.\n// For a RUNTIME the question is REACHABILITY — any HTTP response means the\n// service is up (even 404 = no /health route but the server answered):\n//   * any 2xx/3xx/4xx response → healthy (service reachable; latency>=3s → degraded)\n//   * 5xx                      → degraded (up but erroring)\n//   * network error / timeout  → down (service unreachable)\n\nconst orig = $('Resolve Probe Target').first().json;\nconst latencyMs = Date.now() - Number(orig.probe_started_at || Date.now());\nconst input = $input.first().json;\nconst httpStatus = Number(input.statusCode || input.status || 0);\n\nlet status = 'down';\nlet detail = '';\nif (input.error) {\n  status = 'down';\n  detail = `unreachable: ${String(input.error).slice(0, 200)}`;\n} else if (httpStatus >= 500) {\n  status = 'degraded';\n  detail = `HTTP ${httpStatus} (5xx — up but erroring) in ${latencyMs}ms`;\n} else if (httpStatus >= 200 && httpStatus < 500) {\n  status = latencyMs >= 3000 ? 'degraded' : 'healthy';\n  detail = `HTTP ${httpStatus} (reachable) in ${latencyMs}ms`;\n} else {\n  status = 'down';\n  detail = `no response (status ${httpStatus})`;\n}\n\nreturn [{ json: { slug: orig.slug, runtime_kind: orig.runtime_kind, status, latency_ms: latencyMs, detail } }];"
+      },
+      "id": "node-classify",
+      "name": "Classify Probe Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1480,
+        380
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/record_runtime_health_result",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"p_slug\": \"{{ $json.slug }}\", \"p_status\": \"{{ $json.status }}\", \"p_latency_ms\": {{ $json.latency_ms }}, \"p_detail\": \"{{ ($json.detail || '').replace(/\"/g, '\\\\\"').slice(0, 480) }}\"}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "node-record",
+      "name": "Record Health Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1700,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "List Runtimes Due Probe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Runtimes Due Probe": {
+      "main": [
+        [
+          {
+            "node": "Split Per Runtime",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Per Runtime": {
+      "main": [
+        [
+          {
+            "node": "Resolve Probe Target",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Probe Target": {
+      "main": [
+        [
+          {
+            "node": "Self-healthy?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Self-healthy?": {
+      "main": [
+        [
+          {
+            "node": "Record Health Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Probe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Probe": {
+      "main": [
+        [
+          {
+            "node": "Classify Probe Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Classify Probe Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Probe Result": {
+      "main": [
+        [
+          {
+            "node": "Record Health Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "pinData": {},
+  "versionId": "",
+  "triggerCount": 0,
+  "tags": [
+    {
+      "name": "autopilot"
+    },
+    {
+      "name": "health"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+# ==============================================================================
+# Coolify Story Manifest — cosmos (AISHA App-Chain)
+# ==============================================================================
+# Single-validator Cosmos SDK chain for governance & AISHA token ledger.
+# Deployed on Experimental (staging/AI server, internal-only, no Traefik).
+#
+# Použití:
+#   bash scripts/coolify-story-init.sh --manifest coolify/manifests/cosmos.manifest
+#
+# Required env vars in Coolify:
+#   CHAIN_ID=aisha-1
+#   MONIKER=aisha-validator
+#   COSMOS_SIGNER_MNEMONIC=<24-word-mnemonic>
+# ==============================================================================
+
+story: cosmos
+repo: aisha/evymo-ai-orchestrator
+branch: main
+
+# Cosmos node → Experimental (internal, no Traefik, isolated)
+app: ledger:experimental:docker-compose.coolify-cosmos.yml

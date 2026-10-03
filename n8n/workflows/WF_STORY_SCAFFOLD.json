@@ -1,0 +1,284 @@
+{
+  "name": "WF_STORY_SCAFFOLD",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "story-scaffold",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Story Scaffold Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate and parse scaffold request\nconst body = $input.item.json.body || $input.item.json;\n\nconst storyId = body.story_id;\nconst repoName = body.repo_name;\nconst template = body.template || 'default';\nconst rulesetId = body.ruleset_id;\nconst runId = body.run_id;\nconst org = body.org || 'aisha';\nconst branch = body.branch || 'main';\nconst deployProvider = body.deploy_provider || 'coolify';\nconst previewUrl = body.preview_url;\n\nif (!storyId) {\n  throw new Error('Missing required parameter: story_id');\n}\nif (!repoName) {\n  throw new Error('Missing required parameter: repo_name');\n}\n\nreturn {\n  json: {\n    story_id: storyId,\n    repo_name: repoName,\n    template,\n    ruleset_id: rulesetId,\n    run_id: runId,\n    org,\n    branch,\n    deploy_provider: deployProvider,\n    preview_url: previewUrl,\n    started_at: new Date().toISOString()\n  }\n};"
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 1: Transition story to 'scaffolding' via MCP\nconst input = $input.item.json;\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: {\n      name: 'transition_delivery_status',\n      arguments: {\n        story_id: input.story_id,\n        new_status: 'scaffolding',\n        trigger_source: 'workflow',\n        metadata: { workflow: 'WF_STORY_SCAFFOLD', run_id: input.run_id }\n      }\n    }\n  });\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error: ' + (e.message || String(e));\n}\nconst success = !data.error;\n\nreturn {\n  json: {\n    ...input,\n    transition_to_scaffolding: success ? 'ok' : 'failed',\n    transition_detail: data.error ? data.error.message : 'transitioned'\n  }\n};"
+      },
+      "id": "transition-scaffolding",
+      "name": "Transition to Scaffolding",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 2: Get story context (rules, participants, repo info)\nconst input = $input.item.json;\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: {\n      name: 'get_story_context',\n      arguments: {\n        story_id: input.story_id\n      }\n    }\n  });\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error: ' + (e.message || String(e));\n}\nlet storyContext = {};\nif (data.result?.content) {\n  // Parse text/json content from MCP response\n  for (const c of data.result.content) {\n    if (c.type === 'resource' && c.resource?.text) {\n      try { storyContext = JSON.parse(c.resource.text); } catch {}\n    }\n  }\n}\n\nreturn {\n  json: {\n    ...input,\n    story_context: storyContext,\n    rules_preview: storyContext.expert_rules_preview || [],\n    repo_url: storyContext.repo_url || '',\n    build_cmd: storyContext.build_config?.build_cmd || 'npm run build',\n    node_version: storyContext.build_config?.node_version || '20'\n  }\n};"
+      },
+      "id": "get-context",
+      "name": "Get Story Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 3: Create branch in Forgejo for this story\nconst input = $input.item.json;\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst branchName = `story/${input.story_id.substring(0, 8)}`;\n\nconst rpcBody = JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: {\n      name: 'admin_forgejo_git',\n      arguments: {\n        operation: 'create_branch',\n        owner: input.org,\n        repo: input.repo_name,\n        branch_name: branchName,\n        base_branch: input.branch\n      }\n    }\n  });\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error: ' + (e.message || String(e));\n}\nconst branchCreated = !data.error;\n\nreturn {\n  json: {\n    ...input,\n    story_branch: branchName,\n    branch_created: branchCreated,\n    branch_detail: data.error ? data.error.message : 'created'\n  }\n};"
+      },
+      "id": "create-branch",
+      "name": "Create Branch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 4: Generate copilot-instructions.md from story rules and context\nconst input = $input.item.json;\n\nconst rules = input.rules_preview || [];\nconst ctx = input.story_context || {};\n\nconst sections = [\n  '# Copilot Instructions — Story Delivery',\n  '',\n  `> Auto-generated for story \\`${input.story_id}\\``,\n  `> Repository: ${input.org}/${input.repo_name}`,\n  `> Branch: ${input.story_branch}`,\n  `> Generated: ${new Date().toISOString()}`,\n  '',\n  '---',\n  '',\n  '## Project Context',\n  '',\n  ctx.title ? `**Story:** ${ctx.title}` : '',\n  ctx.program_name ? `**Program:** ${ctx.program_name}` : '',\n  ctx.partner_name ? `**Partner:** ${ctx.partner_name}` : '',\n  '',\n  '## Build Configuration',\n  '',\n  `- **Node.js:** ${input.node_version}`,\n  `- **Build command:** \\`${input.build_cmd}\\``,\n  '',\n];\n\n// Add expert rules\nif (rules.length > 0) {\n  sections.push('## Expert Rules', '');\n  for (const rule of rules) {\n    sections.push(`### ${rule.title || rule.slug || 'Rule'}`);\n    if (rule.description) sections.push('', rule.description);\n    if (rule.content) sections.push('', rule.content);\n    sections.push('');\n  }\n}\n\n// Platform standards\nsections.push(\n  '## Platform Standards',\n  '',\n  '1. **RPC-Only** — No direct `.from()` queries, everything via `supabase.rpc()`',\n  '2. **No sensitive data in logs** — Use `safeError()` for error logging',\n  '3. **Explicit columns** — No `.select(\"*\")`, always list needed columns',\n  '4. **No hardcoded text** — All UI text via i18n `t()`',\n  '5. **No `any` types** — Use proper types or `unknown` + type guard',\n  '6. **No `console.log()`** — Error logging only via `safeError()`',\n  '7. **Gate tests must pass** — `npm run test:gates`',\n  '',\n  '---',\n  '',\n  '> Managed by AISHA Dirigent. Do not edit manually.',\n);\n\nconst instructionsContent = sections.filter(Boolean).join('\\n');\n\nreturn {\n  json: {\n    ...input,\n    instructions_content: instructionsContent,\n    instructions_path: '.github/copilot-instructions.md'\n  }\n};"
+      },
+      "id": "generate-instructions",
+      "name": "Generate Instructions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 5: Commit copilot-instructions.md to Forgejo\nconst input = $input.item.json;\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: {\n      name: 'admin_forgejo_git',\n      arguments: {\n        operation: 'commit_file',\n        owner: input.org,\n        repo: input.repo_name,\n        file_path: input.instructions_path,\n        content: input.instructions_content,\n        message: 'chore: scaffold copilot-instructions.md for story delivery',\n        branch: input.story_branch\n      }\n    }\n  });\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error: ' + (e.message || String(e));\n}\nconst committed = !data.error;\n\nreturn {\n  json: {\n    ...input,\n    file_committed: committed,\n    commit_detail: data.error ? data.error.message : 'committed'\n  }\n};"
+      },
+      "id": "commit-instructions",
+      "name": "Commit Instructions File",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 6: Set up preview environment via MCP\nconst input = $input.item.json;\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst previewUrl = input.preview_url || `https://${input.repo_name}.preview.${?.PUBLIC_TLD || ''}`;\n\nconst rpcBody = JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: {\n      name: 'manage_story_environment',\n      arguments: {\n        story_id: input.story_id,\n        environment: 'preview',\n        url: previewUrl,\n        branch: input.story_branch,\n        deploy_provider: input.deploy_provider,\n        deploy_status: 'pending',\n        config: {\n          repo: `${input.org}/${input.repo_name}`,\n          node_version: input.node_version,\n          build_cmd: input.build_cmd,\n          scaffolded_at: input.started_at\n        }\n      }\n    }\n  });\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error: ' + (e.message || String(e));\n}\nconst envCreated = !data.error;\n\nreturn {\n  json: {\n    ...input,\n    preview_url: previewUrl,\n    env_created: envCreated,\n    env_detail: data.error ? data.error.message : 'created'\n  }\n};"
+      },
+      "id": "setup-environment",
+      "name": "Setup Preview Environment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Step 7: Transition story to 'ready' via MCP\nconst input = $input.item.json;\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: {\n      name: 'transition_delivery_status',\n      arguments: {\n        story_id: input.story_id,\n        new_status: 'ready',\n        trigger_source: 'workflow',\n        metadata: {\n          workflow: 'WF_STORY_SCAFFOLD',\n          run_id: input.run_id,\n          repo: `${input.org}/${input.repo_name}`,\n          branch: input.story_branch,\n          preview_url: input.preview_url\n        }\n      }\n    }\n  });\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error: ' + (e.message || String(e));\n}\nconst transitioned = !data.error;\n\nreturn {\n  json: {\n    ...input,\n    transition_to_ready: transitioned ? 'ok' : 'failed',\n    transition_ready_detail: data.error ? data.error.message : 'transitioned'\n  }\n};"
+      },
+      "id": "transition-ready",
+      "name": "Transition to Ready",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_n8n_trace_event",
+        "rpcParams": "={\n  \"p_event_type\": \"n8n_workflow\",\n  \"p_agent_slug\": \"dirigent\",\n  \"p_operation\": \"scaffold_story\",\n  \"p_status\": \"ok\",\n  \"p_request_summary\": {\n    \"story_id\": \"{{ $json.story_id || '' }}\",\n    \"repo\": \"{{ $json.org || '' }}/{{ $json.repo_name || '' }}\",\n    \"branch\": \"{{ $json.story_branch || '' }}\",\n    \"preview_url\": \"{{ $json.preview_url || '' }}\"\n  }\n}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "log-trace",
+      "name": "Log Trace Event",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        2220,
+        460
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format scaffold result response\nconst input = $input.item.json;\n\nconst allStepsOk = input.branch_created !== false\n  && input.file_committed !== false\n  && input.env_created !== false\n  && input.transition_to_ready !== 'failed';\n\nreturn {\n  json: {\n    success: allStepsOk,\n    signal: 'scaffold_done',\n    story_id: input.story_id,\n    repo: `${input.org}/${input.repo_name}`,\n    branch: input.story_branch,\n    preview_url: input.preview_url,\n    instructions_path: input.instructions_path,\n    deploy_provider: input.deploy_provider,\n    steps: {\n      transition_scaffolding: input.transition_to_scaffolding,\n      branch_created: input.branch_created,\n      file_committed: input.file_committed,\n      env_created: input.env_created,\n      transition_ready: input.transition_to_ready\n    },\n    started_at: input.started_at,\n    completed_at: new Date().toISOString()\n  }\n};"
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2220,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Story Scaffold Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Transition to Scaffolding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transition to Scaffolding": {
+      "main": [
+        [
+          {
+            "node": "Get Story Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Story Context": {
+      "main": [
+        [
+          {
+            "node": "Create Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Branch": {
+      "main": [
+        [
+          {
+            "node": "Generate Instructions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Instructions": {
+      "main": [
+        [
+          {
+            "node": "Commit Instructions File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Commit Instructions File": {
+      "main": [
+        [
+          {
+            "node": "Setup Preview Environment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Setup Preview Environment": {
+      "main": [
+        [
+          {
+            "node": "Transition to Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transition to Ready": {
+      "main": [
+        [
+          {
+            "node": "Log Trace Event",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

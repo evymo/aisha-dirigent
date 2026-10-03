@@ -1,0 +1,409 @@
+{
+  "name": "WF_KB_RAGNAROK_SYNC",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "path": "kb-ragnarok-sync",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "ks-webhook-001",
+      "name": "KB Change Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Parse incoming KB change event from pg_notify or Supabase webhook.\n * Supports: expert_rules changes, knowledge_items changes, manual trigger.\n *\n * Payload format (from fn_notify_knowledge_change):\n * { source_table, source_id, source_slug, story_id, action, title, category, tags, triggered_at }\n *\n * Per-story routing: when story_id is present, upload goes into Ragnarok\n * project_id='story-{story_id}' so Maestro queries scoped to that story\n * (already used by multi-turn USP test) find the document. Globals stay in\n * project_id='aisha'.\n */\nconst body = $input.first().json.body || $input.first().json;\n\nconst sourceTable = body.source_table || body.table || 'unknown';\nconst sourceId = body.source_id || body.record?.id || body.old_record?.id || 'unknown';\nconst sourceSlug = body.source_slug || body.record?.slug || body.record?.source_slug || 'unknown';\nconst storyId = body.story_id || body.record?.story_id || null;\nconst action = body.action || body.type || 'UPDATE';\nconst title = body.title || body.record?.title || '';\nconst category = body.category || body.record?.category || '';\nconst tags = body.tags || body.record?.ai_context_tags || [];\nconst triggeredAt = body.triggered_at || new Date().toISOString();\n\n// Determine KB doc ID prefix\nconst kbIdPrefix = sourceTable === 'expert_rules' ? 'rule' : 'ki';\nconst kbId = `${kbIdPrefix}-${sourceSlug}`;\nconst projectId = storyId ? `story-${storyId}` : 'aisha';\n\nreturn [{\n  json: {\n    sourceTable,\n    sourceId,\n    sourceSlug,\n    storyId,\n    kbId,\n    projectId,\n    action: action.toUpperCase(),\n    title,\n    category,\n    tags,\n    triggeredAt,\n    isDelete: ['DELETE', 'DELETED', 'ARCHIVED'].includes(action.toUpperCase())\n  }\n}];"
+      },
+      "id": "ks-parse-002",
+      "name": "Parse Change Event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "functionName": "fn_build_ragnarok_document",
+        "rpcParams": "={{ JSON.stringify({ p_source_table: $json.sourceTable, p_source_id: $json.sourceId }) }}",
+        "useSingleOutput": true,
+        "onError": "continueRegularOutput"
+      },
+      "id": "ks-build-003",
+      "name": "Build Ragnarok Document",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        680,
+        400
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "supabase-cred",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-upload",
+              "leftValue": "={{ $json.isDelete }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "ks-switch-004",
+      "name": "Decide: Upload or Delete",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        900,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/functions/v1/ragnarok-upload",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "action",
+              "value": "upload"
+            },
+            {
+              "name": "project_id",
+              "value": "={{ $('Parse Change Event').item.json.projectId }}"
+            },
+            {
+              "name": "kb_id",
+              "value": "={{ $('Parse Change Event').item.json.kbId }}"
+            },
+            {
+              "name": "source_type",
+              "value": "txt"
+            },
+            {
+              "name": "language",
+              "value": "en-US"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "sendHeaders": false,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "ks-upload-005",
+      "name": "Upload to Ragnarok",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1140,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/functions/v1/ragnarok-upload",
+        "method": "POST",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify({ action: 'delete', project_id: $('Parse Change Event').item.json.projectId, kb_id: $('Parse Change Event').item.json.kbId }) }}",
+        "options": {
+          "timeout": 15000
+        },
+        "sendHeaders": false,
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "ks-delete-006",
+      "name": "Delete from Ragnarok",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1140,
+        520
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * AISHA Impact Evaluation — hodnotí dopad KB změny NA ÚROVNI PLATFORMY.\n * \n * Toto NENÍ story-context evaluace — tady AISHA funguje jako strážce\n * celkového stavu KB a koherence knowledge base.\n * \n * Vyhodnocuje:\n * 1. Je změna konzistentní s existujícími pravidly?\n * 2. Nesoupeří nové pravidlo/znalost s existujícím?\n * 3. Jsou všechny cross-reference intaktní?\n * 4. Potřebuje expert review?\n * 5. Jsou mezery v pokrytí po této změně?\n */\nconst change = $('Parse Change Event').item.json;\nconst syncResult = $input.first().json;\nconst syncOk = syncResult.statusCode === 200 || syncResult.ok === true;\n\n// Severity classification based on change type\nconst severityMap = {\n  'security_practice': 'HIGH',\n  'architecture_pattern': 'HIGH',\n  'coding_standard': 'MEDIUM',\n  'api_design': 'MEDIUM',\n  'testing_rule': 'LOW',\n  'workflow': 'LOW',\n};\nconst severity = severityMap[change.category] || 'MEDIUM';\n\n// Impact assessment\nconst impactFactors = [];\nif (['DELETE', 'DELETED', 'ARCHIVED'].includes(change.action)) {\n  impactFactors.push('DELETION — potenciální ztráta kontextu');\n}\nif (change.category === 'security_practice') {\n  impactFactors.push('SECURITY — vyžaduje bezpodmínečnou validaci');\n}\nif (change.tags?.some(t => ['critical', 'breaking', 'security'].includes(t))) {\n  impactFactors.push('TAGGED CRITICAL — expert review povinný');\n}\nif (!syncOk) {\n  impactFactors.push('SYNC FAILED — Ragnarok nedostupný nebo chybný upload');\n}\n\nconst needsExpertReview = severity === 'HIGH'\n  || impactFactors.length >= 2\n  || !syncOk\n  || change.action === 'DELETE';\n\n// Build evaluation context for AISHA\nconst evaluation = {\n  change_summary: `${change.action} ${change.sourceTable}/${change.sourceSlug}: ${change.title}`,\n  ragnarok_sync: syncOk ? 'OK' : 'FAILED',\n  severity,\n  impact_factors: impactFactors,\n  needs_expert_review: needsExpertReview,\n  // AISHA's own context questions — what should she investigate next\n  context_questions: [\n    `Existují pravidla která závisí na ${change.sourceSlug}?`,\n    `Mění tato změna celkový kontextový profil platformy?`,\n    `Potřebuje expert ověřit konzistenci s aktuálním směrem projektu?`\n  ],\n  evaluated_at: new Date().toISOString()\n};\n\nreturn [{ json: evaluation }];"
+      },
+      "id": "ks-eval-007",
+      "name": "AISHA Impact Evaluation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Context Gap Detection — AISHA surfacuje potenciální mezery.\n * \n * Principy:\n * - AISHA se nerozhoduje ZA uživatele, ale DOVYPLAVÍ informace\n * - Identifikuje cross-reference gaps (pravidlo odkazuje neexistující)\n * - Kontroluje pokrytí kritických oblastí (security, audit, i18n)\n * - Navrhuje konkrétní otázky pro expert review\n * \n * Tento krok MŮŽE volat MCP tools pro ověření stavu:\n * - search_knowledge_v2 pro hledání podobných/konfliktních pravidel\n * - get_knowledge_stats pro celkový stav KB\n */\nconst evaluation = $input.first().json;\nconst change = $('Parse Change Event').item.json;\n\n// Build context gap report\nconst gapReport = {\n  ...evaluation,\n  \n  // Surface areas to verify with expert\n  surface_for_expert: [],\n  \n  // Auto-detectable gaps\n  detected_gaps: []\n};\n\n// Check: deleted rule might leave orphaned references\nif (change.action === 'DELETE') {\n  gapReport.detected_gaps.push({\n    type: 'orphaned_reference',\n    description: `Smazané pravidlo '${change.sourceSlug}' může být referencováno v story_rulesets nebo compose_context`,\n    suggestion: 'Ověřit story_rulesets.rule_ids a odebrat reference'\n  });\n}\n\n// Check: security category change needs compliance review\nif (change.category === 'security_practice') {\n  gapReport.surface_for_expert.push({\n    question: `Změna v bezpečnostním pravidle '${change.title}' — odpovídá aktuálnímu threat modelu projektu?`,\n    context: 'Security rules mění chování RLS policies a audit journal pattern',\n    urgency: 'HIGH'\n  });\n}\n\n// Check: if sync failed, knowledge might be stale in Ragnarok\nif (!evaluation.ragnarok_sync || evaluation.ragnarok_sync === 'FAILED') {\n  gapReport.detected_gaps.push({\n    type: 'sync_failure',\n    description: 'Ragnarok KB neodpovídá aktuálnímu stavu Supabase — vyhledávání vrací zastaralá data',\n    suggestion: 'Spustit manuální reseed: node scripts/seed-ragnarok.mjs'\n  });\n  gapReport.surface_for_expert.push({\n    question: 'Ragnarok sync selhal — má se pokusit o retry nebo notifikovat správce?',\n    urgency: 'MEDIUM'\n  });\n}\n\n// Always: suggest expert validates overall direction\nif (evaluation.needs_expert_review) {\n  gapReport.surface_for_expert.push({\n    question: `Změna '${change.title}' (${change.action}) — je v souladu s aktuálním směrem platformy?`,\n    context: `Category: ${change.category}, Tags: ${(change.tags || []).join(', ')}`,\n    urgency: evaluation.severity\n  });\n}\n\nreturn [{ json: gapReport }];"
+      },
+      "id": "ks-context-008",
+      "name": "Context Gap Detection",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1620,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-review",
+              "leftValue": "={{ $json.needs_expert_review }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "ks-route-009",
+      "name": "Route Evaluation Result",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1860,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Notify expert about KB change that needs review.\n * Uses WF_EXPERT_NOTIFICATION via Execute Workflow or direct notification.\n * \n * The notification includes:\n * - What changed and why\n * - AISHA's impact assessment\n * - Specific questions AISHA surfaced for the expert\n * - Detected context gaps\n * - Action items\n */\nconst report = $input.first().json;\n\nconst notification = {\n  type: 'kb_change_review',\n  severity: report.severity,\n  title: `KB Sync Review: ${report.change_summary}`,\n  body: [\n    `## KB Change — ${report.severity}`,\n    '',\n    `**Změna:** ${report.change_summary}`,\n    `**Ragnarok sync:** ${report.ragnarok_sync}`,\n    '',\n    '### Impact factors',\n    ...(report.impact_factors || []).map(f => `- ${f}`),\n    '',\n    '### AISHA dotazy pro experta',\n    ...(report.surface_for_expert || []).map(q => `- **[${q.urgency}]** ${q.question}${q.context ? `\\n  _${q.context}_` : ''}`),\n    '',\n    '### Detekované mezery',\n    ...(report.detected_gaps || []).map(g => `- **${g.type}:** ${g.description}\\n  → ${g.suggestion}`),\n  ].join('\\n'),\n  metadata: {\n    source: 'aisha_kb_sync',\n    auto_generated: true,\n    context_questions: report.context_questions,\n    evaluated_at: report.evaluated_at\n  }\n};\n\nreturn [{ json: notification }];"
+      },
+      "id": "ks-notify-010",
+      "name": "Notify Expert — Needs Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Low-risk change auto-approved.\n * Log the decision and close the flow.\n */\nconst report = $input.first().json;\n\nreturn [{\n  json: {\n    status: 'auto_approved',\n    change: report.change_summary,\n    severity: report.severity,\n    ragnarok_sync: report.ragnarok_sync,\n    message: `KB změna '${report.change_summary}' automaticky schválena (severity: ${report.severity}, žádné kritické mezery)`,\n    closed_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "ks-approve-011",
+      "name": "Auto-Approve + Close",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2100,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "functionName": "fn_log_kb_sync_event",
+        "rpcParams": "={{ JSON.stringify({ p_source_table: $('Parse Change Event').item.json.sourceTable, p_source_slug: $('Parse Change Event').item.json.sourceSlug, p_action: $('Parse Change Event').item.json.action, p_ragnarok_ok: $json.ragnarok_sync === 'OK', p_severity: $json.severity, p_needs_review: $json.needs_expert_review }) }}",
+        "useSingleOutput": true,
+        "onError": "continueRegularOutput"
+      },
+      "id": "ks-log-012",
+      "name": "Log Sync Event",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1620,
+        520
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "supabase-cred",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "KB Change Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Change Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Change Event": {
+      "main": [
+        [
+          {
+            "node": "Build Ragnarok Document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Ragnarok Document": {
+      "main": [
+        [
+          {
+            "node": "Decide: Upload or Delete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decide: Upload or Delete": {
+      "main": [
+        [
+          {
+            "node": "Upload to Ragnarok",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Delete from Ragnarok",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Ragnarok": {
+      "main": [
+        [
+          {
+            "node": "AISHA Impact Evaluation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete from Ragnarok": {
+      "main": [
+        [
+          {
+            "node": "AISHA Impact Evaluation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AISHA Impact Evaluation": {
+      "main": [
+        [
+          {
+            "node": "Context Gap Detection",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Sync Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Context Gap Detection": {
+      "main": [
+        [
+          {
+            "node": "Route Evaluation Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route Evaluation Result": {
+      "main": [
+        [
+          {
+            "node": "Notify Expert — Needs Review",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Auto-Approve + Close",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

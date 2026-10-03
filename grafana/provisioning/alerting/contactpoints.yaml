@@ -1,0 +1,42 @@
+# Phase 12 WP 2.4 — Default alert contact points.
+#
+# Operator wires actual webhook URLs / email recipients via Coolify env:
+#   ALERTMANAGER_MATRIX_WEBHOOK   — Matrix webhook for #aisha-ops room
+#   ALERTMANAGER_EMAIL_RECIPIENTS — comma-separated email list
+#
+# Default routing (set up in grafana/provisioning/alerting/policies.yaml):
+#   severity=critical  → matrix + email + page
+#   severity=warning   → matrix + email
+#   severity=info      → matrix
+#
+# To test without going to prod: temporarily route to `grafana-default`
+# contact (in-UI alert preview only) in the Grafana UI.
+
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: aisha-default
+    receivers:
+      # Matrix webhook (primary channel — fastest mean time to alert)
+      - uid: matrix_aisha_ops
+        type: webhook
+        settings:
+          url: ${ALERTMANAGER_MATRIX_WEBHOOK}
+          httpMethod: POST
+          # Matrix expects { text: "..." } for plain rooms
+          message: |
+            🚨 {{ .CommonLabels.severity | toUpper }}: {{ .CommonAnnotations.summary }}
+            Area: {{ .CommonLabels.area }}
+            {{ .CommonAnnotations.description }}
+            {{ if .CommonAnnotations.runbook_url }}Runbook: {{ .CommonAnnotations.runbook_url }}{{ end }}
+        disableResolveMessage: false
+
+      # Email — secondary, slower channel
+      - uid: email_oncall
+        type: email
+        settings:
+          addresses: ${ALERTMANAGER_EMAIL_RECIPIENTS}
+          singleEmail: false
+          subject: "[AISHA {{ .CommonLabels.severity | toUpper }}] {{ .CommonAnnotations.summary }}"
+        disableResolveMessage: false

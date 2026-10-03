@@ -1,0 +1,79 @@
+global:
+    realm: identity-plane
+    servername: generic
+
+locale:
+    language: en_US
+
+logger:
+    level: INFO
+
+auth:
+    stack:
+     - _System
+
+input:
+    allow_raw_post: 1
+    parse_depth: 5
+
+# Section must exist to allow JOSE post but there are no settings yet
+jose: ~
+
+output:
+    use_http_status_codes: 1
+    headers: all
+
+# Method definitions — required on every RPC endpoint YAML.
+# Without these blocks the client returns HTTP 404 for any method call.
+# Definitions kept identical to generic.yaml — only `global.realm` differs.
+
+RequestCertificate:
+    workflow: certificate_enroll
+    input:
+      - pkcs10
+      - profile
+      - comment
+      - signature
+    output:
+      - cert_identifier
+      - certificate
+      - chain
+      - error_code
+      - transaction_id
+    env:
+      - signer_cert
+    pickup:
+        workflow: check_enrollment
+        input:
+          - pkcs10
+          - transaction_id
+
+RevokeCertificate:
+    workflow: certificate_revocation_request_v2
+    input:
+      - cert_identifier
+      - reason_code
+      - comment
+      - invalidity_time
+    env:
+      - signer_cert
+    output:
+      - error_code
+
+TestConnection:
+    workflow: connection_test
+    env:
+      - signer_cert
+      - signer_chain
+    output:
+      - signer_cert
+      - signer_chain
+      - signer_trusted
+      - signer_authorized
+      - signer_validity_ok
+      - signer_revoked
+      - signer_cert_identifier
+      - signer_subject
+      - signer_subject_key_identifier
+      - signer_in_current_realm
+      - error_code

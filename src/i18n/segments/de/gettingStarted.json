@@ -1,0 +1,106 @@
+{
+  "gettingStarted": {
+    "meta": {
+      "title": "Erste Schritte",
+      "description": "Ein praktischer Leitfaden für Ihre ersten Schritte mit AISHA – von der Anmeldung bis zum ersten Ergebnis in 10 Minuten."
+    },
+    "hero": {
+      "badge": "Öffentliche Vorschau",
+      "title": "Erste Schritte mit AISHA",
+      "subtitle": "Ein Kurzkurs für neue Nutzer: Was AISHA ist, wie es funktioniert und wie Sie bereits in den ersten zehn Minuten ein konkretes Ergebnis erzielen können."
+    },
+    "whatIs": {
+      "title": "1. Was AISHA ist und wie es funktioniert",
+      "intro": "AISHA ist kein einzelner Chatbot. Es handelt sich um einen KI-Orchestrator – eine Plattform, die für jede Aufgabe den richtigen Ansatz, das richtige Modell und die richtigen Tools auswählt und alle Vorgänge unter Aufsicht und mit einem Prüfpfad durchführt. Vier Grundsätze, die Ihnen das Leben erleichtern werden:",
+      "stories": {
+        "title": "Geschichten = deine Projekte",
+        "text": "Alles dreht sich um Geschichten. Eine Geschichte ist der Arbeitsbereich eines Projekts oder einer Initiative: Sie verfügt über eine eigene Wissensbasis, einen Zeitplan für die Aktivitäten und eigene Regeln. Was auch immer AISHA tut, geschieht im Rahmen einer bestimmten Geschichte – Wissen und Ergebnisse fließen niemals zwischen Projekten hin und her."
+      },
+      "backend": {
+        "title": "Die KI wählt das Backend je nach Aufgabe aus",
+        "text": "Sie müssen kein Modell konfigurieren. Für jede Aufgabe wählt AISHA je nach Aufgabentyp, Kosten und Verfügbarkeit ein geeignetes Sprachmodell und einen geeigneten Verarbeitungspfad aus. Sie beschreiben, was Sie benötigen – die Entscheidung, „womit dies umgesetzt werden soll“, ist Aufgabe des Orchestrators."
+      },
+      "governance": {
+        "title": "Führung: Lieber laut scheitern als still irren",
+        "text": "Die Plattform ist nach dem „Fail-Loud“-Prinzip konzipiert. Wenn etwas nicht möglich ist oder Daten oder Berechtigungen fehlen, werden Sie direkt darüber informiert – statt einer stillschweigenden Vermutung, die als Antwort ausgegeben wird. Sensible Aktionen durchlaufen Genehmigungsstufen, und privilegierte Vorgänge werden im Prüfprotokoll festgehalten."
+      },
+      "dirigent": {
+        "title": "Dirigent: Überwachung von KI-Agenten",
+        "text": "AISHA Dirigent überwacht kontinuierlich die Arbeit der KI-Agenten und nimmt Kurskorrekturen vor – beratend, nicht zwingend. Die Ergebnisse der Agenten werden noch einmal überprüft, bevor sie Sie erreichen."
+      }
+    },
+    "firstSteps": {
+      "title": "2. Die ersten 10 Minuten",
+      "intro": "Der kürzeste Weg vom Einloggen bis zum ersten Ergebnis.",
+      "step1": {
+        "title": "Anmelden",
+        "text": "Sie melden sich über Single Sign-On (Keycloak) auf der Seite /auth an. Ihren Vorschau-Zugang haben Sie per E-Mail erhalten; bei der ersten Anmeldung legen Sie Ihr eigenes Passwort fest."
+      },
+      "step2": {
+        "title": "Schreibe deine erste Geschichte",
+        "text": "Öffnen Sie im Bereich „Stories“ die für Sie vorbereitete Story (oder lassen Sie eine neue erstellen). Sehen Sie sich die Registerkarten „Übersicht“, „Zeitleiste“ und „Wissen“ an – dort erfahren Sie, was AISHA über das Projekt weiß und was bisher darin geschehen ist."
+      },
+      "step3": {
+        "title": "Sende deine erste Chat-Nachricht",
+        "text": "Öffnen Sie den KI-Chat und stellen Sie eine Frage zum Projekt. Fangen Sie konkret an: „Fassen Sie das Wissen in diesem Artikel zusammen“ ist eine bessere erste Frage als „Was kannst du tun?“. Achten Sie auf das Feld „Verwendete Quellen“ neben den Antworten – dort wird angezeigt, worauf sich die Antwort stützt."
+      },
+      "step4": {
+        "title": "Fahre dein erstes Flowboard",
+        "text": "Das Flowboard ist eine Arbeitsfläche, auf der Sie einen Workflow aus Knoten – Triggern, Agenten, MCP-Tools, Aktionen und Gates – zeichnen und durch Klicken auf „Ausführen“ starten können. Wenn ein Flow auf ein Genehmigungs-Gate trifft, wird der Status „Wartet auf Genehmigung“ angezeigt: Überprüfen Sie, was als Nächstes geschehen soll, und bestätigen Sie mit „Genehmigen und fortfahren“. Sie sind sich nicht sicher, wie Sie den Ablauf zusammenstellen sollen? Nutzen Sie „Ask AISHA“ direkt auf der Arbeitsfläche."
+      },
+      "step5": {
+        "title": "Bonus: Stöbern Sie im Agent Marketplace",
+        "text": "Der Agentenkatalog bietet vorgefertigte Spezialagenten, die Sie in Ihre Geschichte einbinden können – diese werden dann in deren Kontext und unter Nutzung ihres Wissens ausgeführt."
+      }
+    },
+    "workingWithAi": {
+      "title": "3. Wie man effektiv mit KI arbeitet",
+      "intro": "KI ist ein leistungsstarker, aber fehlbarer Kollege. Diese wenigen Gewohnheiten machen den entscheidenden Unterschied zwischen Frustration und einem großartigen Ergebnis aus.",
+      "context": {
+        "title": "Der Kontext entscheidet",
+        "text": "Das Modell weiß nichts, was Sie ihm nicht mitteilen. Beschreiben Sie, was Sie möchten, für wen, in welchem Format und woran Sie erkennen, dass die Aufgabe erledigt ist. Ein gut formulierter Satz mit Anweisungen erspart drei Runden mit Rückfragen."
+      },
+      "knowledge": {
+        "title": "Die Wissensdatenbank ergänzen",
+        "text": "Laden Sie Materialien auf der Registerkarte „Wissen“ der Geschichte hoch (PDF, DOCX, TXT, MD bis zu 50 MB) oder fügen Sie Einträge manuell hinzu. AISHA greift darauf über eine mehrsprachige Suchfunktion zu, die Tschechisch nativ verarbeitet – eine auf Tschechisch gestellte Frage findet englische Dokumente und umgekehrt. Je besser die Quellen, desto weniger erfindet die KI Dinge."
+      },
+      "verify": {
+        "title": "Vertrauen ist gut, Kontrolle ist besser",
+        "text": "Sprachmodelle geben manchmal Aussagen wieder, die nicht der Wahrheit entsprechen – und klingen dabei dabei sehr überzeugt. Aus diesem Grund zeigt AISHA neben den Antworten die verwendeten Quellen sowie ein Zuverlässigkeitssymbol an; nehmen Sie die Warnung „Geringe Zuverlässigkeit – überprüfen Sie die Antwort vor der Verwendung“ ernst. Überprüfen Sie Fakten, Zahlen und alle Informationen, die das Unternehmen verlassen, stets anhand der Quelle."
+      },
+      "iterate": {
+        "title": "Wiederholen, nicht vorschreiben",
+        "text": "Die erste Antwort ist ein Entwurf, kein endgültiges Ergebnis. Reagieren Sie mit: „Kürzen Sie das“, „Belegen Sie das mit einer Quelle“, „Formulieren Sie es für den Kunden um“. Kurze Iterationen sind besser als eine einzige lange, perfekte Eingabeaufforderung."
+      },
+      "rules": {
+        "title": "Das Wichtigste auf einen Blick",
+        "items": [
+          "AI output is a draft — responsibility for the result stays with you.",
+          "The more specific the brief and the better the sources, the better the result.",
+          "Double-check answers that cite no sources.",
+          "Don't paste data into the chat that doesn't belong in the project.",
+          "When AISHA doesn't know, it says so out loud — that's by design, not a bug."
+        ]
+      }
+    },
+    "preview": {
+      "title": "4. Was „Vorschau“ bedeutet",
+      "intro": "Sie nutzen eine funktionierende, aber noch in der Anfangsphase befindliche Version der Plattform. Was Sie erwarten können:",
+      "feedback": {
+        "title": "Ihr Feedback bestimmt, wie es weitergeht",
+        "text": "Hast du einen Fehler entdeckt, erscheint dir etwas unlogisch oder fehlt eine Funktion? Schreib uns an ask@aisha.guru. Während der Preview-Phase lesen wir alle Nachrichten und antworten schnell – das Feedback aus diesen Wochen bestimmt direkt die Reihenfolge der kommenden Änderungen.",
+        "cta": "Schreiben Sie an ask@aisha.guru"
+      },
+      "limits": [
+        "Features change and grow; occasionally something creaks or gets rebuilt.",
+        "AI response speed and quality may vary with the selected backend and current load.",
+        "Some areas (for example the Flowboard) are enabled gradually based on role and permissions.",
+        "Your data runs on self-hosted infrastructure in the EU (Czech Republic), with no third-party trackers. You can request account deletion at any time on the /account/delete page."
+      ]
+    },
+    "closing": {
+      "title": "Jetzt leg los!",
+      "text": "Der schnellste Weg, sich mit AISHA vertraut zu machen, besteht darin, dem Programm eine echte Aufgabe aus Ihrem Projekt zu geben – keine Spielerei. Öffnen Sie eine Story, laden Sie Ihr erstes Dokument hoch und stellen Sie eine Frage. Den Rest lernen Sie ganz nebenbei."
+    }
+  }
+}

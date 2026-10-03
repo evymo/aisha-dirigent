@@ -1,0 +1,57 @@
+# Post-login navigation test — AND App Store screenshot capture.
+#
+# Reuses the test we run anyway: walks the 6 marketing screens, ASSERTS each is
+# visible (the test), and captures a native-resolution screenshot of each (=
+# exact App Store size). Run after auth/login-success.yaml (session persists).
+#
+# Screenshots go to ${SHOT_DIR} (default set by e2e/scripts/run-e2e.sh; the store
+# capture wrapper points it at store/screenshots/<locale>/<device>).
+appId: ${APP_ID}
+---
+- launchApp
+- waitForAnimationToEnd
+
+# 01 · Home (dashboard)
+- extendedWaitUntil:
+    visible:
+      id: home-screen
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOT_DIR}/01_home
+
+# 02 · Story board (projects)
+- tapOn:
+    id: tab-stories
+- assertVisible:
+    id: projects-screen
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOT_DIR}/02_story
+
+# 03 · Studies
+- openLink: aisha-dirigent://studies
+- assertVisible:
+    id: studies-screen
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOT_DIR}/03_studies
+
+# 04 · Health
+- openLink: aisha-dirigent://health
+- assertVisible:
+    id: health-screen
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOT_DIR}/04_health
+
+# 05 · AISHA chat
+- tapOn:
+    id: tab-profile
+- assertVisible:
+    id: profile-screen
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOT_DIR}/05_aisha
+
+# 06 · Privacy & consents
+- openLink: aisha-dirigent://privacy
+- assertVisible:
+    id: privacy-screen
+- waitForAnimationToEnd
+- takeScreenshot: ${SHOT_DIR}/06_privacy

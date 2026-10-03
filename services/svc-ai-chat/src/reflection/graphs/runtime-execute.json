@@ -1,0 +1,24 @@
+{
+  "name": "runtime-execute",
+  "display_name": "Runtime Execute (derive runtime + dispatch)",
+  "description": "E3 executor pipeline. resolve_clow (openclaw_resolve_clow) DERIVES the executor runtime via fn_resolve_runtime (direct_llm/openclaw/hermes — capability-availability, no hardcoded default), admits the clow (fn_admit_clow, fail-loud), and resolves the model (aisha_resolve_clow_backend, serviceable-filtered). dispatch (runtime_dispatch) then EXECUTES the work through the derived RuntimeAdapter and journals it (ai_decisions). node_type is free text and the graph is JSONB, so this is pure wire-up over registered nodes — no DB migration.",
+  "context": "reflection",
+  "version": 1,
+  "is_active": true,
+  "metadata": {
+    "mode": "execute",
+    "owner": "platform",
+    "phase": "E3"
+  },
+  "graph": {
+    "entry": "resolve_clow",
+    "max_iterations": 4,
+    "nodes": [
+      { "id": "resolve_clow", "type": "openclaw_resolve_clow", "config": { "soft_fail": false } },
+      { "id": "dispatch", "type": "runtime_dispatch", "config": {} }
+    ],
+    "edges": [
+      { "from": "resolve_clow", "to": "dispatch", "condition": "admission_verdict == 'allow'" }
+    ]
+  }
+}

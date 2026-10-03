@@ -1,0 +1,44 @@
+{
+  "_comment": [
+    "Známý dluh kontraktu bloků k 2026-08-01 — aby brána mohla být ZAPOJENÁ jako blokující,",
+    "aniž by zastavila každý merge kvůli vadě, která tu byla dřív. Dluh smí jen KLESAT:",
+    "cokoli, co v seznamu není, bránu shodí. Když se něco opraví, smaž to odsud —",
+    "brána na to upozorní, ale běh neshodí, aby oprava nebyla trestaná.",
+    "Měřeno: producenti nad čistou DB ze SoT (cold start, nula řádků);",
+    "bloky sjednoceně z produkce 2026-08-01 (15 z 38 umístěných) i z cold startu (8).",
+    "Kořeny a návrh opravy: docs/testy-Z2-report-2026-08-01.md, čtyři skupiny.",
+    "translation_keys: klíče, které blok VYDÁ a nezná je ani DB, ani inventář v balíku — uživatel vidí syrový klíč. Záměr je mít překlady DYNAMICKY V DB; klíč, který drží jen build-time inventář, se sem NEPÍŠE (hlásí se zvlášť jako dluh k přesunu do DB)."
+  ],
+  "generated_at": "2026-08-01",
+  "producers": [
+    "get_document_detail",
+    "get_flow_node_queue",
+    "get_twin_events_table_block",
+    "get_twin_identity_queue",
+    "get_twin_ref_pending_block",
+    "get_twin_register",
+    "get_workflow_timeline_block"
+  ],
+  "blocks": [
+    "con_register",
+    "dl_register",
+    "inv_register",
+    "mtr_register",
+    "nj_jednotky",
+    "nj_najemci",
+    "pd_activity",
+    "pd_recommend",
+    "pd_review",
+    "sm_expiry",
+    "veh_register",
+    "wb_doc_detail",
+    "wb_flow_nodes",
+    "wb_object_tenants",
+    "wb_twin_unmatched",
+    "wf_timeline"
+  ],
+  "translation_keys": [
+    "app.twins.action.confirm",
+    "app.twins.action.reject"
+  ]
+}

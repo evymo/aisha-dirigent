@@ -1,0 +1,22 @@
+{
+  "_note": "Neutral default instance — ships empty & functional. Real deployments provide their own overlay dir via AISHA_INSTANCE_DIR.",
+  "instance_slug": "default",
+  "api": {
+    "postgrest_url": "https://postgrest.example.invalid",
+    "token_exchange_url": ""
+  },
+  "auth": {
+    "issuer": "https://idp.example.invalid/realms/main",
+    "client_id": "surface-shell"
+  },
+  "i18n": {
+    "default_locale": "en",
+    "locales": [
+      "en"
+    ]
+  },
+  "snapshot_public_jwk": null,
+  "preview": {
+    "enabled": false
+  }
+}

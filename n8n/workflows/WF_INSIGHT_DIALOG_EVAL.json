@@ -1,0 +1,102 @@
+{
+  "name": "WF_INSIGHT_DIALOG_EVAL",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 6h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fetch Maestro dialog traces z Langfuse za posledních 6h pro evaluaci.\n//\n// Cíl: měřit USP integrity (multi-turn coherence, retrieval recall, answer faithfulness)\n// a flagnout regrese před tím, než se promítnou do user experience.\n//\n// Doplňuje WF_LANGFUSE_PERFORMANCE_REVIEW (denní generic review) — toto je\n// Insight-specific eval na úrovni Maestro/Ragnarok dialogů.\n\nconst langfuseHost = $env.LANGFUSE_HOST || 'http://langfuse-web:3000';\nconst langfusePublicKey = $env.LANGFUSE_PUBLIC_KEY;\nconst langfuseSecretKey = $env.LANGFUSE_SECRET_KEY;\n\nif (!langfusePublicKey || !langfuseSecretKey) {\n  return { json: { error: 'Langfuse credentials missing — eval skipped' } };\n}\n\nconst windowHours = 6;\nconst startTime = new Date(Date.now() - windowHours * 60 * 60 * 1000).toISOString();\n\nreturn {\n  json: {\n    langfuseHost,\n    auth: Buffer.from(`${langfusePublicKey}:${langfuseSecretKey}`).toString('base64'),\n    startTime,\n    windowHours,\n  }\n};"
+      },
+      "id": "prepare-eval-input",
+      "name": "Prepare Eval Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.langfuseHost }}/api/public/traces?fromTimestamp={{ encodeURIComponent($json.startTime) }}&tags=insight,maestro&limit=200",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Basic {{ $json.auth }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "fetch-traces",
+      "name": "Fetch Maestro Traces",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Score traces na 3 USP-kritické dimenze:\n//  1. multi_turn_coherence — turn-2+ navazuje na turn-1?\n//  2. retrieval_recall — Ragnarok kb_chunks count > 0 pro KB-relevantní queries?\n//  3. governance_compliance — žádné porušení Tao constraints (warmth floor, no-punitivity)?\n//\n// Skutečná LLM-based eval (semantic coherence) by vyžadovala další API call —\n// pro MVP používáme heuristiky + counts. Detailní semantic eval = future ticket.\n\nconst traces = $input.item.json.data || [];\nconst totalTraces = traces.length;\n\nlet coherenceFlags = 0;\nlet zeroRetrievalCount = 0;\nlet governanceViolations = 0;\nlet maestroUsedCount = 0;\nlet contextEnabledFalse = 0;\n\nfor (const trace of traces) {\n  const meta = trace.metadata || {};\n  const obs = trace.observations || [];\n\n  if (meta.provider === 'maestro' || meta.used_maestro_dialog === true) {\n    maestroUsedCount++;\n  }\n\n  if (meta.kb_retrieval_chunks === 0) {\n    zeroRetrievalCount++;\n  }\n\n  // Multi-turn coherence: pokud má více turnů ale druhý nereferuje předchozí kontext\n  if (obs.length > 1) {\n    const lastObs = obs[obs.length - 1];\n    if (lastObs?.output && typeof lastObs.output === 'string' && lastObs.output.length < 50) {\n      coherenceFlags++;\n    }\n  }\n\n  if (meta.governance_tao_applied === 0) {\n    governanceViolations++;\n  }\n\n  if (meta.context_enabled === false || meta.maestro_context_disabled) {\n    contextEnabledFalse++;\n  }\n}\n\nconst report = {\n  signal: 'insight_dialog_eval',\n  window_hours: $('Prepare Eval Input').item.json.windowHours,\n  total_traces: totalTraces,\n  maestro_used_count: maestroUsedCount,\n  metrics: {\n    coherence_flags: coherenceFlags,\n    zero_retrieval_count: zeroRetrievalCount,\n    governance_violations: governanceViolations,\n    context_enabled_false: contextEnabledFalse,\n  },\n  health: {\n    coherence_ratio: totalTraces > 0 ? 1 - (coherenceFlags / totalTraces) : 1,\n    retrieval_ratio: totalTraces > 0 ? 1 - (zeroRetrievalCount / totalTraces) : 1,\n    governance_ratio: totalTraces > 0 ? 1 - (governanceViolations / totalTraces) : 1,\n  },\n  alerts: [],\n};\n\n// Alert thresholds\nif (totalTraces >= 10) {\n  if (report.health.coherence_ratio < 0.7) {\n    report.alerts.push({ severity: 'high', metric: 'coherence', message: 'Multi-turn coherence < 70% — Maestro dialog management může mít regresi.' });\n  }\n  if (report.health.governance_ratio < 0.9) {\n    report.alerts.push({ severity: 'critical', metric: 'governance', message: 'Tao governance applied < 90% — brain wiring je rozpojený.' });\n  }\n  if (contextEnabledFalse > 0) {\n    report.alerts.push({ severity: 'critical', metric: 'context_enabled', message: 'Maestro CONTEXT_ENABLED=false v některých runech — USP regrese.' });\n  }\n}\n\nreturn { json: report };"
+      },
+      "id": "score-eval",
+      "name": "Score Eval",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Pokud jsou alerts → zaloguj jako improvement_proposal pro WF_SELF_LEARNING_LOOP.\n// Bez alertů → idle, jen audit trail v ai_runs.\n\nconst report = $input.item.json;\nconst alerts = report.alerts || [];\n\nif (alerts.length === 0) {\n  return { json: { ok: true, status: 'no_regression', report } };\n}\n\nconst postgrestUrl = $env.AISHA_POSTGREST_URL || $env.POSTGREST_URL;\nconst serviceKey = $env.AISHA_SERVICE_KEY || $env.POSTGREST_SERVICE_TOKEN;\n\nconst topAlert = alerts.find(a => a.severity === 'critical') || alerts[0];\n\nconst rpcBody = {\n  p_agent_slug: 'insight-dialog-eval',\n  p_title: `Insight Dialog Eval: ${topAlert.message}`,\n  p_description: `Detected ${alerts.length} alert(s) in last ${report.window_hours}h.\\n\\nMetrics:\\n${JSON.stringify(report.metrics, null, 2)}\\n\\nAlerts:\\n${alerts.map(a => `- [${a.severity}] ${a.metric}: ${a.message}`).join('\\n')}`,\n  p_category: 'optimization',\n  p_metadata: report,\n};\n\ntry {\n  const response = await fetch(`${postgrestUrl}/rpc/fn_create_improvement_proposal`, {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\n      'Authorization': `Bearer ${serviceKey}`,\n      'apikey': serviceKey,\n    },\n    body: JSON.stringify(rpcBody),\n  });\n  const result = await response.json();\n  return { json: { ok: true, status: 'proposal_created', proposal: result, report } };\n} catch (e) {\n  return { json: { ok: false, error: e.message, report } };\n}"
+      },
+      "id": "create-proposal-on-alert",
+      "name": "Create Improvement Proposal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 300]
+    }
+  ],
+  "connections": {
+    "Every 6h": {
+      "main": [[{ "node": "Prepare Eval Input", "type": "main", "index": 0 }]]
+    },
+    "Prepare Eval Input": {
+      "main": [[{ "node": "Fetch Maestro Traces", "type": "main", "index": 0 }]]
+    },
+    "Fetch Maestro Traces": {
+      "main": [[{ "node": "Score Eval", "type": "main", "index": 0 }]]
+    },
+    "Score Eval": {
+      "main": [[{ "node": "Create Improvement Proposal", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "insight" },
+    { "name": "eval" },
+    { "name": "langfuse" }
+  ],
+  "meta": {
+    "instanceId": "aisha-evymo",
+    "description": "Insight USP integrity evaluator — měří multi-turn coherence, retrieval recall, governance compliance v Maestro dialozích. Při alertu vytvoří improvement_proposal pro WF_SELF_LEARNING_LOOP."
+  }
+}

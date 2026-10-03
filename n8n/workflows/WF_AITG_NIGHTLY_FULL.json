@@ -1,0 +1,287 @@
+{
+  "name": "WF_AITG_NIGHTLY_FULL",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all"
+  },
+  "nodes": [
+    {
+      "name": "Cron 03:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 3 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Read Automation Setting",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_get_automation_audited",
+        "rpcArgs": "={ \"p_automation_id\": \"nightly_full_sweep\" }",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Should Run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.mode }}",
+              "rightValue": "automated",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Record Skipped",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        720,
+        180
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_record_automation_run_audited",
+        "rpcArgs": "={ \"p_automation_id\": \"nightly_full_sweep\", \"p_status\": \"skipped\", \"p_details\": { \"reason\": \"mode_\" + $node['Read Automation Setting'].json.mode } }",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "List Active Payloads",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        720,
+        -120
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_list_active_payloads_audited",
+        "rpcArgs": "={}",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Split In Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        960,
+        -120
+      ],
+      "parameters": {
+        "batchSize": "={{ $node['Read Automation Setting'].json.parameters?.batch_size ?? 5 }}",
+        "options": {
+          "reset": false
+        }
+      }
+    },
+    {
+      "name": "Dispatch Probe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        -120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=http://svc-aitg-probes:3041/probes/{{ $json.test_id === 'AITG-APP-01' ? 'app-01-prompt-injection' : $json.test_id === 'AITG-APP-12' ? 'app-12-toxic-output' : 'app-03-data-leak' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ payload: $json.payload?.prompt ?? '', model: 'gpt-4o-mini', triggeredBy: 'nightly' }) }}",
+        "onError": "continueRegularOutput",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        -120
+      ],
+      "parameters": {
+        "language": "javaScript",
+        "jsCode": "const items = $input.all();\nconst byStatus = items.reduce((acc, it) => {\n  const s = it.json?.status ?? 'unknown';\n  acc[s] = (acc[s] ?? 0) + 1;\n  return acc;\n}, {});\nconst critical = items.filter((i) => i.json?.severity === 'critical').length;\nreturn [{ json: { total: items.length, byStatus, critical } }];"
+      }
+    },
+    {
+      "name": "Notify Digest",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        -120
+      ],
+      "parameters": {
+        "workflowId": "WF_EXPERT_NOTIFICATION"
+      }
+    },
+    {
+      "name": "Record Success",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        -120
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_record_automation_run_audited",
+        "rpcArgs": "={ \"p_automation_id\": \"nightly_full_sweep\", \"p_status\": \"success\", \"p_details\": $node['Aggregate Results'].json }",
+        "onError": "continueRegularOutput"
+      }
+    }
+  ],
+  "connections": {
+    "Cron 03:30": {
+      "main": [
+        [
+          {
+            "node": "Read Automation Setting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Automation Setting": {
+      "main": [
+        [
+          {
+            "node": "Should Run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Run?": {
+      "main": [
+        [
+          {
+            "node": "List Active Payloads",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Active Payloads": {
+      "main": [
+        [
+          {
+            "node": "Split In Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split In Batches": {
+      "main": [
+        [
+          {
+            "node": "Dispatch Probe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch Probe": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Results": {
+      "main": [
+        [
+          {
+            "node": "Notify Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Digest": {
+      "main": [
+        [
+          {
+            "node": "Record Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

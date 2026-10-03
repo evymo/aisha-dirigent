@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n-key="web.garden.title">The Quiet Garden — a gardening journal</title>
+    <meta name="description" data-i18n-key="web.garden.description"
+      content="Seasonal notes, growing guides and small joys from the garden." />
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header" data-section="header">
+      <div class="wrap">
+        <a class="brand" href="/">
+          <span class="brand__mark" aria-hidden="true">🌿</span>
+          <span data-i18n-key="web.garden.brand">The Quiet Garden</span>
+        </a>
+        <nav class="nav">
+          <a href="#articles" data-i18n-key="web.garden.nav.articles">Articles</a>
+          <a href="#topics" data-i18n-key="web.garden.nav.topics">Topics</a>
+          <a href="#newsletter" data-i18n-key="web.garden.nav.subscribe">Subscribe</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" data-section="hero">
+        <div class="wrap">
+          <h1 data-i18n-key="web.garden.hero.heading">Notes from the garden</h1>
+          <p data-i18n-key="web.garden.hero.body">
+            Down-to-earth writing about growing food and flowers — what worked, what didn't,
+            and the small wins that keep us digging.
+          </p>
+        </div>
+      </section>
+
+      <section class="section" id="articles" data-section="articles">
+        <div class="wrap">
+          <h2 class="section__title" data-i18n-key="web.garden.articles.heading">Latest from the journal</h2>
+          <!-- LIVE articles (instance data). Renders the operator's published
+               news_articles via the news-list runtime block; ships EMPTY (the
+               operator writes their own posts in admin). columns:3 matches the
+               original .articles grid (repeat(3,1fr)). -->
+          <div data-runtime-block="news-list" data-block-config='{"limit":6,"columns":3}'></div>
+        </div>
+      </section>
+
+      <section class="section topics" id="topics" data-section="topics">
+        <div class="wrap">
+          <h2 class="section__title" data-i18n-key="web.garden.topics.heading">Browse by topic</h2>
+          <div class="topic-list">
+            <span class="topic" data-i18n-key="web.garden.topic.1">Vegetables</span>
+            <span class="topic" data-i18n-key="web.garden.topic.2">Flowers</span>
+            <span class="topic" data-i18n-key="web.garden.topic.3">Soil &amp; compost</span>
+            <span class="topic" data-i18n-key="web.garden.topic.4">Tools</span>
+            <span class="topic" data-i18n-key="web.garden.topic.5">Season by season</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section newsletter" id="newsletter" data-section="newsletter">
+        <div class="wrap">
+          <h2 class="section__title" data-i18n-key="web.garden.news.heading">Grow with us</h2>
+          <p data-i18n-key="web.garden.news.body">One short letter a month — what to sow, what to harvest, and a story from the plot.</p>
+          <form class="newsletter__form" onsubmit="return false">
+            <input class="newsletter__input" type="email" data-i18n-key="web.garden.news.placeholder" placeholder="your@email.com" aria-label="email" />
+            <button class="btn" type="submit" data-i18n-key="web.garden.news.button">Subscribe</button>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer" data-section="footer">
+      <div class="wrap" data-i18n-key="web.garden.footer.text">The Quiet Garden — written by hand, grown with patience.</div>
+    </footer>
+  </body>
+</html>

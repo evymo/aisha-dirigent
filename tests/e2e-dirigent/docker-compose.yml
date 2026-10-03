@@ -1,0 +1,70 @@
+# AISHA Dirigent e2e — containerized supervisor verification stack.
+#
+# Usage:
+#   cd tests/e2e-dirigent
+#   node scripts/build-extension-vsix.mjs       # build extension VSIX first
+#   docker compose up -d --build                # ~2 min first time
+#   npm test                                    # runs Playwright + CLI specs
+#   docker compose down -v
+#
+# Networks:
+#   default — internal bridge; services reach each other by name
+#
+# Volumes:
+#   - workspace-fixture is bind-mounted into both IDE containers so any
+#     edit a spec makes is visible to the agent immediately.
+
+services:
+  mock-backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.mock-backend
+    container_name: e2e-mock-backend
+    ports:
+      - "127.0.0.1:3030:3030"
+    environment:
+      MOCK_BACKEND_LOG_LEVEL: ${MOCK_BACKEND_LOG_LEVEL:-warn}
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:3030/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
+
+  code-server:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.code-server
+    container_name: e2e-code-server
+    depends_on:
+      mock-backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8443:8443"
+    volumes:
+      - ./workspace-fixture:/workspace:rw
+    environment:
+      AISHA_GATEWAY_URL: http://mock-backend:3030
+      AISHA_MCP_TOKEN: test-token-e2e
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8443/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 30s
+
+  claude-cli:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.claude-cli
+    container_name: e2e-claude-cli
+    depends_on:
+      mock-backend:
+        condition: service_healthy
+    volumes:
+      - ./workspace-fixture:/workspace:rw
+    environment:
+      AISHA_GATEWAY_URL: http://mock-backend:3030
+      AISHA_MCP_TOKEN: test-token-e2e
+    # Long-running so specs can `docker exec` into it
+    command: ["tail", "-f", "/dev/null"]

@@ -1,0 +1,26 @@
+-- Function: public.get_product_reviews
+-- Arguments: p_product_id uuid
+-- Security: See function definition below.
+-- Extracted: 2026-01-08T18:27:20+01:00
+
+CREATE OR REPLACE FUNCTION public.get_product_reviews(p_product_id uuid)
+ RETURNS TABLE(id uuid, product_id uuid, user_id uuid, rating integer, title text, review text, is_verified_purchase boolean, is_featured boolean, created_at timestamptz, updated_at timestamptz)
+ LANGUAGE plpgsql
+ STABLE
+AS $function$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    r.id, r.product_id, r.user_id, r.rating, r.title, r.review,
+    r.is_verified_purchase, r.is_featured, r.created_at, r.updated_at
+  FROM product_reviews r
+  WHERE r.product_id = p_product_id
+  ORDER BY r.created_at DESC;
+END;
+$function$
+;
+
+-- Permissions
+REVOKE ALL ON FUNCTION public.get_product_reviews(p_product_id uuid) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.get_product_reviews(p_product_id uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.get_product_reviews(p_product_id uuid) TO authenticated;

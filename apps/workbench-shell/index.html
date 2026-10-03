@@ -1,0 +1,27 @@
+<!doctype html>
+<!--
+  data-archetype JE POVINNÝ PÁR K data-theme. Tokeny extranet-sdk-ui existují jen
+  pod dvojicí [data-theme] + [data-archetype] (viz README SDK) — bez archetypu
+  komponenty SDK nemají svůj token layer a kreslí se do prázdna. Naměřeno
+  2026-08-08: shell nastavoval jen téma, takže ESDK byl v repu, most `sdk.ts`
+  hotový, a přesto ho nikdo nemohl použít dál než na Banner.
+
+  KONKRÉTNÍ HODNOTA SEM NEPATŘÍ: archetyp je vlastnost INSTANCE, ne shellu.
+  Nastavuje ji boot z `instance.config.archetype` — touž cestou jako téma.
+  Natvrdo zapsaná hodnota by byla instanční název v generickém kanálu (brána
+  split-rule) a druhá instance by dostala cizí vzhled.
+-->
+<html lang="en" data-theme="carbon">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <link rel="stylesheet" href="/tokens.css" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <!-- title is set at runtime from instance i18n (key-first: app.title) -->
+    <title data-i18n-key="app.title"></title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

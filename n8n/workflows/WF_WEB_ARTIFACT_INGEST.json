@@ -1,0 +1,88 @@
+{
+  "name": "WF_WEB_ARTIFACT_INGEST",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "web-artifact-ingest",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Web Artifact Ingest Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate input + derive idempotency key when missing\nconst crypto = require('crypto');\nconst body = $input.first().json.body ?? $input.first().json;\n\nconst story_id = body.story_id ?? null;\nconst source_type = body.source_type;\nconst source_url = body.source_url ?? null;\nconst source_storage_path = body.source_storage_path ?? null;\nlet idempotency_key = body.idempotency_key ?? null;\nconst kind = body.kind ?? (source_type === 'url_scrape' ? 'ingest_scrape' : 'ingest_upload');\n\nif (!source_type) {\n  throw new Error('source_type required');\n}\n\nif (!idempotency_key) {\n  const seed = `${source_type}|${source_url ?? ''}|${source_storage_path ?? ''}|${story_id ?? 'global'}|${Date.now()}`;\n  idempotency_key = crypto.createHash('sha256').update(seed).digest('hex');\n}\n\nreturn [{ json: { story_id, kind, source_type, source_url, source_storage_path, idempotency_key } }];"
+      },
+      "id": "validate-input",
+      "name": "Validate + Derive Idempotency",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Call start_web_artifact_ingest RPC via PostgREST (service_role JWT)\nconst gatewayUrl = $env.AISHA_GATEWAY_URL;\nconst serviceKey = $env.AISHA_SERVICE_KEY;\nconst { story_id, kind, source_type, source_url, source_storage_path, idempotency_key } = $input.first().json;\n\nconst rpcRes = await fetch(`${gatewayUrl}/rest/v1/rpc/start_web_artifact_ingest`, {\n  method: 'POST',\n  headers: {\n    'content-type': 'application/json',\n    'accept': 'application/json',\n    'apikey': serviceKey,\n    'authorization': `Bearer ${serviceKey}`\n  },\n  body: JSON.stringify({\n    p_story_id: story_id,\n    p_kind: kind,\n    p_source_type: source_type,\n    p_source_url: source_url,\n    p_source_storage_path: source_storage_path,\n    p_idempotency_key: idempotency_key,\n    p_metadata: {}\n  })\n});\n\nif (!rpcRes.ok) {\n  const text = await rpcRes.text();\n  throw new Error(`start_web_artifact_ingest failed: ${rpcRes.status} ${text}`);\n}\nconst job_id = (await rpcRes.json()).toString().replace(/\"/g, '');\n\nreturn [{ json: { ...$input.first().json, job_id } }];"
+      },
+      "id": "start-job",
+      "name": "Start Ingest Job (RPC)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Call svc-web-artifact /parse via gateway\nconst gatewayUrl = $env.AISHA_GATEWAY_URL;\nconst serviceKey = $env.AISHA_SERVICE_KEY;\nconst { job_id, source_type, source_url, source_storage_path } = $input.first().json;\n\nconst started = Date.now();\nconst parseRes = await fetch(`${gatewayUrl}/functions/v1/web-artifact-parse`, {\n  method: 'POST',\n  headers: {\n    'content-type': 'application/json',\n    'authorization': `Bearer ${serviceKey}`\n  },\n  body: JSON.stringify({ job_id, source_type, source_url, source_storage_path })\n});\n\nconst duration_ms = Date.now() - started;\nconst parseBody = await parseRes.text();\n\nif (!parseRes.ok) {\n  // Service has already called fail_web_artifact_ingest internally; record audit at WF level too.\n  await fetch(`${gatewayUrl}/rest/v1/rpc/log_integration_action`, {\n    method: 'POST',\n    headers: {\n      'content-type': 'application/json',\n      'apikey': serviceKey,\n      'authorization': `Bearer ${serviceKey}`\n    },\n    body: JSON.stringify({\n      p_integration: 'n8n',\n      p_action_key: 'web_artifact.ingest.fail',\n      p_payload: { job_id, status: parseRes.status, detail: parseBody, duration_ms },\n      p_tags: ['stack', 'story', 'web_artifact', 'ingest', 'fail']\n    })\n  });\n  throw new Error(`parse failed: ${parseRes.status} ${parseBody}`);\n}\n\nawait fetch(`${gatewayUrl}/rest/v1/rpc/log_integration_action`, {\n  method: 'POST',\n  headers: {\n    'content-type': 'application/json',\n    'apikey': serviceKey,\n    'authorization': `Bearer ${serviceKey}`\n  },\n  body: JSON.stringify({\n    p_integration: 'n8n',\n    p_action_key: 'web_artifact.ingest.complete',\n    p_payload: { job_id, duration_ms },\n    p_tags: ['stack', 'story', 'web_artifact', 'ingest', 'complete']\n  })\n});\n\nreturn [{ json: { job_id, status: 'ready_for_review', duration_ms } }];"
+      },
+      "id": "call-parse",
+      "name": "Call svc-web-artifact /parse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond",
+      "name": "Respond to Caller",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Web Artifact Ingest Webhook": {
+      "main": [[{ "node": "Validate + Derive Idempotency", "type": "main", "index": 0 }]]
+    },
+    "Validate + Derive Idempotency": {
+      "main": [[{ "node": "Start Ingest Job (RPC)", "type": "main", "index": 0 }]]
+    },
+    "Start Ingest Job (RPC)": {
+      "main": [[{ "node": "Call svc-web-artifact /parse", "type": "main", "index": 0 }]]
+    },
+    "Call svc-web-artifact /parse": {
+      "main": [[{ "node": "Respond to Caller", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "stack" },
+    { "name": "story" },
+    { "name": "web_artifact" }
+  ]
+}

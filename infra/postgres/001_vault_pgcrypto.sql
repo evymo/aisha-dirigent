@@ -1,0 +1,15 @@
+-- =============================================================================
+-- 001_vault_pgcrypto.sql — PŘESUNUTO (2026-09-26)
+-- =============================================================================
+-- Trezor (náhrada Supabase Vault na pgcrypto) má domov jinde:
+--   - schéma + tabulka vault.secrets (+ RLS, politika, granty):
+--       infra/postgres/000_init_roles_schemas.sql (substrát, idempotentní)
+--   - pohled vault.decrypted_secrets, funkce vault.create_secret/update_secret:
+--       aisha/db/sql/views|functions (SoT → baseline při cold startu, heals.sql
+--       na běžící DB)
+--   - klíč: public.aisha_vault_encryption_key() → /run/aisha-keys (NE GUC).
+-- Dřív tu žilo všechno a jen při initdb: DB bez initdb (probe brány upgradu)
+-- trezor neměla a změny pohledu/funkcí se na běžící DB nikdy nepřehrály.
+-- Soubor zůstává (Dockerfile ho kopíruje do initdb.d), aby starší obrazy
+-- a skripty, které na něj odkazují, nenarazily na chybějící soubor.
+-- =============================================================================

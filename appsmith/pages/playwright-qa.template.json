@@ -1,0 +1,428 @@
+{
+  "$comment": "Playwright QA — operator-facing dashboard for E2E runs against deployed envs. Mirrors the AITG Automation Control template shape. Mutations go through audited RPCs (start_playwright_run, approve_playwright_run); reads through list_playwright_runs + get_playwright_runs_health_summary. Plugs into the existing AISHA Ops Appsmith app (see appsmith/dashboards/aisha-ops.template.json).",
+  "pageName": "Playwright QA",
+  "pageSlug": "playwright-qa",
+  "isHidden": false,
+  "isDefault": false,
+  "navigation": {
+    "icon": "flask",
+    "label": "Playwright QA",
+    "section": "Quality"
+  },
+  "queries": [
+    {
+      "name": "listRuns",
+      "datasource": "AISHA Postgres REST",
+      "actionConfiguration": {
+        "httpMethod": "POST",
+        "path": "/rpc/list_playwright_runs",
+        "body": "{{ { p_limit: 100, p_status_filter: statusFilter.selectedOptionValues.length > 0 ? statusFilter.selectedOptionValues : null, p_window_hours: Number(windowSelect.selectedOptionValue) } }}"
+      },
+      "executeOnLoad": true,
+      "confirmBeforeExecute": false
+    },
+    {
+      "name": "getHealthSummary",
+      "datasource": "AISHA Postgres REST",
+      "actionConfiguration": {
+        "httpMethod": "POST",
+        "path": "/rpc/get_playwright_runs_health_summary",
+        "body": "{ \"p_window_hours\": 24 }"
+      },
+      "executeOnLoad": true,
+      "confirmBeforeExecute": false
+    },
+    {
+      "name": "approveRun",
+      "datasource": "AISHA Postgres REST",
+      "actionConfiguration": {
+        "httpMethod": "POST",
+        "path": "/rpc/approve_playwright_run",
+        "body": "{{ { p_run_id: runsTable.selectedRow.id } }}"
+      },
+      "executeOnLoad": false,
+      "confirmBeforeExecute": true,
+      "onSuccess": ["listRuns.run()", "getHealthSummary.run()"]
+    },
+    {
+      "name": "startRun",
+      "datasource": "AISHA Postgres REST",
+      "actionConfiguration": {
+        "httpMethod": "POST",
+        "path": "/rpc/start_playwright_run",
+        "body": "{{ { p_trigger_kind: triggerRunModal.data.trigger_kind, p_target_env: triggerRunModal.data.target_env, p_target_base_url: triggerRunModal.data.use_app_lookup ? 'auto' : triggerRunModal.data.target_base_url, p_suite: triggerRunModal.data.suite || 'all', p_deploy_ref: triggerRunModal.data.deploy_ref || null, p_metadata: triggerRunModal.data.metadata_json ? JSON.parse(triggerRunModal.data.metadata_json) : {}, p_story_id: triggerRunModal.data.story_id || null, p_app_name: triggerRunModal.data.app_name || null } }}"
+      },
+      "executeOnLoad": false,
+      "confirmBeforeExecute": true,
+      "onSuccess": ["listRuns.run()", "getHealthSummary.run()", "triggerRunModal.close()"]
+    },
+    {
+      "$comment": "Audit access intent BEFORE rendering the iframe so report views land in audit_journal alongside the operator who opened it. The bucket has admin/staff SELECT — the iframe loads with the same browser session, no signed URL needed.",
+      "name": "auditReportView",
+      "datasource": "AISHA Postgres REST",
+      "actionConfiguration": {
+        "httpMethod": "POST",
+        "path": "/rpc/log_integration_action",
+        "body": "{{ { p_service_name: 'appsmith', p_action: 'playwright_report_view', p_action_detail: { run_id: runsTable.selectedRow.id, report_storage_path: runsTable.selectedRow.report_storage_path, target_env: runsTable.selectedRow.target_env, status: runsTable.selectedRow.status, viewer_email: appsmith.user.email }, p_status: 'success', p_duration_ms: 0 } }}"
+      },
+      "executeOnLoad": false,
+      "confirmBeforeExecute": false,
+      "onSuccess": ["reportModal.open()"]
+    }
+  ],
+  "widgets": [
+    {
+      "type": "TextWidget",
+      "name": "pageTitle",
+      "props": {
+        "text": "Playwright QA",
+        "fontSize": "2rem",
+        "fontWeight": "700"
+      },
+      "position": { "row": 0, "col": 0, "rowSpan": 1, "colSpan": 24 }
+    },
+    {
+      "type": "TextWidget",
+      "name": "pageSubtitle",
+      "props": {
+        "text": "Every Playwright run that hit a deployed env. Staging deploys auto-chain here; production runs need a second admin to approve before the runner picks them up. Mutations are audited; B/G slot health updates are visible in the deploy ops page.",
+        "fontSize": "0.95rem",
+        "fontColor": "#6b7280"
+      },
+      "position": { "row": 1, "col": 0, "rowSpan": 1, "colSpan": 24 }
+    },
+    {
+      "type": "StatBoxWidget",
+      "name": "queuedStat",
+      "props": {
+        "label": "Queued",
+        "value": "{{ getHealthSummary.data?.[0]?.queued ?? 0 }}",
+        "icon": "clock",
+        "color": "{{ (getHealthSummary.data?.[0]?.queued ?? 0) > 0 ? '#3b82f6' : '#9ca3af' }}"
+      },
+      "position": { "row": 2, "col": 0, "rowSpan": 2, "colSpan": 4 }
+    },
+    {
+      "type": "StatBoxWidget",
+      "name": "runningStat",
+      "props": {
+        "label": "Running",
+        "value": "{{ getHealthSummary.data?.[0]?.running ?? 0 }}",
+        "icon": "play-circle",
+        "color": "{{ (getHealthSummary.data?.[0]?.running ?? 0) > 0 ? '#0ea5e9' : '#9ca3af' }}"
+      },
+      "position": { "row": 2, "col": 4, "rowSpan": 2, "colSpan": 4 }
+    },
+    {
+      "type": "StatBoxWidget",
+      "name": "awaitingApprovalStat",
+      "props": {
+        "label": "Awaiting Approval",
+        "value": "{{ getHealthSummary.data?.[0]?.awaiting_approval ?? 0 }}",
+        "icon": "shield",
+        "color": "{{ (getHealthSummary.data?.[0]?.awaiting_approval ?? 0) > 0 ? '#eab308' : '#9ca3af' }}"
+      },
+      "position": { "row": 2, "col": 8, "rowSpan": 2, "colSpan": 4 }
+    },
+    {
+      "type": "StatBoxWidget",
+      "name": "passedStat",
+      "props": {
+        "label": "Passed (24h)",
+        "value": "{{ getHealthSummary.data?.[0]?.passed ?? 0 }}",
+        "icon": "check-circle",
+        "color": "{{ (getHealthSummary.data?.[0]?.passed ?? 0) > 0 ? '#16a34a' : '#9ca3af' }}"
+      },
+      "position": { "row": 2, "col": 12, "rowSpan": 2, "colSpan": 4 }
+    },
+    {
+      "type": "StatBoxWidget",
+      "name": "failedStat",
+      "props": {
+        "label": "Failed/Errored (24h)",
+        "value": "{{ (getHealthSummary.data?.[0]?.failed ?? 0) + (getHealthSummary.data?.[0]?.errored ?? 0) }}",
+        "icon": "alert-triangle",
+        "color": "{{ ((getHealthSummary.data?.[0]?.failed ?? 0) + (getHealthSummary.data?.[0]?.errored ?? 0)) > 0 ? '#dc2626' : '#16a34a' }}"
+      },
+      "position": { "row": 2, "col": 16, "rowSpan": 2, "colSpan": 4 }
+    },
+    {
+      "type": "StatBoxWidget",
+      "name": "rollbacksStat",
+      "props": {
+        "label": "Rollbacks Triggered (24h)",
+        "value": "{{ getHealthSummary.data?.[0]?.rollbacks_triggered ?? 0 }}",
+        "icon": "rotate-ccw",
+        "color": "{{ (getHealthSummary.data?.[0]?.rollbacks_triggered ?? 0) > 0 ? '#dc2626' : '#9ca3af' }}"
+      },
+      "position": { "row": 2, "col": 20, "rowSpan": 2, "colSpan": 4 }
+    },
+    {
+      "type": "SelectWidget",
+      "name": "statusFilter",
+      "props": {
+        "label": "Status filter",
+        "placeholderText": "All statuses",
+        "isMultiSelect": true,
+        "options": [
+          { "label": "queued", "value": "queued" },
+          { "label": "running", "value": "running" },
+          { "label": "passed", "value": "passed" },
+          { "label": "failed", "value": "failed" },
+          { "label": "errored", "value": "errored" },
+          { "label": "aborted", "value": "aborted" }
+        ],
+        "onSelectionChange": "{{ listRuns.run() }}"
+      },
+      "position": { "row": 4, "col": 0, "rowSpan": 1, "colSpan": 8 }
+    },
+    {
+      "type": "SelectWidget",
+      "name": "windowSelect",
+      "props": {
+        "label": "Window",
+        "defaultValue": "168",
+        "options": [
+          { "label": "Last 24 h",  "value": "24" },
+          { "label": "Last 7 d",   "value": "168" },
+          { "label": "Last 30 d",  "value": "720" }
+        ],
+        "onSelectionChange": "{{ listRuns.run() }}"
+      },
+      "position": { "row": 4, "col": 8, "rowSpan": 1, "colSpan": 4 }
+    },
+    {
+      "type": "ButtonWidget",
+      "name": "triggerRunButton",
+      "props": {
+        "text": "Trigger Run",
+        "buttonStyle": "PRIMARY_BUTTON",
+        "iconName": "play",
+        "onClick": "{{ triggerRunModal.open({ data: { trigger_kind: 'production_manual', target_env: 'production', use_app_lookup: true, target_base_url: '', app_name: '', story_id: '', suite: 'all', deploy_ref: '', metadata_json: '{}' } }) }}"
+      },
+      "position": { "row": 4, "col": 20, "rowSpan": 1, "colSpan": 4 }
+    },
+    {
+      "type": "TableWidget",
+      "name": "runsTable",
+      "props": {
+        "tableData": "{{ listRuns.data }}",
+        "primaryColumnKey": "id",
+        "columns": [
+          {
+            "key": "created_at",
+            "label": "Created",
+            "computeValue": "{{ moment(currentRow.created_at).fromNow() }}",
+            "width": 130
+          },
+          {
+            "key": "trigger_kind",
+            "label": "Trigger",
+            "cellBackgroundColor": "{{ currentRow.trigger_kind === 'staging_auto' ? '#dbeafe' : currentRow.trigger_kind === 'production_manual' ? '#fef3c7' : '#e5e7eb' }}",
+            "cellTextColor": "{{ currentRow.trigger_kind === 'staging_auto' ? '#1e40af' : currentRow.trigger_kind === 'production_manual' ? '#854d0e' : '#374151' }}",
+            "width": 140
+          },
+          {
+            "key": "target_env",
+            "label": "Env",
+            "width": 110
+          },
+          {
+            "key": "app_slot",
+            "label": "App / Slot",
+            "computeValue": "{{ currentRow.app_name ? (currentRow.app_name + (currentRow.active_slot ? ' · ' + currentRow.active_slot : '')) : '—' }}",
+            "width": 180
+          },
+          {
+            "key": "status",
+            "label": "Status",
+            "cellBackgroundColor": "{{ ({queued: '#dbeafe', running: '#bae6fd', passed: '#dcfce7', failed: '#fee2e2', errored: '#fee2e2', aborted: '#e5e7eb'})[currentRow.status] || '#e5e7eb' }}",
+            "cellTextColor": "{{ ({queued: '#1e40af', running: '#075985', passed: '#166534', failed: '#991b1b', errored: '#991b1b', aborted: '#374151'})[currentRow.status] || '#374151' }}",
+            "width": 110
+          },
+          {
+            "key": "counts",
+            "label": "Counts",
+            "computeValue": "{{ currentRow.total != null ? ((currentRow.passed ?? 0) + '/' + currentRow.total + (currentRow.skipped ? ' (' + currentRow.skipped + ' skip)' : '')) : '—' }}",
+            "width": 120
+          },
+          {
+            "key": "duration_ms",
+            "label": "Duration",
+            "computeValue": "{{ currentRow.duration_ms == null ? '—' : currentRow.duration_ms < 1000 ? currentRow.duration_ms + ' ms' : currentRow.duration_ms < 60000 ? (currentRow.duration_ms / 1000).toFixed(1) + ' s' : (currentRow.duration_ms / 60000).toFixed(1) + ' min' }}",
+            "width": 110
+          },
+          {
+            "key": "approval_required",
+            "label": "Approval",
+            "computeValue": "{{ currentRow.approval_required ? (currentRow.approved_at ? 'approved' : 'pending') : '—' }}",
+            "cellBackgroundColor": "{{ !currentRow.approval_required ? '#e5e7eb' : currentRow.approved_at ? '#dcfce7' : '#fef3c7' }}",
+            "width": 110
+          },
+          {
+            "key": "triggered_rollback_id",
+            "label": "Rollback",
+            "computeValue": "{{ currentRow.triggered_rollback_id ? '🔄 ' + currentRow.triggered_rollback_id.slice(0, 8) : '—' }}",
+            "width": 130
+          },
+          {
+            "key": "deploy_ref",
+            "label": "Deploy ref",
+            "width": 140
+          }
+        ],
+        "isVisible": true,
+        "isSortable": true,
+        "isFilterable": true,
+        "pageSize": 20
+      },
+      "position": { "row": 5, "col": 0, "rowSpan": 12, "colSpan": 24 }
+    },
+    {
+      "type": "ButtonWidget",
+      "name": "approveButton",
+      "props": {
+        "text": "Approve Run",
+        "buttonStyle": "PRIMARY_BUTTON",
+        "iconName": "check",
+        "isDisabled": "{{ !runsTable.selectedRow || !runsTable.selectedRow.approval_required || !!runsTable.selectedRow.approved_at || runsTable.selectedRow.status !== 'queued' || runsTable.selectedRow.requested_by === appsmith.user.id }}",
+        "tooltip": "Requires a different admin than the requester (segregation of duties).",
+        "onClick": "{{ confirmDialog.open({ message: 'Approve production Playwright run on ' + runsTable.selectedRow.target_env + '?', onConfirm: () => approveRun.run() }) }}"
+      },
+      "position": { "row": 17, "col": 0, "rowSpan": 1, "colSpan": 4 }
+    },
+    {
+      "type": "ButtonWidget",
+      "name": "viewReportButton",
+      "props": {
+        "text": "View Report",
+        "buttonStyle": "SECONDARY_BUTTON",
+        "iconName": "external-link",
+        "isDisabled": "{{ !runsTable.selectedRow || !runsTable.selectedRow.report_storage_path }}",
+        "onClick": "{{ auditReportView.run() }}"
+      },
+      "position": { "row": 17, "col": 4, "rowSpan": 1, "colSpan": 4 }
+    },
+    {
+      "type": "ButtonWidget",
+      "name": "openStoryButton",
+      "props": {
+        "text": "Open Story",
+        "buttonStyle": "SECONDARY_BUTTON",
+        "iconName": "book-open",
+        "isDisabled": "{{ !runsTable.selectedRow || !runsTable.selectedRow.story_id }}",
+        "onClick": "{{ navigateTo('story-intra', { p_story_id: runsTable.selectedRow.story_id }, 'NEW_WINDOW') }}"
+      },
+      "position": { "row": 17, "col": 8, "rowSpan": 1, "colSpan": 4 }
+    },
+    {
+      "type": "ModalWidget",
+      "name": "triggerRunModal",
+      "props": {
+        "title": "Trigger Playwright Run",
+        "size": "LARGE",
+        "children": [
+          {
+            "type": "FormWidget",
+            "name": "triggerRunForm",
+            "fields": [
+              {
+                "type": "select",
+                "name": "trigger_kind",
+                "label": "Trigger kind",
+                "options": [
+                  { "label": "Production manual (requires approval)", "value": "production_manual" },
+                  { "label": "Scheduled (one-off)", "value": "scheduled" }
+                ],
+                "defaultValue": "{{ triggerRunModal.data?.trigger_kind ?? 'production_manual' }}",
+                "helpText": "staging_auto is reserved for WF_DEPLOY_STORY; trigger here only for ad-hoc runs."
+              },
+              {
+                "type": "input",
+                "name": "target_env",
+                "label": "Target env",
+                "placeholder": "production / staging / tenant-staging",
+                "defaultValue": "{{ triggerRunModal.data?.target_env ?? '' }}"
+              },
+              {
+                "type": "switch",
+                "name": "use_app_lookup",
+                "label": "Resolve URL from coolify_app_slots (recommended)",
+                "defaultValue": "{{ triggerRunModal.data?.use_app_lookup ?? true }}",
+                "helpText": "When on, target_base_url is derived from the live B/G slot of app_name. When off, target_base_url must be set explicitly."
+              },
+              {
+                "type": "input",
+                "name": "app_name",
+                "label": "App name (coolify_app_slots.app_name)",
+                "placeholder": "stack-aisha-prod",
+                "defaultValue": "{{ triggerRunModal.data?.app_name ?? '' }}",
+                "helpText": "Required when 'Resolve URL' is on. Used to pick the slot whose health gets updated by the run."
+              },
+              {
+                "type": "input",
+                "name": "target_base_url",
+                "label": "Target base URL (explicit)",
+                "placeholder": "https://app.aisha.guru",
+                "defaultValue": "{{ triggerRunModal.data?.target_base_url ?? '' }}",
+                "helpText": "Only used when 'Resolve URL' is off. Must be http(s):// scheme."
+              },
+              {
+                "type": "input",
+                "name": "suite",
+                "label": "Suite",
+                "placeholder": "all OR e2e/admin-flows.spec.ts",
+                "defaultValue": "{{ triggerRunModal.data?.suite ?? 'all' }}"
+              },
+              {
+                "type": "input",
+                "name": "deploy_ref",
+                "label": "Deploy ref",
+                "placeholder": "v1.2.3 / commit sha",
+                "defaultValue": "{{ triggerRunModal.data?.deploy_ref ?? '' }}"
+              },
+              {
+                "type": "input",
+                "name": "story_id",
+                "label": "Story ID (optional)",
+                "placeholder": "uuid",
+                "defaultValue": "{{ triggerRunModal.data?.story_id ?? '' }}",
+                "helpText": "When set, qa_playwright_requested/passed/failed entries land on the storyloop timeline."
+              },
+              {
+                "type": "textarea",
+                "name": "metadata_json",
+                "label": "Metadata (JSON)",
+                "defaultValue": "{{ triggerRunModal.data?.metadata_json ?? '{}' }}",
+                "rows": 4,
+                "helpText": "Free-form. Useful for browser/viewport hints, parallel workers, etc."
+              }
+            ],
+            "submitText": "Queue run",
+            "onSubmit": "{{ startRun.run() }}"
+          }
+        ]
+      }
+    },
+    {
+      "type": "ModalWidget",
+      "name": "reportModal",
+      "props": {
+        "title": "Playwright HTML Report",
+        "size": "LARGE",
+        "children": [
+          {
+            "type": "IframeWidget",
+            "name": "reportIframe",
+            "props": {
+              "source": "{{ runsTable.selectedRow?.report_storage_path ? appsmith.store.POSTGREST_URL + '/storage/v1/object/' + runsTable.selectedRow.report_storage_path : '' }}",
+              "borderColor": "#e5e7eb",
+              "borderWidth": "1px",
+              "height": "780px"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

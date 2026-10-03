@@ -1,0 +1,18 @@
+{
+  "downtime.description": "Незапланированные простои и недоступность сервисов",
+  "downtime.name": "Простой",
+  "integration-errors.description": "Ошибки, сбои или таймауты при интеграции",
+  "integration-errors.name": "Ошибки интеграции",
+  "latency.description": "Высокое время отклика и снижение производительности системы",
+  "latency.name": "Латентность",
+  "memory-leak.description": "Постепенный рост памяти и проблемы синхронизации данных",
+  "memory-leak.name": "Утечка памяти",
+  "mood-changes.description": "Шторм алертов, ложные срабатывания или шум мониторинга",
+  "mood-changes.name": "Нестабильные алерты",
+  "sleep-issues.description": "Ошибки таймаутов и разрывы неактивных соединений",
+  "sleep-issues.name": "Проблемы с таймаутами",
+  "slow-queries.description": "Узкие места БД и проблемы оптимизации запросов",
+  "slow-queries.name": "Медленные запросы",
+  "ui-glitches.description": "Визуальные баги, проблемы рендеринга и вёрстки",
+  "ui-glitches.name": "Ошибки интерфейса"
+}

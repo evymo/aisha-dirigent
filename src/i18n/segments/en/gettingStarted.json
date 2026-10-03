@@ -1,0 +1,106 @@
+{
+  "gettingStarted": {
+    "meta": {
+      "title": "Getting started",
+      "description": "A practical guide to your first steps with AISHA — from login to your first result in 10 minutes."
+    },
+    "hero": {
+      "badge": "Public preview",
+      "title": "Getting started with AISHA",
+      "subtitle": "A short course for new users: what AISHA is, how it thinks, and how to get a real result out of it in your first ten minutes."
+    },
+    "whatIs": {
+      "title": "1. What AISHA is and how it thinks",
+      "intro": "AISHA is not a single chatbot. It is an AI orchestrator — a platform that picks the right approach, model and tools for each task, and does everything under supervision and with an audit trail. Four principles that will make your life easier:",
+      "stories": {
+        "title": "Stories = your projects",
+        "text": "Everything revolves around stories. A story is the workspace of one project or initiative: it has its own knowledge base, an activity timeline and rulesets. Whatever AISHA does, it does in the context of a specific story — knowledge and outputs never leak between projects."
+      },
+      "backend": {
+        "title": "The AI picks the backend per task",
+        "text": "You don't configure a model. For each task, AISHA selects a suitable language model and processing path based on the task type, cost and availability. You describe what you need — choosing \"what to do it with\" is the orchestrator's job."
+      },
+      "governance": {
+        "title": "Governance: fail loud rather than err quietly",
+        "text": "The platform is designed fail-loud. When something can't be done, or data or permissions are missing, you hear about it directly — instead of a silent guess dressed up as an answer. Sensitive actions pass through approval gates, and privileged operations are written to the audit journal."
+      },
+      "dirigent": {
+        "title": "Dirigent: supervision of AI agents",
+        "text": "AISHA Dirigent continuously watches the work of AI agents and course-corrects it — advisory, not by force. Agent outputs get a second pair of eyes before they reach you."
+      }
+    },
+    "firstSteps": {
+      "title": "2. Your first 10 minutes",
+      "intro": "The shortest path from login to a first result.",
+      "step1": {
+        "title": "Sign in",
+        "text": "You sign in via single sign-on (Keycloak) on the /auth page. Your preview access arrived by e-mail; you set your own password on first login."
+      },
+      "step2": {
+        "title": "Open your first story",
+        "text": "In the Stories section, open the story prepared for you (or have a new one created). Browse the Overview, Timeline and Knowledge tabs — you'll see what AISHA knows about the project and what has happened in it so far."
+      },
+      "step3": {
+        "title": "Send your first chat message",
+        "text": "Open the AI chat and ask something about the project. Start specific: \"Summarize the knowledge in this story\" is a better first question than \"What can you do?\". Watch the Sources used panel next to answers — it shows what the answer is grounded in."
+      },
+      "step4": {
+        "title": "Run your first flowboard",
+        "text": "The flowboard is a canvas where you draw a workflow from nodes — Triggers, Agents, MCP Tools, Actions and Gates — and press Run to execute it. When a flow hits an approval gate, you'll see the \"awaiting approval\" state: review what is about to happen and confirm Approve and continue. Not sure how to assemble the flow? Use Ask AISHA right on the canvas."
+      },
+      "step5": {
+        "title": "Bonus: browse the Agent Marketplace",
+        "text": "The agent catalog offers ready-made specialized agents you can install into your story — they then run in its context and with its knowledge."
+      }
+    },
+    "workingWithAi": {
+      "title": "3. How to work with AI effectively",
+      "intro": "AI is a powerful but fallible colleague. These few habits make the biggest difference between frustration and a great result.",
+      "context": {
+        "title": "Context decides",
+        "text": "The model knows nothing you don't tell it. Describe what you want, for whom, in what format, and how you'll know it's done. One well-written sentence of instructions saves three rounds of clarification."
+      },
+      "knowledge": {
+        "title": "Feed the knowledge base",
+        "text": "Upload materials into the story's Knowledge tab (PDF, DOCX, TXT, MD up to 50 MB) or add entries by hand. AISHA draws on them through multilingual retrieval that handles Czech natively — a question asked in Czech finds English documents and vice versa. The better the sources, the less the AI makes things up."
+      },
+      "verify": {
+        "title": "Trust, but verify",
+        "text": "Language models sometimes state things that aren't true — and sound confident doing it. That's why AISHA shows Sources used and a faithfulness badge next to answers; take the warning \"Low faithfulness — verify the answer before using it\" seriously. Always check facts, numbers and anything leaving the company against the source."
+      },
+      "iterate": {
+        "title": "Iterate, don't dictate",
+        "text": "The first answer is a draft, not a verdict. React: \"shorten this\", \"back it with a source\", \"rewrite it for the customer\". Short iterations beat one long perfect prompt."
+      },
+      "rules": {
+        "title": "The minimum to remember",
+        "items": [
+          "AI output is a draft — responsibility for the result stays with you.",
+          "The more specific the brief and the better the sources, the better the result.",
+          "Double-check answers that cite no sources.",
+          "Don't paste data into the chat that doesn't belong in the project.",
+          "When AISHA doesn't know, it says so out loud — that's by design, not a bug."
+        ]
+      }
+    },
+    "preview": {
+      "title": "4. What \"preview\" means",
+      "intro": "You are using a live but early version of the platform. What to expect:",
+      "limits": [
+        "Features change and grow; occasionally something creaks or gets rebuilt.",
+        "AI response speed and quality may vary with the selected backend and current load.",
+        "Some areas (for example the Flowboard) are enabled gradually based on role and permissions.",
+        "Your data runs on self-hosted infrastructure in the EU (Czech Republic), with no third-party trackers. You can request account deletion at any time on the /account/delete page."
+      ],
+      "feedback": {
+        "title": "Your feedback drives what comes next",
+        "text": "Hit a bug, something doesn't make sense, or a feature is missing? Write to us at ask@aisha.guru. During the preview we read everything and reply fast — feedback from these weeks directly sets the order of upcoming changes.",
+        "cta": "Write to ask@aisha.guru"
+      }
+    },
+    "closing": {
+      "title": "Now go for it",
+      "text": "The fastest way to get comfortable with AISHA is to give it a real task from your project — not a toy exercise. Open a story, upload your first document and ask. You'll learn the rest as you go."
+    }
+  }
+}

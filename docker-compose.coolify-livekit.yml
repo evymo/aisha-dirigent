@@ -1,0 +1,132 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify-livekit.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+x-common: &common
+  restart: unless-stopped
+  networks:
+    - internal
+
+services:
+  livekit-config-init:
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM alpine:3.20
+        RUN apk add --no-cache gettext
+        COPY coolify/livekit.yaml /config/livekit.yaml
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-livekit-config-init
+    restart: "no"
+    command: ["sh", "-c", "envsubst < /config/livekit.yaml > /out/livekit.yaml && echo 'livekit config staged'"]
+    environment:
+      - TURN_DOMAIN=${TURN_DOMAIN}
+      - LIVEKIT_LOG_LEVEL=${LIVEKIT_LOG_LEVEL:-info}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set}
+      - LIVEKIT_TURN_USER=${LIVEKIT_TURN_USER}
+      - LIVEKIT_TURN_PASSWORD=${LIVEKIT_TURN_PASSWORD:?LIVEKIT_TURN_PASSWORD must be set}
+      - LIVEKIT_WEBHOOK_URL=${LIVEKIT_WEBHOOK_URL}
+    volumes:
+      - livekit-config:/out
+    healthcheck:
+      disable: true
+    networks:
+      - internal
+
+  livekit:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    <<: *common
+    image: ${IMAGE_LIVEKIT}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-livekit
+    depends_on:
+      livekit-config-init:
+        condition: service_completed_successfully
+    command: ["--config", "/etc/livekit/livekit.yaml"]
+    volumes:
+      - livekit-config:/etc/livekit:ro
+    environment:
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:?LIVEKIT_API_KEY must be set}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:?LIVEKIT_API_SECRET must be set}
+      - LIVEKIT_LOG_LEVEL=${LIVEKIT_LOG_LEVEL:-info}
+    ports:
+      - "${LIVEKIT_RTC_PORT:?ruční deklarace operátora v .env-prod-backup — veřejný UDP port RTC, na sdíleném serveru jiný pro každou instanci}:7882/udp"
+    expose:
+      - "7880"
+      - "7881"
+    networks:
+      - internal
+      - coolify
+      - mesh-dns
+    labels:
+      - "coolify.managed=true"
+      - "traefik.docker.network=coolify"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:7880"]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+
+  coturn-config-init:
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM alpine:3.20
+        RUN apk add --no-cache gettext
+        COPY coolify/coturn.conf /config/turnserver.conf
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-coturn-config-init
+    restart: "no"
+    command: ["sh", "-c", "envsubst < /config/turnserver.conf > /out/turnserver.conf && echo 'coturn config staged'"]
+    environment:
+      - TURN_REALM=${TURN_DOMAIN}
+      - TURN_USERNAME=${LIVEKIT_TURN_USER}
+      - TURN_PASSWORD=${LIVEKIT_TURN_PASSWORD:?LIVEKIT_TURN_PASSWORD must be set}
+    volumes:
+      - coturn-config:/out
+    healthcheck:
+      disable: true
+    networks:
+      - internal
+
+  coturn:
+    <<: *common
+    image: ${IMAGE_COTURN}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-coturn
+    depends_on:
+      coturn-config-init:
+        condition: service_completed_successfully
+    command: ["-c", "/etc/coturn/turnserver.conf"]
+    volumes:
+      - coturn-config:/etc/coturn:ro
+    environment:
+      - TURN_USERNAME=${LIVEKIT_TURN_USER}
+      - TURN_PASSWORD=${LIVEKIT_TURN_PASSWORD:?LIVEKIT_TURN_PASSWORD must be set}
+      - TURN_REALM=${TURN_DOMAIN}
+    ports:
+      - "${TURN_PORT:?ruční deklarace operátora v .env-prod-backup — veřejný port TURN}:3478"
+      - "${TURN_PORT:?ruční deklarace operátora v .env-prod-backup — veřejný port TURN}:3478/udp"
+      - "${TURN_TLS_PORT:?ruční deklarace operátora v .env-prod-backup — veřejný port TURN TLS}:5349"
+      - "${TURN_TLS_PORT:?ruční deklarace operátora v .env-prod-backup — veřejný port TURN TLS}:5349/udp"
+      - "${TURN_RELAY_PORTS:-49152-49200}:49152-49200/udp"
+    healthcheck:
+      test: ["CMD-SHELL", "turnutils_uclient -T -p 3478 127.0.0.1 2>&1 | grep -q 'Total' || exit 0"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+
+networks:
+  internal:
+    name: ${APP_NAME_PREFIX:?}-livekit-net
+    driver: bridge
+  coolify:
+    external: true
+    name: coolify
+  mesh-dns:
+    external: true
+    name: ${MESH_DNS_NETWORK:?vydává generate-secrets}
+volumes:
+  livekit-config:
+  coturn-config:

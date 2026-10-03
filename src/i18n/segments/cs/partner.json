@@ -1,0 +1,1704 @@
+{
+  "storyloop": {
+    "title": "StoryLoop",
+    "days": "{{count}} dní",
+    "days_one": "{{count}} den",
+    "description": "Partner workspace pro správu případů členů",
+    "unknownUser": "Neznámý člen",
+    "newStory": {
+      "title": "Nová story",
+      "description": "Vytvořte nový případ pro vašeho člena",
+      "memberDescription": "Vytvořte nový případ StoryLoop pro sebe v rámci aktivního clusteru",
+      "user": "Člen",
+      "selectUser": "Vyberte člena",
+      "noUsers": "Žádní členové se souhlasem",
+      "study": "Cluster",
+      "selectStudy": "Vyberte cluster",
+      "noEligibleStudies": "Žádné aktivní nebo zapsané clustery nejsou k dispozici",
+      "storyTitle": "Název (volitelný)",
+      "titlePlaceholder": "Např. Úvodní konzultace",
+      "titleHint": "Krátký název pro identifikaci případu",
+      "create": "Vytvořit story",
+      "error": "Chyba",
+      "errorDescription": "Nepodařilo se vytvořit story. Zkuste to prosím znovu.",
+      "success": "Story vytvořena",
+      "successDescription": "Nový případ byl úspěšně vytvořen"
+    },
+    "addEntry": {
+      "title": "Přidat záznam",
+      "description": "Přidejte záznam do časové osy člena",
+      "selectMember": "Vyberte člena",
+      "selectStory": "Vyberte případ",
+      "noActiveStories": "Žádné aktivní případy pro tohoto člena",
+      "selectEntryType": "Typ záznamu",
+      "content": "Poznámka (volitelná)",
+      "contentPlaceholder": "Doplňující poznámka...",
+      "submit": "Přidat záznam",
+      "success": "Záznam přidán",
+      "successDescription": "Záznam byl přidán do časové osy člena",
+      "error": "Chyba",
+      "errorDescription": "Nepodařilo se přidat záznam. Zkuste to prosím znovu.",
+      "entryTypes": {
+        "note": "Poznámka",
+        "meeting_request": "Žádost o schůzku",
+        "questionnaire_request": "Dotazník",
+        "consent_request": "Žádost o souhlas",
+        "lab_order": "Objednávka testu",
+        "distribution_adjustment": "Úprava dávkování",
+        "email": "E-mail"
+      }
+    },
+    "newDiscussion": {
+      "title": "Nová diskuze",
+      "description": "Založte nové diskuzní téma",
+      "topicTitle": "Název tématu",
+      "topicTitlePlaceholder": "Např. Osvědčené postupy pro suplementační protokoly",
+      "summary": "Shrnutí (volitelné)",
+      "summaryPlaceholder": "Stručný popis tématu...",
+      "firstPost": "Úvodní příspěvek",
+      "firstPostPlaceholder": "Napište úvodní příspěvek...",
+      "visibility": "Viditelnost",
+      "visibilityPublic": "Veřejné",
+      "visibilityMembers": "Pouze pro členy",
+      "create": "Vytvořit téma",
+      "success": "Diskuze vytvořena",
+      "successDescription": "Nové diskuzní téma bylo úspěšně vytvořeno",
+      "error": "Chyba",
+      "errorDescription": "Nepodařilo se vytvořit diskuzi. Zkuste to prosím znovu."
+    },
+    "all": "Vše",
+    "active": "Aktivní",
+    "inbox": "Příchozí",
+    "inProgress": "Rozpracováno",
+    "scheduled": "Naplánované",
+    "starred": "Oblíbené",
+    "archived": "Archiv",
+    "trash": "Koš",
+    "labels": "Štítky",
+    "search": "Hledat v případech...",
+    "noStories": "Žádné případy",
+    "selectStory": "Vyberte členské vlákno ze seznamu",
+    "markRead": "Označit jako přečtené",
+    "star": "Oblíbené",
+    "archive": "Archivovat",
+    "restore": "Obnovit",
+    "delete": "Smazat",
+    "moveTo": "Přesunout do",
+    "addNote": "Přidat poznámku",
+    "addAction": "Přidat akci",
+    "internalNote": "Interní",
+    "internal": "Interní",
+    "entryAdded": "Záznam přidán",
+    "composerPlaceholder": "Napište poznámku nebo zprávu...",
+    "memberComposerPlaceholder": "Přidejte poznámku do své timeline...",
+    "composerHint": "Ctrl+Enter pro odeslání",
+    "hideHeader": "Skrýt hlavičku",
+    "showHeader": "Zobrazit hlavičku",
+    "loadPreview": "Načíst náhled",
+    "previewNotAvailable": "Náhled není k dispozici",
+    "imageLoadFailed": "Nepodařilo se načíst obrázek",
+    "documentLinkCopied": "Odkaz na dokument byl zkopírován do schránky",
+    "blocks": {
+      "meetingRequest": "Žádost o schůzku",
+      "meetingRequestDesc": "Naplánujte schůzku s členem",
+      "questionnaireRequest": "Žádost o dotazník",
+      "questionnaireRequestDesc": "Požádejte člena o vyplnění dotazníku",
+      "consentRequest": "Žádost o souhlas",
+      "consentRequestDesc": "Požádejte člena o souhlas",
+      "labOrder": "Objednávka testu",
+      "labOrderDesc": "Objednat hodnotící testy",
+      "distributionAdjustment": "Úprava dávkování",
+      "distributionAdjustmentDesc": "Změnit distribuci platformních služeb",
+      "bloodMatrixAnalysis": "Analýza matice výkonu",
+      "bloodMatrixAnalysisDesc": "Zaznamenat matici výkonu 3x3 a vygenerovat zprávu",
+      "email": "Odeslat Email",
+      "emailDesc": "Napsat a odeslat email členovi",
+      "productLog": "Zaznamenat suplement",
+      "productLogDesc": "Zaznamenat užití suplementu",
+      "healthLog": "Zaznamenat stav",
+      "trackingLogDesc": "Zaznamenat závažnost problému"
+    },
+    "addBlock": "Blok",
+    "insertBlock": "Vložit blok",
+    "blockAdded": "Blok přidán",
+    "meetingType": {
+      "onboarding": "Onboarding",
+      "consultation": "Konzultace",
+      "check_in": "Odbavení",
+      "urgent": "Urgentní",
+      "other": "Jiné",
+      "initial": "Úvodní",
+      "follow_up": "Následná",
+      "assessment": "Hodnocení",
+      "closing": "Závěrečná"
+    },
+    "user": {
+      "context": "Kontext člena",
+      "timeline": "Časová osa",
+      "recentCheckIns": "Poslední check-iny",
+      "sharedDocuments": "Sdílené dokumenty"
+    },
+    "aisha": {
+      "name": "Aisha",
+      "title": "Konzultace s Aishou",
+      "consult": "Konzultovat",
+      "recap": "Shrnutí",
+      "translate": "Přeložit",
+      "recommend": "Navrhnout kroky",
+      "analyze": "Analyzovat trendy",
+      "contextInfo": "Aisha má přístup ke kontextu člena",
+      "excludeHealth": "Vyloučit citlivé údaje",
+      "generating": "Generuji odpověď...",
+      "comingSoon": "AI konzultace již brzy.",
+      "placeholder": "Napište dotaz...",
+      "startConversation": "Začněte konverzaci nebo použijte rychlé akce výše.",
+      "errorGenerating": "Nepodařilo se vygenerovat odpověď.",
+      "contextDescription": "Aisha má přístup k časové ose případu, check-inům a sdíleným dokumentům (pokud byl udělen souhlas).",
+      "clearHistory": "Vymazat historii",
+      "thinkingChat": "Přemýšlím…",
+      "thinkingRecap": "Shrnuji timeline…",
+      "thinkingTranslate": "Překládám…",
+      "thinkingRecommend": "Připravuji doporučení…",
+      "thinkingAnalyze": "Analyzuji citlivé údaje…"
+    },
+    "meetingStatus": {
+      "pending": "Čeká na potvrzení",
+      "accepted": "Potvrzeno",
+      "declined": "Odmítnuto",
+      "rescheduled": "Přeplánováno",
+      "completed": "Dokončeno",
+      "scheduled": "Naplánováno",
+      "cancelled": "Zrušeno",
+      "no_show": "Nedostavil se"
+    },
+    "location": {
+      "video": "Videohovor",
+      "phone": "Telefon",
+      "in_person": "Osobně",
+      "online": "Online"
+    },
+    "proposedTimes": "Navržené časy",
+    "proposedTimesLabel": "Navržené termíny",
+    "acceptMeeting": "Přijmout",
+    "declineMeeting": "Odmítnout",
+    "rescheduleMeeting": "Přeplánovat",
+    "meetingTypeLabel": "Typ schůzky",
+    "locationLabel": "Místo",
+    "selectLocation": "Vyberte místo",
+    "addProposedTime": "Přidat termín",
+    "notesLabel": "Poznámky",
+    "meetingNotesPlaceholder": "Volitelné poznámky k schůzce...",
+    "createMeetingRequest": "Vytvořit žádost",
+    "meetingRequestContent": "Žádost o schůzku",
+    "questionnaireStatus": {
+      "pending": "Čeká na vyplnění",
+      "started": "Rozpracováno",
+      "completed": "Vyplněno",
+      "expired": "Vypršelo",
+      "in_progress": "Probíhá",
+      "skipped": "Přeskočeno"
+    },
+    "questionnaireLoadError": "Nepodařilo se načíst dotazníky.",
+    "noQuestionnairesAvailable": "Pro tento cluster nejsou k dispozici žádné dotazníky.",
+    "noStudySelected": "Žádný cluster nevybrán",
+    "dueDate": "Termín",
+    "dueDateLabel": "Termín vyplnění",
+    "dueDateHint": "Volitelné. Člen obdrží připomínku před termínem.",
+    "overdue": "Po termínu",
+    "completedAt": "Vyplněno",
+    "viewResults": "Zobrazit výsledky",
+    "responseDetail": {
+      "title": "Detail odpovědi",
+      "description": "Podrobný přehled odpovědí na dotazník",
+      "score": "Skóre",
+      "answers": "Odpovědi",
+      "noAnswers": "Žádné odpovědi nebyly zaznamenány",
+      "loadError": "Nepodařilo se načíst detail odpovědi",
+      "questionnaireVersion": "Dotazník v{{version}}",
+      "responseVersion": "Odpověď v{{version}}"
+    },
+    "consentDetail": {
+      "title": "Detail souhlasu",
+      "description": "Podrobný přehled záznamu souhlasu",
+      "loadError": "Nepodařilo se načíst detail souhlasu",
+      "consentType": "Typ souhlasu",
+      "study": "Cluster",
+      "version": "Verze {{version}}",
+      "statusGranted": "Uděleno",
+      "statusRevoked": "Odvoláno",
+      "statusPending": "Čeká na vyřízení",
+      "grantedAt": "Uděleno dne",
+      "revokedAt": "Odvoláno dne",
+      "createdAt": "Vytvořeno dne",
+      "viewDocument": "Zobrazit dokument",
+      "types": {
+        "data_processing": "Zpracování dat",
+        "observation": "Pozorování",
+        "operational_trial": "Klinické hodnocení",
+        "wearables": "Údaje ze systému Sentry",
+        "marketing": "Marketing",
+        "informed_consent": "Informovaný souhlas"
+      }
+    },
+    "labResultDetail": {
+      "title": "Detail výsledku testu",
+      "description": "Podrobný pohled na výsledek testu",
+      "loadError": "Nepodařilo se načíst detail výsledku testu",
+      "unknownTestType": "Neznámý test",
+      "labName": "Zdroj",
+      "testDate": "Datum odběru",
+      "resultDate": "Datum výsledku",
+      "statusPending": "Čeká na výsledky",
+      "statusCompleted": "Dokončeno",
+      "statusReviewed": "Zkontrolováno",
+      "biomarkers": "Biomarkery",
+      "biomarkerName": "Název",
+      "biomarkerValue": "Hodnota",
+      "biomarkerUnit": "Jednotka",
+      "notes": "Poznámky",
+      "reviewedBy": "Zkontroloval/a {{name}}",
+      "viewDocument": "Zobrazit dokument",
+      "biomarkerLabels": {
+        "alt": "ALT",
+        "ast": "AST",
+        "cd4_count": "CD4 buňky",
+        "cd8_count": "CD8 buňky",
+        "cholesterol_total": "Celkový cholesterol",
+        "creatinine": "Kreatinin",
+        "crp": "CRP",
+        "esr": "Sedimentace",
+        "glucose": "Glukóza",
+        "hba1c": "HbA1c",
+        "hdl": "HDL",
+        "hemoglobin": "Hemoglobin",
+        "il_4": "IL-4",
+        "il_6": "IL-6",
+        "insulin": "Inzulín",
+        "ldl": "LDL",
+        "nad_nadh_ratio": "NAD/NADH poměr",
+        "nk_cells": "NK buňky",
+        "omega3_index": "Index Omega-3",
+        "platelets": "Trombocyty",
+        "rbc": "Erytrocyty",
+        "tnf_alpha": "TNF-alfa",
+        "triglycerides": "Triglyceridy",
+        "urea": "Močovina",
+        "vitamin_b12": "Vitamín B12",
+        "vitamin_d": "Vitamín D",
+        "wbc": "Leukocyty"
+      }
+    },
+    "sendReminder": "Poslat připomínku",
+    "questionnaireLabel": "Dotazník",
+    "selectQuestionnaire": "Vyberte dotazník",
+    "sendQuestionnaire": "Odeslat dotazník",
+    "questionnaireRequestContent": "Žádost o vyplnění dotazníku: {{name}}",
+    "consentStatus": {
+      "pending": "Čeká na podpis",
+      "signed": "Podepsáno",
+      "declined": "Odmítnuto",
+      "expired": "Vypršelo",
+      "granted": "Uděleno",
+      "revoked": "Odebráno"
+    },
+    "requiresSignature": "Vyžaduje podpis",
+    "noSignatureRequired": "Bez podpisu",
+    "signedAt": "Podepsáno",
+    "consentDeclined": "Souhlas byl odmítnut",
+    "viewConsent": "Zobrazit souhlas",
+    "resendRequest": "Znovu odeslat",
+    "consentLabel": "Typ souhlasu",
+    "selectConsent": "Vyberte typ souhlasu",
+    "requireSignature": "Vyžadovat podpis",
+    "requireSignatureHint": "Člen bude muset souhlas digitálně podepsat",
+    "sendConsentRequest": "Odeslat žádost",
+    "consentRequestContent": "Žádost o souhlas: {{name}}",
+    "labOrder": "Objednávka testu",
+    "labPreset": {
+      "custom": "Vlastní výběr",
+      "respiratory_baseline": "Základní kvalita (CBC, hs-CRP, ESR, Ferritin)",
+      "respiratory_extension": "Rozšíření kvality (Fibrinogen, SAA)",
+      "respiratory_immunity": "Mapa odolnosti (CD3/CD4/CD8, Lymfocytární panel)",
+      "respiratory_metabolic": "Výkonová rezerva (HbA1c, Cystatin C, Homocystein)",
+      "respiratory_endocrine": "Kontrola systému (TSH, f-T4)"
+    },
+    "labStatus": {
+      "ordered": "Objednáno",
+      "scheduled": "Naplánováno",
+      "completed": "Dokončeno",
+      "results_ready": "Výsledky k dispozici",
+      "reviewed": "Zkontrolováno",
+      "pending": "Čekající",
+      "cancelled": "Zrušeno"
+    },
+    "orderedTests": "Objednaná vyšetření",
+    "selectLabTest": "Vyberte test z katalogu",
+    "addTest": "Přidat test",
+    "selectedTests": "Vybrané testy",
+    "noTestsSelected": "Zatím nejsou vybrány žádné testy",
+    "scheduledFor": "Naplánováno",
+    "viewLabResults": "Zobrazit výsledky",
+    "distributionAdjustment": "Úprava dávkování",
+    "distributionChange": "Změna",
+    "previousDose": "Předchozí",
+    "newDose": "Nová",
+    "effectiveFrom": "Platné od",
+    "tokenRewardTooltip": "Získáte {{amount}} tokenů za vyplnění",
+    "reprice": {
+      "title": "Návrh přecenění",
+      "awaiting": "Čeká na potvrzení",
+      "confirmed": "Potvrzeno",
+      "rejected": "Zamítnuto",
+      "confirmButton": "Potvrdit",
+      "rejectButton": "Zamítnout",
+      "confirmedToast": "Přecenění potvrzeno",
+      "rejectedToast": "Přecenění zamítnuto"
+    },
+    "blockActions": {
+      "meetingAccepted": "Schůzka přijata",
+      "meetingDeclined": "Schůzka odmítnuta",
+      "meetingRescheduled": "Schůzka označena k přeplánování",
+      "reminderSent": "Připomínka odeslána",
+      "consentResent": "Žádost o souhlas znovu odeslána",
+      "actionFailed": "Akce se nezdařila. Zkuste to prosím znovu.",
+      "viewingResults": "Otevírám výsledky…",
+      "viewingConsent": "Otevírám souhlas…",
+      "viewingLabResults": "Otevírání výsledků testů…"
+    },
+    "entry": {
+      "note": "Poznámka",
+      "action": "Akce",
+      "system": "Systém",
+      "healthEvent": "Stavová událost",
+      "health_event": "Stavová událost",
+      "request": "Žádost",
+      "message": "Zpráva",
+      "aiRecap": "AI shrnutí",
+      "ai_recap": "AI shrnutí",
+      "document": "Dokument",
+      "appointment": "Schůzka",
+      "translation": "Překlad",
+      "meeting_request": "Žádost o schůzku",
+      "questionnaire_request": "Žádost o dotazník",
+      "consent_request": "Žádost o souhlas",
+      "lab_order": "Objednávka testu",
+      "distribution_adjustment": "Úprava dávkování",
+      "title": "Titulek",
+      "content": "Obsah",
+      "status": "Stav",
+      "blood_matrix_analysis": "Analýza matice výkonu",
+      "email": "E-mail",
+      "health_snapshot": "Přehled stavu",
+      "product_info": "Informace o produktu"
+    },
+    "sentAt": "Odesláno",
+    "emailRecipient": "Příjemce",
+    "emailRecipientType": {
+      "user": "Člen",
+      "partner": "Partner",
+      "system": "Systém"
+    },
+    "emailStatus": {
+      "draft": "Koncept",
+      "sent": "Odesláno",
+      "delivered": "Doručeno",
+      "failed": "Selhalo"
+    },
+    "reminders": {
+      "upcoming": "Připomínky",
+      "complete": "Dokončit",
+      "setReminder": "Nastavit připomínku",
+      "overdue": "Po termínu"
+    },
+    "email": {
+      "to": "Komu",
+      "toPlaceholder": "email@priklad.cz",
+      "subject": "Předmět",
+      "subjectPlaceholder": "Předmět emailu...",
+      "body": "Zpráva",
+      "bodyPlaceholder": "Napište email...",
+      "send": "Odeslat email"
+    },
+    "memberCard": {
+      "accessLevel": "Úroveň přístupu",
+      "fullAccess": "Plný přístup",
+      "limitedAccess": "Omezený přístup",
+      "anonymizedOnly": "Pouze anonymizovaná data",
+      "noAccess": "Bez přístupu",
+      "anonymizedAccess": "Anonymizovaná data",
+      "fullAccessDesc": "Máte přístup ke všem sdíleným datům",
+      "limitedAccessDesc": "Máte přístup k některým kategoriím dat",
+      "anonymizedDesc": "Vidíte pouze anonymizovaná agregovaná data",
+      "noAccessDesc": "Nemáte přístup k žádným datům",
+      "consentGranted": "Souhlas udělen",
+      "consentPending": "Čeká na souhlas",
+      "consentRevoked": "Souhlas odvolán",
+      "consentExpired": "Souhlas vypršel",
+      "consentNeverAsked": "Souhlas nebyl vyžádán",
+      "requestAccess": "Požádat o přístup",
+      "healthData": "Zdravotní data",
+      "healthcheckins": "Check-iny",
+      "labresults": "Výsledky testů",
+      "documents": "Dokumenty",
+      "assessments": "Hodnocení",
+      "dosinglogs": "Záznamy dávkování",
+      "studydata": "Data clusteru",
+      "labResults": "Výsledky testů",
+      "checkIns": "Check-iny",
+      "sharedWith": "Sdíleno s",
+      "lastActivity": "Poslední aktivita",
+      "memberSince": "Členem od",
+      "studyRegistration": "Registrace do clusteru",
+      "status": "Stav",
+      "consent": {
+        "pending": "Čekající",
+        "granted": "Uděleno",
+        "revoked": "Odebráno"
+      },
+      "access": "Přístup"
+    },
+    "trackingPanel": {
+      "title": "Zdravotní data",
+      "last7Days": "Posledních 7 dní",
+      "pain": "Bolest",
+      "energy": "Energie",
+      "mood": "Nálada",
+      "sleep": "Spánek",
+      "avgPain": "Prům. bolest",
+      "avgEnergy": "Prům. energie",
+      "avgMood": "Prům. nálada",
+      "avgSleep": "Prům. spánek",
+      "dayStreak": "Série {{count}} dní",
+      "dayStreak_one": "Série {{count}} dne",
+      "lastCheckIn": "Poslední check-in",
+      "tookMeds": "Vzal léky",
+      "wearablesData": "Sentry",
+      "steps": "Kroky",
+      "bpm": "BPM",
+      "activeMin": "Aktivní min",
+      "noData": "Zatím žádné citlivé údaje",
+      "noCheckIns": "Žádné check-iny",
+      "noMeds": "Žádné záznamy služeb",
+      "noSymptoms": "Žádné záznamy problémů",
+      "unknownSymptom": "Neznámý problém",
+      "symptomSeverity": "Závažnost",
+      "symptomOngoing": "Probíhá",
+      "symptomDurationHours": "{{count}} hod",
+      "symptomDurationHours_one": "{{count}} hod",
+      "symptomDurationDays": "{{count}} d",
+      "symptomDurationDays_one": "{{count}} d",
+      "doseCount": "{{count}}× dávek",
+      "doseCount_one": "{{count}}× dávka",
+      "unknownProduct": "Neznámá platformní služba",
+      "noWearables": "Žádná Sentry data",
+      "noConsent": "Bez přístupu",
+      "noConsentDesc": "Člen vám neudělil přístup ke svým citlivým údajům.",
+      "relative": {
+        "today": "Dnes",
+        "yesterday": "Včera"
+      },
+      "tabs": {
+        "overview": "Přehled",
+        "checkIns": "Check-iny",
+        "symptoms": "Problémy",
+        "meds": "Služby",
+        "wearables": "Sentry"
+      }
+    },
+    "trackingSummary": {
+      "label": "Stav",
+      "improving": "Zlepšuje se",
+      "stable": "Stabilní",
+      "declining": "Zhoršuje se"
+    },
+    "status": "Stav",
+    "bloodMatrix": {
+      "title": "Analýza matice výkonu 3x3",
+      "content": "Analýza matice výkonu",
+      "sourceLabel": "Zdroj analýzy",
+      "source": {
+        "manual": "Ruční vyhodnocení",
+        "ai_photo": "AI z fotografie vzorku",
+        "hybrid": "Hybrid (AI + ruční)"
+      },
+      "sampleDate": "Datum vzorku",
+      "squares": {
+        "1": {
+          "title": "Rouleaux (sloupečky erytrocytů)"
+        },
+        "2": {
+          "title": "Bakteriální zátěž"
+        },
+        "3": {
+          "title": "Plísně / krystaly"
+        },
+        "4": {
+          "title": "Fibrin / jaterní zátěž"
+        },
+        "5": {
+          "title": "Odchylky erytrocytů"
+        },
+        "6": {
+          "title": "Prvoci / atypické tvary"
+        },
+        "7": {
+          "title": "Shluky erytrocytů"
+        },
+        "8": {
+          "title": "Rezerva / artefakty"
+        },
+        "9": {
+          "title": "Paraziti / vajíčka"
+        }
+      },
+      "notePlaceholder": "Poznámka k nálezu",
+      "noNote": "Bez poznámky",
+      "summaryNote": "Poznámka terapeuta",
+      "summaryPlaceholder": "Celkový kontext a doporučení...",
+      "nextCheck": "Další kontrola",
+      "aiSummary": "AI shrnutí",
+      "aiSummaryPlaceholder": "Volitelná AI interpretace do závěrečné zprávy",
+      "weightedScore": "Vážené skóre",
+      "severity": {
+        "low": "Nízká závažnost: hydratace a základní podpora",
+        "moderate": "Střední závažnost: doplnit podporu střeva a mikrobiální rovnováhu",
+        "elevated": "Zvýšená závažnost: strukturovaná očista a častější kontrola",
+        "high": "Vysoká závažnost: úplný fázový protokol a odborný follow-up"
+      },
+      "recommendedDuration": "Doporučená délka: {{min}}-{{max}} dní",
+      "parasiteSignal": "Zachycen výrazný signál prvoků/parazitů - zvažte odborné dovyšetření pod dohledem.",
+      "protocolTitle": "Doporučené kroky",
+      "protocol": {
+        "hydration": "Hydratace a elektrolyty",
+        "gut_support": "Podpora střevní bariéry a trávení",
+        "microbial_balance": "Mikrobiální/parazitární vyvážení",
+        "liver_detox": "Podpora jater a eliminačních cest",
+        "membrane_rebuild": "Obnova membrán a mikronutrientů"
+      },
+      "productsTitle": "Doporučené obecné doplňky",
+      "noProductRecommendation": "Pro aktuální nález není nutné doplňkové doporučení",
+      "products": {
+        "hydration_electrolytes": "Elektrolyty + minerální hydratace",
+        "omega3": "Omega-3 (EPA/DHA)",
+        "phosphatidylcholine": "Fosfatidylcholin / lecitin",
+        "probiotic": "Vícekmenové probiotikum",
+        "digestive_enzymes": "Trávicí enzymy",
+        "berberine_oregano": "Berberin / oregano antimikrobiální podpora",
+        "liver_support": "Jaterní komplex (např. silymarin/artyčok)",
+        "nac": "N-acetylcystein (NAC)",
+        "magnesium": "Hořčík (glycinát/citrát)",
+        "vitamin_d3_k2": "Vitamin D3 + K2",
+        "zinc_selenium": "Zinek + selen",
+        "fiber_prebiotic": "Vláknina + prebiotická podpora",
+        "antiparasitic_botanicals": "Bylinná antiparazitární směs"
+      },
+      "priority": {
+        "core": "Jádro",
+        "support": "Podpora",
+        "optional": "Volitelné"
+      },
+      "reasonFromSquare": "na základě {{square}}",
+      "presetLoaded": "Vzorkový AI nález byl načten",
+      "loadPreset": "Načíst vzorový AI nález",
+      "reset": "Reset matice",
+      "report": {
+        "preview": "Náhled reportu",
+        "title": "ANALYTICKÁ ZPRÁVA"
+      },
+      "reportCopied": "Report zkopírován do schránky",
+      "copyReport": "Kopírovat report",
+      "aiPromptTitle": "AI prompt pro finální interpretaci",
+      "aiPromptCopied": "AI prompt zkopírován",
+      "copyAiPrompt": "Kopírovat AI prompt",
+      "notes": {
+        "mild_bacterial_load": "lehká bakteriální zátěž",
+        "mycotic_biofilm": "mykotický biofilm",
+        "active_fibrin": "aktivní fibrin",
+        "echinocyte_pattern": "echinocytární vzorec",
+        "protozoa_activity": "aktivita prvoků",
+        "mild_aggregation": "lehká agregace",
+        "helminth_egg_signal": "možný nález vajíček helmintů"
+      }
+    },
+    "discussions": {
+      "title": "Diskuze",
+      "selectThread": "Vyberte znalostní vlákno",
+      "topicInfo": "Informace o tématu",
+      "posts": "Příspěvky vlákna",
+      "beFirstToPost": "Buďte první, kdo přispěje...",
+      "postAdded": "Příspěvek přidán",
+      "postError": "Nepodařilo se přidat příspěvek",
+      "composerPlaceholder": "Napište odpověď...",
+      "postsCount": "{{count}} příspěvků",
+      "postsCount_one": "{{count}} příspěvek"
+    },
+    "threadModes": {
+      "stories": "Vlákna členů",
+      "discussions": "Znalostní vlákna"
+    },
+    "bookmarks": {
+      "title": "Záložky",
+      "empty": "Zatím žádné záložky",
+      "open": "Otevřít uložený příspěvek",
+      "add": "Přidat záložku",
+      "remove": "Odebrat záložku"
+    },
+    "participants": {
+      "title": "Účastníci",
+      "addParticipant": "Přidat účastníka",
+      "addParticipantDescription": "Pozvat certifikovaného partnera ke spolupráci na tomto příběhu",
+      "removeParticipant": "Odebrat účastníka",
+      "removeConfirmTitle": "Odebrat účastníka?",
+      "removeConfirmDesc": "Tento účastník ztratí přístup k tomuto příběhu",
+      "leaveStory": "Opustit příběh",
+      "leaveConfirmTitle": "Opustit příběh?",
+      "leaveConfirmDesc": "Ztratíte přístup k tomuto příběhu",
+      "searchPartner": "Hledat certifikované partnery...",
+      "noParticipants": "Žádní další účastníci",
+      "owner": "Vlastník",
+      "shared": "Sdílený",
+      "sharedWith": "Sdíleno s {{count}} účastníky",
+      "sharedWith_one": "Sdíleno s {{count}} účastníkem",
+      "inviteSent": "Pozvánka odeslána",
+      "inviteSentDescription": "Partner byl pozván ke spolupráci",
+      "participantRemoved": "Účastník odebrán",
+      "participantRemovedDescription": "Účastník byl odebrán z tohoto příběhu",
+      "leftStory": "Příběh opuštěn",
+      "leftStoryDescription": "Opustili jste tento příběh",
+      "error": "Chyba",
+      "addError": "Nepodařilo se přidat účastníka",
+      "removeError": "Nepodařilo se odebrat účastníka",
+      "notCertified": "Pozvat lze pouze certifikované partnery",
+      "alreadyParticipant": "Tento uživatel je již účastníkem",
+      "cannotRemoveLastOwner": "Nelze odebrat posledního vlastníka",
+      "role": {
+        "partner": "Vlastník",
+        "member": "Člen",
+        "guild_expert": "Odborník",
+        "aisha": "AISHA"
+      },
+      "certificationLevel": {
+        "certified_partner": "Certifikovaný partner",
+        "certified_provider": "Certifikovaný specialista"
+      }
+    }
+  },
+  "partners": {
+    "sectionLabel": "Spolupráce",
+    "title": "Partneři a přispěvatelé",
+    "subtitle": "Archiv Evymo je živý projekt. Vítáme spolupráci s vývojáři, organizacemi a jednotlivci, kteří sdílejí náš závazek k transparentnosti a open source.",
+    "certifiedProvider": "Certifikovaný člen Guildy",
+    "certifiedPartner": "Certifikovaný partner",
+    "categories": {
+      "academic": {
+        "title": "Akademické instituce",
+        "description": "Univerzity a výzkumná centra se zájmem o přístup k archivním materiálům pro historický, technologický nebo platformní výzkum.",
+        "examples": [
+          "Programy dějin technologií",
+          "Výzkum historie platforem",
+          "Středoevropská studia"
+        ]
+      },
+      "research": {
+        "title": "Výzkumné organizace",
+        "description": "Nezávislí výzkumníci a organizace studující historii správy platforem, orchestrace nebo raného vývoje AI.",
+        "examples": [
+          "Technologičtí historici",
+          "Badatelé v oblasti platforem",
+          "Dokumentární filmaři"
+        ]
+      },
+      "cultural": {
+        "title": "Kulturní instituce",
+        "description": "Muzea, archivy a kulturní organizace, které by mohly chtít představit nebo spolupracovat na výstavách nebo veřejných programech.",
+        "examples": [
+          "Muzea technologií",
+          "Národní archivy",
+          "Historické společnosti"
+        ]
+      },
+      "community": {
+        "title": "Komunitní přispěvatelé",
+        "description": "Jednotlivci s osobním vztahem k příběhu Evymo — bývalí přispěvatelé, členové, členové komunity — kteří mohou mít materiály nebo příběhy ke sdílení.",
+        "examples": [
+          "Rodinné archivy",
+          "Osobní fotografie",
+          "Ústní historie"
+        ]
+      }
+    },
+    "howWeWork": {
+      "title": "Jak spolupracujeme",
+      "subtitle": "Náš přístup ke spolupráci upřednostňuje vzájemný prospěch a sdílené standardy.",
+      "openAccess": {
+        "title": "Výzkum s otevřeným přístupem",
+        "description": "Všechny archivní materiály jsou volně přístupné. Výzkumníci je mohou používat pro akademické účely s odpovídající citací. Žádné omezování, žádné poplatky za vzdělávací využití."
+      },
+      "contributions": {
+        "title": "Materiální příspěvky",
+        "description": "Pokud máte dokumenty, snímky obrazovky nebo jiné materiály související s historií Evymo, vítáme příspěvky. Všichni přispěvatelé jsou uvedeni a originály mohou být po digitalizaci vráceny."
+      },
+      "oralHistory": {
+        "title": "Program ústní historie",
+        "description": "Sbíráme ústní svědectví od osob s přímou znalostí provozu Evymo, vývoje nebo platformních služeb. Pokud vy nebo člen vašeho týmu máte příběhy ke sdílení, rádi je uslyšíme."
+      }
+    },
+    "currentCollaborators": "Současní spolupracovníci",
+    "currentCollaboratorsSubtitle": "Organizace a jednotlivci, kteří přispěli k archivnímu projektu.",
+    "partnerLogo": "Logo partnera",
+    "getInTouch": {
+      "title": "Kontaktujte nás",
+      "subtitle": "Ať už jste výzkumník hledající přístup, instituce se zájmem o spolupráci, nebo někdo s materiály k přispění, rádi od vás uslyšíme."
+    },
+    "searchPlaceholder": "Hledat partnery...",
+    "allCities": "Všechna města",
+    "noPartners": "Žádní partneři nenalezeni",
+    "becomeFirst": "Buďte první, kdo se připojí k naší síti certifikovaných partnerů.",
+    "online": "Online",
+    "inPerson": "Osobně",
+    "bookAppointment": "Rezervovat termín",
+    "viewProfile": "Zobrazit profil",
+    "signInToViewDetails": "Přihlaste se pro zobrazení detailů",
+    "signInForMore": {
+      "title": "Chcete vidět více?",
+      "description": "Přihlaste se pro zobrazení všech partnerů, jejich kompletních profilů, služeb a možnosti rezervace.",
+      "descriptionWithCount": "Přihlaste se pro zobrazení všech {{count}} partnerů, jejich kompletních profilů, služeb a možnosti rezervace."
+    },
+    "badges": {
+      "provider": "Člen Guildy",
+      "partner": "Certifikovaný partner"
+    },
+    "becomePartner": {
+      "title": "Staňte se partnerem",
+      "description": "Připojte se k naší síti certifikovaných praktiků a členů Guildu. Získejte školení na platformní protokoly a spojte se s členy hledajícími vedení.",
+      "button": "Získat certifikaci"
+    },
+    "booking": {
+      "title": "Rezervace u {{name}}",
+      "selectDate": "Vyberte datum schůzky.",
+      "selectTime": "Vyberte dostupný časový slot.",
+      "enterDetails": "Zadejte podrobnosti schůzky.",
+      "noTimes": "V tento den nejsou dostupné časy.",
+      "appointmentType": "Typ schůzky",
+      "service": "Služba",
+      "selectService": "Vyberte službu...",
+      "notes": "Poznámky (volitelné)",
+      "notesPlaceholder": "Jakékoliv další informace...",
+      "confirm": "Potvrdit rezervaci",
+      "confirmed": "Rezervace potvrzena",
+      "thankYou": "Děkujeme!",
+      "confirmationSent": "Vaše žádost o schůzku byla odeslána.",
+      "success": "Schůzka rezervována",
+      "successDesc": "Vaše žádost o schůzku byla odeslána.",
+      "error": "Nepodařilo se rezervovat schůzku. Zkuste to prosím znovu.",
+      "shareTrackingData": "Sdílet mé citlivé údaje s tímto partnerem",
+      "shareTrackingDataDesc": "Umožní partnerovi zobrazit váš profil a dokumenty pro lepší konzultaci.",
+      "confirmPassword": "Potvrďte svou identitu",
+      "confirmPasswordDesc": "Zadejte heslo pro přístup a sdílení citlivých údajů.",
+      "unlockTrackingData": "Odemknout citlivé údaje",
+      "healthDataUnlocked": "Přístup k citlivým údajům povolen",
+      "unlockSecureFirst": "Nejprve prosím odemkněte přístup k citlivým údajům zadáním hesla.",
+      "unlockPhiFirst": "Pro sdílení citlivých údajů nejprve aktivujte zabezpečený režim."
+    }
+  },
+  "partnerCertification": {
+    "noQuestionsAvailable": "Nejsou k dispozici žádné otázky. Kontaktujte prosím podporu.",
+    "results": {
+      "passed": "Gratulujeme!",
+      "notPassed": "Test nebyl složen",
+      "passedDesc": "Dosáhli jste {{score}}% a jste nyní certifikovaným partnerem.",
+      "notPassedDesc": "Dosáhli jste {{score}}%. Pro úspěšné složení je potřeba alespoň {{required}}%.",
+      "correctAnswers": "{{correct}} z {{total}} správných odpovědí",
+      "viewDirectory": "Zobrazit adresář partnerů",
+      "goToPortal": "Přejít na portál",
+      "tryAgain": "Zkusit znovu"
+    },
+    "title": "Partnerská certifikace",
+    "subtitle": "Staňte se certifikovaným partnerem Evymo a nabízejte služby členům",
+    "loginRequired": "Pro přístup k partnerské certifikaci se prosím přihlaste.",
+    "qualificationRequired": {
+      "title": "Vyžadováno hodnocení",
+      "description": "Dokončete hodnotící test před zahájením certifikačního testu.",
+      "goToQualification": "Přejít na hodnotící test"
+    },
+    "steps": {
+      "type": "Typ partnera",
+      "profile": "Profil",
+      "test": "Certifikační test"
+    },
+    "intro": {
+      "title": "Program partnerské certifikace",
+      "description": "Dokončete tuto certifikaci pro vstup do partnerské sítě Evymo a zařazení do adresáře partnerů.",
+      "alreadyCertified": "Jste již certifikovaným partnerem.",
+      "selectType": "Vyberte typ partnerství:",
+      "whatYouGet": "Co získáte jako certifikovaný partner:",
+      "benefit1": "Uvedení v adresáři partnerů",
+      "benefit2": "Možnost přijímat rezervace schůzek od členů",
+      "benefit3": "Přístup k partnerským zdrojům a školením",
+      "benefit4": "Oficiální certifikační odznak partnera Evymo",
+      "startButton": "Zahájit certifikaci"
+    },
+    "alreadyCertified": {
+      "title": "Jste certifikovaní",
+      "description": "Úspěšně jste dokončili partnerskou certifikaci.",
+      "certified": "Certifikovaný partner",
+      "score": "Vaše skóre: {{score}}%",
+      "completedAt": "Dokončeno {{date}}",
+      "goToDashboard": "Přejít na partnerský dashboard",
+      "viewNetwork": "Zobrazit síť partnerů"
+    },
+    "types": {
+      "individual": {
+        "title": "Individuální partner",
+        "description": "Jednotlivci se zájmem o platformní protokoly",
+        "badge": "Certifikovaný partner"
+      },
+      "provider": {
+        "title": "Člen Guildy",
+        "description": "Licencovaní profesionálové a organizace",
+        "badge": "Certifikovaný člen Guildy"
+      }
+    },
+    "profile": {
+      "title": "Partnerský profil",
+      "subtitle": "Tyto informace budou zobrazeny v adresáři partnerů.",
+      "displayName": "Zobrazované jméno",
+      "displayNamePlaceholder": "Vaše jméno nebo pseudonym",
+      "businessName": "Název firmy/organizace",
+      "businessNamePlaceholder": "Název vaší organizace nebo firmy",
+      "city": "Město",
+      "cityPlaceholder": "např. Praha",
+      "country": "Země",
+      "email": "Kontaktní e-mail",
+      "phone": "Telefon",
+      "phonePlaceholder": "+420...",
+      "description": "O vás",
+      "descriptionPlaceholder": "Stručně popište své zaměření a služby...",
+      "services": "Nabízené služby",
+      "continueToTest": "Pokračovat k testu"
+    },
+    "services": {
+      "consultation": "Konzultace",
+      "screening": "Screening",
+      "diagnostics": "Analýza",
+      "therapy": "Implementace",
+      "coaching": "Koučování",
+      "education": "Vzdělávání",
+      "assessment": "Hodnocení",
+      "training": "Trénink",
+      "nutrition": "Výživa",
+      "fitness": "Fitness",
+      "wellness": "Monitorování",
+      "lifestyle": "Životní styl",
+      "medical": "Technické"
+    },
+    "test": {
+      "question": "Otázka",
+      "toPass": "pro úspěšné složení",
+      "submit": "Odeslat test"
+    },
+    "messages": {
+      "fillRequired": "Prosím vyplňte všechna povinná pole.",
+      "congratulations": "Gratulujeme!",
+      "certificationPassed": "Nyní jste certifikovaným partnerem Evymo.",
+      "submitError": "Nepodařilo se odeslat certifikaci. Zkuste to prosím znovu."
+    }
+  },
+  "partnerDashboard": {
+    "title": "Partnerský dashboard",
+    "subtitle": "Správa schůzek a dostupnosti",
+    "templates": "Šablony",
+    "statusUpdated": "Stav schůzky aktualizován",
+    "statusUpdateFailed": "Nepodařilo se aktualizovat stav schůzky",
+    "stats": {
+      "pending": "Čekající",
+      "upcoming": "Nadcházející",
+      "completed": "Dokončené",
+      "total": "Celkem",
+      "studies": "Clustery",
+      "users": "Členové",
+      "alerts": "Upozornění"
+    },
+    "tabs": {
+      "overview": "Přehled",
+      "mentoring": "Mentoring",
+      "studies": "Clustery",
+      "alerts": "Upozornění",
+      "calendar": "Kalendář",
+      "pending": "Čekající",
+      "upcoming": "Nadcházející",
+      "availability": "Dostupnost",
+      "invitations": "Pozvánky",
+      "earnings": "Výdělky",
+      "pricing": "Ceník",
+      "profile": "Můj profil"
+    },
+    "overview": {
+      "studiesTitle": "Moje clustery",
+      "studiesDesc": "Clustery, kde jste konzultantem",
+      "noStudies": "Zatím nejste přiřazeni k žádným clusterům",
+      "users": "členů",
+      "viewAll": "Zobrazit vše",
+      "alertsTitle": "Nedávná aktivita",
+      "alertsDesc": "Nová data od vašich členů",
+      "noAlerts": "Žádná nedávná aktivita",
+      "upcomingTitle": "Nadcházející schůzky"
+    },
+    "studies": {
+      "title": "Konzultantské clustery",
+      "description": "Clustery, kde jste registrováni jako konzultant",
+      "none": "Zatím jste se nepřihlásili do žádných clusterů jako konzultant",
+      "browse": "Procházet clustery",
+      "assignedUsers": "přiřazených členů"
+    },
+    "alertsTab": {
+      "title": "Upozornění členů",
+      "description": "Nedávné check-iny a výsledky testů od vašich členů",
+      "none": "Žádná nová upozornění - vše je aktuální!"
+    },
+    "availability": {
+      "title": "Pracovní doba",
+      "description": "Nastavte své dostupné časové sloty pro schůzky",
+      "addSlot": "Přidat časový slot",
+      "newSlot": "Nový časový slot",
+      "day": "Den",
+      "startTime": "Začátek",
+      "endTime": "Konec",
+      "type": "Typ",
+      "online": "Online",
+      "inPerson": "Osobní",
+      "noSlots": "Není nastavena dostupnost",
+      "added": "Časový slot přidán",
+      "removed": "Časový slot odstraněn",
+      "bookingSettings": {
+        "title": "Nastavení rezervací",
+        "description": "Konfigurace délky slotu a mezery mezi schůzkami",
+        "slotDuration": "Délka slotu",
+        "slotDurationDescription": "Délka jednoho rezervovatelného slotu (v minutách)",
+        "bufferTime": "Časová mezera",
+        "bufferTimeDescription": "Minimální mezera mezi koncem jedné schůzky a začátkem další (v minutách)",
+        "minutes": "min",
+        "saved": "Nastavení rezervací uloženo",
+        "errors": {
+          "saveFailed": "Nepodařilo se uložit nastavení rezervací",
+          "loadFailed": "Nepodařilo se načíst nastavení rezervací"
+        }
+      },
+      "errors": {
+        "addFailed": "Nepodařilo se přidat časový slot",
+        "removeFailed": "Nepodařilo se odstranit časový slot",
+        "updateFailed": "Nepodařilo se aktualizovat časový slot"
+      }
+    },
+    "profile": {
+      "title": "Partnerský profil",
+      "description": "Vaše veřejné partnerské informace",
+      "edit": "Upravit profil",
+      "displayName": "Zobrazované jméno",
+      "businessName": "Název firmy",
+      "location": "Lokalita",
+      "email": "E-mail",
+      "phone": "Telefon",
+      "visibility": "Viditelnost",
+      "visible": "Veřejný",
+      "hidden": "Skrytý",
+      "about": "O mně",
+      "services": "Služby",
+      "certificationScore": "Skóre certifikace",
+      "certificationLevel": "Úroveň certifikace",
+      "certifiedOn": "Certifikováno dne"
+    },
+    "calendar": {
+      "title": "Vyberte datum",
+      "selectDate": "Klikněte na datum pro zobrazení schůzek",
+      "appointments": "schůzek",
+      "noAppointments": "Žádné schůzky v tento den"
+    },
+    "pending": {
+      "title": "Čekající žádosti",
+      "description": "Žádosti o schůzku čekající na vaše potvrzení",
+      "none": "Žádné čekající žádosti o schůzku"
+    },
+    "upcoming": {
+      "title": "Nadcházející schůzky",
+      "description": "Vaše potvrzené nadcházející schůzky",
+      "none": "Žádné nadcházející schůzky"
+    },
+    "appointmentType": {
+      "online": "Online konzultace",
+      "inPerson": "Osobní návštěva"
+    },
+    "service": "Služba",
+    "status": {
+      "pending": "Čeká",
+      "confirmed": "Potvrzeno",
+      "completed": "Dokončeno",
+      "cancelled": "Zrušeno",
+      "no_show": "Nedostavil se",
+      "rescheduled": "Přeplánováno"
+    },
+    "actions": {
+      "confirm": "Potvrdit",
+      "cancel": "Zrušit",
+      "complete": "Označit jako dokončené"
+    },
+    "notes": {
+      "show": "Zobrazit poznámky",
+      "hide": "Skrýt poznámky",
+      "none": "Žádné poznámky",
+      "loadFailed": "Nepodařilo se načíst poznámky"
+    },
+    "member": "Člen",
+    "viewUsers": "Zobrazit členy",
+    "mentoring": {
+      "certificationRequired": {
+        "title": "Mentoring je dostupný pouze pro certifikované partnery.",
+        "description": "Dokončete certifikační kurz pro získání přístupu k mentoring funkci a přiřazování klientů.",
+        "cta": "Začít certifikaci →"
+      }
+    },
+    "unclaimedUsers": {
+      "title": "Uživatelé bez mentora",
+      "titleWithCount": "Uživatelé bez mentora ({{count}})",
+      "description": "Noví uživatelé čekající na přiřazení mentora",
+      "descriptionLong": "Tito uživatelé dokončili onboarding a čekají na přiřazení certifikovaného mentora",
+      "loading": "Načítám...",
+      "empty": {
+        "title": "Žádní uživatelé bez přiřazeného mentora",
+        "description": "Momentálně nejsou žádní uživatelé bez přiřazeného mentora. Skvělá práce! 🎉"
+      },
+      "buttons": {
+        "claim": "Přiřadit mě",
+        "claiming": "Přiřazuji..."
+      },
+      "wellbeing": {
+        "overallFeeling": "Celkový pocit",
+        "energy": "Energie"
+      },
+      "sections": {
+        "concern": "Co je trápí:",
+        "goal": "Jejich cíl:"
+      },
+      "badges": {
+        "years": "let",
+        "communication": "komunikace",
+        "prefersMale": "Preferuje muže",
+        "prefersFemale": "Preferuje ženu",
+        "communicationFrequent": "Často",
+        "communicationModerate": "Průměrně",
+        "communicationMinimal": "Minimálně"
+      },
+      "toasts": {
+        "fetchFailed": {
+          "title": "Chyba načítání",
+          "description": "Nepodařilo se načíst uživatele bez mentora"
+        },
+        "claimSuccess": {
+          "charts": {
+            "checkIns": "Check-iny"
+          },
+          "title": "Uživatel přiřazen! 🎉",
+          "description": "{{email}} je nyní ve vašem týmu. Domluvte si s ním úvodní hovor."
+        },
+        "claimFailed": {
+          "title": "Nepodařilo se přiřadit",
+          "description": "Uživatel již možná má mentora nebo nemáte oprávnění."
+        }
+      }
+    },
+    "myClients": {
+      "title": "Moji klienti",
+      "count": "Moji klienti ({{count}})",
+      "description": "Uživatelé, které vedete jako jejich mentor",
+      "descriptionShort": "Uživatelé, které jste si přiřadil/a jako mentor",
+      "loading": "Načítám...",
+      "loadingDetails": "Načítám...",
+      "loadError": "Chyba načítání",
+      "noClients": "Zatím nemáte žádné přiřazené klienty. Přiřaďte si někoho ze sekce \"Uživatelé bez mentora\" výše.",
+      "assignedAgo": "Přiřazeno {{time}}",
+      "relinquishReason": "Partner se dobrovolně vzdal přístupu",
+      "toasts": {
+        "fetchFailed": {
+          "title": "Chyba načítání",
+          "description": "Nepodařilo se načíst vaše klienty"
+        },
+        "detailsFetchFailed": {
+          "title": "Chyba načítání detailů",
+          "description": "Nepodařilo se načíst detaily klienta"
+        },
+        "requestSent": {
+          "title": "Žádost odeslána",
+          "description": "{{email}} obdrží notifikaci s žádostí o sdílení dat."
+        },
+        "requestFailed": {
+          "title": "Chyba odeslání žádosti",
+          "description": "Zkuste to prosím znovu."
+        },
+        "accessRelinquished": {
+          "title": "Přístup ukončen",
+          "description": "Vzdali jste se přístupu k citlivým údajům uživatele {{email}}."
+        },
+        "relinquishFailed": {
+          "title": "Chyba ukončení přístupu",
+          "description": "Zkuste to prosím znovu."
+        }
+      },
+      "consent": {
+        "label": "Souhlas:",
+        "requestMessage": "Rád/a bych měl/a přístup k vašim citlivým údajům, abych vám mohl/a lépe pomoci.",
+        "noConsent": {
+          "title": "Klient neschválil sdílení dat.",
+          "description": "Pro přístup k detailním citlivým údajům musíte požádat o souhlas se sdílením dat."
+        },
+        "waitingForResponse": "Čeká na odpověď uživatele"
+      },
+      "buttons": {
+        "details": "Detaily",
+        "requestConsent": "Požádat o souhlas",
+        "renewConsent": "Obnovit souhlas",
+        "requestAgain": "Znovu požádat",
+        "relinquishAccess": "Vzdát se přístupu",
+        "cancel": "Zrušit",
+        "confirmRelinquish": "Ano, vzdát se přístupu",
+        "requesting": "Odesílám...",
+        "relinquishing": "Ukončuji..."
+      },
+      "status": {
+        "completed": "Hotovo",
+        "afterCall": "Po telefonu",
+        "callScheduled": "Naplánován hovor",
+        "waitingForCall": "Čeká na hovor"
+      },
+      "consentStatus": {
+        "granted": "Udělen",
+        "pending": "Čeká na schválení",
+        "expired": "Vypršel",
+        "revoked": "Odvolán",
+        "none": "Není udělen"
+      },
+      "dialog": {
+        "clientDetail": {
+          "title": "Detail klienta"
+        },
+        "wellbeing": {
+          "overallFeeling": "Celkový pocit",
+          "energy": "Energie",
+          "mentalWellbeing": "Psychika",
+          "sleep": "Spánek"
+        },
+        "sections": {
+          "concerns": "Co je trápí:",
+          "secondaryConcerns": "Další starosti:",
+          "mainGoal": "Hlavní cíl:",
+          "chronicCondition": "Chronické onemocnění:",
+          "preferences": "Preference:",
+          "concern": "Trápí je:",
+          "goal": "Cíl:"
+        },
+        "preferences": {
+          "years": "let",
+          "communication": {
+            "frequent": "Častá",
+            "moderate": "Průměrná",
+            "minimal": "Minimální",
+            "label": "komunikace"
+          },
+          "goalLabel": "Cíl:"
+        },
+        "relinquishAccess": {
+          "title": "Vzdát se přístupu k citlivým údajům?",
+          "description": "Chystáte se ukončit svůj přístup k citlivým údajům uživatele <strong>{{email}}</strong>.",
+          "consequences": "Tato akce:",
+          "bullet1": "Okamžitě ukončí váš přístup k jejich citlivým údajům",
+          "bullet2": "Uživatel bude informován o ukončení přístupu",
+          "bullet3": "Budete muset požádat o nový souhlas, pokud budete chtít přístup obnovit"
+        }
+      }
+    },
+    "invitations": {
+      "title": "Moje pozvánky",
+      "subtitle": "Spravujte pozvánky pro nové členy",
+      "info": "Vytvořte pozvánky pro nové členy. Každý pozvaný člen bude automaticky přiřazen k vám jako jejich mentor.",
+      "createDesc": "Vytvořte pozvánku pro nového člena",
+      "empty": "Zatím nemáte žádné pozvánky",
+      "emptyDesc": "Vytvořte první pozvánku a začněte zvát nové členy",
+      "total": "Celkem pozvánek",
+      "active": "Aktivních",
+      "used": "Použitých",
+      "prefillTitle": "Předvyplnění profilu (volitelné)",
+      "internalNotes": "Interní poznámky",
+      "notesPlaceholder": "Poznámky o kontaktu...",
+      "notesHint": "Tyto poznámky uvidíte pouze vy",
+      "hasPrefill": "Profil předvyplněn"
+    }
+  },
+  "partnerUsers": {
+    "title": "Moji členové",
+    "subtitle": "Zobrazení a správa citlivých údajů přiřazených členů",
+    "backToDashboard": "Zpět na dashboard",
+    "privacyNotice": {
+      "title": "Soukromí členů je chráněno",
+      "description": "Citlivé údaje můžete zobrazit pouze u členů, kteří vám explicitně udělili přístup. Ostatní data se zobrazují jen jako anonymizované souhrnné statistiky."
+    },
+    "searchPlaceholder": "Hledat podle jména, emailu, zaměření...",
+    "filterByStudy": "Filtrovat podle clusteru",
+    "filterByStatus": "Filtrovat podle stavu",
+    "allStudies": "Všechny clustery",
+    "allStatuses": "Všechny stavy",
+    "stats": {
+      "total": "Celkem členů",
+      "consented": "S přístupem",
+      "anonymous": "Anonymní",
+      "active": "Aktivní",
+      "completed": "Dokončení",
+      "filtered": "Zobrazeno"
+    },
+    "status": {
+      "screening": "Prověřování",
+      "enrolled": "Zapsaný",
+      "active": "Aktivní",
+      "completed": "Dokončený",
+      "withdrawn": "Odstoupený"
+    },
+    "noUsers": {
+      "title": "Žádní přiřazení členové",
+      "description": "Zatím nemáte přiřazené žádné členy. Členové se zde objeví po zařazení do clusterů, které konzultujete."
+    },
+    "noResults": {
+      "title": "Žádní členové nenalezeni",
+      "description": "Zkuste upravit kritéria vyhledávání nebo filtrování."
+    },
+    "list": {
+      "title": "Členové",
+      "count": "člen(ů)"
+    },
+    "unknownUser": "Neznámý člen",
+    "selectUser": "Vyberte člena pro zobrazení jeho citlivých údajů",
+    "dob": "Datum narození",
+    "diagnosis": "Oblast zaměření",
+    "enrolled": "Zapsán",
+    "tabs": {
+      "consented": "Členové s přístupem",
+      "cohort": "Statistiky kohorty",
+      "longevity": "Skóre spolehlivosti",
+      "checkIns": "Check-iny",
+      "labs": "Laboratoře",
+      "dosing": "Dávkování",
+      "forms": "Formuláře",
+      "consents": "Souhlasy"
+    },
+    "noConsentedUsers": {
+      "title": "Nebyl udělen přístup k datům",
+      "description": "Žádný z vašich přiřazených členů vám zatím neudělil přístup ke svým podrobným citlivým údajům. Stále ale můžete zobrazit anonymizované statistiky kohorty na kartě „Statistiky kohorty“."
+    },
+    "noData": "Žádné citlivé údaje k dispozici",
+    "noCheckIns": "Žádné check-iny zaznamenány",
+    "noLabs": "Žádné zaznamenané výsledky testů",
+    "noDosing": "Žádné záznamy o dávkování",
+    "noQuestionnaires": "Žádné odpovědi na dotazníky zaznamenány",
+    "noConsents": "Žádné souhlasy zaznamenány",
+    "chart": {
+      "title": "Trendy (posledních 30 dní)"
+    },
+    "labChart": {
+      "title": "Trendy testů"
+    },
+    "avgPain": "Prům. bolest",
+    "avgEnergy": "Prům. energie",
+    "avgMood": "Prům. nálada",
+    "avgSleep": "Prům. spánek",
+    "completed": "Dokončeno",
+    "granted": "Udělen",
+    "denied": "Zamítnut",
+    "cohort": {
+      "anonymousNotice": {
+        "title": "Anonymizovaná data",
+        "description": "Tento pohled zobrazuje souhrnné statistiky všech členů ve vašich clusterech. Individuální data členů nejsou zobrazena. {{count}} z {{total}} členů neudělilo podrobný přístup."
+      },
+      "noStudies": {
+        "title": "Žádné clustery",
+        "description": "Zatím nejste přiřazeni k žádným clusterům."
+      },
+      "aggregateStatistics": "Souhrnné statistiky pro tuto kohortu clusteru",
+      "totalParticipants": "Celkem účastníků",
+      "activeParticipants": "Aktivní",
+      "completedParticipants": "Dokončení",
+      "averageTrackingMetrics": "Průměrné metriky",
+      "pain": "Bolest",
+      "energy": "Energie",
+      "mood": "Nálada",
+      "sleepQuality": "Kvalita spánku",
+      "sleepHours": "Hodiny spánku",
+      "averageLabValues": "Průměrné hodnoty testů",
+      "activityCounts": "Počty aktivit",
+      "totalCheckIns": "Check-iny",
+      "totalLabResults": "Výsledky testů",
+      "totalDosingLogs": "Záznamy dávkování",
+      "noData": "Pro tento cluster zatím nejsou dostupná žádná data.",
+      "noTrendData": "Nejsou k dispozici žádná data o trendech",
+      "trackingTrends": "Trendy (posledních 12 týdnů)",
+      "labTrends": "Trendy testů (posledních 12 měsíců)",
+      "weeklyAverages": "Týdenní průměry všech účastníků kohorty",
+      "monthlyAverages": "Měsíční průměry všech účastníků kohorty"
+    },
+    "biomarkers": {
+      "crp": "CRP (mg/l)",
+      "vitaminD": "Vitamín D (ng/mL)",
+      "glucose": "Glukóza (mg/dL)"
+    },
+    "labels": {
+      "pain": "Bolest",
+      "energy": "Energie",
+      "mood": "Nálada",
+      "sleep": "Spánek",
+      "crp": "CRP",
+      "glucose": "Glukóza",
+      "vitD": "Vit D"
+    }
+  },
+  "partnerProfile": {
+    "notFound": "Partner nenalezen",
+    "notFoundDescription": "Tento partnerský profil nebyl nalezen nebo již není dostupný.",
+    "reviews": "hodnocení",
+    "about": "O mně",
+    "notesForVisitors": "Poznámky pro návštěvníky",
+    "services": "Služby",
+    "availability": "Dostupnost",
+    "availabilityDescription": "Pravidelné pracovní hodiny pro rezervaci schůzek",
+    "noAvailability": "Dostupnost není nastavena",
+    "acceptsOnline": "Přijímá online konzultace",
+    "acceptsInPerson": "Přijímá osobní návštěvy",
+    "reviewsTitle": "Hodnocení",
+    "reviewsCount": "{{count}} hodnocení",
+    "noReviewsYet": "Zatím žádná hodnocení",
+    "certification": "Certifikace",
+    "testScore": "Skóre testu",
+    "certifiedSince": "Certifikován od",
+    "certifiedProvider": "Certifikovaný člen Guildy",
+    "certifiedPartner": "Certifikovaný partner",
+    "contact": "Kontakt",
+    "visitWebsite": "Navštívit web",
+    "bookAppointment": "Rezervovat schůzku",
+    "languages": "Komunikační jazyky"
+  },
+  "partnerProfileEdit": {
+    "title": "Upravit veřejný profil",
+    "subtitle": "Přizpůsobte si, jak váš profil vypadá pro návštěvníky",
+    "saveSuccess": "Profil úspěšně uložen",
+    "saveError": "Nepodařilo se uložit profil",
+    "visibility": {
+      "title": "Viditelnost profilu",
+      "description": "Ovládejte, zda je váš profil viditelný v adresáři partnerů",
+      "label": "Zobrazit v adresáři partnerů",
+      "hint": "Když je zapnuto, váš profil bude viditelný pro všechny návštěvníky"
+    },
+    "basicInfo": {
+      "title": "Základní informace",
+      "displayName": "Zobrazované jméno",
+      "businessName": "Název firmy",
+      "businessNameHint": "Volitelné - název vaší organizace nebo praxe",
+      "description": "O vás",
+      "descriptionHint": "Popište své zkušenosti, specializace a přístup",
+      "notesForVisitors": "Poznámky pro návštěvníky",
+      "notesForVisitorsHint": "Speciální instrukce, informace o parkování nebo cokoliv, co by návštěvníci měli vědět"
+    },
+    "location": {
+      "title": "Lokalita",
+      "city": "Město",
+      "country": "Země",
+      "address": "Úplná adresa",
+      "addressHint": "Zobrazeno návštěvníkům pro osobní schůzky"
+    },
+    "contact": {
+      "title": "Kontaktní informace",
+      "email": "E-mail",
+      "phone": "Telefon",
+      "website": "Webové stránky",
+      "websitePlaceholder": "https://"
+    },
+    "services": {
+      "title": "Nabízené služby",
+      "description": "Vyberte služby, které poskytujete"
+    },
+    "appointments": {
+      "title": "Typy schůzek",
+      "description": "Jaké typy schůzek přijímáte?",
+      "online": "Online schůzky",
+      "inPerson": "Osobní schůzky"
+    },
+    "languages": {
+      "title": "Komunikační jazyky",
+      "description": "Jazyky, ve kterých komunikujete s klienty",
+      "czech": "Čeština",
+      "english": "Angličtina",
+      "german": "Němčina",
+      "russian": "Ruština",
+      "slovak": "Slovenština",
+      "polish": "Polština",
+      "french": "Francouzština",
+      "spanish": "Španělština",
+      "italian": "Italština",
+      "chinese": "Čínština",
+      "japanese": "Japonština",
+      "korean": "Korejština",
+      "vietnamese": "Vietnamština",
+      "other": "Jiný",
+      "cs": "Čeština",
+      "en": "Angličtina",
+      "de": "Němčina",
+      "sk": "Slovenština",
+      "pl": "Polština",
+      "hu": "Maďarština",
+      "ru": "Ruština",
+      "uk": "Ukrajinština",
+      "fr": "Francouzština",
+      "es": "Španělština",
+      "it": "Italština",
+      "pt": "Portugalština"
+    }
+  },
+  "consultantDashboard": {
+    "title": "Přehled členů",
+    "subtitle": "Zobrazit citlivé údaje vašich přidělených členů",
+    "backToPartner": "Zpět na přehled partnera",
+    "stats": {
+      "totalUsers": "Celkem členů",
+      "activeUsers": "Aktivní členové",
+      "completedUsers": "Dokončeno"
+    },
+    "noUsers": {
+      "title": "Žádní přidělení členové",
+      "description": "Zatím nemáte přiřazené žádné členy. Členové se objeví po zařazení do clusterů."
+    },
+    "userList": {
+      "title": "Členové",
+      "description": "Vyberte člena pro zobrazení jeho citlivých údajů"
+    },
+    "unknownUser": "Neznámý člen",
+    "selectUser": "Vyberte člena pro zobrazení jeho citlivých údajů",
+    "dob": "Datum narození",
+    "diagnosis": "Oblast zaměření",
+    "enrolled": "Zařazeno",
+    "tabs": {
+      "users": "Členové",
+      "checkIns": "Check-iny",
+      "labs": "Laboratoř",
+      "dosing": "Dávkování",
+      "questionnaires": "Formuláře",
+      "consents": "Souhlasy"
+    },
+    "avgPain": "Prům. bolest",
+    "avgEnergy": "Prům. energie",
+    "avgMood": "Prům. nálada",
+    "avgSleep": "Prům. spánek",
+    "noCheckIns": "Žádné check-iny",
+    "noLabResults": "Žádné zaznamenané výsledky testů",
+    "noDosingLogs": "Žádné záznamy dávkování",
+    "noQuestionnaires": "Žádné odpovědi na dotazníky",
+    "noConsents": "Žádné záznamy souhlasů",
+    "noData": "Žádné citlivé údaje k dispozici",
+    "questionnaireCompleted": "Dotazník vyplněn",
+    "granted": "Udělen",
+    "denied": "Zamítnut",
+    "chart": {
+      "title": "Trendy (posledních 30 dní)",
+      "pain": "Bolest",
+      "energy": "Energie",
+      "sleep": "Spánek",
+      "mood": "Nálada",
+      "noData": "Nedostatek dat pro zobrazení grafu"
+    },
+    "labChart": {
+      "title": "Trendy výkonu (platformní protokol)",
+      "noData": "Žádné výsledky testů k zobrazení",
+      "inflammation": "Zánět",
+      "metabolic": "Metabolismus",
+      "lipids": "Lipidy",
+      "vitamins": "Vitamíny",
+      "liver": "Játra",
+      "immune": "Imunita",
+      "advanced": "Pokročilé",
+      "inflammationTitle": "Zánětové markery",
+      "inflammationDesc": "CRP & ESR - Klíčové ukazatele pro protokol kvality",
+      "metabolicTitle": "Metabolický panel",
+      "metabolicDesc": "Glukóza & HbA1c - Klíčové ukazatele pro platformní protokol",
+      "lipidsTitle": "Lipidový profil",
+      "lipidsDesc": "Cholesterolový panel - Klíčové ukazatele pro optimalizační protokol",
+      "vitaminsTitle": "Stav vitamínů",
+      "vitaminsDesc": "Vitamin D & B12 - Základní ukazatele spolehlivosti",
+      "liverTitle": "Jaterní funkce",
+      "liverDesc": "AST & ALT - Monitoring zdraví systému",
+      "immuneTitle": "Imunitní panel",
+      "immuneDesc": "NK buňky & Lymfocyty - Klíčové ukazatele pro protokol kvality",
+      "advancedTitle": "Pokročilé ukazatele spolehlivosti",
+      "advancedDesc": "NAD/NADH poměr & Omega-3 - Hloubkové personalizační ukazatele pro platformní protokol"
+    },
+    "biomarkers": {
+      "crp": "CRP",
+      "glucose": "Glukóza",
+      "vitD": "Vit D",
+      "chol": "Chol",
+      "hba1c": "HbA1c",
+      "hdl": "HDL",
+      "ldl": "LDL",
+      "ast": "AST"
+    }
+  },
+  "partnerTemplates": {
+    "title": "Šablony StoryLoop",
+    "description": "Vytvořte šablony pro automatizaci komunikace s členy",
+    "create": "Vytvořit šablonu",
+    "edit": "Upravit šablonu",
+    "delete": "Smazat šablonu",
+    "empty": "Zatím nemáte žádné šablony",
+    "emptyHint": "Vytvořte první šablonu pro zefektivnění práce s členy",
+    "saved": "Šablona uložena",
+    "noDescription": "Bez popisu",
+    "updated": "Aktualizováno",
+    "deleteConfirmTitle": "Smazat šablonu?",
+    "deleteConfirmDesc": "Tuto akci nelze vrátit zpět. Šablona bude trvale odstraněna."
+  },
+  "delivery": {
+    "panel": {
+      "title": "Kontext dodávky",
+      "noContext": "Pro tento příběh není dostupný kontext dodávky",
+      "riskProfile": "Riziko",
+      "rulesCount": "{{count}} připnutých pravidel",
+      "rulesCount_one": "{{count}} připnuté pravidlo",
+      "pinnedRules": "Připnutá pravidla",
+      "participants": "{{count}} účastníků",
+      "participants_one": "{{count}} účastník",
+      "manageRuleset": "Spravovat pravidla",
+      "preview": {
+        "title": "Náhled projektu",
+        "summary": "Shrnutí",
+        "summaryPlaceholder": "Krátké shrnutí projektu",
+        "goals": "Cíle",
+        "constraints": "Omezení",
+        "successCriteria": "Kritéria úspěchu",
+        "listPlaceholder": "Jedna položka na řádek",
+        "save": "Uložit koncept",
+        "publish": "Publikovat",
+        "saveSuccess": "Náhled projektu byl uložen",
+        "publishSuccess": "Náhled projektu byl publikován",
+        "saveError": "Náhled projektu se nepodařilo uložit"
+      }
+    },
+    "status": {
+      "analyzing": "Analýza",
+      "matched": "Spárováno",
+      "scaffolding": "Příprava",
+      "ready": "Připraveno",
+      "in_progress": "Probíhá",
+      "blocked": "Blokováno",
+      "qa": "Kontrola kvality",
+      "delivering": "Doručování",
+      "delivered": "Dodáno",
+      "archived": "Archivováno",
+      "maintenance": "Údržba"
+    },
+    "ruleset": {
+      "title": "Správa pravidel příběhu",
+      "description": "Vyberte odborná pravidla pro připnutí k tomuto příběhu. Z vybraných pravidel bude vypočítán deterministický otisk.",
+      "searchPlaceholder": "Hledat pravidla podle názvu, kategorie nebo tagu...",
+      "noRules": "Žádná publikovaná pravidla k dispozici",
+      "selectedCount": "{{count}} pravidel vybráno",
+      "selectedCount_one": "{{count}} pravidlo vybráno",
+      "save": "Připnout pravidla",
+      "saveSuccess": "Sada pravidel úspěšně vytvořena",
+      "saveError": "Nepodařilo se vytvořit sadu pravidel"
+    },
+    "earnings": {
+      "title": "Výdělky",
+      "subtitle": "Sledujte své příjmy a vyúčtování",
+      "totalEarned": "Celkem vyděláno",
+      "totalPending": "Čeká na vyplacení",
+      "grossRevenue": "Hrubý příjem",
+      "totalProjects": "Projekty",
+      "period": {
+        "month": "Tento měsíc",
+        "quarter": "Toto čtvrtletí",
+        "year": "Tento rok",
+        "all": "Celkově"
+      },
+      "noEarnings": "Zatím žádné výdělky",
+      "noEarningsDescription": "Dokončete konzultace a začněte vydělávat",
+      "table": {
+        "title": "Historie výdělků",
+        "date": "Datum",
+        "project": "Projekt",
+        "type": "Typ",
+        "gross": "Hrubý příjem",
+        "net": "Váš podíl",
+        "yourSplit": "Váš podíl",
+        "splitPct": "Podíl %",
+        "status": "Stav",
+        "noData": "Žádné výdělky za toto období",
+        "page": "Strana {{page}}"
+      },
+      "type": {
+        "consultation": "Konzultace",
+        "project": "Projekt",
+        "maintenance": "Údržba"
+      },
+      "status": {
+        "pending": "Čeká na zpracování",
+        "completed": "Dokončeno",
+        "processing": "Zpracovává se",
+        "settled": "Vyplaceno",
+        "failed": "Selhalo",
+        "refunded": "Vráceno"
+      }
+    },
+    "pricing": {
+      "title": "Nastavení cen",
+      "description": "Nastavte hodinovou sazbu a preference rezervací",
+      "subtitle": "Nastavte hodinovou sazbu a preference rezervací",
+      "hourlyRate": "Hodinová sazba (Kč)",
+      "minBlock": "Minimální blok (hodiny)",
+      "maxConcurrent": "Max souběžných projektů",
+      "instantBooking": "Povolit okamžitou rezervaci",
+      "instantBookingDescription": "Klienti mohou rezervovat bez vašeho ručního potvrzení",
+      "instantBookingHelp": "Klienti mohou rezervovat bez vašeho ručního potvrzení",
+      "active": "Přijímám rezervace",
+      "save": "Uložit ceník",
+      "saved": "Ceník aktualizován",
+      "saveSuccess": "Ceník aktualizován",
+      "saveError": "Nepodařilo se aktualizovat ceník"
+    }
+  },
+  "design": {
+    "interview": {
+      "trigger": "Design DNA",
+      "title": "Design DNA rozhovor",
+      "description": "Nechte Occipitum porozumět vaší vizuální identitě prostřednictvím krátkého rozhovoru.",
+      "welcomeQuestion": "Pojďme začít. Zavřete na chvíli oči — kdyby vaše značka byla místo, jaké by bylo projít se jím?",
+      "q2": "Když někdo poprvé navštíví váš web, jaká emoce by v něm měla zůstat i poté, co odejde?",
+      "q3": "Představte si stůl vašeho ideálního klienta. Jaké předměty na něm jsou? Jaké barvy ho obklopují?",
+      "q4": "Kdyby vaše služby byly skladba, jaký žánr a tempo by měly?",
+      "q5": "Vzpomeňte si na web, který tajně obdivujete — ne konkurenta, něco nečekaného. Co vás na něm přitahuje?",
+      "q6": "Jaké vizuální klišé ve vašem oboru vás nejvíc irituje?",
+      "q7": "Vaše značka má rytmus — je to ostré staccato psacího stroje, nebo plynulé křivky ručního písma?",
+      "q8": "Jmenujte tři slova, která by se nikdy neměla objevit na vašem webu. Proč?",
+      "analyzing": "Děkuji. Nyní tkám vaše odpovědi do profilu design DNA...",
+      "complete": "Vaše design DNA byla zachycena. Occipitum nyní může generovat návrhy plátna, které rezonují s vaší identitou.",
+      "error": "Při analýze se něco pokazilo. Zkuste to prosím znovu.",
+      "placeholder": "Napište svou odpověď...",
+      "processing": "Zpracovávám vaši odpověď...",
+      "progress": "{{current}} z {{total}} otázek"
+    },
+    "occipitum": {
+      "trigger": "Occipitum",
+      "description": "Vygenerujte inovativní návrh plátna poháněný vaší design DNA. Každé generování používá unikátní semínko kreativity pro svěží, nestereotypní výsledky.",
+      "generate": "Generovat design",
+      "generating": "Occipitum si představuje vaše plátno...",
+      "proposal": "Nový",
+      "proposalReady": "Návrh plátna je připraven",
+      "proposalApplied": "Design návrh aplikován",
+      "proposalAppliedDescription": "Nový Occipitum design návrh byl načten do vašeho plátna.",
+      "accept": "Použít",
+      "reject": "Zahodit",
+      "variant": "Zkusit variantu"
+    }
+  }
+}

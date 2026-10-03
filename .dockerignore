@@ -1,0 +1,83 @@
+# ── Build artifacts ──
+dist/
+docs/api/
+docs/db-structure/
+playwright-report/
+workbench/
+trash/
+archive/
+# openxpki-config/ NESMÍ být v dockerignore — Dockerfile.pki-init/Dockerfile.pki-db
+# z něj COPY config tree (templates, schema). Secrets jsou per-instance gen
+# (viz Dockerfile.pki-init entrypoint) a `openxpki-config/tls/` je v .gitignore.
+mobile-app/
+# images/ — DO NOT exclude. images/plugin-exec/Dockerfile copies its own shim/
+# from this dir; exclude would break sandbox image build (gate test enforces).
+# node_modules in images/plugin-exec/shim/ stripped by the **/node_modules/ rule
+# below; actual content is ~10 KB (package.json + tsconfig + src/).
+.claude/
+*.tsbuildinfo
+
+# ── Dependencies (installed fresh in Docker) ──
+node_modules/
+**/node_modules/
+.npm/
+bun.lockb
+.venv/
+**/.venv/
+__pycache__/
+**/__pycache__/
+
+# ── Version control ──
+.git/
+.gitignore
+# Submodule gitlinks (`packages/insight/.git` is a FILE, not dir, pointing at
+# parent .git/modules/... path that doesn't exist in build context). Without
+# this, Dockerfile.maestro patcher stage's `git init` fails with
+# "fatal: not a git repository". `**/.git` matches gitlink files at any depth.
+**/.git
+
+# ── IDE / Editor ──
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── Environment / Secrets ──
+.env
+.env.*
+!.env.example
+
+# ── Tests & Development ──
+e2e/
+src/tests/
+vitest.config.ts
+playwright.config.ts
+coverage/
+test-results/
+
+# ── Docker (prevent recursive context) ──
+docker-compose*.yml
+compose*.yml
+Dockerfile*
+.dockerignore
+
+# ── Logs ──
+*.log
+npm-debug.log*
+
+# ── OS files ──
+.DS_Store
+Thumbs.db
+
+# ── Documentation (not needed in image) ──
+docs/
+knowledge-extraction/
+AGENTS.md
+CONTRIBUTING.md
+README.md
+RULES.md
+
+# ── Supabase local dev (not needed in production image) ──
+supabase/.temp/
+supabase/.branches/

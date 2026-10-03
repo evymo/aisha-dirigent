@@ -1,0 +1,266 @@
+{
+  "name": "WF_AITG_DAILY_REFLECTION",
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveDataSuccessExecution": "all"
+  },
+  "nodes": [
+    {
+      "name": "Cron 06:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Read Automation Setting",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        240,
+        0
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_get_automation_audited",
+        "rpcArgs": "={ \"p_automation_id\": \"daily_reflection\" }",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Should Run?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.mode }}",
+              "rightValue": "automated",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "Record Skipped",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        720,
+        180
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_record_automation_run_audited",
+        "rpcArgs": "={ \"p_automation_id\": \"daily_reflection\", \"p_status\": \"skipped\", \"p_details\": { \"reason\": \"mode_\" + $node['Read Automation Setting'].json.mode } }",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Health Summary",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        720,
+        -120
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_health_summary_audited",
+        "rpcArgs": "={ \"p_window_hours\": ({{ $node['Read Automation Setting'].json.parameters?.window_hours ?? 24 }}) }",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Read History",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        960,
+        -120
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_get_reflection_history_audited",
+        "rpcArgs": "={ \"p_limit\": ({{ $node['Read Automation Setting'].json.parameters?.history_days ?? 7 }}), \"p_generated_by\": \"aisha\" }",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Generate Reflection (LLM)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        -120
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "=http://svc-ai-chat:3011/chat",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: ($node['Read Automation Setting'].json.parameters?.model ?? 'gpt-4o-mini'), messages: [{ role: 'system', content: 'You are Aisha reflecting on your own AITG security posture. Write a 3-5 sentence diary entry summarising the past 24h and propose up to 3 concrete actions for today.' }, { role: 'user', content: 'Health summary: ' + JSON.stringify($node['Health Summary'].json) + '\\n\\nLast 7 days of reflections: ' + JSON.stringify($node['Read History'].json) }] }) }}",
+        "onError": "continueRegularOutput",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "name": "Record Reflection",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1440,
+        -120
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_record_reflection_audited",
+        "rpcArgs": "={ \"p_summary\": $json.text ?? $json.content ?? 'Daily reflection (no narrative).', \"p_proposed_actions\": [], \"p_generated_by\": \"aisha\" }",
+        "onError": "continueRegularOutput"
+      }
+    },
+    {
+      "name": "Record Success",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        -120
+      ],
+      "onError": "continueRegularOutput",
+      "parameters": {
+        "rpcName": "aitg_record_automation_run_audited",
+        "rpcArgs": "={ \"p_automation_id\": \"daily_reflection\", \"p_status\": \"success\", \"p_details\": { \"reflection_id\": $json } }",
+        "onError": "continueRegularOutput"
+      }
+    }
+  ],
+  "connections": {
+    "Cron 06:00": {
+      "main": [
+        [
+          {
+            "node": "Read Automation Setting",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Automation Setting": {
+      "main": [
+        [
+          {
+            "node": "Should Run?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Run?": {
+      "main": [
+        [
+          {
+            "node": "Health Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Record Skipped",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health Summary": {
+      "main": [
+        [
+          {
+            "node": "Read History",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read History": {
+      "main": [
+        [
+          {
+            "node": "Generate Reflection (LLM)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Reflection (LLM)": {
+      "main": [
+        [
+          {
+            "node": "Record Reflection",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Reflection": {
+      "main": [
+        [
+          {
+            "node": "Record Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

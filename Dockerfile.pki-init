@@ -1,0 +1,64 @@
+# Dockerfile.pki-init — Init container for PKI trust chain + per-instance TLS gen
+#
+# Bakes CA bundle + openxpki-config tree (config templates only — no secrets)
+# from git repo into the image. Runtime entrypoint generates self-signed TLS
+# assets into the persisted volume (pki-config-rendered) on first boot.
+#
+# Avoids Coolify bind-mount trap (file/dir bind-mounts on remote workers may
+# resolve to empty dirs → sed/envsubst "Is a directory" / missing file).
+#
+# CA bundle rotation: update config/pki/aisha-ca-bundle.pem → push → redeploy.
+# TLS rotation: delete files from pki-config-rendered volume → restart pki-init
+# (regenerates self-signed; production should rotate via realm CA signing).
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/alpine:3.20
+
+# Tooling for both legacy compose entrypoints AND the new auto-issue script:
+#   - openssl: per-instance TLS gen + cert validation
+#   - curl + jq: ROPC token + pki-bridge /v1/issue (autonomous AISHA cert)
+#   - coreutils (date -d): cert expiry calc in issue-netbird-mesh-cert.sh
+RUN apk add --no-cache openssl ca-certificates curl jq coreutils gettext
+
+COPY config/pki/aisha-ca-bundle.pem /staging/aisha-ca-bundle.pem
+COPY openxpki-config/ /template/
+# System crypto.yaml template — rendered runtime z PKI_SVAULT_KEY env.
+# Důvod: openxpki-config/config.d/system/crypto.yaml je gitignored (svault secret),
+# takže fresh clone na Coolify build serveru ho nemá. Bez crypto.yaml se pki-server
+# nedokáže nastartovat (chybí svault secret pro datapool encryption).
+COPY aisha/templates/openxpki-system-crypto.yaml.template /staging/openxpki-system-crypto.yaml.template
+# Auto-issue script for netbird-internal-tls cert (called from compose entrypoint).
+# Runs at every aisha-netbird deploy, idempotent (skip if existing cert valid >7d).
+COPY infra/pki/issue-netbird-mesh-cert.sh /usr/local/bin/issue-netbird-mesh-cert.sh
+RUN chmod +x /usr/local/bin/issue-netbird-mesh-cert.sh
+# Unified internal mesh-cert issuer/distributor — the aisha-pki-renewer sidecar
+# runs this loop (client_credentials → pki-bridge issue → distribute to consumer
+# Coolify env). Single owner of *.mesh.<tld> cert lifecycle. See the script header.
+COPY infra/pki/pki-renewer.sh /usr/local/bin/pki-renewer.sh
+RUN chmod +x /usr/local/bin/pki-renewer.sh
+# Mesh peer CA-bundle assembler (called from each stack's pki-init command).
+# Fetches the LIVE realm CA from the pki-bridge, retrying until the bridge serves
+# a real certificate. It does NOT fall back to the baked bundle below — that copy
+# froze 2026-04-13 while realm CAs are minted at first boot, so it cannot match a
+# live instance; writing it produced healthy containers with dead mesh TLS.
+# See the script header and src/tests/gates/pki-bundle-fail-closed.gate.test.ts.
+COPY infra/pki/assemble-ca-bundle.sh /usr/local/bin/assemble-ca-bundle.sh
+RUN chmod +x /usr/local/bin/assemble-ca-bundle.sh
+# Shared fingerprint helpers — sourced by cert script + future diag routines.
+# Pattern: SHA-256 prefix + length. Lets operators trace secrets across
+# components without ever logging the raw value.
+COPY infra/lib/fingerprint.sh /usr/local/lib/fingerprint.sh
+RUN chmod +x /usr/local/lib/fingerprint.sh
+
+# Bake the realm bootstrap script into the image. pki-init will copy it
+# into the shared pki-config-rendered volume so pki-realm-bootstrap can
+# read it without using a file-level bind mount (which Coolify v4
+# silently resolves to an empty directory on remote workers — same trap
+# noted at the top of this Dockerfile).
+COPY infra/pki/pki-realm-bootstrap.sh /staging/pki-realm-bootstrap.sh
+
+# pki-crl-issue.sh travels the same way and for the same reason: it needs
+# `openxpkicli` and the daemon socket, which exist only in the openxpki image,
+# so it cannot run from THIS image — it is staged here and executed by
+# pki-server. Without it nothing ever calls the crl_issuance workflow and
+# revocations accumulate forever in CRL_ISSUANCE_PENDING.
+COPY infra/pki/pki-crl-issue.sh /staging/pki-crl-issue.sh

@@ -1,0 +1,210 @@
+# =============================================================================
+# Staging Deploy — Deploy branch to Experimental staging (Forgejo Actions)
+# =============================================================================
+# Deploys a specific branch or PR to the Experimental staging server via Coolify.
+# Uses docker-compose.coolify-staging.yml for isolated testing.
+#
+# DYNAMIC UUID — resolves the staging app uuid via Coolify API by name
+# (scripts/lib/coolify-resolve-uuid.sh). No COOLIFY_UUID_STAGING secret
+# required; the staging app is identified by its Coolify application name
+# (default: aisha-staging, overridable via STAGING_APP_NAME input).
+#
+# Usage: Forgejo UI -> Actions -> Staging Deploy -> Run workflow
+#   or automatically on PR with 'staging' label
+# =============================================================================
+
+name: Staging Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to deploy (default: current)"
+        required: false
+        type: string
+      story_id:
+        description: "Story ID (optional, for tracking)"
+        required: false
+        type: string
+      action:
+        description: "Action"
+        required: true
+        type: choice
+        options:
+          - deploy
+          - teardown
+      staging_app_name:
+        description: "Coolify application name for staging (default aisha-staging)"
+        required: false
+        type: string
+        default: aisha-staging
+
+  pull_request:
+    types: [labeled]
+
+concurrency:
+  group: staging-${{ github.event.inputs.story_id || github.event.pull_request.number || 'manual' }}
+  cancel-in-progress: false
+
+jobs:
+  # ── Auto-deploy on PR label ────────────────────────────────────────────────
+  staging-auto:
+    name: "Staging (PR)"
+    if: github.event_name == 'pull_request' && github.event.label.name == 'staging'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/lib/coolify-resolve-uuid.sh
+            scripts/lib/coolify-project-scope.mjs
+            scripts/lib/coolify-instance-scope.mjs
+            scripts/lib/instance-overlay.mjs
+            scripts/lib/config-env-files.mjs
+            scripts/lib/env-hodnota.mjs
+            scripts/lib/cli-entry.mjs
+            scripts/lib/coolify-http.mjs
+
+      - name: Deploy staging
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          # ⛔ NAMĚŘENO 2026-09-13: resolver UUID se ptá PROJEKTU instance a ten se
+          # odvozuje z identity (projekt pojmenovaný APP_NAME_PREFIX) — stejně jako
+          # v cold-startu. Bez ní resolver nepřekládá (dřív tiše sáhl po všech nájemnících).
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+          STAGING_APP_NAME: aisha-staging
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          if [ -z "${COOLIFY_API_TOKEN:-}" ]; then
+            echo "::error::COOLIFY_API_TOKEN not configured"
+            exit 1
+          fi
+          export COOLIFY_URL="${COOLIFY_URL:?COOLIFY_URL must be set via repository secret}"
+
+          UUID=$(bash scripts/lib/coolify-resolve-uuid.sh "$STAGING_APP_NAME" 2>&1 || true)
+          # Both end the job, but they are not the same fault: ::error:: is the resolve
+          # breaking (API silent, no token, no JSON runtime), ::notfound:: is the app
+          # genuinely absent. Reported as one, the first gets debugged as the second.
+          if printf '%s' "$UUID" | grep -q '::error::'; then
+            echo "::error::Could not resolve '$STAGING_APP_NAME' — infrastructure, not a missing app: $UUID"
+            exit 1
+          fi
+          if [ -z "$UUID" ] || printf '%s' "$UUID" | grep -q '::notfound::'; then
+            echo "::error::Staging app '$STAGING_APP_NAME' not found in Coolify"
+            exit 1
+          fi
+
+          printf 'Deploying PR #%s to staging (uuid=%s)...\n' "$PR_NUMBER" "${UUID:0:12}"
+          DEPLOY_URL="${COOLIFY_URL}/api/v1/deploy?uuid=${UUID}&force=true"
+          HTTP_CODE=$(curl -s -o /tmp/deploy.txt -w "%{http_code}" --max-time 30 \
+            -X GET "$DEPLOY_URL" \
+            -H "Authorization: Bearer $COOLIFY_API_TOKEN")
+          echo "HTTP $HTTP_CODE"
+          cat /tmp/deploy.txt 2>/dev/null || true
+          [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ] || exit 1
+
+  # ── Manual deploy / teardown ───────────────────────────────────────────────
+  staging-manual:
+    name: "Staging (${{ github.event.inputs.action }})"
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/lib/coolify-resolve-uuid.sh
+            scripts/lib/coolify-project-scope.mjs
+            scripts/lib/coolify-instance-scope.mjs
+            scripts/lib/instance-overlay.mjs
+            scripts/lib/config-env-files.mjs
+            scripts/lib/env-hodnota.mjs
+            scripts/lib/cli-entry.mjs
+            scripts/lib/coolify-http.mjs
+
+      - name: Deploy to staging
+        if: github.event.inputs.action == 'deploy'
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          # ⛔ NAMĚŘENO 2026-09-13: resolver UUID se ptá PROJEKTU instance a ten se
+          # odvozuje z identity (projekt pojmenovaný APP_NAME_PREFIX) — stejně jako
+          # v cold-startu. Bez ní resolver nepřekládá (dřív tiše sáhl po všech nájemnících).
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+          STAGING_APP_NAME: ${{ github.event.inputs.staging_app_name }}
+          BRANCH_INPUT: ${{ github.event.inputs.branch }}
+          STORY_ID: ${{ github.event.inputs.story_id }}
+        run: |
+          set -uo pipefail
+          if [ -z "${COOLIFY_API_TOKEN:-}" ]; then
+            echo "::error::COOLIFY_API_TOKEN not configured"
+            exit 1
+          fi
+          export COOLIFY_URL="${COOLIFY_URL:?COOLIFY_URL must be set via repository secret}"
+
+          APP_NAME="${STAGING_APP_NAME:-aisha-staging}"
+          UUID=$(bash scripts/lib/coolify-resolve-uuid.sh "$APP_NAME" 2>&1 || true)
+          # Both end the job, but they are not the same fault: ::error:: is the resolve
+          # breaking (API silent, no token, no JSON runtime), ::notfound:: is the app
+          # genuinely absent. Reported as one, the first gets debugged as the second.
+          if printf '%s' "$UUID" | grep -q '::error::'; then
+            echo "::error::Could not resolve '$APP_NAME' — infrastructure, not a missing app: $UUID"
+            exit 1
+          fi
+          if [ -z "$UUID" ] || printf '%s' "$UUID" | grep -q '::notfound::'; then
+            echo "::error::Staging app '$APP_NAME' not found in Coolify"
+            exit 1
+          fi
+
+          BRANCH="${BRANCH_INPUT:-${GITHUB_REF_NAME:-main}}"
+          printf 'Deploying branch %s to staging (app=%s, uuid=%s)...\n' "$BRANCH" "$APP_NAME" "${UUID:0:12}"
+          [ -n "${STORY_ID:-}" ] && printf 'Story: %s\n' "$STORY_ID"
+
+          DEPLOY_URL="${COOLIFY_URL}/api/v1/deploy?uuid=${UUID}&force=true"
+          HTTP_CODE=$(curl -s -o /tmp/deploy.txt -w "%{http_code}" --max-time 30 \
+            -X GET "$DEPLOY_URL" \
+            -H "Authorization: Bearer $COOLIFY_API_TOKEN")
+          echo "HTTP $HTTP_CODE"
+          cat /tmp/deploy.txt 2>/dev/null || true
+          [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ] || exit 1
+
+      - name: Teardown staging
+        if: github.event.inputs.action == 'teardown'
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          # ⛔ NAMĚŘENO 2026-09-13: resolver UUID se ptá PROJEKTU instance a ten se
+          # odvozuje z identity (projekt pojmenovaný APP_NAME_PREFIX) — stejně jako
+          # v cold-startu. Bez ní resolver nepřekládá (dřív tiše sáhl po všech nájemnících).
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+          STAGING_APP_NAME: ${{ github.event.inputs.staging_app_name }}
+        run: |
+          set -uo pipefail
+          if [ -z "${COOLIFY_API_TOKEN:-}" ]; then
+            echo "::error::COOLIFY_API_TOKEN not configured"
+            exit 1
+          fi
+          export COOLIFY_URL="${COOLIFY_URL:?COOLIFY_URL must be set via repository secret}"
+
+          APP_NAME="${STAGING_APP_NAME:-aisha-staging}"
+          UUID=$(bash scripts/lib/coolify-resolve-uuid.sh "$APP_NAME" 2>&1 || true)
+          # A teardown that cannot resolve must not report "already gone" — the stack may
+          # well be running. Only ::notfound:: proves there is nothing left to tear down.
+          if printf '%s' "$UUID" | grep -q '::error::'; then
+            echo "::error::Could not resolve '$APP_NAME' — teardown cannot confirm the stack is gone: $UUID"
+            exit 1
+          fi
+          if [ -z "$UUID" ] || printf '%s' "$UUID" | grep -q '::notfound::'; then
+            echo "::warning::Staging app '$APP_NAME' already absent — nothing to tear down"
+            exit 0
+          fi
+
+          printf 'Stopping staging stack (uuid=%s)...\n' "${UUID:0:12}"
+          HTTP_CODE=$(curl -s -o /tmp/stop.txt -w "%{http_code}" --max-time 30 \
+            -X POST "${COOLIFY_URL}/api/v1/applications/${UUID}/stop" \
+            -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
+            -H "Content-Type: application/json")
+          echo "HTTP $HTTP_CODE"
+          cat /tmp/stop.txt 2>/dev/null || true
+          echo "Staging teardown completed"

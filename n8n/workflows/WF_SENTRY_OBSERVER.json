@@ -1,0 +1,477 @@
+{
+  "name": "WF_SENTRY_OBSERVER",
+  "meta": {
+    "purpose": "Real-time Sentry event analyzer. Detekuje anomálie (error spike, new exception class, latency degradation) a triggeruje appropriate response: auto-rollback B/G slot, fix proposal, nebo operator alert.",
+    "trigger": "Sentry alert webhook → POST /webhook/sentry-observe",
+    "sentry_instance": "${SENTRY_URL}",
+    "design_doc": "docs/deploy/AUTONOMOUS_DEPLOY_FLOW.md",
+    "phase": "Phase 3 — rollback wired to request_rollback (creates PENDING, human-approved via WF_APPROVAL_GATE; observer never executes). Classification heuristic still placeholder."
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "sentry-observe",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "wh-sentry",
+      "name": "Sentry alert webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sentry alert payload contains:\n//   action: \"created\" | \"resolved\" | \"assigned\" | \"alert\"\n//   data.event: { event_id, project, tags, environment, release, ... }\n//   data.alert: { rule, threshold, current_value }\n//\n// Extract relevant fields + tag with deployment context (release tag → deployment_uuid).\nconst body = $input.first().json.body || $input.first().json;\nconst event = body.data?.event || body.event || {};\nconst alert = body.data?.alert || body.alert || {};\n\nconst tags = Object.fromEntries((event.tags || []).map(t => Array.isArray(t) ? t : [t.key, t.value]));\nconst app = tags['aisha.app'] || tags.app || event.project || 'unknown';\nconst slot = tags['aisha.slot'] || tags.slot || null;\nconst release = event.release || tags.release || null;\nconst environment = event.environment || tags.environment || 'production';\n\nreturn { json: {\n  app,\n  slot,\n  release,\n  environment,\n  event_id: event.event_id,\n  exception_class: event.exception?.values?.[0]?.type || null,\n  message: event.message || event.title || alert.rule || '?',\n  // Alert metrics — present pokud event přišel z alert rule (ne z first-seen issue)\n  alert_rule: alert.rule || null,\n  alert_threshold: alert.threshold || null,\n  alert_current: alert.current_value || null,\n  raw_action: body.action || 'unknown',\n}};"
+      },
+      "id": "parse-event",
+      "name": "Parse Sentry event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-prod",
+              "leftValue": "={{ $json.environment }}",
+              "rightValue": "production",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "env-gate",
+      "name": "Production env?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Anomaly classification — input je parsed Sentry event.\n// Output: { pattern, severity, recommended_action }\n//\n// Patterns (priority order):\n//   1. error_rate_spike: alert_rule s aktuální hodnotou >2× threshold\n//   2. new_exception_class: action=created (first-seen issue) + recent release\n//   3. perf_degradation: alert_rule s 'p95' v rule name\n//   4. recurring_issue: action=assigned (Sentry assigned obnovený issue)\n//   5. unknown: fallback\n//\n// Note: real implementace by konzultovala Sentry Issue API pro historii.\nconst e = $input.first().json;\n\nlet pattern = 'unknown';\nlet severity = 'info';\nlet action = 'log_only';\n\nif (e.alert_rule && e.alert_current && e.alert_threshold &&\n    e.alert_current > e.alert_threshold * 2) {\n  pattern = 'error_rate_spike';\n  severity = 'critical';\n  action = 'auto_rollback';\n} else if (e.raw_action === 'created' && e.exception_class) {\n  pattern = 'new_exception_class';\n  severity = 'high';\n  action = 'propose_fix';\n} else if (e.alert_rule && /p9[0-9]|latency|perf/i.test(e.alert_rule)) {\n  pattern = 'perf_degradation';\n  severity = 'medium';\n  action = 'canary_verify';\n} else if (e.raw_action === 'assigned') {\n  pattern = 'recurring_issue';\n  severity = 'medium';\n  action = 'escalate_alert';\n}\n\nreturn { json: { ...e, pattern, severity, action } };"
+      },
+      "id": "classify",
+      "name": "Classify anomaly",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "rollback",
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "auto_rollback",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "propose",
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "propose_fix",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "canary",
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "canary_verify",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "outputKey": "escalate",
+              "conditions": {
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.action }}",
+                    "rightValue": "escalate_alert",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "fallbackOutput": "extra",
+        "options": {}
+      },
+      "id": "route",
+      "name": "Route by action",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [
+        1000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "request_rollback",
+        "rpcParams": "={{ JSON.stringify({ p_app_name: $json.app, p_triggered_by: 'sentry_observer', p_sentry_correlation: { pattern: $json.pattern, severity: $json.severity, alert_rule: $json.alert_rule, alert_current: $json.alert_current, alert_threshold: $json.alert_threshold, event_id: $json.event_id, release: $json.release }, p_metadata: { slot: $json.slot, environment: $json.environment, source: 'sentry_observer' } }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 8000,
+          "auditTrail": true
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "do-rollback",
+      "name": "Request rollback (gated)",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1200,
+        100
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.N8N_WEBHOOK_URL }}/webhook/drift-now",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"reason\": \"sentry-incident\",\n  \"app\": \"{{ $('parse-event').first().json.app }}\",\n  \"severity\": \"{{ $('classify').first().json.severity }}\",\n  \"pattern\": \"{{ $('classify').first().json.pattern }}\"\n}",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json",
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "trigger-drift-on-incident",
+      "name": "Trigger drift check (post-incident)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1325,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.N8N_WEBHOOK_URL }}/webhook/fix-proposer",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"app\": \"{{ $json.app }}\", \"signal_type\": \"sentry\", \"exception_class\": \"{{ $json.exception_class }}\", \"release\": \"{{ $json.release }}\", \"pattern\": \"{{ $json.pattern }}\" }",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json",
+              "fullResponse": false
+            }
+          }
+        }
+      },
+      "id": "do-propose",
+      "name": "Queue fix proposal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1200,
+        250
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Canary verify: trigger redeploy v --canary mode pro verify že perf reg\n// nepřišla z latest deploy (testuje se isolated single-app deploy).\nconst e = $input.first().json;\nreturn { json: {\n  action_taken: 'canary_verify_scheduled',\n  app: e.app,\n  reason: e.alert_rule,\n  // TODO: spawn `node scripts/aisha-redeploy.mjs --canary=${e.app}` via\n  // svc-agent-runner.\n}};"
+      },
+      "id": "do-canary",
+      "name": "Schedule canary verify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Escalate: post Slack/Mattermost alert with context (recurring issue =\n// known bug, automation unable to fix).\nconst e = $input.first().json;\nreturn { json: {\n  action_taken: 'operator_alert',\n  channel: '#aisha-deploy-alerts',\n  message: `Recurring issue v ${e.app}: ${e.message} (release ${e.release})`,\n  severity: e.severity,\n}};"
+      },
+      "id": "do-escalate",
+      "name": "Post operator alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        550
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extra/unknown: just log + respond.\nconst e = $input.first().json;\nreturn { json: { action_taken: 'log_only', pattern: e.pattern, app: e.app } };"
+      },
+      "id": "do-log",
+      "name": "Log only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($input.first().json) }}"
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1450,
+        350
+      ]
+    }
+  ],
+  "connections": {
+    "Sentry alert webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Sentry event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Sentry event": {
+      "main": [
+        [
+          {
+            "node": "Production env?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Production env?": {
+      "main": [
+        [
+          {
+            "node": "Classify anomaly",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify anomaly": {
+      "main": [
+        [
+          {
+            "node": "Route by action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by action": {
+      "main": [
+        [
+          {
+            "node": "Request rollback (gated)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Queue fix proposal",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Schedule canary verify",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Post operator alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger drift check (post-incident)": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue fix proposal": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule canary verify": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post operator alert": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log only": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request rollback (gated)": {
+      "main": [
+        [
+          {
+            "node": "Trigger drift check (post-incident)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    "aisha",
+    "sentry",
+    "observability",
+    "self-driving"
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "id": "eurowag-telematics",
+  "version": "0.2.1",
+  "name": "Eurowag Telematics",
+  "description": "Reads vehicles, drivers, vehicle states and trips from the Eurowag Telematics customer API (the successor to the Webdispečink SOAP endpoint) and stores what the vendor claims on the generic raw lane (audience_sync_source_catalog, source eurowag-telematics) — no positions. It creates no twins: the platform proposes identity bindings (ew_propose_identity) and projects onto twins through CONFIRMED bindings only (ew_project_catalog). Only the CONFIG (endpoint, credentials, schedule) is administrable — the time-series values go straight to the database. Optional by construction: a deployment that never touches Eurowag simply does not install it. See README.md for the ways this API departs from its vendor documentation.",
+  "author": "Evymo",
+  "kind": "data_source",
+  "trust_tier": "internal",
+  "source_spec": {
+    "source_slug": "eurowag-telematics",
+    "namespace": "telematics/eurowag",
+    "adapter_entry": "plugins/eurowag-telematics/src/index.ts",
+    "default_config": {
+      "vehicleStatePollSeconds": 3600,
+      "tripOverlapHours": 48,
+      "projectionWindowMin": 180,
+      "fleetSyncCron": "0 3 * * *",
+      "tripSyncCron": "40 3 * * *",
+      "tripBackfillDays": 30,
+      "tripPauseMs": 200,
+      "tripCallBudget": 0,
+      "maxPlausibleConsumptionPer100km": 100
+    }
+  },
+  "capabilities": [
+    "http.GET./vehicles-states",
+    "http.GET./drivers",
+    "http.GET./trips",
+    "cron.sync_fleet",
+    "cron.poll_vehicle_states",
+    "cron.sync_trips"
+  ],
+  "config_schema": {
+    "type": "object",
+    "required": ["apiKey", "username", "password"],
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "default": "https://telematics.eurowag.com/customer-api/v1",
+        "description": "Telematics customer API root. GET-only; the API exposes no writes."
+      },
+      "tokenUrl": {
+        "type": "string",
+        "default": "https://login.eurowag.com/auth/realms/eurowag/protocol/openid-connect/token",
+        "description": "Eurowag's own Keycloak token endpoint (password grant) — not the platform realm. Behind Cloudflare: a library User-Agent gets a 403 challenge, and the sandbox fetch adds no UA of its own — see userAgent."
+      },
+      "clientId": {
+        "type": "string",
+        "default": "dfo-client",
+        "description": "OAuth client id. Note: the customer number in the vendor's configuration.json is NOT this value; using it yields invalid_client."
+      },
+      "apiKey": {
+        "type": "string",
+        "secret": true,
+        "description": "Per-tenant key sent as the api_key QUERY parameter on every call. A valid bearer without it is rejected."
+      },
+      "userAgent": {
+        "type": "string",
+        "description": "User-Agent sent on every call. Empty = the plugin's browser default: Cloudflare in front of login.eurowag.com answers library UAs (node, curl, python) with a 403 challenge (measured 2026-09-28)."
+      },
+      "username": { "type": "string", "secret": true, "description": "Password-grant user." },
+      "password": { "type": "string", "secret": true, "description": "Password-grant secret." },
+      "vehicleStatePollSeconds": {
+        "type": "number",
+        "default": 3600,
+        "description": "How often to store odometer, fuel level and ignition (no position is stored). They change over hours, not minutes, and the daily API budget (2000 calls) is shared with Webdispečink. 0 or less = do not poll at all (NOT every minute)."
+      },
+      "tripOverlapHours": {
+        "type": "number",
+        "default": 48,
+        "description": "Each daily trip sync re-reads this many hours before the stored cursor, so trips the vendor completed or corrected after the fact are picked up. Costs rows, not calls."
+      },
+      "projectionWindowMin": {
+        "type": "number",
+        "default": 180,
+        "description": "Trips and vehicle states stored within this many minutes are re-offered to the twin projection, which writes only what actually changed."
+      },
+      "fleetSyncCron": {
+        "type": "string",
+        "default": "0 3 * * *",
+        "description": "How often to resolve vehicles + drivers to twins (a codebook — changes rarely)."
+      },
+      "tripSyncCron": {
+        "type": "string",
+        "default": "40 3 * * *",
+        "description": "How often to pull trips onto the twin-event lane. Runs after the fleet sync — the trip resolver stands on the vehicle twin registry."
+      },
+      "tripBackfillDays": {
+        "type": "number",
+        "default": 30,
+        "description": "On the first run (no cursor yet), how many days of trips to load."
+      },
+      "tripPauseMs": {
+        "type": "number",
+        "default": 200,
+        "description": "Pause between per-vehicle trip calls — courtesy to a third-party production system, not our own throttling."
+      },
+      "tripCallBudget": {
+        "type": "number",
+        "default": 0,
+        "description": "Cap on trip API calls per run, counted per PAGE (the API returns at most 29 trips per call; 0 = no cap). When hit, the cursor is held open so the next run resumes the same window."
+      },
+      "maxPlausibleConsumptionPer100km": {
+        "type": "number",
+        "default": 100,
+        "description": "Values above this are dropped as implausible rather than stored (281 l/100km observed on a short trip)."
+      }
+    }
+  },
+  "lifecycle": {
+    "load_strategy": "hot"
+  },
+  "sandbox": {
+    "timeout_ms": 20000,
+    "network_allowlist": ["telematics.eurowag.com", "login.eurowag.com"],
+    "max_memory_mb": 64,
+    "rpc_allowlist": ["audience_sync_source_catalog", "ew_project_catalog", "ew_propose_identity"]
+  },
+  "dependencies": {}
+}

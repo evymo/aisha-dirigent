@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n-key="web.cafe.title">The Copper Cup — coffee, order ahead</title>
+    <meta name="description" data-i18n-key="web.cafe.description"
+      content="A neighbourhood coffee house. See the menu and order ahead — ready when you arrive." />
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header" data-section="header">
+      <div class="wrap">
+        <a class="brand" href="/">
+          <span class="brand__mark" aria-hidden="true">☕</span>
+          <span data-i18n-key="web.cafe.brand">The Copper Cup</span>
+        </a>
+        <nav class="nav">
+          <a href="#menu" data-i18n-key="web.cafe.nav.menu">Menu</a>
+          <a href="#order" data-i18n-key="web.cafe.nav.order">Order ahead</a>
+          <a href="#visit" data-i18n-key="web.cafe.nav.visit">Visit</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" data-section="hero">
+        <div class="wrap">
+          <h1 data-i18n-key="web.cafe.hero.heading">Coffee, slow and proper</h1>
+          <p data-i18n-key="web.cafe.hero.body">
+            Small-batch beans, pulled with patience. Browse the menu, order from your phone,
+            and we'll have it on the bar by the time you walk in.
+          </p>
+          <a class="btn" href="#order" data-i18n-key="web.cafe.hero.cta">Order ahead</a>
+        </div>
+      </section>
+
+      <section class="section" id="menu" data-section="menu">
+        <div class="wrap">
+          <p class="section__eyebrow" data-i18n-key="web.cafe.menu.eyebrow">On the bar</p>
+          <h2 class="section__title" data-i18n-key="web.cafe.menu.heading">The menu</h2>
+          <!-- LIVE product catalog. Renders the operator's seeded products from the
+               `products` table (via the product-catalog runtime block / get_public_products).
+               Ships EMPTY — the operator fills it with their own menu in admin; until then
+               the block shows its own empty state. This is instance data, not base data. -->
+          <div data-runtime-block="product-catalog" data-block-config='{"columns":3}'></div>
+        </div>
+      </section>
+
+      <section class="section" id="order" data-section="order">
+        <div class="wrap">
+          <div class="order">
+            <div class="inner">
+              <div>
+                <h2 data-i18n-key="web.cafe.order.heading">Order ahead, skip the queue</h2>
+                <p data-i18n-key="web.cafe.order.body">Build your order online and pay in a tap. We start it when you're a few minutes away, so it's fresh on the bar the moment you arrive — no waiting in line.</p>
+                <a class="btn btn-dark" href="#visit" data-i18n-key="web.cafe.order.cta">Start an order</a>
+              </div>
+              <div class="order__stat">
+                <span class="order__num" data-i18n-key="web.cafe.order.statNum">5 min</span>
+                <span class="order__label" data-i18n-key="web.cafe.order.statLabel">saved on a typical morning run</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section visit" id="visit" data-section="visit">
+        <div class="wrap">
+          <h2 class="section__title" data-i18n-key="web.cafe.visit.heading">Find us</h2>
+          <p data-i18n-key="web.cafe.visit.body">On the corner of Linden and 4th, with the green awning. Dogs and laptops welcome.</p>
+          <p class="visit__hours" data-i18n-key="web.cafe.visit.hours">Mon–Fri 7am–6pm · Sat–Sun 8am–4pm</p>
+          <a class="btn" href="mailto:hello@example.coffee" data-i18n-key="web.cafe.visit.button">Get directions</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer" data-section="footer">
+      <div class="wrap">
+        <span data-i18n-key="web.cafe.footer.name">The Copper Cup</span>
+        <span data-i18n-key="web.cafe.footer.note">Roasted nearby, served with no rush.</span>
+      </div>
+    </footer>
+  </body>
+</html>

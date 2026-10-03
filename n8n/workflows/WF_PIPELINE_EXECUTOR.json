@@ -1,0 +1,612 @@
+{
+  "name": "WF_PIPELINE_EXECUTOR",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "pipeline-executor",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "pe-webhook",
+      "name": "Pipeline Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "exchange": "aisha.pipeline",
+        "queue": "aisha.pipeline.execute",
+        "options": {
+          "acknowledge": "executionFinishes",
+          "jsonParseBody": true,
+          "assertQueue": true,
+          "durable": true
+        }
+      },
+      "id": "pe-rabbitmq-trigger",
+      "name": "RabbitMQ Trigger",
+      "type": "n8n-nodes-base.rabbitmqTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        520
+      ],
+      "credentials": {
+        "rabbitmq": {
+          "id": "__REMAP__",
+          "name": "RabbitMQ"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize input from webhook or RabbitMQ trigger\nconst raw = $input.item.json.body || $input.item.json;\n\nconst run_id = raw.run_id;\nconst task_kind = raw.task_kind;\nconst agents = raw.agents || [];\nconst risk_profile = raw.risk_profile || 'low';\nconst stop_conditions = raw.stop_conditions || {};\nconst story_id = raw.story_id || null;\nconst context_profile = raw.context_profile || 'repo_plus_rules';\n\nif (!run_id || !agents.length) {\n  throw new Error(`Invalid pipeline message: run_id=${run_id}, agents=${JSON.stringify(agents)}`);\n}\n\nreturn {\n  json: {\n    run_id,\n    task_kind,\n    agents,\n    risk_profile,\n    stop_conditions,\n    story_id,\n    context_profile,\n    current_step: 0,\n    total_steps: agents.length,\n    results: [],\n    pipeline_started_at: new Date().toISOString()\n  }\n};"
+      },
+      "id": "pe-parse",
+      "name": "Parse Pipeline Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/update_ai_run_status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_run_id",
+              "value": "={{ $json.run_id }}"
+            },
+            {
+              "name": "p_status",
+              "value": "running"
+            },
+            {
+              "name": "p_metadata",
+              "value": "={{ JSON.stringify({ pipeline_executor: 'started', agents: $json.agents, task_kind: $json.task_kind }) }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "pe-mark-running",
+      "name": "Mark Run Started",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        700,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Agent Loop: pick the next agent from the pipeline\nconst data = $input.item.json;\nconst step = data.current_step || 0;\nconst agents = data.agents || [];\n\nif (step >= agents.length) {\n  // All agents done\n  return { json: { ...data, pipeline_complete: true } };\n}\n\nconst agent_slug = agents[step];\n\n// Map agent_slug to sub-workflow name\nconst AGENT_WORKFLOW_MAP = {\n  'dev_patch': 'WF_DEV_PATCH',\n  'compliance_gate': 'WF_PR_COMPLIANCE_GATE',\n  'verifier': 'WF_VERIFIER',\n  'debug_agent': 'WF_DEBUG_AGENT',\n  'librarian': 'WF_KNOWLEDGE_AGENT',\n  'dirigent': 'WF_DIRIGENT_AGENT'\n};\n\nconst workflow_name = AGENT_WORKFLOW_MAP[agent_slug] || null;\n\nreturn {\n  json: {\n    ...data,\n    pipeline_complete: false,\n    current_agent: {\n      slug: agent_slug,\n      workflow_name,\n      step_index: step\n    }\n  }\n};"
+      },
+      "id": "pe-agent-loop",
+      "name": "Agent Loop",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.pipeline_complete }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "pe-check-complete",
+      "name": "Pipeline Complete?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Execute the current agent via its sub-workflow\n// In production, this uses n8n's Execute Workflow node.\n// Here we prepare the payload for the sub-workflow call.\nconst data = $input.item.json;\nconst agent = data.current_agent;\n\nreturn {\n  json: {\n    run_id: data.run_id,\n    task_kind: data.task_kind,\n    story_id: data.story_id,\n    risk_profile: data.risk_profile,\n    context_profile: data.context_profile,\n    agent_slug: agent.slug,\n    workflow_name: agent.workflow_name,\n    step_index: agent.step_index,\n    previous_results: data.results,\n    stop_conditions: data.stop_conditions\n  }\n};"
+      },
+      "id": "pe-prepare-agent",
+      "name": "Prepare Agent Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "workflowId": "={{ $json.workflow_name }}",
+        "options": {}
+      },
+      "id": "pe-execute-agent",
+      "name": "Execute Agent Workflow",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1580,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process the agent result and advance the pipeline\nconst agentResult = $input.item.json;\nconst pipelineData = $('Agent Loop').item.json;\n\nconst stepResult = {\n  agent_slug: pipelineData.current_agent.slug,\n  step_index: pipelineData.current_agent.step_index,\n  result: agentResult,\n  completed_at: new Date().toISOString()\n};\n\nconst results = [...(pipelineData.results || []), stepResult];\nconst nextStep = pipelineData.current_step + 1;\n\n// Check stop conditions\nconst stop = pipelineData.stop_conditions || {};\nlet shouldStop = false;\nlet stopReason = null;\n\n// compliance stop: if compliance_gate fails, stop pipeline\nif (pipelineData.current_agent.slug === 'compliance_gate') {\n  if (agentResult.verdict === 'fail' || agentResult.passed === false) {\n    shouldStop = true;\n    stopReason = 'compliance_gate_failed';\n  }\n}\n\n// human approval stop\nif (stop.require_human_approval && pipelineData.risk_profile === 'high') {\n  if (pipelineData.current_agent.slug === 'compliance_gate') {\n    shouldStop = true;\n    stopReason = 'awaiting_human_approval';\n  }\n}\n\n// max_loops stop\nif (stop.max_loops && nextStep >= stop.max_loops) {\n  shouldStop = true;\n  stopReason = 'max_loops_reached';\n}\n\nreturn {\n  json: {\n    ...pipelineData,\n    results,\n    current_step: nextStep,\n    should_stop: shouldStop,\n    stop_reason: stopReason\n  }\n};"
+      },
+      "id": "pe-process-result",
+      "name": "Process Agent Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.should_stop }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "pe-check-stop",
+      "name": "Should Stop?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2020,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/update_ai_run_status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_run_id",
+              "value": "={{ $json.run_id }}"
+            },
+            {
+              "name": "p_status",
+              "value": "completed"
+            },
+            {
+              "name": "p_metadata",
+              "value": "={{ JSON.stringify({ pipeline_executor: 'completed', total_steps: $json.total_steps, results_count: ($json.results || []).length }) }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "pe-mark-completed",
+      "name": "Mark Completed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        220
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/update_ai_run_status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_run_id",
+              "value": "={{ $json.run_id }}"
+            },
+            {
+              "name": "p_status",
+              "value": "={{ $json.stop_reason === 'awaiting_human_approval' ? 'awaiting_approval' : 'blocked' }}"
+            },
+            {
+              "name": "p_metadata",
+              "value": "={{ JSON.stringify({ pipeline_executor: 'stopped', stop_reason: $json.stop_reason, completed_steps: $json.current_step }) }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "pe-mark-stopped",
+      "name": "Mark Stopped",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2260,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build final pipeline report\nconst data = $input.item.json;\n\nreturn {\n  json: {\n    pipeline_report: {\n      run_id: data.run_id,\n      task_kind: data.task_kind,\n      status: 'completed',\n      total_steps: data.total_steps,\n      agents_executed: (data.results || []).map(r => r.agent_slug),\n      results: data.results,\n      started_at: data.pipeline_started_at,\n      completed_at: new Date().toISOString()\n    }\n  }\n};"
+      },
+      "id": "pe-report-success",
+      "name": "Build Success Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build pipeline stop report\nconst data = $input.item.json;\n\nreturn {\n  json: {\n    pipeline_report: {\n      run_id: data.run_id,\n      task_kind: data.task_kind,\n      status: data.stop_reason === 'awaiting_human_approval' ? 'awaiting_approval' : 'blocked',\n      stop_reason: data.stop_reason,\n      completed_steps: data.current_step,\n      total_steps: data.total_steps,\n      results: data.results,\n      started_at: data.pipeline_started_at,\n      stopped_at: new Date().toISOString()\n    }\n  }\n};"
+      },
+      "id": "pe-report-stopped",
+      "name": "Build Stop Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2480,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendEvent",
+        "eventName": "pipeline.log",
+        "eventData": "={{ JSON.stringify($json.pipeline_report) }}",
+        "options": {}
+      },
+      "id": "pe-log-langfuse",
+      "name": "Log to Langfuse",
+      "type": "n8n-nodes-aisha.aishaAdminBridge",
+      "typeVersion": 1,
+      "position": [
+        1800,
+        220
+      ],
+      "credentials": {
+        "aishaLangfuseApi": {
+          "id": "__REMAP__",
+          "name": "AISHA Langfuse"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Error handler: capture failures and route to debug_agent\nconst error = $input.item.json;\nconst pipelineData = $('Agent Loop').item?.json || {};\n\nreturn {\n  json: {\n    run_id: pipelineData.run_id,\n    task_kind: pipelineData.task_kind,\n    failed_agent: pipelineData.current_agent?.slug,\n    step_index: pipelineData.current_agent?.step_index,\n    error_message: error.message || JSON.stringify(error),\n    results: pipelineData.results || [],\n    stop_conditions: pipelineData.stop_conditions || {},\n    risk_profile: pipelineData.risk_profile\n  }\n};"
+      },
+      "id": "pe-error-handler",
+      "name": "Error Handler",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1800,
+        740
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/update_ai_run_status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_run_id",
+              "value": "={{ $json.run_id }}"
+            },
+            {
+              "name": "p_status",
+              "value": "failed"
+            },
+            {
+              "name": "p_metadata",
+              "value": "={{ JSON.stringify({ pipeline_executor: 'failed', failed_agent: $json.failed_agent, error: $json.error_message }) }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "pe-mark-failed",
+      "name": "Mark Failed",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2020,
+        740
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Pipeline Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Pipeline Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RabbitMQ Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Pipeline Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Pipeline Message": {
+      "main": [
+        [
+          {
+            "node": "Mark Run Started",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Run Started": {
+      "main": [
+        [
+          {
+            "node": "Agent Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Agent Loop": {
+      "main": [
+        [
+          {
+            "node": "Pipeline Complete?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pipeline Complete?": {
+      "main": [
+        [
+          {
+            "node": "Mark Completed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Agent Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Completed": {
+      "main": [
+        [
+          {
+            "node": "Build Success Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Success Report": {
+      "main": [
+        [
+          {
+            "node": "Log to Langfuse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Agent Input": {
+      "main": [
+        [
+          {
+            "node": "Execute Agent Workflow",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute Agent Workflow": {
+      "error": [
+        [
+          {
+            "node": "Error Handler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Agent Result": {
+      "main": [
+        [
+          {
+            "node": "Should Stop?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Stop?": {
+      "main": [
+        [
+          {
+            "node": "Mark Stopped",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Agent Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Stopped": {
+      "main": [
+        [
+          {
+            "node": "Build Stop Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Error Handler": {
+      "main": [
+        [
+          {
+            "node": "Mark Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Prague"
+  },
+  "tags": [
+    {
+      "name": "pipeline"
+    },
+    {
+      "name": "orchestration"
+    },
+    {
+      "name": "aisha"
+    }
+  ]
+}

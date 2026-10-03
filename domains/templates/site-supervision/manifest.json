@@ -1,0 +1,6 @@
+{
+  "$note": "Example demo template — independent CONSTRUCTION SUPERVISION / building inspection (stavební dozor). Lights up document-backed records + credentials: a 'what we check' scope grid, a document-grounded findings panel ('every finding cites its source' — the same knowledge/RAG capability the legal template shows), credentials, a project portfolio, and a request-inspection form. The form is a STATIC demo — live submission needs the flagged follow-up (a public lead_submissions table + capture_lead RPC). Brand-neutral, fork-freely. Seed with /seed-default { \"source_dir\": \"site-supervision\" } or AISHA_SEED_DOMAIN=site-supervision.",
+  "title_key": "web.inspect.title",
+  "description_key": "web.inspect.description",
+  "slug": "index"
+}

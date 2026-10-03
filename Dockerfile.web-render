@@ -1,0 +1,83 @@
+# syntax=docker/dockerfile:1
+# Dockerfile.web-render — generátor statického HTML publikovaných stránek.
+#
+# Dvoustupňový build stejného tvaru jako ostatní služby platformy: sestavení
+# TypeScriptu ve fázi `build`, běhový obraz bez zdrojů a bez devDependencies.
+#
+# ⛔ SKOŘÁPKA SE SEM NEKOPÍRUJE. Generátor ji čte za běhu ze sdíleného volume
+# (`web-shell`), protože musí být z TÉHOŽ buildu, jaký nginx právě servíruje —
+# Vite hashuje jména chunků (`shared-BL9zUP3B.js`) a zapečená kopie by po
+# prvním rebuildu odkazovala na neexistující soubory. SPA by se pak nikdy
+# nepřevzala a nikdo by si toho nemusel všimnout, protože statická stránka
+# vypadá hotově.
+# REGISTRY_PROXY: obrazy chodí přes registry cache instance, ne přímo
+# z Docker Hubu — jinak stack naráží na anonymní limit 100 pullů / 6 h / IP.
+# Prázdná hodnota = přímý Docker Hub (únikový východ pro lokální build).
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/node:22-alpine AS build
+WORKDIR /app
+
+# ⛔ CELÝ STROM, ne vybrané složky. Selektivní COPY znamená, že se dřív nebo
+# později zapomene na složku, kterou npm nebo build potřebuje — naměřeno:
+# chybějící `scripts/` shodilo `preinstall: node scripts/check-node.cjs`
+# a nasazení padlo na `Cannot find module`. Sourozenecké služby kopírují celý
+# strom z téhož důvodu; `.dockerignore` drží node_modules a dist venku.
+COPY . .
+
+# ⛔ `--ignore-scripts` U KAŽDÉHO npm ci. Kontrolu verze Node zajišťuje základní
+# obraz (`node:22-alpine`), ne `preinstall` skript — týž postup jako
+# u svc-web-artifact, gateway i svc-ai-chat.
+RUN npm ci --workspace=@aisha/svc-web-render --include-workspace-root --include=dev --ignore-scripts
+
+# ⛔ VŠECHNY workspace závislosti, ne jen ta nejnápadnější. Služba importuje
+# `@aisha/security` i `@aisha/web-canvas`; oba vydávají `dist/`, který je
+# gitignorovaný. Postavit jen jeden z nich znamená obraz, který se sestaví
+# a spadne až za běhu na ERR_MODULE_NOT_FOUND — tedy nejdražší možný okamžik.
+RUN npm run build --workspace=@aisha/web-canvas && \
+    npm run build --workspace=@aisha/security && \
+    npm run --workspace @aisha/svc-web-render build
+
+# Produkční závislosti ČISTOU přeinstalací, NE `npm prune --omit=dev`.
+# Workspace-scoped prune vyhazuje i hoistované PRODUKČNÍ balíčky (sourozenec
+# na tom ztratil jsdom a nasbíral ~18 tisíc restartů). `npm ci --omit=dev`
+# nainstaluje přesně produkční uzávěr z lockfile. `packages/*/dist` postavené
+# výš přežijí — leží pod packages/, ne v node_modules.
+RUN rm -rf node_modules services/svc-web-render/node_modules \
+ && npm ci --workspace=@aisha/svc-web-render --omit=dev --ignore-scripts
+
+# Aby COPY v běhovém stupni nikdy nespadl a nesl i závislosti, které npm
+# vnořil sem místo do kořene.
+RUN mkdir -p services/svc-web-render/node_modules
+
+# Selhat NAHLAS: každá deklarovaná produkční závislost se musí v obrazu
+# rozřešit, jinak build padne TADY, ne za běhu v produkci.
+RUN node scripts/verify-runtime-deps.mjs services/svc-web-render
+
+FROM ${REGISTRY_PROXY}library/node:22-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+
+# wget kvůli healthchecku v compose — alpine ho má v busyboxu, ale explicitní
+# závislost je lepší než tichý předpoklad.
+# `su-exec` shazuje práva po postavení mesh routy: entrypoint musí běžet jako
+# root (ip route vyžaduje NET_ADMIN), ale SLUŽBA běžet jako root nemá.
+RUN apk add --no-cache wget su-exec
+
+# Celé adresáře, aby putovaly i vnořené node_modules, které npm nehoistoval.
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/packages/security packages/security
+COPY --from=build /app/packages/web-canvas packages/web-canvas
+COPY --from=build /app/services/svc-web-render/package.json services/svc-web-render/package.json
+COPY --from=build /app/services/svc-web-render/node_modules services/svc-web-render/node_modules
+COPY --from=build /app/services/svc-web-render/dist services/svc-web-render/dist
+
+# ⛔ ŽÁDNÉ `USER node` V OBRAZU. Entrypoint musí začít jako root, aby postavil
+# routu do mesh (`ip route` chce NET_ADMIN, který neprivilegovaný uživatel
+# nedostane), a teprve pak práva zahodí přes `su-exec node`. Služba tedy běží
+# neprivilegovaně stejně jako dřív — jen se to rozhoduje o krok později.
+# Bez toho: `ip route` selže na Permission denied a mesh jméno se nepřeloží
+# na dosažitelnou adresu (naměřeno 2026-08-31).
+
+EXPOSE 3040
+CMD ["node", "services/svc-web-render/dist/server.js"]

@@ -1,0 +1,46 @@
+# Dockerfile.ragnarok — Evymo-adapted Ragnarok RAG microservice
+#
+# Build context: . (repo root) — Coolify requires root context for all services
+# Exposes: 9696 (FastAPI/Uvicorn)
+#
+# Standalone single-stage Dockerfile to avoid Coolify's ARG injection explosion.
+# (Coolify adds ARG declarations for ALL env vars to EVERY stage; single-stage
+# keeps each build small enough for the shell argument limit.)
+
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/python:3.11-slim-bookworm
+
+WORKDIR /root
+
+RUN pip install --disable-pip-version-check --no-cache-dir pipenv setuptools wheel \
+    && apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY packages/insight/common common
+COPY packages/insight/ragnarok/Pipfile packages/insight/ragnarok/Pipfile.lock ragnarok/
+RUN cd ragnarok && pipenv install --deploy --system
+
+ENV USER=app
+ENV USER_HOME=/home/$USER
+RUN groupadd -g 999 $USER \
+    && useradd -r -u 999 -g $USER $USER \
+    && mkdir -p $USER_HOME \
+    && chown $USER:$USER -R $USER_HOME
+
+USER $USER
+WORKDIR $USER_HOME
+
+ENV PYTHONPATH=$USER_HOME:$USER_HOME/ragnarok
+
+# Copy common + ragnarok sources
+COPY --chown=999:999 packages/insight/common ./common
+COPY --chown=999:999 packages/insight/ragnarok ./ragnarok
+COPY --chown=999:999 packages/insight/ragnarok/run.py ./run.py
+# --chmod=755 avoids a separate RUN chmod (Coolify injects secrets into every RUN)
+COPY --chmod=755 --chown=999:999 packages/insight/ragnarok/start.sh ./start.sh
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD curl -fsS http://localhost:9696/health || exit 1
+
+EXPOSE 9696
+CMD ["./start.sh"]

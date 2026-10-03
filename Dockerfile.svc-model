@@ -1,0 +1,70 @@
+# syntax=docker/dockerfile:1
+# Dockerfile.svc-model — lokální model serving (llama.cpp OpenAI-kompat, port 8000)
+#
+# Jedna jednotka vystavuje /v1 (chat + embeddings + models) pro zbytek stacku:
+#   - chat: base GGUF (URL + sha pin v env instance) + volitelný LoRA adaptér z instance-data bundle
+#   - embeddings: embedding GGUF (URL + sha pin v env instance) pro RAG vektory
+# Konzument = svc-ai-chat backend registry (OpenAI-compat discovery přes /v1/models)
+# → Aisha model vystavuje dál jako součást svého stacku; nikdo nemluví s llama.cpp přímo.
+# KTERÝ model to je, image neví: váhy i alias deklaruje instance, výběr dělá AISHA
+# (discovery → self-test → benchmark → resolver).
+#
+# ── SIMD: přenositelné, ale NE bez AVX2 ───────────────────────────────────────
+# GGML_NATIVE=OFF: build smí běžet na jiném stroji, než kde image poběží (build server /
+# jiná CPU generace) — `-march=native` by riskoval SIGILL.
+# ⛔ NAMĚŘENO 2026-09-13 (čtením tohoto repa, ne během): se samotným GGML_NATIVE=OFF je sada
+# instrukcí IMPLICITNÍ — určují ji výchozí hodnoty CMake v právě staženém llama.cpp (verze nebyla
+# připnutá) a prostředí buildu. NEOVĚŘENO proti zdrojům llama.cpp (bez sítě): podle CMake ggml,
+# jak ho znám, závisí výchozí GGML_AVX2/FMA na tom, zda je GGML_NATIVE_DEFAULT zapnutý, a ten
+# vypíná křížový build nebo SOURCE_DATE_EPOCH v prostředí. Jestli dnešní image AVX2/FMA má,
+# se tedy z repa zjistit NEDÁ — proto výslovné volby a kontrola system_info níž. Cílový hardware (AMD EPYC 7302P,
+# Zen 2, jen CPU) umí x86-64-v3: AVX, AVX2, FMA, F16C, BMI2 — bez nich běží maticové násobení
+# skalárně. Proto VÝSLOVNĚ zapnuté a AVX512 VÝSLOVNĚ vypnuté: image poběží na každém AVX2 hostiteli
+# a na starším CPU spadne hlasitě (SIGILL při startu), ne tiše pomalu.
+# NEMĚŘENO: tokeny/s a doba embeddingu před/po — měřit na cílovém stroji (compose notes).
+#
+# In-cluster only: žádné Traefik labels, žádný public face — síť coolify, alias svc-model.
+
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/python:3.12-slim-bookworm
+
+# build-essential+cmake = kompilace llama-cpp-python; libgomp1 = OpenMP runtime;
+# curl = weights seed + healthcheck; git = adapter seed z instance-data.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential cmake libgomp1 curl git \
+    && rm -rf /var/lib/apt/lists/*
+
+# [server] extra = fastapi/uvicorn/sse-starlette — OpenAI-kompat HTTP vrstva.
+# ⛔ PŘESNÝ pin: `>=0.3` stáhl při každém buildu jiný llama.cpp (jiné CMake výchozí hodnoty,
+# jiné chování serveru). Změna verze = vědomý commit, ne vedlejší účinek rebuildu.
+# NEOVĚŘENO proti PyPI z tohoto prostředí (bez sítě) — první build to potvrdí, nebo spadne hlasitě.
+ENV CMAKE_ARGS="-DGGML_NATIVE=OFF -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON -DGGML_BMI2=ON -DGGML_AVX512=OFF" \
+    FORCE_CMAKE=1
+RUN pip install --no-cache-dir "llama-cpp-python[server]==0.3.16"
+
+# Build se MĚŘÍ, ne předpokládá: knihovna musí hlásit AVX2 i FMA, jinak build selže.
+# (llama_print_system_info vypisuje sadu, se kterou byla knihovna přeložena.)
+RUN python -c "import llama_cpp, sys; info = llama_cpp.llama_print_system_info().decode(); print(info); \
+missing = [f for f in ('AVX2 = 1', 'FMA = 1', 'F16C = 1') if f not in info]; \
+sys.exit('CHYBA: llama.cpp přeložen bez ' + ', '.join(missing)) if missing else None"
+
+WORKDIR /app
+COPY scripts/deploy/svc-model-entrypoint.sh /entrypoint.sh
+COPY scripts/deploy/svc-model-threads.sh /usr/local/lib/svc-model-threads.sh
+COPY scripts/deploy/svc-model-aliasy.sh /usr/local/lib/svc-model-aliasy.sh
+RUN chmod +x /entrypoint.sh \
+    && useradd -r -u 10001 model \
+    && mkdir -p /models \
+    && chown -R model:model /models
+USER model
+
+# Žádný MODEL_ALIAS / EMBED_ALIAS / MODEL_N_THREADS tady: aliasy deklaruje instance (compose)
+# a entrypoint je ověří proti kontraktu discovery/směrování (svc-model-aliasy.sh),
+# vlákna se odvozují z CPU kvóty kontejneru (svc-model-threads.sh).
+ENV MODEL_PORT=8000
+
+EXPOSE 8000
+HEALTHCHECK --interval=30s --timeout=8s --start-period=300s --retries=5 \
+    CMD curl -fsS "http://127.0.0.1:${MODEL_PORT}/v1/models" || exit 1
+
+ENTRYPOINT ["/entrypoint.sh"]

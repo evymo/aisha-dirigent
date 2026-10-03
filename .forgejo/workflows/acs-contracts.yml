@@ -1,0 +1,46 @@
+name: ACS Contracts
+# Contract gate (IP-10): packages/acs-* tests + breaking-change detection.
+# Runs standalone so a red core pipeline never masks a contract violation.
+
+on:
+  push:
+    paths:
+      - 'packages/acs-contracts/**'
+      - 'packages/acs-sdk/**'
+      - 'scripts/acs/**'
+      - '.forgejo/workflows/acs-contracts.yml'
+  pull_request:
+    paths:
+      - 'packages/acs-contracts/**'
+      - 'packages/acs-sdk/**'
+      - 'scripts/acs/**'
+
+jobs:
+  contracts:
+    runs-on: docker
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install & test acs-contracts
+        working-directory: packages/acs-contracts
+        run: |
+          npm install --no-audit --no-fund
+          npx tsc --noEmit
+          npx vitest run
+          npx tsc
+
+      - name: Install & test acs-sdk
+        working-directory: packages/acs-sdk
+        run: |
+          npm install --no-audit --no-fund
+          npx tsc --noEmit
+          npx vitest run
+
+      - name: Schema breaking-change gate (R4)
+        run: node scripts/acs/schema-diff.mjs origin/main

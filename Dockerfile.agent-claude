@@ -1,0 +1,43 @@
+# Dockerfile.agent-claude — base image for an AISHA-spawned Claude Code CLI run.
+#
+# Built once and referenced as agent_runs.image for kind='claude_cli_task'.
+# svc-agent-runner (Component 4 E4) mounts a per-run git worktree at /work and
+# launches the entrypoint, which runs `claude -p` against the story branch.
+#
+# Monitoring is automatic: the runner generates the .claude/ overlay (relay +
+# settings.json) into the worktree before launch, so on every tool use the
+# supervisor relay POSTs telemetry to AISHA_GATEWAY_URL and links the live
+# session back to this run via AISHA_AGENT_RUN_ID (Components 1-3 + E2).
+#
+# Auth + LLM routing are injected at run time (E5): ANTHROPIC_BASE_URL→gateway
+# (cost governance) + ANTHROPIC_API_KEY, or a read-only ~/.claude subscription
+# credential mount. This image bakes NO secrets.
+# Pull through the AISHA registry cache (cache.aisha.guru) — REGISTRY_PROXY is
+# injected at build time; empty = direct docker.io (matches the other Dockerfiles).
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/node:22-bookworm-slim
+
+# git (worktree ops) + ca-certs (TLS to the gateway/remote) + tini (PID1 reaping)
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends git ca-certificates tini \
+  && rm -rf /var/lib/apt/lists/*
+
+# Claude Code CLI (official package). Pin via build arg for reproducible images.
+ARG CLAUDE_CODE_VERSION=latest
+RUN npm install -g @anthropic-ai/claude-code@${CLAUDE_CODE_VERSION} \
+  && claude --version
+
+# Non-root run user with a writable HOME for ~/.claude (session state, optional
+# subscription credential mount). UID 10001 so the runner can chown the worktree
+# mount to match (E4).
+RUN useradd -m -u 10001 agent
+
+COPY docker/agent-claude/entrypoint.sh /usr/local/bin/agent-claude-entrypoint.sh
+RUN chmod +x /usr/local/bin/agent-claude-entrypoint.sh
+
+USER agent
+ENV HOME=/home/agent
+WORKDIR /work
+
+# tini reaps zombies and forwards signals so a cancelled run terminates cleanly.
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/agent-claude-entrypoint.sh"]

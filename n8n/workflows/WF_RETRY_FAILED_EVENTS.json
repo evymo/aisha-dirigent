@@ -1,0 +1,404 @@
+{
+  "name": "WF_RETRY_FAILED_EVENTS",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "retry-cron",
+      "name": "Every 5 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "get_retryable_integration_events",
+        "rpcParams": "={{ JSON.stringify({ p_limit: 20 }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "fetch-retryable",
+      "name": "Fetch Retryable Events",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse RPC result — returns array of retryable events\nconst raw = $input.first().json;\nconst events = Array.isArray(raw) ? raw : (raw.data || []);\nreturn [{ json: { events, count: events.length } }];"
+      },
+      "id": "parse-events",
+      "name": "Parse Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-has-events",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "has-events",
+      "name": "Has Events?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Split events array into individual items for batch processing\nconst events = $input.first().json.events;\nreturn events.map(e => ({ json: e }));"
+      },
+      "id": "split-events",
+      "name": "Split Events",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "condition-exhausted",
+              "leftValue": "={{ $json.attempt }}",
+              "rightValue": "={{ $json.max_attempts }}",
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "check-max-attempts",
+      "name": "Check Max Attempts",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/functions/v1/github-webhook-bridge",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "X-Retry-Event-Id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "X-Retry-Attempt",
+              "value": "={{ $json.attempt + 1 }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "=retry",
+              "value": "true"
+            },
+            {
+              "name": "=event_id",
+              "value": "={{ $json.id }}"
+            },
+            {
+              "name": "=event_source",
+              "value": "={{ $json.event_source }}"
+            },
+            {
+              "name": "=event_type",
+              "value": "={{ $json.event_type }}"
+            },
+            {
+              "name": "=installation_id",
+              "value": "={{ $json.installation_id }}"
+            },
+            {
+              "name": "=story_id",
+              "value": "={{ $json.story_id }}"
+            },
+            {
+              "name": "=routed_to",
+              "value": "={{ $json.routed_to }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          },
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "redispatch",
+      "name": "Re-dispatch Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Update status based on re-dispatch result\nconst event = $('Split Events').item.json;\nconst response = $input.first().json;\nconst success = response.ok === true || response.status === 'processing';\n\nreturn [{\n  json: {\n    event_id: event.id,\n    attempt: event.attempt + 1,\n    success,\n    error: success ? null : (response.error || 'Re-dispatch failed'),\n    event_type: event.event_type,\n    event_source: event.event_source\n  }\n}];"
+      },
+      "id": "update-status",
+      "name": "Update Event Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "complete_integration_event",
+        "rpcParams": "={{ JSON.stringify({ p_event_id: $json.id, p_status: 'exhausted', p_error_json: { message: 'Max retry attempts exhausted', final_attempt: $json.attempt, original_error: $json.error_json?.message || 'unknown' } }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "mark-exhausted",
+      "name": "Mark Exhausted",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        200
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_URL }}/webhook/approval-gate",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"source\": \"retry_failed_events\",\n  \"severity\": \"high\",\n  \"event_id\": \"{{ $('Split Events').item.json.id }}\",\n  \"event_type\": \"{{ $('Split Events').item.json.event_type }}\",\n  \"event_source\": \"{{ $('Split Events').item.json.event_source }}\",\n  \"story_id\": \"{{ $('Split Events').item.json.story_id }}\",\n  \"attempts_exhausted\": {{ $('Split Events').item.json.max_attempts }},\n  \"last_error\": {{ JSON.stringify($('Split Events').item.json.error_json) }},\n  \"message\": \"Integration event exhausted all {{ $('Split Events').item.json.max_attempts }} retry attempts. Manual intervention required.\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "escalate",
+      "name": "Escalate to Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1780,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 5 min": {
+      "main": [
+        [
+          {
+            "node": "Fetch Retryable Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Retryable Events": {
+      "main": [
+        [
+          {
+            "node": "Parse Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Events": {
+      "main": [
+        [
+          {
+            "node": "Has Events?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Events?": {
+      "main": [
+        [
+          {
+            "node": "Split Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Events": {
+      "main": [
+        [
+          {
+            "node": "Check Max Attempts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Max Attempts": {
+      "main": [
+        [
+          {
+            "node": "Mark Exhausted",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Re-dispatch Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Re-dispatch Event": {
+      "main": [
+        [
+          {
+            "node": "Update Event Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Exhausted": {
+      "main": [
+        [
+          {
+            "node": "Escalate to Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

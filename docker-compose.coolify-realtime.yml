@@ -1,0 +1,530 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify-realtime.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+x-svc-common: &svc-common
+  restart: unless-stopped
+  networks:
+    - internal
+
+x-svc-healthcheck: &svc-healthcheck
+  interval: 15s
+  timeout: 5s
+  start_period: 20s
+  retries: 5
+
+services:
+  pki-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.pki-init
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-realtime-pki-init
+    restart: "no"
+    environment:
+      PKI_BRIDGE_URL: ${PKI_BRIDGE_URL:-}
+      # Odvozuje cold-start z manifestu (pki nasazeno ⇒ true); bez PKI se vypíná
+      # POŽADAVEK, ne jen adresa — výklad: docs/compose-notes/docker-compose.coolify.yml.md
+      PKI_BUNDLE_REQUIRED: ${PKI_BUNDLE_REQUIRED:?odvozuje cold-start z manifestu; bez něj pki-init trvá na bundlu i bez PKI}
+    command: ["/usr/local/bin/assemble-ca-bundle.sh"]
+    volumes:
+      - pki-certs:/certs/pki
+    healthcheck:
+      disable: true
+    networks:
+      - internal
+
+  event-worker:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    <<: *svc-common
+    build:
+      context: .
+      dockerfile: services/event-worker/Dockerfile
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-event-worker
+    cap_add:
+      - NET_ADMIN
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+
+        # ⛔ TENHLE SOUBOR SE NEMOUNTUJE. Je KANONICKÝM ZNĚNÍM, které se vkládá doslova
+        # do entrypointů `edge-proxy` a `extranet-auth` v docker-compose.coolify-prebuilt.yml
+        # (tam s compose-escapovaným `$$` → `$$$$`). Bind mount z repa byl první pokus a
+        # NEFUNGUJE: Coolify staví edge na build serveru a na cílovém uzlu repo nemá,
+        # takže zdroj mountu neexistoval, Docker místo souboru vytvořil ADRESÁŘ a
+        # edge-proxy skončil v restart smyčce (`exit 126: Permission denied`) —
+        # veřejná plocha byla kvůli tomu dole (2026-08-21).
+        # Shodu obou kopií s tímhle souborem hlídá brána `mesh-lane-miri-jmenem-ne-hopem`.
+
+        _mesh="$$(echo "$${MESH_ENABLED:-false}" | tr '[:upper:]' '[:lower:]')"
+        case "$$_mesh" in
+          true|1|yes|on)
+            if [ -z "$${NETBIRD_PEER_CIDR:-}" ] || [ -z "$${NETBIRD_DNS_IP:-}" ]; then
+              echo "[mesh-route] FATAL: mesh je vyhlášená, ale chybí NETBIRD_PEER_CIDR nebo NETBIRD_DNS_IP." >&2
+              exit 64
+            fi
+            if ip route replace "$${NETBIRD_PEER_CIDR}" via "$${NETBIRD_DNS_IP}" 2>&1; then
+              echo "[mesh-route] routa $${NETBIRD_PEER_CIDR} → $${NETBIRD_DNS_IP} (mesh-router) postavena"
+            else
+              echo "[mesh-route] FATAL: routu do mesh nelze postavit — chybí NET_ADMIN, nebo služba není na síti mesh-dns." >&2
+              echo "[mesh-route] NEDĚLEJ: nepokračuj bez routy — vnitřní jméno by se přeložilo wildcardem VEN." >&2
+              exit 64
+            fi
+            ;;
+          *)
+            echo "[mesh-route] MESH_ENABLED=$${MESH_ENABLED:-<unset>} — routa do mesh se nestaví (veřejná lane)."
+            ;;
+        esac
+
+        # Brána je PINOVANÁ adresa mesh-routeru na síti mesh-dns (generate-secrets ji
+        # odvozuje z MESH_DNS_SUBNET a compose ji mesh-routeru přiděluje jako
+        # ipv4_address). Proto se nikam nekouká přes DNS: adresa je vlastnost návrhu,
+        # ne nález. Rozsah peerů je konstanta NetBirdu (scripts/lib/derive-subnets.mjs).
+        if [ -z "$${NETBIRD_PEER_CIDR:-}" ] || [ -z "$${NETBIRD_DNS_IP:-}" ]; then
+          echo "[mesh-route] FATAL: mesh je vyhlášená, ale chybí NETBIRD_PEER_CIDR nebo NETBIRD_DNS_IP." >&2
+          echo "[mesh-route] Obojí vydává generate-secrets a doručuje coolify-deploy-init.sh." >&2
+          exit 64
+        fi
+
+        if ip route replace "$${NETBIRD_PEER_CIDR}" via "$${NETBIRD_DNS_IP}" 2>&1; then
+          echo "[mesh-route] routa $${NETBIRD_PEER_CIDR} → $${NETBIRD_DNS_IP} (mesh-router) postavena"
+        else
+          echo "[mesh-route] FATAL: routu do mesh nelze postavit ($${NETBIRD_PEER_CIDR} via $${NETBIRD_DNS_IP})." >&2
+          echo "[mesh-route] Nejčastěji chybí cap_add NET_ADMIN nebo služba není na síti mesh-dns." >&2
+          echo "[mesh-route] NEDĚLEJ: nepokračuj bez routy — vnitřní jméno by se přeložilo wildcardem" >&2
+          echo "[mesh-route]          na cizí stroj a provoz by odešel VEN místo dovnitř." >&2
+          exit 64
+        fi
+
+        # Práva se zahazují hned po postavení routy — služba běží jako `node`.
+        exec su-exec node node dist/worker.js
+    depends_on:
+      pki-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      MESH_ENABLED: ${MESH_ENABLED:?vydává topologický resolver}
+      NETBIRD_PEER_CIDR: ${NETBIRD_PEER_CIDR:?vydává generate-secrets — rozsah peerů pro routu}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DATABASE_URL: postgresql://authenticator:${POSTGRES_PASSWORD}@${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-db:5432/postgres
+      REDIS_URL: redis://core:${REDIS_PASSWORD_CORE}@${SHARED_REDIS_HOST:?required — derive-domains.mjs ho odvozuje z katalogu (internal_tcp_endpoints.env_aliases); coolify-sync-envs ho doručí}:6379
+      WEBHOOK_PROFILES: ${WEBHOOK_PROFILES:-}
+      WEBHOOK_ACTIVITIES: ${WEBHOOK_ACTIVITIES:-}
+      WEBHOOK_EVALUATIONS: ${WEBHOOK_EVALUATIONS:-}
+      WEBHOOK_AGENT_RUNNER: ${WEBHOOK_AGENT_RUNNER:-}
+      WEBHOOK_PLAYWRIGHT_RUNNER: ${WEBHOOK_PLAYWRIGHT_RUNNER:-}
+      # storage_events → AV sken: bez obou klíčů je ta větev slepá — viz compose notes.
+      STORAGE_AUTH_URL: ${STORAGE_AUTH_URL:?vydává derive-domains z katalogu (internal_endpoints.env_aliases), doručuje coolify-sync-envs}
+      POSTGREST_SERVICE_TOKEN: ${POSTGREST_SERVICE_TOKEN:?required — generate-secrets.mjs emits it + coolify-sync-envs.sh bulk-pushes (mandatory cold-start step)}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
+      # Executor akcí po události (F3a). Kanál push jde přes svc-push; adresu vydává
+      # derive-domains z katalogu (domain-services → internal_endpoints → PUSH_SERVICE_URL).
+      # Prázdné = pravidla s kanálem push končí `no_transport` (poctivě, ne tiše).
+      PUSH_SERVICE_URL: ${PUSH_SERVICE_URL:-}
+      # Vypínač pro výjimečný stav (`off`); co se vykonává, určují pravidla v datech instance.
+      PROACTIVE_EXECUTOR: ${PROACTIVE_EXECUTOR:-}
+      PROACTIVE_CATCHUP_MS: ${PROACTIVE_CATCHUP_MS:-}
+      PROACTIVE_CRON_TICK_MS: ${PROACTIVE_CRON_TICK_MS:-}
+      PROACTIVE_STALE_SECONDS: ${PROACTIVE_STALE_SECONDS:-}
+      PROACTIVE_MAX_ATTEMPTS: ${PROACTIVE_MAX_ATTEMPTS:-}
+      PROACTIVE_CATCHUP_BATCH: ${PROACTIVE_CATCHUP_BATCH:-}
+      NODE_EXTRA_CA_CERTS: /certs/pki/aisha-ca-bundle.pem
+    volumes:
+      - pki-certs:/certs/pki:ro
+    healthcheck:
+      <<: *svc-healthcheck
+      test: ["CMD-SHELL", "pgrep -f node > /dev/null || exit 1"]
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-event-worker
+      mesh-dns: {}
+
+  ws-gateway:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    <<: *svc-common
+    build:
+      context: .
+      dockerfile: services/ws-gateway/Dockerfile
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-ws-gateway
+    cap_add:
+      - NET_ADMIN
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+
+        # ⛔ TENHLE SOUBOR SE NEMOUNTUJE. Je KANONICKÝM ZNĚNÍM, které se vkládá doslova
+        # do entrypointů `edge-proxy` a `extranet-auth` v docker-compose.coolify-prebuilt.yml
+        # (tam s compose-escapovaným `$$` → `$$$$`). Bind mount z repa byl první pokus a
+        # NEFUNGUJE: Coolify staví edge na build serveru a na cílovém uzlu repo nemá,
+        # takže zdroj mountu neexistoval, Docker místo souboru vytvořil ADRESÁŘ a
+        # edge-proxy skončil v restart smyčce (`exit 126: Permission denied`) —
+        # veřejná plocha byla kvůli tomu dole (2026-08-21).
+        # Shodu obou kopií s tímhle souborem hlídá brána `mesh-lane-miri-jmenem-ne-hopem`.
+
+        _mesh="$$(echo "$${MESH_ENABLED:-false}" | tr '[:upper:]' '[:lower:]')"
+        case "$$_mesh" in
+          true|1|yes|on)
+            if [ -z "$${NETBIRD_PEER_CIDR:-}" ] || [ -z "$${NETBIRD_DNS_IP:-}" ]; then
+              echo "[mesh-route] FATAL: mesh je vyhlášená, ale chybí NETBIRD_PEER_CIDR nebo NETBIRD_DNS_IP." >&2
+              exit 64
+            fi
+            if ip route replace "$${NETBIRD_PEER_CIDR}" via "$${NETBIRD_DNS_IP}" 2>&1; then
+              echo "[mesh-route] routa $${NETBIRD_PEER_CIDR} → $${NETBIRD_DNS_IP} (mesh-router) postavena"
+            else
+              echo "[mesh-route] FATAL: routu do mesh nelze postavit — chybí NET_ADMIN, nebo služba není na síti mesh-dns." >&2
+              echo "[mesh-route] NEDĚLEJ: nepokračuj bez routy — vnitřní jméno by se přeložilo wildcardem VEN." >&2
+              exit 64
+            fi
+            ;;
+          *)
+            echo "[mesh-route] MESH_ENABLED=$${MESH_ENABLED:-<unset>} — routa do mesh se nestaví (veřejná lane)."
+            ;;
+        esac
+
+        # Brána je PINOVANÁ adresa mesh-routeru na síti mesh-dns (generate-secrets ji
+        # odvozuje z MESH_DNS_SUBNET a compose ji mesh-routeru přiděluje jako
+        # ipv4_address). Proto se nikam nekouká přes DNS: adresa je vlastnost návrhu,
+        # ne nález. Rozsah peerů je konstanta NetBirdu (scripts/lib/derive-subnets.mjs).
+        if [ -z "$${NETBIRD_PEER_CIDR:-}" ] || [ -z "$${NETBIRD_DNS_IP:-}" ]; then
+          echo "[mesh-route] FATAL: mesh je vyhlášená, ale chybí NETBIRD_PEER_CIDR nebo NETBIRD_DNS_IP." >&2
+          echo "[mesh-route] Obojí vydává generate-secrets a doručuje coolify-deploy-init.sh." >&2
+          exit 64
+        fi
+
+        if ip route replace "$${NETBIRD_PEER_CIDR}" via "$${NETBIRD_DNS_IP}" 2>&1; then
+          echo "[mesh-route] routa $${NETBIRD_PEER_CIDR} → $${NETBIRD_DNS_IP} (mesh-router) postavena"
+        else
+          echo "[mesh-route] FATAL: routu do mesh nelze postavit ($${NETBIRD_PEER_CIDR} via $${NETBIRD_DNS_IP})." >&2
+          echo "[mesh-route] Nejčastěji chybí cap_add NET_ADMIN nebo služba není na síti mesh-dns." >&2
+          echo "[mesh-route] NEDĚLEJ: nepokračuj bez routy — vnitřní jméno by se přeložilo wildcardem" >&2
+          echo "[mesh-route]          na cizí stroj a provoz by odešel VEN místo dovnitř." >&2
+          exit 64
+        fi
+
+        # Práva se zahazují hned po postavení routy — služba běží jako `node`.
+        exec su-exec node node dist/server.js
+    expose:
+      - "3002"
+    depends_on:
+      pki-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      MESH_ENABLED: ${MESH_ENABLED:?vydává topologický resolver}
+      NETBIRD_PEER_CIDR: ${NETBIRD_PEER_CIDR:?vydává generate-secrets — rozsah peerů pro routu}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      WS_GATEWAY_PORT: 3002
+      REDIS_URL: redis://core:${REDIS_PASSWORD_CORE}@${SHARED_REDIS_HOST:?required — derive-domains.mjs ho odvozuje z katalogu (internal_tcp_endpoints.env_aliases); coolify-sync-envs ho doručí}:6379
+      KEYCLOAK_URL: ${KEYCLOAK_INTERNAL_URL:?KEYCLOAK_INTERNAL_URL must be generated by topology resolver}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      WS_JWT_AUDIENCE: ${WS_JWT_AUDIENCE:?WS_JWT_AUDIENCE must be delivered by cold-start env (generate-secrets; the realm constant lives in keycloak/aisha-realm.json)}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      NODE_EXTRA_CA_CERTS: /certs/pki/aisha-ca-bundle.pem
+    volumes:
+      - pki-certs:/certs/pki:ro
+    healthcheck:
+      <<: *svc-healthcheck
+      test:
+        - "CMD-SHELL"
+        - "node -e \"require('http').get('http://127.0.0.1:3002/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\" || exit 1"
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-ws-gateway
+      coolify: {}
+      mesh-dns: {}
+    labels:
+      - "coolify.managed=true"
+      - "traefik.docker.network=coolify"
+      - "traefik.enable=true"
+
+  svc-ide-context:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    <<: *svc-common
+    build:
+      context: .
+      dockerfile: services/svc-ide-context/Dockerfile
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-svc-ide-context
+    cap_add:
+      - NET_ADMIN
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+
+        # ⛔ TENHLE SOUBOR SE NEMOUNTUJE. Je KANONICKÝM ZNĚNÍM, které se vkládá doslova
+        # do entrypointů `edge-proxy` a `extranet-auth` v docker-compose.coolify-prebuilt.yml
+        # (tam s compose-escapovaným `$$` → `$$$$`). Bind mount z repa byl první pokus a
+        # NEFUNGUJE: Coolify staví edge na build serveru a na cílovém uzlu repo nemá,
+        # takže zdroj mountu neexistoval, Docker místo souboru vytvořil ADRESÁŘ a
+        # edge-proxy skončil v restart smyčce (`exit 126: Permission denied`) —
+        # veřejná plocha byla kvůli tomu dole (2026-08-21).
+        # Shodu obou kopií s tímhle souborem hlídá brána `mesh-lane-miri-jmenem-ne-hopem`.
+
+        _mesh="$$(echo "$${MESH_ENABLED:-false}" | tr '[:upper:]' '[:lower:]')"
+        case "$$_mesh" in
+          true|1|yes|on)
+            if [ -z "$${NETBIRD_PEER_CIDR:-}" ] || [ -z "$${NETBIRD_DNS_IP:-}" ]; then
+              echo "[mesh-route] FATAL: mesh je vyhlášená, ale chybí NETBIRD_PEER_CIDR nebo NETBIRD_DNS_IP." >&2
+              exit 64
+            fi
+            if ip route replace "$${NETBIRD_PEER_CIDR}" via "$${NETBIRD_DNS_IP}" 2>&1; then
+              echo "[mesh-route] routa $${NETBIRD_PEER_CIDR} → $${NETBIRD_DNS_IP} (mesh-router) postavena"
+            else
+              echo "[mesh-route] FATAL: routu do mesh nelze postavit — chybí NET_ADMIN, nebo služba není na síti mesh-dns." >&2
+              echo "[mesh-route] NEDĚLEJ: nepokračuj bez routy — vnitřní jméno by se přeložilo wildcardem VEN." >&2
+              exit 64
+            fi
+            ;;
+          *)
+            echo "[mesh-route] MESH_ENABLED=$${MESH_ENABLED:-<unset>} — routa do mesh se nestaví (veřejná lane)."
+            ;;
+        esac
+
+        # Brána je PINOVANÁ adresa mesh-routeru na síti mesh-dns (generate-secrets ji
+        # odvozuje z MESH_DNS_SUBNET a compose ji mesh-routeru přiděluje jako
+        # ipv4_address). Proto se nikam nekouká přes DNS: adresa je vlastnost návrhu,
+        # ne nález. Rozsah peerů je konstanta NetBirdu (scripts/lib/derive-subnets.mjs).
+        if [ -z "$${NETBIRD_PEER_CIDR:-}" ] || [ -z "$${NETBIRD_DNS_IP:-}" ]; then
+          echo "[mesh-route] FATAL: mesh je vyhlášená, ale chybí NETBIRD_PEER_CIDR nebo NETBIRD_DNS_IP." >&2
+          echo "[mesh-route] Obojí vydává generate-secrets a doručuje coolify-deploy-init.sh." >&2
+          exit 64
+        fi
+
+        if ip route replace "$${NETBIRD_PEER_CIDR}" via "$${NETBIRD_DNS_IP}" 2>&1; then
+          echo "[mesh-route] routa $${NETBIRD_PEER_CIDR} → $${NETBIRD_DNS_IP} (mesh-router) postavena"
+        else
+          echo "[mesh-route] FATAL: routu do mesh nelze postavit ($${NETBIRD_PEER_CIDR} via $${NETBIRD_DNS_IP})." >&2
+          echo "[mesh-route] Nejčastěji chybí cap_add NET_ADMIN nebo služba není na síti mesh-dns." >&2
+          echo "[mesh-route] NEDĚLEJ: nepokračuj bez routy — vnitřní jméno by se přeložilo wildcardem" >&2
+          echo "[mesh-route]          na cizí stroj a provoz by odešel VEN místo dovnitř." >&2
+          exit 64
+        fi
+
+        # Práva se zahazují hned po postavení routy — služba běží jako `node`.
+        exec su-exec node node dist/server.js
+    expose:
+      - "3050"
+    depends_on:
+      pki-init:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      MESH_ENABLED: ${MESH_ENABLED:?vydává topologický resolver}
+      NETBIRD_PEER_CIDR: ${NETBIRD_PEER_CIDR:?vydává generate-secrets — rozsah peerů pro routu}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      SVC_IDE_CONTEXT_PORT: 3050
+      AISHA_SHARED_REDIS_URL: redis://core:${REDIS_PASSWORD_CORE}@${SHARED_REDIS_HOST:?required — derive-domains.mjs ho odvozuje z katalogu (internal_tcp_endpoints.env_aliases); coolify-sync-envs ho doručí}:6379
+      POSTGREST_URL: ${POSTGREST_URL:?POSTGREST_URL must be generated by topology resolver}
+      POSTGREST_SERVICE_TOKEN: ${POSTGREST_SERVICE_TOKEN:?required — generate-secrets.mjs emits it + coolify-sync-envs.sh bulk-pushes (mandatory cold-start step)}
+      JWT_SECRET: ${JWT_SECRET:?required — generate-secrets.mjs emits it + coolify-sync-envs.sh bulk-pushes (mandatory cold-start step)}
+      KEYCLOAK_URL: ${KEYCLOAK_INTERNAL_URL:?KEYCLOAK_INTERNAL_URL must be generated by topology resolver}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KC_JWKS_URL: ${KEYCLOAK_INTERNAL_URL:?KEYCLOAK_INTERNAL_URL must be generated by topology resolver}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs
+      KC_ISSUER: https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}
+      KC_ALLOWED_CLIENTS: ${IDE_CONTEXT_ALLOWED_CLIENTS:-}
+      CORS_ALLOWLIST: ${CORS_ALLOWLIST:-}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      NODE_EXTRA_CA_CERTS: /certs/pki/aisha-ca-bundle.pem
+    volumes:
+      - pki-certs:/certs/pki:ro
+    healthcheck:
+      <<: *svc-healthcheck
+      test:
+        - "CMD-SHELL"
+        - "node -e \"require('http').get('http://127.0.0.1:3050/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\" || exit 1"
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-svc-ide-context
+      mesh-dns: {}
+
+  netbird-agent:
+    # Mesh komponenta — bez meshe nemá co dělat. Profil "mesh" zapíná
+    # coolify-deploy-init.sh podle MESH_ENABLED; hlídá brána mesh-profil-drzi.
+    profiles: ["mesh"]
+    image: ${IMAGE_NETBIRD}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-realtime--netbird
+    cap_add:
+      - NET_ADMIN
+      - SYS_RESOURCE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    depends_on:
+      pki-init:
+        condition: service_completed_successfully
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        if [ -z "$${NB_SETUP_KEY:-}" ]; then
+          echo "[netbird-agent] NB_SETUP_KEY empty for hostname=$${NB_HOSTNAME:-<unset>}"
+          echo "[netbird-agent] State: PENDING_BOOTSTRAP — awaiting netbird-bootstrap.sh + redeploy."
+          trap 'echo "[netbird-agent] received TERM — exiting idle"; exit 0' TERM INT
+          while :; do sleep 3600 & wait "$$!" || true; done
+        fi
+        if ! command -v netbird >/dev/null 2>&1; then
+          echo "[netbird-agent] FATAL: netbird binary not in PATH" >&2
+          exit 127
+        fi
+        echo "[netbird-agent] Bridge mode — own netns, no host daemon conflict."
+        echo "[netbird-agent] DNS proxy disabled — realtime receives inbound mesh only."
+        # ⛔ NETBIRD 0.70 NEPÍŠE config.json (naměřeno 2026-09-06). Stav drží
+        # `default.json` + `active_profile.json`; podmínka na legacy cestu proto
+        # neplatila NIKDE — změřeno na 6 z 6 agentů včetně cizího nájemníka.
+        # Následek: agent se při KAŽDÉM startu zapsal jako NOVÝ peer, dostal
+        # novou mesh IP, a DNS záznam osiřel. Edge pak volal na starou adresu
+        # („dial 100.112.246.17:3002: no route to host") → live.<tld> 502.
+        # Je to ta příčina, proč se „mesh DNS se neprovisionuje samo" vracelo
+        # dokola: nešlo o provisioning, ale o ztrátu identity při restartu.
+        # Legacy cesta zůstává kvůli starším agentům — stačí KTERÝKOLI stavový
+        # soubor; teprve když není žádný, je zápis do meshe opravdu první.
+        CONFIG_FILE="$${NB_CONFIG_FILE:-/etc/netbird/config.json}"
+        if [ "$${NB_FORCE_REENROLL:-0}" = "1" ]; then
+          echo "[netbird-agent] NB_FORCE_REENROLL=1 — wiping local NetBird state before enrollment."
+          rm -rf /etc/netbird/* 2>/dev/null || true
+        fi
+        for _nb_stav in "$$CONFIG_FILE" /etc/netbird/default.json /var/lib/netbird/default.json; do
+          if [ -s "$$_nb_stav" ]; then CONFIG_FILE="$$_nb_stav"; break; fi
+        done
+        if [ -s "$$CONFIG_FILE" ]; then
+          echo "[netbird-agent] Existing config found at $$CONFIG_FILE — reconnecting without setup key."
+          set -- --foreground-mode --disable-dns --management-url "$${NB_MANAGEMENT_URL}" --hostname "$${NB_HOSTNAME}"
+        else
+          echo "[netbird-agent] No existing config — enrolling as $${NB_HOSTNAME} via $${NB_MANAGEMENT_URL}."
+          set -- --foreground-mode --disable-dns --management-url "$${NB_MANAGEMENT_URL}" --setup-key "$${NB_SETUP_KEY}" --hostname "$${NB_HOSTNAME}"
+        fi
+        trap 'echo "[netbird-agent] received TERM — exiting"; exit 0' TERM INT
+        while :; do
+          netbird up "$$@" || true
+          echo "[netbird-agent] netbird up exited — retry in 15s; container stays UP (never trips Coolify restart-limit)."
+          sleep 15 & wait "$$!" || true
+        done
+    extra_hosts:
+      - "${NETBIRD_MESH_HOST}:${NETBIRD_MGMT_HOST:-host-gateway}"
+    volumes:
+      - netbird-realtime-data-v3:/etc/netbird
+      - netbird-realtime-data-v3:/var/lib/netbird
+      - pki-certs:/certs/pki:ro
+    environment:
+      NB_SETUP_KEY: ${NETBIRD_STACK_KEY_BACKEND}
+      NB_MANAGEMENT_URL: https://${NETBIRD_MESH_HOST}:${NETBIRD_MESH_PORT:-33073}
+      NB_SSL_TRUST_BUNDLE: /certs/pki/aisha-ca-bundle.pem
+      SSL_CERT_FILE: /certs/pki/aisha-ca-bundle.pem
+      NB_HOSTNAME: backend-realtime
+      NB_FORCE_REENROLL: ${NB_FORCE_REENROLL:-0}
+    expose:
+      - "3002"
+      - "3003"
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -z \"$$NB_SETUP_KEY\" ]; then exit 0; fi; ip -o addr show wt0 2>/dev/null | grep -qE 'inet 100\\.'"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 8
+    restart: unless-stopped
+    networks:
+      - internal
+      - mesh-dns
+
+  realtime-mesh-ingress:
+    # Mesh komponenta — bez meshe nemá co dělat. Profil "mesh" zapíná
+    # coolify-deploy-init.sh podle MESH_ENABLED; hlídá brána mesh-profil-drzi.
+    profiles: ["mesh"]
+    image: ${IMAGE_CADDY}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-model--mesh-ingress
+    restart: unless-stopped
+    network_mode: "service:netbird-agent"
+    depends_on:
+      netbird-agent:
+        condition: service_started
+    environment:
+      REALTIME_MESH_INGRESS_ROUTES: ${REALTIME_MESH_INGRESS_ROUTES:-}
+      GATEWAY_TRUSTED_PROXIES: ${GATEWAY_TRUSTED_PROXIES:-}
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        if [ -z "$${REALTIME_MESH_INGRESS_ROUTES:-}" ]; then
+          echo "[mesh-ingress] REALTIME_MESH_INGRESS_ROUTES prázdné — derivace nic nevydala nebo se nedoručila."
+          echo "[mesh-ingress] Naslouchám jen na health, aby bylo VIDĚT, že tabulka chybí."
+          # ⛔ STAV BEZ TABULKY MUSÍ BÝT VIDĚT SONDĚ (naměřeno 2026-09-03).
+          # Záložní Caddyfile poslouchal na :8000, ale healthcheck sonduje :3002 —
+          # port této služby. Sonda tedy dostala „connection refused" místo
+          # navrženého 503 „bez směrovací tabulky", a diagnóza vedla k „zavřený
+          # port" místo ke skutečné příčině. Neshoda byla v 15 z 16 stacků;
+          # jediný, kde porty seděly, byl `model`, jehož vlastní port JE 8000 —
+          # vzor se trefil sám sebou a vada byla ze zdroje neviditelná.
+          printf ':3002 {\n  handle /__mesh_health {\n    respond "no-routes" 503\n  }\n  handle {\n    respond "mesh-ingress bez směrovací tabulky" 503\n  }\n}\n' > /etc/caddy/Caddyfile
+        else
+          : > /etc/caddy/Caddyfile
+          # ⛔ NAMĚŘENO 2026-08-31: brána viděla `x-forwarded-for` s JEDINÝM
+          # prvkem — adresou svého souseda (mesh-router edge). To je podpis
+          # NAHRAZENÍ, ne řetězu: Caddy bez `trusted_proxies` příchozí hlavičce
+          # nedůvěřuje a přepíše ji tím, kdo se právě připojil. Každý náš skok
+          # tak řetěz zahodil a klientská adresa se ke dveřím NEDOSTALA —
+          # `enforce` by zamkl i majitele.
+          #
+          # Hodnota se NEOPISUJE: je to TÝŽ seznam, jaký dostává gateway
+          # (`lib/derive-subnets.mjs` → GATEWAY_TRUSTED_PROXIES). Dva tvary
+          # (čárky pro env, mezery pro Caddy), jeden zdroj — kdyby si je každý
+          # skládal sám, chůze zprava by v každém prvku končila jinde.
+          if [ -n "$${GATEWAY_TRUSTED_PROXIES:-}" ]; then
+            printf '{\n  servers {\n    trusted_proxies static %s\n  }\n}\n\n' \
+              "$$(echo "$${GATEWAY_TRUSTED_PROXIES}" | tr ',' ' ')" >> /etc/caddy/Caddyfile
+          else
+            # Nedoručený seznam se NEDOSAZUJE. Bez něj Caddy řetěz přepíše —
+            # to je vada, ale TICHÁ; tady se aspoň řekne nahlas.
+            echo "[mesh-ingress] GATEWAY_TRUSTED_PROXIES nedoručen — x-forwarded-for bude PŘEPSÁN, klientská adresa se ztratí"
+          fi
+          PORTS=$$(echo "$${REALTIME_MESH_INGRESS_ROUTES}" | tr ';' '\n' | cut -d'|' -f1 | sort -un)
+          for P in $$PORTS; do
+            printf ':%s {\n  handle /__mesh_health {\n    respond "ok" 200\n  }\n' "$$P" >> /etc/caddy/Caddyfile
+            echo "$${REALTIME_MESH_INGRESS_ROUTES}" | tr ';' '\n' | while IFS='|' read -r RP RH RT; do
+              [ "$$RP" = "$$P" ] || continue
+              M=$$(echo "$$RH" | cut -d, -f1 | cut -d. -f1 | tr '-' '_')
+              HOSTS=$$(echo "$$RH" | tr ',' ' ')
+              printf '  @%s host %s\n  handle @%s {\n    reverse_proxy http://%s\n  }\n' "$$M" "$$HOSTS" "$$M" "$$RT" >> /etc/caddy/Caddyfile
+            done
+            printf '  handle {\n    respond "mesh-ingress: Host nepatri na tento port" 421\n  }\n}\n' >> /etc/caddy/Caddyfile
+          done
+          echo "[mesh-ingress] tabulka: $$(echo "$${REALTIME_MESH_INGRESS_ROUTES}" | tr ';' '\n' | wc -l) tras na $$(echo "$$PORTS" | wc -w) portech"
+        fi
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3002/__mesh_health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  netbird-realtime-data-v3:
+    name: ${APP_NAME_PREFIX:?}_netbird-realtime-data
+  pki-certs:
+    name: ${APP_NAME_PREFIX:?}_realtime-pki-certs
+networks:
+  internal:
+    external: true
+    name: ${APP_NAME_PREFIX:?identita instance}-shared-net
+  coolify:
+    external: true
+    name: coolify
+  mesh-dns:
+    external: true
+    name: ${MESH_DNS_NETWORK:?vydává generate-secrets}

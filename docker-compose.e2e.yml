@@ -1,0 +1,81 @@
+# =============================================================================
+# Local E2E override for the Coolify stack.
+# Publishes the otherwise internal PostgreSQL, Gateway and Keycloak ports to
+# loopback only, and makes Keycloak issue localhost-based OIDC metadata.
+# =============================================================================
+
+services:
+  db:
+    ports:
+      - "${E2E_DB_BIND:-127.0.0.1}:${E2E_DB_PORT:-57422}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aisha_admin -h 127.0.0.1 && test -f /tmp/.db-passwords-ready"]
+      interval: 5s
+      timeout: 5s
+      start_period: 30s
+      retries: 30
+
+  postgrest:
+    # PGRST202 guard: wait for migrate so PostgREST doesn't cache an empty schema
+    # on a fresh `down -v` (memory: project_local_host_client_auth_2026-06-06).
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "/bin/busybox", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3001/ready"]
+      interval: 10s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+
+  gateway:
+    ports:
+      - "${E2E_GATEWAY_BIND:-127.0.0.1}:${E2E_GATEWAY_PORT:-57421}:3001"
+    environment:
+      PUBLIC_URL: "http://127.0.0.1:${E2E_GATEWAY_PORT:-57421}"
+      FRONTEND_URL: "http://127.0.0.1:${E2E_WEB_PORT:-4173}"
+      # Resolved + injected by scripts/e2e/run-local.mjs (shared kc-endpoint-resolver):
+      # host-facing iss (so the gateway MINTS) ⟂ in-network JWKS/token fetch.
+      KC_ISSUER: "${KC_ISSUER}"
+      KC_JWKS_URL: "${KC_JWKS_URL}"
+      KC_TOKEN_URL: "${KC_TOKEN_URL}"
+      CORS_ORIGINS: "http://127.0.0.1:${E2E_WEB_PORT:-4173},http://localhost:${E2E_WEB_PORT:-4173}"
+      ALLOWED_REDIRECT_URIS: "http://127.0.0.1:${E2E_WEB_PORT:-4173},http://127.0.0.1:${E2E_WEB_PORT:-4173}/auth/callback,http://localhost:${E2E_WEB_PORT:-4173},http://localhost:${E2E_WEB_PORT:-4173}/auth/callback"
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "node -e \"require('http').get('http://127.0.0.1:3001/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\" || exit 1"
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 10
+
+  svc-mcp-knowledge:
+    environment:
+      KC_ISSUER: "${KC_ISSUER}"
+      KC_JWKS_URL: "${KC_JWKS_URL}"
+      RAGNAROK_URL: "http://host.docker.internal:${E2E_RAGNAROK_PORT:-9696}"
+      RAGNAROK_API_KEY: ${E2E_RAGNAROK_API_KEY:-e2e-ragnarok-test-key}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "node -e \"require('http').get('http://127.0.0.1:3017/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\" || exit 1"
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 10
+
+  keycloak:
+    ports:
+      - "${E2E_KC_BIND:-127.0.0.1}:${E2E_KC_PORT:-8080}:80"
+    environment:
+      KC_HOSTNAME: "${KC_HOSTNAME}"
+      KC_HOSTNAME_STRICT: "false"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/80 && printf 'GET /health/ready HTTP/1.0\r\nHost: localhost\r\n\r\n' >&3 && grep -q 'UP' <&3"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 120s

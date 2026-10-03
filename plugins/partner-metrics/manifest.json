@@ -1,0 +1,43 @@
+{
+  "id": "partner-metrics",
+  "version": "0.1.0",
+  "name": "Partner Metrics Dashboard",
+  "description": "Reference full_stack plugin. Aggregates partner KPIs, generates AI summaries, exposes API routes for a metrics dashboard.",
+  "author": "Evymo",
+  "kind": "full_stack",
+  "trust_tier": "internal",
+  "capabilities": [
+    "rpc.get_available_plugins",
+    "rpc.get_partner_stats",
+    "http.GET./status",
+    "http.GET./metrics",
+    "http.GET./summary",
+    "http.POST./refresh",
+    "cron.daily_rollup"
+  ],
+  "config_schema": {
+    "type": "object",
+    "properties": {
+      "refresh_interval_hours": {
+        "type": "number",
+        "default": 24,
+        "description": "How often to auto-refresh metrics (hours)"
+      },
+      "summary_model": {
+        "type": "string",
+        "default": "gpt-4",
+        "description": "LLM model for generating metric summaries"
+      }
+    }
+  },
+  "lifecycle": {
+    "backend_entry": "src/index.ts",
+    "load_strategy": "hot"
+  },
+  "sandbox": {
+    "timeout_ms": 15000,
+    "network_allowlist": [],
+    "max_memory_mb": 64
+  },
+  "dependencies": {}
+}

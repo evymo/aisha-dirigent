@@ -1,0 +1,22 @@
+# Build context for the generic surface-host image (BuildKit picks this up in
+# preference to the repo-root .dockerignore when building with
+# `-f deploy/surface-host/Dockerfile`).
+#
+# UNLIKE the root .dockerignore, this MUST keep `instances/` in context: the
+# surface shell's vite build reads ${AISHA_INSTANCE_DIR}/app.config.json (+ i18n,
+# fixtures) at build time to compose the instance overlay. Excluding it (as the
+# root ignore does, for the token-exchange service image) breaks the shell build
+# with `ENOENT app.config.json`.
+node_modules
+**/node_modules
+**/dist
+.git
+.forgejo
+db
+scripts
+# …except the one script `npm ci` itself runs: package.json declares
+# `"preinstall": "node scripts/check-node.cjs"`, so without this the install
+# fails with `npm error command sh -c node scripts/check-node.cjs`. Keep the
+# rest of scripts/ out — the image has no business carrying the toolshed.
+!scripts/check-node.cjs
+*.md

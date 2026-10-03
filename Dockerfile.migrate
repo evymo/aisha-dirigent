@@ -1,0 +1,46 @@
+#
+# Dockerfile.migrate — Runs DB migrations via Node (`npm run db:migrate`)
+#
+# Standalone single-stage Dockerfile (Coolify adds ARG declarations for ALL env
+# vars to EVERY stage; separate files keep each build small enough for the
+# shell argument limit).
+#
+# ⛔ ŽÁDNÉ node_modules (2026-09-26). Obraz dřív stavěl stupeň `deps` s
+# `npm ci --include=dev` celého monorepa — vrstva 1,09 GB na každém hostiteli
+# (obrazy aisha-core, disk 89 %). Za běhu z ní nepoužil NIC: skripty, které tu
+# běží (docker-migrate-entrypoint.sh → migrate/seed/compile-seed/
+# provision-operators, n8n-deploy-entrypoint.sh → bootstrap/overit-typy/
+# provision-credentials/deploy-workflows, instance-data-hook.sh a vše, co
+# importují nebo spouštějí), sahají výhradně na vestavěné moduly node + psql,
+# git, curl, jq, openssl, bash, ip. `npm run` k tomu node_modules nepotřebuje.
+# Brána `migrate-obraz-ma-co-skripty-importuji` to MĚŘÍ sledováním importů od
+# vstupů odvozených z compose; kdyby skript začal importovat balík, zčervená
+# a řekne který — nainstaluj pak JEN ten, ne celý strom.
+#
+
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/node:22-alpine
+WORKDIR /app
+# migrate.mjs shells out to psql for applying SQL files
+# git: scripts/deploy/instance-data-hook.sh clones the private instance
+# overlay at deploy time (runtime env URL — never baked into the image).
+# curl+jq+openssl: the in-cluster migrate one-shot provisions the aisha-pki-issuer
+# KC client (aisha-bootstrap-user-init.sh --issuer-only) over http://aisha-keycloak:80,
+# so a locked-down operator never needs a KC tunnel to break the PKI-issuer deadlock.
+# bash: the entrypoint shells out to scripts/aisha-bootstrap-user-init.sh, whose
+# shebang is `#!/usr/bin/env bash`. node:*-alpine ships busybox sh only, so the
+# call died with `bash: not found` and the issuer step was silently skipped —
+# the WARN is non-fatal by design, so the stack looked fine while the renewer had
+# no client to authenticate as (verified 2026-07-20). Install the interpreter the
+# script declares rather than hoping it is sh-clean.
+# iproute2: n8n-workflow-init (týž obraz) staví routu do mesh — PostgREST jádra je mesh jménem
+# na jiném uzlu; bez routy se jméno přeloží a nespojí (naměřeno 2026-09-16 na guru).
+RUN apk add --no-cache postgresql-client git curl jq openssl bash iproute2
+COPY . .
+ENV NODE_ENV=production
+# Use external entrypoint script instead of inline CMD to avoid
+# Dockerfile line-continuation + JSON escaping issues with Coolify's
+# Dockerfile modification (ARG injection, secret mounts).
+COPY scripts/docker-migrate-entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+CMD ["/entrypoint.sh"]

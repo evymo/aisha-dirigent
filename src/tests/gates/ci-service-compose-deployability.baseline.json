@@ -1,0 +1,4 @@
+{
+  "$comment": "Known CI-built services with NO docker-compose.coolify*.yml deployment. Historical debt snapshotted 2026-06-11 (stack-revival phase A). The gate fails on any NEW orphan and on stale entries here (service gained a compose home → remove it). Drain this list with dedicated PRs — each service needs its own env/placement analysis (core vs opt-in stack), see docker-compose.coolify-source-broker.yml for the opt-in pattern. svc-source-broker debt REPAID: it now deploys as the optional `source-broker` stack. The remaining 11 (storage-auth + the domain svc-* fleet) debt REPAID: they now deploy as the `domain-services` sibling stack (docker-compose.coolify-domain-services.yml, manifest + redeploy wave 4 + SOFT_DEPLOY_APPS + services.json tier=optional) — the core gateway reaches them cross-stack on the shared coolify network by their ROUTE_TABLE-default aliases.",
+  "orphans": []
+}

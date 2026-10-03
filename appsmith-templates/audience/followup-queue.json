@@ -1,0 +1,98 @@
+{
+  "applicationName": "Audience: Follow-up Queue",
+  "version": 1,
+  "description": "Marketer to-do list. Bucketed (overdue/today/this_week/later) with quick actions.",
+  "dataSources": [
+    { "name": "aisha-postgrest", "type": "PostgresREST", "endpoint": "{{appsmith.env.POSTGREST_URL}}",
+      "headers": { "Authorization": "Bearer {{appsmith.user.jwt}}" } }
+  ],
+  "queries": [
+    {
+      "name": "loadQueue",
+      "method": "GET",
+      "path": "/audience_admin_followup_queue_v",
+      "queryParams": {
+        "assigned_to_user_id": "eq.{{appsmith.user.sub}}",
+        "order": "due_at.asc"
+      }
+    },
+    {
+      "name": "loadTeamQueue",
+      "method": "GET",
+      "path": "/audience_admin_followup_queue_v",
+      "queryParams": { "order": "due_at.asc" }
+    },
+    {
+      "name": "completeFollowup",
+      "method": "POST",
+      "path": "/rpc/audience_log_event",
+      "body": {
+        "p_action_type": "update",
+        "p_action": "complete_followup",
+        "p_entity_type": "ai_task",
+        "p_entity_id": "{{selectedFollowup.task_id}}",
+        "p_summary": "Marketer completed follow-up"
+      }
+    },
+    {
+      "name": "createFollowup",
+      "method": "POST",
+      "path": "/rpc/audience_admin_create_followup",
+      "body": {
+        "p_actor_id": "{{newFollowupActor.text}}",
+        "p_due_at": "{{newFollowupDue.value}}",
+        "p_note": "{{newFollowupNote.text}}"
+      }
+    }
+  ],
+  "widgets": [
+    { "type": "Text", "name": "title", "text": "Follow-ups", "style": "heading" },
+    {
+      "type": "Tabs",
+      "name": "scopeTabs",
+      "tabs": [
+        { "name": "myQueue", "label": "My queue", "query": "loadQueue" },
+        { "name": "teamQueue", "label": "Team queue", "query": "loadTeamQueue" }
+      ]
+    },
+    {
+      "type": "StatGroup",
+      "name": "summaryCards",
+      "cards": [
+        { "label": "Overdue", "value": "{{loadQueue.data.filter(r => r.bucket === 'overdue').length}}", "color": "red" },
+        { "label": "Today", "value": "{{loadQueue.data.filter(r => r.bucket === 'today').length}}", "color": "amber" },
+        { "label": "This week", "value": "{{loadQueue.data.filter(r => r.bucket === 'this_week').length}}", "color": "blue" },
+        { "label": "Later", "value": "{{loadQueue.data.filter(r => r.bucket === 'later').length}}", "color": "gray" }
+      ]
+    },
+    {
+      "type": "Table",
+      "name": "queueTable",
+      "dataSource": "{{loadQueue.data}}",
+      "columns": [
+        { "field": "actor_name", "label": "Contact" },
+        { "field": "note", "label": "Note" },
+        { "field": "due_at", "label": "Due", "type": "datetime" },
+        { "field": "bucket", "label": "Bucket", "type": "badge" },
+        { "field": "days_until_due", "label": "Days" }
+      ],
+      "onRowClick": "{{store('selectedFollowup', row)}}",
+      "groupBy": "bucket"
+    },
+    {
+      "type": "Drawer",
+      "name": "newFollowupDrawer",
+      "trigger": { "type": "Button", "label": "+ New follow-up" },
+      "children": [
+        { "type": "InputText", "name": "newFollowupActor", "label": "Actor user_id" },
+        { "type": "DatePicker", "name": "newFollowupDue", "label": "Due at" },
+        { "type": "Textarea", "name": "newFollowupNote", "label": "Note" },
+        { "type": "Button", "label": "Schedule", "onClick": "{{createFollowup.run()}}" }
+      ]
+    }
+  ],
+  "permissions": {
+    "view": ["admin", "staff", "marketer"],
+    "edit": ["admin", "staff", "marketer"]
+  }
+}

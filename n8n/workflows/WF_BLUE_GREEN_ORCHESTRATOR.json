@@ -1,0 +1,587 @@
+{
+  "name": "WF_BLUE_GREEN_ORCHESTRATOR",
+  "meta": {
+    "purpose": "Self-driven blue-green switch orchestration triggered by Coolify deploy webhook. Reads manifest for `bluegreen=on` flag, runs smoke test on inactive slot, switches Traefik label if OK.",
+    "trigger": "Coolify deploy webhook → POST /webhook/coolify-bg-orchestrate",
+    "fallback": "scripts/blue-green-deploy.sh (manual operator override)",
+    "design_doc": "docs/deploy/BLUE_GREEN_DESIGN.md"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "coolify-bg-orchestrate",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "wh-coolify",
+      "name": "Coolify deploy webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Coolify deploy event payload.\n// Coolify sends e.g. { application_uuid, application_name, status, ... }\nconst body = $input.first().json.body || $input.first().json;\nconst appName = body.application_name || body.app_name || '';\nconst deploymentUuid = body.deployment_uuid || body.deployment?.uuid || '';\nconst status = body.status || 'unknown';\n\nif (!appName.startsWith('aisha-')) {\n  return { json: { skip: true, reason: 'not an aisha app', appName } };\n}\nif (status !== 'success' && status !== 'finished') {\n  return { json: { skip: true, reason: `deploy not successful: ${status}`, appName } };\n}\n\nconst short = appName.replace(/^aisha-/, '').replace(/-(blue|green)$/, '');\nconst slot = appName.endsWith('-blue') ? 'blue' : appName.endsWith('-green') ? 'green' : null;\nif (!slot) {\n  return { json: { skip: true, reason: 'app is not a B/G pair member', appName } };\n}\n\nconst SAFE_SHORT = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;\nconst SAFE_UUID = /^[A-Za-z0-9_-]{1,64}$/;\nif (!SAFE_SHORT.test(short)) { throw new Error('Refusing to orchestrate: unsafe app short name ' + JSON.stringify(short) + ' from ' + JSON.stringify(appName)); }\nif (!SAFE_UUID.test(deploymentUuid)) { throw new Error('Refusing to orchestrate: unsafe deployment uuid ' + JSON.stringify(deploymentUuid)); }\nreturn { json: { short, slot, appName, deploymentUuid, status } };"
+      },
+      "id": "parse-event",
+      "name": "Parse event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "is-skip",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "skip-gate",
+      "name": "Skip non-B/G events",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "__REMAP__FORGEJO_URL/aisha/evymo-ai-orchestrator/raw/main/coolify/manifests/aisha.manifest",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "fetch-manifest",
+      "name": "Fetch manifest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Check if this app is opted-in for blue-green via manifest flag `bluegreen=on`.\nconst short = $('parse-event').first().json.short;\nconst manifest = $input.first().json.data || $input.first().json.body || $input.first().json;\nconst lines = (typeof manifest === 'string' ? manifest : '').split('\\n');\nconst line = lines.find(l => /^app:\\s*/.test(l) && new RegExp(`:${short}:`).test(l));\nconst hasBluegreen = !!line && line.includes('bluegreen=on');\nreturn { json: { hasBluegreen, manifestLine: line || null, short } };"
+      },
+      "id": "check-flag",
+      "name": "Check bluegreen flag",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "no-bg",
+              "leftValue": "={{ $json.hasBluegreen }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "false"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "bg-gate",
+      "name": "Has bluegreen flag?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// COOLIFY API: list aisha apps, find the B/G pair (blue+green) for this short name.\n// Note: this is a placeholder — real call needs Coolify API token.\nconst short = $('parse-event').first().json.short;\nconst slot = $('parse-event').first().json.slot;\nconst other = slot === 'blue' ? 'green' : 'blue';\nreturn {\n  json: {\n    short,\n    just_deployed: slot,    // this slot completed deploy\n    inactive: other,        // the OTHER slot — currently idle/warm\n    smoke_url: `http://aisha-${short}-${slot}:8080/health/ready`,\n    bg_active_host_var: 'BG_ACTIVE_HOST',\n  }\n};"
+      },
+      "id": "resolve-pair",
+      "name": "Resolve B/G pair",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.smoke_url }}",
+        "options": {
+          "timeout": 5000,
+          "redirect": {
+            "redirect": {}
+          },
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json",
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "smoke-test",
+      "name": "Smoke test (HTTP, just-deployed slot)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1600,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "smoke-ok",
+              "leftValue": "={{ $json.statusCode }}",
+              "rightValue": 200,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "smoke-gate",
+      "name": "HTTP smoke OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1750,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "url": "{{ $env.AGENT_RUNNER_URL }}/exec",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipe\": \"smoke/{{ $('parse-event').first().json.short }}-bg-validate\",\n  \"target_slot\": \"{{ $('parse-event').first().json.slot }}\",\n  \"isolation\": \"kata\",\n  \"timeout_s\": 60\n}",
+        "options": {
+          "timeout": 90000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json",
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "exec-sandbox-test",
+      "name": "Sandbox integration test (exec)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1900,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "exec-ok",
+              "leftValue": "={{ $json.body.status }}",
+              "rightValue": "passed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "exec-gate",
+      "name": "Sandbox test OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2050,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "command": "node scripts/blue-green-switch.mjs --app aisha-{{ $('parse-event').first().json.short }} --target-slot {{ $('parse-event').first().json.slot }} --image-tag {{ $('parse-event').first().json.deploymentUuid }} --triggered-by drift_remediation --json"
+      },
+      "id": "promote",
+      "name": "Promote (slot switch)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.N8N_WEBHOOK_URL }}/webhook/drift-now",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"reason\": \"post-bg-promote\",\n  \"app\": \"{{ $('parse-event').first().json.short }}\",\n  \"promoted_slot\": \"{{ $('parse-event').first().json.slot }}\"\n}",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "neverError": true,
+              "responseFormat": "json",
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "trigger-drift-after-promote",
+      "name": "Trigger drift check (event-driven)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2150,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SMOKE FAILED: leave inactive slot alone, alert.\nconst e = $('parse-event').first().json;\nreturn { json: {\n  decision: 'ABORT',\n  app: e.short,\n  failed_slot: e.slot,\n  reason: 'smoke test failed',\n  ts: new Date().toISOString(),\n}};"
+      },
+      "id": "abort",
+      "name": "Abort + alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($input.first().json) }}"
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fingerprint the blue/green promotion for the immutable ledger (OPANCHOR).\nconst crypto = require('crypto');\nlet ctx = {};\ntry { ctx = $('Parse event').item.json || {}; } catch (e) { ctx = {}; }\nconst promote = $json || {};\nconst payload = { event: 'blue_green_switch', deploy: ctx, promote_result: promote, at: new Date().toISOString() };\nconst payload_hash = crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');\nconst reference_id = String(ctx.uuid || ctx.resource_uuid || ctx.deployment_uuid || ctx.application_uuid || '');\nreturn [{ json: { event_type: 'blue_green_switch', reference_table: 'coolify_app_slots', reference_id, payload, payload_hash } }];"
+      },
+      "id": "build-deploy-anchor",
+      "name": "Build Deploy Anchor",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        120
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "edge_blockchain_audit",
+        "rpcParams": "={{ JSON.stringify({ p_action: 'insert_record', p_payload: { event_type: $json.event_type, reference_table: $json.reference_table, reference_id: $json.reference_id, payload: $json.payload, payload_hash: $json.payload_hash } }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "anchor-deploy",
+      "name": "Anchor Deploy",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1420,
+        120
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Coolify deploy webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse event": {
+      "main": [
+        [
+          {
+            "node": "Skip non-B/G events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Skip non-B/G events": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch manifest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch manifest": {
+      "main": [
+        [
+          {
+            "node": "Check bluegreen flag",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check bluegreen flag": {
+      "main": [
+        [
+          {
+            "node": "Has bluegreen flag?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has bluegreen flag?": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resolve B/G pair",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve B/G pair": {
+      "main": [
+        [
+          {
+            "node": "Smoke test (HTTP, just-deployed slot)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Smoke test (HTTP, just-deployed slot)": {
+      "main": [
+        [
+          {
+            "node": "HTTP smoke OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP smoke OK?": {
+      "main": [
+        [
+          {
+            "node": "Sandbox integration test (exec)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Abort + alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sandbox integration test (exec)": {
+      "main": [
+        [
+          {
+            "node": "Sandbox test OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sandbox test OK?": {
+      "main": [
+        [
+          {
+            "node": "Promote (slot switch)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Abort + alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Promote (slot switch)": {
+      "main": [
+        [
+          {
+            "node": "Trigger drift check (event-driven)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Deploy Anchor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger drift check (event-driven)": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Abort + alert": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Deploy Anchor": {
+      "main": [
+        [
+          {
+            "node": "Anchor Deploy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    "aisha",
+    "blue-green",
+    "orchestration"
+  ]
+}

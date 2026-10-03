@@ -1,0 +1,959 @@
+{
+  "tests": {
+    "qualification": {
+      "1": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "2": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "3": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "4": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "5": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "18": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "19": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "20": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      }
+    },
+    "certification": {
+      "1": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "2": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "3": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "4": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "5": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "6": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "7": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "8": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "9": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "10": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "11": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "12": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      },
+      "13": {
+        "question": "",
+        "option_a": "",
+        "option_b": "",
+        "option_c": ""
+      }
+    }
+  },
+  "timeline": {
+    "sectionLabel": "",
+    "title": "",
+    "subtitle": "",
+    "browseFullTimeline": "",
+    "documents": "",
+    "events": {
+      "founding": {
+        "decade": "",
+        "title": "",
+        "description": ""
+      },
+      "rtnProgram": {
+        "decade": "",
+        "title": "",
+        "description": ""
+      },
+      "operational": {
+        "decade": "",
+        "title": "",
+        "description": ""
+      },
+      "nationalization": {
+        "decade": "",
+        "title": "",
+        "description": ""
+      },
+      "rediscovery": {
+        "decade": "",
+        "title": "",
+        "description": ""
+      }
+    }
+  },
+  "story": {
+    "sectionLabel": "",
+    "title": "",
+    "subtitle": "",
+    "contactUs": "",
+    "learnMore": "",
+    "vision": {
+      "sectionLabel": "",
+      "title": "",
+      "paragraph1": "",
+      "paragraph2": ""
+    },
+    "timeline": {
+      "sectionLabel": "",
+      "title": "",
+      "events": {
+        "2024": {
+          "year": "",
+          "title": "",
+          "description": ""
+        },
+        "2026": {
+          "year": "",
+          "title": "",
+          "description": ""
+        },
+        "2023-07": {
+          "year": "",
+          "title": "",
+          "description": ""
+        },
+        "2023-08": {
+          "year": "",
+          "title": "",
+          "description": ""
+        },
+        "2025-03": {
+          "year": "",
+          "title": "",
+          "description": ""
+        },
+        "2025-11": {
+          "year": "",
+          "title": "",
+          "description": ""
+        }
+      }
+    },
+    "capabilities": {
+      "sectionLabel": "",
+      "title": "",
+      "subtitle": "",
+      "items": {
+        "development": {
+          "title": "",
+          "description": ""
+        },
+        "operations": {
+          "title": "",
+          "description": ""
+        },
+        "monitoring": {
+          "title": "",
+          "description": ""
+        },
+        "maintenance": {
+          "title": "",
+          "description": ""
+        }
+      }
+    },
+    "services": {
+      "sectionLabel": "",
+      "title": "",
+      "intro": "",
+      "items": {
+        "managed": {
+          "title": "",
+          "description": ""
+        },
+        "oversight": {
+          "title": "",
+          "description": ""
+        },
+        "consulting": {
+          "title": "",
+          "description": ""
+        }
+      }
+    },
+    "partner": {
+      "sectionLabel": "",
+      "title": "",
+      "paragraph1": "",
+      "paragraph2": "",
+      "team": ""
+    },
+    "cta": {
+      "title": "",
+      "subtitle": "",
+      "button": ""
+    }
+  },
+  "study": {
+    "registration": {
+      "title": "",
+      "subtitle": "",
+      "steps": {
+        "basicInfo": "",
+        "currentState": "",
+        "trackingHistory": "",
+        "lifestyle": "",
+        "complete": ""
+      },
+      "basicInfoTitle": "",
+      "basicInfoDesc": "",
+      "currentStateTitle": "",
+      "currentStateDesc": "",
+      "trackingHistoryTitle": "",
+      "trackingHistoryDesc": "",
+      "lifestyleTitle": "",
+      "lifestyleDesc": "",
+      "completeTitle": "",
+      "completeDesc": "",
+      "registrationDisclaimer": "",
+      "whatHappensNext": "",
+      "nextSteps": [
+        "",
+        "",
+        "",
+        ""
+      ],
+      "gdprNotice": "",
+      "back": "",
+      "next": "",
+      "submit": "",
+      "submitting": "",
+      "accessDenied": {
+        "title": "",
+        "notEnrolled": "",
+        "pendingApproval": "",
+        "joinRII": ""
+      },
+      "alreadyCompleted": {
+        "title": "",
+        "description": "",
+        "takeTest": ""
+      },
+      "consents": {
+        "iAgree": ""
+      },
+      "consentsTitle": "",
+      "consentsDescription": "",
+      "continueToQuestionnaire": "",
+      "goToDashboard": "",
+      "questionnaireMissingError": "",
+      "questionnaireRenderError": ""
+    },
+    "form": {
+      "email": "",
+      "emailPlaceholder": "",
+      "password": "",
+      "passwordPlaceholder": "",
+      "confirmPassword": "",
+      "confirmPasswordPlaceholder": "",
+      "passwordDesc": "",
+      "dateOfBirth": "",
+      "pickDate": "",
+      "membershipType": "",
+      "individual": "",
+      "professional": "",
+      "physicalState": "",
+      "mentalState": "",
+      "energyLevel": "",
+      "stressLevel": "",
+      "veryPoor": "",
+      "excellent": "",
+      "veryLow": "",
+      "fullEnergy": "",
+      "noStress": "",
+      "extremeStress": "",
+      "professionalFindings": "",
+      "professionalFindingsDesc": "",
+      "professionalFindingsPlaceholder": "",
+      "note": "",
+      "notePlaceholder": "",
+      "preExistingConditions": "",
+      "preExistingConditionsDetails": "",
+      "preExistingConditionsPlaceholder": "",
+      "familyHistory": "",
+      "familyHistoryDetails": "",
+      "familyHistoryPlaceholder": "",
+      "lastBPDate": "",
+      "lastBPDatePlaceholder": "",
+      "lastBPResult": "",
+      "lastBPResultPlaceholder": "",
+      "covidVaccination": "",
+      "covidOneDose": "",
+      "covidTwoDoses": "",
+      "covidThreeDoses": "",
+      "covidUnvaccinated": "",
+      "covidOther": "",
+      "takingMedications": "",
+      "medicationsList": "",
+      "medicationsPlaceholder": "",
+      "products": "",
+      "productsDesc": "",
+      "productsPlaceholder": "",
+      "gender": "",
+      "genderMale": "",
+      "genderFemale": "",
+      "genderNonBinary": "",
+      "genderPreferNotToSay": "",
+      "weight": "",
+      "weightPlaceholder": "",
+      "height": "",
+      "heightPlaceholder": "",
+      "workActivity": "",
+      "workNone": "",
+      "workModerate": "",
+      "workHigh": "",
+      "exercisesRegularly": "",
+      "exerciseFrequency": "",
+      "exerciseNever": "",
+      "exerciseOnceWeek": "",
+      "exercise2to3Week": "",
+      "exercise4to5Week": "",
+      "exercise6to7Week": "",
+      "leisureActivities": "",
+      "leisureActivitiesDesc": "",
+      "leisureActivitiesPlaceholder": "",
+      "onDiet": "",
+      "dietDetails": "",
+      "dietPlaceholder": "",
+      "smokes": "",
+      "smokesPerDay": "",
+      "smokesPlaceholder": "",
+      "alcohol": "",
+      "alcoholDetails": "",
+      "alcoholPlaceholder": "",
+      "hasAsthma": "",
+      "hasHighBP": "",
+      "bpYes": "",
+      "bpNo": "",
+      "bpUnknown": "",
+      "hasHeartCondition": "",
+      "otherConditions": "",
+      "otherConditionsPlaceholder": "",
+      "pastInjuries": "",
+      "pastInjuriesPlaceholder": "",
+      "questionnaireDifficulty": "",
+      "veryEasy": "",
+      "veryDifficult": "",
+      "questionnaireFeedback": "",
+      "questionnaireFeedbackPlaceholder": "",
+      "referralSource": "",
+      "referralSourcePlaceholder": "",
+      "select": ""
+    },
+    "messages": {
+      "consentError": "",
+      "consentErrorDesc": "",
+      "submitError": "",
+      "submitErrorDesc": "",
+      "loadError": "",
+      "registrationSuccess": "",
+      "registrationSuccessDesc": "",
+      "applicationSubmitted": "",
+      "applicationSubmittedDesc": "",
+      "passwordRequired": "",
+      "passwordRequiredDesc": "",
+      "validationError": "",
+      "validationErrorDesc": "",
+      "error": "",
+      "errorDesc": ""
+    }
+  },
+  "qualificationTest": {
+    "title": "",
+    "subtitle": "",
+    "alreadyQualified": "",
+    "alreadyQualifiedDesc": "",
+    "aboutTest": "",
+    "aboutTestDesc": "",
+    "questions": "",
+    "toPass": "",
+    "noTimeLimit": "",
+    "whatTestCovers": "",
+    "testTopics": {
+      "basics": "",
+      "studyRules": "",
+      "membership": "",
+      "safety": ""
+    },
+    "startTest": "",
+    "question": "",
+    "answered": "",
+    "previous": "",
+    "next": "",
+    "submitTest": "",
+    "submitting": "",
+    "congratulations": "",
+    "tryAgain": "",
+    "correct": "",
+    "qualifiedMember": "",
+    "answersReview": "",
+    "yourAnswer": "",
+    "correctAnswer": "",
+    "goToPortal": "",
+    "noQuestionsAvailable": "",
+    "testPassed": "",
+    "testFailed": "",
+    "passedDesc": "",
+    "failedDesc": "",
+    "correctAnswers": "",
+    "passingScore": "",
+    "goToMemberPortal": "",
+    "browseStudies": "",
+    "retakeTest": "",
+    "messages": {
+      "passed": "",
+      "notPassed": ""
+    },
+    "riiRequired": {
+      "title": "",
+      "description": "",
+      "enrollFirst": "",
+      "joinRII": ""
+    },
+    "pendingApproval": {
+      "title": "",
+      "description": "",
+      "waitMessage": ""
+    },
+    "questionnaireRequired": {
+      "title": "",
+      "description": "",
+      "fillFirst": "",
+      "fillQuestionnaire": ""
+    },
+    "activationRequired": {
+      "title": "",
+      "description": "",
+      "backToMember": ""
+    }
+  },
+  "research": {
+    "badge": "",
+    "title": "",
+    "subtitle": "",
+    "patentTimeline": {
+      "title": "",
+      "subtitle": ""
+    },
+    "timeline": {
+      "1983": {
+        "title": "",
+        "description": ""
+      },
+      "1994": {
+        "title": "",
+        "description": ""
+      },
+      "2009": {
+        "title": "",
+        "description": ""
+      },
+      "2019": {
+        "title": "",
+        "description": ""
+      },
+      "2024": {
+        "title": "",
+        "description": ""
+      },
+      "2025": {
+        "title": "",
+        "description": ""
+      }
+    },
+    "programs": {
+      "2020": {
+        "title": "",
+        "rtn118": {
+          "name": "",
+          "description": ""
+        }
+      },
+      "2022": {
+        "title": "",
+        "rtn33": {
+          "name": "",
+          "description": ""
+        },
+        "rtn102": {
+          "name": "",
+          "description": ""
+        }
+      },
+      "2024": {
+        "title": "",
+        "rtn122k": {
+          "name": "",
+          "description": ""
+        }
+      },
+      "title": "",
+      "subtitle": ""
+    },
+    "labSamples": {
+      "title": "",
+      "description": "",
+      "cta": ""
+    },
+    "protocol": {
+      "title": "",
+      "description": "",
+      "cta": ""
+    },
+    "disclaimer": ""
+  },
+  "studies": {
+    "sectionLabel": "",
+    "title": "",
+    "subtitle": "",
+    "hero": {
+      "badge": "",
+      "title": "",
+      "subheadline": "",
+      "stats": {
+        "members": "",
+        "studies": "",
+        "partners": "",
+        "secure": ""
+      },
+      "cta": {
+        "archive": "",
+        "faq": "",
+        "protocol": ""
+      },
+      "archiveContext": {
+        "title": "",
+        "description": ""
+      }
+    },
+    "noStudies": "",
+    "noStudiesDescription": "",
+    "weeks": "",
+    "professionals": "",
+    "contributors": "",
+    "participants": "",
+    "viewDetails": "",
+    "contribute": "",
+    "stats": {
+      "total": "",
+      "funding": "",
+      "active": "",
+      "completed": ""
+    },
+    "tabs": {
+      "all": "",
+      "funding": "",
+      "active": "",
+      "completed": ""
+    },
+    "status": {
+      "draft": "",
+      "funding": "",
+      "funded": "",
+      "active": "",
+      "completed": "",
+      "cancelled": "",
+      "recruiting": "",
+      "suspended": "",
+      "archived": ""
+    },
+    "types": {
+      "observational": "",
+      "operational_trial": "",
+      "community": "",
+      "interventional": "",
+      "umbrella": "",
+      "registry": ""
+    },
+    "registrationStatus": {
+      "screening": "",
+      "enrolled": "",
+      "active": "",
+      "completed": "",
+      "withdrawn": "",
+      "pending": "",
+      "suspended": ""
+    },
+    "funding": {
+      "raised": "",
+      "deadline": ""
+    },
+    "howItWorks": {
+      "title": "",
+      "subtitle": "",
+      "step1": {
+        "title": "",
+        "description": ""
+      },
+      "step2": {
+        "title": "",
+        "description": ""
+      },
+      "step3": {
+        "title": "",
+        "description": ""
+      }
+    },
+    "cta": {
+      "title": "",
+      "subtitle": "",
+      "button": ""
+    },
+    "umbrella": {
+      "label": "",
+      "entryPoint": "",
+      "description": "",
+      "joinCTA": "",
+      "pendingApproval": "",
+      "pendingDescription": "",
+      "awaitingApproval": ""
+    },
+    "specificPrograms": {
+      "title": "",
+      "subtitle": ""
+    },
+    "emptyState": ""
+  },
+  "studyDetail": {
+    "notFound": "",
+    "backToStudies": "",
+    "loadError": "",
+    "rating": {
+      "success": "",
+      "error": ""
+    },
+    "consultant": {
+      "applySuccess": "",
+      "applyError": "",
+      "applied": "",
+      "pending": "",
+      "pendingDesc": "",
+      "approved": "",
+      "approvedDesc": "",
+      "rejected": "",
+      "rejectedDesc": ""
+    },
+    "registration": {
+      "success": "",
+      "error": "",
+      "pending": "",
+      "pendingDesc": ""
+    },
+    "funding": {
+      "title": "",
+      "of": "",
+      "contributors": "",
+      "contribute": ""
+    },
+    "contribute": {
+      "title": "",
+      "description": "",
+      "type": "",
+      "types": {
+        "financial": "",
+        "governance": "",
+        "impact": ""
+      },
+      "amount": "",
+      "message": "",
+      "messagePlaceholder": "",
+      "submit": "",
+      "success": "",
+      "error": "",
+      "invalidAmount": ""
+    },
+    "ratings": {
+      "title": "",
+      "add": "",
+      "update": "",
+      "dialogTitle": "",
+      "dialogDescription": "",
+      "yourRating": "",
+      "comment": "",
+      "commentPlaceholder": "",
+      "submit": "",
+      "success": "",
+      "error": "",
+      "none": ""
+    },
+    "consultants": {
+      "title": "",
+      "description": "",
+      "roles": {
+        "consultant": "",
+        "supervisor": "",
+        "lead": "",
+        "coordinator": "",
+        "investigator": "",
+        "monitor": "",
+        "analyst": ""
+      }
+    },
+    "info": {
+      "title": "",
+      "participants": "",
+      "duration": "",
+      "condition": ""
+    },
+    "actions": {
+      "register": "",
+      "enroll": "",
+      "enrolled": "",
+      "applyConsultant": "",
+      "joinRII": ""
+    },
+    "contributors": {
+      "title": "",
+      "anonymous": "",
+      "member": "",
+      "tokens": {
+        "tokens_governance": "",
+        "tokens_impact": "",
+        "donated": "",
+        "earned": "",
+        "allocated": ""
+      }
+    },
+    "qualificationRequired": {
+      "title": "",
+      "description": "",
+      "testLink": ""
+    },
+    "questionnaireRequired": {
+      "title": "",
+      "description": "",
+      "link": ""
+    },
+    "riiRequired": {
+      "title": "",
+      "description": "",
+      "joinLink": ""
+    },
+    "riiPending": {
+      "title": "",
+      "description": ""
+    },
+    "consentRequired": {
+      "title": "",
+      "description": "",
+      "signLink": ""
+    }
+  },
+  "rtnProtocol": {
+    "badge": "",
+    "title": "",
+    "subtitle": "",
+    "panelsTitle": "",
+    "mappingTitle": "",
+    "mappingSubtitle": "",
+    "recommendedDiagnostics": "",
+    "whyTitle": "",
+    "whyDescription": "",
+    "tagline": "",
+    "panels": {
+      "annual": {
+        "title": "",
+        "description": "",
+        "target": "",
+        "frequency": ""
+      },
+      "baseline": {
+        "title": "",
+        "description": "",
+        "target": "",
+        "frequency": ""
+      },
+      "specialized": {
+        "title": "",
+        "description": "",
+        "target": "",
+        "frequency": ""
+      },
+      "strategic": {
+        "title": "",
+        "description": "",
+        "target": "",
+        "frequency": ""
+      }
+    },
+    "products": {
+      "retisin": {
+        "mechanism": "",
+        "oncology": {
+          "title": "",
+          "description": ""
+        },
+        "metabolic": {
+          "title": "",
+          "description": ""
+        }
+      },
+      "lyastin": {
+        "mechanism": "",
+        "cardiovascular": {
+          "title": "",
+          "description": ""
+        }
+      },
+      "floristen": {
+        "mechanism": "",
+        "immunity": {
+          "title": "",
+          "description": ""
+        }
+      },
+      "silexil": {
+        "mechanism": "",
+        "joints": {
+          "title": "",
+          "description": ""
+        }
+      }
+    }
+  },
+  "longevityScore": {
+    "title": "",
+    "clsLabel": "",
+    "low": "",
+    "high": "",
+    "noDataYet": "",
+    "takeFirstAssessment": "",
+    "takeAssessment": "",
+    "viewHistory": "",
+    "domainBreakdown": "",
+    "moreDomainsHint": "",
+    "strongAreas": "",
+    "needsAttention": "",
+    "trend": {
+      "up": "",
+      "down": "",
+      "stable": ""
+    },
+    "domains": {
+      "vitality": "",
+      "energy": "",
+      "sleep": "",
+      "physical": "",
+      "metabolism": "",
+      "immunity": "",
+      "psyche": "",
+      "cognition": "",
+      "mood": "",
+      "pain": "",
+      "change_perception": ""
+    },
+    "history": {
+      "title": "",
+      "noHistory": "",
+      "improvement": "",
+      "decline": "",
+      "periodLabel": ""
+    },
+    "partner": {
+      "title": "",
+      "description": "",
+      "avgScore": "",
+      "trendSummary": "",
+      "membersImproving": "",
+      "membersDeclining": "",
+      "membersStable": "",
+      "totalUsers": "",
+      "improving": "",
+      "declining": "",
+      "assessmentCount": "",
+      "noConsentedUsers": ""
+    }
+  },
+  "questionBlock": {
+    "invalidTagsConfig": "",
+    "invalidFeelingPresetConfig": "",
+    "invalidSelectConfig": "",
+    "invalidRadioConfig": "",
+    "invalidCheckboxConfig": "",
+    "unknownQuestionType": ""
+  }
+}

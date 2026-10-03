@@ -1,0 +1,33 @@
+{
+  "activeProfile": "id3a",
+  "profiles": {
+    "local": {
+      "supabaseUrl": "",
+      "anonKey": "",
+      "modelEndpoint": "http://127.0.0.1:3001"
+    },
+    "id3a": {
+      "supabaseUrl": "https://api.backend.id3a.cz"
+    },
+    "aisha": {
+      "supabaseUrl": "https://api.aisha.guru",
+      "aishaUrl": "https://api.aisha.guru",
+      "modelEndpoint": "https://ask.aisha.guru"
+    }
+  },
+  "expertiseLevel": "expert",
+  "storyId": "0db00000-0000-4000-8000-000000000001",
+  "contextProfile": "repo",
+  "autonomyMode": "hybrid",
+  "routerCoach": {
+    "enabled": true,
+    "costThresholdUsd": 0.50,
+    "suggestProfileSwitch": true,
+    "slotProfile": "balanced",
+    "slotProfiles": {
+      "budget":     { "spark": "gemini-2.5-flash", "ember": "claude-haiku-4-20250514", "verify": "claude-haiku-4-20250514", "default": "gemini-2.5-flash" },
+      "balanced":   { "spark": "gemini-2.5-flash", "ember": "claude-haiku-4-20250514", "verify": "claude-sonnet-4-20250514", "default": "claude-haiku-4-20250514" },
+      "maxQuality": { "spark": "claude-sonnet-4-20250514", "ember": "claude-sonnet-4-20250514", "verify": "claude-sonnet-4-20250514", "default": "claude-sonnet-4-20250514" }
+    }
+  }
+}

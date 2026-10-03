@@ -1,0 +1,53 @@
+/* Farm shop — example template tokens. Brand-neutral, fork-freely.
+ * Warm cream + terracotta/barn + field-green for a working farm shop (light).
+ *
+ * Authored on :root so it matches the GrapesJS editor; PageRenderer maps :root →
+ * .gjs-page-content, so these cascade to BOTH the static chrome (via --color-*
+ * aliases) AND the live product-catalog runtime block (which reads the shadcn
+ * set hsl(var(--token))). One palette, plain inheritance.
+ * shadcn set MUST be bare-HSL triplets ("H S% L%") — a hex here would fall back
+ * to the global app brand. */
+:root {
+  /* shadcn token set — consumed by the runtime React blocks (light farm). */
+  --background: 40 60% 96%;
+  --foreground: 26 18% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 26 18% 15%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 26 18% 15%;
+  --muted: 39 45% 91%;
+  --muted-foreground: 29 12% 39%;
+  --primary: 18 64% 37%;          /* terracotta #9c4722 */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 39 45% 91%;
+  --secondary-foreground: 26 18% 15%;
+  --accent: 92 35% 36%;           /* field green #5a7d3c */
+  --accent-foreground: 0 0% 100%;
+  --border: 39 37% 85%;
+  --input: 39 37% 85%;
+  --ring: 18 64% 37%;
+
+  /* template's own semantic names, ALIASED to the shadcn set → one palette. */
+  --color-bg: hsl(var(--background));
+  --color-fg: hsl(var(--foreground));
+  --color-muted: hsl(var(--muted-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-dark: hsl(19 67% 29%);   /* #7d3819 — no shadcn slot */
+  --color-primary-fg: hsl(var(--primary-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-border: hsl(var(--border));
+  --color-surface: hsl(var(--muted));
+  --color-surface-2: hsl(var(--card));
+
+  --font-display: 'Iowan Old Style', 'Palatino Linotype', 'Georgia', serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 2rem;
+  --space-xl: 4rem;
+
+  --radius-sm: 6px;
+  --radius-md: 14px;
+}

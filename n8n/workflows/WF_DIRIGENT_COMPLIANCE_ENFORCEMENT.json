@@ -1,0 +1,223 @@
+{
+  "name": "WF_DIRIGENT_COMPLIANCE_ENFORCEMENT",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "dirigent/compliance_enforcement",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "enforcement-trigger",
+      "name": "Enforcement Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// PostToolUse playbook — inspect tool output for compliance signals.\n// MVP: scan tool_output stderr/stdout for known failure patterns; if file\n// edit landed in story scope, queue a nudge for the next Stop to surface\n// a deeper review.\n//\n// Future: LLM scoring of edit diff vs story_rulesets.rule_ids (mid-tier\n// model, low temperature).\nconst body = $input.first().json.body || $input.first().json;\nif (body.event !== 'post_tool') {\n  throw new Error(`WF_DIRIGENT_COMPLIANCE_ENFORCEMENT expects event=post_tool, got ${body.event}`);\n}\nconst toolInput = body.tool_input || {};\nconst toolOutput = body.tool_output || {};\nconst filePath = String(toolInput.file_path || '');\nconst output = String(toolOutput.stderr || toolOutput.stdout || toolOutput.output || '');\n\nconst failureSignals = [\n  { pattern: /error TS\\d+/, kind: 'ts-error', note: 'TypeScript chyba v build outputu' },\n  { pattern: /FAIL\\s+|✗\\s|✘\\s/, kind: 'test-fail', note: 'Test failure' },\n  { pattern: /eslint.*error/i, kind: 'lint-error', note: 'ESLint violation' },\n  { pattern: /npm\\s+run\\s+db:(reset|refreshdb)|drop\\s+(?:table|database)|truncate\\s+table/i, kind: 'destructive-op', note: 'destruktivní DB operace v outputu' }\n];\n\nconst hits = failureSignals.filter(s => s.pattern.test(output)).map(s => ({ kind: s.kind, note: s.note }));\n\nlet advisory = '';\nlet nudgeQueued = false;\nif (hits.length > 0) {\n  advisory = `⚠️ AISHA Enforcement: po nástroji detekuji ${hits.length} signál(ů) — ${hits.map(h => h.note).join('; ')}.`;\n} else if (filePath && body.story_id) {\n  // Soft hint that a file landed inside story scope; nudge is the durable persistence\n  nudgeQueued = true;\n}\nreturn [{\n  json: {\n    advisory,\n    decision: 'allow',\n    nudge_queued: nudgeQueued,\n    nudge: nudgeQueued ? { story_id: body.story_id, conversation_id: body.session_id, event_origin: 'compliance_engine', severity: 'info', message: `Edit landed: ${filePath}. Bude přepáčen na příští Stop evaluaci.` } : null,\n    _audit: { event: 'post_tool', story_id: body.story_id, session_id: body.session_id, file_path: filePath, hits_count: hits.length, nudge_queued: nudgeQueued }\n  }\n}];"
+      },
+      "id": "scan-output",
+      "name": "Scan Tool Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.nudge_queued }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "should-queue-nudge",
+      "name": "Should Queue Nudge?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/dirigent_enqueue_nudge_FUTURE",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_story_id: $json.nudge.story_id, p_conversation_id: $json.nudge.conversation_id, p_event_origin: $json.nudge.event_origin, p_severity: $json.nudge.severity, p_message: $json.nudge.message }) }}",
+        "options": {
+          "timeout": 3000
+        }
+      },
+      "id": "enqueue-nudge",
+      "name": "Enqueue Nudge (PLACEHOLDER — needs dirigent_enqueue_nudge RPC)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        220
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_integration_action",
+        "rpcParams": "={{ JSON.stringify({ p_action_key: 'dirigent.compliance_enforcement.completed', p_integration: 'wf_dirigent_compliance_enforcement', p_payload: $('Scan Tool Output').first().json._audit }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 3000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "audit-log",
+      "name": "Audit Log",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ advisory: $('Scan Tool Output').first().json.advisory, decision: 'allow' }) }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Enforcement Trigger": {
+      "main": [
+        [
+          {
+            "node": "Scan Tool Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Scan Tool Output": {
+      "main": [
+        [
+          {
+            "node": "Should Queue Nudge?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Queue Nudge?": {
+      "main": [
+        [
+          {
+            "node": "Enqueue Nudge (PLACEHOLDER — needs dirigent_enqueue_nudge RPC)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enqueue Nudge (PLACEHOLDER — needs dirigent_enqueue_nudge RPC)": {
+      "main": [
+        [
+          {
+            "node": "Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit Log": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

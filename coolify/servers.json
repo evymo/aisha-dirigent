@@ -1,0 +1,96 @@
+{
+  "$schema": "./servers.schema.json",
+  "_comment": "Multi-server registry — source of truth for Coolify infrastructure. Template-only: hostnames, IPs, UUIDs, and domain lists are operator-set via env. Server IDs (frontend/build/backend/experimental) are AISHA reference labels — operators forking the repo edit this file or override the values via env. See servers.json.example for the AISHA reference deploy.",
+  "servers": {
+    "frontend": {
+      "hostname": "${FRONTEND_HOSTNAME}",
+      "ip": "${FRONTEND_IP}",
+      "role": "production",
+      "coolify_uuid": "${COOLIFY_SERVER_UUID_FRONTEND}",
+      "is_build_server": false,
+      "has_traefik": true,
+      "cpu": 12,
+      "ram_gb": 24,
+      "disk_gb": 200,
+      "placement_rules": {
+        "accepts": ["http-frontend", "api-gateway", "admin-ui", "observability"],
+        "max_ram_per_stack_gb": 4,
+        "reserved_ram_gb": 4
+      },
+      "stacks": [
+        "core",
+        "web",
+        "keycloak",
+        "integration",
+        "langfuse",
+        "admin",
+        "n8n",
+        "pki",
+        "app-frontend",
+        "netbird"
+      ],
+      "domains": []
+    },
+    "build": {
+      "hostname": "${BUILD_HOSTNAME}",
+      "ip": "${BUILD_IP}",
+      "role": "build",
+      "coolify_uuid": "${COOLIFY_SERVER_UUID_BUILD}",
+      "is_build_server": true,
+      "has_traefik": false,
+      "cpu": 4,
+      "ram_gb": 8,
+      "disk_gb": 64,
+      "stacks": [],
+      "domains": [],
+      "notes": "Dedicated Docker build server — no runtime containers"
+    },
+    "backend": {
+      "hostname": "${BACKEND_HOSTNAME}",
+      "ip": "${BACKEND_IP}",
+      "role": "backend",
+      "coolify_uuid": "${COOLIFY_SERVER_UUID_BACKEND}",
+      "is_build_server": false,
+      "has_traefik": false,
+      "has_gpu": false,
+      "cpu": 6,
+      "ram_gb": 12,
+      "disk_gb": 100,
+      "placement_rules": {
+        "accepts": ["database", "app-primary", "headless-backend"],
+        "max_ram_per_stack_gb": 8,
+        "reserved_ram_gb": 2
+      },
+      "stacks": [
+        "integration-backend",
+        "app-backend"
+      ],
+      "domains": [],
+      "notes": "Internal backend runtime — no public domains, no Traefik."
+    },
+    "experimental": {
+      "hostname": "${EXPERIMENTAL_HOSTNAME}",
+      "ip": "${EXPERIMENTAL_IP}",
+      "role": "staging",
+      "coolify_uuid": "${COOLIFY_SERVER_UUID_EXPERIMENTAL}",
+      "is_build_server": false,
+      "has_traefik": false,
+      "has_gpu": false,
+      "cpu": 4,
+      "ram_gb": 8,
+      "disk_gb": 80,
+      "placement_rules": {
+        "accepts": ["ai-inference", "ml-model", "staging"],
+        "max_ram_per_stack_gb": 6,
+        "reserved_ram_gb": 2
+      },
+      "stacks": [
+        "staging",
+        "app-ai",
+        "cosmos"
+      ],
+      "domains": [],
+      "notes": "Staging + AI hosting + Cosmos chain node — isolated from production"
+    }
+  }
+}

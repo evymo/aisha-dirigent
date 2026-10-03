@@ -1,0 +1,41 @@
+# Phase 12 WP 0.2 — Grafana datasource provisioning.
+#
+# Three datasources:
+#   1. Prometheus — host/container/service metrics
+#   2. Loki — log aggregation; derivedFields link trace_id to Langfuse
+#   3. Langfuse — trace API datasource (uses langfuse-grafana plugin
+#      OR JSON-API datasource as fallback)
+#
+# Trace correlation:
+#   Click a log line in Grafana Loki → trace_id label is extracted →
+#   opens Langfuse trace URL in new tab. Closes the observability loop.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: false
+    jsonData:
+      httpMethod: POST
+      timeInterval: 30s
+      manageAlerts: false
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    editable: false
+    jsonData:
+      maxLines: 5000
+      # Trace correlation: extract trace_id from log labels + link to Langfuse.
+      # Phase 12 §-1.12 R6 — Langfuse is sole traces backend.
+      derivedFields:
+        - matcherRegex: '(?:trace_id|traceId)["=:\s]+([0-9a-fA-F]{16,32})'
+          name: trace_id
+          url: 'https://langfuse.backend.id3a.cz/trace/${__value.raw}'
+          datasourceUid: ''  # external link, not Grafana datasource
+          urlDisplayLabel: 'Open in Langfuse'

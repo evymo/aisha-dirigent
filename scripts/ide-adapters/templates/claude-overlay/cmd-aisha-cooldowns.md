@@ -1,0 +1,49 @@
+# AISHA Dirigent — Cooldown Manager
+
+List or clear active cooldown timers for advisory hooks. Each advisory rule
+has a per-session 45-second cooldown to prevent flooding the chat with the
+same advice — this command lets you inspect or reset them.
+
+## Arguments: $ARGUMENTS
+
+## Instructions
+
+1. **Default behavior (no arguments)** — list active cooldowns:
+   ```bash
+   ls -la /tmp/aisha-advise-*-${CLAUDE_SESSION_ID:-default} 2>/dev/null
+   ```
+   For each file, report:
+   - Rule key (parsed from filename: `aisha-advise-<rule>-<session>`)
+   - Last fire time (file mtime)
+   - Seconds remaining until next fire allowed (now - mtime, vs 45s budget)
+
+   If no files: report "No active cooldowns — all rules ready to fire."
+
+2. **`clear` argument** — remove all cooldown files for current session:
+   ```bash
+   rm -f /tmp/aisha-advise-*-${CLAUDE_SESSION_ID:-default} 2>/dev/null
+   ```
+   Then re-list to confirm. Useful when you want to test the same advisory
+   twice in a row, or after intentionally triggering many edits.
+
+3. **`clear <rule>` argument** — remove just one rule's cooldown:
+   ```bash
+   rm -f /tmp/aisha-advise-<rule>-${CLAUDE_SESSION_ID:-default} 2>/dev/null
+   ```
+   Valid rules: `rpc-only`, `no-console`, `no-any`, `i18n-hardcoded`,
+   `i18n-mixed`, `bash-risk`.
+
+4. **`clear --all-sessions` argument** — sweep all sessions (rare, mostly for
+   cleanup if old session files accumulate):
+   ```bash
+   rm -f /tmp/aisha-advise-*
+   ```
+   Display count of files removed.
+
+## Notes
+
+- Cooldown files are session-scoped via `${CLAUDE_SESSION_ID}` env. Different
+  Claude Code sessions don't share cooldowns.
+- Cooldown duration mirrors `extensions/aisha-dirigent/src/copilot-watcher.ts:21`
+  `COOLDOWN_MS = 45_000` for behavioural parity with the VS Code extension.
+- Clearing cooldown is local and temporary — backend (Vrstva 2) is unaffected.

@@ -1,0 +1,117 @@
+# shellcheck shell=bash
+# =============================================================================
+# hesla-roli.lib — JEDEN seznam aplikačních rolí DB a toho, odkud berou heslo
+# =============================================================================
+# Načítají ho OBA zapisovatelé hesel:
+#   - set-passwords.sh     (/docker-entrypoint-initdb.d, jen první initdb)
+#   - entrypoint-wrapper.sh (každý start nad existujícími daty)
+# Dřív měl každý svůj seznam s `${ROLE_PASSWORD:-${POSTGRES_PASSWORD}}` — a
+# wrapper roli postgres_exporter neznal vůbec, takže její heslo nenastavil nikdo
+# (naměřeno 2026-09-19 na instanci: role bez hesla, exporter 942× „password
+# authentication failed" za 2 h).
+#
+# ⛔ ŽÁDNÁ NÁHRADA HESLEM SUPERUŽIVATELE. Konzumenti čtou svou proměnnou bez
+#    náhrady (keycloak/netbird dokonce `:?`), takže heslo superuživatele by roli
+#    nikoho nepřihlásilo — jen by přidalo další účet, který ho přijímá. Když
+#    heslo role do DB kontejneru nedorazí, role dostane PASSWORD NULL (nepřihlásí
+#    se) a řekne se to nahlas. NULL a ne „nechat být": instance, která dřív
+#    nastartovala se starým kódem, v roli heslo superuživatele DRŽÍ a jen
+#    ponechání by ji nevyléčilo.
+#
+# ✅ Heslo superuživatele smějí dostat JEN role v HESLO_SUPERUZIVATELE — záměr,
+#    ne náhoda: aisha_admin a authenticator ho sdílejí z definice, nocodb_app
+#    je v kontraktu doktora `alias POSTGRES_PASSWORD`. Brána
+#    `hesla-roli-bez-hesla-superuzivatele` to měří chováním obou skriptů.
+#
+# Hodnoty: jedna vrstva okolních uvozovek se strhne (Coolify je tak ukládá),
+# apostrof se pro SQL zdvojí.
+# =============================================================================
+
+# Role, které sdílejí heslo superuživatele ZÁMĚRNĚ.
+HESLO_SUPERUZIVATELE=(aisha_admin authenticator nocodb_app)
+
+# role:PROMĚNNÁ — role existují od initdb (000_init_roles_schemas.sql).
+ROLE_HESLA=(
+  "nocodb_app:NOCODB_DB_PASSWORD"
+  "langfuse_app:LANGFUSE_DB_PASSWORD"
+  "synapse_user:SYNAPSE_DB_PASSWORD"
+  "keycloak_app:KEYCLOAK_DB_PASSWORD"
+  "n8n_app:N8N_DB_PASSWORD"
+  "netbird_app:NETBIRD_DB_PASSWORD"
+)
+
+# role:PROMĚNNÁ — role vzniká až v heals (postgres_exporter). Na čerstvém
+# initdb ještě neexistuje; ALTER na neexistující roli by s ON_ERROR_STOP shodil
+# celé re-apply a wrapper by nevytvořil sentinel → všechny závislé služby by
+# stály. Proto DO blok s kontrolou existence.
+ROLE_HESLA_POZDNI=(
+  "postgres_exporter:POSTGRES_EXPORTER_PASSWORD"
+)
+
+hr_strip_outer_quotes() {
+  local v="$1"
+  if [[ "$v" =~ ^\'(.*)\'$ ]] || [[ "$v" =~ ^\"(.*)\"$ ]]; then
+    v="${BASH_REMATCH[1]}"
+  fi
+  printf '%s' "$v"
+}
+
+hr_esc() { printf '%s' "$1" | sed "s/'/''/g"; }
+
+hr_je_superuzivatelska() {
+  local r
+  for r in "${HESLO_SUPERUZIVATELE[@]}"; do [ "$r" = "$1" ] && return 0; done
+  return 1
+}
+
+# hesla_roli_sql <heslo-superuživatele-bez-uvozovek>
+#   stdout: SQL (ALTER ROLE …), stderr: varování o nedoručených heslech
+hesla_roli_sql() {
+  local super pair role var val
+  super="$(hr_esc "$1")"
+  printf "ALTER ROLE aisha_admin WITH PASSWORD '%s';\n" "$super"
+  printf "ALTER ROLE authenticator WITH PASSWORD '%s';\n" "$super"
+
+  for pair in "${ROLE_HESLA[@]}"; do
+    role="${pair%%:*}"; var="${pair#*:}"
+    val="$(hr_strip_outer_quotes "${!var:-}")"
+    if [ -z "$val" ] && hr_je_superuzivatelska "$role"; then
+      val="$1"
+    fi
+    if [ -n "$val" ]; then
+      printf "ALTER ROLE %s WITH PASSWORD '%s';\n" "$role" "$(hr_esc "$val")"
+    else
+      echo "postgres: ⚠ ${var} není doručené — role ${role} dostane PASSWORD NULL (nepřihlásí se), heslo superuživatele NE." >&2
+      printf "ALTER ROLE %s WITH PASSWORD NULL;\n" "$role"
+    fi
+  done
+
+  for pair in "${ROLE_HESLA_POZDNI[@]}"; do
+    role="${pair%%:*}"; var="${pair#*:}"
+    val="$(hr_strip_outer_quotes "${!var:-}")"
+    # ⛔ Tvar `WHERE EXISTS … \\gexec`, ne DO blok (upstream 4dec10ab8, 2026-09-17):
+    #    vada se ohlásí JEN tam, kde role existuje. DO blok s RAISE NOTICE hlásil
+    #    i ve stacích, kde role být nemá — nepoužitelné pravidlo má mlčet, ne
+    #    vyrábět nález. Jednotný seznam rolí (tenhle soubor) zůstává; mění se
+    #    jen tvar SQL pro roli, která vzniká až v heals.
+    if [ -n "$val" ]; then
+      printf "SELECT format('ALTER ROLE %s WITH PASSWORD %%L', '%s') WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '%s') \\gexec\n" \
+        "$role" "$(hr_esc "$val")" "$role"
+    else
+      # Dva řádky, protože se tu potkávají dvě měřené vlastnosti:
+      #   1. hlasitá vada JEN tam, kde role existuje (upstream 4dec10ab8)
+      #   2. fail-closed: role bez doručeného hesla dostane PASSWORD NULL, ať se
+      #      nepřihlásí starým heslem (riq 4e5bee491). Přes %I, takže doslovný
+      #      `ALTER ROLE <role> WITH PASSWORD` v SQL nevznikne — ten je vyhrazen
+      #      případu, kdy heslo DORAZILO.
+      # Na stderr taky — operátor to vidí v logu kontejneru hned, i tam, kde role
+      # ještě neexistuje. SQL varování se ozve jen tam, kde existuje; jedno
+      # nenahrazuje druhé (riq 4e5bee491).
+      echo "postgres: ⚠ ${var} není doručené — role ${role} dostane PASSWORD NULL (nepřihlásí se), heslo superuživatele NE." >&2
+      printf "SELECT 'postgres: ⚠ role %s existuje, ale %s není doručené — exporter se nepřihlásí' AS vada WHERE EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '%s');\n" \
+        "$role" "$var" "$role"
+      printf "DO \$hr\$ BEGIN IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '%s') THEN EXECUTE format('ALTER ROLE %%I WITH PASSWORD NULL', '%s'); END IF; END \$hr\$;\n" \
+        "$role" "$role"
+    fi
+  done
+}

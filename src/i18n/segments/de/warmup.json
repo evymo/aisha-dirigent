@@ -1,0 +1,61 @@
+{
+  "warmup": {
+    "title": "Stack-Warmup",
+    "subtitle": "Plattform-Basiswissen in der stack-default Story vorbereiten",
+    "statusDone": "Warmup abgeschlossen",
+    "stepperAria": "Fortschritt der Warmup-Schritte",
+    "progressLabel": "Schritt {{current}} von {{total}} · {{count}} Schritt(e) abgeschlossen",
+    "stepMarked": {
+      "title": "Schritt erfasst",
+      "description": "Schritt {{step}} als abgeschlossen markiert"
+    },
+    "stepMarkedError": "Warmup-Schritt konnte nicht erfasst werden",
+    "steps": {
+      "welcome": {
+        "title": "Willkommen",
+        "headline": "Lassen Sie uns Ihren AISHA-Stack aufwärmen",
+        "description": "Dieser Assistent führt Sie durch die Vorbereitung des Plattform-Basiswissens in der stack-default Story. Alles, was Sie hier einrichten, wird automatisch von jeder weiteren Story über die bestehende Per-Story-Isolation + Globals-Abruf geerbt.",
+        "defaultPresent": "Stack-default Story ist vorhanden und bereit, Wissen aufzunehmen.",
+        "defaultMissing": "Stack-default Story fehlt — führen Sie zuerst den Cold-Start-Bootstrap aus.",
+        "cta": "Verstanden — fortfahren"
+      },
+      "kb_upload": {
+        "title": "Wissen hochladen",
+        "headline": "Laden Sie Ihre initialen Wissensquellen hoch",
+        "description": "Laden Sie Dokumente, FAQs, Expertenregeln und andere Quellen hoch, die zur Basis der Plattform werden sollen. Diese Einträge werden für jede Story als Globals abgerufen.",
+        "requirement": "Mindestens {{min}} Wissenseintrag zum Fortfahren erforderlich",
+        "currentCount": "Aktuell in stack-default: {{count}} Eintrag/Einträge",
+        "cta": "Uploads als abgeschlossen markieren"
+      },
+      "rules_setup": {
+        "title": "Profile prüfen",
+        "headline": "Kontext-Profile + Expertenregeln prüfen",
+        "description": "Kontext-Profile bestimmen, welche Wissensebenen (KB-Retrieval, Ruleset, Graph-Kontext, Learnings) in den LLM-Prompt einfließen und in welcher Reihenfolge. Bestätigen Sie, dass die Standardeinstellungen für Ihre Installation passen.",
+        "body": "Öffnen Sie die Seite Kontext-Profile, um die Rulesets zu prüfen oder anzupassen — oder bestätigen Sie einfach, dass die Standards für den ersten Durchlauf passen. Sie können später zurückkehren.",
+        "openProfiles": "Kontext-Profile öffnen",
+        "acknowledge": "oder Standards akzeptieren und fortfahren",
+        "cta": "Bestätigen und fortfahren"
+      },
+      "test_query": {
+        "title": "Testanfrage",
+        "headline": "Eine Testanfrage gegen die Default-Story laufen lassen",
+        "description": "Stellen Sie sicher, dass Retrieval, Zitate und der Graph-Trail durchgängig funktionieren, bevor Sie das Warmup als erledigt erklären.",
+        "body": "Öffnen Sie die stack-default Story, stellen Sie eine Frage zu einem der hochgeladenen Einträge, und überprüfen Sie, ob die Antwort mit Quellen + Graph-Kontext erscheint.",
+        "checkCitations": "Das Zitate-Panel unter der Antwort listet die von AISHA verwendeten Chunks auf",
+        "checkGraph": "Das Explainability-Panel zeigt den Multi-Hop-Graph zu entdeckten Konzepten",
+        "checkRoute": "Der Route-Plan (in Admin AI Runs) zeigt, dass der Chat das erwartete Kontext-Profil getroffen hat",
+        "openStory": "Default-Story öffnen",
+        "cta": "Testanfrage verifiziert"
+      },
+      "complete": {
+        "title": "Fertig",
+        "headline": "Warmup abgeschlossen",
+        "description": "Die Plattform-Basis ist eingerichtet. Neue Stories erben sie über die compose_context kb_retrieval Globals + graph_context Ebene.",
+        "body": "Ab jetzt wird der Assistent Sie nicht mehr weiterleiten. Sie können jederzeit auf diese Seite zurückkehren, um die Warmup-Audit-Historie einzusehen.",
+        "cta": "Warmup als abgeschlossen markieren",
+        "backToAdmin": "Zurück zur Admin-Übersicht",
+        "lastActivity": "Letzte Warmup-Aktivität: {{iso}}"
+      }
+    }
+  }
+}

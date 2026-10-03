@@ -1,0 +1,355 @@
+{
+  "name": "WF_MODEL_ROUTER",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "model-router",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Router Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract routing parameters from incoming webhook\nconst input = $input.first().json;\nconst task = input.body?.task || input.task || '';\nconst context = input.body?.context || input.context || '';\nconst provider = input.body?.provider || input.provider || 'auto';\nconst model = input.body?.model || input.model || '';\nconst systemPrompt = input.body?.system_prompt || input.system_prompt || '';\nconst maxTokens = input.body?.max_tokens || input.max_tokens || 4096;\nconst temperature = input.body?.temperature ?? input.temperature ?? 0.4;\nconst jsonMode = input.body?.json_mode || input.json_mode || false;\n\n// Auto-resolve provider from model string if not explicit\nlet resolvedProvider = provider;\nif (provider === 'auto' && model) {\n  if (model.startsWith('gemini')) resolvedProvider = 'google';\n  else if (model.startsWith('claude')) resolvedProvider = 'anthropic';\n  else resolvedProvider = 'openai';\n}\n\n// Default model per provider\nlet resolvedModel = model;\nif (!resolvedModel) {\n  switch (resolvedProvider) {\n    case 'google': resolvedModel = 'gemini-2.0-flash'; break;\n    case 'anthropic': resolvedModel = 'claude-3-5-sonnet-20241022'; break;\n    default: resolvedModel = 'gpt-4o'; break;\n  }\n}\n\nreturn [{\n  json: {\n    task,\n    context,\n    provider: resolvedProvider,\n    model: resolvedModel,\n    systemPrompt,\n    maxTokens,\n    temperature,\n    jsonMode,\n    routedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "prepare-input",
+      "name": "Prepare & Route",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.provider }}",
+                    "rightValue": "google",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": "Gemini"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.provider }}",
+                    "rightValue": "anthropic",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": "Anthropic"
+            }
+          ]
+        },
+        "fallbackOutput": "extra",
+        "options": {
+          "fallbackOutputLabel": "OpenAI"
+        }
+      },
+      "id": "provider-switch",
+      "name": "Provider Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Prepare & Route').item.json.task }}",
+        "options": {
+          "systemMessage": "={{ $('Prepare & Route').item.json.systemPrompt || 'You are AISHA Expert — an advanced AI assistant for the AISHA platform. Provide thorough, accurate analysis.' }}",
+          "maxTokens": "={{ $('Prepare & Route').item.json.maxTokens }}",
+          "temperature": "={{ $('Prepare & Route').item.json.temperature }}"
+        }
+      },
+      "id": "openai-agent",
+      "name": "AISHA Expert (OpenAI)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        920,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "routingStrategy": "auto",
+        "modelOverride": "",
+        "options": {
+          "temperature": "={{ $('Prepare & Route').item.json.temperature }}",
+          "maxOutputTokens": 4096,
+          "topP": 0.9,
+          "maxRetries": 2
+        }
+      },
+      "id": "llm-router-expert",
+      "name": "LLM Router (Expert)",
+      "type": "n8n-nodes-aisha.aishaLlmRouter",
+      "typeVersion": 1,
+      "position": [
+        920,
+        400
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "__REMAP__",
+          "name": "Google Gemini(PaLM) Api account"
+        },
+        "openAiApi": {
+          "id": "__REMAP__",
+          "name": "OpenAi account"
+        },
+        "anthropicApi": {
+          "id": "__REMAP__",
+          "name": "Anthropic account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('Prepare & Route').item.json.task }}",
+        "options": {
+          "systemMessage": "={{ $('Prepare & Route').item.json.systemPrompt || 'You are AISHA Scout — a fast, efficient AI assistant for the AISHA platform. Be concise and practical.' }}",
+          "maxTokens": "={{ $('Prepare & Route').item.json.maxTokens }}",
+          "temperature": "={{ $('Prepare & Route').item.json.temperature }}"
+        }
+      },
+      "id": "gemini-agent",
+      "name": "AISHA Scout (Gemini)",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        920,
+        540
+      ]
+    },
+    {
+      "parameters": {
+        "routingStrategy": "auto",
+        "modelOverride": "",
+        "options": {
+          "temperature": "={{ $('Prepare & Route').item.json.temperature }}",
+          "maxOutputTokens": 4096,
+          "topP": 0.9,
+          "maxRetries": 2
+        }
+      },
+      "id": "llm-router-scout",
+      "name": "LLM Router (Scout)",
+      "type": "n8n-nodes-aisha.aishaLlmRouter",
+      "typeVersion": 1,
+      "position": [
+        920,
+        760
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "__REMAP__",
+          "name": "Google Gemini(PaLM) Api account"
+        },
+        "openAiApi": {
+          "id": "__REMAP__",
+          "name": "OpenAi account"
+        },
+        "anthropicApi": {
+          "id": "__REMAP__",
+          "name": "Anthropic account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format the agent response into a standardized output\nconst agentOutput = $input.first().json;\nconst routeData = $('Prepare & Route').first().json;\n\nconst output = agentOutput?.output || agentOutput?.text || JSON.stringify(agentOutput);\n\nreturn [{\n  json: {\n    success: true,\n    provider: routeData.provider,\n    model: routeData.model,\n    response: output,\n    metadata: {\n      routed_at: routeData.routedAt,\n      completed_at: new Date().toISOString(),\n      task_preview: routeData.task.substring(0, 100)\n    }\n  }\n}];"
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_n8n_trace_event",
+        "rpcParams": "={\n  \"p_event_type\": \"n8n_workflow\",\n  \"p_agent_slug\": \"model-router\",\n  \"p_provider\": \"{{ $json.provider }}\",\n  \"p_operation\": \"route_and_execute\",\n  \"p_status\": \"ok\",\n  \"p_request_summary\": {\n    \"model\": \"{{ $json.model }}\",\n    \"task_preview\": \"{{ $json.metadata?.task_preview || '' }}\"\n  }\n}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "log-trace",
+      "name": "Log Trace",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1380,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Router Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare & Route",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare & Route": {
+      "main": [
+        [
+          {
+            "node": "Provider Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Provider Switch": {
+      "main": [
+        [
+          {
+            "node": "AISHA Scout (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AISHA Expert (OpenAI)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AISHA Expert (OpenAI)": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AISHA Scout (Gemini)": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Log Trace",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Router (Expert)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AISHA Expert (OpenAI)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Router (Scout)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AISHA Scout (Gemini)",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

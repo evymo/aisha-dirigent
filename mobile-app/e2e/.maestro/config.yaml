@@ -1,0 +1,7 @@
+# Maestro configuration for AISHA Dirigent mobile app
+appId: cz.id3a.aisha.app
+---
+defaults:
+  timeout: 20000
+  animationSpeed: 0.7
+  startupTimeout: 120000

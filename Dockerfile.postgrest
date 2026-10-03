@@ -1,0 +1,5 @@
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/busybox:1.37.0-musl AS busybox
+FROM ${REGISTRY_PROXY}postgrest/postgrest:v14.1
+
+COPY --from=busybox /bin/busybox /bin/busybox

@@ -1,0 +1,338 @@
+{
+  "name": "WF_RAG_EVAL_NIGHTLY",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 2,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "rag-eval-cron",
+      "name": "Daily Schedule (02:00 UTC)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst batchId = (typeof crypto !== 'undefined' && crypto.randomUUID)\n  ? crypto.randomUUID()\n  : `${now.toISOString().replace(/[:.]/g, '-')}-${Math.random().toString(36).slice(2, 10)}`;\nreturn [{\n  json: {\n    batch_id: batchId,\n    started_at: now.toISOString(),\n    embedding_model: $env.RAG_EVAL_EMBEDDING_MODEL || 'text-embedding-3-small',\n    llm_model: $env.RAG_EVAL_LLM_MODEL || 'gpt-4o-mini',\n    judge_model: $env.RAG_JUDGE_MODEL || $env.RAG_EVAL_LLM_MODEL || 'gpt-4o-mini'\n  }\n}];"
+      },
+      "id": "rag-eval-prepare",
+      "name": "Prepare Batch ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SVC_MCP_KNOWLEDGE_URL || 'http://svc-mcp-knowledge:3017' }}/rag/eval/run",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ batch_id: $json.batch_id, embedding_model: $json.embedding_model, llm_model: $json.llm_model, judge_model: $json.judge_model }) }}",
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "id": "rag-eval-run",
+      "name": "Run Eval Batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        690,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $('Run Eval Batch').first()?.json ?? {};\nconst prep = $('Prepare Batch ID').first()?.json ?? {};\nconst now = new Date().toISOString();\n\nconst summary = {\n  timestamp: now,\n  workflow: 'WF_RAG_EVAL_NIGHTLY',\n  batch_id: result.batch_id || prep.batch_id,\n  ok: result.ok === true,\n  embedding_model: result.embedding_model,\n  llm_model: result.llm_model,\n  judge_model: result.judge_model,\n  golden_total: result.golden_total ?? 0,\n  scored: result.scored ?? 0,\n  failed: result.failed ?? 0,\n  baseline_rows_upserted: result.baseline_rows_upserted ?? 0,\n  duration_ms: result.duration_ms ?? 0,\n  failures_sample: (result.failures || []).slice(0, 5)\n};\n\nif (!summary.ok || summary.failed > summary.scored * 0.2) {\n  summary.severity = 'warn';\n  summary.message = `RAG eval batch had ${summary.failed} failures out of ${summary.golden_total}`;\n} else {\n  summary.severity = 'info';\n  summary.message = `RAG eval batch ok: ${summary.scored}/${summary.golden_total} scored, ${summary.baseline_rows_upserted} baseline rows`;\n}\n\nreturn [{ json: summary }];"
+      },
+      "id": "rag-eval-log",
+      "name": "Log Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        910,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.POSTGREST_URL || 'http://postgrest:3000' }}/rpc/fn_detect_rag_baseline_regression",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "params=single-object"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_lookback_hours: 168, p_warn_drop: parseFloat($env.RAG_EVAL_WARN_DROP || '0.02'), p_crit_drop: parseFloat($env.RAG_EVAL_CRIT_DROP || '0.05'), p_warn_pct: parseFloat($env.RAG_EVAL_WARN_PCT || '0.025'), p_crit_pct: parseFloat($env.RAG_EVAL_CRIT_PCT || '0.05') }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "rag-eval-detect-regression",
+      "name": "Detect Regressions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1130,
+        300
+      ],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Classify regression results — derive top-line severity for the batch.\n// Input: array of regression rows (one per (profile, embedding, llm) group)\n// from fn_detect_rag_baseline_regression. Output: single summary row used by\n// both the audit log and the Matrix alert.\nconst summary = $('Log Results').first()?.json ?? {};\nconst regressionRaw = $('Detect Regressions').first()?.json ?? [];\nconst regressions = Array.isArray(regressionRaw) ? regressionRaw : [];\n\nconst critical = regressions.filter((r) => r.severity === 'critical');\nconst warning = regressions.filter((r) => r.severity === 'warning');\n\nlet topSeverity = summary.severity || 'info';\nif (critical.length > 0) topSeverity = 'critical';\nelse if (warning.length > 0 && topSeverity !== 'critical') topSeverity = 'warn';\n\nconst formatRow = (r) =>\n  `  - ${r.context_profile_slug || '(default)'} / ${r.embedding_model} / ${r.llm_model}: ` +\n  `${r.latest_composite ?? 'n/a'} vs ${r.lookback_avg_composite ?? 'n/a'} ` +\n  `(drop ${r.drop_absolute ?? 0}, ${(((r.drop_pct ?? 0) * 100).toFixed(2))}%) [${r.severity}: ${r.reason}]`;\n\nlet alertText = '';\nif (critical.length > 0) {\n  alertText += `*RAG eval — CRITICAL regression on ${critical.length} group(s)*\\n`;\n  alertText += critical.map(formatRow).join('\\n') + '\\n';\n}\nif (warning.length > 0) {\n  alertText += `*RAG eval — warning regression on ${warning.length} group(s)*\\n`;\n  alertText += warning.map(formatRow).join('\\n') + '\\n';\n}\nif (critical.length === 0 && warning.length === 0) {\n  alertText = `RAG eval — all groups within tolerance (${regressions.length} compared)`;\n}\n\nreturn [{\n  json: {\n    ...summary,\n    regression_top_severity: topSeverity,\n    regression_critical_count: critical.length,\n    regression_warning_count: warning.length,\n    regression_total_groups: regressions.length,\n    regression_alert_text: alertText.trim(),\n    regression_groups: regressions\n  }\n}];"
+      },
+      "id": "rag-eval-classify-regression",
+      "name": "Classify Regression",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1350,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "alert-on-warn-or-critical",
+              "leftValue": "={{ $json.regression_top_severity }}",
+              "rightValue": "info",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "rag-eval-alert-gate",
+      "name": "Alert if Warn or Critical",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1570,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.MATRIX_WEBHOOK_URL || $env.OPS_ALERT_WEBHOOK_URL }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ severity: $json.regression_top_severity, text: $json.regression_alert_text, batch_id: $json.batch_id, embedding_model: $json.embedding_model, llm_model: $json.llm_model, critical_count: $json.regression_critical_count, warning_count: $json.regression_warning_count }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "rag-eval-alert-send",
+      "name": "Send Alert (Matrix/Slack)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1790,
+        220
+      ],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.POSTGREST_URL || 'http://postgrest:3000' }}/rpc/log_integration_action",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "params=single-object"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_action: 'rag_eval.nightly_batch_completed', p_metadata: { batch_id: $('Classify Regression').first().json.batch_id, scored: $('Classify Regression').first().json.scored, failed: $('Classify Regression').first().json.failed, baseline_rows: $('Classify Regression').first().json.baseline_rows_upserted, duration_ms: $('Classify Regression').first().json.duration_ms, severity: $('Classify Regression').first().json.regression_top_severity, message: $('Classify Regression').first().json.message, regression_critical_count: $('Classify Regression').first().json.regression_critical_count, regression_warning_count: $('Classify Regression').first().json.regression_warning_count, regression_total_groups: $('Classify Regression').first().json.regression_total_groups } }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "rag-eval-audit",
+      "name": "Audit Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1790,
+        380
+      ],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily Schedule (02:00 UTC)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Batch ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Batch ID": {
+      "main": [
+        [
+          {
+            "node": "Run Eval Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Eval Batch": {
+      "main": [
+        [
+          {
+            "node": "Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Results": {
+      "main": [
+        [
+          {
+            "node": "Detect Regressions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Regressions": {
+      "main": [
+        [
+          {
+            "node": "Classify Regression",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Regression": {
+      "main": [
+        [
+          {
+            "node": "Alert if Warn or Critical",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert if Warn or Critical": {
+      "main": [
+        [
+          {
+            "node": "Send Alert (Matrix/Slack)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

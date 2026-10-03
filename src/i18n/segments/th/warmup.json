@@ -1,0 +1,61 @@
+{
+  "warmup": {
+    "title": "การวอร์มอัปสแต็ก",
+    "subtitle": "เตรียมฐานความรู้พื้นฐานของแพลตฟอร์มใน stack-default story",
+    "statusDone": "วอร์มอัปเสร็จสมบูรณ์",
+    "stepperAria": "ความคืบหน้าของขั้นตอนวอร์มอัป",
+    "progressLabel": "ขั้นที่ {{current}} จาก {{total}} · เสร็จสิ้น {{count}} ขั้น",
+    "stepMarked": {
+      "title": "บันทึกขั้นตอนแล้ว",
+      "description": "ขั้นตอน {{step}} ถูกทำเครื่องหมายว่าเสร็จสิ้น"
+    },
+    "stepMarkedError": "ไม่สามารถบันทึกขั้นตอนวอร์มอัปได้",
+    "steps": {
+      "welcome": {
+        "title": "ยินดีต้อนรับ",
+        "headline": "มาวอร์มอัปสแต็ก AISHA ของคุณกัน",
+        "description": "ตัวช่วยนี้จะนำคุณผ่านการเตรียมฐานความรู้ของแพลตฟอร์มใน stack-default story ทุกอย่างที่คุณตั้งค่าที่นี่จะถูกสืบทอดอัตโนมัติโดยทุก story ที่ตามมาผ่านการแยกต่อ story + การดึง globals ที่มีอยู่",
+        "defaultPresent": "Stack-default story พร้อมรับความรู้แล้ว",
+        "defaultMissing": "Stack-default story หายไป — โปรดเรียกใช้ cold-start bootstrap ก่อน",
+        "cta": "เข้าใจแล้ว — ดำเนินการต่อ"
+      },
+      "kb_upload": {
+        "title": "อัปโหลดความรู้",
+        "headline": "อัปโหลดแหล่งความรู้เริ่มต้นของคุณ",
+        "description": "อัปโหลดและแท็กเอกสาร คำถามที่พบบ่อย กฎผู้เชี่ยวชาญ และแหล่งอื่นๆ ที่ควรเป็นฐานของแพลตฟอร์ม รายการเหล่านี้จะถูกดึงเป็น globals สำหรับทุก story",
+        "requirement": "ต้องมีความรู้อย่างน้อย {{min}} รายการเพื่อดำเนินการต่อ",
+        "currentCount": "ปัจจุบันใน stack-default: {{count}} รายการ",
+        "cta": "ทำเครื่องหมายการอัปโหลดเสร็จสิ้น"
+      },
+      "rules_setup": {
+        "title": "ตรวจสอบโปรไฟล์",
+        "headline": "ตรวจสอบ context profiles + กฎผู้เชี่ยวชาญ",
+        "description": "Context profiles กำหนดว่าชั้นความรู้ใด (KB retrieval, ruleset, graph context, learnings) ถูกประกอบเข้าใน LLM prompt และเรียงลำดับอย่างไร ยืนยันว่าค่าเริ่มต้นเหมาะกับการติดตั้งของคุณ",
+        "body": "เปิดหน้า context profiles เพื่อตรวจสอบหรือปรับแต่ง rulesets — หรือเพียงรับทราบว่าค่าเริ่มต้นใช้ได้สำหรับครั้งแรก คุณสามารถกลับมาภายหลังได้",
+        "openProfiles": "เปิด context profiles",
+        "acknowledge": "หรือรับทราบค่าเริ่มต้นและดำเนินการต่อ",
+        "cta": "ยืนยันและดำเนินการต่อ"
+      },
+      "test_query": {
+        "title": "ทดสอบคำถาม",
+        "headline": "รันการสนทนาทดสอบกับ default story",
+        "description": "ตรวจสอบว่าการดึงข้อมูล การอ้างอิง และ graph trail ทำงานครบวงจรก่อนประกาศว่าวอร์มอัปเสร็จสิ้น",
+        "body": "เปิด stack-default story ถามคำถามเกี่ยวกับรายการที่อัปโหลด และตรวจสอบว่าคำตอบมีแหล่งที่มา + graph context",
+        "checkCitations": "แผงการอ้างอิงใต้คำตอบแสดง chunks ที่ AISHA ใช้",
+        "checkGraph": "แผง explainability แสดงกราฟ multi-hop ไปยังแนวคิดที่ค้นพบ",
+        "checkRoute": "Route plan (ใน Admin AI Runs) แสดงว่าการสนทนาตรงกับ context profile ที่คาดไว้",
+        "openStory": "เปิด default story",
+        "cta": "ยืนยันคำถามทดสอบ"
+      },
+      "complete": {
+        "title": "เสร็จสมบูรณ์",
+        "headline": "วอร์มอัปเสร็จสมบูรณ์",
+        "description": "ฐานของแพลตฟอร์มถูกตั้งค่าแล้ว Story ใหม่จะสืบทอดผ่าน compose_context kb_retrieval globals + ชั้น graph_context",
+        "body": "ตั้งแต่นี้เป็นต้นไป ตัวช่วยจะไม่เปลี่ยนเส้นทางคุณอีก คุณสามารถกลับมาที่หน้านี้ได้ทุกเมื่อเพื่อดูประวัติการตรวจสอบวอร์มอัป",
+        "cta": "ทำเครื่องหมายวอร์มอัปเสร็จสมบูรณ์",
+        "backToAdmin": "กลับไปยัง admin overview",
+        "lastActivity": "กิจกรรมวอร์มอัปล่าสุด: {{iso}}"
+      }
+    }
+  }
+}

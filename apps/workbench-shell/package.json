@@ -1,0 +1,27 @@
+{
+  "name": "@aisha/workbench-shell",
+  "version": "0.1.0",
+  "description": "Generic operator workbench (document-management surface): browses the evidence registry and drives the human review/preparation flow. Read + audited write, live-only (no offline cache). ALL branding/config/i18n comes from an instance overlay (AISHA_INSTANCE_DIR). Ships empty & functional.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "test": "vitest run",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@aisha/design-language": "*",
+    "@aisha/extranet-sdk-ui": "^0.5.0",
+    "@aisha/surface-blocks": "*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.5.4",
+    "vite": "^5.4.11",
+    "vitest": "^2.1.8"
+  }
+}

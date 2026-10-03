@@ -1,0 +1,33 @@
+{
+  "name": "@aisha/ws-gateway",
+  "version": "0.1.0",
+  "license": "Elastic-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/server.ts",
+    "start": "node dist/server.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aisha/observability": "*",
+    "@aisha/security": "*",
+    "@fastify/helmet": "^12.0.0",
+    "@fastify/rate-limit": "^10.0.0",
+    "@fastify/websocket": "^11.2.0",
+    "fastify": "^5.3.3",
+    "ioredis": "^5.6.1",
+    "jose": "^6.0.11",
+    "pino": "^9.6.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "fast-uri": "^3.1.2"
+  }
+}

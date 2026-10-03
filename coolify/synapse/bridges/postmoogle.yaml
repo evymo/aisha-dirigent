@@ -1,0 +1,45 @@
+# =============================================================================
+# Postmoogle — Email ↔ Matrix Bridge Configuration — Evymo Production
+# =============================================================================
+# Docs: https://gitlab.com/etke.cc/postmoogle
+# Receives emails via SMTP (port 2525) and bridges to Matrix rooms.
+# =============================================================================
+
+homeserver:
+  address: http://synapse:8008
+  domain: ${MATRIX_DOMAIN}
+
+appservice:
+  address: http://postmoogle:29336
+  hostname: 0.0.0.0
+  port: 29336
+  database:
+    type: postgres
+    uri: postgres://synapse_user:${SYNAPSE_DB_PASSWORD}@${APP_NAME_PREFIX}-db:5432/synapse_bridge_email?sslmode=disable
+  id: postmoogle
+  as_token: ${AISHA_AS_TOKEN}_postmoogle
+  hs_token: ${AISHA_HS_TOKEN}_postmoogle
+  bot:
+    username: emailbot
+    displayname: Email Bridge Bot
+
+smtp:
+  hostname: 0.0.0.0
+  port: 2525
+  # TLS handled by Traefik/reverse proxy for incoming email
+  tls: false
+
+bridge:
+  permissions:
+    "*": relay
+    "${MATRIX_DOMAIN}": user
+    "@admin:${MATRIX_DOMAIN}": admin
+  command_prefix: "!email"
+  domains:
+    - "aisha.cz"
+
+logging:
+  min_level: warn
+  writers:
+    - type: stdout
+      format: json

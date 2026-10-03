@@ -1,0 +1,24 @@
+{
+  "$comment": "Kolik TAJEMSTVÍ se u kterého compose dostane do build-time množiny (a tím do `docker history`). ROHATKA JE OBOUSTRANNÁ: číslo smí jen KLESAT, a když klesne, musí se rovnou utáhnout — jinak by brána povolila návrat zpátky. Do 2026-09-03 tu stálo JEDNO číslo pro celý strom (ROHATKA_TAJEMSTVI = 60). To měřilo správnou věc, ale předpokládalo NEMĚNNOU množinu compose souborů: fork, který přidá vlastní službu, nutně přidá i tajemství, a jediná cesta dál bylo zvednout globální strop — tedy skrýt i expozici všech ostatních souborů. Per-soubor to jde přiznat adresně: nový compose se sem ZAPÍŠE se svým číslem, což je vědomý akt viditelný v diffu, a nad zbytkem stromu rohatka drží beze změny. Zbytek je tam kvůli `${SECRET:?}` uvnitř `environment:` — ta pojistka si hodnotu sama vynutí do buildu; náhrada (read-back doručení v coolify-sync-envs.sh) existuje, takže čísla mají kam klesat.",
+  "soubory": {
+    "docker-compose.coolify-admin.yml": 1,
+    "docker-compose.coolify-ai-chat.yml": 4,
+    "docker-compose.coolify-cosmos.yml": 1,
+    "docker-compose.coolify-domain-services.yml": 1,
+    "docker-compose.coolify-integration.yml": 4,
+    "docker-compose.coolify-keycloak.yml": 5,
+    "docker-compose.coolify-langfuse.yml": 1,
+    "docker-compose.coolify-livekit.yml": 3,
+    "docker-compose.coolify-llm-gateway.yml": 2,
+    "docker-compose.coolify-matrix.yml": 6,
+    "docker-compose.coolify-n8n.yml": 2,
+    "docker-compose.coolify-netbird.yml": 2,
+    "docker-compose.coolify-openclaw.yml": 2,
+    "docker-compose.coolify-pki.yml": 4,
+    "docker-compose.coolify-playwright.yml": 1,
+    "docker-compose.coolify-prebuilt.yml": 3,
+    "docker-compose.coolify-realtime.yml": 2,
+    "docker-compose.coolify-source-broker.yml": 4,
+    "docker-compose.coolify.yml": 12
+  }
+}

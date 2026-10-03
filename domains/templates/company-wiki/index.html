@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n-key="web.wiki.title">Northwind Handbook — the company wiki</title>
+    <meta name="description" data-i18n-key="web.wiki.description"
+      content="The open company handbook: how we work, our policies, and the things new joiners need to know." />
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar" data-section="topbar">
+      <div class="wrap">
+        <a class="brand" href="index.html">
+          <span class="brand__mark" aria-hidden="true">¶</span>
+          <span data-i18n-key="web.wiki.brand">Northwind Handbook</span>
+        </a>
+        <div class="search">
+          <input type="search" placeholder="Search the handbook…" data-i18n-key="web.wiki.search.placeholder" aria-label="Search" />
+        </div>
+        <nav class="topnav">
+          <a href="index.html" data-i18n-key="web.wiki.topnav.home">Home</a>
+          <a href="getting-started.html" data-i18n-key="web.wiki.topnav.handbook">Handbook</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <section class="hero" data-section="hero">
+        <h1 data-i18n-key="web.wiki.hero.heading">Everything we know, written down</h1>
+        <p data-i18n-key="web.wiki.hero.body">
+          The handbook is our single source of truth — how we work, what we've decided, and why.
+          It's public, it's versioned, and anyone can suggest an edit.
+        </p>
+        <div class="hero__search">
+          <input type="search" placeholder="Search 120+ articles…" data-i18n-key="web.wiki.hero.search" aria-label="Search articles" />
+        </div>
+      </section>
+
+      <section class="cats" data-section="categories">
+        <a class="cat" href="getting-started.html">
+          <span class="cat__icon" aria-hidden="true">🧭</span>
+          <h3 data-i18n-key="web.wiki.cat.1.title">Getting started</h3>
+          <p data-i18n-key="web.wiki.cat.1.desc">Your first week, the tools we use, and who to ask.</p>
+          <span class="cat__count" data-i18n-key="web.wiki.cat.1.count">12 articles</span>
+        </a>
+        <a class="cat" href="remote-work.html">
+          <span class="cat__icon" aria-hidden="true">🌍</span>
+          <h3 data-i18n-key="web.wiki.cat.2.title">How we work</h3>
+          <p data-i18n-key="web.wiki.cat.2.desc">Remote norms, meetings, and how decisions get made.</p>
+          <span class="cat__count" data-i18n-key="web.wiki.cat.2.count">18 articles</span>
+        </a>
+        <a class="cat" href="security-basics.html">
+          <span class="cat__icon" aria-hidden="true">🔐</span>
+          <h3 data-i18n-key="web.wiki.cat.3.title">Security &amp; data</h3>
+          <p data-i18n-key="web.wiki.cat.3.desc">Keeping accounts, devices and customer data safe.</p>
+          <span class="cat__count" data-i18n-key="web.wiki.cat.3.count">9 articles</span>
+        </a>
+      </section>
+
+      <section class="updated" data-section="updated">
+        <h2 data-i18n-key="web.wiki.updated.heading">Recently updated</h2>
+        <ul>
+          <li>
+            <a href="getting-started.html" data-i18n-key="web.wiki.updated.1.title">Welcome — your first week</a>
+            <span class="meta" data-i18n-key="web.wiki.updated.1.meta">Updated 2 days ago</span>
+          </li>
+          <li>
+            <a href="remote-work.html" data-i18n-key="web.wiki.updated.2.title">Working remotely, well</a>
+            <span class="meta" data-i18n-key="web.wiki.updated.2.meta">Updated last week</span>
+          </li>
+          <li>
+            <a href="security-basics.html" data-i18n-key="web.wiki.updated.3.title">Security basics everyone should know</a>
+            <span class="meta" data-i18n-key="web.wiki.updated.3.meta">Updated last week</span>
+          </li>
+        </ul>
+      </section>
+    </main>
+
+    <footer class="site-footer" data-section="footer">
+      <div class="wrap">
+        <span data-i18n-key="web.wiki.footer.name">Northwind Handbook</span>
+        <span data-i18n-key="web.wiki.footer.note">Open by default — edit history is public.</span>
+      </div>
+    </footer>
+  </body>
+</html>

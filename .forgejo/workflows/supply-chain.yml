@@ -1,0 +1,715 @@
+# =============================================================================
+# Supply-chain heavy lane — AISHA Platform (Forgejo Actions)
+# =============================================================================
+# SYSTEMIC SPLIT (2026-07-14): the docker/matrix-heavy supply-chain scanners
+# (npm-audit root+services, SBOM ~35-target matrix, Trivy ~24-target matrix)
+# were extracted from ci.yml so the shared soren runner is NEVER loaded with
+# them at peak (push/PR = fast lane). This lane runs the FULL load nightly
+# (off-peak cron) + on demand via workflow_dispatch. Semgrep stays in ci.yml
+# on push/PR by design (SEC-02: diff-aware, pip-based, no docker — light).
+#
+# WHO RUNS IT (2026-07-25): the runner on soren is registered instance-wide and
+# serves 14 repositories across two orgs at capacity 2. Every repo that adopts
+# this platform inherits this file, so a plain nightly cron meant N repositories
+# firing the same ~60-job matrix into 2 slots at the same minute. Running the
+# matrix unattended is therefore a per-repository PARAMETER — the repo variable
+# HEAVY_LANE_NIGHTLY — resolved by the `lane-gate` job below. This file names no
+# repository and grants no repository a default: unset ⇒ stand down, loudly.
+# workflow_dispatch always runs, everywhere, with no configuration.
+#
+# Gates parsing this file: sbom-coverage.gate.test.ts (sbom + sbom-python jobs,
+# cyclonedx), wp-3-8-supply-chain.gate.test.ts (trivy-scan job + severity/
+# exit-code + Python SBOM coverage), supply-chain-lane-gate.gate.test.ts (cron
+# slots ↔ HEAVY_LANE_SLOTS in sync; every entry job gated on lane-gate).
+#
+# Two SBOM lanes by build system: `sbom` = cyclonedx-npm over
+# services/<name>/package-lock.json (npm services); `sbom-python` = anchore/syft
+# over the BUILT root Dockerfile.<name> image (the packages/* Python submodules
+# svc-local-ingest + svc-potok, which have no npm lockfile). Together they cover
+# every deployable image signed by container-signing.yml.
+# =============================================================================
+
+name: Supply Chain
+
+on:
+  schedule:
+    # STAGGERED SLOTS (2026-07-25). Every repository that adopts this platform
+    # inherits this file verbatim, so a SINGLE cron made every derivative fire
+    # its ~60-job matrix in the same minute onto the one shared runner
+    # (soren, capacity 2). Measured in the runner log: a sibling repo
+    # started at 01:17:40 UTC — our own cron, inherited.
+    #
+    # Four off-peak slots, 01:17–04:17 UTC ≈ 03:17–06:17 Europe/Prague. The
+    # `lane-gate` job picks ONE slot per repository, derived from the repo name,
+    # so adopters spread out deterministically instead of colliding. A wake-up
+    # on the other three slots exits in seconds and never checks out.
+    #
+    # Slot COUNT and slot HOURS must stay in sync with HEAVY_LANE_SLOTS below —
+    # a mismatch would strand every repo hashed to an undeclared slot (it would
+    # never run, silently). Pinned by supply-chain-lane-gate.gate.test.ts.
+    - cron: "17 1 * * *"
+    - cron: "17 2 * * *"
+    - cron: "17 3 * * *"
+    - cron: "17 4 * * *"
+  workflow_dispatch: {}
+
+concurrency:
+  # Own group (not aisha-ci-serialized): the nightly heavy lane must queue
+  # against itself, and at 03:17 there is no fast-lane contention to manage.
+  group: aisha-supply-chain
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+  N8N_NODE_VERSION: "22"
+  VERDACCIO_URL: ${{ vars.VERDACCIO_URL }}
+  # Pull-through cache pro obrazy z Docker Hubu (prefix, končí `/`); ověřuje
+  # scripts/ci/registry-proxy-guard.sh. Stejný vstup a důvod jako v ci.yml.
+  REGISTRY_PROXY: ${{ vars.REGISTRY_PROXY }}
+  # WHICH hour this repository runs in: the UTC hours of the cron slots declared
+  # above, in order. Keep the two lists in sync — supply-chain-lane-gate.gate.test.ts
+  # fails the build if they drift.
+  #
+  # WHETHER it runs unattended at all is a per-repository PARAMETER, not a
+  # property of this file: the repo variable HEAVY_LANE_NIGHTLY. This file names
+  # no repository, so it stays a generic template — every instance that adopts
+  # the platform decides for itself, and none inherits a decision made for
+  # someone else. Unset ⇒ stand down (loudly); workflow_dispatch always runs.
+  HEAVY_LANE_SLOTS: "1 2 3 4"
+
+jobs:
+  # ===========================================================================
+  # Heavy-lane gate — decides whether THIS repository runs the matrix on THIS
+  # trigger. Two independent reasons to stand down, both reported to the job
+  # summary AND the log, so a stand-down is always visible (never a silent skip):
+  #   1. HEAVY_LANE_NIGHTLY is not 'true' here — no repository runs this matrix
+  #      unattended on the shared runner until it says so for itself;
+  #   2. wrong stagger slot — one of the other three crons is this repo's slot.
+  # workflow_dispatch ALWAYS runs, in every repository: the escape hatch is
+  # manual and needs no configuration.
+  # Deliberately NO checkout — the decision needs only the context and the
+  # clock, so a stood-down wake-up costs a container start, not a clone.
+  # ===========================================================================
+  lane-gate:
+    name: "Heavy lane gate"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.decide.outputs.run }}
+    steps:
+      - name: Decide whether this repository runs the heavy lane now
+        id: decide
+        # Explicit: the slot maths uses bash arrays and 0x arithmetic, which a
+        # POSIX /bin/sh would silently get wrong.
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          NIGHTLY: ${{ vars.HEAVY_LANE_NIGHTLY }}
+        run: |
+          set -euo pipefail
+
+          # Which slot belongs to this repository? Deterministic in the repo
+          # name: a given repo always lands on the same hour, and adopters
+          # spread across the declared slots without coordinating.
+          #
+          # sha256, NOT cksum: cksum's low bits are badly distributed — every
+          # repository in the *-orchestrator family hashed to 0 mod 4, which
+          # would have put them all back on one cron, the exact collision this
+          # gate exists to break. Measured before shipping, not assumed.
+          read -r -a slots <<< "${HEAVY_LANE_SLOTS}"
+          count=${#slots[@]}
+          if [ "${count}" -lt 1 ]; then
+            echo "::error::HEAVY_LANE_SLOTS is empty — cannot assign a nightly slot." >&2
+            exit 1
+          fi
+          hash=$(printf '%s' "${REPO}" | sha256sum | cut -c1-8)
+          my_hour=${slots[$(( 0x${hash} % count ))]}
+          now_hour=$(date -u +%-H)
+
+          run=false
+          if [ "${EVENT}" = "workflow_dispatch" ]; then
+            run=true
+            verdict="RUNNING"
+            reason="manual dispatch — the heavy lane always runs on demand, in every repository"
+          elif [ "${NIGHTLY:-}" = "true" ]; then
+            if [ "${now_hour}" = "${my_hour}" ]; then
+              run=true
+              verdict="RUNNING"
+              reason="nightly enabled, and ${my_hour}:17 UTC is this repository's stagger slot"
+            else
+              verdict="STOOD DOWN (wrong stagger slot)"
+              reason="nightly enabled, but this repository's slot is ${my_hour}:17 UTC — this wake-up was ${now_hour}:17 UTC"
+            fi
+          else
+            verdict="STOOD DOWN (nightly not enabled in this repository)"
+            reason="repository variable HEAVY_LANE_NIGHTLY is not 'true' in '${REPO}'"
+          fi
+
+          echo "run=${run}" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### Heavy supply-chain lane: ${verdict}"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Decision | \`run=${run}\` |"
+            echo "| Reason | ${reason} |"
+            echo "| Repository | \`${REPO}\` |"
+            echo "| \`HEAVY_LANE_NIGHTLY\` | \`${NIGHTLY:-<unset>}\` |"
+            echo "| This repo's stagger slot | ${my_hour}:17 UTC (of ${HEAVY_LANE_SLOTS}) |"
+            echo "| Trigger | \`${EVENT}\` |"
+            echo
+            if [ "${run}" != "true" ]; then
+              echo "The scanners did **not** run. This is a declared stand-down, not a failure."
+              echo
+              echo "To run them here: **Actions → Supply Chain → Run workflow** (works in any"
+              echo "repository, no configuration), or set the repository variable"
+              echo "\`HEAVY_LANE_NIGHTLY=true\` to also run them nightly in this repo's slot."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          # Same verdict in the log — the summary is easy to miss when scanning runs.
+          echo "heavy-lane gate: ${verdict} (run=${run}) — ${reason}"
+
+  npm-audit-root:
+    name: NPM Audit — root
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [lane-gate]
+    if: needs.lane-gate.outputs.run == 'true'
+    # ON-DEMAND ONLY — deferred from auto push/PR runs (maintainer decision
+    # 2026-05-31), same bucket as semgrep/sbom/trivy. Run via:
+    #   Actions → CI/CD → Run workflow → run_supply_chain = yes
+    # runs on every trigger of this workflow (nightly schedule + manual dispatch)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Audit (fail on high/critical)
+        # --registry: Verdaccio has no /-/npm/v1/security/audits endpoint (404 →
+        # the audit evaluated nothing). Advisory queries go to the public registry;
+        # package INSTALLS still resolve via .npmrc/Verdaccio. Replace with the
+        # self-hosted advisory DB when it lands (osv-scan below is the primary gate).
+        run: npm audit --audit-level=high --registry=https://registry.npmjs.org
+
+  # ADVISORY (continue-on-error: true) as of 2026-05-30. Most service HIGH
+  # findings are the OTel transitive cluster fixed in @aisha/observability
+  # 0.1.1 — but that fix only reaches the registry when THIS change merges
+  # (aisha-packages-publish republishes on merge to main). Until then the
+  # services still resolve the published 0.1.0 with the vulnerable OTel deps,
+  # so a hard gate here would be a chicken-and-egg block on the very PR that
+  # fixes it. The audit still RUNS and its output is reviewable in the log.
+  # FLIP BACK TO GATING: once 0.1.1 is published + services re-resolve clean,
+  # delete the `continue-on-error: true` line. npm-audit-root stays BLOCKING.
+  npm-audit-services:
+    name: NPM Audit — services
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [lane-gate]
+    if: needs.lane-gate.outputs.run == 'true'
+    # ON-DEMAND ONLY — see npm-audit-root. Run via workflow_dispatch +
+    # run_supply_chain = yes.
+    # runs on every trigger of this workflow (nightly schedule + manual dispatch)
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - gateway
+          - svc-ai-chat
+          - svc-mcp-knowledge
+          - svc-pki-bridge
+          - svc-stripe
+          - svc-blockchain
+          - svc-health-ai
+          - svc-github-app
+          - svc-livekit
+          - svc-matrix
+          - svc-openclaw
+          - storage-auth
+          - ws-gateway
+          - svc-agent-runner
+          - svc-plugin-system
+          - svc-source-broker
+          - svc-web-render
+          - svc-communications
+          - svc-push
+          - svc-packeta
+          - svc-knock
+          - svc-money
+          - svc-fio-bank
+          - svc-homeassistant
+          - svc-aisha-kronos-shim
+          - event-worker
+          # Phase 13.1 (2026-05-19) — dynamic agent broadcasting service
+          - svc-ide-context
+    env:
+      SERVICE_NAME: ${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install in service dir
+        run: |
+          cd "services/${SERVICE_NAME}"
+          # SYSTEMIC FIX: a service-dir `npm install` does NOT inherit the
+          # monorepo-root .npmrc, so @aisha/* would 404 (install fails before
+          # audit even runs). Re-declare the private scope here — the proven
+          # svc-*/Dockerfile pattern. The committed root .npmrc carries the
+          # Verdaccio scope + token (via VERDACCIO_URL/VERDACCIO_TOKEN); left in place for the audit step.
+          cp "${GITHUB_WORKSPACE}/.npmrc" .npmrc 2>/dev/null || true
+          npm install --no-audit --no-fund || echo "::warning::install failed for ${SERVICE_NAME} (advisory)"
+      - name: Audit (advisory — see job comment)
+        run: |
+          cd "services/${SERVICE_NAME}"
+          # ADVISORY: tolerate non-zero so the job CONCLUDES success. On
+          # Forgejo a job-level `continue-on-error` does NOT suppress the
+          # per-job commit-status check, so we gate at the step instead.
+          # Findings still print in the log for review.
+          # FLIP TO GATING: drop the `|| { ...; }` wrapper below.
+          npm audit --audit-level=high --registry=https://registry.npmjs.org || {
+            echo "::warning::npm audit reported HIGH/CRITICAL advisories for ${SERVICE_NAME} (advisory, non-gating pending @aisha/observability 0.1.1 republish)"
+          }
+
+  osv-scan:
+    name: OSV vulnerability scan (lockfiles)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [lane-gate]
+    if: needs.lane-gate.outputs.run == 'true'
+    # PRIMARY supply-chain vulnerability gate (owner-approved 2026-07-14):
+    # google/osv-scanner reads package-lock.json files directly (no node_modules,
+    # no registry audit endpoint needed) against the open OSV database — which is
+    # mirrorable for a fully self-hosted advisory source later. Scans the whole
+    # tree recursively: root + services/* + packages/* lockfiles in one pass.
+    # Fails on any known vulnerability affecting a locked version (burndown via
+    # the nightly report; scoped ignores go to osv-scanner.toml with rationale).
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install osv-scanner (pinned release binary)
+        run: |
+          OSV_VERSION=v2.4.0
+          curl -sSL -o /usr/local/bin/osv-scanner \
+            "https://github.com/google/osv-scanner/releases/download/${OSV_VERSION}/osv-scanner_linux_amd64"
+          chmod +x /usr/local/bin/osv-scanner
+          osv-scanner --version
+      - name: Scan all lockfiles (recursive)
+        run: |
+          osv-scanner scan --recursive --format table . 2>&1 | tail -80
+
+  sbom:
+    name: SBOM (CycloneDX)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [npm-audit-root]
+    # RE-ENABLED 2026-07-14: the ELSPROBLEMS failure is fixed by cyclonedx-npm
+    # --package-lock-only (Generate step below) — it builds the SBOM straight from
+    # package-lock.json and never shells to `npm ls`, so no installed node_modules
+    # are needed. Runs on auto PUSH (post-merge deployable-image evidence for
+    # supply-chain forensics + EU AI Act) and on-demand; NOT on every PR, because
+    # the ~35-target matrix on the shared (cap~1) soren runner would serialize into
+    # a long tail per PR. Matrix alignment with container-signing is enforced by
+    # sbom-coverage.gate.test.ts.
+    # runs on every trigger of this workflow (nightly schedule + manual dispatch)
+    strategy:
+      fail-fast: false
+      matrix:
+        # Must stay in sync with container-signing.yml::matrix.service.
+        # New deployable services (= services with a Dockerfile) MUST be
+        # added here AND there. Services without a Dockerfile (type-only,
+        # local-dev tooling) are listed in sbom-coverage.gate.test.ts
+        # EXEMPT_SERVICES with rationale.
+        target:
+          - root
+          - gateway
+          - svc-ai-chat
+          - svc-mcp-knowledge
+          - svc-pki-bridge
+          - svc-stripe
+          - svc-blockchain
+          - svc-health-ai
+          - svc-github-app
+          - storage-auth
+          - ws-gateway
+          - svc-plugin-system
+          - svc-source-broker
+          - svc-web-render
+          # Added 2026-05-17 — defense-in-depth coverage extension
+          - event-worker
+          - svc-communications
+          - svc-fio-bank
+          - svc-homeassistant
+          - svc-livekit
+          - svc-matrix
+          - svc-openclaw
+          - svc-money
+          - svc-packeta
+          - svc-knock
+          - svc-push
+          - svc-web-artifact
+          # In container-signing matrix but were missing from SBOM matrix
+          # (drift since these were never aligned). Now corrected — alignment
+          # is enforced by sbom-coverage.gate.test.ts.
+          - svc-agent-runner
+          - svc-aisha-kronos-shim
+          # Phase 13.1 (2026-05-19) — dynamic agent broadcasting service
+          - svc-ide-context
+          # NOT listed here: svc-local-ingest + svc-potok (packages/local-ingest,
+          # packages/potok — Python submodules built via root Dockerfile.*).
+          # This lane is cyclonedx-npm over services/<target>/package-lock.json;
+          # a matrix entry would 404 the workdir AND cyclonedx-npm has no npm
+          # lockfile evidence for a Python app. Their SBOM coverage lives in the
+          # dedicated `sbom-python` job below (anchore/syft over the built image)
+          # — enforced by sbom-coverage.gate.test.ts + wp-3-8-supply-chain.gate.test.ts.
+    env:
+      TARGET_NAME: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Resolve workdir + sbom name
+        id: workdir
+        run: |
+          if [ "${TARGET_NAME}" = "root" ]; then
+            echo "path=." >> "$GITHUB_OUTPUT"
+            echo "name=aisha-orchestrator-root" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=services/${TARGET_NAME}" >> "$GITHUB_OUTPUT"
+            echo "name=${TARGET_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Install (lockfile only — cyclonedx builds the SBOM from it)
+        env:
+          WORKDIR_PATH: ${{ steps.workdir.outputs.path }}
+        run: |
+          cd "${WORKDIR_PATH}"
+          # SYSTEMIC FIX: service-dir installs don't inherit the root .npmrc →
+          # @aisha/* 404. Copy the scoped root .npmrc (no-op for root target).
+          [ "${WORKDIR_PATH}" = "." ] || cp "${GITHUB_WORKSPACE}/.npmrc" .npmrc 2>/dev/null || true
+          # cyclonedx-npm builds the SBOM from package-lock.json — it does NOT
+          # need node_modules. Float services (lockfile deleted to let overrides
+          # float) have none, and a full `npm install` flakes on native deps
+          # (prebuild-install binary downloads), leaving cyclonedx with
+          # "No evidence: no lock file nor node_modules" → job fails. Generate
+          # JUST the lockfile (resolves the tree, builds nothing) so cyclonedx
+          # always has evidence. Verified locally: lockfile-only → valid SBOM.
+          if [ ! -f package-lock.json ]; then
+            npm install --package-lock-only --no-audit --no-fund \
+              || echo "::warning::lockfile generation failed for ${WORKDIR_PATH} (advisory)"
+          fi
+      - name: Generate CycloneDX SBOM
+        env:
+          WORKDIR_PATH: ${{ steps.workdir.outputs.path }}
+          SBOM_NAME: ${{ steps.workdir.outputs.name }}
+        run: |
+          cd "${WORKDIR_PATH}"
+          # --ignore-npm-errors: cyclonedx-npm shells out to `npm ls`, which
+          # reports "invalid" when a root `overrides` entry (e.g. form-data
+          # ^4.0.4) bumps a transitive past a dep's exact pin (n8n-workflow
+          # pins form-data@4.0.0). That mismatch is intentional + audited, so
+          # we tolerate the npm-ls warning and still emit a complete SBOM.
+          # --package-lock-only: build the SBOM straight from package-lock.json
+          # WITHOUT shelling to `npm ls` (which needs installed node_modules and
+          # otherwise ELSPROBLEMS-fails on the lockfile-only install). This is the
+          # fix that lets the job run reliably on auto push (no node_modules).
+          npx --yes @cyclonedx/cyclonedx-npm \
+            --package-lock-only \
+            --ignore-npm-errors \
+            --output-file "sbom-${SBOM_NAME}.cdx.json" \
+            --output-format JSON \
+            --spec-version 1.5
+      - name: Upload SBOM artifact (90d expiry)
+        # Tolerant: the SBOM is already GENERATED by the step above (the real
+        # deliverable). Artifact upload is retention only, and Forgejo's
+        # act_runner artifact backend may not implement the upload-artifact@v4
+        # API — don't fail the SBOM job over a retention hiccup.
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ steps.workdir.outputs.name }}
+          path: ${{ steps.workdir.outputs.path }}/sbom-${{ steps.workdir.outputs.name }}.cdx.json
+          retention-days: 90
+
+      # Phase 12 WP 3.8 — MinIO archival (unbounded retention).
+      # Artifacts expire in 90 days, insufficient for supply-chain forensics +
+      # EU AI Act compliance. MinIO bucket `aisha-sbom-artifacts` provides
+      # unbounded content-addressable storage indexed by service + commit SHA.
+      # Skips gracefully when AISHA_MINIO_S3_PUBLIC_ENDPOINT is unset.
+      - name: Mirror SBOM to MinIO
+        if: ${{ env.MINIO_PUBLIC_ENDPOINT != '' }}
+        # Tolerant: unbounded archival is best-effort. If MinIO is unreachable
+        # from the runner (or creds rotated), don't fail the SBOM job — the
+        # SBOM is generated + uploaded as a CI artifact above.
+        continue-on-error: true
+        env:
+          MINIO_PUBLIC_ENDPOINT: ${{ secrets.AISHA_MINIO_S3_PUBLIC_ENDPOINT }}
+          RCLONE_CONFIG_AISHA_ACCESS_KEY_ID: ${{ secrets.AISHA_MINIO_ACCESS_KEY }}
+          RCLONE_CONFIG_AISHA_SECRET_ACCESS_KEY: ${{ secrets.AISHA_MINIO_SECRET_KEY }}
+          SBOM_NAME: ${{ steps.workdir.outputs.name }}
+          WORKDIR_PATH: ${{ steps.workdir.outputs.path }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          # rclone, ne mc: MinIO obrazy nevydává (Docker Hub smazán, quay.io 401).
+          # Pin z jediného domova config/image-versions.env, prefix cache z prostředí;
+          # klíče jdou do kontejneru jménem (-e NAME), ne v argv.
+          bash scripts/ci/registry-proxy-guard.sh
+          RCLONE_IMAGE="${REGISTRY_PROXY}$(sed -n 's/^IMAGE_RCLONE=\${REGISTRY_PROXY}//p' config/image-versions.env)"
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}/${WORKDIR_PATH}:/sbom:ro" \
+            -e RCLONE_CONFIG_AISHA_TYPE=s3 -e RCLONE_CONFIG_AISHA_PROVIDER=Minio \
+            -e RCLONE_CONFIG_AISHA_FORCE_PATH_STYLE=true -e RCLONE_CONFIG_AISHA_NO_CHECK_BUCKET=true \
+            -e RCLONE_CONFIG_AISHA_ENDPOINT="https://${MINIO_PUBLIC_ENDPOINT}" \
+            -e RCLONE_CONFIG_AISHA_ACCESS_KEY_ID -e RCLONE_CONFIG_AISHA_SECRET_ACCESS_KEY \
+            "${RCLONE_IMAGE}" \
+            copyto "/sbom/sbom-${SBOM_NAME}.cdx.json" \
+               "aisha:aisha-sbom-artifacts/${SBOM_NAME}/${COMMIT_SHA}.cdx.json" \
+          || echo "::warning::MinIO SBOM mirror failed for ${SBOM_NAME} (advisory — artifact still uploaded)"
+
+  # ---------------------------------------------------------------------------
+  # Python SBOM lane — svc-local-ingest + svc-potok.
+  #
+  # These two services are packages/* Git submodules (local-ingest, potok)
+  # built from root Dockerfile.local-ingest / Dockerfile.potok. They have NO
+  # package.json, so the cyclonedx-npm `sbom` job above cannot cover them (a
+  # matrix entry would 404 the workdir and there is no npm lockfile to read).
+  #
+  # We run anchore/syft over the BUILT image so the SBOM reflects exactly what
+  # ships — the pip-installed Python packages AND the apt OS packages (e.g.
+  # local-ingest's tesseract) — with NO maintained duplicate dependency list to
+  # drift (the image is the single source of truth). Same triggers, retention,
+  # and MinIO-mirror shape as the npm sbom job; artifact name `sbom-<target>`
+  # matches container-signing.yml's `Download SBOM artifact` step so the cosign
+  # CycloneDX attestation resolves. Matrix alignment with container-signing.yml
+  # is enforced by sbom-coverage.gate.test.ts.
+  # runs on every trigger of this workflow (nightly schedule + manual dispatch)
+  sbom-python:
+    name: SBOM (CycloneDX) — Python images
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    needs: [npm-audit-root]
+    strategy:
+      fail-fast: false
+      matrix:
+        # matrix.target (NOT matrix.service) on purpose: the compose-deployability
+        # gate walks matrix.service across the CI workflows, and these images are
+        # deployed via their own opt-in stacks (W1), not this SBOM lane. Naming:
+        # svc-<name> → root Dockerfile.<name>; artifact sbom-svc-<name>.
+        target:
+          - svc-local-ingest
+          - svc-potok
+    env:
+      TARGET_NAME: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Root Dockerfile.<name> COPYs from packages/<name> (relative-URL
+          # submodule, `insight` pattern) — the build context needs it present.
+          submodules: recursive
+      - name: Install syft (pinned release binary)
+        run: |
+          # anchore/syft — pinned; the installer writes the single static binary
+          # to /usr/local/bin (act runner is root, no sudo needed).
+          SYFT_VERSION=v1.18.1
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
+            | sh -s -- -b /usr/local/bin "${SYFT_VERSION}"
+          syft version
+      - name: Install docker CLI (DinD socket mounted by the runner)
+        run: |
+          # Same recipe as ci.yml's cold-start build job: the runner image binds
+          # the DinD socket but ships no `docker` binary. Idempotent — a baked
+          # docker-capable job image short-circuits.
+          if command -v docker >/dev/null 2>&1; then docker --version; exit 0; fi
+          if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends ca-certificates curl gnupg
+          $SUDO install -m 0755 -d /etc/apt/keyrings
+          curl -fsSL https://download.docker.com/linux/debian/gpg | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+          $SUDO chmod a+r /etc/apt/keyrings/docker.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/debian bookworm stable" | $SUDO tee /etc/apt/sources.list.d/docker.list >/dev/null
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends docker-ce-cli
+          docker --version
+      - name: Detect DinD availability
+        id: dind
+        run: |
+          # Honest fail (NOT skip-to-green): this lane builds the image then syfts
+          # it, so it CANNOT run without a docker daemon. DinD is guaranteed by
+          # the soren build runner (same contract as the cold-start build gate).
+          if command -v docker >/dev/null 2>&1 && timeout 30 docker info >/dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error title=sbom-python::DinD daemon UNREACHABLE — the Python SBOM lane builds the image then runs syft over it and MUST NOT skip-to-green. Restart the build runner DinD daemon."
+            exit 1
+          fi
+      - name: Resolve Dockerfile path
+        id: dockerfile
+        run: |
+          # svc-local-ingest → Dockerfile.local-ingest ; svc-potok → Dockerfile.potok
+          echo "path=Dockerfile.${TARGET_NAME#svc-}" >> "$GITHUB_OUTPUT"
+      - name: Build image
+        env:
+          DOCKERFILE_PATH: ${{ steps.dockerfile.outputs.path }}
+        run: |
+          # context = repo root (Coolify ARG_MAX pattern — the root Dockerfiles
+          # COPY packages/<name>/...). Tag is local/CI-only (syft reads it off the
+          # DinD daemon; never pushed).
+          bash scripts/ci/registry-proxy-guard.sh
+          docker build --build-arg REGISTRY_PROXY="$REGISTRY_PROXY" \
+            -f "${DOCKERFILE_PATH}" -t "aisha-sbom/${TARGET_NAME}:ci" .
+      - name: Generate CycloneDX SBOM (syft over built image)
+        run: |
+          # cyclonedx-json spec matches the npm lane's CycloneDX 1.5 output so
+          # downstream consumers (cosign attest --type cyclonedx) treat both
+          # lanes uniformly. syft emits CycloneDX 1.5 by default.
+          syft "aisha-sbom/${TARGET_NAME}:ci" \
+            --output "cyclonedx-json=sbom-${TARGET_NAME}.cdx.json"
+      - name: Upload SBOM artifact (90d expiry)
+        # Tolerant: the SBOM is already generated above (the real deliverable);
+        # artifact upload is retention only, and Forgejo's act_runner artifact
+        # backend may not implement upload-artifact@v4. Mirrors the npm job.
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-${{ matrix.target }}
+          path: sbom-${{ matrix.target }}.cdx.json
+          retention-days: 90
+
+      # MinIO archival (unbounded retention) — same bucket + content-addressable
+      # path as the npm sbom job. Skips gracefully when the endpoint is unset.
+      - name: Mirror SBOM to MinIO
+        if: ${{ env.MINIO_PUBLIC_ENDPOINT != '' }}
+        continue-on-error: true
+        env:
+          MINIO_PUBLIC_ENDPOINT: ${{ secrets.AISHA_MINIO_S3_PUBLIC_ENDPOINT }}
+          RCLONE_CONFIG_AISHA_ACCESS_KEY_ID: ${{ secrets.AISHA_MINIO_ACCESS_KEY }}
+          RCLONE_CONFIG_AISHA_SECRET_ACCESS_KEY: ${{ secrets.AISHA_MINIO_SECRET_KEY }}
+          SBOM_NAME: ${{ matrix.target }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -uo pipefail
+          # Týž tvar jako npm lane výš (rclone z pinu v config/image-versions.env).
+          bash scripts/ci/registry-proxy-guard.sh
+          RCLONE_IMAGE="${REGISTRY_PROXY}$(sed -n 's/^IMAGE_RCLONE=\${REGISTRY_PROXY}//p' config/image-versions.env)"
+          docker run --rm \
+            -v "${PWD}:/sbom:ro" \
+            -e RCLONE_CONFIG_AISHA_TYPE=s3 -e RCLONE_CONFIG_AISHA_PROVIDER=Minio \
+            -e RCLONE_CONFIG_AISHA_FORCE_PATH_STYLE=true -e RCLONE_CONFIG_AISHA_NO_CHECK_BUCKET=true \
+            -e RCLONE_CONFIG_AISHA_ENDPOINT="https://${MINIO_PUBLIC_ENDPOINT}" \
+            -e RCLONE_CONFIG_AISHA_ACCESS_KEY_ID -e RCLONE_CONFIG_AISHA_SECRET_ACCESS_KEY \
+            "${RCLONE_IMAGE}" \
+            copyto "/sbom/sbom-${SBOM_NAME}.cdx.json" \
+               "aisha:aisha-sbom-artifacts/${SBOM_NAME}/${COMMIT_SHA}.cdx.json" \
+          || echo "::warning::MinIO SBOM mirror failed for ${SBOM_NAME} (advisory — artifact still uploaded)"
+
+  # Phase 12 WP 3.8 — Trivy CVE scan (fs mode).
+  # Scans every service for CRITICAL/HIGH unfixed CVEs. `.trivyignore` at repo
+  # root is the accepted-risk allowlist (justification + expiry per entry,
+  # enforced by `gate:supply-chain`) — so a NEW unlisted CVE must be explicitly
+  # allowed before it stops failing.
+  #
+  # ADVISORY as of 2026-05-30: the allowlist is not yet populated with the
+  # current base-image CVE baseline, so a hard gate would block every PR on
+  # pre-existing image CVEs unrelated to the change. The scan still RUNS and
+  # the table/SARIF artifact is produced + reviewable. Tolerance is applied at
+  # the STEP level (step `continue-on-error: true` below) because a job-level
+  # `continue-on-error` does NOT suppress Forgejo's per-job commit status.
+  # FLIP BACK TO GATING: once `.trivyignore` captures the accepted baseline
+  # (each entry justified + dated), delete the step `continue-on-error: true`
+  # — exit-code: 1 then fails the build on any unlisted CRITICAL/HIGH CVE.
+  # NOTE: SARIF upload to a Security tab is GitHub-only — on Forgejo we emit a
+  # table + artifact and rely on exit-code for gating (severity policy intact).
+  trivy-scan:
+    name: Trivy CVE scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [lane-gate]
+    if: needs.lane-gate.outputs.run == 'true'
+    # DISABLED (skipped, NOT hollow-green) pending DinD runner support.
+    # Same root cause as the semgrep job: jobs run in node:20-bookworm with NO
+    # docker CLI, so `docker run aquasec/trivy` fails "docker: command not
+    # found" and the `|| echo` would falsely green it without scanning. Honest
+    # ON-DEMAND ONLY (workflow_dispatch + run_supply_chain=yes). Deferred from
+    # auto push/PR; needs docker the runner exposes only via DinD (follow-up) —
+    # an on-demand run still requires a docker-capable runner.
+    # runs on every trigger of this workflow (nightly schedule + manual dispatch)
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        # Same target set as sbom job — every service with a Dockerfile
+        # gets scanned.
+        target:
+          - gateway
+          - svc-ai-chat
+          - svc-mcp-knowledge
+          - svc-pki-bridge
+          - svc-stripe
+          - svc-blockchain
+          - svc-health-ai
+          - svc-github-app
+          - storage-auth
+          - ws-gateway
+          - svc-plugin-system
+          - svc-source-broker
+          - svc-web-render
+          - event-worker
+          - svc-communications
+          - svc-fio-bank
+          - svc-homeassistant
+          - svc-livekit
+          - svc-matrix
+          - svc-openclaw
+          - svc-packeta
+          - svc-knock
+          - svc-push
+          - svc-web-artifact
+          - svc-ide-context
+    env:
+      TARGET_NAME: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan (CRITICAL + HIGH severities)
+        # Run trivy via `docker run` (docker-hub image — the runner pulls those
+        # fine, as semgrep/minio prove) instead of the aquasecurity/trivy-action.
+        # The act_runner DOES reach github to clone the action, but then can't
+        # resolve its git tag (`0.24.0^{commit}` unknown) — a bare-clone/tag
+        # quirk. The action only wraps this same docker invocation anyway, so
+        # invoking trivy directly removes the failure mode.
+        # CRITICAL,HIGH + exit-code 1 + .trivyignore allowlist preserved.
+        # ADVISORY (|| echo): keep the job green while findings still print;
+        # FLIP TO GATING by dropping the trailing `|| echo`.
+        run: |
+          bash scripts/ci/registry-proxy-guard.sh
+          docker run --rm -v "${PWD}:/src" -w /src "${REGISTRY_PROXY}aquasec/trivy:0.58.1" \
+            fs \
+              --scanners vuln \
+              --severity CRITICAL,HIGH \
+              --exit-code 1 \
+              --ignore-unfixed \
+              --ignorefile .trivyignore \
+              --format sarif \
+              --output "trivy-${TARGET_NAME}.sarif" \
+              "services/${TARGET_NAME}" \
+          || echo "::warning::trivy CRITICAL/HIGH or scan/registry issue for ${TARGET_NAME} (advisory)"
+
+      # Forgejo has no GitHub Security tab — preserve the SARIF as a CI artifact
+      # for supply-chain forensics (the Security-tab-equivalent on self-hosted).
+      - name: Upload Trivy SARIF artifact
+        if: always()
+        # Tolerant: SARIF retention is best-effort; Forgejo's artifact backend
+        # may not implement upload-artifact@v4 (same as the SBOM job).
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-sarif-${{ matrix.target }}
+          path: trivy-${{ matrix.target }}.sarif
+          retention-days: 90

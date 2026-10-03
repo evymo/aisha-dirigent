@@ -1,0 +1,74 @@
+{
+  "rag": {
+    "baseline": {
+      "title": "Retrieval-Qualität (letzte 7 Tage)",
+      "subtitle": "Nächtliche RAG-Auswertung gegen kuratiertes Golden-Q/A-Set",
+      "faithfulness": "Treue",
+      "faithfulnessHint": "Wie stark die Antwort durch den abgerufenen Kontext gestützt wird",
+      "answerRelevancy": "Antwortrelevanz",
+      "answerRelevancyHint": "Wie direkt die Antwort auf die Frage eingeht",
+      "contextPrecision": "Kontextpräzision",
+      "contextPrecisionHint": "Anteil der abgerufenen Chunks, die relevant waren",
+      "contextRecall": "Kontextabdeckung",
+      "contextRecallHint": "Anteil der benötigten Informationen, die abgerufen wurden",
+      "compositeScore": "Gesamtbewertung",
+      "evalRuns": "Auswertungsläufe",
+      "p90": "p90",
+      "p50": "p50",
+      "noData": "Noch keine Auswertungsdaten — führe zuerst den Nachtbatch aus",
+      "periodLabel": "Zeitraum",
+      "period24h": "Letzte 24 Stunden",
+      "period7d": "Letzte 7 Tage",
+      "period30d": "Letzte 30 Tage",
+      "embeddingModel": "Embedding-Modell",
+      "llmModel": "LLM",
+      "allProfiles": "Alle Profile"
+    },
+    "chip": {
+      "high": "Hohe Treue",
+      "medium": "Mittlere Treue",
+      "low": "Niedrige Treue — Antwort vor Nutzung prüfen",
+      "noData": "Nicht ausgewertet",
+      "tooltip": "Treue {{score}} · {{count}} Zitate"
+    },
+    "citations": {
+      "panelTitle": "Verwendete Quellen",
+      "empty": "Für diese Antwort sind keine Zitate vorhanden",
+      "toggleShow": "Quellen einblenden",
+      "toggleHide": "Quellen ausblenden",
+      "openItem": "Quelle öffnen",
+      "weight": "Gewicht {{value}}"
+    },
+    "feedback": {
+      "thumbsUp": "Antwort war korrekt",
+      "thumbsDown": "Antwort passt nicht",
+      "reasonPlaceholder": "Optional: Was war falsch?",
+      "submit": "Feedback senden",
+      "saved": "Danke, Ihr Feedback wurde gespeichert"
+    },
+    "quarantine": {
+      "title": "Wissens-Quarantäne",
+      "subtitle": "Vom Ingestion-Sicherheitsscanner markierte Inhalte prüfen",
+      "queueTitle": "Markierte und quarantänisierte Einträge",
+      "queueDescription": "Diese Einträge sind vom Retrieval ausgeblendet, bis sie wiederhergestellt werden",
+      "empty": "Keine markierten oder quarantänisierten Einträge",
+      "score": "Sicherheits-Score",
+      "reason": "Grund",
+      "reinstate": "Wiederherstellen",
+      "reinstateReasonPlaceholder": "Warum ist dieser Eintrag sicher? (Audit-Trail)",
+      "reasonRequired": "Begründung ist erforderlich",
+      "confirmReinstate": "Eintrag wiederherstellen",
+      "reinstated": "Eintrag wiederhergestellt",
+      "reinstatedDescription": "Der Eintrag ist wieder für das Retrieval sichtbar",
+      "reinstateError": "Wiederherstellung fehlgeschlagen"
+    },
+    "explainability": {
+      "panelTitle": "Wie diese Antwort verknüpft ist",
+      "empty": "Kein Graph-Kontext — aus den zitierten Quellen wurden noch keine vorgelagerten Konzepte oder verwandten Läufe abgeleitet",
+      "depthLabel": "{{depth}} Hop(s)",
+      "confidenceLabel": "{{pct}} % Konfidenz",
+      "viaSeeds": "über {{labels}}{{extra}}",
+      "moreSeeds": " und {{n}} weitere"
+    }
+  }
+}

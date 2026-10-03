@@ -1,0 +1,7 @@
+{
+  "_comment": "Ratchet baseline for src/tests/gates/destructive-ops-dry-run-coverage.gate.test.ts. UNGUARDED = destructive ops without a recognised DRY_RUN guard. Target: drive to ZERO over time. Update DOWNWARD when cleanup PRs reduce the count.",
+  "_generated_at": "2026-05-26T09:50:00Z",
+  "_last_iter": "post-netbird+self-scan-precision: (1) isEphemeralNetbirdConfigCleanup classifies `rm -rf /etc/netbird/*` as PROTECTED — the mesh-sidecar self-heal re-enroll idiom clears an ephemeral daemon-config dir re-provisioned from the setup-key every container start (same class as the literal /tmp and mktemp exemptions), reclassifying ALL 6 sidecars uniformly; (2) isLiteralStringMention now skips this scanner's own pattern-catalog `hint:`/`regex:` lines, which were self-matching (12 false positives). Both are precision fixes, NOT exceptions/allowlists — dropped 31 → 13, absorbing the 2 new local-ingest/potok sidecars with the count going DOWN, not up. Prior: isMktempBackedRm 30→29; isLiteralStringMention 48→30.",
+  "_known_remaining_unguarded": "13 genuine follow-up candidates (all pre-existing): container-config cleanups (matrix /synapse/*, pki /rendered find -exec rm), build-dir cleanups (mobile-app android/ios/Pods/DerivedData, mlx venv), cosmos init-node HOME_DIR, ci.yml throwaway coldstart `docker rm -f`. Two are true operational risks needing a DRY_RUN guard in follow-up PRs: scripts/insight-patches-apply.sh:76 `git clean -fd`; scripts/local-warmup.sh:222 `docker network rm`.",
+  "unguarded_count": 13
+}

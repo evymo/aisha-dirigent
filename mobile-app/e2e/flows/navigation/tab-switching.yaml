@@ -1,0 +1,23 @@
+appId: ${APP_ID}
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: tab-home
+    timeout: 30000
+- tapOn:
+    id: tab-stories
+- assertVisible:
+    id: projects-screen
+- tapOn:
+    id: tab-profile
+- assertVisible:
+    id: profile-screen
+- tapOn:
+    id: tab-wallet
+- assertVisible:
+    id: wallet-screen
+- tapOn:
+    id: tab-home
+- assertVisible:
+    id: home-screen

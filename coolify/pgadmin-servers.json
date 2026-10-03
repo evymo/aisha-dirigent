@@ -1,0 +1,14 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "Evymo PG17 (v2)",
+      "Group": "Production",
+      "Host": "db",
+      "Port": 5432,
+      "Username": "aisha_admin",
+      "MaintenanceDB": "postgres",
+      "SSLMode": "prefer",
+      "Comment": "Primary Evymo v2 database — PG17 with pgvector, pgcrypto vault, PostgREST roles"
+    }
+  }
+}

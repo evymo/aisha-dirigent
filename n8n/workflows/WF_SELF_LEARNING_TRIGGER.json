@@ -1,0 +1,253 @@
+{
+  "name": "WF_SELF_LEARNING_TRIGGER",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * *"
+            }
+          ]
+        }
+      },
+      "id": "slt-cron",
+      "name": "Daily 03:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "fn_get_trace_anomalies_24h",
+        "rpcParams": "{\"p_min_occurrences\": 3, \"p_max_results\": 10}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 15000,
+          "auditTrail": true
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "slt-fetch",
+      "name": "Fetch Trace Anomalies",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analyze trace anomalies from last 24h and generate improvement proposals\nconst traces = $input.first().json;\nconst anomalies = Array.isArray(traces) ? traces : (traces?.data || []);\n\nif (!anomalies.length) {\n  return [{ json: { proposals: [], reason: 'No anomalies found in last 24h' } }];\n}\n\nconst proposals = [];\n\nfor (const anomaly of anomalies) {\n  const category = anomaly.event_type === 'error' ? 'bug_fix'\n    : anomaly.event_type === 'slow_response' ? 'optimization'\n    : 'general';\n\n  proposals.push({\n    agent_slug: anomaly.agent_slug || 'dirigent',\n    title: `Auto-fix: ${anomaly.operation || 'unknown'} — ${anomaly.occurrences || 0} occurrences`,\n    description: `Pattern detected: ${anomaly.status || 'error'} in ${anomaly.operation || '?'}. `\n      + `Occurred ${anomaly.occurrences || 0}x in last 24h. `\n      + `Sample: ${JSON.stringify(anomaly.request_summary || {}).substring(0, 200)}`,\n    category,\n    metadata: {\n      source: 'self_learning_trigger',\n      anomaly_type: anomaly.event_type,\n      occurrences: anomaly.occurrences,\n      first_seen: anomaly.first_seen,\n      last_seen: anomaly.last_seen\n    }\n  });\n}\n\n// Rate limit: max 3 proposals per trigger run\nreturn [{ json: { proposals: proposals.slice(0, 3) } }];"
+      },
+      "id": "slt-analyze",
+      "name": "Analyze Patterns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-proposals",
+              "leftValue": "={{ $json.proposals.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "slt-check",
+      "name": "Has Proposals?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Split proposals array into individual items for sequential processing\nconst proposals = $input.first().json.proposals || [];\nreturn proposals.map(p => ({ json: p }));"
+      },
+      "id": "slt-split",
+      "name": "Split Proposals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_BASE_URL || 'http://localhost:5678' }}/webhook/self-learning",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 30000,
+          "allowUnauthorizedCerts": false
+        }
+      },
+      "id": "slt-call",
+      "name": "Call Self-Learning Loop",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "fn_log_ai_trace_event",
+        "rpcParams": "={\"p_event_type\": \"n8n_workflow\", \"p_agent_slug\": \"dirigent\", \"p_operation\": \"daily_trigger\", \"p_status\": \"ok\", \"p_request_summary\": {\"proposals_sent\": 1, \"proposal_title\": {{ JSON.stringify($json.title) }} }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 5000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "slt-log",
+      "name": "Log Trigger Result",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1560,
+        240
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// No anomalies detected — healthy system state (zero tokens consumed)\nreturn [{ json: { status: 'clean', message: 'No anomalies in last 24h — system healthy' } }];"
+      },
+      "id": "slt-noop",
+      "name": "Log No Findings",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Daily 03:00": {
+      "main": [
+        [
+          {
+            "node": "Fetch Trace Anomalies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Trace Anomalies": {
+      "main": [
+        [
+          {
+            "node": "Analyze Patterns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Patterns": {
+      "main": [
+        [
+          {
+            "node": "Has Proposals?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Proposals?": {
+      "main": [
+        [
+          {
+            "node": "Split Proposals",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log No Findings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Proposals": {
+      "main": [
+        [
+          {
+            "node": "Call Self-Learning Loop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Self-Learning Loop": {
+      "main": [
+        [
+          {
+            "node": "Log Trigger Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

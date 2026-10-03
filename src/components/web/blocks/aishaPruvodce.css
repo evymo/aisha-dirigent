@@ -1,0 +1,597 @@
+/* ==========================================================================
+   aishaPruvodce.css — scoped styles for the AishaPruvodceBlock runtime block.
+
+   Adapted from the aisha.guru standalone deck (private design repo
+   lib/pruvodce.css): same editorial-black + ember-orange identity, reworked
+   from a full-viewport slideshow into an embeddable section that lives under
+   the SPA header (and inside GrapeJS-rendered pages). Every selector is
+   scoped under .aisha-pruvodce; brand values are local custom properties so
+   a page's canvas_css can re-theme the deck without touching the component.
+   ========================================================================== */
+
+.aisha-pruvodce {
+  /* brand tokens (overridable from canvas_css) */
+  --ap-accent: #ff6a1a;
+  --ap-accent-dark: #e55a10;
+  --ap-surface: #0e0e10;
+  --ap-surface-2: #16161a;
+  --ap-line: rgba(255, 255, 255, 0.1);
+  --ap-text: #ffffff;
+  --ap-text-dim: rgba(255, 255, 255, 0.62);
+  --ap-skew: -23deg;
+
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: max(640px, calc(100vh - 120px));
+  background: var(--ap-surface);
+  color: var(--ap-text);
+  outline: none;
+  overflow: hidden;
+}
+
+/* ── Stage / slides ─────────────────────────────────────────────────────── */
+
+.aisha-pruvodce .ap-stage {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+  overflow-y: auto;
+}
+
+.aisha-pruvodce .ap-slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 48px 24px 96px;
+  animation: ap-slide-in 0.35s ease;
+}
+
+@keyframes ap-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aisha-pruvodce .ap-slide {
+    animation: none;
+  }
+}
+
+.aisha-pruvodce .ap-slide__inner {
+  width: 100%;
+  max-width: 860px;
+}
+
+.aisha-pruvodce .ap-slide__inner--center {
+  text-align: center;
+}
+
+.aisha-pruvodce .ap-slide__eyebrow {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ap-accent);
+  margin-bottom: 18px;
+}
+
+.aisha-pruvodce .ap-slide__h {
+  font-size: clamp(1.8rem, 4.4vw, 3.1rem);
+  font-weight: 900;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  margin: 0 0 20px;
+}
+
+.aisha-pruvodce .ap-accent {
+  color: var(--ap-accent);
+}
+
+.aisha-pruvodce .ap-slide__body {
+  font-size: clamp(1rem, 1.6vw, 1.18rem);
+  line-height: 1.65;
+  color: var(--ap-text-dim);
+  max-width: 640px;
+  margin: 0 0 8px;
+}
+
+.aisha-pruvodce .ap-slide__body strong {
+  color: var(--ap-text);
+}
+
+.aisha-pruvodce .ap-slide__body--center {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+.aisha-pruvodce .ap-slide__caption {
+  margin-top: 18px;
+  font-size: 0.88rem;
+  color: var(--ap-text-dim);
+  font-style: italic;
+}
+
+.aisha-pruvodce .ap-slide__cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  margin-top: 30px;
+}
+
+/* ── Buttons (slice = brand skew CTA, ghost = quiet link) ──────────────── */
+
+.aisha-pruvodce .ap-btn-slice {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 26px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--ap-text);
+  background: var(--ap-accent);
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  transform: skewX(var(--ap-skew));
+  transition: background 0.18s ease, opacity 0.18s ease;
+  opacity: 0.55;
+}
+
+.aisha-pruvodce .ap-btn-slice > * {
+  transform: skewX(calc(-1 * var(--ap-skew)));
+}
+
+.aisha-pruvodce .ap-btn-slice.is-ready {
+  opacity: 1;
+}
+
+.aisha-pruvodce .ap-btn-slice:hover {
+  background: var(--ap-accent-dark);
+}
+
+.aisha-pruvodce .ap-btn-ghost {
+  color: var(--ap-text-dim);
+  font-weight: 700;
+  font-size: 0.92rem;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.aisha-pruvodce .ap-btn-ghost:hover {
+  color: var(--ap-text);
+}
+
+.aisha-pruvodce .ap-arrow {
+  font-weight: 900;
+}
+
+/* ── Visualization shells ──────────────────────────────────────────────── */
+
+.aisha-pruvodce .ap-viz {
+  margin: 26px 0 0;
+  padding: 22px;
+  background: var(--ap-surface-2);
+  border: 1px solid var(--ap-line);
+}
+
+/* donkey */
+.aisha-pruvodce .ap-donkey {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 26px;
+  flex-wrap: wrap;
+}
+
+.aisha-pruvodce .ap-donkey__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 120px;
+}
+
+.aisha-pruvodce .ap-donkey__col svg {
+  width: 86px;
+  height: 86px;
+}
+
+.aisha-pruvodce .ap-donkey__lbl {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ap-text-dim);
+}
+
+.aisha-pruvodce .ap-donkey__lbl--genius {
+  color: var(--ap-accent);
+}
+
+.aisha-pruvodce .ap-donkey__arrow {
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--ap-accent);
+  white-space: nowrap;
+}
+
+/* models grid */
+.aisha-pruvodce .ap-models {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px;
+}
+
+.aisha-pruvodce .ap-models__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid var(--ap-line);
+}
+
+.aisha-pruvodce .ap-models__provider {
+  font-weight: 800;
+  font-size: 0.92rem;
+}
+
+.aisha-pruvodce .ap-models__line {
+  font-size: 0.8rem;
+  color: var(--ap-text-dim);
+}
+
+.aisha-pruvodce .ap-models__tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ap-accent);
+}
+
+/* context flow */
+.aisha-pruvodce .ap-ctx {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.aisha-pruvodce .ap-ctx__side {
+  flex: 1 1 240px;
+  max-width: 330px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px dashed var(--ap-line);
+}
+
+.aisha-pruvodce .ap-ctx__side--right {
+  border: 1px solid var(--ap-accent);
+}
+
+.aisha-pruvodce .ap-ctx__lbl {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ap-text-dim);
+}
+
+.aisha-pruvodce .ap-ctx__side--right .ap-ctx__lbl {
+  color: var(--ap-accent);
+}
+
+.aisha-pruvodce .ap-ctx__answer {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.aisha-pruvodce .ap-ctx__arrow {
+  align-self: center;
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: var(--ap-accent);
+}
+
+/* distribution bars */
+.aisha-pruvodce .ap-dist {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.aisha-pruvodce .ap-dist__row {
+  display: grid;
+  grid-template-columns: 90px 1fr 64px;
+  align-items: center;
+  gap: 14px;
+  font-size: 0.88rem;
+}
+
+.aisha-pruvodce .ap-dist__bar {
+  height: 10px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.aisha-pruvodce .ap-dist__bar span {
+  display: block;
+  height: 100%;
+}
+
+.aisha-pruvodce .ap-dist__pct {
+  font-weight: 700;
+  color: var(--ap-text-dim);
+  text-align: right;
+}
+
+/* use cases */
+.aisha-pruvodce .ap-usecases {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+}
+
+.aisha-pruvodce .ap-usecase {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--ap-line);
+}
+
+.aisha-pruvodce .ap-usecase__icon {
+  width: 22px;
+  height: 22px;
+  color: var(--ap-accent);
+}
+
+.aisha-pruvodce .ap-usecase__name {
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.aisha-pruvodce .ap-usecase__desc {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--ap-text-dim);
+}
+
+/* ── Quiz ──────────────────────────────────────────────────────────────── */
+
+.aisha-pruvodce .ap-quiz__qnum {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ap-accent);
+  margin-bottom: 14px;
+}
+
+.aisha-pruvodce .ap-quiz__q {
+  font-size: clamp(1.4rem, 3vw, 2.1rem);
+  font-weight: 900;
+  line-height: 1.15;
+  margin: 0 0 24px;
+}
+
+.aisha-pruvodce .ap-quiz__opts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.aisha-pruvodce .ap-quiz__opt {
+  display: grid;
+  grid-template-columns: 34px 1fr 28px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  text-align: left;
+  font-size: 0.98rem;
+  color: var(--ap-text);
+  background: var(--ap-surface-2);
+  border: 1px solid var(--ap-line);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.aisha-pruvodce .ap-quiz__opt:hover:not(.is-disabled) {
+  border-color: var(--ap-accent);
+}
+
+.aisha-pruvodce .ap-quiz__opt.is-disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.aisha-pruvodce .ap-quiz__opt.is-correct {
+  border-color: #4ade80;
+  opacity: 1;
+}
+
+.aisha-pruvodce .ap-quiz__opt.is-correct .ap-quiz__opt-mark {
+  color: #4ade80;
+}
+
+.aisha-pruvodce .ap-quiz__opt-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  font-weight: 800;
+  font-size: 0.85rem;
+  border: 1px solid var(--ap-line);
+}
+
+.aisha-pruvodce .ap-quiz__opt-mark {
+  font-weight: 900;
+  text-align: center;
+  color: var(--ap-text-dim);
+}
+
+.aisha-pruvodce .ap-quiz__hint {
+  margin: 18px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--ap-text-dim);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.aisha-pruvodce .ap-quiz__hint strong {
+  color: var(--ap-accent);
+}
+
+.aisha-pruvodce .ap-quiz__hint.is-visible {
+  opacity: 1;
+}
+
+.aisha-pruvodce .ap-quiz__next-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 22px;
+}
+
+/* ── Result ───────────────────────────────────────────────────────────── */
+
+.aisha-pruvodce .ap-result__score {
+  font-size: clamp(3rem, 8vw, 5rem);
+  font-weight: 900;
+  margin: 0 0 6px;
+  color: var(--ap-accent);
+}
+
+.aisha-pruvodce .ap-result__of {
+  font-size: 0.4em;
+  color: var(--ap-text-dim);
+}
+
+.aisha-pruvodce .ap-result__verdict {
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  font-weight: 900;
+  margin: 0 0 14px;
+}
+
+.aisha-pruvodce .ap-result__verdict.is-ready {
+  color: #4ade80;
+}
+
+.aisha-pruvodce .ap-result__verdict.is-soon {
+  color: var(--ap-accent);
+}
+
+.aisha-pruvodce .ap-result__body {
+  max-width: 560px;
+  margin: 0 auto;
+  font-size: 1.02rem;
+  line-height: 1.6;
+  color: var(--ap-text-dim);
+}
+
+/* ── Bottom navigation ────────────────────────────────────────────────── */
+
+.aisha-pruvodce .ap-nav {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 14px 22px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.55));
+}
+
+.aisha-pruvodce .ap-nav__arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  color: var(--ap-text);
+  background: var(--ap-surface-2);
+  border: 1px solid var(--ap-line);
+  cursor: pointer;
+  transition: border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.aisha-pruvodce .ap-nav__arrow:hover:not(:disabled) {
+  border-color: var(--ap-accent);
+}
+
+.aisha-pruvodce .ap-nav__arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.aisha-pruvodce .ap-progress {
+  flex: 1;
+  display: flex;
+  gap: 5px;
+}
+
+.aisha-pruvodce .ap-progress__step {
+  flex: 1;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.aisha-pruvodce .ap-progress__step.is-done {
+  background: var(--ap-accent);
+  opacity: 0.55;
+}
+
+.aisha-pruvodce .ap-progress__step.is-active {
+  background: var(--ap-accent);
+}
+
+.aisha-pruvodce .ap-nav__right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.aisha-pruvodce .ap-nav__counter {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ap-text-dim);
+  white-space: nowrap;
+}
+
+/* ── Small screens ────────────────────────────────────────────────────── */
+
+@media (max-width: 560px) {
+  .aisha-pruvodce .ap-slide {
+    padding: 32px 16px 110px;
+  }
+
+  .aisha-pruvodce .ap-dist__row {
+    grid-template-columns: 72px 1fr 52px;
+    gap: 8px;
+  }
+
+  .aisha-pruvodce .ap-nav {
+    gap: 10px;
+    padding: 10px 14px;
+  }
+}

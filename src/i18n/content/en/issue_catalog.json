@@ -1,0 +1,18 @@
+{
+  "downtime.description": "Unplanned outages and service unavailability",
+  "downtime.name": "Downtime",
+  "integration-errors.description": "Errors, failures or timeouts in integrations",
+  "integration-errors.name": "Integration errors",
+  "latency.description": "High response times and degraded system performance",
+  "latency.name": "Latency",
+  "memory-leak.description": "Memory leak and data-sync issues",
+  "memory-leak.name": "Memory leak",
+  "mood-changes.description": "Alert storms, false positives or monitoring noise",
+  "mood-changes.name": "Mood changes",
+  "sleep-issues.description": "Timeout errors and idle connection drops",
+  "sleep-issues.name": "Timeout issues",
+  "slow-queries.description": "Database bottlenecks and query optimization issues",
+  "slow-queries.name": "Slow queries",
+  "ui-glitches.description": "Visual bugs, rendering issues and layout problems",
+  "ui-glitches.name": "UI glitches"
+}

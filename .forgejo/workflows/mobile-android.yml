@@ -1,0 +1,131 @@
+# =============================================================================
+# Mobile: Android — postavit APK a (volitelně) rozeslat testerům
+# =============================================================================
+# ⛔ PROČ TAHLE ÚLOHA VZNIKLA (2026-09-08). Mobilní buildy byly JEDINÁ část
+# dodávky bez zastoupení v pipeline. Backend se po merge nasadí sám do dvaceti
+# minut; appka se nepostavila NIKDY, dokud ji někdo ručně nespustil na svém
+# počítači. Důsledek naměřen týž den: oprava klepátka ležela v mainu hodiny,
+# zatímco v telefonu byl pořád rozbitý build — a dvakrát se rozestavěný build
+# ztratil s restartem, protože ho dělal jeden konkrétní stroj, ne infrastruktura.
+#
+# ⭐ iOS TU ZÁMĚRNĚ NENÍ. Archiv vyžaduje macOS runner a podpisové certifikáty;
+# registrované runnery jsou jen `ubuntu-latest`. Slibovat iOS úlohu, která nemá
+# na čem běžet, by bylo horší než ji nemít — proto zůstává lokální
+# (`scripts/prepare-xcode-build.sh`) a tady je poznamenané PROČ.
+#
+# Spouští se ručně (`workflow_dispatch`), protože číslo buildu je rozhodnutí
+# člověka: každé odeslání spotřebuje jedno a zpátky se vzít nedá.
+name: "Mobile: Android"
+
+on:
+  workflow_dispatch:
+    inputs:
+      surface:
+        # ⛔ BEZ VÝCHOZÍ HODNOTY. Jméno povrchu je INSTANČNÍ DATO a tenhle
+        # repozitář je generický — hlídá to brána `instance-nazvy-nepatri-do-
+        # stack-kodu`. Kdo staví, ať řekne CO staví; uhodnutý výchozí povrch by
+        # navíc tiše postavil cizí appku.
+        description: "Povrch instance — adresář v surfaces/ overlay repa"
+        required: true
+      upload:
+        description: "Rozeslat testerům přes Firebase App Distribution"
+        required: false
+        default: "false"
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  android:
+    name: "Android: APK"
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # JDK 17 + Android SDK: jeden domov se sdíleným buildem Kiosk Admina
+      # (kiosk-balicky.yml). Proč bez `sudo` a proč ANDROID_HOME — v tom skriptu.
+      - name: JDK a Android SDK
+        run: bash scripts/ci/android-prostredi.sh "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;27.1.12297006"
+
+      # ⛔ BEZ OVERLAYE SE INSTANČNÍ APPKA POSTAVIT NEDÁ — nese identitu,
+      # google-services.json i version.json. Na rozdíl od `overlay-gates`, kde
+      # chybějící overlay jen varuje, je tady FAIL-CLOSED: build bez identity by
+      # vyrobil balík platformní aplikace se jménem instance, a to je horší než
+      # žádný build. (Naměřeno 2026-09-06 na `prepare-xcode-build.sh`.)
+      - name: Získat instanční overlay
+        env:
+          OVERLAY_REPO: ${{ secrets.INSTANCE_OVERLAY_REPO }}
+          OVERLAY_TOKEN_PRIMARY: ${{ secrets.REPO_API_TOKEN }}
+          OVERLAY_TOKEN_FALLBACK: ${{ secrets.FORGEJO_API_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${OVERLAY_REPO:-}" ]; then
+            echo "::error title=android::secret INSTANCE_OVERLAY_REPO není deklarovaný — instanční appku NELZE postavit."
+            exit 1
+          fi
+          for T in "${OVERLAY_TOKEN_PRIMARY:-}" "${OVERLAY_TOKEN_FALLBACK:-}"; do
+            [ -n "$T" ] || continue
+            if git clone --depth 1 "https://oauth2:${T}@${OVERLAY_REPO}" "${RUNNER_TEMP}/overlay" 2>/dev/null; then
+              echo "AISHA_INSTANCE_OVERLAY=${RUNNER_TEMP}/overlay/surfaces/${{ inputs.surface }}" >> "$GITHUB_ENV"
+              exit 0
+            fi
+          done
+          echo "::error title=android::overlay je deklarovaný, ale žádným z tokenů se nedal stáhnout."
+          exit 1
+
+      - name: Ověřit, že povrch v overlayi existuje
+        run: |
+          set -euo pipefail
+          if [ ! -d "$AISHA_INSTANCE_OVERLAY" ]; then
+            echo "::error title=android::povrch '${{ inputs.surface }}' v overlayi není. Dostupné:"
+            ls "${RUNNER_TEMP}/overlay/surfaces" 2>/dev/null || true
+            exit 1
+          fi
+          echo "povrch: $AISHA_INSTANCE_OVERLAY"
+
+      # Pořadí je dané: kořen → balíčky → mobil. Mobilní strom závisí na
+      # `@aisha/knock-protocol` přes `file:`, takže bez postavených balíčků
+      # spadne na místě, které s příčinou nesouvisí.
+      - name: Závislosti a sdílené balíčky
+        run: |
+          set -euo pipefail
+          bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+          npm run build:packages
+          bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh" --prefix mobile-app || npm --prefix mobile-app ci --no-audit --no-fund
+
+      - name: Postavit APK
+        working-directory: mobile-app
+        run: ./scripts/build-android.sh --apk
+
+      - name: Uložit APK jako artefakt
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-${{ inputs.surface }}
+          path: mobile-app/android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 30
+
+      # ⛔ ROZESLÁNÍ JE SAMOSTATNÉ ROZHODNUTÍ. Artefakt vzniká vždy; testerům se
+      # posílá jen na výslovný vstup a jen když je čím. Prázdný secret NENÍ
+      # důvod tiše přeskočit — build proběhl, takže se to hlásí nahlas.
+      - name: Rozeslat testerům (Firebase App Distribution)
+        if: ${{ inputs.upload == 'true' }}
+        working-directory: mobile-app
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-sa.json
+          FIREBASE_SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          FIREBASE_TESTER_GROUPS: ${{ secrets.FIREBASE_TESTER_GROUPS }}
+        run: |
+          set -euo pipefail
+          if [ -z "${FIREBASE_SA_JSON:-}" ]; then
+            echo "::error title=android::rozeslání vyžádáno, ale secret FIREBASE_SERVICE_ACCOUNT_JSON je prázdný. APK je v artefaktech."
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_SA_JSON" > "$GOOGLE_APPLICATION_CREDENTIALS"
+          npm install -g firebase-tools@13 >/dev/null 2>&1
+          ./scripts/build-android.sh --apk --skip-prebuild --upload

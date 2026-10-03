@@ -1,0 +1,97 @@
+{
+  "$schema": "../profiles.schema.json",
+  "id": "cloud-multi",
+  "app_name_prefix": null,
+  "description": "Multi-server Coolify deployment. Public *.${PUBLIC_TLD} via edge server, internal *.{server}.${INTERNAL_TLD} per backend server. Mesh OFF by default. TLDs + cookie domains come from operator env / config/domains.env — this file ships zero deployment-specific hostnames. Server identifiers (frontend/backend/experimental) are AISHA reference labels — forks override via their own profile copy or coolify/servers.json. See cloud-multi.json.example for the full AISHA reference mapping.",
+  "domain": {
+    "public_tld": null,
+    "internal_tld": null,
+    "internal_pattern": "{subdomain}.{server}.{internal_tld}",
+    "public_pattern": "{subdomain}.{public_tld}",
+    "mesh_tld": null,
+    "mesh_pattern": "{subdomain}.{mesh_tld}",
+    "_notes": "TLD values resolved by scripts/lib/derive-domains.mjs: env > profile (null here = operator must supply). Patterns stay declarative — they describe how subdomains compose with operator-set TLDs.",
+    "direct_scope": "no_mesh_internal"
+  },
+  "servers": [
+    "frontend",
+    "backend",
+    "experimental"
+  ],
+  "service_overrides": {
+    "core": {
+      "placement": "backend"
+    },
+    "keycloak": {
+      "placement": "backend"
+    },
+    "pki": {
+      "placement": "backend"
+    },
+    "integration": {
+      "placement": "backend"
+    },
+    "orchestration": {
+      "placement": "backend"
+    },
+    "observability": {
+      "placement": "backend"
+    },
+    "admin": {
+      "placement": "backend"
+    },
+    "messaging": {
+      "placement": "backend"
+    },
+    "edge": {
+      "placement": "frontend"
+    },
+    "netbird": {
+      "placement": "backend"
+    },
+    "registry": {
+      "placement": "frontend"
+    },
+    "monitoring": {
+      "placement": "frontend"
+    },
+    "ledger": {
+      "placement": "experimental"
+    },
+    "exec": {
+      "placement": "experimental"
+    },
+    "llm-gateway": {
+      "placement": "backend",
+      "legacy_env_var": "LLM_GATEWAY"
+    },
+    "openclaw": {
+      "placement": "backend",
+      "legacy_env_var": "OPENCLAW"
+    },
+    "local-ingest": {
+      "placement": "experimental"
+    },
+    "potok": {
+      "placement": "backend"
+    }
+  },
+  "tier_filter": [
+    "required",
+    "important",
+    "optional"
+  ],
+  "exclude": [],
+  "_exclude_notes": "monitoring (Dozzle) is now wired into coolify/manifests/aisha.manifest + the redeploy waves, so cold-start creates the aisha-monitoring app and the resolver's logs.* domain has a real deploy target (no cold-start-verify coverage FAIL). Was previously excluded pending that wiring.",
+  "mesh_default": false,
+  "oauth2": {
+    "cookie_domains": null,
+    "whitelist_domains": null,
+    "_notes": "Operator declares OAUTH2_COOKIE_DOMAINS + OAUTH2_WHITELIST_DOMAINS in .env-prod-backup. Resolver fills from env; null here means template-only. Multi-zone deploys (separate public + internal TLDs) need comma-separated values so OAuth2 Proxy scopes cookies across both zones (memory: feedback_oauth2_multi_zone_cookies.md)."
+  },
+  "oauth2_cookie_domains_per_server": null,
+  "ai": {
+    "execution_mode": "cloud",
+    "_note": "Rezidence dat AI (local | hybrid | cloud). Šablona drží dnešní chování platformy; instance s modelem uvnitř meshe deklaruje local."
+  }
+}

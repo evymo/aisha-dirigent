@@ -1,0 +1,277 @@
+{
+  "name": "WF_PROVIDER_HEALTH_PROBE",
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "node-trigger",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        300
+      ],
+      "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/get_providers_due_health_probe",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"p_min_interval_seconds\": 300, \"p_limit\": 50}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "node-list-providers",
+      "name": "List Providers Due Probe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        420,
+        300
+      ],
+      "onError": "stopWorkflow",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "node-split",
+      "name": "Split Per Provider",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        620,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Resolve probe URL + auth header per backend_kind.\n//\n// Strategy (OpenAI-compatible /v1/models is the lingua franca; works for\n// direct_cloud Anthropic/OpenAI/Google/HuggingFace, llm_gateway, vLLM, and\n// llmgateway.io. Ollama is the only outlier with /api/tags). When the\n// registry has a custom health_url, prefer it (operator override).\n\nconst input = $input.first().json;\nconst { slug, backend_kind, endpoint_url, health_url, auth_env_var } = input;\n\n// Trim trailing slashes for predictable concat\nconst baseUrl = String(endpoint_url || '').replace(/\\/+$/, '');\n\nlet probeUrl = health_url;\nif (!probeUrl) {\n  if (backend_kind === 'local_ollama') {\n    probeUrl = `${baseUrl}/api/tags`;\n  } else {\n    // direct_cloud + llm_gateway + local_vllm — all OpenAI-compatible\n    probeUrl = `${baseUrl}/v1/models`;\n  }\n}\n\n// Auth header — resolve env var at runtime. The env var name comes from the\n// registry row (auth_env_var). If it's not set in the n8n container env,\n// the probe goes through unauthenticated (some providers like Ollama don't\n// need auth at all; for others a 401 still counts as 'reachable' and we\n// treat it as healthy with a note).\nconst authToken = auth_env_var ? (process.env[auth_env_var] || '') : '';\nconst hasAuth = Boolean(authToken);\n\n// Anthropic uses x-api-key + version header instead of Authorization Bearer\nconst isAnthropic = String(endpoint_url || '').includes('api.anthropic.com');\n\nreturn [\n  {\n    json: {\n      ...input,\n      probe_url: probeUrl,\n      probe_started_at: Date.now(),\n      auth_header_name: isAnthropic ? 'x-api-key' : 'Authorization',\n      auth_header_value: isAnthropic ? authToken : `Bearer ${authToken}`,\n      has_auth: hasAuth,\n    },\n  },\n];"
+      },
+      "id": "node-resolve-probe",
+      "name": "Resolve Probe Target",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        820,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.probe_url }}",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "={{ $json.auth_header_name }}",
+              "value": "={{ $json.auth_header_value }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "id": "node-probe",
+      "name": "HTTP Probe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        300
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Classify probe result into status enum: healthy | degraded | down.\n//\n// Rules:\n//   * HTTP 2xx + latency < 3s + parseable response → healthy\n//   * HTTP 2xx + latency >= 3s → degraded (slow but works)\n//   * HTTP 401/403 → healthy (provider is up; auth issue is operator's,\n//     not provider's — resolver should keep considering it)\n//   * HTTP 4xx (other) → degraded (endpoint exists but rejects probe)\n//   * HTTP 5xx OR network error / timeout → down\n//\n// Failed probes (continueErrorOutput from HTTP node) come in as items with\n// a top-level `error` field set. The fallback path covers that.\n\nconst orig = $('Resolve Probe Target').first().json;\nconst probeStartedAt = Number(orig.probe_started_at || Date.now());\nconst latencyMs = Date.now() - probeStartedAt;\n\nlet status = 'unknown';\nlet detail = '';\n\nconst input = $input.first().json;\nconst httpStatus = Number(input.statusCode || input.status || 0);\n\nif (input.error) {\n  status = 'down';\n  detail = `network/timeout error: ${String(input.error).slice(0, 200)}`;\n} else if (httpStatus >= 200 && httpStatus < 300) {\n  status = latencyMs >= 3000 ? 'degraded' : 'healthy';\n  detail = `HTTP ${httpStatus} in ${latencyMs}ms`;\n} else if (httpStatus === 401 || httpStatus === 403) {\n  // Service is reachable; auth is the operator's problem, not the\n  // provider's reachability. We mark healthy so resolver keeps it in\n  // the pool — the actual API call will fail loud-fast with the same\n  // 401, and decisionProvenance will surface it.\n  status = 'healthy';\n  detail = `HTTP ${httpStatus} (auth issue — provider reachable; check ${orig.auth_env_var || 'auth'} env var)`;\n} else if (httpStatus >= 400 && httpStatus < 500) {\n  status = 'degraded';\n  detail = `HTTP ${httpStatus} (4xx — endpoint exists but rejects probe)`;\n} else if (httpStatus >= 500) {\n  status = 'down';\n  detail = `HTTP ${httpStatus} (5xx — provider error)`;\n} else {\n  status = 'down';\n  detail = `Unexpected status ${httpStatus}`;\n}\n\nreturn [\n  {\n    json: {\n      slug: orig.slug,\n      backend_kind: orig.backend_kind,\n      status,\n      latency_ms: latencyMs,\n      detail,\n      http_status: httpStatus,\n    },\n  },\n];"
+      },
+      "id": "node-classify",
+      "name": "Classify Probe Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/record_provider_health_result",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"p_slug\": \"{{ $json.slug }}\", \"p_status\": \"{{ $json.status }}\", \"p_latency_ms\": {{ $json.latency_ms }}, \"p_detail\": \"{{ ($json.detail || '').replace(/\"/g, '\\\\\"').slice(0, 480) }}\"}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "node-record",
+      "name": "Record Health Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1460,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "List Providers Due Probe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Providers Due Probe": {
+      "main": [
+        [
+          {
+            "node": "Split Per Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Per Provider": {
+      "main": [
+        [
+          {
+            "node": "Resolve Probe Target",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Probe Target": {
+      "main": [
+        [
+          {
+            "node": "HTTP Probe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Probe": {
+      "main": [
+        [
+          {
+            "node": "Classify Probe Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Classify Probe Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify Probe Result": {
+      "main": [
+        [
+          {
+            "node": "Record Health Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "pinData": {},
+  "versionId": "",
+  "triggerCount": 0,
+  "tags": [
+    {
+      "name": "autopilot"
+    },
+    {
+      "name": "health"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+ARG NETBIRD_BASE_IMAGE=netbirdio/management:0.70.0
+
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/busybox:1.37.0-musl AS busybox
+FROM ${NETBIRD_BASE_IMAGE}
+
+COPY --from=busybox /bin/busybox /bin/busybox

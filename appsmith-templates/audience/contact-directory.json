@@ -1,0 +1,101 @@
+{
+  "applicationName": "Audience: Contact Directory",
+  "version": 1,
+  "description": "Universal contact list with tier badges, tags, follow-ups, last communication. Operator's main entry point.",
+  "dataSources": [
+    {
+      "name": "aisha-postgrest",
+      "type": "PostgresREST",
+      "endpoint": "{{appsmith.env.POSTGREST_URL}}",
+      "headers": {
+        "Authorization": "Bearer {{appsmith.user.jwt}}"
+      }
+    }
+  ],
+  "queries": [
+    {
+      "name": "listContacts",
+      "dataSourceName": "aisha-postgrest",
+      "method": "GET",
+      "path": "/audience_admin_contact_directory_v",
+      "queryParams": {
+        "limit": "{{listContactsTable.pageSize}}",
+        "offset": "{{(listContactsTable.pageNo - 1) * listContactsTable.pageSize}}",
+        "order": "last_active_at.desc.nullslast"
+      }
+    },
+    {
+      "name": "searchContacts",
+      "dataSourceName": "aisha-postgrest",
+      "method": "POST",
+      "path": "/rpc/audience_admin_search_contacts",
+      "body": {
+        "p_query": "{{searchInput.text}}",
+        "p_filters": "{{tierFilter.selectedOptionValue ? { tier: tierFilter.selectedOptionValue } : {} }}",
+        "p_limit": 50
+      }
+    },
+    {
+      "name": "bulkTag",
+      "dataSourceName": "aisha-postgrest",
+      "method": "POST",
+      "path": "/rpc/audience_admin_bulk_tag",
+      "body": {
+        "p_actor_ids": "{{listContactsTable.selectedRows.map(r => r.user_id)}}",
+        "p_label": "{{tagInput.text}}"
+      }
+    }
+  ],
+  "widgets": [
+    {
+      "type": "Text",
+      "name": "title",
+      "text": "Audience: Contact Directory",
+      "style": "heading"
+    },
+    {
+      "type": "Container",
+      "name": "filterBar",
+      "children": [
+        { "type": "InputText", "name": "searchInput", "placeholder": "Search by name, email, business..." },
+        { "type": "Select", "name": "tierFilter", "options": [
+          { "label": "All", "value": "" },
+          { "label": "Registered", "value": "registered" },
+          { "label": "Active", "value": "active" },
+          { "label": "Qualified", "value": "qualified" },
+          { "label": "Partner", "value": "partner" }
+        ]},
+        { "type": "Button", "name": "applyFilters", "label": "Search", "onClick": "{{searchContacts.run()}}" }
+      ]
+    },
+    {
+      "type": "Table",
+      "name": "listContactsTable",
+      "dataSource": "{{searchContacts.data ?? listContacts.data}}",
+      "columns": [
+        { "field": "display_name", "label": "Name" },
+        { "field": "email", "label": "Email" },
+        { "field": "member_tier", "label": "Tier", "type": "badge" },
+        { "field": "audience_size", "label": "Audience" },
+        { "field": "tags", "label": "Tags", "type": "chips" },
+        { "field": "last_active_at", "label": "Last active", "type": "datetime" }
+      ],
+      "selectable": true,
+      "pageSize": 50,
+      "onRowClick": "navigate('/actor-detail', { user_id: row.user_id })"
+    },
+    {
+      "type": "Container",
+      "name": "bulkActions",
+      "visible": "{{listContactsTable.selectedRows.length > 0}}",
+      "children": [
+        { "type": "InputText", "name": "tagInput", "placeholder": "Tag name" },
+        { "type": "Button", "name": "bulkTagBtn", "label": "Apply tag to selected", "onClick": "{{bulkTag.run()}}" }
+      ]
+    }
+  ],
+  "permissions": {
+    "view": ["admin", "staff", "marketer"],
+    "edit": ["admin", "staff"]
+  }
+}

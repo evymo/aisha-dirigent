@@ -1,0 +1,51 @@
+{
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "module": "ESNext",
+    "moduleDetection": "force",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "noFallthroughCasesInSwitch": false,
+    "noImplicitAny": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ],
+      "@aisha/api-core": [
+        "./packages/api-core/src/index.ts"
+      ],
+      "@aisha/flowboard-core": [
+        "./packages/flowboard-core/src/index.ts"
+      ],
+      "@aisha/capture-ui": [
+        "./packages/capture-ui/src/index.ts"
+      ],
+      "@aisha/web-canvas": [
+        "./packages/web-canvas/src/index.ts"
+      ]
+    },
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2020",
+    "types": [
+      "vitest/globals"
+    ],
+    "useDefineForClassFields": true
+  },
+  "include": [
+    "src"
+  ],
+  "exclude": [
+    "node_modules",
+    "src/tests/extensions"
+  ]
+}

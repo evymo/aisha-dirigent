@@ -1,0 +1,16 @@
+{
+  "name": "aisha-dirigent-zed",
+  "version": "0.1.1",
+  "description": "AISHA Dirigent Zed extension — bundles the MCP stdio bridge it launches, generated from the monorepo Source of Truth via scripts/bundle-bridge.mjs.",
+  "type": "module",
+  "private": true,
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "gen:bridge": "node scripts/bundle-bridge.mjs",
+    "gen:bridge:check": "node scripts/bundle-bridge.mjs --check"
+  },
+  "dependencies": {}
+}

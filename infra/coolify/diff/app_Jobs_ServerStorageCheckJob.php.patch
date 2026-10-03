@@ -1,0 +1,39 @@
+--- stock/app_Jobs_ServerStorageCheckJob.php	2026-09-05 14:32:27
++++ live/app_Jobs_ServerStorageCheckJob.php	2026-09-05 14:32:29
+@@ -57,6 +57,36 @@
+             if (! $this->percentage) {
+                 return 'No percentage could be retrieved.';
+             }
++
++            // Disk pressure triggers the cleanup that already exists.
++            //
++            // Coolify ships both halves of this and never joined them: this job
++            // detects that a server is filling up and notifies, while CleanupDocker
++            // knows how to reclaim the space but only runs on its own cron. Between
++            // two cron runs a server can fill completely with nobody acting on it --
++            // measured on a build server that went from 31 GB of build cache to 48 GB
++            // in two hours while the daily cleanup was still 14 hours away.
++            //
++            // Deliberately gated on docker_cleanup_threshold, NOT on the notification
++            // threshold used above. They are separate settings answering separate
++            // questions -- when to tell someone, and when to act -- and they only look
++            // interchangeable because operators often set both to the same number.
++            // Cleaning on the notification threshold would clean whenever someone
++            // wanted to be told, which is not what they asked for.
++            $dockerCleanupThreshold = data_get($this->server, 'settings.docker_cleanup_threshold');
++            if ($dockerCleanupThreshold && $this->percentage >= $dockerCleanupThreshold) {
++                // Rate-limited so a server that stays above the threshold does not
++                // start a cleanup on every check; the first one has to finish and be
++                // given a chance to help before another is worth running.
++                RateLimiter::attempt(
++                    'disk-pressure-cleanup:'.$this->server->id,
++                    0,
++                    function () {
++                        DockerCleanupJob::dispatch($this->server);
++                    },
++                    3600,
++                );
++            }
+             if ($this->percentage > $serverDiskUsageNotificationThreshold) {
+                 $executed = RateLimiter::attempt(
+                     'high-disk-usage:'.$this->server->id,

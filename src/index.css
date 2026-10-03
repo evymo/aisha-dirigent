@@ -1,0 +1,540 @@
+@import url('/fonts/nunito-sans/fonts.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 0 0% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 10%;
+
+    /* Brand orange — canonical #FF6A1A (hsl 20 100% 55%) */
+    --primary: 20 100% 55%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 210 16% 95%;
+    --secondary-foreground: 0 0% 10%;
+
+    --muted: 210 16% 95%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 20 100% 88%;
+    --accent-foreground: 0 0% 10%;
+
+    --destructive: 0 85% 66%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 220 13% 85%;
+    --input: 220 13% 85%;
+    --ring: 20 100% 55%;
+
+    --radius: 0.5rem;
+
+    --brand: 20 100% 55%;
+    --brand-dark: 17 87% 48%;
+    --brand-light: 20 100% 88%;
+    --ink: 0 0% 10%;
+    --ink-light: 0 0% 16%;
+    --ink-dark: 0 0% 7%;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 0 0% 10%;
+    --sidebar-primary: 20 100% 55%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 210 16% 95%;
+    --sidebar-accent-foreground: 0 0% 10%;
+    --sidebar-border: 220 13% 85%;
+    --sidebar-ring: 20 100% 55%;
+
+    /* Motion — dvě tier-based dvojice (state vs editorial) */
+    --ease-state: ease-in-out;
+    --duration-state: 200ms;
+    --ease-editorial: cubic-bezier(0.16, 1, 0.3, 1);
+    --duration-editorial: 600ms;
+
+    /* Brand motif geometry */
+    --skew-angle: -23deg;
+    --skew-angle-soft: -22deg;
+    --skew-hover: -15deg;
+
+    /* Solid offset block — substituce drop-shadows pro fotky/portréty */
+    --shadow-block-gray: 110px 85px 0 hsl(0 0% 96%);
+    --shadow-block-brand: 110px 85px 0 hsl(20 100% 55% / 0.12);
+  }
+
+  /* Dark mode = the AISHA editorial near-black surface (brand orange kept).
+     Brand orange mirrors packages/design-tokens/tokens.json (the SoT). The
+     softer LIGHT product surface above is intentionally left unchanged. */
+  .dark {
+    --background: 0 0% 6%;
+    --foreground: 0 0% 98%;
+
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 20 100% 55%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 0 0% 13%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 13%;
+    --muted-foreground: 220 9% 65%;
+
+    --accent: 17 87% 48%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 16%;
+    --input: 0 0% 16%;
+    --ring: 20 100% 55%;
+
+    --sidebar-background: 0 0% 7%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 20 100% 55%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 0 0% 13%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 16%;
+    --sidebar-ring: 20 100% 55%;
+
+    --shadow-block-gray: 110px 85px 0 hsl(0 0% 10%);
+  }
+}
+
+/* =====================================================
+   Story Canvas tokens (--sc-*)
+   Used by GrapesJS block templates via inline var() refs.
+   Duplicated into buildCanvasCss() for the editor iframe.
+   ===================================================== */
+:root {
+  --sc-brand: #FF6A1A;
+  --sc-brand-tint-15: rgba(255, 106, 26, 0.15);
+  --sc-brand-tint-10: rgba(255, 106, 26, 0.1);
+  --sc-ink: #1A1A1A;
+  --sc-surface-dark: #2D2D2D;
+  --sc-surface-footer: #111;
+  --sc-text-body: #333;
+  --sc-text-medium: #444;
+  --sc-text-muted: #666;
+  --sc-text-subtle: #aaa;
+  --sc-text-light: #ccc;
+  --sc-text-footer: #9ca3af;
+  --sc-white: #fff;
+  --sc-surface-light: #fafafa;
+  --sc-surface-lighter: #f8f8f8;
+  --sc-border: #e5e5e5;
+  --sc-border-input: #d1d5db;
+  --sc-shadow-subtle: rgba(0, 0, 0, 0.1);
+  --sc-font-family: 'Nunito Sans', sans-serif;
+  /* Workflow block accent colors */
+  --sc-wf-meeting: #60a5fa;
+  --sc-wf-questionnaire: #a78bfa;
+  --sc-wf-consent: #34d399;
+  --sc-wf-action: #fb923c;
+  --sc-wf-info: #94a3b8;
+  --sc-wf-text: #6b7280;
+}
+
+/* =====================================================
+   Color Scheme Overrides (applied per-section via class)
+   Each .sc-scheme-* class overrides --sc-* tokens locally.
+   Schemes are orthogonal to layout variants.
+   ===================================================== */
+
+.sc-scheme-warm-sunset {
+  --sc-brand: #E85D26;
+  --sc-brand-tint-15: rgba(232, 93, 38, 0.15);
+  --sc-brand-tint-10: rgba(232, 93, 38, 0.10);
+  --sc-ink: #2C1810;
+  --sc-surface-dark: #3D2014;
+  --sc-text-body: #4A2C1A;
+  --sc-text-medium: #5C3A24;
+  --sc-surface-light: #FFF8F4;
+  --sc-surface-lighter: #FFF5EF;
+}
+
+.sc-scheme-cool-ocean {
+  --sc-brand: #2563EB;
+  --sc-brand-tint-15: rgba(37, 99, 235, 0.15);
+  --sc-brand-tint-10: rgba(37, 99, 235, 0.10);
+  --sc-ink: #0F172A;
+  --sc-surface-dark: #1E293B;
+  --sc-text-body: #1E3A5F;
+  --sc-text-medium: #2D4A6F;
+  --sc-surface-light: #F0F7FF;
+  --sc-surface-lighter: #F5F9FF;
+}
+
+.sc-scheme-forest-green {
+  --sc-brand: #16A34A;
+  --sc-brand-tint-15: rgba(22, 163, 74, 0.15);
+  --sc-brand-tint-10: rgba(22, 163, 74, 0.10);
+  --sc-ink: #14291A;
+  --sc-surface-dark: #1A3D24;
+  --sc-text-body: #1C4428;
+  --sc-text-medium: #2D5A3A;
+  --sc-surface-light: #F0FDF4;
+  --sc-surface-lighter: #F5FFF8;
+}
+
+.sc-scheme-dark-elegant {
+  --sc-brand: #A78BFA;
+  --sc-brand-tint-15: rgba(167, 139, 250, 0.15);
+  --sc-brand-tint-10: rgba(167, 139, 250, 0.10);
+  --sc-ink: #E2E8F0;
+  --sc-surface-dark: #0F0F23;
+  --sc-surface-footer: #08081A;
+  --sc-text-body: #CBD5E1;
+  --sc-text-medium: #94A3B8;
+  --sc-text-muted: #64748B;
+  --sc-white: #1E1E3A;
+  --sc-surface-light: #1A1A35;
+  --sc-surface-lighter: #16162E;
+  --sc-border: #334155;
+}
+
+.sc-scheme-soft-lavender {
+  --sc-brand: #8B5CF6;
+  --sc-brand-tint-15: rgba(139, 92, 246, 0.15);
+  --sc-brand-tint-10: rgba(139, 92, 246, 0.10);
+  --sc-ink: #1E1033;
+  --sc-surface-dark: #2D1B4E;
+  --sc-text-body: #3B2463;
+  --sc-text-medium: #4C3575;
+  --sc-surface-light: #FAF5FF;
+  --sc-surface-lighter: #FDF8FF;
+}
+
+.sc-scheme-neutral-slate {
+  --sc-brand: #64748B;
+  --sc-brand-tint-15: rgba(100, 116, 139, 0.15);
+  --sc-brand-tint-10: rgba(100, 116, 139, 0.10);
+  --sc-ink: #0F172A;
+  --sc-surface-dark: #1E293B;
+  --sc-text-body: #334155;
+  --sc-text-medium: #475569;
+  --sc-surface-light: #F8FAFC;
+  --sc-surface-lighter: #F1F5F9;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Nunito Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Headings: balanced wrap a heavy weight platí všude (admin i marketing).
+     Display uppercase + 0.3em tracking je marketingové gesto — scopováno na
+     surface flagy nebo třídu `.marketing` aby admin tabulky/labels nekřičely. */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Nunito Sans', sans-serif;
+    font-weight: 800;
+    text-wrap: balance;
+  }
+
+  /* ⛔ OBSAH Z EDITORU NENÍ MARKETINGOVÝ POVRCH PLATFORMY.
+     Stránka složená v page builderu si nese VLASTNÍ kompletní design
+     (canvas_css), včetně vlastní typografie. Tohle gesto se do ní ale
+     vlévalo, protože sedí uvnitř `.marketing` — a plátno ho nepřebilo,
+     protože `text-transform` ani `letter-spacing` vůbec nedeklaruje.
+
+     Naměřeno 2026-08-31 na živém webu: VŠECH 39 nadpisů veřejné stránky
+     bylo verzálkami s prostrkáním 0,3 em (h2 dokonce 10,8 px), zatímco
+     předloha webu instance je má normální. Vedlejší škoda: nadpis
+     karty „CHANNELS" se kvůli prostrkání nevešel do svého boxu (178 px
+     ve 146 px) a roztlačil celou mřížku o 7 px.
+
+     `:not(:where(…))` drží specificitu na nule, takže výjimka nemění
+     pořadí ničeho jiného. */
+  :where(.marketing, [data-surface="marketing"])
+    :is(h1, h2, h3, h4, h5, h6):not(:where(.gjs-page-content *)) {
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+  }
+
+  /* Hero / display heading — větší tracking-relax (≈ 0.0473em) */
+  :where(.marketing, [data-surface="marketing"])
+    :is(h1, .display-1):not(:where(.gjs-page-content *)) {
+    letter-spacing: 0.05em;
+  }
+
+  /* Eyebrow nadpisy v sekcích — orange, malé, hodně tracking */
+  :where(.marketing, [data-surface="marketing"]) :is(h3) {
+    color: hsl(var(--brand));
+  }
+
+  /* Selection color — brand tint */
+  ::selection {
+    background: hsl(var(--brand) / 0.25);
+    color: hsl(var(--ink));
+  }
+
+  ::-moz-selection {
+    background: hsl(var(--brand) / 0.25);
+    color: hsl(var(--ink));
+  }
+
+  /* Custom scrollbar — subtle, elegant */
+  ::-webkit-scrollbar {
+    width: 5px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--ink));
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--brand) / 0.25);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--brand) / 0.4);
+  }
+
+  /* Smooth scroll for anchor links */
+  html {
+    scroll-behavior: smooth;
+    scrollbar-color: hsl(var(--brand) / 0.25) hsl(var(--ink));
+    scrollbar-width: thin;
+  }
+}
+
+@layer utilities {
+  /* Hero photo overlay — top-to-bottom black fade (1 → 0). Aplikovat na ::after
+     nad full-bleed photo, aby bílý display text nad ní zůstal čitelný. */
+  .photo-overlay {
+    position: relative;
+  }
+  .photo-overlay::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(180deg, hsl(0 0% 0% / 0.7) 0%, hsl(0 0% 0% / 0.2) 100%);
+  }
+  .photo-overlay-soft::after {
+    background: linear-gradient(180deg, hsl(0 0% 0% / 0.3) 0%, hsl(0 0% 0% / 0) 100%);
+  }
+
+  /* Subtle animated fade-in for scroll reveals */
+  .reveal-up {
+    animation: fade-in-up 0.6s var(--ease-editorial) both;
+  }
+
+  /* ===== BRAND SLICE — the −23° signature plate ====================
+     Solid orange (or gray) skewed block sitting behind text. The slice
+     bleeds off-canvas via `inset: 0 0 0 -9999px` — that's how it reads
+     as "sliced into the page" rather than "boxed inside a card".
+     Use sparingly — once per section as a visual anchor, not on every
+     headline. Hover relaxes from −23° → −15° in 200ms ease-in-out. */
+  .brand-slice {
+    position: relative;
+    display: inline-block;
+    padding: 12px 28px;
+    color: hsl(var(--primary-foreground));
+    z-index: 1;
+    isolation: isolate;
+  }
+  .brand-slice::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 0 -9999px;
+    background: hsl(var(--brand));
+    transform: skew(var(--skew-angle));
+    transform-origin: right bottom;
+    transition: transform var(--duration-state) var(--ease-state),
+                background-color var(--duration-state) var(--ease-state);
+    z-index: -1;
+  }
+  .brand-slice:hover::before {
+    transform: skew(var(--skew-hover));
+    background: hsl(var(--brand-dark));
+  }
+  /* Right-anchored variant — slice bleeds off the right edge instead. */
+  .brand-slice--right::before {
+    inset: 0 -9999px 0 0;
+    transform-origin: left top;
+  }
+  /* Gray variant — for muted location callouts / quiet anchors. */
+  .brand-slice--muted {
+    color: hsl(var(--ink));
+  }
+  .brand-slice--muted::before {
+    background: hsl(0 0% 96%);
+  }
+  .brand-slice--muted:hover::before {
+    background: hsl(0 0% 92%);
+  }
+
+  /* ===== OFFSET BLOCK FRAME — the brand "shadow" ===================
+     Solid gray block offset 110×85px behind imagery. Reads as Cubist
+     offset rather than soft elevation. Ideal for specialist portraits,
+     hero feature photos, methodology diagrams. */
+  .offset-block-frame {
+    position: relative;
+    display: inline-block;
+    box-shadow: var(--shadow-block-gray);
+  }
+  .offset-block-frame--brand {
+    box-shadow: var(--shadow-block-brand);
+  }
+  /* Compact variant for smaller portraits — half the offset. */
+  .offset-block-frame--sm {
+    box-shadow: 56px 44px 0 hsl(0 0% 96%);
+  }
+
+  /* ===== SKEW UTILITIES =============================================
+     Lower-level helpers if you need to roll a custom skewed surface.
+     Prefer .brand-slice unless you have a specific reason. */
+  .skew-brand {
+    transform: skew(var(--skew-angle));
+    transform-origin: right bottom;
+  }
+  .skew-brand-soft {
+    transform: skew(var(--skew-angle-soft));
+    transform-origin: left bottom;
+  }
+
+  /* ===== BUTTON ACCENT (subtle skew underlay) =======================
+     Used as the default ::before on shadcn Button (variant: default).
+     Decorative low-opacity slice on top of solid bg-primary — keeps
+     CTA looking like a regular button while echoing the brand motif. */
+  .btn-skewed {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+  }
+  .btn-skewed::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: currentColor;
+    opacity: 0.14;
+    transform: skew(var(--skew-angle-soft));
+    transform-origin: left bottom;
+    transition: transform var(--duration-state) var(--ease-state);
+  }
+  .btn-skewed:hover::before {
+    transform: skew(var(--skew-hover));
+  }
+}
+
+@layer components {
+  /* Refined card with gold top-edge accent */
+  .card-accent-top {
+    position: relative;
+  }
+
+  .card-accent-top::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 24px;
+    right: 24px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(23 100% 55% / 0.4), transparent);
+  }
+
+  /* Section label — small uppercase tracking */
+  .section-label {
+    @apply text-xs font-sans font-medium tracking-[0.2em] uppercase;
+    color: hsl(23 100% 55%);
+  }
+
+  .shortcut-hint {
+    @apply inline-flex items-center rounded border border-border bg-secondary px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground;
+  }
+
+  .admin-density table {
+    font-size: 0.8125rem;
+  }
+
+  .admin-density table thead th {
+    height: 2.25rem;
+    padding: 0.45rem 0.6rem;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .admin-density table tbody td {
+    padding: 0.45rem 0.6rem;
+    vertical-align: middle;
+  }
+
+  .admin-density table tbody tr {
+    min-height: 2.25rem;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Editor plátna (GrapesJS) — výška se musí PŘEDAT celým řetězem.
+
+   ⛔ NAMĚŘENO 2026-09-08 na produkci. Plátno editoru zabíralo proužek vlevo
+   nahoře, zbytek okna zůstal prázdný. Změřeno v DOM:
+
+       .gjs-editor-wrapper   1600 x 1600   ← rodič výšku NABÍZÍ
+       .gjs-editor-cont       647 x  279
+       .gjs-editor            647 x  279
+       .gjs-cv-canvas         647 x  279
+       .gjs-frames            647 x  150   ← článek, který nikdo neviděl
+       .gjs-frame-wrapper     647 x  150
+       iframe.gjs-frame       300 x  150   ← VÝCHOZÍ rozměr <iframe> dle HTML
+
+   ⭐ TO `300 x 150` NIKDO NENASTAVIL. Je to tovární velikost, kterou dává
+   prohlížeč `<iframe>`, když mu nikdo nezadá jinou. Plátno tedy nemělo
+   „špatnou výšku" — nedostalo ŽÁDNOU a spadlo na hodnotu ze specifikace.
+
+   Řetěz má šest článků a stačí, aby výšku neměl JEDEN: `height: 100%` se
+   počítá z rodiče, takže první uzel bez výšky utne všechny pod sebou. Nejdéle
+   se hledal `.gjs-frames` — leží mezi plátnem a rámem, v DOM není vidět a
+   žádný z okolních prvků na něj neukazuje.
+
+   Ověřeno naživo v prohlížeči: po doplnění výšky se řetěz srovnal
+   (647 x 534 na okně 794 px) a rám přestal být 150 px vysoký.
+   ───────────────────────────────────────────────────────────────────────── */
+.gjs-editor-cont,
+.gjs-editor,
+.gjs-cv-canvas,
+.gjs-cv-canvas__frames,
+.gjs-frames,
+.gjs-frame-wrapper,
+.gjs-frame-wrapper iframe.gjs-frame {
+  height: 100%;
+}
+
+/* Rám musí vyplnit i na šířku — jinak zůstane na továrních 300 px. */
+.gjs-frame-wrapper,
+.gjs-frame-wrapper iframe.gjs-frame {
+  width: 100%;
+}
+
+/* Wrapper potřebuje DEFINITNÍ výšku, ne procenta — ta ale NEPATŘÍ sem.
+   ⛔ NAMĚŘENO 2026-09-14: pravidlo `height: calc(100vh - 16rem)` tu nikdy
+   neplatilo, @grapesjs/react dává wrapperu inline `height: 100%`, který ho
+   přebije. A i kdyby platilo, 16rem je výška hlavičky na jednom displeji.
+   Výšku teď nastavuje obal plátna v CanvasEditoru podle VIDITELNÉ PLOCHY
+   okna (src/lib/builder/vyskaPlatna.ts); wrapper z ní bere svých 100 %. */

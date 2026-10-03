@@ -1,0 +1,106 @@
+{
+  "gettingStarted": {
+    "meta": {
+      "title": "Jak začít",
+      "description": "Praktický průvodce prvními kroky s AISHA — od přihlášení k prvnímu výsledku za 10 minut."
+    },
+    "hero": {
+      "badge": "Public preview",
+      "title": "Jak začít s AISHA",
+      "subtitle": "Krátký kurz pro nové uživatele: co AISHA je, jak přemýšlí a jak z ní za prvních deset minut dostat skutečný výsledek."
+    },
+    "whatIs": {
+      "title": "1. Co je AISHA a jak přemýšlí",
+      "intro": "AISHA není jeden chatbot. Je to AI orchestrátor — platforma, která pro každý úkol vybere vhodný postup, model i nástroje, a všechno dělá pod dohledem a s auditní stopou. Čtyři principy, které vám usnadní život:",
+      "stories": {
+        "title": "Příběhy (stories) = vaše projekty",
+        "text": "Všechno se točí kolem příběhů. Příběh je pracovní prostor jednoho projektu nebo záměru: má vlastní znalostní bázi, časovou osu aktivit a sady pravidel. Cokoliv AISHA dělá, dělá v kontextu konkrétního příběhu — znalosti ani výstupy se mezi projekty nemíchají."
+      },
+      "backend": {
+        "title": "AI vybírá backend per úkol",
+        "text": "Nenastavujete si model. AISHA pro každý úkol sama zvolí vhodný jazykový model a cestu zpracování podle typu úkolu, nákladů a dostupnosti. Vy popisujete, co potřebujete — výběr „čím se to udělá“ je práce orchestrátoru."
+      },
+      "governance": {
+        "title": "Governance: raději hlasitě selhat než tiše chybovat",
+        "text": "Platforma je navržená fail-loud. Když něco nejde, chybí data nebo oprávnění, dozvíte se to rovnou — místo tichého odhadu, který vypadá jako odpověď. Citlivé akce procházejí schvalovacími branami a privilegované operace se zapisují do auditního žurnálu."
+      },
+      "dirigent": {
+        "title": "Dirigent: dohled nad AI agenty",
+        "text": "AISHA Dirigent průběžně sleduje práci AI agentů a koriguje ji — poradensky, ne silou. Výstupy agentů tak mají druhý pár očí dřív, než se dostanou k vám."
+      }
+    },
+    "firstSteps": {
+      "title": "2. Prvních 10 minut",
+      "intro": "Nejkratší cesta od přihlášení k prvnímu výsledku.",
+      "step1": {
+        "title": "Přihlaste se",
+        "text": "Přihlásíte se přes jednotné přihlášení (Keycloak) na stránce /auth. Přístup do preview jste dostali e-mailem; při prvním přihlášení si nastavíte vlastní heslo."
+      },
+      "step2": {
+        "title": "Otevřete svůj první příběh",
+        "text": "V sekci Příběhy otevřete připravený příběh (nebo si nechte založit nový). Projděte si záložky Přehled, Časová osa a Znalosti — uvidíte, co o projektu AISHA ví a co se v něm zatím stalo."
+      },
+      "step3": {
+        "title": "Napište první zprávu do chatu",
+        "text": "Otevřete chat s AI a zeptejte se na něco k projektu. Začněte konkrétně: „Shrň, jaké znalosti jsou v tomhle příběhu“ je lepší první otázka než „Co umíš?“. U odpovědí si všímejte panelu Použité zdroje — ukazuje, o co se odpověď opírá."
+      },
+      "step4": {
+        "title": "Spusťte první flowboard",
+        "text": "Flowboard je plátno, na kterém postup nakreslíte z uzlů — Spouštěče, Agenti, Nástroje MCP, Akce a Brány — a tlačítkem Spustit ho necháte běžet. Když tok narazí na schvalovací bránu, uvidíte stav „čeká na schválení“: zkontrolujte, co se má stát, a potvrďte Schválit a pokračovat. Nevíte, jak postup poskládat? Použijte Zeptejte se AISHA přímo na plátně."
+      },
+      "step5": {
+        "title": "Bonus: projděte si Agent Marketplace",
+        "text": "V katalogu agentů najdete hotové specializované agenty, které si můžete nainstalovat do svého příběhu — běží pak v jeho kontextu a s jeho znalostmi."
+      }
+    },
+    "workingWithAi": {
+      "title": "3. Jak s AI pracovat efektivně",
+      "intro": "AI je výkonný, ale omylný kolega. Těchto pár návyků dělá největší rozdíl mezi frustrací a skvělým výsledkem.",
+      "context": {
+        "title": "Kontext rozhoduje",
+        "text": "Model neví nic, co mu neřeknete. Popište, co chcete, pro koho, v jakém formátu a jak poznáte, že je hotovo. Jedna dobře popsaná věta zadání ušetří tři kola upřesňování."
+      },
+      "knowledge": {
+        "title": "Krmte znalostní bázi",
+        "text": "Do záložky Znalosti v příběhu nahrajte podklady (PDF, DOCX, TXT, MD do 50 MB) nebo přidejte položky ručně. AISHA z nich čerpá přes vícejazyčné vyhledávání, které si rozumí i s češtinou — česky položený dotaz najde i anglické dokumenty a naopak. Čím lepší podklady, tím méně si AI vymýšlí."
+      },
+      "verify": {
+        "title": "Důvěřuj, ale prověřuj",
+        "text": "Jazykové modely občas tvrdí nepravdivé věci — a znějí u toho sebejistě. Proto AISHA u odpovědí ukazuje Použité zdroje a štítek věrnosti; upozornění „Nízká věrnost — ověřte odpověď před použitím“ berte vážně. Fakta, čísla a cokoliv, co půjde ven z firmy, vždy ověřte proti zdroji."
+      },
+      "iterate": {
+        "title": "Iterujte, nediktujte",
+        "text": "První odpověď je návrh, ne rozsudek. Reagujte: „tohle zkrať“, „dolož zdrojem“, „přepiš pro zákazníka“. Krátké iterace vedou k lepšímu výsledku než jeden dlouhý dokonalý prompt."
+      },
+      "rules": {
+        "title": "Minimum, které si zapamatujte",
+        "items": [
+          "Výstup AI je koncept — zodpovědnost za výsledek zůstává na vás.",
+          "Čím konkrétnější zadání a lepší podklady, tím lepší výsledek.",
+          "Odpovědi bez citovaných zdrojů ověřujte dvakrát.",
+          "Nevkládejte do chatu údaje, které v projektu nemají co dělat.",
+          "Když si AISHA neví rady, řekne to nahlas — to je záměr, ne chyba."
+        ]
+      }
+    },
+    "preview": {
+      "title": "4. Co znamená „preview“",
+      "intro": "Používáte živou, ale ranou verzi platformy. Co od ní čekat:",
+      "limits": [
+        "Funkce se mění a přibývají; občas něco zaskřípe nebo se přestaví.",
+        "Odezvy AI se mohou lišit rychlostí i kvalitou podle zvoleného backendu a aktuální zátěže.",
+        "Některé části (například Flowboard) se zpřístupňují postupně podle role a oprávnění.",
+        "Vaše data běží na vlastní infrastruktuře v EU (Česká republika), bez trackerů třetích stran. Smazání účtu si můžete kdykoliv vyžádat na stránce /account/delete."
+      ],
+      "feedback": {
+        "title": "Váš feedback řídí, co bude dál",
+        "text": "Narazili jste na chybu, něco nedává smysl, nebo vám chybí funkce? Napište nám na ask@aisha.guru. V preview čteme všechno a odpovídáme rychle — zpětná vazba z těchto týdnů přímo určuje pořadí dalších úprav.",
+        "cta": "Napsat na ask@aisha.guru"
+      }
+    },
+    "closing": {
+      "title": "A teď do toho",
+      "text": "Nejrychleji se s AISHA sžijete tak, že jí dáte skutečný úkol z vašeho projektu — ne testovací hříčku. Otevřete příběh, nahrajte první podklad a zeptejte se. Zbytek se naučíte za pochodu."
+    }
+  }
+}

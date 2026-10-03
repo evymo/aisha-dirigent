@@ -1,0 +1,67 @@
+{
+  "_komentar": [
+    "Výjimky brány definer-subjekt-jen-volajici. Každá položka je JMÉNO + DŮVOD, ne počet:",
+    "nová funkce bez stráže je nové jméno = červená. Položka, která stráž mezitím dostala,",
+    "je ZASTARALÁ a brána ji shodí — výjimka, která už nic nevysvětluje, by jen schovala",
+    "příští regresi. Kategorie:",
+    "  zamer     — parametr není cizí identita, nebo je odpověď o cizím účtu záměrně veřejná;",
+    "            důvod musí říct, PROČ to není orákulum.",
+    "  vztah     — subjekt se čte jen přes vazbu na volajícího (přidělený partner, souhlas",
+    "            partnera volajícího); statická brána vazbu nevidí, důvod ji jmenuje.",
+    "  k-revizi  — ZNÁMÁ VADA, NE POSVĚCENÍ. Oprava potřebuje rozhodnutí, které nepatří do",
+    "            téhle změny; důvod říká, jaké a kde je plán."
+  ],
+  "vytvoreno": "2026-09-19",
+  "vyjimky": [
+    {
+      "name": "is_admin_or_staff",
+      "kategorie": "k-revizi",
+      "reason": "ZNÁMÁ VADA: varianta s argumentem odpovídá o roli CIZÍHO účtu (/rpc/is_admin_or_staff s cizím uuid → admin/staff ano/ne). #1045 (přenos z forku) opravilo has_role, has_permission a is_story_partner, tuhle ne. Stráž nejde přidat mechanicky: 346 politik v baseline a ~105 volání v SoT jí předává proměnnou — většinou volajícího (v_user_id := auth.uid()), ale některá subjekt (audience_user_meets_tier_requirement: is_admin_or_staff(p_user_id)) a těm by stráž změnila význam. Potřebuje inventuru volajících a rozhodnutí o tvaru (návrh: predikát se subjektem přesunout do schématu, které PostgREST nevystavuje, v public nechat jen variantu bez argumentu = volající; politiky jako (SELECT …) do InitPlanu). Bez argumentu (volající sám) ji tahle brána bere jako stráž a to se nemění."
+    },
+    {
+      "name": "create_discussion_entry_audited",
+      "kategorie": "zamer",
+      "reason": "p_subject_id je id OBSAHU (news_articles / knowledge_topics / web_pages / partner_stories podle p_subject_type), ne osoby; autorem je vždy auth.uid() (RAISE bez přihlášení). Nic se nedozví o cizím účtu."
+    },
+    {
+      "name": "get_discussion_entries",
+      "kategorie": "zamer",
+      "reason": "p_subject_id je id OBSAHU (publikovaný článek / webová stránka), ne osoby; funkce vrací jen diskusi k veřejně publikovanému obsahu. Nic se nedozví o cizím účtu."
+    },
+    {
+      "name": "log_break_glass_access",
+      "kategorie": "zamer",
+      "reason": "p_user_user_id je CÍL break-glass záznamu, který volající zapisuje SÁM ZA SEBE (actor = auth.uid(), RAISE bez přihlášení); vrací jen id záznamu. Nečte nic o cílovém účtu, takže není orákulem ani podvrhem cizího jména."
+    },
+    {
+      "name": "is_certified_partner",
+      "kategorie": "zamer",
+      "reason": "Certifikace partnera je záměrně veřejná — certifikovaní partneři jsou vypsaní přes get_certified_partners (komentář u grantu v SoT). Odpověď o cizím uuid tedy neprozradí nic, co veřejný adresář nevydá. Všichni volající v repu (submit_plugin) se ptají bez argumentu."
+    },
+    {
+      "name": "get_client_onboarding_details",
+      "kategorie": "vztah",
+      "reason": "Subjekt se čte jen přes vazbu na volajícího: WHERE user_id = p_user_id AND assigned_partner_id = auth.uid(), jinak RAISE 'Access denied'; data navíc jen při has_data_sharing_consent(p_user_id, volající). Statická brána vazbu přes sloupec nevidí."
+    },
+    {
+      "name": "request_data_sharing_consent",
+      "kategorie": "vztah",
+      "reason": "Žádost o souhlas smí podat jen partner PŘIDĚLENÝ subjektu: EXISTS(user_id = p_user_id AND assigned_partner_id = auth.uid()), jinak RAISE 'Access denied'. Statická brána vazbu přes sloupec nevidí."
+    },
+    {
+      "name": "partner_relinquish_data_access",
+      "kategorie": "vztah",
+      "reason": "Partner se vzdává jen SVÉHO souhlasu: řádek data_sharing_consents se hledá pro partner_profile volajícího (auth.uid()), jinak RAISE. Cizí souhlas zrušit nejde; statická brána vazbu přes profil nevidí."
+    },
+    {
+      "name": "get_chat_context_story_id",
+      "kategorie": "k-revizi",
+      "reason": "ZNÁMÁ VADA: p_user_id DEFAULT auth.uid() jde přepsat, takže přihlášený dostane id aktivní story CIZÍHO účtu. Svc-ai-chat volá bez argumentů (tedy za sebe), ale oprava patří do plánu BASE-2 v docs/planning/AISHA_OMNI_GATEWAY.md: omni akceptační sada (aisha/db/tests/schema/omni/story-resolver-hole.sql, src/tests/omni-acceptance/story-resolver-hole) funkci volá jako superuser s identitou v argumentu a stráž by jí změnila kontrakt."
+    },
+    {
+      "name": "create_ai_run",
+      "kategorie": "k-revizi",
+      "reason": "ZNÁMÁ VADA (akce za cizí subjekt): přihlášený založí ai_run s actor_user_id = kdokoli (COALESCE(p_actor_user_id, auth.uid())) a s libovolným p_story_id. Oprava actor je jednořádková, ale vazba na story a útrata (fn_authorize_task_spend) jsou jeden návrh; volá ji get_answer_block, svc-ai-chat a n8n. Rozhodnutí patří vlastníkovi — stejná vada je ve fn_create_workflow_run, kterou statická brána nevidí (stráž „přihlášen, nebo služba“ se tváří jako role)."
+    }
+  ]
+}

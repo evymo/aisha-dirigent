@@ -1,0 +1,967 @@
+{
+  "production": {
+    "nodes": {
+      "received": "Received",
+      "handedOver": "Handed Over",
+      "transportLoss": "Transport Loss",
+      "input": "Input",
+      "output": "Output",
+      "humidity": "Humidity",
+      "volume": "Volume",
+      "alcoholContent": "Alcohol Content",
+      "percentageOfTotal": "% of Total",
+      "loss": "Loss",
+      "yield": "Yield",
+      "waste": "Waste",
+      "dilution": "Dilution",
+      "water": "water"
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No notifications",
+    "markAllRead": "Mark all read",
+    "questionnaireRequest": {
+      "title": "New questionnaire to complete",
+      "message": "You have a new questionnaire: {{name}}"
+    },
+    "meetingRequest": {
+      "title": "Meeting invitation",
+      "message": "You have been invited to a meeting: {{title}}"
+    },
+    "consentRequest": {
+      "title": "Consent request",
+      "message": "Please provide your consent: {{title}}"
+    },
+    "labOrder": {
+      "title": "Platform assessment",
+      "message": "You have a scheduled platform assessment"
+    },
+    "distributionAdjustment": {
+      "title": "Distribution adjustment",
+      "message": "Your distribution has been adjusted"
+    },
+    "reminder": {
+      "title": "Reminder",
+      "message": "You have a new reminder"
+    },
+    "message": {
+      "title": "New message",
+      "message": "You have a new message"
+    },
+    "generic": {
+      "title": "Notification",
+      "message": "You have a new notification"
+    }
+  },
+  "hero": {
+    "badge": "AI-powered development",
+    "headlinePart1": "Your product,",
+    "headlinePart2": "your way",
+    "subheadline": "Join a community of builders delivering software with AI orchestration, expert supervision, and transparent quality gates.",
+    "cta": {
+      "primary": "Start for free",
+      "secondary": "FAQ",
+      "protocol": "Our framework"
+    },
+    "stats": {
+      "members": "Active members",
+      "studies": "Active programs",
+      "partners": "Verified partners",
+      "secure": "Secure data"
+    }
+  },
+  "common": {
+    "days": {
+      "sunday": "Sunday",
+      "monday": "Monday",
+      "tuesday": "Tuesday",
+      "wednesday": "Wednesday",
+      "thursday": "Thursday",
+      "friday": "Friday",
+      "saturday": "Saturday",
+      "day": "day",
+      "dayCount_one": "day",
+      "dayCount_few": "days",
+      "dayCount_other": "days"
+    },
+    "date": "Date",
+    "day": "Day",
+    "of": "of",
+    "uploading": "Uploading...",
+    "month": "Month",
+    "year": "Year",
+    "close": "Close",
+    "more": "More",
+    "morePages": "More pages",
+    "toggleSidebar": "Toggle Sidebar",
+    "previousSlide": "Previous slide",
+    "nextSlide": "Next slide",
+    "signIn": "Sign In",
+    "signInRequired": "Sign in required",
+    "signInToAddToCart": "Please sign in to add items to your cart.",
+    "signOut": "Sign Out",
+    "signUp": "Sign Up",
+    "backToHome": "Back to Home",
+    "backToDashboard": "Back to Dashboard",
+    "back": "Back",
+    "loading": "Loading...",
+    "retry": "Retry",
+    "learnMore": "Learn More",
+    "loadMore": "Load More",
+    "readMore": "Read More",
+    "viewAll": "View All",
+    "contactUs": "Contact Us",
+    "downloadPDF": "Download PDF",
+    "clearAll": "Clear all",
+    "examples": "Examples",
+    "contents": "Contents",
+    "save": "Save",
+    "settings": "Settings",
+    "theme": {
+      "toggle": "Toggle theme",
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "you": "You",
+    "saving": "Saving...",
+    "apply": "Apply",
+    "send": "Send",
+    "share": "Share",
+    "download": "Download",
+    "viewDetails": "View details",
+    "warning": "Warning",
+    "validate": "Validate",
+    "validating": "Validating...",
+    "tomorrow": "Tomorrow",
+    "processing": "Processing...",
+    "saveChanges": "Save Changes",
+    "cancel": "Cancel",
+    "search": "Search",
+    "filter": "Filter",
+    "all": "All",
+    "yes": "Yes",
+    "no": "No",
+    "active": "Active",
+    "inactive": "Inactive",
+    "pending": "Pending",
+    "completed": "Completed",
+    "error": "Error",
+    "success": "Success",
+    "select": "Select",
+    "submit": "Submit",
+    "continue": "Continue",
+    "next": "Next",
+    "step": "Step",
+    "selectDate": "Select a date",
+    "previous": "Previous",
+    "total": "Total",
+    "valueOutOf": "{{value}}/{{total}}",
+    "currency": "Currency",
+    "currencyCzk": "CZK",
+    "currencyKc": "Kč",
+    "separatorBullet": "•",
+    "separatorSlash": "/",
+    "multiplierTimes": "×",
+    "separatorColon": ":",
+    "ipLabel": "IP: ",
+    "placeholderHyphen": "-",
+    "placeholderDash": "—",
+    "infinity": "∞",
+    "versionPrefixShort": "v",
+    "scaleOutOfTen": "/10",
+    "unitHourShort": "h",
+    "unitMinuteShort": "min",
+    "timeHourSuffix": ":00",
+    "unitMgPerL": "mg/L",
+    "unitMgPerDl": "mg/dL",
+    "unitNgPerMl": "ng/mL",
+    "unitUPerL": "U/L",
+    "symbolPercent": "%",
+    "status": "Status",
+    "vip": "VIP",
+    "never": "Never",
+    "justNow": "just now",
+    "minutesAgo": "{{count}} min ago",
+    "hoursAgo": "{{count}} h ago",
+    "daysAgo": "{{count}} d ago",
+    "unnamed": "Unnamed",
+    "untitled": "Untitled",
+    "unknown": "Unknown",
+    "noData": "No data available",
+    "create": "Create",
+    "edit": "Edit",
+    "approved": "Approved",
+    "rejected": "Rejected",
+    "none": "None",
+    "unlimited": "Unlimited",
+    "required": "Required",
+    "other": "Other",
+    "backToStudies": "Back to Clusters",
+    "verifying": "Verifying...",
+    "or": "or",
+    "confirm": "Confirm",
+    "confirmDelete": "Confirm Delete",
+    "noResults": "No results found",
+    "latest": "Latest",
+    "detected": "Detected",
+    "recentLogins": "Recent logins (24h)",
+    "from": "From",
+    "to": "To",
+    "refresh": "Refresh",
+    "update": "Update",
+    "undo": "Undo",
+    "uploadDocument": "Upload Document",
+    "redactDocument": "Redact Document",
+    "redactHint": "Draw rectangles to hide sensitive data.",
+    "redirecting": "Redirecting...",
+    "delete": "Delete",
+    "export": "Export",
+    "view": "View",
+    "notes": "Notes",
+    "actions": "Actions",
+    "tryAgain": "Try again",
+    "somethingWentWrong": "Something went wrong",
+    "copied": "Copied",
+    "copyId": "Copy ID",
+    "copyLink": "Copy link",
+    "openMenu": "Open menu",
+    "areYouSure": "Are you sure?",
+    "selected": "Selected",
+    "optional": "Optional",
+    "units": "Units",
+    "firstName": "First name",
+    "lastName": "Last name",
+    "emailPlaceholder": "user@example.com",
+    "phone": "Phone",
+    "requestedAt": "Requested at",
+    "scheduledFor": "Scheduled for",
+    "selectOption": "Select an option",
+    "cancelling": "Cancelling...",
+    "selectAll": "Select all",
+    "selectRow": "Select row",
+    "anonymous": "Anonymous",
+    "created": "Created",
+    "createdAt": "Created At",
+    "open": "Open",
+    "pageOf": "Page {{current}} of {{total}}",
+    "updated": "Updated",
+    "add": "Add",
+    "copy": "Copy to Clipboard",
+    "noPermission": "You do not have permission to access this page",
+    "selectItem": "Select an item",
+    "permissionDenied": "Permission denied",
+    "revoke": "Revoke",
+    "hour": "hour"
+  },
+  "errors": {
+    "alreadyEnrolled": "You are already enrolled in this cluster.",
+    "serviceNotConfigured": "Service is not configured correctly (missing database component). Please try again later.",
+    "signInRequired": "Please sign in to continue.",
+    "noPermission": "You do not have permission to perform this action.",
+    "genericError": "An error occurred. Please try again.",
+    "downloadFailed": "Download failed. Please try again.",
+    "loadingConsents": "Failed to load consents. Please try again.",
+    "accessDenied": "Access denied",
+    "accessDeniedDescription": "You do not have permission to access this page.",
+    "forbiddenCode": "403",
+    "pageLoadError": "An unexpected error occurred while loading the page. Please try again or come back later.",
+    "devDetails": "Details (development only):"
+  },
+  "session": {
+    "timeout_warning_title": "Session expiring soon",
+    "timeout_warning_message": "Your session will expire soon due to inactivity.",
+    "time_remaining": "Time remaining: {{time}}",
+    "logout_now": "Log out now",
+    "stay_logged_in": "Stay logged in"
+  },
+  "navigation": {
+    "archive": "Archive",
+    "news": "News",
+    "story": "Story",
+    "studies": "Clusters",
+    "whitepaper": "Whitepaper",
+    "shop": "Services",
+    "partners": "Contacts"
+  },
+  "header": {
+    "memberArea": "Member Area",
+    "memberSection": "Member",
+    "dashboard": "Dashboard",
+    "profile": "Profile",
+    "orders": "Orders",
+    "tokens": "AISHA Tokens",
+    "appointments": "My Appointments",
+    "questionnaires": "Questionnaires",
+    "checkIn": "Check-in",
+    "studiesSection": "Clusters",
+    "browseStudies": "Browse Clusters",
+    "enrollStudy": "Enroll in Cluster",
+    "qualificationTest": "Skill Assessment",
+    "partnerSection": "Partner",
+    "partnerDashboard": "Partner Dashboard",
+    "partnerCertification": "Partner Certification",
+    "myDiary": "My Diary",
+    "adminSection": "Admin",
+    "adminDashboard": "Admin Dashboard",
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "basicMembership": "Basic",
+    "openCart": "Open shopping cart",
+    "devBackend": "Dev backend"
+  },
+  "footer": {
+    "brandDescription": "AISHA is a builder platform for independent teams and operators. Use your own presets in your own cloud, or add our expert layer, operations, and maintenance as a managed service.",
+    "services": "Services",
+    "contacts": "Contacts",
+    "phone": "+420 723 960 666",
+    "company": "Company",
+    "news": "News",
+    "whitepaper": "Whitepaper",
+    "rtnArchive": "Archive",
+    "timeline": "Timeline",
+    "documentLibrary": "Document Library",
+    "provenance": "Provenance",
+    "methods": "Methods & Integrity",
+    "knowledge": "Knowledge",
+    "ourStory": "Our Story",
+    "rdPipeline": "Development Pipeline",
+    "faq": "FAQ",
+    "platformShop": "Platform Services",
+    "allProducts": "All Platform Services",
+    "legal": "Legal",
+    "privacyPolicy": "Privacy Policy",
+    "termsOfService": "Terms of Service",
+    "disclaimer": "Disclaimer",
+    "allRightsReserved": "All rights reserved.",
+    "location": "Prague, Czech Republic",
+    "buildSignatureLabel": "π",
+    "buildSignatureTooltipDate": "Date",
+    "buildSignatureTooltipEnvironment": "Environment",
+    "buildSignatureTooltipSite": "Site",
+    "buildSignatureTooltipBackend": "Backend",
+    "buildSignatureBackendSourceEnv": "env",
+    "buildSignatureBackendSourceFallback": "fallback",
+    "buildSignatureTooltipVersion": "Version",
+    "buildSignatureTooltipRepo": "Repo",
+    "buildSignatureTooltipWorkflow": "Workflow",
+    "buildSignatureTooltipBranch": "Branch",
+    "buildSignatureTooltipRun": "Run",
+    "disclaimerText": "All prices are indicative. Final calculation depends on scope, hosting model, and level of managed service. Evymo s.r.o. — orchestration and software delivery company.",
+    "terminalLogin": "Login",
+    "gettingStarted": "Getting started"
+  },
+  "heroArchive": {
+    "archiveBadge": "Evymo Archive • Est. 2012",
+    "headlinePart1": "From a Company Archive",
+    "headlinePart2": "to Open Knowledge",
+    "contextLine": "Founded in 2012, Evymo’s team evolved from enterprise IT integration through IoT automation to the AISHA AI orchestration platform — building tools that support software delivery naturally.",
+    "subheadline": "We’re opening the company archive: project records, technical reports, and milestone photographs. Explore the history, ask questions, and form your own view.",
+    "exploreArchive": "Explore the Archive",
+    "readWhitepaper": "Read the Whitepaper",
+    "curatorQuote": "These are historical records, presented as-is with modern context. We digitize and share them openly—not as evidence of current capabilities, but as a transparent window into our engineering history.",
+    "curatorAttribution": "The Evymo Archive Team"
+  },
+  "archiveProvenance": {
+    "sectionLabel": "Evymo Archive",
+    "title": "Provenance",
+    "subtitle": "For every document, we show where it comes from, how it was digitized, and what limits apply to interpretation.",
+    "whatIsTitle": "What provenance means",
+    "whatIsText": "Provenance is a set of facts about a document's origin (source, author, date, context) and handling (digitization, transcription, translation, editorial changes).",
+    "badgesTitle": "Document badges",
+    "badges": [
+      {
+        "label": "Original scan",
+        "description": "We provide a direct image record of the original document."
+      },
+      {
+        "label": "Transcript",
+        "description": "A text version for readability and search (may include normalization)."
+      },
+      {
+        "label": "Translation",
+        "description": "An excerpt or full translation; translations are interpretive by nature."
+      },
+      {
+        "label": "Editorial note",
+        "description": "Modern context, period terminology notes, and evidence limitations."
+      }
+    ],
+    "weVerifyTitle": "What we verify",
+    "verifyItems": [
+      "Basic metadata (date, document type, language, length)",
+      "File origin (where and when the document was obtained/digitized)",
+      "Handling chain (who performed digitization/transcription)"
+    ],
+    "weCannotVerifyTitle": "What often cannot be verified reliably",
+    "cannotVerifyItems": [
+      "Period claims without independent replication",
+      "Completeness (missing pages/attachments)",
+      "Mapping historical terms to modern meanings"
+    ]
+  },
+  "archiveMethods": {
+    "sectionLabel": "Evymo Archive",
+    "title": "Methods & Integrity",
+    "subtitle": "How we digitize, describe, and publish materials so they remain traceable and interpretable.",
+    "sections": [
+      {
+        "title": "Digitization & preservation",
+        "body": "We prefer direct scans, preserve original page order, and clearly label file versions."
+      },
+      {
+        "title": "Transcription & translation",
+        "body": "Transcripts support readability and search. Translations are interpretive; where ambiguous, we prefer conservative phrasing."
+      },
+      {
+        "title": "Modern context",
+        "body": "We highlight period standards, terminology, and evidence limits. Historical documents are not presented as capability claims."
+      },
+      {
+        "title": "Change trace",
+        "body": "When possible, we keep version traceability (transcript/translation versions) and separate originals from editorial context."
+      }
+    ]
+  },
+  "provenance": {
+    "sectionLabel": "Methods & Integrity",
+    "title": "Transparent by Design",
+    "subtitle": "Every document in our archive includes clear provenance information. We show you exactly what you're looking at, how we digitized it, and what modern context applies.",
+    "disclaimer": "\"This document reflects standards of its era. It is provided for historical interest and transparency, not as evidence of efficacy.\"",
+    "disclaimerAttribution": "— Standard Context Disclaimer",
+    "curationMethods": "Our Curation Methods",
+    "points": {
+      "openAccess": {
+        "title": "Open Access",
+        "description": "No login required. No gatekeeping. All documents freely accessible to researchers and the public."
+      },
+      "provenanceVerified": {
+        "title": "Provenance Verified",
+        "description": "Each document shows source, date, author, digitization method, and chain of custody."
+      },
+      "editorialTransparency": {
+        "title": "Editorial Transparency",
+        "description": "We mark what we can verify and what we can't. Translations show version and editor initials."
+      },
+      "downloadPacks": {
+        "title": "Download Packs",
+        "description": "Bundle scans + transcript + context PDF. Full materials for your own research."
+      }
+    }
+  },
+  "whitepaperSection": {
+    "label": "Whitepaper",
+    "title": "AISHA Builders",
+    "description": "The canonical reference for understanding our approach. How we interpret legacy materials today, our methodology, glossary of historical vs. modern terminology, and engineering principles.",
+    "features": {
+      "interpretation": "Interpretation methodology for project documents from 2012–2024",
+      "glossary": "Glossary: historical terms vs. current terminology",
+      "curation": "Curation rules and editorial conflicts disclosure"
+    },
+    "readOnline": "Read Online",
+    "version": "v2.0"
+  },
+  "archive": {
+    "sectionLabel": "Evymo Document Archive",
+    "title": "Explore the Archive",
+    "subtitle": "Browse original documents, photographs, and records from the Evymo story. Each item includes provenance information and modern context. No login required — this archive is open to all.",
+    "searchPlaceholder": "Search documents...",
+    "filter": {
+      "label": "Filter:",
+      "decade": "Decade",
+      "allDecades": "All decades",
+      "type": "Type",
+      "allTypes": "All types",
+      "preparation": "Preparation",
+      "allPreparations": "All preparations",
+      "keywords": "Keywords"
+    },
+    "allDecades": "All Decades",
+    "allTypes": "All Types",
+    "allPreparations": "All Preparations",
+    "allTags": "All tags",
+    "badges": {
+      "featured": "Featured"
+    },
+    "exploreDecade": "Explore the {{decade}}",
+    "editorialPolicy": "— Editorial Policy",
+    "resultCount": "{{count}} document(s) found",
+    "backToList": "Back to list",
+    "documentTypes": {
+      "operational_report": "Operational Report",
+      "operational_study": "Operational Cluster",
+      "correspondence": "Correspondence",
+      "certificate": "Certificate",
+      "directive": "Directive",
+      "form": "Form",
+      "formula": "Formula",
+      "guideline": "Guideline",
+      "letter": "Letter",
+      "patent": "Patent",
+      "photograph": "Photograph",
+      "policy": "Policy",
+      "preparation_record": "Preparation Record",
+      "procedure": "Procedure",
+      "product_label": "Product Certificate",
+      "protocol": "Protocol",
+      "report": "Report",
+      "research_paper": "Research Paper",
+      "research_report": "Research Report",
+      "template": "Template",
+      "testimonial": "Testimonial",
+      "other": "Other"
+    },
+    "emptyState": "No archive documents found",
+    "viewDocument": "View document",
+    "noDocuments": "No documents available"
+  },
+  "whitepaper": {
+    "version": "Version 1.0 • December 2024",
+    "title": "Evymo Archive Whitepaper",
+    "subtitle": "How we interpret legacy materials, our editorial methodology, and the standards we apply to digitization, translation, and context annotation. This is our credibility engine.",
+    "browseArchive": "Browse the Archive",
+    "sections": {
+      "introduction": "Introduction",
+      "methods": "Methods & Integrity",
+      "curation": "Curation Rules",
+      "digitization": "Digitization Workflow",
+      "editorial": "Editorial Policy",
+      "glossary": "Terminology Glossary",
+      "compliance": "Compliance & Standards",
+      "problem": "Problem",
+      "solution": "Solution",
+      "tokenomics": "Tokenomics",
+      "roadmap": "Roadmap",
+      "team": "Team",
+      "legal": "Legal"
+    },
+    "introText1": "The Evymo Archive contains documents spanning from 2012 to the present — project records, technical specifications, architecture decisions, correspondence, photographs, and administrative records related to software engineering and AI orchestration development.",
+    "introText2": "These materials were created under technical and business frameworks that evolved significantly over the years. We do not present them as evidence of current capabilities. Instead, we offer them as historical documents with transparent provenance and contemporary context.",
+    "introQuote": "\"Our goal is not to prove claims, but to share history openly and let readers form their own informed views.\"",
+    "whatWeVerify": "What We Verify",
+    "whatWeCannotVerify": "What We Cannot Verify",
+    "verifyItems": [
+      "Document authenticity and provenance",
+      "Physical characteristics of originals",
+      "Chain of custody where traceable",
+      "Dating through paper, ink, and context"
+    ],
+    "cannotVerifyItems": [
+      "Claims made within historical documents",
+      "Accuracy of period operational observations",
+      "Complete chain for all materials",
+      "Authorship where unsigned"
+    ],
+    "methodsNote": "Every document in the archive includes explicit notation about what we can confirm and what remains uncertain. This transparency is foundational to our approach.",
+    "curationRules": {
+      "rule1": {
+        "title": "Rule 1: Provenance Required",
+        "description": "No document enters the archive without documented provenance — where it came from, when it was acquired, and who maintained it."
+      },
+      "rule2": {
+        "title": "Rule 2: Context Always Added",
+        "description": "Every historical document is accompanied by modern context explaining its historical significance and the differences from current standards."
+      },
+      "rule3": {
+        "title": "Rule 3: Uncertainty Marked",
+        "description": "Where we cannot verify information, we explicitly say so. Claims from the period are labeled as such, not presented as fact."
+      },
+      "rule4": {
+        "title": "Rule 4: No Sales Pressure",
+        "description": "Archive pages contain no direct preparation links or sales calls-to-action. The archive is for education, not conversion."
+      }
+    },
+    "digitizationSteps": [
+      "Document received and catalogued with acquisition metadata",
+      "Physical inspection: condition, paper, ink characteristics noted",
+      "High-resolution scanning at 600 DPI minimum",
+      "OCR processing for searchability (where applicable)",
+      "Translation by qualified translator with version control",
+      "Editorial review and context annotation",
+      "Provenance badge assigned based on verification level",
+      "Publication with download pack availability"
+    ],
+    "editorialIntro": "Our editorial approach prioritizes transparency over persuasion. We are curators, not advocates.",
+    "editorialPolicies": {
+      "translations": {
+        "title": "Translations",
+        "description": "All translations show version number, translator initials, and date. Original language scans are always available alongside."
+      },
+      "redactions": {
+        "title": "Redactions",
+        "description": "Personal information (addresses, family details) may be redacted for privacy. All redactions are marked and explained."
+      },
+      "corrections": {
+        "title": "Corrections",
+        "description": "If errors are discovered post-publication, we issue corrections with full version history maintained."
+      }
+    },
+    "glossaryIntro": "Historical documents use terminology that differs from modern scientific language. This glossary helps bridge the gap.",
+    "glossaryHeaders": {
+      "period": "Period Term",
+      "modern": "Modern Equivalent",
+      "context": "Context"
+    },
+    "glossaryTerms": [
+      {
+        "period": "System Integration",
+        "modern": "Cloud-native orchestration",
+        "context": "Historical approach to connecting enterprise systems"
+      },
+      {
+        "period": "Manual Deployment",
+        "modern": "CI/CD Pipeline",
+        "context": "Early deployment approach before automation"
+      },
+      {
+        "period": "Script Automation",
+        "modern": "AI Agent Workflow",
+        "context": "Evolution from scripts to intelligent agent orchestration"
+      },
+      {
+        "period": "Monolithic Architecture",
+        "modern": "Multi-agent orchestration",
+        "context": "Architectural evolution from monoliths to distributed agents"
+      }
+    ],
+    "complianceIntro": "The archive is maintained separately from commercial operations. Platform services are developed under current standards and do not rely on historical documents as evidence of current capabilities.",
+    "standardDisclaimer": "Standard Disclaimer",
+    "disclaimerText": "\"Historical documents in the Evymo Archive reflect the technical standards, methodology, and business context of their era. They are provided for historical interest and transparency, not as evidence of current platform capabilities. Current platform services are developed independently under modern software engineering standards.\"",
+    "cta": {
+      "title": "Ready to explore?",
+      "subtitle": "Browse the archive with confidence, knowing our methodology and standards.",
+      "button": "Enter the Archive"
+    }
+  },
+  "security": {
+    "mustChangePassword": {
+      "title": "Password Change Required",
+      "description": "For security reasons, you must change your password before continuing.",
+      "warning": "Your account has a default password or has been flagged for password change. For your security, you need to set a new password.",
+      "instructions": "Click the button below and we'll send you an email with a secure link to change your password.",
+      "sendEmail": "Send Password Change Email"
+    }
+  },
+  "notFound": {
+    "title": "404",
+    "message": "Page not found",
+    "description": "The page you're looking for doesn't exist or has been moved.",
+    "exploreTitle": "Where would you like to go?",
+    "returnHome": "Back to Home",
+    "links": {
+      "archive": "Archive",
+      "archiveDesc": "Historical documents and materials from the archive",
+      "story": "Story",
+      "storyDesc": "The story of AISHA Dirigent — AI-powered software delivery orchestration",
+      "studies": "Clusters",
+      "studiesDesc": "Active clusters and development programs",
+      "whitepaper": "Whitepaper",
+      "whitepaperDesc": "Scientific background and methodology",
+      "shop": "Services",
+      "shopDesc": "Platform services and offerings",
+      "partners": "Partners",
+      "partnersDesc": "Network of experts and verified specialists",
+      "faq": "FAQ",
+      "faqDesc": "Answers to frequently asked questions"
+    }
+  },
+  "faq": {
+    "badge": "Frequently Asked Questions",
+    "title": "Answers to Your Questions",
+    "subtitle": "Common questions about the AISHA Dirigent platform, AI-powered development, and how Evymo can help your project succeed.",
+    "categories": {
+      "general": "General Information",
+      "platform": "Platform & Technology",
+      "agents": "AI Agents & Automation",
+      "services": "Services & Cooperation",
+      "security": "Security & Privacy",
+      "pricing": "Plans & Pricing"
+    },
+    "general": {
+      "q1": {
+        "question": "What is AISHA Dirigent?",
+        "answer": "AISHA Dirigent is an AI orchestration platform developed by Evymo. It coordinates specialized AI agents that assist throughout the entire software development lifecycle — from planning and implementation through testing to deployment and operations. The name \"Dirigent\" (conductor) reflects its role: orchestrating the work of multiple AI agents and human specialists into a cohesive workflow."
+      },
+      "q2": {
+        "question": "Who is Evymo?",
+        "answer": "Evymo s.r.o. is a Czech technology company that builds AI-powered tools for software development and project delivery. We connect clients who need custom software with qualified specialists, and provide them with AISHA — our AI platform that accelerates development, maintains quality standards, and reduces costs."
+      },
+      "q3": {
+        "question": "Who is the platform designed for?",
+        "answer": "AISHA serves two audiences: clients who need custom software built reliably and cost-effectively, and specialists (developers, architects, consultants) who want to amplify their capabilities with AI-powered tooling. Whether you're a startup needing an MVP or an enterprise requiring complex integrations, the platform adapts to your needs."
+      }
+    },
+    "platform": {
+      "q1": {
+        "question": "What technology stack does the platform use?",
+        "answer": "The platform is built on React with TypeScript for the frontend, PostgreSQL 17 with PostgREST behind AISHA Gateway for the backend, Keycloak for authentication, n8n for workflow automation, and Elasticsearch for knowledge retrieval. Function endpoints run as self-hosted services behind the gateway. The entire stack is designed for self-hosting and can be deployed to any infrastructure."
+      },
+      "q2": {
+        "question": "Can AISHA be self-hosted?",
+        "answer": "Yes. AISHA is designed for self-hosted deployment. The platform runs in Docker containers and can be deployed via Coolify, Docker Compose, or any container orchestration system. Your data stays on your infrastructure — we never require cloud dependencies that you don't control."
+      },
+      "q3": {
+        "question": "What programming languages and frameworks does AISHA support?",
+        "answer": "AISHA's knowledge base and agent system are language-agnostic in principle. The platform itself is built with TypeScript and React, but AI agents can assist with projects in any major language or framework. The knowledge system can be trained on any technology stack your project requires."
+      }
+    },
+    "agents": {
+      "q1": {
+        "question": "How do the AI agents work?",
+        "answer": "AISHA uses a catalog of seven specialized agents, each with a defined purpose: the Dirigent coordinates workflows, the Librarian manages knowledge, the Compliance Gate enforces quality standards, the Dev Patch implements changes, the Verifier validates results, the Planner creates project plans, and the Debug Agent diagnoses issues. They work together, with the Dirigent routing tasks to the right agent based on context."
+      },
+      "q2": {
+        "question": "Do the AI agents replace human developers?",
+        "answer": "No. AI agents amplify human capabilities, they don't replace them. A specialist always oversees the work, makes architectural decisions, and reviews results. The agents handle repetitive tasks, enforce standards, search knowledge bases, and accelerate implementation — freeing specialists to focus on creative and strategic work."
+      },
+      "q3": {
+        "question": "What is the knowledge base system?",
+        "answer": "Every project builds a knowledge base of expert rules, architectural patterns, coding conventions, and domain-specific information. AI agents consult this knowledge before making any change, ensuring consistency across the entire codebase. The system uses vector search and text matching to find relevant knowledge for each task."
+      }
+    },
+    "services": {
+      "q1": {
+        "question": "What services does Evymo offer?",
+        "answer": "We offer three core services: Managed Development (specialist + AI agents build your project), Operations Oversight (monitoring, quality gates, and compliance checking for existing projects), and Maintenance & Support (ongoing bug fixes, updates, and infrastructure management). Each service can be engaged independently or combined."
+      },
+      "q2": {
+        "question": "How does a typical project work?",
+        "answer": "You describe what you need, we assign a specialist who configures AISHA for your project's technology stack and domain. The specialist works alongside AI agents who handle implementation while the Dirigent ensures quality standards. Projects typically deliver in weeks, not months, because AI agents work continuously and iterate in real time."
+      },
+      "q3": {
+        "question": "Can I keep the code after the project?",
+        "answer": "Absolutely. All code, documentation, and knowledge bases created during the project belong to you. There is no vendor lock-in. You can maintain the code yourself, hire another team, or continue with us for ongoing support — the choice is entirely yours."
+      }
+    },
+    "security": {
+      "q1": {
+        "question": "How is my data protected?",
+        "answer": "Security is built into every layer: Row-Level Security (RLS) on all database tables, audit logging for every sensitive operation, encrypted connections (TLS 1.2+), and no personal data in logs or error messages. The platform follows OWASP Top 10 guidelines and undergoes regular security reviews."
+      },
+      "q2": {
+        "question": "Where does the code and data run?",
+        "answer": "On infrastructure you control. AISHA is self-hosted by design. For managed services, we deploy to EU-based infrastructure. Your source code, databases, and knowledge bases remain on your designated servers. We never share project data between clients."
+      },
+      "q3": {
+        "question": "What compliance standards does the platform meet?",
+        "answer": "The platform is designed with SOC 2 principles in mind: comprehensive audit trails, role-based access control, data isolation between tenants, and automated compliance gates that validate every change. All database operations are logged, and access to sensitive data requires explicit authorization."
+      }
+    },
+    "pricing": {
+      "q1": {
+        "question": "What do the different plans include?",
+        "answer": "Starter includes community projects with up to 3 specialists, ideal for smaller engagements. Professional adds advanced analytics, priority matching, and supports up to 10 specialists. Enterprise provides SLA guarantees, a dedicated Dirigent coordinator, custom integrations, and unlimited specialists."
+      },
+      "q2": {
+        "question": "Is there a free trial or proof of concept?",
+        "answer": "Yes. We offer a free Proof of Concept phase where we configure AISHA for your specific use case and demonstrate the platform's capabilities on a small scope. This lets you evaluate the quality and speed of AI-assisted development before committing to a full engagement."
+      },
+      "q3": {
+        "question": "How does pricing work?",
+        "answer": "Pricing is project-based and depends on scope and complexity. Typically, AI-assisted development costs about half of traditional outsourcing because agents handle repetitive work while specialists focus on high-value tasks. Your specialist provides a specific estimate after a free consultation."
+      }
+    },
+    "disclaimer": "Information provided here is for general guidance. Specific capabilities, timelines, and pricing depend on project requirements. Contact us for a detailed consultation."
+  },
+  "landing": {
+    "hero": {
+      "badge": "Engineering since 2012",
+      "title": "AI-powered delivery for every project",
+      "subtitle": "Development services powered by AISHA orchestration, designed for modern teams. From startups to enterprise.",
+      "fallbackTitle": "Your Development Partner",
+      "fallbackSubtitle": "AI-assisted development and project delivery.",
+      "ctaShop": "Explore services",
+      "ctaResearch": "Our technology",
+      "addToCart": "Add to cart",
+      "addedToCart": "Added to cart",
+      "featuredProduct": "Featured service",
+      "forEveryone": "For every team"
+    },
+    "segments": {
+      "title": "Who are our services for",
+      "subtitle": "Choose the category that suits your project",
+      "kids": {
+        "title": "Startups",
+        "description": "MVP development and rapid prototyping"
+      },
+      "athletes": {
+        "title": "Growth Teams",
+        "description": "Scaling and performance optimization"
+      },
+      "midlife": {
+        "title": "Enterprise",
+        "description": "Integration, compliance, architecture"
+      },
+      "seniors": {
+        "title": "Maintenance",
+        "description": "Operations and continuous improvement"
+      }
+    },
+    "products": {
+      "label": "Our Services",
+      "title": "Popular Services",
+      "subtitle": "Choose from our range of AI-powered development services",
+      "viewAll": "View All"
+    },
+    "research": {
+      "label": "Technology-backed",
+      "title": "A Decade of Engineering",
+      "subtitle": "Evymo originated from enterprise IT integration in 2012. We are documenting our engineering journey and making project archives publicly available. Form your own view — and if you want to work with us, join the builder community. Active members with verified skills can access platform services.",
+      "archive": {
+        "title": "Document Archive",
+        "description": "Browse original project records, technical reports, and photographs from 2012–2026."
+      },
+      "studies": {
+        "title": "Development Programs",
+        "description": "Join active programs and become part of the community."
+      },
+      "cta": "Explore Technology"
+    },
+    "trust": {
+      "title": "Why Trust Us",
+      "subtitle": "Transparency, quality, and community are our core values",
+      "quality": {
+        "title": "Quality Ingredients",
+        "description": "Carefully selected ingredients with verified provenance"
+      },
+      "community": {
+        "title": "Growing Community",
+        "description": "Active members in our program"
+      },
+      "research": {
+        "title": "Active Programs",
+        "description": "Ongoing and completed programs"
+      },
+      "security": {
+        "title": "Secure Data",
+        "description": "Your data is encrypted and protected"
+      }
+    },
+    "cta": {
+      "title": "Start Your Journey to Better Software",
+      "subtitle": "Choose a service that fits your project needs",
+      "button": "Explore Services",
+      "learnMore": "Our Story"
+    }
+  },
+  "validation": {
+    "passwordMin8": "Password must be at least 8 characters",
+    "passwordUppercase": "Password must contain an uppercase letter",
+    "passwordLowercase": "Password must contain a lowercase letter",
+    "passwordNumber": "Password must contain a number",
+    "passwordMatch": "Passwords do not match",
+    "passwordsNotMatch": "Passwords do not match",
+    "required": "This field is required",
+    "email": "Please enter a valid email address"
+  },
+  "datatable": {
+    "rowsSelected": "{{selected}} of {{total}} row(s) selected.",
+    "rowsPerPage": "Rows per page",
+    "pageOf": "Page {{current}} of {{total}}",
+    "goToFirst": "Go to first page",
+    "goToPrevious": "Go to previous page",
+    "goToNext": "Go to next page",
+    "goToLast": "Go to last page"
+  },
+  "pwa": {
+    "offlineReadyTitle": "App is ready to work offline",
+    "offlineReadyMessage": "Content has been cached for offline use.",
+    "updateAvailableTitle": "New version available",
+    "updateAvailableMessage": "Click update to load the latest version of the application.",
+    "update": "Update"
+  },
+  "news": {
+    "badge": "News & Updates",
+    "title": "What's New",
+    "subtitle": "The latest news, updates and announcements from our team.",
+    "noArticles": "No news articles published yet.",
+    "readMore": "Read more",
+    "backToNews": "Back to News",
+    "notFound": "Article not found.",
+    "emptyState": "No news articles found",
+    "searchPlaceholder": "Search articles…",
+    "filter": {
+      "tags": "Tags",
+      "sort": "Sort",
+      "label": "Filter"
+    },
+    "sort": {
+      "recent": "Most recent",
+      "oldest": "Oldest first",
+      "alpha": "Alphabetical (A–Z)",
+      "featured": "Featured"
+    }
+  },
+  "discussion": {
+    "title": "Discussion",
+    "type": "Type",
+    "placeholder": "Write a comment…",
+    "submit": "Post",
+    "cancel": "Cancel",
+    "reply": "Reply",
+    "replyingTo": "Replying to",
+    "posted": "Posted",
+    "signIn": "Sign in to join the discussion",
+    "unconfigured": "Discussion is not available here yet."
+  },
+  "betaBanner": {
+    "message": "This platform is in trial operation. Some features may be limited or subject to change.",
+    "dismiss": "Got it"
+  },
+  "dataConsent": {
+    "message": "This platform collects anonymized data for analysis and service improvement. No data is sent to third parties.",
+    "accept": "I understand and agree",
+    "decline": "I do not wish to continue",
+    "privacyNote": "All data remains on our servers within the EU."
+  },
+  "secretTerminal": {
+    "bootHeader": "AISHA SYSTEM v3.14\n(c) 2012-2026 Evymo Engineering Division\nInitializing secure terminal...",
+    "welcomeMessage": "Enter access code to proceed.",
+    "prompt": ">",
+    "accessDenied": "ACCESS DENIED",
+    "accessGranted": "ACCESS GRANTED — Redirecting...",
+    "inputLabel": "Terminal input"
+  },
+  "phiMode": {
+    "title": "Secure Data Mode",
+    "passwordPlaceholder": "Enter your password",
+    "description": "Enter your credentials to access protected sensitive information",
+    "cancel": "Cancel",
+    "unlock": "Unlock",
+    "unsupported": "Secure mode is not supported for your account type",
+    "magicLinkUserInfo": "You signed in with a magic link. Use OTP verification below.",
+    "passwordLabel": "Password",
+    "passwordRequired": "Password Required",
+    "passwordRequiredDescription": "You need to set a password or use OTP to access sensitive data",
+    "passwordEmailSent": "Password reset email sent",
+    "mustSetPasswordOrUseOtp": "You must set a password or use a one-time code to view sensitive data.",
+    "setPasswordViaEmail": "Set Password via Email",
+    "useOtpInstead": "Or use a one-time code instead",
+    "noPasswordHint": "Don't have a password? Use the OTP tab.",
+    "otpLabel": "One-Time Code",
+    "otpDescription": "We will send a one-time verification code to your email",
+    "otpPlaceholder": "Enter the code from your email",
+    "otpSent": "Verification code sent to your email",
+    "otpSendFailed": "Failed to send verification code",
+    "otpRateLimitGeneric": "Too many requests. Please wait before trying again.",
+    "otpRateLimitWithTime": "Too many requests. Please wait {{seconds}} seconds.",
+    "sendOtp": "Send Code",
+    "verifyOtp": "Verify Code"
+  },
+  "story": {
+    "knowledge": {
+      "title": "Story Knowledge Base",
+      "dropZone": "Drag a file here or click to upload",
+      "acceptedTypes": "PDF, DOCX, TXT, MD up to 50 MB",
+      "uploading": "Uploading…",
+      "selectFile": "Choose file",
+      "empty": "No documents yet.",
+      "deleteAria": "Delete document",
+      "uploadError": "Upload failed",
+      "uploadSuccess": "Document uploaded.",
+      "deleteSuccess": "Document deleted.",
+      "deleteError": "Delete failed"
+    }
+  }
+}

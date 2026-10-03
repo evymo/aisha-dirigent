@@ -1,0 +1,45 @@
+-- Table: production_protocol_steps
+-- RLS: ENABLED
+
+CREATE TABLE IF NOT EXISTS production_protocol_steps (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  batch_id uuid,
+  step_name text NOT NULL,
+  step_order int4,
+  description text,
+  is_completed bool DEFAULT false,
+  completed_by uuid,
+  completed_at timestamptz,
+  token_reward numeric(20,8),
+  metadata jsonb,
+  created_at timestamptz DEFAULT now(),
+  workflow_step_id uuid,
+  step_type text,
+  expected_input_volume numeric,
+  expected_output_volume numeric,
+  actual_input_volume numeric,
+  actual_output_volume numeric,
+  input_concentration numeric,
+  output_concentration numeric,
+  expected_loss numeric,
+  actual_loss numeric,
+  waste_volume numeric,
+  status text,
+  started_at timestamptz,
+  performed_by uuid,
+  notes text,
+  photos jsonb,
+  documents jsonb,
+  measurements jsonb,
+  verified_by uuid,
+  verified_at timestamptz,
+  verification_notes text,
+  updated_at timestamptz,
+  tokens_minted numeric,
+  tokens_burned numeric,
+  PRIMARY KEY (id),
+  CONSTRAINT production_protocol_steps_batch_id_fkey FOREIGN KEY (batch_id) REFERENCES production_batches(id) ON DELETE CASCADE,
+  CONSTRAINT production_protocol_steps_completed_by_fkey FOREIGN KEY (completed_by) REFERENCES aisha_auth.users(id)
+);
+
+ALTER TABLE production_protocol_steps ENABLE ROW LEVEL SECURITY;

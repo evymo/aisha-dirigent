@@ -1,0 +1,919 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back",
+    "settings": "Settings",
+    "logout": "Sign Out",
+    "login": "Sign In",
+    "ok": "OK",
+    "or": "or",
+    "try_again": "Please try again.",
+    "app_name": "{{brandFull}}"
+  },
+  "auth": {
+    "email": "Email",
+    "password": "Password",
+    "sign_in": "Sign In",
+    "sign_in_title": "{{brandFull}}",
+    "sign_in_subtitle": "Sign in to your account",
+    "invalid_credentials": "Invalid credentials",
+    "session_expired": "Session expired, please sign in again",
+    "biometric_prompt": "Verify your identity",
+    "biometric_unlock": "Unlock with {name}",
+    "biometric_offer_title": "Biometric login",
+    "biometric_offer_message": "Would you like to use {name} for quick login next time?",
+    "success_title": "Success",
+    "registration_success_desc": "Your account has been created. Please check your email to verify, then sign in.",
+    "registration_error_title": "Registration Failed",
+    "registration_error_desc": "Could not create your account. Please try again.",
+    "login_error_title": "Login Failed",
+    "magicLink": {
+      "sent": "Magic link sent",
+      "checkEmailDesc": "We sent a 6-digit code to",
+      "enterCode": "Verification code",
+      "codePlaceholder": "123456",
+      "verifyCode": "Verify Code",
+      "resend": "Resend Code",
+      "usePassword": "Use password instead",
+      "useMagicLink": "Use magic link instead",
+      "changeEmail": "Change email",
+      "sendLink": "Send Magic Link"
+    },
+    "oauth": {
+      "divider": "or continue with",
+      "apple": "Continue with Apple",
+      "google": "Continue with Google",
+      "keycloak": "Continue with {{brand}} ID",
+      "processing": "Signing you in...",
+      "success": "Authentication successful",
+      "redirecting_back": "Redirecting back to login..."
+    },
+    "register": {
+      "subtitle": "Create your {{brandFull}} account",
+      "full_name": "Full Name",
+      "full_name_placeholder": "John Doe",
+      "password_hint": "Minimum 8 characters",
+      "confirm_password": "Confirm Password",
+      "submit": "Create Account",
+      "have_account": "Already have an account?",
+      "login_link": "Sign In"
+    },
+    "login": {
+      "noAccount": "Don't have an account?",
+      "register": "Sign Up"
+    },
+    "errors": {
+      "accountNotFound": "Account Not Found",
+      "mustRegisterFirst": "No account exists with this email. Please register first.",
+      "verificationFailed": "Verification Failed",
+      "invalidCode": "The code you entered is invalid or expired. Please try again.",
+      "missing_tokens": "Could not complete authentication. No tokens received.",
+      "login_failed": "Login failed. Please try again."
+    },
+    "validation": {
+      "fill_all_fields": "Please fill in all fields.",
+      "password_length": "Password must be at least 8 characters.",
+      "passwords_mismatch": "Passwords do not match.",
+      "fill_email_password": "Please enter your email address."
+    },
+    "diagnostics": {
+      "show": "Show diagnostics",
+      "hide": "Hide diagnostics"
+    },
+    "webview": {
+      "title": "Sign in with RIQ ID",
+      "blocked": "This page is not available here — the app signs in only with your RIQ ID name and password."
+    }
+  },
+  "dashboard": {
+    "title": "Overview",
+    "projects": "Projects",
+    "active": "Active",
+    "blocked": "Blocked",
+    "messages": "Pending Messages",
+    "sentry": "Unresolved Errors",
+    "vulnerabilities": "Critical Vulnerabilities",
+    "build": "Build Status",
+    "last_deploy": "Last deploy",
+    "validate": "Validator"
+  },
+  "projects": {
+    "title": "Projects",
+    "empty": "No projects",
+    "status": "Status",
+    "priority": "Priority",
+    "agent": "Agent",
+    "progress": "Progress",
+    "messages_pending": "pending messages",
+    "complexity": "Complexity",
+    "created": "Created",
+    "checklist": "Checklist",
+    "consult_aisha": "Consult {{assistant}}",
+    "conversations": "Conversations",
+    "no_conversations": "No conversations yet"
+  },
+  "chat": {
+    "title": "{{assistant}} Chat",
+    "placeholder": "Type a message for {{assistant}}...",
+    "send": "Send",
+    "empty": "Start a conversation with {{assistant}}",
+    "thinking": "{{assistant}} is thinking...",
+    "story_context": "Story Context",
+    "new_conversation": "New Conversation"
+  },
+  "monitor": {
+    "title": "Monitoring",
+    "sentry_issues": "Sentry Issues",
+    "vulnerabilities": "Vulnerabilities",
+    "metrics": "Metrics",
+    "agents": "Agents",
+    "no_issues": "No unresolved issues",
+    "analyze": "Analyze with {{assistant}}",
+    "requests_24h": "Requests (24h)",
+    "error_rate": "Error Rate",
+    "avg_response": "Avg Response",
+    "active_users": "Active Users"
+  },
+  "settings": {
+    "title": "Settings",
+    "backend_url": "Server address",
+    "backend_url_placeholder": "https://api.example.com",
+    "anon_key": "Anon Key",
+    "test_connection": "Test Connection",
+    "connection_ok": "Connection OK",
+    "connection_failed": "Connection Failed",
+    "reset_to_default": "Reset to Default",
+    "language": "Language",
+    "notifications": "Notifications",
+    "enable_push": "Enable Push Notifications",
+    "about": "About",
+    "version": "Version",
+    "environment": "Environment",
+    "env_custom": "Custom",
+    "env_custom_hint": "Enter your Supabase URL",
+    "apply_environment": "Apply",
+    "env_switched": "Environment Switched",
+    "env_switched_desc": "You will be redirected to login.",
+    "current_env": "Active"
+  },
+  "startup": {
+    "error_title": "App startup failed",
+    "error_subtitle": "Check the connection settings and try again."
+  },
+  "questionnaire": {
+    "title": "Questionnaire",
+    "list_title": "Questionnaires",
+    "next": "Next",
+    "submit": "Submit",
+    "completed": "Completed",
+    "pending": "Pending",
+    "expired": "Expired",
+    "status_pending": "Awaiting completion",
+    "status_completed": "Completed",
+    "status_expired": "Expired",
+    "empty": "No questionnaires"
+  },
+  "validator": {
+    "title": "Pocket Validator",
+    "subtitle": "Interactive Definition of Done checklist",
+    "run": "Run Validation",
+    "running": "Validating...",
+    "passed": "Passed",
+    "failed": "Failed",
+    "dod_checklist": "DoD Checklist",
+    "effort": "Effort Estimate",
+    "complexity": "Complexity",
+    "hours": "Hours",
+    "confidence": "Confidence",
+    "tests_pass": "Tests passing",
+    "build_pass": "Build passing",
+    "typescript_strict": "TypeScript strict",
+    "gate_tests": "Gate tests",
+    "lint_clean": "Lint clean",
+    "i18n_complete": "i18n complete",
+    "rpc_only": "RPC-only pattern",
+    "no_select_star": "No .select(*)",
+    "no_pii_logs": "No PII in logs",
+    "rls_policies": "RLS policies",
+    "tsdoc_exports": "TSDoc on exports"
+  },
+  "home": {
+    "title": "Home",
+    "points": "Points",
+    "streak": "Streak",
+    "rank": "Rank",
+    "my_stories": "My Stories",
+    "no_stories": "No stories yet",
+    "reminders": "Today's Reminders",
+    "active_studies": "Active Studies",
+    "view_all_stories": "View all stories",
+    "action_stories": "Stories",
+    "action_leaderboard": "Leaderboard",
+    "action_studies": "Studies"
+  },
+  "story": {
+    "no_entries": "No entries yet",
+    "compose_placeholder": "Write a message...",
+    "description": "Description",
+    "labels": "Labels",
+    "reminders": "Reminders",
+    "tab_thread": "Thread",
+    "tab_timeline": "Timeline",
+    "no_timeline": "No activity yet",
+    "tab_chat": "Chat",
+    "chat_no_room": "No chat room for this story yet",
+    "chat_empty": "No messages yet",
+    "chat_placeholder": "Message…",
+    "chat_aisha": "{{assistant}}",
+    "chat_team": "Team",
+    "chat_voice": "Voice",
+    "chat_aisha_welcome": "Ask {{assistant}} about this story",
+    "chat_aisha_placeholder": "Ask {{assistant}}…",
+    "chat_ruleset": "ruleset",
+    "chat_context": "context",
+    "voice_title": "Story voice channel",
+    "voice_participants": "participants",
+    "voice_ready": "LiveKit token ready",
+    "voice_join": "Join voice",
+    "voice_hold": "Hold to talk",
+    "voice_leave": "Leave",
+    "voice_status": {
+      "disconnected": "Disconnected",
+      "connecting": "Connecting",
+      "connected": "Connected",
+      "error": "Connection error"
+    }
+  },
+  "stories": {
+    "title": "Stories",
+    "empty": "No stories",
+    "status": "Status",
+    "messages_pending": "pending messages"
+  },
+  "profile": {
+    "title": "Profile",
+    "tokens": "Tokens",
+    "membership": "Membership",
+    "completeness": "Profile Completeness",
+    "leaderboard": "Leaderboard",
+    "notifications": "Notifications",
+    "settings": "Settings",
+    "logout": "Sign Out",
+    "health": "Health",
+    "privacy": "Privacy & data",
+    "admin": "Admin",
+    "operations": "Operations"
+  },
+  "health": {
+    "title": "Health Check-in",
+    "pain": "Pain Level",
+    "sleep": "Sleep Quality",
+    "energy": "Energy Level",
+    "mood": "Mood",
+    "medication": "Medication",
+    "notes": "Notes",
+    "submit": "Submit Check-in",
+    "success": "Check-in saved!",
+    "trends": "Trends",
+    "no_data": "No check-ins yet",
+    "log": "Log a check-in",
+    "notes_placeholder": "Notes (optional)",
+    "logged": "Check-in saved",
+    "logged_desc": "Your check-in was recorded.",
+    "history": "History",
+    "steps_30d": "Steps trend (30d)",
+    "labs": "Lab results",
+    "no_labs": "No lab results",
+    "dosing": "Dosing",
+    "no_dosing": "No dosing logs",
+    "symptoms": "Symptoms",
+    "no_symptoms": "No ongoing symptoms"
+  },
+  "leaderboard": {
+    "title": "Leaderboard",
+    "your_rank": "Your Rank",
+    "all_tokens": "All",
+    "governance": "Governance",
+    "impact": "Impact",
+    "data": "Data",
+    "empty": "No entries yet"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "empty": "No notifications",
+    "mark_read": "Mark as read",
+    "mark_all_read": "Mark all as read"
+  },
+  "errors": {
+    "title": "Error",
+    "generic": "Something went wrong. Please try again.",
+    "network": "Network error. Check your connection.",
+    "session_expired": "Session expired. Please sign in again.",
+    "permission_denied": "You don't have permission for this action.",
+    "not_found": "Not found.",
+    "rate_limit": "Too many requests. Try again later.",
+    "validation": "Invalid data."
+  },
+  "wallet": {
+    "title": "Wallet",
+    "address": "Your {{brand}} Address",
+    "copied": "Address copied!",
+    "governance": "Vote on Proposals",
+    "history": "Transaction History",
+    "noTransactions": "No transactions yet.",
+    "required": "Wallet required. Create or import one first.",
+    "setup": {
+      "title": "{{brand}} Wallet",
+      "subtitle": "Create or import your Cosmos wallet to vote on governance proposals and manage tokens.",
+      "create": "Create New Wallet",
+      "import": "Import Existing Wallet",
+      "mnemonicPlaceholder": "Enter your 24-word recovery phrase…",
+      "confirmImport": "Import Wallet"
+    },
+    "backup": {
+      "title": "Backup Your Seed Phrase",
+      "warning": "Write down these 24 words and store them safely. This is the ONLY way to recover your wallet.",
+      "done": "I've Saved My Seed Phrase"
+    },
+    "delete": {
+      "title": "Delete Wallet",
+      "message": "This action is irreversible. Make sure you have backed up your seed phrase.",
+      "confirm": "Delete",
+      "button": "Delete Wallet"
+    }
+  },
+  "governance": {
+    "title": "Governance",
+    "subtitle": "Vote on active proposals to shape the {{brand}} ecosystem.",
+    "walletRequired": "You need a {{brand}} wallet to vote. Go to the Wallet tab to create one.",
+    "noProposals": "No active proposals at this time.",
+    "votingEnds": "Voting ends",
+    "voteSuccess": "Vote submitted!",
+    "voteFailed": "Vote failed"
+  },
+  "signTx": {
+    "title": "Sign Transaction",
+    "heading": "Review & Sign",
+    "description": "Authenticate with biometrics to sign this transaction.",
+    "messages": "Messages",
+    "memo": "Memo",
+    "sign": "Sign & Broadcast",
+    "signing": "Signing…",
+    "success": "Transaction Confirmed",
+    "failed": "Transaction Failed"
+  },
+  "claimReward": {
+    "title": "Claim Rewards",
+    "subtitle": "Collect your earned {{brand}} tokens on-chain.",
+    "walletRequired": "You need a {{brand}} wallet to claim rewards.",
+    "noRewards": "No rewards to claim right now.",
+    "claim": "Claim",
+    "success": "Reward claimed!",
+    "failed": "Claim failed"
+  },
+  "kanban": {
+    "move_title": "Move story",
+    "no_moves": "No moves available",
+    "statuses": {
+      "inbox": "Inbox",
+      "in_progress": "In progress",
+      "blocked": "Blocked",
+      "review": "Review",
+      "testing": "Testing",
+      "done": "Done",
+      "archived": "Archived",
+      "deployed": "Deployed"
+    }
+  },
+  "studies": {
+    "list_title": "Studies",
+    "detail_title": "Study",
+    "my_studies": "My studies",
+    "discover": "Discover",
+    "none_available": "No studies available right now",
+    "funding": "Funding",
+    "questionnaires": "Questionnaires",
+    "no_questionnaires": "No scheduled questionnaires yet",
+    "consent": "Consent",
+    "required": "Required",
+    "consent_note": "Review and accept the consent items before enrolment.",
+    "required_accepted": "required accepted",
+    "consent_required_title": "Consent required",
+    "consent_required_desc": "Accept all required consent items before enrolment.",
+    "consent_contract_error": "Consent setup is incomplete for this study. Try again later or contact support.",
+    "enroll": "Enrol in study",
+    "enroll_ok": "Enrolled",
+    "enroll_ok_desc": "You are now registered. Scheduled questionnaires will appear here.",
+    "status": {
+      "pending": "Pending",
+      "screening": "Screening",
+      "enrolled": "Enrolled",
+      "active": "Active",
+      "completed": "Completed",
+      "withdrawn": "Withdrawn"
+    },
+    "qstatus": {
+      "pending": "Due",
+      "completed": "Completed",
+      "expired": "Expired"
+    }
+  },
+  "services": {
+    "title": "Subscription & services",
+    "subscription": "Subscription",
+    "next_billing": "Next billing",
+    "free_tier": "Free tier — no active subscription",
+    "free_tier_short": "Free",
+    "product_access": "Product access",
+    "expires": "Expires",
+    "llm_quota": "LLM quota",
+    "tokens_remaining": "tokens remaining",
+    "packages": "Packages",
+    "reward_rules": "Reward rules"
+  },
+  "operations": {
+    "title": "Operations",
+    "appointments": "Appointments",
+    "appointment": "Appointment",
+    "no_appointments": "No appointments",
+    "orders": "Orders",
+    "order": "Order",
+    "no_orders": "No orders",
+    "cart": "Cart",
+    "no_cart": "Cart is empty",
+    "vouchers": "Vouchers",
+    "no_vouchers": "No vouchers",
+    "wearables": "Wearables",
+    "wearable": "Wearable",
+    "no_wearables": "No wearable connections"
+  },
+  "privacy": {
+    "title": "Privacy & compliance",
+    "compliance": "Compliance",
+    "discount_eligible": "Discount eligible",
+    "score": "Score",
+    "completed": "Completed",
+    "streak": "Streak",
+    "consents": "Consents",
+    "no_consents": "No consents recorded",
+    "granted": "Granted",
+    "revoked": "Revoked",
+    "data_sharing": "Data sharing",
+    "no_sharing": "Not sharing data with partners",
+    "partner": "Partner",
+    "expires": "Expires",
+    "devices": "Devices",
+    "no_devices": "No registered devices",
+    "device": "Device"
+  },
+  "admin": {
+    "title": "Admin · Operator",
+    "not_authorized": "Admin access required",
+    "api_stats": "API (24h)",
+    "requests_24h": "Requests",
+    "error_rate": "Error rate",
+    "avg_response": "Avg response",
+    "active_users": "Active users",
+    "no_data": "No metrics available",
+    "top_endpoints": "Top endpoints",
+    "agents": "AI agents",
+    "no_agents": "No agent activity",
+    "runs": "runs",
+    "tokenomics": "Tokenomics",
+    "token_configs": "Token configs",
+    "transaction_summary": "Transaction summary",
+    "footer_note": "Operator view — admin/staff only"
+  },
+  "naturel": {
+    "words": {
+      "choiceVariants": "At gates I will give you {{count}} equal variants with trade-offs, no preselection.",
+      "choiceSteps": "I will guide you step by step — the recommended option comes preselected, and after each decision I say what follows.",
+      "choiceRecommendation": "I will bring one recommendation with its impact; other variants stay collapsed, one tap away.",
+      "messageBrief": "Messages brief: summary first, details collapsed.",
+      "messageRich": "Messages in detail: numbers, sources and context up front.",
+      "messageStandard": "Messages standard: summary + detail on demand.",
+      "evidenceInline": "Sources and provenance shown right next to the numbers.",
+      "evidenceOnDemand": "Sources one tap away (provenance is never missing).",
+      "cadenceDigest": "I will collect updates into a morning brief ({{at}}).",
+      "cadenceLive": "I will bring updates continuously as they come.",
+      "deferOption": "Deferring a decision will be offered as a legitimate choice — big gates wait for the morning.",
+      "inviteOthers": "You can invite a colleague to a decision in one tap, briefing included."
+    },
+    "steps": {
+      "podani": {
+        "overline": "Calibration 1/3 · first gate",
+        "question": "Should I present things to you rather as…",
+        "opt0": {
+          "title": "Variants to compare — I will choose.",
+          "detail": "impacts and trade-offs side by side"
+        },
+        "opt1": {
+          "title": "A ready recommendation — I confirm and go.",
+          "detail": "one sentence, the impact, a button"
+        },
+        "opt2": {
+          "title": "Guide me step by step.",
+          "detail": "one clear next step at a time"
+        }
+      },
+      "forma": {
+        "overline": "Calibration 2/3 · first output",
+        "question": "Should the first output come as…",
+        "opt0": {
+          "title": "A brief summary.",
+          "detail": "the essence in a few lines, detail on tap"
+        },
+        "opt1": {
+          "title": "Detail with sources and numbers.",
+          "detail": "provenance and context up front"
+        },
+        "opt2": {
+          "title": "A table.",
+          "detail": "columns, mono numbers, sortable"
+        }
+      },
+      "kadence": {
+        "overline": "Calibration 3/3 · tempo",
+        "question": "You want updates from me…",
+        "opt0": {
+          "title": "Continuously, as things come.",
+          "detail": "live flow, exceptions immediately"
+        },
+        "opt1": {
+          "title": "Once, in a morning brief.",
+          "detail": "a calm summary at 08:00, urgencies as exceptions"
+        }
+      }
+    },
+    "calibration": {
+      "doneOverline": "Calibration · done",
+      "doneTitle": "This is how I will talk with you:",
+      "save": "Save my style →",
+      "back": "← Adjust",
+      "skip": "Just start working",
+      "footnote": "A preference, not a diagnosis — only you see the profile, and it never changes the facts.",
+      "noWrongAnswer": "There is no right answer — pick what feels closest. You can change it anytime in \"My style\".",
+      "deniedTitle": "We were not let in — looks like a different network. Knock and try again.",
+      "saveError": "Saving failed. Please try again.",
+      "knockAction": "Knock on the door"
+    },
+    "arch": {
+      "kurator": "Curator",
+      "dispecer": "Dispatcher",
+      "dokoncovac": "Finisher",
+      "metodik": "Methodist",
+      "ladic": "Tuner"
+    },
+    "axes": {
+      "initiative": {
+        "name": "N1 · Initiative",
+        "lo": "I open topics",
+        "hi": "I react to prompts"
+      },
+      "choice": {
+        "name": "N2 · Breadth of choice",
+        "lo": "give me variants",
+        "hi": "guide me"
+      },
+      "grain": {
+        "name": "N4 · Grain",
+        "lo": "the whole is enough",
+        "hi": "I want detail"
+      },
+      "closure": {
+        "name": "N5 · Closure",
+        "lo": "open ends are fine",
+        "hi": "I need things closed"
+      },
+      "register": {
+        "name": "N6 · Register",
+        "lo": "matter-of-fact",
+        "hi": "personal"
+      }
+    },
+    "style": {
+      "title": "My style with {{assistant}}",
+      "emptyTitle": "No profile yet.",
+      "emptyHint": "Go through the calibration (3 choices) — safe defaults apply until then.",
+      "startCalibration": "Start calibration",
+      "confidence": "confidence {{pct}} %",
+      "howNow": "How I do it now",
+      "switchChoice": "Switch how choices are presented",
+      "variants": "Variants",
+      "recommendation": "Recommendation",
+      "steps": "Step by step",
+      "live": "Continuously",
+      "digest": "Morning brief",
+      "lock": "Lock (stop learning)",
+      "unlock": "Unlock learning",
+      "recalibrate": "Re-calibrate",
+      "reset": "Turn off and delete profile",
+      "resetTitle": "Delete profile?",
+      "resetBody": "The saved style will be deleted and safe defaults apply. You can run the calibration again anytime.",
+      "resetConfirm": "Delete",
+      "privacy": "Your explicit choice always beats the estimate. The profile belongs to you — managers and HR never see it; it never enters evaluations."
+    }
+  },
+  "extranet": {
+    "source": "Source",
+    "blockUnavailable": "This block is unavailable right now.",
+    "blockType": "Block type: {{type}}",
+    "moreRows": "…and {{n}} more",
+    "queueEmpty": "Nothing waiting for confirmation.",
+    "tower": {
+      "flag": {
+        "green": "Running",
+        "yellow": "Checking",
+        "red": "Blocked",
+        "box": "Waiting on a person",
+        "finish": "Delivered"
+      },
+      "inPhase": "In phase",
+      "notMeasured": "—",
+      "waitingFor": "Waiting on"
+    },
+    "porada": {
+      "overline": "Extranet · Daily brief",
+      "title": "Daily brief",
+      "toTabs": "To home",
+      "loadError": "Couldn't load the brief right now. Pull down to retry.",
+      "emptyTitle": "Nothing here yet.",
+      "emptyHint": "Once the evidence and data sources are running you'll get a daily overview here: operations, people, money, contracts and decisions to confirm — each figure with its verbatim quote and source."
+    },
+    "wf": {
+      "progress": "Process runs",
+      "mySteps": "My milestones",
+      "timeline": "Process timeline"
+    },
+    "tape": {
+      "done": "Done today",
+      "now": "Now",
+      "ahead": "Ahead",
+      "position": "{{n}} of {{total}} today",
+      "handover": "Handover and signature",
+      "goal": "Unload",
+      "moreItems": "+{{n}} more"
+    },
+    "sections": {
+      "pick": "Sections",
+      "inactive": "Not connected yet"
+    },
+    "day": {
+      "label": "Day",
+      "current": "as the block is configured",
+      "clear": "Clear",
+      "weekdays": "Mo,Tu,We,Th,Fr,Sa,Su",
+      "months": "January,February,March,April,May,June,July,August,September,October,November,December"
+    },
+    "target": {
+      "open": "Open: {{label}}"
+    },
+    "kpi_state": {
+      "warning": "caution",
+      "loss": "loss",
+      "ok": "ok"
+    },
+    "overline": "Extranet",
+    "profile": {
+      "unmatchedTitle": "This app targets a section that isn't here",
+      "unmatchedHint": "The build profile names {{sections}}, but the server did not grant it to you. Either it is not assigned to you, or the deployment has a typo — please report it; the app will not guess."
+    },
+    "blockFailed": "Cannot load data right now.",
+    "blockFailedHint": "This is not something you did — please try again shortly.",
+    "blockNoAccess": "You do not have access to this data yet.",
+    "actionTitle": "Actions",
+    "actionNone": "No actions available here.",
+    "actionSubmit": "Run",
+    "actionCancel": "Cancel",
+    "actionDone": "Recorded.",
+    "actionFailed": "The action was not recorded. Try again.",
+    "actionRequired": "required",
+    "actionYes": "Yes",
+    "actionNo": "No"
+  },
+  "workflow": {
+    "steps": {
+      "overline": "Operations",
+      "title": "My steps",
+      "emptyTitle": "No pending steps",
+      "emptyHint": "When a process step is assigned to you (e.g. a delivery handover), it will appear here.",
+      "loadError": "Could not load your steps. Please try again.",
+      "recipient": "Recipient (name)",
+      "recipientPlaceholder": "Who received the shipment",
+      "itemsOk": "Items match",
+      "deviation": "Deviation (step failed)",
+      "note": "Remark on the delivery",
+      "notePlaceholder": "What on site does not match the note — quantity, condition, damage. Optional.",
+      "submit": "Confirm completion",
+      "submitDeviation": "Save deviation",
+      "submitting": "Saving…",
+      "completed": "Step completed.",
+      "rewarded": "Step completed · +{{amount}} {{token}}",
+      "queuedOffline": "No signal — saved, will send itself (photos: {{n}}).",
+      "queuedAfterFailure": "Sending failed — your work is saved and will send itself.",
+      "queuedLocked": "Saved. You are online, but the server refused us — knock to get in.",
+      "queuedKnocked": "Saved. The device knocked on its own — the queue will retry.",
+      "knockAction": "Knock",
+      "completeError": "Completion failed. Please try again.",
+      "doneSection": "Completed",
+      "status": {
+        "completed": "completed",
+        "failed": "deviation",
+        "pending": "pending",
+        "in_progress": "in progress"
+      },
+      "recipientLast": "Last received by: {{name}} — tap to fill"
+    },
+    "step": {
+      "mineTitle": "Your step",
+      "dispatchTitle": "Dispatcher view",
+      "dispatchHint": "This step belongs to someone else. You may complete it, but the record will show that YOU confirmed it.",
+      "notFoundTitle": "Step unavailable",
+      "notFoundHint": "It either does not exist or you have no claim to it.",
+      "backToMine": "← Back to my steps",
+      "state": "State",
+      "doc": "Document",
+      "due": "Due",
+      "assignedTo": "Assigned to",
+      "role": "Role",
+      "assignedTwin": "Driver / vehicle",
+      "completedBy": "Closed by",
+      "deviationLabel": "Deviation",
+      "deviationFlag": "Yes — the step ended in a deviation",
+      "noteLabel": "Remark on the delivery",
+      "pathTitle": "Document path",
+      "cargoSection": "Cargo and document",
+      "cargoSource": "Delivery note {{doc}}",
+      "itemName": "Material",
+      "itemQty": "Quantity",
+      "itemsPending": "Awaiting review"
+    }
+  },
+  "handover": {
+    "signature": "Recipient's signature",
+    "signHere": "Sign with your finger",
+    "clear": "Clear",
+    "signatureTooLarge": "Signature is too large — clear it and sign again.",
+    "moment": {
+      "nadpis": "Delivery handover",
+      "komu": "Customer",
+      "kam": "Where",
+      "vozidlo": "Vehicle",
+      "veta": "By signing I confirm receipt of delivery {{predmet}}.",
+      "vetaBezPredmetu": "By signing I confirm receipt of the delivery.",
+      "podat": "Hand over for signature",
+      "hotovo": "Done",
+      "zrusit": "Back",
+      "podepsano": "✓ Signed",
+      "znovu": "Again"
+    },
+    "signatureTooShort": "Please sign — a single tap is not a signature.",
+    "cta": {
+      "start": "Handover and signature",
+      "agree": "Matches · to signature",
+      "confirm": "Confirm handover"
+    },
+    "sheet": {
+      "title": "Handover · {{kam}}",
+      "back": "Back"
+    },
+    "step": {
+      "check": "Check",
+      "sign": "Signature"
+    },
+    "missing": {
+      "podpis": "The recipient's signature is missing.",
+      "jmeno": "The recipient's name is missing.",
+      "obe": "The recipient's signature and name are missing."
+    },
+    "extra": {
+      "title": "Only if something is off",
+      "hint": "None of this is required — we record the time and place of the handover ourselves.",
+      "claim": "Reservation",
+      "claimPlaceholder": "E.g. 2 kerbs with chipped edges — accepted with reservation.",
+      "claimCancel": "Remove reservation",
+      "claimHint": "It is recorded with the handover and dispatch will see it."
+    },
+    "sign": {
+      "title": "Recipient's signature",
+      "cargo": "Material",
+      "claim": "With reservation",
+      "claimYes": "yes · note attached"
+    },
+    "done": {
+      "title": "Handed over",
+      "sent": "Sent to dispatch",
+      "next": "Next trip",
+      "continue": "Continue",
+      "signedBy": "Signature",
+      "signed": "✓ signed",
+      "photos": "Photos",
+      "pieces": "{{n}}",
+      "claim": "Reservation"
+    }
+  },
+  "evidence": {
+    "photos": "Photo",
+    "photo": "Photograph",
+    "cameraDeniedTitle": "Camera not allowed",
+    "cameraDenied": "Without camera access I cannot take the photo. You can allow it in Settings.",
+    "captureFailedTitle": "Could not take the photo",
+    "captureFailed": "Please try again.",
+    "deleted": "Photo deleted",
+    "undo": "Undo"
+  },
+  "meter": {
+    "value": "Meter reading",
+    "valuePlaceholder": "e.g. 12345.6",
+    "suggested": "Read by the app: {{value}} — check and correct if needed",
+    "valueRequired": "Enter the value you see on the display.",
+    "saved": "Reading saved · {{value}}",
+    "savedNoPhoto": "Reading saved · {{value}} (photo upload failed)",
+    "queuedOffline": "No signal — reading {{value}} saved, will send itself."
+  },
+  "knock": {
+    "title": "Knock",
+    "intro": "The server is not answering, or it is refusing you. Enter the code and knock — only then will it let you in.",
+    "code_label": "Code",
+    "action": "Knock",
+    "sent": "Knocked",
+    "sent_desc": "The door never answers a knock — the only way to tell whether it opened is that the next request goes through. Try again.",
+    "try_again_now": "Try again",
+    "not_sent": "Not sent",
+    "unknown_error": "Unknown error",
+    "not_configured": "Nothing to knock with",
+    "not_configured_desc": "The knock target is not declared. Knocking blind is pointless: a knock at the wrong address looks exactly like a correct one — that is, like nothing. Add to the build:",
+    "fromLogin": "Can't connect? Knock on the door",
+    "device_title": "This device",
+    "device_none": "This device has no credential of its own, so knocking is manual only.",
+    "device_enroll": "Enrol this device",
+    "device_enrolled": "This device has its own credential.",
+    "device_pending": "The credential opens nothing by itself. Send the fingerprint to an administrator; until they approve it, knocking stays manual.",
+    "tablet_waiting": "Waiting for administrator approval — in administration: Devices → Door credentials.",
+    "tablet_approved": "Approved. The tablet opens the door by itself.",
+    "tablet_revoked": "The credential was revoked. The tablet will not open the door by itself.",
+    "tablet_door_closed": "Enrolment works only right after knocking with a technician code. Knock and try again.",
+    "tablet_failed": "Enrolment failed: {{duvod}}",
+    "tablet_retry": "Enrol again",
+    "device_fingerprint": "Fingerprint for the administrator",
+    "device_forget": "Forget this device",
+    "device_error": "There is a problem with the device credential"
+  },
+  "fronta": {
+    "ceka": "⏳ Waiting to send: {{n}}",
+    "odesila": "↑ Sending… ({{n}})",
+    "nevim": "⚠️ Can't tell what's waiting to send",
+    "vyzaduje-cloveka": "⚠️ Won't send on its own: {{n}}",
+    "zkusit": "Try now"
+  },
+  "kiosk": {
+    "title": "Today's deliveries",
+    "podle_ridice": "By driver",
+    "podle_vozidla": "By vehicle",
+    "k_predani": "{{pocet}} to hand over",
+    "hotovo": "{{pocet}} done",
+    "predano": "Handed over",
+    "prazdne": "Nothing to hand over today.",
+    "vyber": "Choose who is driving or which vehicle.",
+    "prihlasit": "Sign in to your account",
+    "odhlasit": "Sign out",
+    "odhlasit_fronta": "There are unsent handovers on this tablet. They will be sent when you sign in on this tablet again. Sign out anyway?",
+    "prihlasen_jako": "Signed in: {name} · the tablet signs you out at midnight",
+    "tablet": "Cab tablet",
+    "pruvodce_nacitam": "The tablet is connecting…",
+    "zavedeni_nadpis": "Tablet setup",
+    "zavedeni_nezname": "The server does not know this tablet — announce it again with the technician code.",
+    "zavedeni_krok1": "The technician enters the door code.",
+    "zavedeni_krok2": "The tablet knocks and announces itself with its fingerprint.",
+    "zavedeni_krok3": "An administrator approves it (Devices → Door credentials). From then on the tablet runs on its own.",
+    "zavedeni_kod": "Technician code",
+    "zavedeni_akce": "Knock and announce",
+    "zavedeni_bezi": "Knocking and announcing…",
+    "zavedeni_dvere": "The door did not open. Either the technician code is wrong, or the server does not have the tablet door enabled yet (administrator). Try again.",
+    "zavedeni_neodeslano": "Knocking failed: {{duvod}}",
+    "zavedeni_chyba": "Setup failed: {{duvod}}",
+    "zavedeni_nenastaveno": "The device manager has not configured the door for this tablet. Contact service.",
+    "ceka_nadpis": "Waiting for approval",
+    "ceka_text": "An administrator approves the tablet in Devices → Door credentials. The tablet checks by itself.",
+    "pripojuji_nadpis": "Approved — connecting",
+    "pripojuji_text": "The tablet opens the door with its own credential and gets access to today's deliveries.",
+    "odvolano_nadpis": "The tablet was revoked",
+    "odvolano_text": "Contact the administrator. If the tablet is approved again, it reconnects by itself.",
+    "vyprselo_nadpis": "The tablet's access expired",
+    "vyprselo_text": "An administrator renews it. The tablet then reconnects by itself.",
+    "vadny_nadpis": "The tablet key is damaged",
+    "vadny_text": "Service: door symbol at the top → Forget device → set up again.",
+    "porucha_nadpis": "Cannot reach the server",
+    "znovu_za": "Retrying in {{s}} s",
+    "zkusit_hned": "Try now",
+    "rozvozy_chyba": "Deliveries could not be loaded right now — retrying.",
+    "doklad": "Delivery note",
+    "ridic": "Driver",
+    "vozidlo": "Vehicle",
+    "zpet_na_rozvozy": "← Back to deliveries"
+  }
+}

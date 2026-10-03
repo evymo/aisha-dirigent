@@ -1,0 +1,640 @@
+{
+  "name": "WF_KB_COMPLIANCE_GATE",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "kb-compliance-gate",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "gate-webhook",
+      "name": "KB Compliance Gate Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ queue_id: $json.body.queue_id, resource_type: $json.body.resource_type || 'expert_rule', rule_id: $json.body.rule_id, plugin_id: $json.body.plugin_id, slug: $json.body.slug, title: $json.body.title || $json.body.name || '', summary: $json.body.summary || $json.body.description || '', category: $json.body.category || 'other', body_preview: $json.body.body_preview || '', capabilities: $json.body.capabilities || [], ai_context_tags: $json.body.ai_context_tags || [], requester_id: $json.body.requester_id, action: $json.body.action || 'publish' }) }}",
+        "options": {}
+      },
+      "id": "parse-request",
+      "name": "Parse Publish Request",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        470,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/get_expert_rule_detail",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_rule_slug",
+              "value": "={{ $json.slug }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "fetch-rule",
+      "name": "Fetch Full Rule Content",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        690,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/functions/v1/mcp-knowledge-server",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ method: 'tools/call', params: { name: 'validate_compliance', arguments: { description: $('Parse Publish Request').first().json.title + ': ' + $('Parse Publish Request').first().json.summary, scope: 'rules', area: $('Parse Publish Request').first().json.category } } }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "fetch-context",
+      "name": "Fetch KB Context for Evaluation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        910,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "model": "gpt-4",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "Jsi AISHA — AI Supervizorka a Holistic Analytička platformy AISHA. Tvůj úkol je evaluovat navrhovanou změnu v knowledge base a rozhodnout, zda je v souladu s posláním platformy.\n\nPoslání AISHA: Komunitní platforma pro propojení klientů s odbornými specialisty a matching projektů. Holistic solutions realizované softwarem.\n\nHodnotící kritéria:\n1. ALIGNMENT — Je změna v souladu s architekturou a principy platformy?\n2. SECURITY — Neporušuje bezpečnostní vzory (SECURITY DEFINER, audit, RLS)?\n3. COHERENCE — Je konzistentní s existujícími pravidly? Nevytváří rozpory?\n4. QUALITY — Je dostatečně kvalitní pro knowledge base (jasný, srozumitelný, aplikovatelný)?\n5. IMPACT — Jaký dopad bude mít na existující stories, agenty a workflows?\n\nVýstup MUSÍ být JSON:\n{\n  \"decision\": \"approved\" | \"rejected\" | \"escalated\",\n  \"confidence\": 0.0-1.0,\n  \"reason\": \"stručné zdůvodnění (1-2 věty)\",\n  \"alignment_score\": 0.0-1.0,\n  \"security_score\": 0.0-1.0,\n  \"coherence_score\": 0.0-1.0,\n  \"quality_score\": 0.0-1.0,\n  \"flags\": [\"volitelné flagy\"]\n}\n\nRozhodovací logika:\n- confidence ≥ 0.8 AND všechny scores ≥ 0.7 → approved\n- security_score < 0.5 NEBO alignment_score < 0.3 → rejected\n- jinak → escalated (vyžaduje lidský review)\n\nPokud Typ == 'agent': hodnotíš PUBLIKOVANÉHO MARKETPLACE AGENTA (executable run-as-story persona certifikovaného člena guildy). Obsah jsou jeho capabilities + agent_spec (rule_slugs, knowledge_items, runtime config). Klíčové je SECURITY (nebezpečné capabilities/tools, eskalace oprávnění) a ALIGNMENT (rule_slugs odkazují na schválená pravidla). Při pochybnostech radši 'escalated' na lidský review — agenti jsou spustitelní."
+            },
+            {
+              "role": "user",
+              "content": "=Navrhovaná změna:\n\nTyp: {{ $('Parse Publish Request').first().json.resource_type }}\nTitul: {{ $('Parse Publish Request').first().json.title }}\nKategorie: {{ $('Parse Publish Request').first().json.category }}\nShrnutí: {{ $('Parse Publish Request').first().json.summary }}\nTagy: {{ ($('Parse Publish Request').first().json.ai_context_tags || []).join(', ') }}\n\nObsah (preview):\n{{ $('Parse Publish Request').first().json.resource_type === 'agent' ? ('Capabilities: ' + JSON.stringify($('Fetch Agent Detail').first().json?.capabilities || []) + '\\nAgent spec (rule_slugs + knowledge_items + runtime config): ' + JSON.stringify($('Fetch Agent Detail').first().json?.agent_spec || {})) : ($('Fetch Full Rule Content').first().json.body_markdown ? $('Fetch Full Rule Content').first().json.body_markdown.substring(0, 2000) : $('Parse Publish Request').first().json.body_preview) }}\n\nExistující KB kontext (validate_compliance výstup):\n{{ JSON.stringify($('Fetch KB Context for Evaluation').first().json) }}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.1,
+          "maxTokens": 500,
+          "responseFormat": "json_object"
+        }
+      },
+      "id": "aisha-eval",
+      "name": "AISHA Compliance Evaluation",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.4,
+      "position": [
+        1130,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ (() => { try { const eval_result = JSON.parse($json.message.content); const queue_id = $('Parse Publish Request').first().json.queue_id; const rule_id = $('Parse Publish Request').first().json.rule_id; return JSON.stringify({ ...eval_result, queue_id, rule_id }); } catch(e) { return JSON.stringify({ decision: 'escalated', confidence: 0, reason: 'Failed to parse AISHA evaluation: ' + e.message, queue_id: $('Parse Publish Request').first().json.queue_id, rule_id: $('Parse Publish Request').first().json.rule_id, flags: ['parse_error'] }); } })() }}",
+        "options": {}
+      },
+      "id": "parse-eval",
+      "name": "Parse Evaluation Result",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1350,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "approved",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "approved",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "rejected",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "rejected",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "outputKey": "escalated",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.decision }}",
+                    "rightValue": "escalated",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "fallbackOutput": "extra"
+      },
+      "id": "router",
+      "name": "Decision Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        1570,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/fn_aisha_kb_decision",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_queue_id: $json.queue_id, p_decision: 'approved', p_evaluation: { auto: true, reason: $json.reason, confidence: $json.confidence, alignment_score: $json.alignment_score, security_score: $json.security_score, coherence_score: $json.coherence_score, quality_score: $json.quality_score }, p_notes: 'AISHA auto-approved: ' + ($json.reason || 'aligned with platform mission') }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "approve",
+      "name": "Apply Decision: Approved",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1790,
+        180
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/fn_aisha_kb_decision",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_queue_id: $json.queue_id, p_decision: 'rejected', p_evaluation: { auto: true, reason: $json.reason, confidence: $json.confidence, flags: $json.flags || [], alignment_score: $json.alignment_score, security_score: $json.security_score }, p_notes: 'AISHA rejected: ' + ($json.reason || 'conflicts with platform rules') }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "reject",
+      "name": "Apply Decision: Rejected",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1790,
+        340
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/fn_aisha_kb_decision",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_queue_id: $json.queue_id, p_decision: 'escalated', p_evaluation: { auto: false, reason: $json.reason, confidence: $json.confidence, flags: $json.flags || [], alignment_score: $json.alignment_score, security_score: $json.security_score, coherence_score: $json.coherence_score, quality_score: $json.quality_score }, p_notes: 'AISHA escalated for human review: ' + ($json.reason || 'uncertain alignment') }) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "escalate",
+      "name": "Apply Decision: Escalated",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1790,
+        500
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "raw",
+        "jsonOutput": "={{ JSON.stringify({ logged: true, decision: $('Parse Evaluation Result').first().json.decision, rule_id: $('Parse Publish Request').first().json.rule_id, queue_id: $('Parse Publish Request').first().json.queue_id, timestamp: new Date().toISOString() }) }}",
+        "options": {}
+      },
+      "id": "log-decision",
+      "name": "Log Compliance Decision",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        2010,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "outputKey": "agent",
+              "conditions": {
+                "options": {
+                  "leftValue": "",
+                  "typeValidation": "loose"
+                },
+                "combinator": "and",
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.resource_type }}",
+                    "rightValue": "agent",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "id": "resource-type-router-0001",
+      "name": "Resource Type Router",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        580,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/get_agent_publish_detail",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_plugin_id",
+              "value": "={{ $json.plugin_id }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "fetch-agent-detail-0001",
+      "name": "Fetch Agent Detail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        690,
+        480
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "KB Compliance Gate Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Publish Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Publish Request": {
+      "main": [
+        [
+          {
+            "node": "Resource Type Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Full Rule Content": {
+      "main": [
+        [
+          {
+            "node": "Fetch KB Context for Evaluation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch KB Context for Evaluation": {
+      "main": [
+        [
+          {
+            "node": "AISHA Compliance Evaluation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AISHA Compliance Evaluation": {
+      "main": [
+        [
+          {
+            "node": "Parse Evaluation Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Evaluation Result": {
+      "main": [
+        [
+          {
+            "node": "Decision Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Decision Router": {
+      "main": [
+        [
+          {
+            "node": "Apply Decision: Approved",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Apply Decision: Rejected",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Apply Decision: Escalated",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Decision: Approved": {
+      "main": [
+        [
+          {
+            "node": "Log Compliance Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Decision: Rejected": {
+      "main": [
+        [
+          {
+            "node": "Log Compliance Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apply Decision: Escalated": {
+      "main": [
+        [
+          {
+            "node": "Log Compliance Decision",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resource Type Router": {
+      "main": [
+        [
+          {
+            "node": "Fetch Agent Detail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch Full Rule Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Agent Detail": {
+      "main": [
+        [
+          {
+            "node": "Fetch KB Context for Evaluation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

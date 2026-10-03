@@ -1,0 +1,11 @@
+{
+  "_comment": "Ratchet baseline. Each future PR may only DECREASE these counts. Target: 0 for every count. ACHIEVED 2026-05-26 in iter 10+11.",
+  "_generated_at": "2026-05-26T20:00:00Z",
+  "_last_iter": "iter 10+11: 0/0/0/0/0 — repo is template-clean. Gate is now hard zero (no further regressions tolerated). Total: 418 → 0.",
+  "frontend_or_experimental_url_literals": 0,
+  "infra_url_defaults_in_scripts": 0,
+  "coolify_uuid_strings": 0,
+  "realm_path_literals": 0,
+  "deployment_value_fallbacks": 0,
+  "registry_host_literals": 0
+}

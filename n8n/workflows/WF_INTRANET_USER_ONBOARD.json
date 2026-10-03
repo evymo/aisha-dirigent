@@ -1,0 +1,333 @@
+{
+  "name": "WF_INTRANET_USER_ONBOARD",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "intranet-onboard",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Onboard Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract user info from OAuth2 Proxy headers or webhook body\nconst input = $input.first().json;\nconst email = input.headers?.['x-auth-request-email'] || input.body?.email;\nconst preferredUsername = input.headers?.['x-auth-request-preferred-username'] || input.body?.username || '';\n\nif (!email) {\n  throw new Error('Missing user email — x-auth-request-email header or body.email required');\n}\n\nreturn [{\n  json: {\n    email,\n    username: preferredUsername,\n    triggered_at: new Date().toISOString(),\n  },\n}];"
+      },
+      "id": "extract-user",
+      "name": "Extract User Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "rpc",
+        "rpcName": "get_user_id_by_email",
+        "rpcParams": "={{ JSON.stringify({ p_email: $json.email }) }}",
+        "onError": "continueRegularOutput"
+      },
+      "id": "lookup-user",
+      "name": "Lookup User in DB",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        660,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const userId = $input.first().json;\nconst email = $('Extract User Info').first().json.email;\n\nif (!userId) {\n  return [{ json: { action: 'skip', reason: 'user_not_in_db', email } }];\n}\n\nreturn [{ json: { action: 'provision', user_id: userId, email } }];"
+      },
+      "id": "check-user-exists",
+      "name": "Check User Exists",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "action-check",
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "provision",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "should-provision",
+      "name": "Should Provision?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.APPSMITH_URL }}/api/v1/users?email={{ encodeURIComponent($json.email) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "check-appsmith-user",
+      "name": "Check Appsmith User",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        200
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst email = $('Check User Exists').first().json.email;\n\n// If user already exists in Appsmith, skip creation\nif (response?.data?.length > 0) {\n  return [{ json: { action: 'already_exists', email, appsmith_user_id: response.data[0].id } }];\n}\n\nreturn [{ json: { action: 'create', email } }];"
+      },
+      "id": "evaluate-appsmith-status",
+      "name": "Evaluate Appsmith Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "rpc",
+        "rpcName": "join_intranet_channel",
+        "rpcParams": "={{ JSON.stringify({ p_channel_slug: 'general', p_user_id: $('Check User Exists').first().json.user_id }) }}",
+        "onError": "continueRegularOutput"
+      },
+      "id": "join-general-channel",
+      "name": "Join General Channel",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        200
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "rpc",
+        "rpcName": "join_intranet_channel",
+        "rpcParams": "={{ JSON.stringify({ p_channel_slug: 'announcements', p_user_id: $('Check User Exists').first().json.user_id }) }}",
+        "onError": "continueRegularOutput"
+      },
+      "id": "join-announcements-channel",
+      "name": "Join Announcements Channel",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1980,
+        200
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, email: $('Extract User Info').first().json.email, provisioned: true }) }}"
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        2200,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, reason: $json.reason || 'user_not_found', email: $('Extract User Info').first().json.email }) }}"
+      },
+      "id": "respond-skip",
+      "name": "Respond Skip",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        420
+      ]
+    }
+  ],
+  "connections": {
+    "Onboard Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract User Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract User Info": {
+      "main": [
+        [
+          {
+            "node": "Lookup User in DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lookup User in DB": {
+      "main": [
+        [
+          {
+            "node": "Check User Exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check User Exists": {
+      "main": [
+        [
+          {
+            "node": "Should Provision?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Provision?": {
+      "main": [
+        [
+          {
+            "node": "Check Appsmith User",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Skip",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Appsmith User": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Appsmith Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Appsmith Status": {
+      "main": [
+        [
+          {
+            "node": "Join General Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Join General Channel": {
+      "main": [
+        [
+          {
+            "node": "Join Announcements Channel",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Join Announcements Channel": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "intranet"
+    },
+    {
+      "name": "story-intra"
+    }
+  ]
+}

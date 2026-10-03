@@ -1,0 +1,44 @@
+# =============================================================================
+# LiveKit Server Configuration — Evymo Production
+# =============================================================================
+# Docs: https://docs.livekit.io/realtime/self-hosting/configuration/
+#
+# API key/secret are injected via environment variables:
+#   LIVEKIT_API_KEY, LIVEKIT_API_SECRET
+# =============================================================================
+
+port: 7880
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+  # Use ICE lite for server-side (standard for SFU)
+  use_ice_lite: true
+  # Enable TURN relay via Coturn
+  turn_servers:
+    - host: ${TURN_DOMAIN}
+      port: 3478
+      protocol: udp
+      username: ${LIVEKIT_TURN_USER}
+      credential: ${LIVEKIT_TURN_PASSWORD}
+
+# Keys map is mandatory for self-hosted livekit-server startup.
+keys:
+  ${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}
+
+room:
+  # Maximum participants per room
+  max_participants: 50
+  # Auto-close room after all participants leave (seconds)
+  empty_timeout: 300
+  # Auto-close room after this duration regardless (seconds)
+  departure_timeout: 30
+
+logging:
+  level: ${LIVEKIT_LOG_LEVEL}
+  json: true
+
+webhook:
+  # Edge function for room/participant events → Supabase → n8n
+  urls:
+    - ${LIVEKIT_WEBHOOK_URL}
+  api_key: ${LIVEKIT_API_KEY}

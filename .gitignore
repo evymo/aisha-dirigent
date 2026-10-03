@@ -1,0 +1,241 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+AuthKey*
+*.p8
+offline-knowledge/*
+
+# Operator roster — real emails/identities are PII; never in the (public) repo.
+# Real roster lives locally (or AISHA_OPERATORS env); only the placeholder
+# example is committed. provision-operators.mjs resolves live Keycloak subs.
+config/operators.json
+!config/operators.json.example
+
+# Real production-data SQL migrations — PII / PHI; never in the (public) repo.
+# The folder's README promises this protection; enforce it here. Only the
+# skeleton (README + .gitkeep) is tracked; any *.sql dropped in stays local.
+aisha/db/seed/realdata/*
+!aisha/db/seed/realdata/.gitkeep
+!aisha/db/seed/realdata/README.md
+
+# PKI — private keys and CA material
+config/pki-client.key
+config/pki/*.key
+config/pki/root-ca.pem
+openxpki-config/config.d/system/crypto.yaml
+# All TLS material is regenerated per-instance by pki-init (Dockerfile.pki-init
+# entrypoint, openssl). Volume `pki-config-rendered` persists across restarts.
+# Keys NEVER live in git — even sample/dummy ones.
+openxpki-config/tls/
+
+trash
+.aisha
+.evymo
+
+# Per-tenant / private deploy artifacts — local-only, must never be in the public
+# OSS tree. Onboard tenants via overlays / scripts/init-new-tenant.sh, not here.
+# Default-deny every manifest, then re-include ONLY the platform/fork stacks by
+# name (safe — they are the product, not tenants). Any per-tenant manifest is
+# thus ignored WITHOUT the .gitignore having to name a real tenant.
+coolify/manifests/*.manifest
+!coolify/manifests/_template.manifest
+!coolify/manifests/aisha.manifest
+!coolify/manifests/cosmos.manifest
+!coolify/manifests/netbird.manifest
+scripts/gen_seed_stories.py
+scripts/seed_*.py
+
+# Private tenant roster for the leak-detection gates (exact tenant names). Held
+# only on operator/CI hosts — a committed denylist of real customers would itself
+# disclose them. See config/tenant.json.example + src/tests/gates/lib/tenant-leak-detect.ts.
+config/tenant.json
+
+# Private/heritage instance assets — real family/company imagery, local-only,
+# never in the public OSS tree (no code references them).
+src/assets/eko-*.jpg
+src/assets/rakusanovi.jpg
+# .forgejo/ runner state + cached secrets stay out of git, but the workflows
+# subtree IS source-controlled — pipelines live in git so review applies to
+# them like any code. Same pattern as .claude/{commands,skills,...} below.
+# Note: cannot say `.forgejo` then negate `!.forgejo/workflows/` — git stops
+# recursing into excluded directories, so children can't be re-included.
+# Instead, ignore only specific subpaths.
+.forgejo/runner-cache/
+.forgejo/secrets/
+.forgejo/.runner
+
+# Local warmup generated artifacts
+docker-compose.local.generated.json
+.env.local.dev
+
+# Cold-start runtime artifacts
+.coolify-deploy-snapshots/
+.tmp/
+.metrics/
+# .claude/ — Claude Code config, mostly local-only.
+# Whitelist tracked subtrees: commands (existing), skills + hooks (META-2 deploy
+# target per docs/deploy/AISHA_SELF_TOOLING.md), settings.json (project-level).
+# NOTE: settings.local.json is intentionally NOT tracked — it is per-machine
+# local config that Claude Code auto-accrues machine-specific permission grants
+# into (absolute /Users/<name>/… paths). Keep shared settings in settings.json.
+.claude/*
+!.claude/agents/
+!.claude/commands/
+!.claude/hooks/
+!.claude/lib/
+!.claude/skills/
+!.claude/settings.json
+!.claude/statusline.sh
+
+# Dependencies
+node_modules
+
+# Build outputs
+dist
+dist-ssr
+
+# Environment / secrets
+.env
+.env.*
+.env-*
+!.env.example
+!.env.docker.example
+!.env.supabase.example
+!.env.coolify.example
+!.env.aisha.example
+*.local
+
+# .aisha/ — local workspace config, only template tracked
+.aisha/*
+!.aisha/dirigent.template.json
+
+# .evymo/ — legacy, replaced by .aisha/
+.evymo/
+
+# MCP — contains only public anon key (read-only KB access), safe to commit
+# .mcp.json
+
+# Backup files (never commit)
+*.bak
+*.orig
+*.swp
+*.swo
+.backup/
+.backup-sort/
+# Coolify env/secrets backups — contain production credentials, never in git
+*env-prod-backup*
+.env-prod-backup-coolify-*.json
+
+# Supabase local state
+supabase/.branches/
+supabase/.temp/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS files
+Thumbs.db
+
+# Coverage / reports
+coverage/
+
+# Python artifacts (migration scripts etc.)
+*.pyc
+__pycache__/
+/tmp/
+*.pid
+
+# AI scripts runtime artifacts
+scripts/ai/.mlx-server.pid
+scripts/ai/.venv/
+
+# Misc
+*.tgz
+*.gz
+
+# db-manager runtime reports (regenerated on demand)
+docs/db-structure/*-report.json
+docs/db-structure/gates-test-report.json
+docs/db-structure/gates-test-progress.json
+# Full tbls site (browse-locally; the committed ER is docs/db/RELATIONSHIPS.md)
+docs/db/tbls/
+_tmp_*
+apple-keygen.*
+.claude/worktrees/
+.commit-msg.tmp
+
+# AISHA eval reports (generated, not versioned)
+docs/reports/aisha-eval-*.json
+test-results/
+
+# Playwright outputs
+playwright-report/
+playwright-report-e2e-dirigent/
+e2e/.auth/
+e2e/screenshots/
+security_and_test_analysis.md
+aisha-story.md.env.coolify.backup-*
+.rules
+
+# Gap-analysis reports (regenerable)
+reports/
+
+# ── Instanční soukromá vrstva (fail-CLOSED) ──────────────────────────────────
+# instances/<id>/private/ — VEŠKERÝ obsah je gitignorovaný (tajemství, provozní
+# poznámky, cokoli instančně specifického, co NIKDY nesmí nahoru). Sledují se
+# jen .gitkeep a README.md, aby struktura existovala v čerstvém klonu.
+#
+# Konvenci zavedl fork pod SVÝM jménem (`<jmeno>/private/`). Cesta se tady
+# ODVOZUJE z instances/, protože upstream je šablona a nesmí znát nájemníka —
+# a hlavně: pravidlo pojmenované po jednom forku ostatní instance NECHRÁNÍ.
+# Pořadí je nosné: první řádek vyloučí obsah, `!…/*/` vrátí podadresáře do hry,
+# aby šla vyjmout jejich .gitkeep — negace neumí vrátit soubor z vyloučeného
+# adresáře.
+instances/*/private/*
+!instances/*/private/.gitkeep
+!instances/*/private/README.md
+!instances/*/private/*/
+instances/*/private/*/*
+!instances/*/private/*/.gitkeep
+
+# === z konvergence forků ===
+.playwright-mcp/
+services/svc-web-artifact/node_modules/
+aisha/db/seed/instance/*.sql
+
+# dynamic port allocation (scripts/local/ports.mjs) — machine-local, never commit
+scripts/local/.env.ports
+scripts/local/.stack-ports.json
+
+# public/assets — content-hashed font/image deploy copies; source of truth lives
+# in the instance's own web/design repo (assets/), synced at deploy time. Never commit here.
+/public/assets/
+
+# Local deploy/reseed run artifacts (per-machine, never committed)
+.last-deploy-uuid
+.reseed-deploy-uuid
+.reseed*-uuid
+
+# Local pre-wipe vault snapshots (plaintext, mode 600) — never commit
+.vault-backups/
+
+# FUSE filesystem deletion artifacts (accidental commits over network mounts)
+.fuse_hidden*
+
+# Odkladiště instančního buildu (build-ios.sh → gen:tokens). NENÍ instance:
+# nese jen brand.tokens.json, nikdy i18n.json. Bez tohohle řádku zůstane po
+# každém instančním buildu v repu neuklizený artefakt (naměřeno 2026-09-03).
+instances/_overlay/

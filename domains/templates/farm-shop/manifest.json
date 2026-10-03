@@ -1,0 +1,6 @@
+{
+  "$note": "Example demo template — a family FARM SHOP. Showcases TWO platform capabilities: an e-shop product grid (commerce) AND a knowledge panel (document-grounded growing guides). Prices use '$' as a neutral placeholder — localise per instance. Brand-neutral, fork-freely. Seed with /seed-default { \"source_dir\": \"farm-shop\" } or AISHA_SEED_DOMAIN=farm-shop.",
+  "title_key": "web.farm.title",
+  "description_key": "web.farm.description",
+  "slug": "index"
+}

@@ -1,0 +1,12 @@
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/node:22-alpine
+WORKDIR /app
+COPY services/gateway/package.json services/gateway/package-lock.json* ./
+RUN npm ci --ignore-scripts
+COPY services/gateway/ .
+RUN npm run build
+ENV NODE_ENV=production
+RUN npm prune --omit=dev
+USER node
+EXPOSE 3001
+CMD ["node", "dist/server.js"]

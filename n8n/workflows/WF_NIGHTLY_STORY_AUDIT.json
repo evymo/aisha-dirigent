@@ -1,0 +1,326 @@
+{
+  "name": "WF_NIGHTLY_STORY_AUDIT",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 2 * * *"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Nightly 02:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "get_active_stories_for_audit",
+        "rpcParams": "{}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "get-active-stories",
+      "name": "Get Active Stories",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse stories and prepare for batch processing\nconst stories = Array.isArray($input.item.json) ? $input.item.json : ($input.item.json.data || []);\n\nif (stories.length === 0) {\n  return [{ json: { skip: true, message: 'No active stories to audit' } }];\n}\n\n// Return each story as a separate item for SplitInBatches\nreturn stories.map(s => ({\n  json: {\n    story_id: s.id,\n    title: s.title,\n    delivery_status: s.delivery_status,\n    tech_stack: s.tech_stack || [],\n    risk_profile: s.risk_profile || 'low',\n  }\n}));"
+      },
+      "id": "parse-stories",
+      "name": "Parse Stories",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.skip }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "skip-check",
+      "name": "Any Stories?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 5,
+        "options": {}
+      },
+      "id": "batch-stories",
+      "name": "Batch (5 at a time)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"validate_compliance\",\n    \"arguments\": {\n      \"story_id\": \"{{ $json.story_id }}\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "validate-story",
+      "name": "Validate Story Compliance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Evaluate each story's compliance\nconst batchItem = $('Batch (5 at a time)').item.json;\nconst complianceResult = $input.item.json;\n\n// Check if ruleset exists\nconst hasRuleset = complianceResult?.result?.content?.some(\n  r => r.type === 'resource'\n) ?? false;\n\nconst staleRuleset = !hasRuleset;\nconst needsAttention = staleRuleset;\n\nreturn {\n  story_id: batchItem.story_id,\n  title: batchItem.title,\n  delivery_status: batchItem.delivery_status,\n  risk_profile: batchItem.risk_profile,\n  has_ruleset: hasRuleset,\n  stale_ruleset: staleRuleset,\n  needs_attention: needsAttention,\n  audit_time: new Date().toISOString(),\n};"
+      },
+      "id": "evaluate-story",
+      "name": "Evaluate Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "create_ai_run",
+        "rpcParams": "={\n  \"p_kind\": \"compliance_check\",\n  \"p_story_id\": \"{{ $json.story_id }}\",\n  \"p_route_plan\": {\n    \"audit_type\": \"nightly\",\n    \"has_ruleset\": {{ $json.has_ruleset }},\n    \"needs_attention\": {{ $json.needs_attention }}\n  }\n}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "log-audit-run",
+      "name": "Log Audit Run",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1780,
+        200
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate all audit results into a summary\nconst items = $input.all();\nconst results = items.map(i => i.json);\n\nconst total = results.length;\nconst withRuleset = results.filter(r => r.has_ruleset).length;\nconst needsAttention = results.filter(r => r.needs_attention);\n\nreturn {\n  audit_summary: {\n    total_stories_audited: total,\n    with_active_ruleset: withRuleset,\n    without_ruleset: total - withRuleset,\n    needs_attention: needsAttention.length,\n    attention_stories: needsAttention.map(s => ({\n      story_id: s.story_id,\n      title: s.title,\n      issue: s.stale_ruleset ? 'no_ruleset' : 'compliance_issue',\n    })),\n    completed_at: new Date().toISOString(),\n  }\n};"
+      },
+      "id": "aggregate-results",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env?.AISHA_POSTGREST_URL || '') + '/rest/v1/audit_journal' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action\": \"NIGHTLY_STORY_AUDIT\",\n  \"metadata\": {{ JSON.stringify($json.audit_summary) }}\n}",
+        "options": {}
+      },
+      "id": "log-summary",
+      "name": "Log Audit Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1560,
+        450
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Nightly 02:00": {
+      "main": [
+        [
+          {
+            "node": "Get Active Stories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Active Stories": {
+      "main": [
+        [
+          {
+            "node": "Parse Stories",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Stories": {
+      "main": [
+        [
+          {
+            "node": "Any Stories?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Stories?": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Batch (5 at a time)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch (5 at a time)": {
+      "main": [
+        [
+          {
+            "node": "Validate Story Compliance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Story Compliance": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Result": {
+      "main": [
+        [
+          {
+            "node": "Log Audit Run",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Batch (5 at a time)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Audit Run": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Results": {
+      "main": [
+        [
+          {
+            "node": "Log Audit Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

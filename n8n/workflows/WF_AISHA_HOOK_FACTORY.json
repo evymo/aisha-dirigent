@@ -1,0 +1,351 @@
+{
+  "name": "WF_AISHA_HOOK_FACTORY",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "aisha-hook-factory",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "factory-trigger",
+      "name": "Hook Factory Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate factory webhook input + derive hook identity\n//\n// Hook detection trigger: action with low success_rate (repeated mistake pattern)\n// Hook will be a PreToolUse guard preventing the failure pattern.\n\nconst body = $input.first().json.body || $input.first().json;\nconst pattern = body.pattern;\n\nif (!pattern || !pattern.action) {\n  throw new Error('pattern.action required');\n}\n\n// Derive hook name from failure action\n// e.g., 'env_var_drift_failed' → 'prevent-env-var-drift'\nconst slug = String(pattern.action)\n  .toLowerCase()\n  .replace(/_(failed|error|aborted|rejected)$/, '')\n  .replace(/_/g, '-')\n  .replace(/[^a-z0-9-]/g, '');\n\nconst hookName = `prevent-${slug}`;\nconst hookPath = `.claude/hooks/${hookName}.sh`;\n\n// Registration target for .claude/settings.json (consumed by WF_AISHA_TOOLING_COMMITTER\n// via metadata.settings_patch). Factory hooks are PRE-emptive edit guards, so they\n// register as PreToolUse on Edit|Write|MultiEdit unless the detected pattern overrides it.\nconst hookEvent = pattern.hook_event || 'PreToolUse';\nconst hookMatcher = pattern.hook_matcher || 'Edit|Write|MultiEdit';\n\nreturn [{\n  json: {\n    hook_name: hookName,\n    hook_path: hookPath,\n    hook_event: hookEvent,\n    hook_matcher: hookMatcher,\n    pattern,\n    occurrence_count: pattern.occurrence_count || 0,\n    success_rate: pattern.success_rate || 0,\n    requested_at: new Date().toISOString(),\n  },\n}];"
+      },
+      "id": "validate-input",
+      "name": "Validate + Derive Identity",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "mcp_search_knowledge",
+        "rpcParams": "={{ JSON.stringify({\n  p_query: $('Validate + Derive Identity').item.json.pattern.action,\n  p_category: 'self-tooling',\n  p_context_tags: ['self-tooling', 'hook'],\n  p_include_ai_instructions: true,\n  p_limit: 5\n}) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "fetch-expert-context",
+      "name": "Fetch Expert Context",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [550, 150],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ANTHROPIC_API_URL || 'https://api.anthropic.com' }}/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"claude-sonnet-4-5\",\n  \"max_tokens\": 2000,\n  \"system\": \"Jsi expert na Claude Code hooks. Vytváříš bash hook scripts pro PreToolUse / PostToolUse events. Hook script:\\n- MUSÍ začínat #!/usr/bin/env bash\\n- MUSÍ obsahovat 'set -euo pipefail'\\n- MUSÍ číst CLAUDE_HOOK_TOOL_INPUT env var\\n- Exit code 0 = allow, 1 = block s důvodem na stderr\\n- NESMÍ shell out to network commands (curl, wget, ssh, ...)\\n- Krátký a jasný — preventivní gate pro detekovatelný pattern chyby\\nŽádné emoji.\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Vytvoř hook script pro: \\n\\nName: {{ $('Validate + Derive Identity').item.json.hook_name }}\\nPath: {{ $('Validate + Derive Identity').item.json.hook_path }}\\n\\nDetekovaný pattern (proč hook navrhuji):\\n{{ JSON.stringify($('Validate + Derive Identity').item.json.pattern, null, 2) }}\\n\\nExpert kontext z AISHA knowledge base (Tier 1 \\u2014 pokud pr\\u00e1zdn\\u00e9/null, pou\\u017eij obecn\\u00e9 best practices):\\n{{ JSON.stringify($('Fetch Expert Context').item.json || {}) }}\\n\\nHook by měl PRE-emptively blokovat tento failure pattern když ho Claude Code detekuje při Edit/Write operacích. Obsahuje:\\n1. JSON parsing CLAUDE_HOOK_TOOL_INPUT (file_path, content)\\n2. Pattern detection logic\\n3. Block s clear error message když pattern detected\\n4. Allow (exit 0) jinak\\n\\nVystup samotný bash script, nic jiného. Bez ``` blocků.\"\n    }\n  ]\n}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "render-hook",
+      "name": "Render Hook via Anthropic",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate generated bash hook\nconst response = $input.first().json;\nconst content = response.content?.[0]?.text;\n\nif (!content) {\n  throw new Error('No content from Anthropic response');\n}\n\n// Strip optional code fences (Anthropic sometimes adds them despite instructions)\nlet cleanContent = content\n  .replace(/^```(?:bash|sh)?\\n?/m, '')\n  .replace(/\\n?```\\s*$/m, '')\n  .trim();\n\n// Add trailing newline\nif (!cleanContent.endsWith('\\n')) cleanContent += '\\n';\n\nconst networkPatterns = /\\b(curl\\s|wget\\s|nc\\s|ssh\\s|scp\\s|sftp\\s|rsync\\s)/;\n\nconst validation = {\n  has_shebang: /^#!\\/usr\\/bin\\/env bash|^#!\\/bin\\/bash/.test(cleanContent),\n  has_strict_mode: /set -euo pipefail/.test(cleanContent),\n  reads_hook_input: /CLAUDE_HOOK_TOOL_INPUT/.test(cleanContent),\n  no_network: !networkPatterns.test(cleanContent),\n  has_exit_code: /exit\\s+[0-9]/.test(cleanContent),\n  passed: false,\n};\n\nvalidation.passed = validation.has_shebang &&\n  validation.has_strict_mode &&\n  validation.reads_hook_input &&\n  validation.no_network &&\n  validation.has_exit_code;\n\nreturn [{\n  json: {\n    ...$('Validate + Derive Identity').item.json,\n    rendered_content: cleanContent,\n    validation,\n  },\n}];"
+      },
+      "id": "validate-output",
+      "name": "Validate Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "validation-passed",
+              "leftValue": "={{ $json.validation.passed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "validation-ok",
+      "name": "Validation OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 300]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "propose_tooling_artifact",
+        "rpcParams": "={{ JSON.stringify({\n  p_kind: 'hook',\n  p_name: $json.hook_name,\n  p_path: $json.hook_path,\n  p_content: $json.rendered_content,\n  p_trigger_pattern: $json.pattern,\n  p_occurrence_count: $json.occurrence_count,\n  p_metadata: {\n    settings_patch: {\n      event: $('Validate + Derive Identity').item.json.hook_event,\n      matcher: $('Validate + Derive Identity').item.json.hook_matcher\n    }\n  },\n  p_decision_provenance: [\n    { source: 'tooling_observer', rule: 'repeated_mistake', value: $json.pattern.action, applied: true },\n    { source: 'anthropic_api', rule: 'claude-sonnet-4-5', value: 'render_succeeded', applied: true },\n    { source: 'validation', rule: 'shebang_strict_input_network_exit', value: $json.validation, applied: true }\n  ]\n}) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": true
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "propose-artifact",
+      "name": "Propose Hook Artifact",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [1320, 200],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.N8N_WEBHOOK_URL }}/webhook/approval-gate",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"action_description\": \"AISHA navrhuje nový hook: {{ $('Validate + Derive Identity').item.json.hook_name }} (block-pattern guard)\",\n  \"severity\": \"high\",\n  \"context\": {\n    \"proposal_id\": \"{{ $json.id }}\",\n    \"kind\": \"hook\",\n    \"path\": \"{{ $('Validate + Derive Identity').item.json.hook_path }}\",\n    \"trigger\": {{ JSON.stringify($('Validate + Derive Identity').item.json.pattern) }}\n  },\n  \"timeout_hours\": 168,\n  \"agent_slug\": \"aisha_hook_factory\",\n  \"category\": \"tooling_commit\",\n  \"decision_reasoning\": \"Pattern {{ $('Validate + Derive Identity').item.json.pattern.action }} selhává s úspěšností {{ $('Validate + Derive Identity').item.json.success_rate }} v {{ $('Validate + Derive Identity').item.json.occurrence_count }} výskytech. AISHA navrhuje pre-commit hook pro pre-emptive blokování tohoto failure modu.\"\n}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "request-approval",
+      "name": "Request Approval",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 200]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_integration_action",
+        "rpcParams": "={{ JSON.stringify({\n  p_service_name: 'n8n',\n  p_action: 'aisha_hook_factory_validation_failed',\n  p_action_detail: {\n    hook_name: $json.hook_name,\n    validation: $json.validation\n  },\n  p_status: 'failure'\n}) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 5000,
+          "auditTrail": true
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "log-validation-failure",
+      "name": "Log Validation Failure",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [1320, 400],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": true, \"proposal_id\": \"{{ $('Propose Hook Artifact').item.json.id }}\", \"status\": \"pending_approval\" }",
+        "options": {}
+      },
+      "id": "respond-ok",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1760, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"ok\": false, \"reason\": \"validation_failed\", \"validation\": {{ JSON.stringify($('Validate Output').item.json.validation) }} }",
+        "responseCode": 422,
+        "options": {}
+      },
+      "id": "respond-fail",
+      "name": "Respond Validation Failed",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1540, 400]
+    }
+  ],
+  "connections": {
+    "Hook Factory Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate + Derive Identity",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate + Derive Identity": {
+      "main": [
+        [
+          {
+            "node": "Fetch Expert Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Render Hook via Anthropic": {
+      "main": [
+        [
+          {
+            "node": "Validate Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Output": {
+      "main": [
+        [
+          {
+            "node": "Validation OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validation OK?": {
+      "main": [
+        [
+          {
+            "node": "Propose Hook Artifact",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Validation Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Propose Hook Artifact": {
+      "main": [
+        [
+          {
+            "node": "Request Approval",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Request Approval": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Validation Failure": {
+      "main": [
+        [
+          {
+            "node": "Respond Validation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Expert Context": {
+      "main": [
+        [
+          {
+            "node": "Render Hook via Anthropic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

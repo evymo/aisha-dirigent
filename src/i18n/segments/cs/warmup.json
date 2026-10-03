@@ -1,0 +1,61 @@
+{
+  "warmup": {
+    "title": "Zahřátí stacku",
+    "subtitle": "Připrav výchozí znalostní bázi platformy ve výchozí stack-default story",
+    "statusDone": "Zahřátí dokončeno",
+    "stepperAria": "Průběh kroků průvodce zahřátí",
+    "progressLabel": "Krok {{current}} z {{total}} · dokončeno {{count}} krok(ů)",
+    "stepMarked": {
+      "title": "Krok zaznamenán",
+      "description": "Krok {{step}} označen jako dokončený"
+    },
+    "stepMarkedError": "Nepodařilo se zaznamenat krok zahřátí",
+    "steps": {
+      "welcome": {
+        "title": "Úvod",
+        "headline": "Pojďme zahřát váš AISHA stack",
+        "description": "Tento průvodce vás provede přípravou výchozí znalostní báze ve stack-default story. Vše, co tu nastavíte, automaticky zdědí každá další story díky existující per-story izolaci + retrievalu globals.",
+        "defaultPresent": "Stack-default story existuje a je připravena přijmout znalosti.",
+        "defaultMissing": "Stack-default story chybí — nejprve spusťte cold-start bootstrap.",
+        "cta": "Rozumím — pokračovat"
+      },
+      "kb_upload": {
+        "title": "Nahrání znalostí",
+        "headline": "Nahrajte počáteční znalostní zdroje",
+        "description": "Nahrajte a otagujte dokumenty, FAQ, expertní pravidla a další zdroje, které mají tvořit baseline platformy. Tyto položky se budou stahovat jako globální pro každou story.",
+        "requirement": "Pro pokračování je potřeba alespoň {{min}} znalostní položka",
+        "currentCount": "Aktuálně ve stack-default: {{count}} položka/y",
+        "cta": "Označit nahrání dokončené"
+      },
+      "rules_setup": {
+        "title": "Revize profilů",
+        "headline": "Zkontrolujte context profiles + expertní pravidla",
+        "description": "Context profiles určují, které vrstvy znalostí (KB retrieval, ruleset, graph context, learnings) se vloží do LLM promptu a v jakém pořadí. Potvrďte, že výchozí hodnoty dávají smysl pro vaši instalaci.",
+        "body": "Otevřete stránku context profiles pro kontrolu nebo úpravu rulesetů — nebo prostě potvrďte, že výchozí hodnoty pro první průchod stačí. Můžete se sem vrátit kdykoli.",
+        "openProfiles": "Otevřít context profiles",
+        "acknowledge": "nebo potvrďte výchozí hodnoty a pokračujte",
+        "cta": "Potvrdit a pokračovat"
+      },
+      "test_query": {
+        "title": "Testovací dotaz",
+        "headline": "Spusťte testovací chat proti výchozí story",
+        "description": "Ověřte, že retrieval, citace a graph trail fungují end-to-end, než zahřátí prohlásíte za hotové.",
+        "body": "Otevřete stack-default story, položte otázku k jedné z nahraných položek a ověřte, že odpověď přijde se zdroji + graph kontextem.",
+        "checkCitations": "Panel s citacemi pod odpovědí vypisuje chunks, které AISHA použila",
+        "checkGraph": "Explainability panel zobrazuje multi-hop graf k objeveným konceptům",
+        "checkRoute": "Route plan (v admin AI runs) ukazuje, že chat zasáhl očekávaný context profile",
+        "openStory": "Otevřít výchozí story",
+        "cta": "Testovací dotaz ověřen"
+      },
+      "complete": {
+        "title": "Hotovo",
+        "headline": "Zahřátí dokončeno",
+        "description": "Baseline platformy je nastaven. Nové stories ho zdědí přes compose_context kb_retrieval globals + graph_context vrstvu.",
+        "body": "Od této chvíle vás průvodce už nebude přesměrovávat. Na tuto stránku se můžete kdykoli vrátit, abyste si prohlédli audit historii zahřátí.",
+        "cta": "Označit zahřátí dokončené",
+        "backToAdmin": "Zpět na admin overview",
+        "lastActivity": "Poslední aktivita zahřátí: {{iso}}"
+      }
+    }
+  }
+}

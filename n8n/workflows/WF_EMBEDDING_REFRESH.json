@@ -1,0 +1,161 @@
+{
+  "name": "WF_EMBEDDING_REFRESH",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                0
+              ],
+              "triggerAtHour": 4,
+              "triggerAtMinute": 0
+            }
+          ]
+        }
+      },
+      "id": "emb-cron",
+      "name": "Weekly Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL || 'http://127.0.0.1:57421' }}/functions/v1/generate-knowledge-embeddings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": false,
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "batch_size",
+              "value": "50"
+            },
+            {
+              "name": "force",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "emb-knowledge",
+      "name": "Refresh Knowledge Embeddings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        470,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL || 'http://127.0.0.1:57421' }}/functions/v1/generate-memory-embeddings",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": false,
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "batch_size",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120000
+        }
+      },
+      "id": "emb-memories",
+      "name": "Refresh Memory Embeddings",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        470,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const knowledgeResult = $('Refresh Knowledge Embeddings').first()?.json ?? { error: 'no output' };\nconst memoryResult = $('Refresh Memory Embeddings').first()?.json ?? { error: 'no output' };\n\nconst now = new Date().toISOString();\n\nreturn [{\n  json: {\n    timestamp: now,\n    workflow: 'WF_EMBEDDING_REFRESH',\n    knowledge_embeddings: {\n      status: knowledgeResult.status || 'unknown',\n      processed: knowledgeResult.processed || 0,\n      success: knowledgeResult.success || 0,\n      errors: knowledgeResult.errors || 0\n    },\n    memory_embeddings: {\n      status: memoryResult.status || 'unknown',\n      processed: memoryResult.processed || 0,\n      success: memoryResult.success || 0,\n      errors: memoryResult.errors || 0\n    },\n    summary: `Knowledge: ${knowledgeResult.processed || 0} processed, Memory: ${memoryResult.processed || 0} processed`\n  }\n}];"
+      },
+      "id": "emb-log",
+      "name": "Log Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        690,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Weekly Schedule": {
+      "main": [
+        [
+          {
+            "node": "Refresh Knowledge Embeddings",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Refresh Memory Embeddings",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refresh Knowledge Embeddings": {
+      "main": [
+        [
+          {
+            "node": "Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Refresh Memory Embeddings": {
+      "main": [
+        [
+          {
+            "node": "Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

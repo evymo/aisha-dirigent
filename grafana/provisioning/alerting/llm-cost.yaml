@@ -1,0 +1,127 @@
+# Phase 12 WP 2.4 — LLM cost + reliability alert rules.
+#
+# Auto-provisioned by Grafana via this YAML at boot (mounted at
+# /etc/grafana/provisioning/alerting/). Edit + restart Grafana to apply
+# changes — or use Grafana UI for live tweaks (saved back to this file
+# via `grafana-cli admin export-rules`).
+#
+# NOTIFICATION ROUTING: alerts route to the default contact point
+# configured in `grafana/provisioning/alerting/contactpoints.yaml`
+# (Matrix room + email, set up at operator discretion). Configure
+# Matrix webhook + email SMTP in Coolify Grafana env vars.
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: aisha-llm-cost
+    folder: AISHA
+    interval: 1m
+    rules:
+      # ── Alert 1: Sustained high error rate per provider ─────────────────
+      - uid: llm_error_rate_high
+        title: "LLM provider error rate >5% for 10min"
+        condition: error_rate
+        data:
+          - refId: error_rate
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 600
+              to: 0
+            model:
+              expr: '100 * sum by (provider) (rate(aisha_llm_calls_total{status="error"}[5m])) / sum by (provider) (rate(aisha_llm_calls_total[5m]))'
+              instant: true
+              intervalMs: 60000
+              maxDataPoints: 100
+        noDataState: NoData
+        execErrState: Alerting
+        for: 10m
+        annotations:
+          summary: "LLM provider {{ $labels.provider }} error rate {{ $value }}%"
+          # Forge host is env-driven (no hardcoded host). Grafana expands
+          # $__env{VAR} in provisioning at load; RUNBOOK_BASE_URL is set on the
+          # grafana service env from the deployment's forge URL.
+          runbook_url: "$__env{RUNBOOK_BASE_URL}/aisha/evymo-ai-orchestrator/wiki/llm-error-rate-runbook"
+        labels:
+          severity: warning
+          area: llm
+
+      # ── Alert 2: Catastrophic single-provider failure ──────────────────
+      - uid: llm_provider_down
+        title: "LLM provider error rate >25% for 5min (paging)"
+        condition: error_rate
+        data:
+          - refId: error_rate
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              expr: '100 * sum by (provider) (rate(aisha_llm_calls_total{status="error"}[5m])) / sum by (provider) (rate(aisha_llm_calls_total[5m]))'
+              instant: true
+              intervalMs: 60000
+              maxDataPoints: 100
+        noDataState: NoData
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "LLM provider {{ $labels.provider }} likely down — error rate {{ $value }}%"
+          description: "Investigate the provider's status page + Langfuse trace UI. Consider failover via ai_provider_registry."
+        labels:
+          severity: critical
+          area: llm
+          page: oncall
+
+      # ── Alert 3: Traffic spike (proxy for runaway tenant / abuse) ──────
+      # Trigger: total LLM calls/sec >2× the 7-day rolling baseline.
+      # The threshold uses `quantile_over_time(0.95, ...[7d])` as the
+      # baseline floor so genuinely busy days don't trip false alarms.
+      - uid: llm_traffic_spike
+        title: "LLM traffic spike — 2× weekly baseline"
+        condition: spike
+        data:
+          - refId: spike
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 300
+              to: 0
+            model:
+              expr: 'sum(rate(aisha_llm_calls_total[5m])) > 2 * quantile_over_time(0.95, sum(rate(aisha_llm_calls_total[5m]))[7d:1h])'
+              instant: true
+              intervalMs: 60000
+              maxDataPoints: 100
+        noDataState: OK
+        execErrState: OK
+        for: 5m
+        annotations:
+          summary: "LLM traffic at {{ $value }} req/sec — 2× weekly baseline"
+          description: "Check WP 2.3 llm_quota table for runaway tenant. Investigate via Langfuse UI top-tenant breakdown."
+        labels:
+          severity: warning
+          area: llm
+
+      # ── Alert 4: Daily call ceiling (informational; tune as cost data
+      # arrives via WP 0.3 Langfuse SDK wrap) ─────────────────────────────
+      - uid: llm_daily_calls_high
+        title: "LLM daily call count >100k (rough budget proxy)"
+        condition: daily_count
+        data:
+          - refId: daily_count
+            datasourceUid: prometheus
+            relativeTimeRange:
+              from: 86400
+              to: 0
+            model:
+              expr: 'sum(increase(aisha_llm_calls_total[24h])) > 100000'
+              instant: true
+              intervalMs: 60000
+              maxDataPoints: 100
+        noDataState: OK
+        execErrState: OK
+        for: 0s
+        annotations:
+          summary: "LLM daily calls {{ $value }} crossed 100k threshold"
+          description: "Cross-reference with Langfuse UI for cost-per-day breakdown. Adjust this threshold once WP 0.3 ships actual cost roll-up — until then, call count is a coarse budget proxy."
+        labels:
+          severity: info
+          area: llm

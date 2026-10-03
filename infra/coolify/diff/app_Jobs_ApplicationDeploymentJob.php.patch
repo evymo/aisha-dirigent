@@ -1,0 +1,677 @@
+--- /var/folders/n7/cb6hx9bd2kjfwkrfz_jy301r0000gn/T/tmp.oFwqp1vA54/stock.php	2026-09-06 02:42:11.649449158 +0200
++++ /var/folders/n7/cb6hx9bd2kjfwkrfz_jy301r0000gn/T/tmp.oFwqp1vA54/fixed.php	2026-09-06 02:42:49.933291685 +0200
+@@ -31,6 +31,7 @@
+ use Illuminate\Queue\InteractsWithQueue;
+ use Illuminate\Queue\SerializesModels;
+ use Illuminate\Support\Collection;
++use Illuminate\Support\Facades\Process;
+ use Illuminate\Support\Sleep;
+ use Illuminate\Support\Str;
+ use JsonException;
+@@ -410,6 +411,7 @@
+             try {
+                 $this->application_deployment_queue->addLogEntry("Gracefully shutting down build container: {$this->deployment_uuid}");
+                 $this->graceful_shutdown_container($this->deployment_uuid, skipRemove: true);
++                $this->shutdown_helper_on_deployment_server();
+             } catch (Exception $e) {
+                 // Log but don't fail - container cleanup errors are expected when container is already gone
+                 \Log::warning('Failed to shutdown container '.$this->deployment_uuid.': '.$e->getMessage());
+@@ -658,6 +660,9 @@
+         } else {
+             $this->application_deployment_queue->addLogEntry("Starting pull request (#{$this->pull_request_id}) deployment of {$this->customRepository}:{$this->application->git_branch} to {$this->server->name}.");
+         }
++        if ($this->use_build_server) {
++            $this->server = $this->build_server;
++        }
+         $this->prepare_builder_image();
+         $this->check_git_if_build_needed();
+         $this->clone_repository();
+@@ -728,10 +733,9 @@
+             $yaml = Yaml::dump(convertToArray($composeFile), 10);
+         }
+         $this->docker_compose_base64 = base64_encode($yaml);
+-        $this->execute_remote_command([
+-            executeInDocker($this->deployment_uuid, "echo '{$this->docker_compose_base64}' | base64 -d | tee {$this->workdir}{$this->docker_compose_location} > /dev/null"),
+-            'hidden' => true,
+-        ]);
++        foreach ($this->base64WriteCommands($this->docker_compose_base64, "{$this->workdir}{$this->docker_compose_location}", $this->deployment_uuid) as $writeCommand) {
++            $this->execute_remote_command([$writeCommand, 'hidden' => true]);
++        }
+ 
+         // Modify Dockerfiles for ARGs and build secrets
+         $this->modify_dockerfiles_for_compose($composeFile);
+@@ -808,6 +812,11 @@
+         // This overwrites the build-time .env with ALL variables (build-time + runtime)
+         $this->save_runtime_environment_variables();
+ 
++        if ($this->use_build_server) {
++            $this->transfer_images_to_deployment_server();
++            $this->server = $this->mainServer;
++        }
++
+         $this->stop_running_container(force: true);
+         $this->application_deployment_queue->addLogEntry('Starting new application.');
+         $networkId = $this->application->uuid;
+@@ -896,6 +905,16 @@
+                     $this->execute_remote_command(
+                         ['command' => $command, 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
+                     );
++                } elseif ($this->use_build_server) {
++                    $this->write_deployment_configurations();
++                    $this->server = $this->mainServer;
++                    $this->docker_compose_location = '/docker-compose.yaml';
++                    // Always use .env file
++                    $command .= " --env-file {$this->configuration_dir}/.env";
++                    $command .= " --project-name {$this->application->uuid} --project-directory {$this->configuration_dir} -f {$this->configuration_dir}{$this->docker_compose_location} up -d";
++                    $this->execute_remote_command(
++                        ['command' => $command, 'hidden' => false, 'type' => 'stdout', 'command_hidden' => true],
++                    );
+                 } else {
+                     // Always use .env file
+                     $command .= " --env-file {$this->workdir}/.env";
+@@ -1085,17 +1104,11 @@
+                 $composeFileName = "$mainDir/".addPreviewDeploymentSuffix('docker-compose', $this->pull_request_id).'.yaml';
+                 $this->docker_compose_location = '/'.addPreviewDeploymentSuffix('docker-compose', $this->pull_request_id).'.yaml';
+             }
+-            $this->execute_remote_command(
+-                [
+-                    "mkdir -p $mainDir",
+-                ],
+-                [
+-                    "echo '{$this->docker_compose_base64}' | base64 -d | tee $composeFileName > /dev/null",
+-                ],
+-                [
+-                    "echo '{$readme}' > $mainDir/README.md",
+-                ]
+-            );
++            $this->execute_remote_command(["mkdir -p $mainDir"]);
++            foreach ($this->base64WriteCommands($this->docker_compose_base64, $composeFileName) as $writeCommand) {
++                $this->execute_remote_command([$writeCommand, 'hidden' => true]);
++            }
++            $this->execute_remote_command(["echo '{$readme}' > $mainDir/README.md"]);
+             if ($this->use_build_server) {
+                 $this->server = $this->build_server;
+             }
+@@ -1160,6 +1173,300 @@
+         }
+     }
+ 
++    /**
++     * Commands that write a base64 payload to a file, in chunks.
++     *
++     * Linux caps a SINGLE argv entry at MAX_ARG_STRLEN (128 KiB), and Coolify ships
++     * file contents as `echo '<base64>' | base64 -d`, i.e. one argument. Anything
++     * whose size scales with the number of environment variables eventually crosses
++     * that line and the deployment dies before it starts. Measured 2026-08-16:
++     * aisha-core produced a 133394 B compose argument and a 162136 B Dockerfile
++     * argument; aisha-registry projects to 103189 B for its .env alone.
++     *
++     * Single quoting needs no escaping here: the base64 alphabet is A-Za-z0-9+/=
++     * and can never contain a quote.
++     */
++    private function base64WriteCommands(string $base64, string $path, ?string $inDockerUuid = null): array
++    {
++        $tmp = $path.'.b64';
++        $commands = [];
++        foreach (str_split($base64, 24000) as $index => $chunk) {
++            $redirect = $index === 0 ? '>' : '>>';
++            $command = "printf '%s' '{$chunk}' {$redirect} {$tmp}";
++            $commands[] = $inDockerUuid ? executeInDocker($inDockerUuid, $command) : $command;
++        }
++        $command = "base64 -d {$tmp} > {$path} && rm -f {$tmp}";
++        $commands[] = $inDockerUuid ? executeInDocker($inDockerUuid, $command) : $command;
++
++        return $commands;
++    }
++
++    /**
++     * Obrazy, které se PODLE DEKLARACE mají přenést.
++     *
++     * Coolify si do vyrenderovaného compose zapisuje ke KAŽDÉ službě s `build:`
++     * explicitní `image: <uuid>_<sluzba>:<commit>`. Tahle množina je tedy
++     * deklarace, ne pozorování — a právě proto se z ní smí měřit.
++     *
++     * Výjimka se NEODPOUŠTÍ: nečitelný compose znamená, že o očekávané množině
++     * nic nevíme, a tichá prázdná množina by vypnula obě kontroly níž.
++     */
++    private function images_declared_by_compose()
++    {
++        // ⛔ DVA KANÁLY TÉŽE HODNOTY, a každý buildpack plní JINÝ.
++        // `$this->docker_compose` plní jen `generate_compose_file()` (ne-compose
++        // buildpacky, ř. ~3880). Buildpack `dockercompose` — tedy TEN, na kterém
++        // přenos obrazů vůbec běží — plní v `deploy_docker_compose_buildpack()`
++        // (ř. ~735) POUZE `$this->docker_compose_base64`.
++        //
++        // ⭐ NAMĚŘENO 2026-09-06: první podoba testovala jen `$this->docker_compose`
++        // a shodila KAŽDÉ dockercompose nasazení všech instancí (12 výjimek
++        // „the rendered compose is empty" za tři hodiny). Ověřoval jsem PRAVIDLO
++        // proti compose souboru na disku, ne to, že ta property je naplněná NA
++        // TÉHLE cestě.
++        //
++        // Není to fallback pro nejistotu: obě property nesou TÝŽ dokument, jen
++        // jiným kanálem. Když nemá hodnotu ani jeden, pořád je to STOP.
++        $yaml = filled($this->docker_compose)
++            ? $this->docker_compose
++            : base64_decode((string) $this->docker_compose_base64);
++
++        if (blank($yaml)) {
++            throw new \RuntimeException('cannot determine which images to transfer: the rendered compose is empty');
++        }
++
++        $parsed = Yaml::parse($yaml);
++        $prefix = "{$this->application->uuid}_";
++
++        return collect(data_get($parsed, 'services', []))
++            ->filter(fn ($service) => filled(data_get($service, 'build')))
++            ->map(fn ($service) => data_get($service, 'image'))
++            ->filter(fn ($image) => is_string($image) && str_starts_with($image, $prefix))
++            ->values();
++    }
++
++    private function transfer_images_to_deployment_server()
++    {
++        $filter = "docker images --filter reference='{$this->application->uuid}_*:{$this->commit}' --format '{{.Repository}}:{{.Tag}}'";
++
++        // ⛔ OČEKÁVANÁ MNOŽINA SE DEKLARUJE, NEPOZORUJE.
++        //
++        // Dřív se ptalo jedním dotazem build serveru „co tu je" a to se přeneslo.
++        // Jenže obrazy se do úložiště objevují POSTUPNĚ, jak dobíhají cíle
++        // buildu — řádek `Image X Built` v logu neznamená, že už je X v
++        // `docker images`. Když dotaz padne doprostřed, přenese se PODMNOŽINA.
++        //
++        // ⛔ A kontrola pod přenosem to nechytila, protože porovnávala naložené
++        // proti TÉ UŽ ZKRÁCENÉ množině: `$images->diff($loaded)`. Prázdnou
++        // množinu hlídala, neúplnou ne.
++        //
++        // ⭐ NAMĚŘENO 2026-09-05 na `<fork>-exec`, týž commit, dva běhy:
++        //
++        //     běh 1:  3 postavené →  Transferring 1   ⇒ na cíli chyběly DVA
++        //     běh 2:  3 postavené →  Transferring 3   ⇒ prošlo
++        //
++        // Cíl pak obraz zkusil stáhnout (`pull access denied` — na Hubu není)
++        // a pak postavit, jenže tam repo není:
++        //     resolve : lstat /data/coolify/applications/<uuid>/images: no such file
++        // Spadl tím CELÝ stack, ne jedna služba.
++        //
++        // Očekávaná množina se proto bere z compose a na build server se ČEKÁ,
++        // dokud ji nemá celou. Nedočká-li se, je to CHYBA — ne tichý přenos
++        // podmnožiny, který se projeví až na cíli jako úplně jiná porucha.
++        $expected = $this->images_declared_by_compose();
++
++        if ($expected->isEmpty()) {
++            // Compose bez jediné stavěné služby: není co přenášet a je to
++            // DEKLAROVANÉ, ne dohadované.
++            return;
++        }
++
++        // ⛔ ČEKÁ SE NA POSTUP, NE NA HODINKY.
++        //
++        // První podoba měla pevných 300 s. Naměřeno 2026-09-06 na desetiobrazovém
++        // stacku pod zátěží (Soren: load 23, disk 87 %): BuildKit ohlásil všech
++        // 10× `Built` v 00:31:58, ale do úložiště se obrazy objevovaly ještě
++        // o DEVĚT MINUT později. Pevný strop tedy neměřil vadu, ale velikost
++        // stacku a vytížení builderu — a nasazení padalo na zdravém buildu.
++        //
++        // Správná vlastnost není „jak dlouho to trvá", ale „děje se ještě něco".
++        // Hodiny nečinnosti se resetují při KAŽDÉM novém obrazu, takže velký
++        // stack smí trvat, jak potřebuje, kdežto zaseknutý builder padne rychle.
++        // Absolutní strop je jen pojistka proti věčnému čekání.
++        $tichoLimit = 600;   // bez jediného nového obrazu
++        $absolutni  = 3600;  // celkový strop
++        $start      = time();
++        $poslediZmena = time();
++        $melDrive   = -1;
++
++        $onBuildServer = collect();
++        $missingOnBuildServer = $expected;
++
++        while (true) {
++            $onBuildServer = str(instant_remote_process([$filter], $this->build_server, false))
++                ->trim()->explode("\n")->filter();
++            $missingOnBuildServer = $expected->diff($onBuildServer);
++
++            if ($missingOnBuildServer->isEmpty()) {
++                break;
++            }
++
++            $ma = $expected->count() - $missingOnBuildServer->count();
++            if ($ma !== $melDrive) {
++                // Postup: hodiny nečinnosti se resetují.
++                $melDrive = $ma;
++                $poslediZmena = time();
++                $this->application_deployment_queue->addLogEntry(
++                    'Waiting for the build server to materialise images: '.$ma.' of '.$expected->count().
++                    ' ready, still missing '.$missingOnBuildServer->implode(', ')
++                );
++            }
++
++            if (time() - $poslediZmena >= $tichoLimit) {
++                $this->application_deployment_queue->addLogEntry(
++                    'No new image appeared in '.$tichoLimit.'s — the build server has stopped making progress.',
++                    'stderr'
++                );
++                break;
++            }
++            if (time() - $start >= $absolutni) {
++                $this->application_deployment_queue->addLogEntry(
++                    'Absolute cap of '.$absolutni.'s reached while waiting for images.',
++                    'stderr'
++                );
++                break;
++            }
++
++            sleep(5);
++        }
++
++        if ($missingOnBuildServer->isNotEmpty()) {
++            // Poslední smířlivá možnost: cíl už ty obrazy MÁ (nic se nepřestavělo).
++            // Rozhoduje ale pořád DEKLARACE — musí tam být všechny, ne „nějaké".
++            $onDestination = str(instant_remote_process([$filter], $this->mainServer, false))
++                ->trim()->explode("\n")->filter();
++
++            if ($expected->diff($onDestination)->isEmpty()) {
++                $this->application_deployment_queue->addLogEntry(
++                    'Nothing to transfer: the destination already has all '.$expected->count().' declared image(s) for this commit.'
++                );
++
++                return;
++            }
++
++            throw new \RuntimeException(
++                'the build server stopped producing images with '.$missingOnBuildServer->count().' of '.$expected->count().
++                ' still missing after '.(time() - $start).'s, and the destination does not have them either: '.
++                $missingOnBuildServer->implode(', ')
++            );
++        }
++
++        // Od téhle chvíle se pracuje s DEKLAROVANOU množinou, ne s pozorovanou:
++        // kdyby build server nesl navíc obrazy z dřívějšího běhu téhož commitu,
++        // nemají s tímhle nasazením co dělat.
++        $images = $expected;
++
++        // Staged on disk on the SERVERS, because their /tmp is tmpfs: 8.8 GB of it on
++        // a build server with 17 GB of RAM. `docker save -o /tmp/...` therefore wrote
++        // the whole image set into memory. Measured 2026-08-17: a 235 MB pki archive
++        // sat in the build server's RAM for hours after a killed transfer, and an
++        // application the size of core or web would be gigabytes -- on the build
++        // server and on the destination in turn.
++        //
++        // The middle hop stays in /tmp deliberately. That leg lands inside the Coolify
++        // container, where /tmp is the container's overlay filesystem and already on
++        // disk; moving it to /data would need a mount the container does not have --
++        // it can write /data/coolify/applications and nothing else, since only the
++        // subdirectories are bind-mounted. Same-path-on-both-ends is what hid this:
++        // one string served three machines with different filesystems behind it.
++        //
++        // mkdir -p on each server leg because /data/coolify/tmp is ours, not something
++        // Coolify creates.
++        $archiveDir = '/data/coolify/tmp';
++        $archive = "{$archiveDir}/{$this->deployment_uuid}.tar";
++        $localArchive = "/tmp/{$this->deployment_uuid}.tar";
++        $this->application_deployment_queue->addLogEntry('----------------------------------------');
++        // Name them, not just count them. When the filter above matches fewer images
++        // than the build produced, a bare count says nothing about which one is
++        // absent -- measured 2026-09-04: three deployments out of 129 transferred a
++        // subset and then failed on the destination, and nothing in the log recorded
++        // what had actually matched, so the record could not settle the cause
++        // afterwards. Three hypotheses were raised and all three disproved against
++        // it; the names are what the next occurrence needs.
++        $this->application_deployment_queue->addLogEntry("Transferring {$images->count()} built image(s) from {$this->build_server->name} to {$this->mainServer->name}: ".$images->implode(', '));
++        try {
++            instant_remote_process(["mkdir -p {$archiveDir}"], $this->build_server);
++            instant_remote_process(['docker save '.$images->implode(' ')." -o {$archive}"], $this->build_server);
++            instant_scp_from_server($archive, $localArchive, $this->build_server);
++            instant_remote_process(["mkdir -p {$archiveDir}"], $this->mainServer);
++            instant_scp($localArchive, $archive, $this->mainServer);
++            instant_remote_process(["docker load -i {$archive}"], $this->mainServer);
++
++            // Confirm what arrived instead of assuming it did. `docker load` can
++            // report success on a truncated archive -- one transfer here died with
++            // "short read: expected 3708 bytes" -- and the images are dropped from
++            // the build server a few lines below, so an unnoticed gap leaves the
++            // only copy nowhere. Checking here fails with the real reason at the
++            // point it happened, rather than later as "pull access denied".
++            $loaded = instant_remote_process(["docker images --filter reference='{$this->application->uuid}_*:{$this->commit}' --format '{{.Repository}}:{{.Tag}}'"], $this->mainServer, false);
++            $loaded = str($loaded)->trim()->explode("\n")->filter();
++            $missing = $images->diff($loaded);
++
++            if ($missing->isNotEmpty()) {
++                throw new \RuntimeException(
++                    'the destination is missing '.$missing->count().' of '.$images->count().' image(s) after loading the archive: '.$missing->implode(', ')
++                );
++            }
++
++            // Confirming that what was sent arrived is not the same as confirming the
++            // destination has what it needs. The compose file is the statement of
++            // need: every image it names with this application's prefix is built here
++            // and served by no registry, so its absence is fatal and knowable now.
++            // Without this the deployment carries on to `compose up`, which fails with
++            // "pull access denied" -- a message that blames a registry nobody uses and
++            // buries the real fault one layer down.
++            $composeFile = "{$this->configuration_dir}{$this->docker_compose_location}";
++            // Only `image:` lines. A bare pattern search over the whole file would
++            // also read volume declarations -- `<uuid>_data:/var/lib` has the same
++            // shape up to the colon -- and a false positive here fails a deployment
++            // that would otherwise have worked, which is worse than the confusing
++            // message this replaces.
++            $referenced = instant_remote_process(
++                ['grep -hE '.escapeshellarg('^[[:space:]]*image:').' '.escapeshellarg($composeFile)
++                    .' 2>/dev/null | grep -ohE '.escapeshellarg("{$this->application->uuid}_[A-Za-z0-9._-]+:[A-Za-z0-9._-]+").' || true'],
++                $this->mainServer,
++                false
++            );
++            $referenced = str($referenced)->trim()->explode("\n")->filter()->unique();
++            $absent = $referenced->diff($loaded);
++
++            if ($absent->isNotEmpty()) {
++                throw new \RuntimeException(
++                    'the compose file needs '.$absent->count().' locally built image(s) the destination does not have: '.$absent->implode(', ')
++                );
++            }
++
++            // Drop the transferred images from the build server. Without this it keeps
++            // every image it ever built: the archive below was cleaned up, the images
++            // were not. Measured 2026-08-16 during a 120-application rollout -- 34 GB of
++            // images on the build server, 30 GB of them already transferred and never
++            // read again, and a CUDA-sized build died at "exporting layers" for want of
++            // disk.
++            //
++            // Deliberately here and not in finally: only a successful `docker load`
++            // proves the destination has its own copy, so a failed transfer never
++            // destroys the only one. `docker rmi` does not touch the BuildKit cache,
++            // which lives separately -- the next build still reuses its layers.
++            instant_remote_process(['docker rmi '.$images->implode(' ')], $this->build_server, false);
++        } catch (Exception $e) {
++            throw new DeploymentException('Failed to transfer the built images to the deployment server: '.$e->getMessage(), $e->getCode(), $e);
++        } finally {
++            instant_remote_process(["rm -f {$archive}"], $this->build_server, false);
++            instant_remote_process(["rm -f {$archive}"], $this->mainServer, false);
++            Process::run("rm -f {$localArchive}");
++        }
++    }
++
+     private function shouldPushDockerRegistryImageTag(): bool
+     {
+         if (blank($this->application->docker_registry_image_tag)) {
+@@ -1589,11 +1896,9 @@
+ 
+         // Write .env file to workdir (for container runtime)
+         $this->application_deployment_queue->addLogEntry('Creating .env file with runtime variables for container.', hidden: true);
+-        $this->execute_remote_command(
+-            [
+-                executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee $this->workdir/.env > /dev/null"),
+-            ]
+-        );
++        foreach ($this->base64WriteCommands($envs_base64, "{$this->workdir}/.env", $this->deployment_uuid) as $writeCommand) {
++            $this->execute_remote_command([$writeCommand, 'hidden' => true]);
++        }
+ 
+         if (isDev()) {
+             $this->execute_remote_command(
+@@ -1607,18 +1912,14 @@
+         // Write .env file to configuration directory
+         if ($this->use_build_server) {
+             $this->server = $this->mainServer;
+-            $this->execute_remote_command(
+-                [
+-                    "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
+-                ]
+-            );
++            foreach ($this->base64WriteCommands($envs_base64, "{$this->configuration_dir}/.env") as $writeCommand) {
++                $this->execute_remote_command([$writeCommand, 'hidden' => true]);
++            }
+             $this->server = $this->build_server;
+         } else {
+-            $this->execute_remote_command(
+-                [
+-                    "echo '$envs_base64' | base64 -d | tee $this->configuration_dir/.env > /dev/null",
+-                ]
+-            );
++            foreach ($this->base64WriteCommands($envs_base64, "{$this->configuration_dir}/.env") as $writeCommand) {
++                $this->execute_remote_command([$writeCommand, 'hidden' => true]);
++            }
+         }
+     }
+ 
+@@ -1729,7 +2030,15 @@
+         if ($this->pull_request_id === 0) {
+             $sorted_environment_variables = $this->application->environment_variables()
+                 ->withoutBuildpackControlVariables()
+-                ->where('is_buildtime', true)  // ONLY build-time variables
++                // Compose interpolation reads this file, so it must carry EVERY variable the
++                // compose file may reference -- including runtime-only secrets. Filtering on
++                // is_buildtime here made `${RUNTIME_SECRET}` in a compose file fail the build
++                // with "required variable ... is missing a value", which forced operators to
++                // mark runtime secrets as build-time. That in turn baked them into image
++                // metadata via --build-arg, readable forever through `docker history`.
++                // Values still reach --build-arg only through generate_build_env_variables(),
++                // which keeps the is_buildtime filter -- that is where the distinction belongs.
++                ->when($this->build_pack !== 'dockercompose', fn ($q) => $q->where('is_buildtime', true))
+                 ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
+                 ->get();
+ 
+@@ -1784,7 +2093,15 @@
+         } else {
+             $sorted_environment_variables = $this->application->environment_variables_preview()
+                 ->withoutBuildpackControlVariables()
+-                ->where('is_buildtime', true)  // ONLY build-time variables
++                // Compose interpolation reads this file, so it must carry EVERY variable the
++                // compose file may reference -- including runtime-only secrets. Filtering on
++                // is_buildtime here made `${RUNTIME_SECRET}` in a compose file fail the build
++                // with "required variable ... is missing a value", which forced operators to
++                // mark runtime secrets as build-time. That in turn baked them into image
++                // metadata via --build-arg, readable forever through `docker history`.
++                // Values still reach --build-arg only through generate_build_env_variables(),
++                // which keeps the is_buildtime filter -- that is where the distinction belongs.
++                ->when($this->build_pack !== 'dockercompose', fn ($q) => $q->where('is_buildtime', true))
+                 ->orderBy($this->application->settings->is_env_sorting_enabled ? 'key' : 'id')
+                 ->get();
+ 
+@@ -1924,9 +2241,9 @@
+                 $envs_base64 = base64_encode($environment_variables->implode("\n"));
+ 
+                 $this->application_deployment_queue->addLogEntry('Creating build-time .env file in /artifacts (outside Docker context).', hidden: true);
+-                $this->execute_remote_command([
+-                    executeInDocker($this->deployment_uuid, "echo '$envs_base64' | base64 -d | tee ".self::BUILD_TIME_ENV_PATH.' > /dev/null'),
+-                ]);
++                foreach ($this->base64WriteCommands($envs_base64, self::BUILD_TIME_ENV_PATH, $this->deployment_uuid) as $writeCommand) {
++                    $this->execute_remote_command([$writeCommand, 'hidden' => true]);
++                }
+ 
+                 if (isDev()) {
+                     $this->execute_remote_command([
+@@ -2302,6 +2619,7 @@
+         }
+ 
+         $this->graceful_shutdown_container($this->deployment_uuid, skipRemove: true);
++        $this->wait_for_container_name_to_be_free($this->deployment_uuid);
+         $this->execute_remote_command(
+             [
+                 $runCommand,
+@@ -2314,6 +2632,44 @@
+         $this->run_pre_deployment_command();
+     }
+ 
++    /**
++     * Block until a container name is free again.
++     *
++     * The helper is started with --rm, so `docker stop` only asks the daemon to
++     * remove it; the removal completes asynchronously and the name stays reserved
++     * for a moment afterwards. The line above stops the helper and the one below
++     * starts a new one under the same name, so whenever the daemon is a little slow
++     * the run fails with:
++     *
++     *   Conflict. The container name "/<uuid>" is already in use
++     *
++     * Measured over seven days on this installation: 77 of 131 deployment failures,
++     * and none of 1216 successful deployments carried that message.
++     *
++     * Waits on `docker inspect`, not on `docker ps`. That distinction is the whole
++     * fix and it was found by measuring, not by reading: a container leaves
++     * `docker ps -a` BEFORE the daemon releases its name, so a version of this that
++     * polled `docker ps -a` returned immediately and the run still collided. Over
++     * eight trials of stop-then-reuse: no wait at all collided 7 times, the
++     * `docker ps -a` wait 2 times, and this one 0 -- and 0 again over a further 20
++     * trials, none of which waited longer than two seconds.
++     *
++     * The deadline is wall clock rather than an iteration count, because each
++     * docker call costs a quarter of a second of its own on a server with a few
++     * hundred containers; counting iterations there meant 35 seconds, not 10.
++     */
++    private function wait_for_container_name_to_be_free(string $containerName): void
++    {
++        $name = escapeshellarg($containerName);
++        $script = 'deadline=$(( $(date +%s) + 10 )); '
++            .'while [ "$(date +%s)" -lt "$deadline" ]; do '
++            .'docker inspect '.$name.' >/dev/null 2>&1 || exit 0; '
++            .'sleep 0.2; '
++            .'done';
++
++        instant_remote_process([$script], $this->server, false);
++    }
++
+     private function restart_builder_container_with_actual_commit()
+     {
+         // Stop the current helper container (no need for rm -f as it was started with --rm)
+@@ -4091,6 +4447,43 @@
+         $this->application_deployment_queue->addLogEntry('Building docker image completed.');
+     }
+ 
++    /**
++     * Stop the helper container that is left behind on the deployment server.
++     *
++     * With a build server this flow prepares a helper on BOTH machines: one on the
++     * builder that runs the build, and one on the destination that writes the
++     * configuration and starts the containers. graceful_shutdown_container() acts on
++     * whichever server $this->server points at, and the block that precedes it sets
++     * that to the build server on purpose, so the destination's helper is never
++     * stopped and stays running after the deployment ends.
++     *
++     * Measured 2026-09-01 across two deployments to two different destinations: the
++     * builder's helper was gone in both cases and the destination's was still up
++     * minutes later. Historically one destination held 447 of them while the build
++     * server held 2.
++     *
++     * The helper runs with --rm, so stopping it is enough to remove it.
++     */
++    private function shutdown_helper_on_deployment_server(): void
++    {
++        if (! $this->use_build_server || ! isset($this->mainServer)) {
++            return;
++        }
++        if ($this->mainServer->id === $this->server->id) {
++            return;
++        }
++
++        $buildServer = $this->server;
++        try {
++            $this->server = $this->mainServer;
++            $this->graceful_shutdown_container($this->deployment_uuid, skipRemove: true);
++        } catch (\Throwable $e) {
++            \Log::warning('Failed to shut down helper on deployment server: '.$e->getMessage());
++        } finally {
++            $this->server = $buildServer;
++        }
++    }
++
+     private function graceful_shutdown_container(string $containerName, bool $skipRemove = false)
+     {
+         try {
+@@ -4570,14 +4963,34 @@
+             return;
+         }
+ 
+-        // Read the Dockerfile
++        // Read the Dockerfile.
++        //
++        // The saved-output key has to be unique per Dockerfile AND emptied before
++        // each read. execute_remote_command defaults to append (ExecuteRemoteCommand
++        // reads `data_get($single_command, 'append', true)`) because one command's
++        // output can arrive in several chunks -- appending is right WITHIN a command
++        // and wrong ACROSS commands. Upstream used the fixed key 'dockerfile_content'
++        // and called this once per built service, so service N read services 1..N
++        // concatenated and wrote that back to its own Dockerfile. Each chunk is
++        // trimmed on the way in, so the seam has no newline: measured on this fleet,
++        // a netbird build died with `busybox# syntax=docker/dockerfile:1` spliced
++        // together at the boundary between two files, and only the LAST built
++        // service ever failed.
++        //
++        // Keying by path is not enough on its own: several services may share one
++        // Dockerfile (netbird-management, -signal and -relay all build
++        // Dockerfile.netbird-runtime), which collapses to the same key and appends
++        // the same file to itself. Forgetting the key first is what makes each read
++        // stand alone.
++        $dockerfileSaveKey = 'dockerfile_content_'.md5($dockerfile_path);
++        $this->saved_outputs->forget($dockerfileSaveKey);
+         $this->execute_remote_command([
+             executeInDocker($this->deployment_uuid, "cat {$dockerfile_path}"),
+             'hidden' => true,
+-            'save' => 'dockerfile_content',
++            'save' => $dockerfileSaveKey,
+         ]);
+ 
+-        $dockerfile = str($this->saved_outputs->get('dockerfile_content'))->trim()->explode("\n");
++        $dockerfile = str($this->saved_outputs->get($dockerfileSaveKey))->trim()->explode("\n");
+ 
+         // Add BuildKit syntax directive if not present
+         if (! str_starts_with($dockerfile->first(), '# syntax=')) {
+@@ -4653,10 +5066,9 @@
+         if ($modified) {
+             // Write the modified Dockerfile back
+             $dockerfile_base64 = base64_encode($dockerfile->implode("\n"));
+-            $this->execute_remote_command([
+-                executeInDocker($this->deployment_uuid, "echo '{$dockerfile_base64}' | base64 -d | tee {$dockerfile_path} > /dev/null"),
+-                'hidden' => true,
+-            ]);
++            foreach ($this->base64WriteCommands($dockerfile_base64, $dockerfile_path, $this->deployment_uuid) as $writeCommand) {
++                $this->execute_remote_command([$writeCommand, 'hidden' => true]);
++            }
+         }
+     }
+ 
+@@ -4752,15 +5164,30 @@
+ 
+             $isMultiStage = count($fromIndices) > 1;
+ 
++            // Upstream's non-compose sibling, add_build_env_variables_to_dockerfile(),
++            // returns early when build secrets are supported: the values travel with
++            // --secret, so an ARG declaration would only bake them into the image.
++            // This compose path was missing that guard -- it injected ARG *and* mounted
++            // the secrets, so `docker history` kept every value and use_build_secrets
++            // bought nothing for build_pack=dockercompose. Measured 2026-08-16 on
++            // <fork>-sites: POSTGRES_PASSWORD, RABBITMQ_PASSWORD and SESSION_SECRET
++            // still in a freshly built layer with the setting enabled.
++            //
++            // The guard cannot be an early return the way it is upstream:
++            // modify_dockerfile_for_secrets() runs at the END of this same per-service
++            // loop, so returning here would also skip the secret mounts and starve the
++            // build of the values it just stopped receiving as ARGs.
+             $argsToAdd = collect([]);
+-            foreach ($variables as $key => $value) {
+-                $argsToAdd->push("ARG {$key}");
+-            }
++            if (! $this->dockerSecretsSupported) {
++                foreach ($variables as $key => $value) {
++                    $argsToAdd->push("ARG {$key}");
++                }
+ 
+-            if ($argsToAdd->isEmpty()) {
+-                $this->application_deployment_queue->addLogEntry("Service {$serviceName}: No build-time variables to add.");
++                if ($argsToAdd->isEmpty()) {
++                    $this->application_deployment_queue->addLogEntry("Service {$serviceName}: No build-time variables to add.");
+ 
+-                continue;
++                    continue;
++                }
+             }
+ 
+             // Development logging to show what ARGs are being injected for Docker Compose
+@@ -4822,7 +5249,7 @@
+ 
+                 $stageInfo = $isMultiStage ? ' (multi-stage build, added to '.count($fromIndices).' stages)' : '';
+                 $this->application_deployment_queue->addLogEntry("Added {$totalAdded} ARG declarations to Dockerfile for service {$serviceName}{$stageInfo}.");
+-            } else {
++            } elseif (! $this->dockerSecretsSupported) {
+                 $this->application_deployment_queue->addLogEntry("Service {$serviceName}: All required ARG declarations already exist.");
+             }
+ 

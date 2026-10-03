@@ -1,0 +1,186 @@
+{
+  "name": "WF_PROPOSAL_OUTCOME_REVIEW",
+  "meta": {
+    "purpose": "Closes the self-improvement loop. Cron lists applied improvement_proposals due for outcome review and calls fn_record_proposal_outcome (two-phase: baseline -> outcome). On regression the RPC PROPOSES a gated rollback (advisory-only). Observer never executes.",
+    "trigger": "scheduleTrigger hourly",
+    "design_doc": "docs/architecture/STORY_SELF_EVALUATION_LOOP.md (PR 5)"
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "cron",
+      "name": "Hourly",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "fn_get_proposals_due_outcome_review",
+        "rpcParams": "={{ JSON.stringify({ p_window_hours: 24, p_limit: 50 }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 8000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "list-due",
+      "name": "List due proposals",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        420,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Split the lister's rows into one item per proposal so the next node\n// records each proposal's outcome per-item.\nconst r = $input.first() ? $input.first().json : null;\nconst arr = Array.isArray(r) ? r : (Array.isArray(r && r.data) ? r.data : (r ? [r] : []));\nreturn arr.filter((x) => x && x.proposal_id).map((x) => ({ json: x }));"
+      },
+      "id": "split",
+      "name": "Split proposals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "fn_record_proposal_outcome",
+        "rpcParams": "={{ JSON.stringify({ p_proposal_id: $json.proposal_id }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 8000,
+          "auditTrail": true
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "record",
+      "name": "Record outcome",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        860,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "edge_blockchain_audit",
+        "rpcParams": "={{ JSON.stringify({ p_action: 'proposal_outcome_anchor', p_payload: { proposalId: $json.proposal_id || $json.proposalId, outcome: $json.outcome, reviewedAt: $json.reviewed_at || $json.reviewedAt } }) }}",
+        "authMode": "service_role",
+        "options": {},
+        "onError": "continueRegularOutput"
+      },
+      "id": "anchor-outcome",
+      "name": "Anchor Outcome",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Hourly": {
+      "main": [
+        [
+          {
+            "node": "List due proposals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List due proposals": {
+      "main": [
+        [
+          {
+            "node": "Split proposals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split proposals": {
+      "main": [
+        [
+          {
+            "node": "Record outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record outcome": {
+      "main": [
+        [
+          {
+            "node": "Anchor Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anchor Outcome": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Prague"
+  },
+  "tags": [
+    "aisha",
+    "self-improvement",
+    "outcome",
+    "self-driving"
+  ]
+}

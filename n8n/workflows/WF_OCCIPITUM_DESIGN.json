@@ -1,0 +1,164 @@
+{
+  "name": "WF_OCCIPITUM_DESIGN",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "occipitum-design",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Occipitum Design Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate input\nconst body = $input.first().json.body ?? $input.first().json;\nconst story_id = body.story_id;\nconst partner_id = body.partner_id;\nconst page_intent = body.page_intent ?? 'landing';\nconst existing_canvas = body.existing_canvas ?? null;\n\nif (!story_id || !partner_id) {\n  throw new Error('story_id and partner_id are required');\n}\n\n// Inject creativity seed — CRITICAL for anti-stereotypical output\nconst creativity_seed = Math.random();\n\nreturn [{ json: { story_id, partner_id, page_intent, existing_canvas, creativity_seed } }];"
+      },
+      "id": "validate-input",
+      "name": "Validate Input + Creativity Seed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Load design profile via MCP\nconst { partner_id } = $input.first().json;\n\nconst mcpUrl = $env.AISHA_POSTGREST_URL + '/functions/v1/mcp-knowledge-server';\nconst mcpToken = $env.AISHA_ACCESS_TOKEN;\n\nconst response = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': `Bearer ${mcpToken}`\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: 1,\n    method: 'tools/call',\n    params: {\n      name: 'get_design_profile',\n      arguments: { partner_id }\n    }\n  })\n});\n\nconst result = await response.json();\nconst profile = result?.result?.content?.[0]?.text ?? null;\nconst designProfile = profile ? JSON.parse(profile) : null;\n\nreturn [{ json: { ...$input.first().json, design_profile: designProfile?.profile ?? {} } }];"
+      },
+      "id": "load-profile",
+      "name": "Load Design Profile",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Load compose_context for Occipitum agent\nconst { story_id, partner_id, page_intent } = $input.first().json;\n\nconst mcpUrl = $env.AISHA_POSTGREST_URL + '/functions/v1/mcp-knowledge-server';\nconst mcpToken = $env.AISHA_ACCESS_TOKEN;\n\nconst response = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': `Bearer ${mcpToken}`\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: 2,\n    method: 'tools/call',\n    params: {\n      name: 'compose_context',\n      arguments: {\n        agent_slug: 'occipitum',\n        context_profile_slug: 'planning_heavy',\n        query: `Design canvas for ${page_intent} page, story ${story_id}`\n      }\n    }\n  })\n});\n\nconst result = await response.json();\nconst context = result?.result?.content?.[0]?.text ?? '';\n\nreturn [{ json: { ...$input.first().json, agent_context: context } }];"
+      },
+      "id": "load-context",
+      "name": "Load Agent Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Search design patterns with ANTI-STEREOTYPICAL selection\n// Top-15 recall, random 5 pick (never deterministic top-5)\nconst mcpUrl = $env.AISHA_POSTGREST_URL + '/functions/v1/mcp-knowledge-server';\nconst mcpToken = $env.AISHA_ACCESS_TOKEN;\n\nconst { design_profile, creativity_seed, page_intent } = $input.first().json;\nconst vibeWords = design_profile?.style_preferences?.vibe_words ?? ['modern', 'clean'];\n\n// Search patterns\nconst patternResponse = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': `Bearer ${mcpToken}`\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: 3,\n    method: 'tools/call',\n    params: {\n      name: 'search_knowledge_v2',\n      arguments: {\n        query: `design pattern ${page_intent} ${vibeWords.join(' ')}`,\n        tags: ['occipitum'],\n        limit: 15\n      }\n    }\n  })\n});\n\nconst patternResult = await patternResponse.json();\nconst allPatterns = JSON.parse(patternResult?.result?.content?.[0]?.text ?? '[]');\n\n// ANTI-STEREOTYPE: Random 5 from top-15 (not deterministic top-5)\nconst shuffled = allPatterns\n  .map(p => ({ ...p, _sort: Math.random() }))\n  .sort((a, b) => a._sort - b._sort)\n  .slice(0, 5);\n\n// Search anti-patterns (always load all)\nconst antiPatternResponse = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': `Bearer ${mcpToken}`\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: 4,\n    method: 'tools/call',\n    params: {\n      name: 'search_knowledge_v2',\n      arguments: {\n        query: 'design anti-pattern blacklist',\n        tags: ['occipitum', 'antipattern'],\n        limit: 20\n      }\n    }\n  })\n});\n\nconst antiPatternResult = await antiPatternResponse.json();\nconst antiPatterns = JSON.parse(antiPatternResult?.result?.content?.[0]?.text ?? '[]');\n\nreturn [{ json: {\n  ...$input.first().json,\n  selected_patterns: shuffled,\n  anti_patterns: antiPatterns\n} }];"
+      },
+      "id": "search-patterns",
+      "name": "Search Patterns (Anti-Stereotype)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare LLM prompt for canvas generation\nconst data = $input.first().json;\n\n// Creativity seed determines style band:\n// 0-0.3 → experimental/brutalist\n// 0.3-0.6 → editorial/storytelling\n// 0.6-1.0 → luxury/immersive\nconst seed = data.creativity_seed;\nlet styleBand;\nif (seed < 0.3) styleBand = 'experimental_brutalist';\nelse if (seed < 0.6) styleBand = 'editorial_storytelling';\nelse styleBand = 'luxury_immersive';\n\nconst systemPrompt = `You are OCCIPITUM — AISHA's visual cortex.\n\nYour mission: Generate a GrapeJS ProjectData JSON for a ${data.page_intent} page.\n\nSTYLE BAND (from creativity_seed ${seed.toFixed(3)}): ${styleBand}\n\nDESIGN PROFILE:\n${JSON.stringify(data.design_profile, null, 2)}\n\nSELECTED PATTERNS (use as inspiration, don't copy literally):\n${data.selected_patterns.map(p => '- ' + (p.title ?? p.name ?? 'pattern')).join('\\n')}\n\nABSOLUTE BLACKLIST — NEVER use:\n${data.anti_patterns.map(p => '- ' + (p.title ?? p.name ?? 'anti-pattern')).join('\\n')}\n\nAGENT CONTEXT:\n${data.agent_context}\n\nOUTPUT FORMAT:\nReturn ONLY valid JSON with this structure:\n{\n  \"pages\": [{ \"component\": \"<body>...</body>\" }],\n  \"styles\": [...],\n  \"_occipitum_rationale\": {\n    \"style_band\": \"${styleBand}\",\n    \"creativity_seed\": ${seed.toFixed(3)},\n    \"patterns_used\": [...],\n    \"anti_patterns_avoided\": [...],\n    \"design_reasoning\": \"...\"\n  }\n}\n\nRULES:\n1. The HTML in pages[0].component MUST use Tailwind CSS classes\n2. NEVER use generic hero+CTA layout\n3. NEVER use hamburger menu on desktop\n4. NEVER use cookie-cutter card grids\n5. Each section must have a clear visual rhythm\n6. Use personality from design_profile to drive color, typography, spacing\n7. Include at least 2 unexpected visual elements (asymmetry, overlapping, kinetic hints)\n8. The design must tell a story, not just display information`;\n\nconst userPrompt = `Generate a ${data.page_intent} page design for this partner.\nExisting canvas: ${data.existing_canvas ? 'yes (will be replaced)' : 'fresh start'}\nCreativity seed: ${seed.toFixed(3)} → ${styleBand}`;\n\nreturn [{ json: {\n  ...data,\n  style_band: styleBand,\n  system_prompt: systemPrompt,\n  user_prompt: userPrompt\n} }];"
+      },
+      "id": "prepare-prompt",
+      "name": "Prepare Design Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-5",
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "={{$json.system_prompt}}"
+            },
+            {
+              "role": "user",
+              "content": "={{$json.user_prompt}}"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.92,
+          "maxTokens": 8192
+        }
+      },
+      "id": "generate-canvas",
+      "name": "Generate Canvas (Claude)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1,
+      "position": [1560, 300],
+      "notes": "High temperature (0.92) for maximum creativity. Claude Sonnet for design quality."
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse LLM output into valid GrapeJS ProjectData\nconst llmOutput = $input.first().json.response ?? $input.first().json.text ?? '';\n\n// Extract JSON from potentially markdown-wrapped response\nlet projectData;\ntry {\n  const jsonMatch = llmOutput.match(/```(?:json)?\\s*([\\s\\S]*?)```/);\n  const jsonStr = jsonMatch ? jsonMatch[1].trim() : llmOutput.trim();\n  projectData = JSON.parse(jsonStr);\n} catch (e) {\n  // Fallback: try direct parse\n  try {\n    projectData = JSON.parse(llmOutput);\n  } catch {\n    throw new Error('Failed to parse LLM output as valid GrapeJS ProjectData: ' + e.message);\n  }\n}\n\n// Validate minimal structure\nif (!projectData.pages || !Array.isArray(projectData.pages)) {\n  throw new Error('Invalid ProjectData: missing pages array');\n}\n\nconst { story_id, partner_id, creativity_seed, style_band } = $input.first().json;\n\nreturn [{ json: {\n  story_id,\n  partner_id,\n  creativity_seed,\n  style_band,\n  project_data: projectData,\n  rationale: projectData._occipitum_rationale ?? {}\n} }];"
+      },
+      "id": "parse-canvas",
+      "name": "Parse Canvas Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Store as personality signal for Hippocampus memory\nconst { partner_id, story_id, style_band, rationale } = $input.first().json;\n\n// Resolve partner_id → user_id (personality_signals requires auth user UUID)\nlet userId = null;\ntry {\n  const lookupRes = await fetch($env.AISHA_POSTGREST_URL + '/rest/v1/partner_profiles?id=eq.' + partner_id + '&select=user_id', {\n    method: 'GET',\n    headers: {\n      'Authorization': `Bearer ${$env.AISHA_POSTGREST_SERVICE_KEY}`,\n      'apikey': $env.AISHA_POSTGREST_ANON_KEY\n    }\n  });\n  const rows = await lookupRes.json();\n  if (rows.length > 0) userId = rows[0].user_id;\n} catch (e) {\n  // Non-blocking — continue without signal\n}\n\nif (userId) {\n  await fetch($env.AISHA_POSTGREST_URL + '/rest/v1/rpc/fn_capture_personality_signal', {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\n      'Authorization': `Bearer ${$env.AISHA_POSTGREST_SERVICE_KEY}`,\n      'apikey': $env.AISHA_POSTGREST_ANON_KEY\n    },\n    body: JSON.stringify({\n      p_user_id: userId,\n      p_signal_type: 'design_proposal_generated',\n      p_value: { style_band, story_id, reasoning: rationale.design_reasoning ?? '' },\n      p_weight: 0.6\n    })\n  });\n}\n\nreturn [{ json: $input.first().json }];"
+      },
+      "id": "store-memory",
+      "name": "Store Hippocampus Signal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2000, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Broadcast proposal to StoryLoop canvas via Supabase Realtime HTTP API\nconst { story_id, partner_id, project_data, rationale, creativity_seed, style_band } = $input.first().json;\n\nconst realtimeUrl = $env.AISHA_POSTGREST_URL + '/realtime/v1/api/broadcast';\n\ntry {\n  await fetch(realtimeUrl, {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\n      'Authorization': `Bearer ${$env.AISHA_POSTGREST_SERVICE_KEY}`,\n      'apikey': $env.AISHA_POSTGREST_ANON_KEY\n    },\n    body: JSON.stringify({\n      messages: [{\n        topic: `story:${story_id}:canvas`,\n        event: 'agent_activity',\n        payload: {\n          id: `occipitum-${Date.now()}`,\n          agent: 'occipitum',\n          type: 'occipitum_proposal',\n          timestamp: new Date().toISOString(),\n          project_data,\n          rationale,\n          creativity_seed,\n          style_band\n        }\n      }]\n    })\n  });\n} catch (e) {\n  // Non-blocking — proposal is still returned in response\n}\n\nreturn [{ json: {\n  success: true,\n  signal: 'occipitum_proposal',\n  story_id,\n  partner_id,\n  style_band,\n  creativity_seed,\n  rationale,\n  project_data\n} }];"
+      },
+      "id": "broadcast-canvas",
+      "name": "Broadcast to Canvas",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2220, 300]
+    }
+  ],
+  "connections": {
+    "Occipitum Design Webhook": {
+      "main": [[{ "node": "Validate Input + Creativity Seed", "type": "main", "index": 0 }]]
+    },
+    "Validate Input + Creativity Seed": {
+      "main": [[{ "node": "Load Design Profile", "type": "main", "index": 0 }]]
+    },
+    "Load Design Profile": {
+      "main": [[{ "node": "Load Agent Context", "type": "main", "index": 0 }]]
+    },
+    "Load Agent Context": {
+      "main": [[{ "node": "Search Patterns (Anti-Stereotype)", "type": "main", "index": 0 }]]
+    },
+    "Search Patterns (Anti-Stereotype)": {
+      "main": [[{ "node": "Prepare Design Prompt", "type": "main", "index": 0 }]]
+    },
+    "Prepare Design Prompt": {
+      "main": [[{ "node": "Generate Canvas (Claude)", "type": "main", "index": 0 }]]
+    },
+    "Generate Canvas (Claude)": {
+      "main": [[{ "node": "Parse Canvas Output", "type": "main", "index": 0 }]]
+    },
+    "Parse Canvas Output": {
+      "main": [[{ "node": "Store Hippocampus Signal", "type": "main", "index": 0 }]]
+    },
+    "Store Hippocampus Signal": {
+      "main": [[{ "node": "Broadcast to Canvas", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

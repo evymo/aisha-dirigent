@@ -1,0 +1,89 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  line-height: 1.6;
+}
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 var(--space-lg); }
+
+/* Header */
+.site-header { border-bottom: 1px solid var(--color-border); }
+.site-header .wrap {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: var(--space-md); padding-bottom: var(--space-md);
+}
+.brand {
+  display: flex; align-items: center; gap: var(--space-sm);
+  font-family: var(--font-display); font-size: 1.35rem; font-weight: 700; color: var(--color-accent);
+}
+.brand__mark { font-size: 1.3rem; }
+.nav { display: flex; gap: var(--space-lg); }
+.nav a { color: var(--color-fg); text-decoration: none; font-size: 0.95rem; opacity: 0.85; }
+.nav a:hover { opacity: 1; color: var(--color-accent); }
+
+/* Hero */
+.hero { padding: var(--space-xl) 0; }
+.hero h1 { font-family: var(--font-display); font-weight: 700; font-size: 3rem; line-height: 1.1; margin: 0 0 var(--space-md); max-width: 15ch; }
+.hero p { max-width: 540px; color: var(--color-muted); font-size: 1.18rem; margin: 0 0 var(--space-lg); }
+
+/* Section scaffolding */
+.section { padding: var(--space-xl) 0; border-top: 1px solid var(--color-border); }
+.section__eyebrow { color: var(--color-accent); font-size: 0.78rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; margin: 0 0 var(--space-sm); }
+.section__title { font-family: var(--font-display); font-size: 2rem; margin: 0 0 var(--space-lg); }
+
+/* Menu — order grid (e-shop capability) */
+.items { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-lg); }
+.item {
+  display: flex; align-items: flex-start; gap: var(--space-md);
+  padding: var(--space-lg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+.item__media { font-size: 2.2rem; line-height: 1; }
+.item__body { flex: 1; display: flex; flex-direction: column; gap: var(--space-xs); }
+.item__name { font-family: var(--font-display); font-size: 1.25rem; margin: 0; }
+.item__desc { margin: 0; color: var(--color-muted); font-size: 0.9rem; }
+.item__row { display: flex; align-items: center; justify-content: space-between; margin-top: var(--space-sm); }
+.item__price { font-weight: 700; color: var(--color-accent); font-size: 1.15rem; }
+.item__add {
+  border: 0; border-radius: var(--radius-sm); cursor: pointer; font: inherit; font-weight: 600;
+  padding: var(--space-xs) var(--space-md); background: var(--color-primary); color: var(--color-primary-fg);
+}
+.item__add:hover { background: var(--color-primary-dark); }
+
+/* Order-ahead panel (online-ordering / commerce capability) */
+.order { background: var(--color-primary); color: var(--color-primary-fg); border-radius: var(--radius-md); }
+.order .inner { padding: var(--space-xl); display: grid; grid-template-columns: 1.5fr 1fr; gap: var(--space-xl); align-items: center; }
+.order h2 { font-family: var(--font-display); font-size: 2rem; margin: 0 0 var(--space-md); }
+.order p { margin: 0 0 var(--space-lg); font-size: 1.05rem; }
+.order__stat { text-align: center; }
+.order__num { font-family: var(--font-display); font-size: 3.4rem; font-weight: 700; line-height: 1; }
+.order__label { display: block; margin-top: var(--space-sm); font-size: 0.9rem; opacity: 0.85; }
+.order .btn-dark { background: var(--color-bg); color: var(--color-accent); }
+
+/* Visit */
+.visit { text-align: center; }
+.visit p { color: var(--color-muted); max-width: 540px; margin: 0 auto var(--space-md); }
+.visit__hours { font-family: var(--font-display); color: var(--color-fg); font-size: 1.05rem; margin: 0 0 var(--space-lg); }
+
+.btn {
+  display: inline-block; padding: var(--space-sm) var(--space-lg);
+  background: var(--color-primary); color: var(--color-primary-fg);
+  border: 0; border-radius: var(--radius-sm); text-decoration: none; font-weight: 600; font: inherit; cursor: pointer;
+}
+.btn:hover { background: var(--color-primary-dark); }
+
+/* Footer */
+.site-footer { border-top: 1px solid var(--color-border); padding: var(--space-lg) 0; color: var(--color-muted); font-size: 0.85rem; }
+.site-footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-sm); }
+
+@media (max-width: 760px) {
+  .items { grid-template-columns: 1fr; }
+  .order .inner { grid-template-columns: 1fr; text-align: center; }
+  .nav { display: none; }
+  .hero h1 { font-size: 2.2rem; }
+}

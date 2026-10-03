@@ -1,0 +1,32 @@
+{
+  "name": "@aisha/svc-fio-bank",
+  "version": "1.0.0",
+  "license": "Elastic-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@aisha/postgrest-client": "*",
+    "@aisha/observability": "*",
+    "@aisha/security": "*",
+    "@fastify/helmet": "^12.0.0",
+    "fastify": "^5.3.3",
+    "@fastify/cors": "^11.0.0",
+    "@fastify/rate-limit": "^10.2.2",
+    "jose": "^6.0.11",
+    "pino": "^9.6.0",
+    "pino-pretty": "^13.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.15.0",
+    "vitest": "^3.2.4"
+  }
+}

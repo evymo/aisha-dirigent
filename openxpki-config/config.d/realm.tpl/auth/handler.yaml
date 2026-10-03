@@ -1,0 +1,33 @@
+# Those stacks are usually required so you should not remove them
+Anonymous:
+    type: Anonymous
+    label: Anonymous
+
+System:
+    type: Anonymous
+    role: System
+
+# Using the default config this allows a user login with ANY certificate
+# issued by the democa which has the client auth keyUsage bit set
+# the commonName is used as username!
+Certificate:
+    type: ClientX509
+    role: User
+    arg: CN
+    trust_anchor:
+        realm: democa
+
+# Operator login — the single human/operator credential for this realm.
+# The digest is NOT shipped in the repo: pki-init renders the placeholder
+# __PKI_OPERATOR_PASSWORD_HASH__ from the OPENXPKI_OPERATOR_PASSWORD_HASH
+# Coolify env at deploy time, exactly like the __PKI_RPC_HMAC__ flow
+# (see docker-compose.coolify-pki.yml). No demo/test accounts ship here —
+# the upstream TestAccounts stack (alice/bob/rose/rob, shared password)
+# has been removed as an insecure primitive.
+LocalPassword:
+    type: Password
+    user:
+        pkiadmin:
+            digest: __PKI_OPERATOR_PASSWORD_HASH__
+            role: RA Operator
+

@@ -1,0 +1,15 @@
+{
+  "name": "aisha-dirigent-claude",
+  "version": "0.7.0",
+  "description": "AISHA Dirigent for Claude — governance rules, seed/merge tracking, model routing, health, and local-LLM cost/usage, exposed as MCP tools.",
+  "type": "module",
+  "private": true,
+  "license": "Elastic-2.0",
+  "bin": {
+    "aisha-dirigent-mcp": "server/index.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {}
+}

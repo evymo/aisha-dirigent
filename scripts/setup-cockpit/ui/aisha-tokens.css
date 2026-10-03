@@ -1,0 +1,104 @@
+/* ============================================================================
+   AISHA Brand Tokens — Setup Cockpit
+   ----------------------------------------------------------------------------
+   Lean brand SOURCE-OF-TRUTH SNAPSHOT for the zero-dependency setup cockpit.
+
+   These values MIRROR the CANONICAL AISHA brand design system,
+   whose single source of truth is the PRIVATE brand repo:
+       • aisha-guru-web → lib/tokens.src.css   (tokens + Avenir @font-face)
+                          blocks/atoms/A7-logo.html (the wordmark)
+   linked into the stack as the `domains/templates/<public-tld>` git submodule.
+
+   That repo is "ours" / private — it is NOT shipped in the public open-source
+   stack (there `domains/templates/<public-tld>` is a README stub and
+   `domains/default/` is the neutral white-label web seed operators self-brand).
+   Internal stack surfaces (this cockpit, workbench admin, mobile app) DO wear
+   the AISHA brand; only the marketing WEB is operator-self-branded.
+
+   Language in one line: editorial near-black (#0E0E10) with an orange ember
+   glow, huge Nunito-Black UPPERCASE headlines, a single orange accent
+   (#FF6A1A), sharp corners + 1px hairlines, −23° skew motifs (slice + clip-path
+   parallelogram buttons), JetBrains-Mono for technical lines.
+
+   The cockpit is served as static files BEFORE `npm install`, so it can't
+   import packages/ or run a build → these tokens live as a committed CSS file.
+   The brand typeface is Nunito Sans (OSS / SIL OFL — replaced commercial Avenir
+   in PR #298), bundled under ./fonts/nunito-sans/ and loaded by index.html.
+
+   NEXT PHASE: packages/design-tokens/build.mjs will EMIT this file from the
+   brand tokens.json so the snapshot stays in sync. Until then, keep aligned
+   with the brand sources above — do not drift. A drift gate will enforce it.
+   ========================================================================== */
+
+:root {
+  /* ── Brand palette (verbatim from the brand design tokens) ─────────────── */
+  --color-primary:        #FF6A1A;   /* the single accent — energy / action   */
+  --color-primary-dark:   #E55A10;   /* hover / pressed                        */
+  --color-primary-light:  #FFD5BF;   /* tint                                   */
+  --color-white:          #FFFFFF;
+  --color-black:          #1A1A1A;
+  --color-black-alt:      #2A2A2A;
+
+  /* near-black editorial canvas (from pruvodce stage) */
+  --bg-0:                 #0E0E10;   /* page base                              */
+  --bg-1:                 #0A0A0C;   /* deepest (gradient floor)               */
+  --bg-panel:             #141417;   /* subtle lifted panel                    */
+  --bg-panel-2:           #1A1A1E;   /* hover / elevated                       */
+
+  /* hairlines (the editorial look is borders, not fills) */
+  --line:        rgba(255,255,255,0.12);
+  --line-soft:   rgba(255,255,255,0.08);
+  --line-strong: rgba(255,255,255,0.18);
+
+  /* foreground */
+  --fg:      rgba(255,255,255,0.92);
+  --fg-dim:  rgba(255,255,255,0.55);
+  --fg-faint:rgba(255,255,255,0.40);
+
+  /* status */
+  --color-success: #4ADE80;
+  --color-warning: #FACC15;
+  --color-error:   #F87171;
+  --color-info:    #60A5FA;
+
+  /* geometry — sharp, with the signature skew */
+  --skew-angle:      -23deg;
+  --skew-angle-soft: -22deg;
+  --skew-hover:      -15deg;
+  --radius:    0px;     /* editorial = square corners                          */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+
+  /* motion */
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+  --ease-default:  ease-in-out;
+
+  /* typography — Nunito Sans (OSS, bundled under ./fonts/nunito-sans/) */
+  --font-black:  "Nunito Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font:        "Nunito Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono:        ui-monospace, "JetBrains Mono", "SF Mono", "Cascadia Code", Menlo, monospace;
+
+  /* ════════════════════════════════════════════════════════════════════════
+     Cockpit semantic contract — variable NAMES the wizard markup (cockpit.js)
+     references inline. Kept intact, re-pointed onto the brand so no JS changes.
+     ════════════════════════════════════════════════════════════════════════ */
+  --bg:           var(--bg-0);
+  --bg-card:      var(--bg-panel);
+  --bg-hover:     var(--bg-panel-2);
+  --border:       var(--line);
+  --text:         var(--fg);
+  --text-dim:     var(--fg-dim);
+  --accent:       var(--color-primary);
+  --accent-hover: var(--color-primary-dark);
+  --green:        var(--color-success);
+  --yellow:       var(--color-warning);
+  --red:          var(--color-error);
+
+  /* ── Ambient ember background (from pruvodce .stage::before) ────────────── */
+  --ember-bg:
+    radial-gradient(ellipse at 50% 24%, rgba(255,106,26,0.10), transparent 52%),
+    radial-gradient(ellipse at 16% 84%, rgba(255,106,26,0.05), transparent 50%),
+    linear-gradient(180deg, #0E0E10 0%, #0A0A0C 100%);
+}

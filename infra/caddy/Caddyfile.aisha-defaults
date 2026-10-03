@@ -1,0 +1,58 @@
+# Phase 12 WP 4.4 — AISHA Caddy defaults.
+#
+# Reference Caddyfile fragment that operators (or Coolify "Custom Caddy
+# Config" UI) should adopt for every public-facing site. Combines:
+#   - HTTP/1.1 + HTTP/2 + HTTP/3 (QUIC)
+#   - Brotli + zstd + gzip compression (in preference order)
+#   - Security headers from security-headers.caddy
+#   - Default reverse-proxy template for AISHA upstreams
+#
+# DEPLOY: mount this directory at `/etc/caddy/` (or `/etc/caddy/Caddyfile.d/`
+# depending on Caddy compose version). For Coolify edge proxy, paste the
+# `servers { protocols ... }` global block into Coolify's Caddy custom
+# config UI; the security-headers snippet auto-loads if Caddyfile.d/
+# is mounted.
+#
+# HSTS preload submission (one-time, after deploy verified):
+#   https://hstspreload.org/?domain=<PUBLIC_TLD>
+#   https://hstspreload.org/?domain=<INTERNAL_TLD>
+
+# ─── Global Caddy server config ─────────────────────────────────────────────
+{
+  # Enable HTTP/3 (QUIC) alongside HTTP/1.1 and HTTP/2. Caddy auto-
+  # negotiates per client. UDP 443 must be reachable on the edge — open
+  # the firewall rule if pfSense / iptables blocks UDP by default.
+  servers {
+    protocols h1 h2 h3
+    # Larger header buffer than default — Coolify + Cloudflare + NetBird
+    # chain can accumulate headers on auth-heavy requests.
+    max_header_size 16KB
+  }
+
+  # Encoding preference: zstd (newest, best CPU:ratio), brotli (broadest
+  # browser support), gzip (legacy). Caddy picks the best one the client
+  # accepts per Accept-Encoding header.
+  encode zstd br gzip
+
+  # Logging: structured + filtered for noise. Coolify scrapes stdout.
+  log {
+    output stdout
+    format json
+    level INFO
+  }
+}
+
+# Import the security-headers snippet — applied to every site block below.
+import /etc/caddy/Caddyfile.d/*.caddy
+
+# ─── Site block example ─────────────────────────────────────────────────────
+# Operators copy this pattern per site. The `import security-headers`
+# line is the AISHA convention.
+#
+# web.${PUBLIC_TLD} {
+#   import security-headers
+#   reverse_proxy gateway:3001
+# }
+#
+# (Per-site CSP — added by WP 4.7 — uses an additional `import csp-nonce`
+#  snippet that sets the nonce-based Content-Security-Policy header.)

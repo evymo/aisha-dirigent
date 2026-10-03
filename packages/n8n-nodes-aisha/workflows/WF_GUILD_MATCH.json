@@ -1,0 +1,311 @@
+{
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "connections": {
+    "Guild Match Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Guild Match Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guild Match Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Trace Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Guild Match Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: get_story_context": {
+      "ai_tool": [
+        [
+          {
+            "node": "Guild Match Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: match_experts": {
+      "ai_tool": [
+        [
+          {
+            "node": "Guild Match Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: assign_expert_to_story": {
+      "ai_tool": [
+        [
+          {
+            "node": "Guild Match Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: search_knowledge": {
+      "ai_tool": [
+        [
+          {
+            "node": "Guild Match Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Router": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Guild Match Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "guild-match",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Guild Match Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "guild-match-trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse and validate guild matching request\nconst body = $input.item.json.body || $input.item.json;\n\nconst storyId = body.story_id;\nconst expertiseArea = body.expertise_area || '';\nconst minProficiency = body.min_proficiency || 3;\nconst maxExperts = body.max_experts || 5;\nconst action = body.action || 'match';\n\nif (!storyId && action !== 'search') {\n  throw new Error('story_id is required for guild matching');\n}\n\nlet chatInput = '';\n\nswitch (action) {\n  case 'match':\n    chatInput = `Find the best expert match for story ${storyId}. ` +\n      (expertiseArea ? `Focus on expertise area: ${expertiseArea}. ` : '') +\n      `Minimum proficiency: ${minProficiency}. Return up to ${maxExperts} candidates.`;\n    break;\n  case 'assign':\n    if (!body.expert_id) throw new Error('expert_id is required for assign action');\n    chatInput = `Assign expert ${body.expert_id} to story ${storyId}. ` +\n      (body.role ? `Role: ${body.role}. ` : '') +\n      (body.reason ? `Reason: ${body.reason}` : '');\n    break;\n  case 'search':\n    chatInput = `Search for experts with expertise in: ${expertiseArea || body.query}. ` +\n      `Minimum proficiency: ${minProficiency}. Limit: ${maxExperts}.`;\n    break;\n  case 'evaluate':\n    chatInput = `Evaluate current expert assignments for story ${storyId}. ` +\n      `Check if expertise coverage is adequate and suggest improvements.`;\n    break;\n  default:\n    chatInput = `Guild matching task: ${JSON.stringify(body)}`;\n}\n\nreturn {\n  json: {\n    chatInput,\n    session_id: body.session_id || `guild-${storyId || 'search'}-${Date.now()}`,\n    context: {\n      story_id: storyId,\n      action,\n      expertise_area: expertiseArea,\n      min_proficiency: minProficiency,\n      max_experts: maxExperts,\n      source: body.source || 'webhook'\n    }\n  }\n};"
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=Jsi **Guild Match Agent** — subsystém AISHA Dirigenta pro matching expertů na projekty.\n\n## Role\nTvůj úkol je najít nejlepšího experta pro daný projekt (story) na základě požadovaných expertíz, proficiency a dostupnosti.\n\n## Operační protokol\n\n### Match request (najdi experta):\n1. `get_story_context({ story_id })` — zjisti požadavky story (expertise areas, priority, scope)\n2. `match_experts({ expertise_area, proficiency_min, limit })` — vyhledej kandidáty\n3. Pro každého kandidáta ohodnoť fit score (0-100):\n   - Expertise overlap: max 40 bodů\n   - Proficiency level: max 25 bodů\n   - Historical success rate: max 20 bodů\n   - Availability: max 15 bodů\n4. Vrať seřazený seznam s doporučením\n\n### Assign request (přiřaď experta):\n1. Ověř přes `get_story_context` že story existuje a je ve správném stavu\n2. `assign_expert_to_story({ story_id, expert_id, role })` — proveď přiřazení\n3. Vrať potvrzení\n\n### Search request (hledej experty):\n1. `match_experts({ expertise_area, proficiency_min, limit })` — vyhledej\n2. Pro každého kandidáta přidej kontext z knowledge base\n3. Vrať výsledky se skóre\n\n### Evaluate request (zhodnoť pokrytí):\n1. `get_story_context({ story_id })` — zjisti požadavky\n2. `search_knowledge({ query })` — doplň kontext\n3. Porovnej požadavky vs. přiřazení\n4. Identifikuj mezery a navrhni doplnění\n\n## SIGNÁLNÍ PROTOKOL\n\n```json\n{\n  \"signal\": \"guild_match_result\",\n  \"action\": \"match|assign|search|evaluate\",\n  \"story_id\": \"uuid|null\",\n  \"result\": \"success|no_match|partial|error\",\n  \"candidates\": [\n    {\n      \"expert_id\": \"uuid\",\n      \"name\": \"string\",\n      \"fit_score\": 85,\n      \"expertise_match\": [\"area1\", \"area2\"],\n      \"proficiency\": 4,\n      \"recommendation\": \"strong_match|good_match|partial_match\"\n    }\n  ],\n  \"assigned\": { \"expert_id\": \"uuid\", \"role\": \"string\" },\n  \"coverage_gaps\": [\"missing expertise areas\"],\n  \"requires_human\": false,\n  \"summary\": \"Nalezeni 3 experti, doporučen expert X se skóre 85/100\"\n}\n```\n\n## Pravidla\n- VŽDY vrať fit_score pro každého kandidáta\n- Při no_match navrhni rozšíření kritérií\n- NIKDY nepřiřazuj experta bez explicitního assign requestu\n- Odpovídej v jazyce dotazu",
+          "maxIterations": 8
+        }
+      },
+      "id": "ai-agent",
+      "name": "Guild Match Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "routingStrategy": "auto",
+        "modelOverride": "",
+        "options": {
+          "temperature": 0.2,
+          "maxOutputTokens": 4096,
+          "topP": 0.9,
+          "maxRetries": 2
+        }
+      },
+      "type": "n8n-nodes-aisha.aishaLlmRouter",
+      "typeVersion": 1,
+      "position": [
+        500,
+        520
+      ],
+      "id": "llm-router",
+      "name": "LLM Router",
+      "credentials": {
+        "openAiApi": {
+          "id": "__REMAP__",
+          "name": "OpenAi account"
+        },
+        "googlePalmApi": {
+          "id": "__REMAP__",
+          "name": "Google Gemini(PaLM) Api account"
+        },
+        "anthropicApi": {
+          "id": "__REMAP__",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.session_id || 'guild-default' }}",
+        "contextWindowLength": 5,
+        "inputKey": "chatInput"
+      },
+      "id": "memory",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        680,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format guild match response\nconst agentOutput = $input.item.json;\nconst context = $('Validate Input').item.json.context;\n\nreturn {\n  json: {\n    success: true,\n    agent: 'guild_match',\n    response: agentOutput.output || agentOutput.text || agentOutput,\n    context: {\n      story_id: context.story_id,\n      action: context.action,\n      expertise_area: context.expertise_area\n    },\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "format-output",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "id": "log-trace",
+      "name": "Log Trace Event",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        900,
+        500
+      ],
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_n8n_trace_event",
+        "rpcParams": "={\n  \"p_event_type\": \"n8n_workflow\",\n  \"p_agent_slug\": \"guild_match\",\n  \"p_operation\": \"guild_match_agent\",\n  \"p_status\": \"ok\",\n  \"p_request_summary\": {\n    \"story_id\": \"{{ $('Validate Input').item.json.context.story_id || '' }}\",\n    \"action\": \"{{ $('Validate Input').item.json.context.action || 'match' }}\",\n    \"expertise_area\": \"{{ $('Validate Input').item.json.context.expertise_area || '' }}\"\n  }\n}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AishaSupabaseApi"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolCode": "// MCP Tool: get_story_context\n// Retrieves story context for guild matching decisions\nconst storyId = $input.item.json.story_id || $input.item.json.p_story_id;\nif (!storyId) return { error: 'story_id is required' };\n\nconst resp = await this.helpers.httpRequest({\n  method: 'POST',\n  url: `${$env.AISHA_POSTGREST_URL}/rest/v1/rpc/get_story_context`,\n  headers: {\n    'apikey': $env.AISHA_POSTGREST_SERVICE_KEY,\n    'Authorization': `Bearer ${$env.AISHA_POSTGREST_SERVICE_KEY}`,\n    'Content-Type': 'application/json'\n  },\n  body: { p_story_id: storyId }\n});\nreturn resp;"
+      },
+      "id": "mcp-get-story-context",
+      "name": "MCP: get_story_context",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1,
+      "position": [
+        440,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "toolCode": "// MCP Tool: match_experts\n// Finds experts matching required expertise area and proficiency\nconst area = $input.item.json.expertise_area || $input.item.json.p_expertise_area || '';\nconst profMin = Number($input.item.json.proficiency_min || $input.item.json.p_proficiency_min || 3);\nconst limit = Number($input.item.json.limit || $input.item.json.p_limit || 5);\n\nconst resp = await this.helpers.httpRequest({\n  method: 'POST',\n  url: `${$env.AISHA_POSTGREST_URL}/rest/v1/rpc/match_experts`,\n  headers: {\n    'apikey': $env.AISHA_POSTGREST_SERVICE_KEY,\n    'Authorization': `Bearer ${$env.AISHA_POSTGREST_SERVICE_KEY}`,\n    'Content-Type': 'application/json'\n  },\n  body: {\n    p_expertise_area: area,\n    p_proficiency_min: profMin,\n    p_limit: limit\n  }\n});\nreturn resp;"
+      },
+      "id": "mcp-match-experts",
+      "name": "MCP: match_experts",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1,
+      "position": [
+        600,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "toolCode": "// MCP Tool: assign_expert_to_story\n// Assigns an expert to a story with a role\nconst storyId = $input.item.json.story_id || $input.item.json.p_story_id;\nconst expertId = $input.item.json.expert_id || $input.item.json.p_expert_id;\nconst role = $input.item.json.role || $input.item.json.p_role || 'specialist';\n\nif (!storyId || !expertId) return { error: 'story_id and expert_id are required' };\n\nconst resp = await this.helpers.httpRequest({\n  method: 'POST',\n  url: `${$env.AISHA_POSTGREST_URL}/rest/v1/rpc/assign_expert_to_story`,\n  headers: {\n    'apikey': $env.AISHA_POSTGREST_SERVICE_KEY,\n    'Authorization': `Bearer ${$env.AISHA_POSTGREST_SERVICE_KEY}`,\n    'Content-Type': 'application/json'\n  },\n  body: {\n    p_story_id: storyId,\n    p_expert_id: expertId,\n    p_role: role\n  }\n});\nreturn resp;"
+      },
+      "id": "mcp-assign-expert",
+      "name": "MCP: assign_expert_to_story",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1,
+      "position": [
+        760,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "toolCode": "// MCP Tool: search_knowledge\n// Searches knowledge base for expertise context\nconst query = $input.item.json.query || $input.item.json.p_query || '';\nif (!query) return { error: 'query is required' };\n\nconst resp = await this.helpers.httpRequest({\n  method: 'POST',\n  url: `${$env.AISHA_POSTGREST_URL}/rest/v1/rpc/mcp_search_knowledge_v2`,\n  headers: {\n    'apikey': $env.AISHA_POSTGREST_SERVICE_KEY,\n    'Authorization': `Bearer ${$env.AISHA_POSTGREST_SERVICE_KEY}`,\n    'Content-Type': 'application/json'\n  },\n  body: {\n    p_query: query,\n    p_limit: 5,\n    p_tags: []\n  }\n});\nreturn resp;"
+      },
+      "id": "mcp-search-knowledge",
+      "name": "MCP: search_knowledge",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1,
+      "position": [
+        920,
+        700
+      ]
+    }
+  ],
+  "name": "WF_GUILD_MATCH"
+}

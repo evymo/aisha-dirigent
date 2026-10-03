@@ -1,0 +1,35 @@
+# .squawk.toml — Postgres migration-safety linter (https://squawkhq.com)
+#
+# The migration-safety half of the DB-quality lens (companion to the FK-relationship
+# gate). Squawk reads aisha/db/migrations/*.sql STATICALLY (no DB) and flags DDL that
+# locks/breaks prod: CREATE INDEX without CONCURRENTLY, ADD COLUMN NOT NULL, dropping
+# columns/tables, renames, FK adds without NOT VALID, etc.
+#
+# Run via the wrapper (identity-keyed allowlist + report/gate/baseline modes):
+#   npm run db:migrations:lint            # gate: exit 1 on a NEW violation
+#   npm run db:migrations:lint:report     # list every violation, never fail
+#   npm run db:migrations:lint:baseline   # snapshot current violations into the allowlist
+# Gated in src/tests/gates/migration-safety.gate.test.ts (runs in test:gates).
+
+pg_version = "17"
+
+# Most migrations are applied file-by-file via psql (autocommit); only ~20/190 wrap in
+# an explicit BEGIN. So do NOT assume an ambient transaction — the conservative default
+# keeps transactionality-sensitive rules honest.
+assume_in_transaction = false
+
+# The generated full-schema baseline is not a "migration" — linting its 136k lines
+# would drown the real delta signal.
+excluded_paths = ["00000000000000_baseline.sql"]
+
+# Keep the gate on PROD-SAFETY hazards (locks / data-loss / breaking changes). Exclude:
+excluded_rules = [
+  "require-timeout-settings",     # operational (lock_timeout handled at the apply layer); fires on ~every DDL (310×)
+  "prefer-bigint-over-int",       # scale/style, not a safety hazard
+  "prefer-bigint-over-smallint",  # ditto
+  "prefer-identity",              # style (serial vs GENERATED identity)
+  "prefer-robust-stmts",          # idempotency convention — already enforced by the cold-start re-apply test
+]
+# Note: `syntax-error` (squawk's parser choking on PL/pgSQL it doesn't fully grok — the
+# migrations apply fine via migrate.mjs) is NOT an excludable rule here; the wrapper
+# scripts/db/check-migration-safety.mjs filters it out after parsing instead.

@@ -1,0 +1,145 @@
+{
+  "name": "WF_MAESTRO_DIALOG_AGENT",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "maestro-dialog",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Maestro Dialog Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Maestro Dialog Agent — proxy přes MCP /maestro/chat (service-role).\n//\n// VAROVÁNÍ: Tento workflow je low-level proxy pro n8n agenty s service-role tokenem.\n// Standardní cesta z frontendu je svc-ai-chat /story-consult orchestrace s plným\n// brain wiringem (Tao + Psyche + Hippocampus + governance + compose_context).\n// Pro user-facing dialogy vždy použij /story-consult endpoint.\n//\n// Body: { project_id?, session_id?, message, system_prompt?, history?, lang? }\nconst body = $input.item.json.body || {};\nconst projectId = body.project_id || 'aisha';\nconst message = body.message || body.text || '';\nconst history = body.history || [];\nconst systemPrompt = body.system_prompt || '';\nconst lang = body.lang || 'cs-CZ';\n\nif (!message) {\n  return { json: { error: 'Missing message in request body' } };\n}\n\nreturn {\n  json: {\n    project_id: projectId,\n    session_id: body.session_id || 'maestro-' + Date.now(),\n    message,\n    history,\n    system_prompt: systemPrompt,\n    lang,\n  }\n};"
+      },
+      "id": "prepare-input",
+      "name": "Prepare Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_MCP_KNOWLEDGE_URL || 'http://svc-mcp-knowledge:3017' }}/maestro/chat",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  project_id: $json.project_id,\n  session_id: $json.session_id,\n  message: $json.message,\n  history: $json.history,\n  system_prompt: $json.system_prompt,\n  lang: $json.lang,\n}) }}",
+        "options": {
+          "timeout": 90000
+        }
+      },
+      "id": "call-maestro",
+      "name": "Call Maestro via MCP",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        660,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "aisha-mcp-service-role",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format Maestro response s metadata pro callers (n8n agents, sandbox tests).\nconst maestroData = $input.item.json.data || $input.item.json;\nconst answer = maestroData.answer || maestroData.response || maestroData.generated_text || maestroData.message || '';\n\nreturn {\n  json: {\n    signal: 'maestro_dialog_result',\n    action: 'multi_turn_chat',\n    answer,\n    metadata: {\n      provider: 'maestro',\n      project_id: $('Prepare Input').item.json.project_id,\n      session_id: $('Prepare Input').item.json.session_id,\n      multi_turn_coherence: 'alquist-insight-alexa-prize',\n    },\n    raw: maestroData,\n  }\n};"
+      },
+      "id": "format-response",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Maestro Dialog Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Input": {
+      "main": [
+        [
+          {
+            "node": "Call Maestro via MCP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call Maestro via MCP": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "insight"
+    },
+    {
+      "name": "maestro"
+    },
+    {
+      "name": "dialog"
+    }
+  ],
+  "meta": {
+    "instanceId": "aisha-evymo",
+    "description": "Low-level proxy na Maestro dialog management. Standardní cesta pro frontend je svc-ai-chat /story-consult — viz docs/INSIGHT_INTEGRATION.md."
+  }
+}

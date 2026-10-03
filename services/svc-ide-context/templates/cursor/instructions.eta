@@ -1,0 +1,40 @@
+<%
+// Eta template: cursor/instructions.eta — Phase 13 WP 13.2
+// Receives: it = WorkspaceContextEnvelope
+// Output:   text/plain — .cursorrules content with safe-write delimiters
+function renderStory(s) {
+  const badge = s.is_stack_default ? " [STACK DEFAULT]" : "";
+  const branch = s.default_branch ? " (branch: " + s.default_branch + ")" : "";
+  const status = s.status || "unknown";
+  const delivery = s.delivery_status ? "/" + s.delivery_status : "";
+  return "* **" + s.title + "** — `" + s.id + "` — status: `" + status + delivery + "`" + branch + badge;
+}
+const storiesBlock = (!it.stories || it.stories.length === 0)
+  ? "* No active stories yet."
+  : it.stories.map(renderStory).join("\n");
+const approvalsNote = (it.pending_approvals && it.pending_approvals.length > 0)
+  ? "⚠ " + it.pending_approvals.length + " pending approval(s) — respect approval gate before any related code change."
+  : "No pending approvals.";
+%># .cursorrules — AISHA Platform (dynamic, generated <%= it.generated_at %>)
+
+<!-- AISHA-MANAGED-START -->
+You are working in the AISHA platform repository. Current workspace context:
+
+Active stories:
+<%~ storiesBlock %>
+
+<%~ approvalsNote %>
+
+Coding standards:
+- Hook-Only Data Access — API calls only from custom hooks
+- No `any` types — use proper TypeScript or unknown + type guard
+- Zod validation for all external data
+- i18n for all UI text (t("key") — no hardcoded strings)
+- No console.log — use safeError()
+- No emoji in UI — use lucide-react icons
+- RPC-Only — no direct .from() queries
+<!-- AISHA-MANAGED-END -->
+
+<!-- USER-CUSTOM-START -->
+
+<!-- USER-CUSTOM-END -->

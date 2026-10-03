@@ -1,0 +1,157 @@
+name: Build AISHA Workbench
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Target platform'
+        required: true
+        default: 'linux'
+        type: choice
+        options:
+          - linux
+          - osx
+          - win32
+      arch:
+        description: 'Target architecture'
+        required: true
+        default: 'x64'
+        type: choice
+        options:
+          - x64
+          - arm64
+
+env:
+  VSCODIUM_REF: '1.112.01907'
+  NODE_OPTIONS: '--max-old-space-size=8192'
+
+jobs:
+  # ── Linux x64 (primary, fastest) ────────────────────────
+  build-linux-x64:
+    if: >-
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' && inputs.platform == 'linux'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            jq git python3 python3-pip \
+            librsvg2-bin icoutils \
+            libx11-dev libxkbfile-dev libsecret-1-dev \
+            rpm fakeroot dpkg
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Generate icons
+        run: bash build/generate_icons.sh
+
+      - name: Build
+        run: |
+          export PLATFORM=linux
+          export ARCH=x64
+          bash build.sh --platform linux --arch x64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aisha-workbench-linux-x64
+          path: artifacts/*
+          retention-days: 30
+
+  # ── macOS arm64 ─────────────────────────────────────────
+  build-macos-arm64:
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      github.event_name == 'workflow_dispatch' && inputs.platform == 'osx'
+    runs-on: macos-14
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install jq librsvg python@3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Generate icons
+        run: bash build/generate_icons.sh
+
+      - name: Build
+        run: bash build.sh --platform osx --arch arm64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aisha-workbench-macos-arm64
+          path: artifacts/*
+          retention-days: 30
+
+  # ── macOS x64 ───────────────────────────────────────────
+  build-macos-x64:
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      github.event_name == 'workflow_dispatch' && inputs.platform == 'osx'
+    runs-on: macos-13
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: brew install jq librsvg python@3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Generate icons
+        run: bash build/generate_icons.sh
+
+      - name: Build
+        run: bash build.sh --platform osx --arch x64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: aisha-workbench-macos-x64
+          path: artifacts/*
+          retention-days: 30
+
+  # ── Release ─────────────────────────────────────────────
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-linux-x64, build-macos-arm64, build-macos-x64]
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: release-artifacts/**/*
+          generate_release_notes: true
+          draft: true

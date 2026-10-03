@@ -1,0 +1,28 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "ios-archive-check",
+			"type": "shell",
+			"command": "xcodebuild",
+			"args": [
+				"-workspace",
+				"${workspaceFolder}/ios/AISHADirigent.xcworkspace",
+				"-scheme",
+				"AISHADirigent",
+				"-configuration",
+				"Release",
+				"-destination",
+				"generic/platform=iOS",
+				"-archivePath",
+				"/tmp/aisha-ios-archive/AISHADirigent.xcarchive",
+				"-allowProvisioningUpdates",
+				"DEVELOPMENT_TEAM=${env:APPLE_TEAM_ID}",
+				"CODE_SIGN_STYLE=Automatic",
+				"archive"
+			],
+			"isBackground": false,
+			"group": "build"
+		}
+	]
+}

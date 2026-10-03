@@ -1,0 +1,84 @@
+--- stock/app_Jobs_CleanupHelperContainersJob.php	2026-09-05 14:32:25
++++ live/app_Jobs_CleanupHelperContainersJob.php	2026-09-05 14:32:26
+@@ -22,21 +22,72 @@
+     public function handle(): void
+     {
+         try {
+-            // Get all active deployments on this server
+-            $activeDeployments = ApplicationDeploymentQueue::where('server_id', $this->server->id)
+-                ->whereIn('status', [
+-                    ApplicationDeploymentStatus::IN_PROGRESS->value,
+-                    ApplicationDeploymentStatus::QUEUED->value,
+-                ])
+-                ->pluck('deployment_uuid')
+-                ->toArray();
++            // Which deployments could own a helper container ON THIS MACHINE.
++            //
++            // application_deployment_queues.server_id is the DESTINATION, but the
++            // helper runs wherever the build happens. With a build server those are
++            // different machines, so asking only about the destination makes the list
++            // structurally empty on the build server -- and every helper running there,
++            // including live ones, then looks orphaned. Measured 2026-08-17: 178
++            // applications had a build server enabled and this job logged
++            // {"server":"Soren","active_deployment_uuids":[]} on every run.
++            //
++            // Nothing was destroyed only by accident: the container filter below
++            // matches `docker.io/coollabsio/coolify-helper` while Docker reports the
++            // image as `coollabsio/coolify-helper:1.0.15`, so no helper ever matched.
++            // A safety that depends on a registry prefix not being printed is not a
++            // safety; the query is what has to be right.
++            //
++            // Which build server a deployment picked is not recorded -- the job
++            // chooses at random from the team's pool at run time -- so it cannot be
++            // matched exactly. On a build server we therefore treat every deployment
++            // of a build-server application as possibly ours. That errs towards
++            // keeping a helper too long, which costs a container; the other direction
++            // kills a running build.
++            $activeQuery = ApplicationDeploymentQueue::whereIn('status', [
++                ApplicationDeploymentStatus::IN_PROGRESS->value,
++                ApplicationDeploymentStatus::QUEUED->value,
++            ]);
+ 
++            if ($this->server->settings->is_build_server) {
++                // Ids resolved in PHP and cast: application_deployment_queues.application_id
++                // is a varchar while applications.id is a bigint, so comparing them in a
++                // subquery fails with "operator does not exist: character varying = bigint".
++                $buildServerApplicationIds = \App\Models\Application::query()
++                    ->join('application_settings', 'application_settings.application_id', '=', 'applications.id')
++                    ->where('application_settings.is_build_server_enabled', true)
++                    ->pluck('applications.id')
++                    ->map(fn ($id) => (string) $id)
++                    ->all();
++
++                $activeDeployments = $activeQuery
++                    ->where(function ($query) use ($buildServerApplicationIds) {
++                        $query->where('server_id', $this->server->id)
++                            ->orWhereIn('application_id', $buildServerApplicationIds);
++                    })
++                    ->pluck('deployment_uuid')
++                    ->toArray();
++            } else {
++                $activeDeployments = $activeQuery
++                    ->where('server_id', $this->server->id)
++                    ->pluck('deployment_uuid')
++                    ->toArray();
++            }
++
+             \Log::info('CleanupHelperContainersJob - Active deployments', [
+                 'server' => $this->server->name,
+                 'active_deployment_uuids' => $activeDeployments,
+             ]);
+ 
+-            $containers = instant_remote_process_with_timeout(['docker container ps --format \'{{json .}}\' | jq -s \'map(select(.Image | contains("'.coolifyRegistryUrl().'/coollabsio/coolify-helper")))\''], $this->server, false);
++            // Matched WITHOUT the registry prefix on purpose. Docker reports the image
++            // as it was pulled, and on this fleet that is `coollabsio/coolify-helper:1.0.15`
++            // -- no `docker.io/`. The prefixed pattern therefore never matched anything,
++            // which for months looked like "the job works and finds nothing".
++            //
++            // Fixed only AFTER the query above, and the order matters: with the old query
++            // this filter was the single thing standing between a build server and having
++            // its live helpers deleted. Repairing the filter first would have armed it.
++            $containers = instant_remote_process_with_timeout(['docker container ps --format \'{{json .}}\' | jq -s \'map(select(.Image | contains("coollabsio/coolify-helper")))\''], $this->server, false);
+             $helperContainers = collect(json_decode($containers));
+ 
+             if ($helperContainers->count() > 0) {

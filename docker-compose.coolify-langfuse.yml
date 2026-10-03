@@ -1,0 +1,432 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify-langfuse.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+services:
+  pki-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.pki-init
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-langfuse-pki-init
+    restart: "no"
+    environment:
+      PKI_BRIDGE_URL: ${PKI_BRIDGE_URL:-}
+      # Odvozuje cold-start z manifestu (pki nasazeno ⇒ true); bez PKI se vypíná
+      # POŽADAVEK, ne jen adresa — výklad: docs/compose-notes/docker-compose.coolify.yml.md
+      PKI_BUNDLE_REQUIRED: ${PKI_BUNDLE_REQUIRED:?odvozuje cold-start z manifestu; bez něj pki-init trvá na bundlu i bez PKI}
+    command: ["/usr/local/bin/assemble-ca-bundle.sh"]
+    volumes:
+      - pki-certs:/certs/pki
+    healthcheck:
+      disable: true
+    networks:
+      - internal
+  clickhouse:
+    image: ${REGISTRY_PROXY}clickhouse/clickhouse-server:24.3
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-clickhouse
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-clickhouse}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - clickhouse-logs:/var/log/clickhouse-server
+    expose:
+      - "8123"
+      - "9000"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:8123/ping || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-clickhouse
+  langfuse-redis:
+    image: ${REGISTRY_PROXY}library/redis:7-alpine
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-langfuse-redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru", "--appendonly", "yes"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --no-auth-warning -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+  langfuse-db-init:
+    image: ${REGISTRY_PROXY}library/postgres:17-alpine
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-langfuse-db-init
+    restart: "no"
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      LANGFUSE_DB_PASSWORD: ${LANGFUSE_DB_PASSWORD}
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        # Pojistka u spotřeby — proč tady a ne v compose: docs/compose-notes/.
+        [ -n "$${LANGFUSE_DB_PASSWORD}" ] || { echo "FATAL: LANGFUSE_DB_PASSWORD je prazdne — ucet by vznikl bez pouzitelneho hesla." >&2; exit 1; }
+        # Wait for aisha-db — cross-stack dependency (core stack) that may be mid-restart
+        # during cold-start (entrypoint-wrapper.sh re-applies role passwords ~60s after
+        # boot; the wave-4 core gate is SOFT). Bounded so a genuinely-dead DB fails loudly
+        # instead of hanging the wave. Same resilient wait pattern as n8n-config-init.
+        i=0; until pg_isready -h ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-db -U aisha_admin -q 2>/dev/null; do
+          i=$$((i+1)); [ "$$i" -ge 150 ] && { echo "[langfuse-db-init] ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-db not ready after 300s — aborting"; exit 1; }
+          echo "[langfuse-db-init] waiting for ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-db ($$i)"; sleep 2
+        done
+        # Use aisha_admin (SUPERUSER) — its password is re-applied on every aisha-db boot
+        # via entrypoint-wrapper.sh, unlike the postgres superuser which is only set on first init.
+
+        # Create langfuse_app user if it doesn't exist (idempotent; pg17 creates it but belt+suspenders)
+        psql -h ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-db -U aisha_admin -d postgres -tc \
+          "SELECT 1 FROM pg_roles WHERE rolname='langfuse_app'" \
+          | grep -q 1 || \
+          psql -h ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-db -U aisha_admin -d postgres -c \
+          "CREATE USER langfuse_app WITH PASSWORD '$${LANGFUSE_DB_PASSWORD}';"
+
+        # Create langfuse schema if it doesn't exist, owned by langfuse_app
+        psql -h ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-db -U aisha_admin -d postgres -c \
+          "CREATE SCHEMA IF NOT EXISTS langfuse AUTHORIZATION langfuse_app;"
+
+        # Grant connect + usage
+        psql -h ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-db -U aisha_admin -d postgres -c \
+          "GRANT CONNECT ON DATABASE postgres TO langfuse_app;"
+        psql -h ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-db -U aisha_admin -d postgres -c \
+          "GRANT USAGE, CREATE ON SCHEMA langfuse TO langfuse_app;"
+
+        echo "[langfuse-db-init] langfuse_app + schema ready"
+    healthcheck:
+      disable: true
+    networks:
+      - internal
+
+  langfuse:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    image: ${REGISTRY_PROXY}langfuse/langfuse:3
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-langfuse
+    restart: unless-stopped
+    extra_hosts:
+      - "${KEYCLOAK_DOMAIN_PUBLIC}:host-gateway"
+      - "${KEYCLOAK_EXTRA_HOST_ALIAS:?vydává derive-domains; bez něj by extra_hosts nesl duplicitu nebo prázdné jméno}:host-gateway"
+    environment:
+      - DATABASE_URL=postgresql://langfuse_app:${LANGFUSE_DB_PASSWORD}@${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-db:5432/postgres?schema=langfuse
+      - ENCRYPTION_KEY=${LANGFUSE_ENCRYPTION_KEY}
+      - CLICKHOUSE_URL=http://${APP_NAME_PREFIX:?identita instance}-clickhouse:8123
+      - CLICKHOUSE_USER=${CLICKHOUSE_USER:-clickhouse}
+      - CLICKHOUSE_PASSWORD=${CLICKHOUSE_PASSWORD}
+      - CLICKHOUSE_MIGRATION_URL=clickhouse://${APP_NAME_PREFIX:?identita instance}-clickhouse:9000
+      - CLICKHOUSE_CLUSTER_ENABLED=false
+      - REDIS_HOST=langfuse-redis
+      - REDIS_PORT=6379
+      - REDIS_AUTH=${REDIS_PASSWORD}
+      - LANGFUSE_S3_EVENT_UPLOAD_ENABLED=true
+      - LANGFUSE_S3_EVENT_UPLOAD_BUCKET=langfuse
+      - LANGFUSE_S3_EVENT_UPLOAD_REGION=auto
+      - LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT=http://${APP_NAME_PREFIX:?identita instance}-minio:9000
+      - LANGFUSE_S3_EVENT_UPLOAD_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - LANGFUSE_S3_EVENT_UPLOAD_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - LANGFUSE_S3_EVENT_UPLOAD_FORCE_PATH_STYLE=true
+      - LANGFUSE_S3_MEDIA_UPLOAD_ENABLED=true
+      - LANGFUSE_S3_MEDIA_UPLOAD_BUCKET=langfuse-media
+      - LANGFUSE_S3_MEDIA_UPLOAD_REGION=auto
+      - LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT=http://${APP_NAME_PREFIX:?identita instance}-minio:9000
+      - LANGFUSE_S3_MEDIA_UPLOAD_ACCESS_KEY_ID=${MINIO_ROOT_USER}
+      - LANGFUSE_S3_MEDIA_UPLOAD_SECRET_ACCESS_KEY=${MINIO_ROOT_PASSWORD}
+      - LANGFUSE_S3_MEDIA_UPLOAD_FORCE_PATH_STYLE=true
+      - NEXTAUTH_SECRET=${LANGFUSE_NEXTAUTH_SECRET}
+      - NEXTAUTH_URL=https://${LANGFUSE_DOMAIN}
+      - SALT=${LANGFUSE_SALT}
+      - HOSTNAME=0.0.0.0
+      - TELEMETRY_ENABLED=false
+      - LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=true
+      - LANGFUSE_INIT_ORG_ID=aisha
+      - LANGFUSE_INIT_ORG_NAME=AISHA Platform
+      - LANGFUSE_INIT_PROJECT_ID=aisha-dirigent
+      - LANGFUSE_INIT_PROJECT_NAME=Aisha Dirigent
+      - LANGFUSE_INIT_PROJECT_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_INIT_PROJECT_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_INIT_USER_EMAIL=${LANGFUSE_ADMIN_EMAIL}
+      - LANGFUSE_INIT_USER_PASSWORD=${LANGFUSE_ADMIN_PASSWORD}
+      - LANGFUSE_INIT_USER_NAME=AISHA Admin
+      - AUTH_KEYCLOAK_CLIENT_ID=langfuse
+      - AUTH_KEYCLOAK_CLIENT_SECRET=${LANGFUSE_OIDC_SECRET}
+      - AUTH_KEYCLOAK_ISSUER=https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}
+      - AUTH_KEYCLOAK_SCOPE=openid email profile
+      - AUTH_KEYCLOAK_ALLOW_ACCOUNT_LINKING=true
+      - AUTH_DISABLE_SIGNUP=true
+      - AUTH_IGNORE_ACCOUNT_FIELDS=refresh_expires_in
+      - NODE_EXTRA_CA_CERTS=/certs/pki/aisha-ca-bundle.pem
+    volumes:
+      - langfuse-data:/app/.next/cache
+      - pki-certs:/certs/pki:ro
+    depends_on:
+      langfuse-db-init:
+        condition: service_completed_successfully
+      pki-init:
+        condition: service_completed_successfully
+      clickhouse:
+        condition: service_healthy
+      langfuse-redis:
+        condition: service_healthy
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://0.0.0.0:3000/api/public/health"]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 120s
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-langfuse
+      mesh-dns:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-langfuse
+  langfuse-gateway:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    image: ${REGISTRY_PROXY}library/caddy:2-alpine
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-langfuse-gateway
+    restart: unless-stopped
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        { echo ":8080 {"
+        echo "  reverse_proxy ${APP_NAME_PREFIX:?identita instance}-langfuse:3000 {"
+        echo "    header_down -X-Frame-Options"
+        echo "    header_down Content-Security-Policy \"default-src * blob: data: ws: wss: 'unsafe-inline' 'unsafe-eval'; frame-ancestors 'self' https://$${APP_DOMAIN} https://*.$${PUBLIC_TLD};\""
+        echo "  }"
+        echo "}"
+        } > /etc/caddy/Caddyfile
+        caddy run --config /etc/caddy/Caddyfile
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    depends_on:
+      langfuse:
+        condition: service_healthy
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-langfuse-gateway
+      coolify:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-langfuse-gateway
+      mesh-dns:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-langfuse-gateway
+    labels:
+      - "coolify.managed=true"
+      - "traefik.docker.network=coolify"
+      - "traefik.enable=true"
+
+  netbird-agent:
+    # Mesh komponenta — bez meshe nemá co dělat. Profil "mesh" zapíná
+    # coolify-deploy-init.sh podle MESH_ENABLED; hlídá brána mesh-profil-drzi.
+    profiles: ["mesh"]
+    image: ${IMAGE_NETBIRD}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-langfuse--netbird
+    cap_add:
+      - NET_ADMIN
+      - SYS_RESOURCE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    depends_on:
+      pki-init:
+        condition: service_completed_successfully
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        if [ -z "$${NB_SETUP_KEY:-}" ]; then
+          echo "[netbird-agent] NB_SETUP_KEY empty for hostname=$${NB_HOSTNAME:-<unset>}"
+          echo "[netbird-agent] State: PENDING_BOOTSTRAP — awaiting netbird-bootstrap.sh + redeploy."
+          trap 'echo "[netbird-agent] received TERM — exiting idle"; exit 0' TERM INT
+          while :; do sleep 3600 & wait "$$!" || true; done
+        fi
+        if ! command -v netbird >/dev/null 2>&1; then
+          echo "[netbird-agent] FATAL: netbird binary not in PATH" >&2
+          exit 127
+        fi
+        echo "[netbird-agent] Bridge mode — own netns, no host daemon conflict."
+        echo "[netbird-agent] DNS proxy disabled — langfuse receives inbound mesh only."
+        # ⛔ NETBIRD 0.70 NEPÍŠE config.json (naměřeno 2026-09-06). Stav drží
+        # `default.json` + `active_profile.json`; podmínka na legacy cestu proto
+        # neplatila NIKDE — změřeno na 6 z 6 agentů včetně cizího nájemníka.
+        # Následek: agent se při KAŽDÉM startu zapsal jako NOVÝ peer, dostal
+        # novou mesh IP, a DNS záznam osiřel. Edge pak volal na starou adresu
+        # („dial 100.112.246.17:3002: no route to host") → live.<tld> 502.
+        # Je to ta příčina, proč se „mesh DNS se neprovisionuje samo" vracelo
+        # dokola: nešlo o provisioning, ale o ztrátu identity při restartu.
+        # Legacy cesta zůstává kvůli starším agentům — stačí KTERÝKOLI stavový
+        # soubor; teprve když není žádný, je zápis do meshe opravdu první.
+        CONFIG_FILE="$${NB_CONFIG_FILE:-/etc/netbird/config.json}"
+        if [ "$${NB_FORCE_REENROLL:-0}" = "1" ]; then
+          echo "[netbird-agent] NB_FORCE_REENROLL=1 — wiping local NetBird state before enrollment."
+          rm -rf /etc/netbird/* 2>/dev/null || true
+        fi
+        for _nb_stav in "$$CONFIG_FILE" /etc/netbird/default.json /var/lib/netbird/default.json; do
+          if [ -s "$$_nb_stav" ]; then CONFIG_FILE="$$_nb_stav"; break; fi
+        done
+        if [ -s "$$CONFIG_FILE" ]; then
+          echo "[netbird-agent] Existing config found at $$CONFIG_FILE — reconnecting without setup key."
+          set -- --foreground-mode --disable-dns --management-url "$${NB_MANAGEMENT_URL}" --hostname "$${NB_HOSTNAME}"
+        else
+          echo "[netbird-agent] No existing config — enrolling as $${NB_HOSTNAME} via $${NB_MANAGEMENT_URL}."
+          set -- --foreground-mode --disable-dns --management-url "$${NB_MANAGEMENT_URL}" --setup-key "$${NB_SETUP_KEY}" --hostname "$${NB_HOSTNAME}"
+        fi
+        trap 'echo "[netbird-agent] received TERM — exiting"; exit 0' TERM INT
+        while :; do
+          netbird up "$$@" || true
+          echo "[netbird-agent] netbird up exited — retry in 15s; container stays UP (never trips Coolify restart-limit)."
+          sleep 15 & wait "$$!" || true
+        done
+    extra_hosts:
+      - "${NETBIRD_MESH_HOST}:${NETBIRD_MGMT_HOST:-host-gateway}"
+    volumes:
+      - netbird-langfuse-data-v3:/etc/netbird
+      - netbird-langfuse-data-v3:/var/lib/netbird
+      - pki-certs:/certs/pki:ro
+    environment:
+      NB_SETUP_KEY: ${NETBIRD_STACK_KEY_BACKEND}
+      NB_MANAGEMENT_URL: https://${NETBIRD_MESH_HOST}:${NETBIRD_MESH_PORT:-33073}
+      NB_SSL_TRUST_BUNDLE: /certs/pki/aisha-ca-bundle.pem
+      SSL_CERT_FILE: /certs/pki/aisha-ca-bundle.pem
+      NB_HOSTNAME: backend-langfuse
+      NB_FORCE_REENROLL: ${NB_FORCE_REENROLL:-0}
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -z \"$$NB_SETUP_KEY\" ]; then exit 0; fi; ip -o addr show wt0 2>/dev/null | grep -qE 'inet 100\\.'"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 8
+    restart: unless-stopped
+    networks:
+      - internal
+      - mesh-dns
+
+  langfuse-mesh-ingress:
+    # Mesh komponenta — bez meshe nemá co dělat. Profil "mesh" zapíná
+    # coolify-deploy-init.sh podle MESH_ENABLED; hlídá brána mesh-profil-drzi.
+    profiles: ["mesh"]
+    image: ${IMAGE_CADDY}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-model--mesh-ingress
+    restart: unless-stopped
+    network_mode: "service:netbird-agent"
+    depends_on:
+      netbird-agent:
+        condition: service_started
+    environment:
+      LANGFUSE_MESH_INGRESS_ROUTES: ${LANGFUSE_MESH_INGRESS_ROUTES:-}
+      # TÝŽ seznam, jaký dostává gateway — jeden zdroj (`lib/derive-subnets.mjs`).
+      # Bez něj Caddy `x-forwarded-for` přepíše a klientská adresa se ztratí.
+      GATEWAY_TRUSTED_PROXIES: ${GATEWAY_TRUSTED_PROXIES:-}
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        if [ -z "$${LANGFUSE_MESH_INGRESS_ROUTES:-}" ]; then
+          echo "[mesh-ingress] LANGFUSE_MESH_INGRESS_ROUTES prázdné — derivace nic nevydala nebo se nedoručila."
+          echo "[mesh-ingress] Naslouchám jen na health, aby bylo VIDĚT, že tabulka chybí."
+          # ⛔ STAV BEZ TABULKY MUSÍ BÝT VIDĚT SONDĚ (naměřeno 2026-09-03).
+          # Záložní Caddyfile poslouchal na :8000, ale healthcheck sonduje :8080 —
+          # port této služby. Sonda tedy dostala „connection refused" místo
+          # navrženého 503 „bez směrovací tabulky", a diagnóza vedla k „zavřený
+          # port" místo ke skutečné příčině. Neshoda byla v 15 z 16 stacků;
+          # jediný, kde porty seděly, byl `model`, jehož vlastní port JE 8000 —
+          # vzor se trefil sám sebou a vada byla ze zdroje neviditelná.
+          printf ':8080 {\n  handle /__mesh_health {\n    respond "no-routes" 503\n  }\n  handle {\n    respond "mesh-ingress bez směrovací tabulky" 503\n  }\n}\n' > /etc/caddy/Caddyfile
+        else
+          : > /etc/caddy/Caddyfile
+          # ⛔ NAMĚŘENO 2026-08-31: brána viděla `x-forwarded-for` s JEDINÝM
+          # prvkem — adresou svého souseda (mesh-router edge). To je podpis
+          # NAHRAZENÍ, ne řetězu: Caddy bez `trusted_proxies` příchozí hlavičce
+          # nedůvěřuje a přepíše ji tím, kdo se právě připojil. Každý náš skok
+          # tak řetěz zahodil a klientská adresa se ke dveřím NEDOSTALA —
+          # `enforce` by zamkl i majitele.
+          #
+          # Hodnota se NEOPISUJE: je to TÝŽ seznam, jaký dostává gateway
+          # (`lib/derive-subnets.mjs` → GATEWAY_TRUSTED_PROXIES). Dva tvary
+          # (čárky pro env, mezery pro Caddy), jeden zdroj — kdyby si je každý
+          # skládal sám, chůze zprava by v každém prvku končila jinde.
+          if [ -n "$${GATEWAY_TRUSTED_PROXIES:-}" ]; then
+            printf '{\n  servers {\n    trusted_proxies static %s\n  }\n}\n\n' \
+              "$$(echo "$${GATEWAY_TRUSTED_PROXIES}" | tr ',' ' ')" >> /etc/caddy/Caddyfile
+          else
+            # Nedoručený seznam se NEDOSAZUJE. Bez něj Caddy řetěz přepíše —
+            # to je vada, ale TICHÁ; tady se aspoň řekne nahlas.
+            echo "[mesh-ingress] GATEWAY_TRUSTED_PROXIES nedoručen — x-forwarded-for bude PŘEPSÁN, klientská adresa se ztratí"
+          fi
+          PORTS=$$(echo "$${LANGFUSE_MESH_INGRESS_ROUTES}" | tr ';' '\n' | cut -d'|' -f1 | sort -un)
+          for P in $$PORTS; do
+            printf ':%s {\n  handle /__mesh_health {\n    respond "ok" 200\n  }\n' "$$P" >> /etc/caddy/Caddyfile
+            echo "$${LANGFUSE_MESH_INGRESS_ROUTES}" | tr ';' '\n' | while IFS='|' read -r RP RH RT; do
+              [ "$$RP" = "$$P" ] || continue
+              M=$$(echo "$$RH" | cut -d, -f1 | cut -d. -f1 | tr '-' '_')
+              HOSTS=$$(echo "$$RH" | tr ',' ' ')
+              printf '  @%s host %s\n  handle @%s {\n    reverse_proxy http://%s\n  }\n' "$$M" "$$HOSTS" "$$M" "$$RT" >> /etc/caddy/Caddyfile
+            done
+            printf '  handle {\n    respond "mesh-ingress: Host nepatri na tento port" 421\n  }\n}\n' >> /etc/caddy/Caddyfile
+          done
+          echo "[mesh-ingress] tabulka: $$(echo "$${LANGFUSE_MESH_INGRESS_ROUTES}" | tr ';' '\n' | wc -l) tras na $$(echo "$$PORTS" | wc -w) portech"
+        fi
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/__mesh_health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  netbird-langfuse-data-v3:
+    name: ${APP_NAME_PREFIX:?}_netbird-langfuse-data
+  pki-certs:
+    name: ${APP_NAME_PREFIX:?}_langfuse-pki-certs
+  clickhouse-data:
+    name: ${APP_NAME_PREFIX:?}_clickhouse-data
+  clickhouse-logs:
+    name: ${APP_NAME_PREFIX:?}_clickhouse-logs
+  redis-data:
+    name: ${APP_NAME_PREFIX:?}_redis-data
+  langfuse-data:
+    name: ${APP_NAME_PREFIX:?}_langfuse-data
+networks:
+  internal:
+    external: true
+    name: ${APP_NAME_PREFIX:?identita instance}-shared-net
+  coolify:
+    external: true
+    name: coolify
+  mesh-dns:
+    external: true
+    name: ${MESH_DNS_NETWORK:?vydává generate-secrets}

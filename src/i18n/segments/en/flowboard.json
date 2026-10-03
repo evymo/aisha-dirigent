@@ -1,0 +1,56 @@
+{
+  "flowboard": {
+    "palette": {
+      "title": "Node palette",
+      "subtitle": "= federated plugin_catalog"
+    },
+    "kind": {
+      "trigger": "Triggers",
+      "agent": "Agents",
+      "tool": "MCP tools",
+      "action": "Actions",
+      "control": "Control",
+      "gate": "Gates"
+    },
+    "canvas": {
+      "cannotConnect": "Cannot connect {{from}} → {{to}}.",
+      "invalidConnection": "Invalid port connection.",
+      "valid": "valid",
+      "errors": "{{count}} errors",
+      "descriptionPlaceholder": "Describe what the flow should do…",
+      "askAisha": "Ask AISHA",
+      "save": "Save"
+    },
+    "page": {
+      "savedFlows": "Saved flows",
+      "newFlow": "New flow",
+      "empty": "No flows yet",
+      "loading": "Loading palette…",
+      "saved": "Flow saved",
+      "saveFailed": "Failed to save the flow",
+      "loadFailed": "Failed to load the flow",
+      "run": "Run",
+      "running": "Running…",
+      "runStarted": "Flow run started",
+      "runAwaitingApproval": "Run paused — awaiting approval",
+      "runFailed": "Failed to run the flow",
+      "runResumed": "Flow resumed"
+    },
+    "block": {
+      "consentTitle": "Approval required",
+      "approved": "approved",
+      "awaiting": "awaiting approval",
+      "approveButton": "Approve & continue",
+      "runTitle": "Automation run",
+      "stepTitle": "Automation step",
+      "status": {
+        "executed": "done",
+        "approved": "approved",
+        "error": "error",
+        "running": "running",
+        "compliance_checkpoint": "compliance check",
+        "awaiting_approval": "awaiting approval"
+      }
+    }
+  }
+}

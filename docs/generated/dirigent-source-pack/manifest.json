@@ -1,0 +1,74 @@
+{
+  "generated_at": "2026-04-22T01:41:32.047Z",
+  "source_count": 17,
+  "sources": [
+    {
+      "source": ".github/copilot-instructions.md",
+      "output": "docs/generated/dirigent-source-pack/01-.github__copilot-instructions.md"
+    },
+    {
+      "source": "AGENTS.md",
+      "output": "docs/generated/dirigent-source-pack/02-AGENTS.md"
+    },
+    {
+      "source": "CLAUDE.md",
+      "output": "docs/generated/dirigent-source-pack/03-CLAUDE.md"
+    },
+    {
+      "source": ".cursorrules",
+      "output": "docs/generated/dirigent-source-pack/04-.cursorrules"
+    },
+    {
+      "source": ".windsurfrules",
+      "output": "docs/generated/dirigent-source-pack/05-.windsurfrules"
+    },
+    {
+      "source": ".github/agents/AISHA.agent.md",
+      "output": "docs/generated/dirigent-source-pack/06-.github__agents__AISHA.agent.md"
+    },
+    {
+      "source": "codex/skills/aisha-dirigent-autopilot/SKILL.md",
+      "output": "docs/generated/dirigent-source-pack/07-codex__skills__aisha-dirigent-autopilot__SKILL.md"
+    },
+    {
+      "source": ".claude/commands/aisha-compliance.md",
+      "output": "docs/generated/dirigent-source-pack/08-.claude__commands__aisha-compliance.md"
+    },
+    {
+      "source": ".claude/commands/aisha-db.md",
+      "output": "docs/generated/dirigent-source-pack/09-.claude__commands__aisha-db.md"
+    },
+    {
+      "source": ".claude/commands/aisha-deploy.md",
+      "output": "docs/generated/dirigent-source-pack/10-.claude__commands__aisha-deploy.md"
+    },
+    {
+      "source": ".claude/commands/aisha-estimate.md",
+      "output": "docs/generated/dirigent-source-pack/11-.claude__commands__aisha-estimate.md"
+    },
+    {
+      "source": ".claude/commands/aisha-health.md",
+      "output": "docs/generated/dirigent-source-pack/12-.claude__commands__aisha-health.md"
+    },
+    {
+      "source": ".claude/commands/aisha-next.md",
+      "output": "docs/generated/dirigent-source-pack/13-.claude__commands__aisha-next.md"
+    },
+    {
+      "source": ".claude/commands/aisha-quality.md",
+      "output": "docs/generated/dirigent-source-pack/14-.claude__commands__aisha-quality.md"
+    },
+    {
+      "source": ".claude/commands/aisha-setup.md",
+      "output": "docs/generated/dirigent-source-pack/15-.claude__commands__aisha-setup.md"
+    },
+    {
+      "source": ".claude/commands/aisha-story.md",
+      "output": "docs/generated/dirigent-source-pack/16-.claude__commands__aisha-story.md"
+    },
+    {
+      "source": ".claude/commands/aisha-test.md",
+      "output": "docs/generated/dirigent-source-pack/17-.claude__commands__aisha-test.md"
+    }
+  ]
+}

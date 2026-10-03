@@ -1,0 +1,28 @@
+max_fork_redo: 5
+max_exception_threshhold: 10
+interval_sleep_exception: 60
+max_tries_hanging_workflows:  3
+
+# Each worker holds ~3 DB connections. At 50 that is ~150 against MariaDB's
+# default max_connections of 151 — a worker burst exhausted the pool, every
+# workflow then failed with "Too many connections", and those exception
+# workflows came straight back to the watchdog (max_tries_hanging_workflows),
+# which is self-sustaining. Paired with --max-connections in
+# docker-compose.coolify-pki.yml (pki-db); change both together.
+max_worker_count: 10
+
+interval_wait_initial: 10
+interval_loop_idle: 5
+interval_loop_run: 1
+interval_sleep_overload: 15
+
+interval_session_purge: 300
+
+interval_status_update: 120
+
+# purge expired CRLs once a day
+interval_crl_purge: 86400
+
+# You should not change this unless you know what you are doing
+max_instance_count: 1
+disabled: 0

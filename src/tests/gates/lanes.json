@@ -1,0 +1,366 @@
+{
+  "$komentar": [
+    "DRÁHY BRAN — které brány se pouštějí kdy, a proč.",
+    "",
+    "PROČ: sada bran není 'pomalá'. NAMĚŘENO 2026-08-31 per-soubor (poprvé;",
+    "dosud existoval jen agregát): 630 souborů, 227 s CPU, MEDIÁN souboru 20 ms.",
+    "Devět souborů spolkne 114 s = 50 % veškerého času. 'Běžet méně bran' proto",
+    "poráží 'běžet brány rychleji' o řád.",
+    "",
+    "DRUHÝ DŮVOD, DŮLEŽITĚJŠÍ: náklad je superlineární v zátěži, ne součet",
+    "nezávislých položek. Když jedna brána přestala 60 s čekat na retry, klesl",
+    "součet o 162 s — TŘIKRÁT víc, než ušetřila sama; zbytek byla odlehčená",
+    "kontence u bran, kterých se nikdo nedotkl. Proto těžké patří stranou: ne",
+    "aby doběhly dřív, ale aby nezdržovaly ostatních 621.",
+    "",
+    "TŘETÍ: vyprchalá těžká brána hlásí PRÁZDNÝ nález, tedy vypadá jako rozbitý",
+    "detektor, ne jako pomalý test. Oddělením drah smí lehká dráha dostat",
+    "POCTIVÝ timeout (30 s místo 300 s), takže vyprchání konečně znamená vadu.",
+    "",
+    "ČÍSLA JSOU NAMĚŘENÁ, NE ODHADNUTÁ. Trvání brány není její vlastnost, ale",
+    "vlastnost běhu: 'prikaz-v-compose-se-da-rozparsovat' má v komentáři",
+    "zdokumentovaných 131 s z jednoho zatíženého běhu a 7,0 s v tomhle. Kdo",
+    "seznam mění, ať přiloží měření z definovaného běhu, ne pozorování z incidentu."
+  ],
+  "merenoDne": "2026-08-31",
+  "merenoJak": "AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts --reporter=json, 8 workerů, wall 56 s, součet 227 s CPU",
+  "prahSekund": 5,
+  "heavy": [
+    {
+      "soubor": "pki-bundle-fail-closed.gate.test.ts",
+      "s": 24.7,
+      "proc": "testuje PRÁVĚ retry chování (prázdné tělo ⇒ opakuje, pak selže) — čekání JE předmětem tvrzení"
+    },
+    {
+      "soubor": "cold-start-doctor.gate.test.ts",
+      "s": 18.4,
+      "proc": "spouští celého cold-start doktora s prázdným prostředím"
+    },
+    {
+      "soubor": "zmena-sluzby-dosahne-na-svuj-stack.gate.test.ts",
+      "s": 13.1,
+      "proc": "staví dočasné git repo a mutuje soubor per build adresář"
+    },
+    {
+      "soubor": "pki-renewer-delivery-vs-freshness.gate.test.ts",
+      "s": 12.6,
+      "proc": "spouští skript pod non-bash POSIX shellem"
+    },
+    {
+      "soubor": "external-klic-je-opravdu-operatorsky.gate.test.ts",
+      "s": 11.2,
+      "proc": "pouští env-doktora a pak git grep na každý externí klíč"
+    },
+    {
+      "soubor": "jmeno-na-sdilene-siti-nese-identitu.gate.test.ts",
+      "s": 10.7,
+      "proc": "ptá se compose orákula (rozhoduje parser, ne text)"
+    },
+    {
+      "soubor": "claude-overlay-runtime.gate.test.ts",
+      "s": 9.4,
+      "proc": "mnoho drobných spuštění overlay runtime"
+    },
+    {
+      "soubor": "coolify-sync-instance-scope.gate.test.ts",
+      "s": 8.1,
+      "proc": "bylo 60,1 s — čekalo na retry, o kterém netvrdí nic; timeout snížen na 8 s"
+    },
+    {
+      "soubor": "mesh-ingress-one-generator.gate.test.ts",
+      "s": 6.2,
+      "proc": "porovnává generátor s kanonickým compose"
+    },
+    {
+      "soubor": "build-time-mnozina-vsech-compose.gate.test.ts",
+      "s": 14.0,
+      "proc": "izolovaně 14 s, POD PRE-PUSH ZÁTĚŽÍ 42,6 s — 6 volání podprocesu (docker)"
+    },
+    {
+      "soubor": "selhani-dotazu-neni-nalez.gate.test.ts",
+      "s": 11.0,
+      "proc": "izolovaně 11 s, pod zátěží vypršelo na 30 s — sahá na netbird-backend"
+    },
+    {
+      "soubor": "stale-publish-vylucuje-testy.gate.test.ts",
+      "s": 10.2,
+      "proc": "orákulum: 5× postaví dočasné git repo a spustí nad ním pravou bránu (git init/add/commit + node); měřeno 2026-09-01 na klidném stroji, pod zátěží počítej s trojnásobkem"
+    },
+    {
+      "soubor": "prikaz-v-compose-se-da-rozparsovat.gate.test.ts",
+      "s": 20.0,
+      "proc": "PŘESUNUTO Z LEHKÉ 2026-09-01 po vypršení na 60 727 ms. Manifest měl zapsáno 7,0 s z první základny; samostatné přeměření dalo 24,7 s a 15,4 s, tedy 2–3,5x víc. Pravidlo 'počítej s trojnásobkem' pak dává 74 s > limit lehké dráhy 60 s. Vyprchání vydá PRÁZDNÝ nález a vypadá jako rozbitý detektor, ne jako pomalý test."
+    },
+    {
+      "soubor": "doktor-nesnizi-duveru-bez-peeru.gate.test.ts",
+      "s": 5.6,
+      "proc": "pouští env-doktora TŘIKRÁT v APPLY do temp souboru (měří se zapsaný soubor, ne useknutý výpis). ZMĚŘENO 2026-09-13 samostatně (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, Mac M4, load 43): 5,6 s testů / 8,0 s wall, dříve při load 32 4,1 s. Nad prahem 5 s už bez trojnásobku zátěže; sourozenec external-klic-je-opravdu-operatorsky (jeden doktor) je v heavy s 11,2 s."
+    },
+    {
+      "soubor": "registry-proxy-centralni-domov.gate.test.ts",
+      "s": 12.5,
+      "proc": "pouští env-doktora TŘIKRÁT v APPLY do temp souboru (srovnání prefixu a pinů, kontrolní vzorek, --no-external). ZMĚŘENO 2026-09-14 samostatně (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, Mac M4, load 54): 12,5 s testů / 17,6 s wall."
+    },
+    {
+      "soubor": "overlay-cachebust-mluvi-pravdu.gate.test.ts",
+      "s": 17.3,
+      "proc": "spouští refresh-overlay-cachebust.sh 4× proti zastrčenému curl/git (každý běh = bash + několik python3). ZMĚŘENO 2026-09-24 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>): testy 17,3 s (load 65) / 46,3 s (load 52) / pád na 30s limitu podprocesu (load 52) — nad prahem 5 s, proto heavy; limit podprocesu zvednut na 180 s, čas není předmětem tvrzení"
+    },
+    {
+      "soubor": "git-v-testech-bez-prostredi.gate.test.ts",
+      "s": 10.1,
+      "proc": "behaviorální sonda staví dvě dočasná git repa a spouští git pod zděděným GIT_DIR; samostatně 8,31 / 10,14 s (load 22, 2026-09-23)"
+    },
+    {
+      "soubor": "doktor-vyrobi-vapid-par.gate.test.ts",
+      "s": 15.6,
+      "proc": "pouští env-doktora PĚTKRÁT v APPLY do temp souboru (čistý start, prázdný alias plochy u chybějícího páru, oprava veřejného klíče mimo křivku, chybějící soukromý, cizí pár; měří se zapsaný soubor). ZMĚŘENO 2026-09-27 po přidání pátého testu (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts, běh 49 souborů, Mac M4, load 38): 15,6 s testů / 5 testů. Dříve se čtyřmi testy: ZMĚŘENO 2026-09-23 samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, Mac M4, load 20–30): testy 10,40 / 9,98 / 6,36 s, wall 20,5 / 15,2 / 8,3 s. Jeden běh doktora 3,4–4,7 s, takže pod prahem 5 s být nemůže."
+    },
+    {
+      "soubor": "doktor-nezapise-nerozvinutou-sablonu.gate.test.ts",
+      "s": 11.7,
+      "proc": "pouští env-doktora DVAKRÁT v APPLY do temp souboru (uložená doména → VAPID subject z ní; chybějící doména → nezapsáno, žádné `${…}` v celém zapsaném souboru; měří se zapsaný soubor). ZMĚŘENO 2026-09-27 samostatně 2× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, Mac M4, load 37): testy 11,65 / 6,61 s, Duration 12,16 / 7,10 s. Nad prahem 5 s jako sourozenci doktor-vyrobi-vapid-par a doktor-nesnizi-duveru-bez-peeru, proto heavy."
+    },
+    {
+      "soubor": "doktor-samostatne-jako-cold-start.gate.test.ts",
+      "s": 11.9,
+      "proc": "pouští env-doktora DEVĚTKRÁT v APPLY do temp souboru + derive-domains --shell (samostatně 2× vs. pod napodobeným cold-startem, --report --strict, prázdný alias, negativní sonda referenčních cookie domén, kontrolní vzorky (a) bez identity a (b) s referenční PUBLIC_TLD). ZMĚŘENO 2026-09-28 samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, Mac M4): testy 42,66 s (load 20,6) / 11,92 s (load 18,8) / 9,06 s (load 17,4). Jeden běh doktora 1–4 s, pod prahem 5 s být nemůže; sourozenci doktor-nezapise-nerozvinutou-sablonu a doktor-vyrobi-vapid-par jsou v heavy."
+    },
+    {
+      "soubor": "smerovani-jeden-domov.gate.test.ts",
+      "s": 38.2,
+      "proc": "spouští směrovač (bash) nad 400 cestami z merge commitu upstream #943 a výběr pre-pushe nad DOČASNÝM GITEM (6 scénářů: init, commit, merge --no-ff, push do bare remote) — 14 testů, desítky podprocesů. ZMĚŘENO 2026-09-25 samostatně (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 36–46): 38,2 s wall; ani naprázdno se pod práh 5 s nedostane (git init+commit+merge ×6)."
+    },
+    {
+      "soubor": "cold-start-izolace-prostredi.gate.test.ts",
+      "s": 67.7,
+      "proc": "spouští skutečný aisha-cold-start.sh proti falešnému Coolify v dočasném gitu (5 scénářů izolace staging × prod); ZMĚŘENO 2026-09-26 samostatně (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor> --reporter=json, load ~31): 26,0 s. 2026-09-27 PR2 izolace: +2 scénáře (d) slot <story>-staging, (e) pin vyhrává = 7 běhů cold-startu; ZMĚŘENO samostatně po domerge c2dedcdd5 (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, Apple M4, load 82): 67,7 s; ve společném běhu se dvěma dalšími branami (load ~20) 72,8 s."
+    },
+    {
+      "soubor": "prostredi-behu-jeden-domov.gate.test.ts",
+      "s": 7.1,
+      "proc": "PR2 izolace cold-startu: bash nad scripts/lib/prostredi-behu.sh (tabulka tvarů AISHA_ENV proti .mjs), env-doctor 5× CHOVÁNÍM (--report: cíl a zdroj doplnění v ne-produkčním běhu), funkce brány zápisů ze skutečného aisha-cold-start.sh proti falešnému curl, odvozovače cold-startu přes cestu se SYMLINKEM (node). ZMĚŘENO 3× samostatně (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, Apple M4, load 19–25): Duration 6,85 / 8,51 / 6,07 s, testy 4,7–7,8 s / 40 testů. Nad prahem 5 s, proto vědomě v těžké dráze (env-doctor na běh ~1 s pod zátěží)."
+    },
+    {
+      "soubor": "deploy-vetev-odchylka-nese-duvod.gate.test.ts",
+      "s": 6.4,
+      "proc": "spouští domov scripts/lib/deploy-vetev-odchylka.sh (bash + git + node) nad dočasnými repy v deseti stavech — měří VLASTNOST (předek upstreamu, volba remote podle URL), ne text. ZMĚŘENO 3× samostatně (Apple M4, load 22–25): Duration 6,37 / 6,16 / 7,11 s, testy 4,5–5,7 s / 17 testů. Před zrychlením (šablona repa místo 12 volání gitu na test, jeden Node na všechny URL) 21–31 s. Na prahu 5 s i po něm, proto vědomě v těžké dráze."
+    },
+    {
+      "soubor": "smir-prvniho-prihlaseni-dorovna-realm.gate.test.ts",
+      "s": 10.6,
+      "proc": "spouští blok tok-prvniho-prihlaseni ze SKUTEČNÉHO keycloak/reconcile-realm-clients.sh (sh) proti falešnému kcadm (model Keycloaku 26.0.8 v awk, jeden awk na volání) — realm před opravou, idempotence, rozbité pořadí, 404/401 a pád v KAŽDÉM z 19 zapisujících volání s dorovnáním: ~880 volání. ZMĚŘENO 3× samostatně (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, Apple M4, load 10–11): Duration 7,66 / 10,58 / 17,31 s / 10 testů. Model v node s procesem na volání dával 104 s, jeden node proces za pojmenovanými rourami se zasekával (EINTR při otevření roury). Vlastnosti šablony měří lehká brána prvni-prihlaseni-bez-automatickeho-propojeni (0,24 s, bez podprocesu)."
+    }
+  ],
+  "ratchetPodprocesMimoHeavy": {
+    "pocet": 176,
+    "proc": [
+      "Bran s podprocesem je 129; devět z nich je v heavy, zbylých 120 je pod",
+      "prahem a běží v lehké dráze. Číslo je RATCHET: když přibude brána",
+      "s podprocesem, ať se nejdřív ZMĚŘÍ a vědomě zařadí, místo aby tiše",
+      "zdražila lehkou dráhu. Snížit je vždy v pořádku, zvýšit jen s měřením.",
+      "Číslo je z chůze CELÝM stromem včetně remediation/ a aitg/ — první odhad (120) vznikl shellovým vzorem, který podadresáře minul. Brána chodí stromem, takže ratchet musí stát na témž universu.",
+      "117 je po opravě detektoru, který dosud počítal ZMÍNKU místo VOLÁNÍ: vzor bez otevřené závorky se trefil i do souborů, které ta jména jen vyjmenovávají — včetně brány samotné. Naměřeno 2026-08-31: 122 se zmínkami vs. 117 s voláními.",
+      "2026-09-12, sloučení forku riq do upstreamu: 122 → 123. Z forku přišlo 47 bran, šest z nich spouští podproces. VŠECHNY ZMĚŘENY samostatně a žádná do heavy nepatří: cislo-z-prostredi-ma-straz 6 ms, env-doktor-nezname-prepinace 39 ms, tema-ze-znacky-nese-vse-co-kod-pouziva 50 ms, zarizeni-z-rosteru-projde-dvermi 90 ms, neznamy-prepinac-neni-vychozi-chovani 150 ms, stavena-sluzba-nesmi-mit-pevny-tag 167 ms. Nejpomalejší z nich je o dva řády pod prahem heavy, takže lehkou dráhu znatelně nezdraží.",
+      "2026-09-12, sloučení <fork> do upstreamu: 123 → 125. Z forku přišly DVĚ brány s podprocesem, obě ZMĚŘENY samostatně (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 5,0, HEAD cd5c4b762+patche): extra-hosts-nesmi-mit-duplicitu 545 ms (9 testů, 4× node derive-domains --shell), mesh-profil-drzi 169 ms (10 testů, bash nad mesh_profile_merge). Trojnásobek pod zátěží je pořád o řád pod prahem 5 s, do heavy nepatří.",
+      "2026-09-12, dluhy doručovací cesty po slití <fork>: 125 → 126. deklarace-v-compose-ma-zapisovatele SPOUŠTÍ env-doktora v APPLY do temp souboru (jediný způsob, jak změřit, co skutečně zapíše — část klíčů vzniká za běhu). ZMĚŘENO samostatně (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 3,3, HEAD 1af002269+patche): 1,93 s / 6 testů, z toho doktor 1,87 s (`/usr/bin/time`). Trojnásobek pod zátěží (~6 s) je nad prahem 5 s jen těsně a jen u JEDNOHO podprocesu — hlídej při dalším měření drah; do heavy zatím nepatří.",
+      "2026-09-12, sloučení <fork> do upstreamu: 126 → 127. Z forku přišlo OSM bran, podproces spouští jediná: dist-se-kopiruje-jen-kdyz-se-stavi (čte docker build kontext). ZMĚŘENA samostatně: 2 testy, 1,76 s wall (Mac M4, load 12, AISHA_SKIP_ONLINE=1) — hluboko pod prahem lehké dráhy, proto zůstává v light.",
+      "2026-09-13, sloučení <fork> (cheers) do upstreamu: 127 → 128. Brána public-oss-boundary přišla se dvěma voláními podprocesu (satelity forku se odvozují z `git remote`, ne ze seznamu jmen) — dřív žádné. Změřeno chůzí stromem bránou drah: 128 proti rohatce 127, rozdíl je právě tahle brána. Samostatně: viz commit (Mac M4, load 5.31), hluboko pod prahem lehké dráhy.",
+      "2026-09-15, detektor submodulů: 128 → 129. Brána posun-submodulu-nenasazuje-core spouští detektor (node) nad dočasným gitem a vyříznutý směrovač `app` z ci.yml (bash). ZMĚŘENA samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load ~12): 2,4–3,2 s / 7 testů — pod prahem 5 s, proto vědomě v lehké dráze.",
+      "2026-09-16, obraz ingestu z extras: 129 → 130. Brána local-ingest-obraz-z-extras spouští měřidlo enginu (`python3 packages/local-ingest/scripts/image_extras.py check`) — druhý parser Dockerfilu v TS by se s ním rozešel, a právě rozchod dvou seznamů tu vadu vyrobil. ZMĚŘENA samostatně 3× S NAČTENÝM submodulem (tedy v plné, ne přeskočené variantě; AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load ~13): 1,54 / 1,20 / 1,21 s wall, z toho testy 0,58–0,61 s. Bez submodulu (CI brány) 2 ms. Pod prahem 5 s, proto vědomě v lehké dráze.",
+      "2026-09-18, heslo exporteru: 130 → 131. Brána exporter-nedostane-heslo-superuzivatele SPOUŠTÍ infra/postgres/set-passwords.sh (bash) s podvrženým psql — měří chování, ne text skriptu. ZMĚŘENA samostatně 4× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 38–48): Duration 1,57–3,31 s, testy 12–45 ms. Pod prahem 5 s i při té zátěži, proto vědomě v lehké dráze.",
+      "2026-09-19, hesla rolí: počet BEZE ZMĚNY (131). Brána exporter-nedostane-heslo-superuzivatele přejmenována na hesla-roli-bez-hesla-superuzivatele a rozšířena na třídu (všechny aplikační role, oba zapisovatele: set-passwords.sh i hesla_roli_sql z hesla-roli.lib, kterou vkládá wrapper). Pořád jedna brána s podprocesem (bash). ZMĚŘENA samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load ~20): wall 2,96 / 1,70 / 1,65 s, testy 0,49–0,90 s / 9 testů — pod prahem 5 s, proto vědomě v lehké dráze.",
+      "2026-09-20, CORS dveřníka: 131 → 132. Brána fastify-sluzba-dostane-cors-allowlist SPOUŠTÍ `git ls-files` dvakrát — univerzum si musí HLEDAT (služby z volání applySecurity ve zdrojácích × compose ze stromu), protože ručně psaný seznam by novou Fastify službu minul, a právě to tu vadu vyrobilo. Druhý parser v TS nad `ls` by se s gitem rozešel u nesledovaných souborů. ZMĚŘENA samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 17,6): wall 1,30 / 1,34 / 1,35 s, testy 936–954 ms / 4 testy — o řád pod prahem 5 s i při té zátěži, proto vědomě v lehké dráze.",
+      "2026-09-23, overlay přepočte profil: 158 → 159. Brána overlay-prepocte-cely-profil SPOUŠTÍ mobile-app/scripts/app-profile.sh (bash) dvakrát nad dočasným projektem — měří CHOVÁNÍ (druhé načtení nad instančním version.json přepočítá AISHA_SKIP_*), ne text. ZMĚŘENA samostatně 3× (vitest run --config vitest.gates.config.ts): testy 1,09–1,32 s, celkem 1,66–2,02 s — pod prahem 5 s, proto lehká dráha. Vznikla z vady doložené na artefaktu: řidič 1.1.0 (14) 89,6 MB místo 52 MB.",
+      "2026-09-25, kolo 6 (sync/<fork>-kolo-6): 161 → 162. NENÍ nová brána — sejdou se sync kola 6 (161) a #382 (158 → 159, brána `overlay-prepocte-cely-profil`, změřena na své straně, viz záznam výš). Nad společnou bází 158 přidaly různé brány, proto součet.",
+      "2026-09-26, fronta Coolify není práce: 162 → 163. Brána `nasazeni-fronta-neni-prace` spouští bash — vyjme `cekej_na_nasazeni` ze SKUTEČNÉHO deploy-and-verify.sh a pustí ji na virtuálních hodinách s podstrčeným curl/date/sleep (chování, ne text), a jednou nasad-podle-vln.sh nad skutečným --print-waves (node). ZMĚŘENA samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 12–13): Duration 1,78 / 1,77 / 2,25 s, testy 1,61–2,10 s / 9 testů — pod prahem 5 s, proto vědomě v lehké dráze.",
+      "2026-09-29, váhy svc-model ověřené i ve svazku: 163 → 164. Brána `svc-model-vahy-overene-i-ve-svazku` spouští sh — vyjme SKUTEČNOU funkci seed() ze scripts/deploy/svc-model-entrypoint.sh a pustí ji nad dočasnými soubory (curl přes file://): měří CHOVÁNÍ (soubor ve svazku s jiným sha se stáhne znovu, jinak exit 1), ne text. ZMĚŘENA samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 16–43): Duration 691 / 621 / 616 ms, testy 275–351 ms / 3 testy — o řád pod prahem 5 s, proto vědomě v lehké dráze.",
+      "2026-09-23, sync-envs-cteni-payloadu-bez-sigpipe (z forku cheers eefcb0a89): 159 → 160 (změřeno bránou drah po sloučení #1054 a #1056, které každá přidaly jednu bránu nad 157). Spouští bash nad vyříznutými řádky čtení z coolify-sync-envs.sh s payloadem ~2 MB (2 testy, 2 podprocesy). ZMĚŘENO ve forku samostatně (vitest run --config vitest.gates.config.ts <soubor>, Mac M4): 1,7 s testů. Trojnásobek pod zátěží (~5 s) je na prahu heavy — při dalším měření drah hlídat.",
+      "2026-09-25, stav poskytovatele identity: 160 → 161. Brána idp-se-srovnava-pri-kazdem-startu SPOUŠTÍ funkci idp_stav přímo ze skriptu smíru (sh) proti falešnému kcadm — jediný způsob, jak změřit, že chyba nástroje (401/5xx/síť) není „poskytovatel v realmu není“. Všech pět scénářů v JEDNOM podprocesu; ZMĚŘENO samostatně (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>) při load 43–55: celá brána 1,67 s (collect vč. jediného podprocesu 1,35 s, testy 6 ms); první verze s pěti podprocesy dávala 2,7 s, proto sloučeno do jednoho. Do heavy nepatří.",
+      "2026-09-26, izolace cold-startu (fork, cherry-pick 3c3d2c8e3): 160 → 161. Přibyly DVĚ brány s podprocesem: cold-start-izolace-prostredi (26,0 s → do heavy, viz výš) a cold-start-zamer-behu-neprepise-soubor. Ta druhá spouští bash nad cold-start.sh; ZMĚŘENA samostatně (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor> --reporter=json, load ~31): 1,3 s / 9 testů — pod prahem 5 s, proto vědomě v lehké dráze. POZOR: #1071 a MinIO #1072 zapisují taky 161 — kdo půjde do mainu druhý/třetí, zvedne podle skutečného počtu a uvede svá měření.",
+      "2026-09-25, lhůta evidence adres (dveře observe): 160 → 162. Dvě brány s podprocesem, obě měří CHOVÁNÍ, ne text. `evidence-adres-drzi-lhutu` spouští vyříznutý úsek příkazu edge (sh) — validaci lhůty, vygenerovaný úklid nad pískovištěm s posunutými mtime, healthcheck s atrapou wget — a dál env-doktora (--print-contract-keys) a generate-secrets; `dvernik-nenavrhuje-z-vadne-evidence` spouští scripts/dvernik-evidence.mjs nad syntetickou evidencí. ZMĚŘENO samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, Apple M4, load 18–21): evidence-adres-drzi-lhutu Duration 3,53 / 3,42 / 2,99 s (25 testů), dvernik-nenavrhuje-z-vadne-evidence 0,92 / 0,87 / 0,91 s (11 testů). Pod prahem 5 s, proto vědomě v lehké dráze. První z nich naměřena i při loadu 68: 6,1 s — tehdy ještě každý test healthchecku zapisoval nové spustitelné atrapy, které macOS při prvním spuštění skenuje; po sloučení atrap výše uvedená čísla. Při dalším měření drah hlídat.",
+      "2026-09-26, integrační dávka upstreamu (#1071 #1076 #1079 #1081 a dalších): 162 → 164, změřeno bránou drah nad sloučeným stromem. Skládá se z bran, které autoři změřili ve svých PR a vědomě ponechali v lehké dráze: idp-se-srovnava-pri-kazdem-startu 1,67 s (#1071), cold-start-zamer-behu-neprepise-soubor 1,3 s (#1076), evidence-adres-drzi-lhutu + dvernik-nenavrhuje-z-vadne-evidence (#1081); deploy-vetev-odchylka-nese-duvod (#1079, 6,4 s) a cold-start-izolace-prostredi (26,0 s) jsou v heavy. Tři PR zapisovaly nezávisle 161/162 — dávka je sjednotila na skutečný počet.",
+      "2026-09-26, sync <fork> → upstream (kola 5–7): <fork> 162 / upstream 164 → 168. NENÍ nová brána — sjednocení dvou už změřených sad, ověřeno JMENOVITĚ chůzí stromem (týž regex volání jako brána): báze bb84a4056 = 158; jen <fork> +4 (kid-appky-plyne-ze-slugu, modul-appky-ma-obe-pulky, opakovani-nasazeni-se-vejde-do-ulohy, overlay-prepocte-cely-profil); jen upstream +6 (cold-start-zamer-behu-neprepise-soubor, dvernik-nenavrhuje-z-vadne-evidence, evidence-adres-drzi-lhutu, heslo-db-mimo-argv, idp-se-srovnava-pri-kazdem-startu, sync-envs-cteni-payloadu-bez-sigpipe); ve sloučeném stromu, ale v žádné straně: 0. Každá změřena na své straně při zavedení (záznamy výš).",
+      "2026-09-27, fronta Coolify není práce: 168 → 169. Brána `nasazeni-fronta-neni-prace` spouští bash — vyjme `cekej_na_nasazeni` ze SKUTEČNÉHO deploy-and-verify.sh a pustí ji na virtuálních hodinách s podstrčeným curl/date/sleep (chování, ne text), a jednou nasad-podle-vln.sh nad skutečným --print-waves (node, s envWithoutGitLocation). ZMĚŘENA samostatně 3× ve forku (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 12–13): Duration 1,78 / 1,77 / 2,25 s, testy 1,61–2,10 s / 9 testů — pod prahem 5 s, proto vědomě v lehké dráze.",
+      "2026-09-27, doktor bez identity: 169 → 170. Brána `doktor-bez-identity-neskladat-diru` spouští env-doktora (node) v APPLY nad dočasným souborem 3× (s identitou, bez ní) a měří ZAPSANÝ soubor — díru po prázdné identitě pozná odvozením (hodnota s identitou minus identita), ne vzorem textu. ZMĚŘENA samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 9,3–9,6): Duration 2,05 / 1,91 / 1,92 s, testy 1,79–1,91 s / 2 testy — pod prahem 5 s, proto vědomě v lehké dráze.",
+      "2026-09-27, doktor PKI z výslovného manifestu: 172 → 173. Brána `doktor-pki-z-vyslovneho-manifestu` spouští env-doktora (node) v APPLY nad dočasným souborem 3× (MANIFEST_FILE s PKI, bez PKI, bez manifestu) a měří zapsaný PKI_BUNDLE_REQUIRED a stderr. ZMĚŘENA samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 12,9–13,4): Duration 2,24 / 2,57 / 2,32 s, 2 testy — pod prahem 5 s, proto vědomě v lehké dráze.",
+      "2026-09-30, kolo 15 (sync/<fork>-kolo-15-upstream): 174 → 175. NENÍ nová brána — sejdou se upstream main 9087ef3df (174) a brána forku `svc-model-vahy-overene-i-ve-svazku` (163 → 164 ve forku, změřena tam 3×: Duration 616–691 ms, viz záznam 2026-09-29). Nad společnou bází přidaly různé brány, proto součet; skript porovnání množin: HEAD − upstream = právě tahle jedna, upstream − HEAD = žádná.",
+      "2026-09-28, jména na uzlu edge: 174 → 175 (větev zapsala 173 → 174 nad c2dedcdd5; po domerge mainu 5f1d02b6a, kde #1072 zvedl 173 → 174 bránou minio-obraz-ze-zdroje, přepočteno chůzí stromem týmž regexem jako brána drah: 175). Brána `edge-vlastni-jmena-na-svem-uzlu` spouští všechny tři roviny nad týmiž vstupy — derivaci (node derive-domains --shell 5× nad profily v dočasném overlayi), skutečného coolify-domain-doctor --apply 4× proti místnímu „Coolify“ (execFile, asynchronně) a vyříznuté bez_jmen_edge + set_coolify_domains z deploy-initu (bash 9×) — a měří CHOVÁNÍ: konvergenci doktora v jednom běhu i shodu bashe s knihovnou. ZMĚŘENA samostatně 3× (vitest run --config vitest.gates.config.ts <soubor>, Apple M4, load 19–31): Duration 3,18 / 2,57 / 2,58 s, testy 1,93–2,15 s / 21–23 testů — pod prahem 5 s, proto vědomě v lehké dráze; trojnásobek pod zátěží (~10 s) se vejde do jejího timeoutu 30 s.",
+      "2026-09-30, hromadná integrace (integrace/davka-2026-09-30): 175 → 176. NENÍ nová brána — sejdou se dvě NEZÁVISLÁ zvýšení 174 → 175: riq kolo 15 (svc-model-vahy-overene-i-ve-svazku, změřena ve forku 616–691 ms) a #1107 (edge-vlastni-jmena-na-svem-uzlu, změřena ve větvi). Resolver drah vzal jen jedno z nich; přepočteno chůzí stromem regexem brány drah: 176."
+    ],
+    "duvod": "120 (bylo 117) — merge upstreamu 2026-09-07 přinesl TŘI brány s podprocesem. ZMĚŘENY samostatně, všechny procházejí a jsou rychlé, takže do heavy nepatří: instance-identity-natvrdo 1.9 s, vyber-bran-je-fail-closed 2.6 s, zona-ve-jmene 0.8 s. Součet 5.3 s na lehkou dráhu je přijatelný; kdyby některá zpomalila, patří do heavy s měřením. || 122 (bylo 120) — drift forku 2026-09-07…09-10 (dveře/pověření zařízení, značka) přinesl DVĚ brány s podprocesem: tema-ze-znacky-nese-vse-co-kod-pouziva 0.32 s, zarizeni-z-rosteru-projde-dvermi 0.23 s (změřeno v pre-push běhu 2026-09-11 při load 40; obě zdaleka pod 1 s, do heavy nepatří).",
+    "$komentar": [
+      "2026-09-21, kolo 4 (sync forku do upstreamu): 132 → 156. NENÍ to nová brána — je to SJEDNOCENÍ dvou už změřených sad. upstream/main nesl ratchet 153, riq/main 132; po merge je ve stromu 156 bran s podprocesem mimo heavy, tedy upstreamových 153 plus tři, které přibyly ve forku (CORS dveřníka a spol.). Každá z nich byla změřena na své straně při svém zavedení; merge žádnou novou nezavádí a žádná neběží dvakrát. Ratchet se tu proto nezvedá tolerancí, ale tím, že se sešly dvě historie.",
+      "2026-09-21, kid appky ze slugu: 156 → 157. Brána `kid-appky-plyne-ze-slugu` spouští OBA producenty (bash `instance-env-derive.sh` a node `knock-provision.mjs`) nad podvrženým overlayem — měří CHOVÁNÍ, ne přítomnost řádku. Ručně psaný seznam by minul právě to, co vadu způsobilo: POŘADÍ dvou správně napsaných bloků. ZMĚŘENA samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 26,8): wall 1,56 / 1,28 / 1,29 s, testy 787–800 ms / 6 testů — pod prahem 5 s i při té zátěži, proto vědomě v lehké dráze.",
+      "2026-09-22, hlídač rozdává a aktualizuje: 157 → 158. Brána `modul-appky-ma-obe-pulky` spouští `git ls-files` — univerzum si MUSÍ hledat v INDEXU, protože měřenou vadou je právě rozdíl mezi diskem a repem: `mobile-app/.gitignore` nesl `android/` bez lomítka na začátku a spolkl nativní půlku vlastního Expo modulu. Kontrola přes `fs` by soubor na disku NAŠLA a vadu minula. ZMĚŘENA samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 8,35): wall 300 / 296 / 339 ms, testy 61–72 ms / 2 testy — o dva řády pod prahem 5 s i po trojnásobku pod zátěží, proto vědomě v lehké dráze.",
+      "2026-09-21, pověření v build argu: 156 → 157. Brána `povereni-nepatri-do-build-argu` spouští `git ls-files` — univerzum si MUSÍ hledat ve stromu, protože ručně psaný seznam Dockerfilů je přesně ta vada, kterou brána řeší: po nálezu z 2026-08-15 se stráž roznesla do tří souborů a do čtvrtého, kde vada vznikla, nedošla. ZMĚŘENA samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 23,7): wall 0,84 / 0,73 / 0,86 s, testy 160–229 ms / 3 testy — o řád pod prahem 5 s i při té zátěži, proto vědomě v lehké dráze.",
+      "2026-09-23, kolo 5 (sync forku do upstreamu): 158 (fork) / 157 (upstream) → 159. NENÍ to nová brána — sejdou se dvě už změřené sady: z forku `kid-appky-plyne-ze-slugu` a `modul-appky-ma-obe-pulky`, z upstreamu `povereni-nepatri-do-build-argu`; každá změřena na své straně při zavedení (viz záznamy výše), merge žádnou nezavádí ani nespouští dvakrát.",
+      "2026-09-23, dotažení nasazení: 158 → 159. Brána `opakovani-nasazeni-se-vejde-do-ulohy` spouští bash — vyjme `dalsi_pokus` ze SKUTEČNÉHO deploy-and-verify.sh a pustí ji s podstrčeným curl/git (chování, ne text: jinak by „opakuje jen na verdikt“ mohl být jen komentář). ZMĚŘENA samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 22,8): wall 3,10 / 3,32 / 3,41 s, testy 929–1010 ms / 17 testů — pod prahem 5 s, proto vědomě v lehké dráze.",
+      "2026-09-23, kolo 5 + dotažení nasazení: 159 → 160. Sejdou se sjednocení kola 5 (159) a brána `opakovani-nasazeni-se-vejde-do-ulohy` z forku (změřena výše, 3,10–3,41 s); obě strany zvedly 158 → 159 nezávisle, skutečný součet je 160.",
+      "2026-09-23, závora generátoru tajemství: 157 → 158. Brána `generator-nemintuje-bez-vstupu` SPOUŠTÍ scripts/generate-secrets.mjs (node) ve čtyřech konfiguracích — měří, co generátor skutečně vydá na stdout a s jakým kódem skončí, protože právě výstup (ne text skriptu) přepsal 94 klíčů. ZMĚŘENA samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, Mac M4, load 12–31): Duration 0,36 / 0,99 / 0,79 s, 5 testů — hluboko pod prahem 5 s, proto vědomě v lehké dráze. Chůze stromem bránou drah: 158 proti rohatce 157, rozdíl je právě tahle brána.",
+      "2026-09-23, kolo 5 + upstream #1054: 160 → 161. Z upstreamu přišla brána `generator-nemintuje-bez-vstupu` (změřena na své straně, viz záznam výše); sjednocení, žádná nová brána z forku.",
+      "2026-09-23, heslo DB mimo argv: 158 → 159 (souběh s #1054, který přistál dřív se 157 → 158; obě brány jsou v lehké dráze, proto oba řádky a součet 159). Brána `heslo-db-mimo-argv` SPOUŠTÍ scripts/db/seed.mjs (node) s falešným psql na PATH — měří, co seed skutečně vypíše a co psql dostane v argv a v prostředí, protože únik hesla vznikl ve výstupu, ne v textu skriptu; dál `git ls-files` (univerzum volajících ze stromu) a `sed` (výraz z entrypointu). ZMĚŘENA 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, Mac M4): 0,88 s testů v běhu s 25 dotčenými branami (load 11–35), samostatně Duration 1,98s / 2,22s (load 63,55) — hluboko pod prahem 5 s, proto vědomě v lehké dráze. Chůze stromem bránou drah: 158 proti rohatce 157, rozdíl je právě tahle brána.",
+      "2026-09-25, pre-push podle cest: nová brána smerovani-jeden-domov spouští podprocesy (bash, git) → zařazena do HEAVY s měřením 38,2 s, lehká dráha zůstává 160 → ratchet beze změny.",
+      "2026-09-27 (integrační dávka 3, #1088), kolace klíčů v syncu: 170 → 171. Brána sync-envs-kolace-klicu SPOUŠTÍ bash nad vyříznutými klice_comm + build_app_payload z coolify-sync-envs.sh se skutečným YAML extraktorem (node) pod LC_ALL=en_US.UTF-8 i pod emulovanou kolací (podvržený sort) — falešné MISSING vznikají ve výstupu comm, ne v textu skriptu. ZMĚŘENA autorem samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 15,8–16,4): Duration 2,16 / 2,18 / 2,28 s, testy 1,80–1,96 s / 7 testů — pod prahem 5 s, proto vědomě v lehké dráze. PR zapisovalo 160 → 161; v dávce přepočteno na skutečný stav mainu.",
+      "2026-09-26, verdikt dveří z kódu (#1089, v integrační dávce 3 přepočteno 171 → 172): Brána doktor-dvere-verdikt-z-kodu SPOUŠTÍ skutečného cold-start doktora (`--phase B --no-network`, oddíl dveří nad syntetickým ENV_FILE), `dvere-soulad.mjs --soulad` i `--coolify` proti atrapě Coolify API (HTTP v procesu testu) a vyříznutou funkci verdiktu fáze P (bash) — falešný FATAL vznikal v tom, jak doktor čte VÝSTUP měření, ne v textu skriptu. ZMĚŘENA samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, Mac, load 14,0–15,4): Duration 2,54 / 3,29 / 3,33 s, testy 2,16–3,02 s / 8 testů — pod prahem 5 s, proto vědomě v lehké dráze. Chůze stromem bránou drah: 161 proti rohatce 160, rozdíl je právě tahle brána.",
+      "2026-09-25, minio-obraz-ze-zdroje (MinIO ze zdroje přes Go proxy, #1072): 173 → 174 (po domerge mainu c2dedcdd5; ve větvi původně 160 → 161, stejné číslo zapisovaly nezávisle #1071 a #1076). Spouští `git ls-files` dvakrát — kontext buildu a univerzum souborů, které by mohly táhnout obraz MinIO z registru, musí být SLEDOVANÁ množina (Coolify staví z klonu); výpis disku by zahrnul lokálně ignorované soubory a výsledek by závisel na stroji. ZMĚŘENA samostatně 3× (AISHA_SKIP_ONLINE=1 vitest run --config vitest.gates.config.ts <soubor>, load 15–90): testy 1,10 / 0,92 / 0,90 s, Duration 2,24 / 1,50 / 2,27 s / 14 testů — pod prahem 5 s, proto vědomě v lehké dráze."
+    ]
+  },
+  "$komentarKCemuToJeAKCemuNe": [
+    "CO ROZDĚLENÍ PŘINÁŠÍ (naměřeno 2026-08-31 jedním sledem, 8 workerů):",
+    "  all   wall 77 s · CPU 333 s · 630 souborů",
+    "  light wall 53 s · CPU 160 s · 621 souborů",
+    "  heavy wall 37 s · CPU  92 s ·   9 souborů (3 workeři)",
+    "Součet CPU obou drah je 252 s proti 333 s společně — samo rozdělení tedy",
+    "ušetří 81 s odlehčením kontence.",
+    "",
+    "CO ROZDĚLENÍ NEPŘINÁŠÍ: rychlou synchronní dráhu. Lehká dráha celá trvá",
+    "53 s a strop jí neurčuje práce v branách, ale POČET souborů:",
+    "  20 souborů → 8 s · 60 → 15 s · 150 → 46 s · 621 → 53 s",
+    "Nasycení nastává kolem 150 souborů; snížení prahu z 5 s na 1 s (vyloučí",
+    "52 souborů = 81 % CPU) srazilo wall jen z 53 na 40 s.",
+    "",
+    "DŮSLEDEK: rychlou dráhu dělá VÝBĚR DOTČENÝCH, ne tenhle manifest. Dráhy",
+    "jsou tu kvůli poctivému timeoutu (30 s místo 300 s v lehké), izolaci",
+    "kontence a té úspoře CPU. Kdo čeká, že samotné rozdělení zrychlí pre-push,",
+    "bude zklamán — a měl by sáhnout po výběru."
+  ],
+  "$komentarKVyberu": [
+    "MAPA DOTČENÝCH — kterou hrstku bran pustit synchronně podle toho, co se změnilo.",
+    "",
+    "PROČ VŮBEC: naměřeno 2026-08-31, že strop dráhy určuje POČET souborů, ne práce",
+    "v nich: 20 souborů → 8 s · 60 → 15 s · 150 → 46 s · 621 → 53 s. Rychlou",
+    "synchronní dráhu tedy dělá VÝBĚR, ne rozdělení na light/heavy.",
+    "",
+    "FAIL-CLOSED JE ZÁKLAD, NE VÝJIMKA. Cestu, kterou mapa nezná, NELZE mlčky",
+    "prohlásit za nedotčenou — v CI se tenhle druh mapy zdokumentovaně spletl",
+    "TŘIKRÁT (chyběly apps/, docker-compose*.yml + config/, packages/) a pokaždé",
+    "to znamenalo, že 'zelená znamenala neměřeno'. Neznámá cesta proto padá na",
+    "CELOU lehkou dráhu (53 s) — pomalé, ale pravdivé.",
+    "",
+    "MAPA NETVRDÍ ÚPLNOST. Tvrzení 'žádná brána mimo kategorii X nečte compose'",
+    "je pro 501 textových bran staticky nedokazatelné a pokus o to by byl jen",
+    "další špatný regex. Úplnost zaručuje PLNÝ BĚH NA POZADÍ, ne tahle mapa;",
+    "výběr musí být jen fail-closed a užitečný."
+  ],
+  "ignorovat": {
+    "$proc": [
+      "UZAVŘENÝ VÝČET, ne obecné pravidlo. Cesty, u kterých je doloženo, že žádnou",
+      "bránu neovlivní. Cokoliv jiného padá na celou lehkou dráhu.",
+      "POZOR: `package.json` a `vitest.gates.config.ts` sem SCHVÁLNĚ NEPATŘÍ. Změna testovací konfigurace se dotýká všeho, takže fail-closed (celá lehká dráha) je u nich SPRÁVNÁ odpověď, ne mezera v mapě. Naměřeno 2026-09-01: právě ony dvě cesty způsobily pád na celou dráhu — a měly."
+    ],
+    "vzory": [
+      "docs/**",
+      "**/*.md",
+      "**/*.png",
+      "**/*.jpg",
+      "**/*.svg",
+      ".vscode/**"
+    ]
+  },
+  "kategorie": {
+    "compose": {
+      "zmenene": [
+        "docker-compose*.yml",
+        "coolify/**",
+        "config/services.json"
+      ],
+      "brany": [
+        "coolify-compose-compliance",
+        "coolify-domain-format",
+        "depends-on-healthy",
+        "prikaz-v-compose-se-da-rozparsovat",
+        "jmeno-na-sdilene-siti-nese-identitu",
+        "mesh-ingress-one-generator",
+        "healthcheck-port-consistency",
+        "deklarace-v-compose-ma-zapisovatele",
+        "evidence-adres-drzi-lhutu"
+      ]
+    },
+    "coldstart": {
+      "zmenene": [
+        "scripts/aisha-cold-start.sh",
+        "scripts/cold-start-doctor.sh",
+        "scripts/generate-secrets.mjs"
+      ],
+      "brany": [
+        "cold-start-doctor",
+        "cold-start-heredoc-bindings",
+        "shell-heredoc-metachar",
+        "coolify-sync-instance-scope",
+        "deklarace-v-compose-ma-zapisovatele",
+        "deploy-vetev-odchylka-nese-duvod"
+      ]
+    },
+    "nasazeni": {
+      "zmenene": [
+        "scripts/aisha-redeploy.mjs",
+        "scripts/deploy/**",
+        "scripts/ci/**",
+        ".forgejo/workflows/**"
+      ],
+      "brany": [
+        "zmena-sluzby-dosahne-na-svuj-stack",
+        "ci-deploy-honesty",
+        "overlay-clone-cachebust"
+      ]
+    },
+    "pki": {
+      "zmenene": [
+        "infra/pki/**",
+        "Dockerfile.pki-init",
+        "docker-compose.coolify-pki.yml"
+      ],
+      "brany": [
+        "pki-bundle-fail-closed",
+        "pki-renewer-delivery-vs-freshness",
+        "pki-bridge-public-issuer"
+      ]
+    },
+    "db": {
+      "zmenene": [
+        "aisha/db/**"
+      ],
+      "brany": [
+        "heals-signature-drift",
+        "source-of-truth-analyzer",
+        "sql-type-consistency"
+      ]
+    },
+    "skripty": {
+      "zmenene": [
+        "scripts/**"
+      ],
+      "brany": [
+        "skript-musi-jit-spustit",
+        "zadny-fallback-nad-identitou",
+        "curl-http-code-capture-integrity",
+        "deploy-vetev-odchylka-nese-duvod",
+        "evidence-adres-drzi-lhutu",
+        "dvernik-nenavrhuje-z-vadne-evidence"
+      ]
+    },
+    "brany": {
+      "zmenene": [
+        "src/tests/gates/**"
+      ],
+      "brany": [
+        "drahy-bran-manifest"
+      ]
+    }
+  },
+  "$komentarOPrahu": [
+    "⛔ PRÁH NELZE URČIT JEDNÍM MĚŘENÍM. Naměřeno 2026-09-01: obě brány doplněné",
+    "níže vyšly na nezatíženém stroji na 14 s a 11 s, tedy hluboko pod prahem —",
+    "a pod pre-push zátěží 42,6 s a >30 s. Trojnásobek.",
+    "",
+    "Je to táž věc, kterou tenhle manifest tvrdí o číslech výš: trvání není",
+    "vlastnost souboru, ale vlastnost běhu. Můj původní výběr devíti souborů",
+    "vznikl z běhu BEZ zátěže, takže podcenil právě ty brány, které pod zátěží",
+    "rostou nejvíc — ty s podprocesem.",
+    "",
+    "PRAKTICKÉ PRAVIDLO, které z toho plyne: čas z klidného běhu je DOLNÍ odhad.",
+    "U brány s podprocesem počítej s trojnásobkem, a když má být v lehké dráze,",
+    "musí se do jejího timeoutu vejít i ten trojnásobek."
+  ]
+}

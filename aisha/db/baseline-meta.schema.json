@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Baseline Meta",
+  "description": "Schema for baseline-meta.json — tracks baseline + seed version state",
+  "type": "object",
+  "required": ["baseline", "seed", "pending_migrations"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "description": { "type": "string" },
+    "baseline": {
+      "type": "object",
+      "required": ["refreshed_at", "source", "output"],
+      "properties": {
+        "refreshed_at": { "type": "string", "format": "date-time", "description": "ISO 8601 timestamp of last baseline refresh" },
+        "source": { "type": "string", "description": "Directory containing SQL source of truth" },
+        "output": { "type": "string", "description": "Path to generated baseline migration" },
+        "note": { "type": "string" }
+      }
+    },
+    "seed": {
+      "type": "object",
+      "required": ["refreshed_at", "source_dirs", "output"],
+      "properties": {
+        "refreshed_at": { "type": "string", "format": "date-time" },
+        "source_dirs": { "type": "array", "items": { "type": "string" } },
+        "output": { "type": "string" },
+        "file_count": { "type": "integer" },
+        "line_count": { "type": "integer" }
+      }
+    },
+    "pending_migrations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Migrations NOT yet absorbed into baseline. After refreshdb.sh these become empty."
+    },
+    "compatibility_note": { "type": "string" }
+  }
+}

@@ -1,0 +1,105 @@
+{
+  "storyDetail": {
+    "missingId": "Fehlende Story-ID in der URL",
+    "notFound": "Geschichte nicht gefunden.",
+    "backToList": "Alle Geschichten",
+    "stackBadge": "Stapelvorgabe",
+    "studyLink": "Verknüpfte Studie",
+    "stackRedirectError": "Die Stack-default story id konnte nicht aufgelöst werden: {{message}}",
+    "stackRedirectEmpty": "ensure_stack_default_story hat keine ID zurückgegeben; überprüfen Sie die Dienstberechtigungen.",
+    "tabs": {
+      "overview": "Übersicht",
+      "timeline": "Zeitleiste",
+      "knowledge": "Wissen",
+      "rulesets": "Regelwerke",
+      "bindings": "Bindungen",
+      "hippocampus": "Hippocampus"
+    },
+    "timeline": {
+      "feedTitle": "Aktivitäts-Feed",
+      "railTitle": "Verzweigung + Einsatz",
+      "empty": "Für diese Geschichte wurden noch keine Ereignisse aufgezeichnet. AISHA wird diesen Feed während ihrer Arbeit auffüllen.",
+      "railEmpty": "Es wurden noch keine Anwendungen bereitgestellt, die mit dieser Geschichte verknüpft sind.",
+      "branch": "Zweigstelle",
+      "active": "Aktiv",
+      "lastSwitch": "Letzter Schalter",
+      "lastRollback": "Letzter Rollback",
+      "noActivity": "Noch keine Einsatztätigkeit"
+    },
+    "overview": {
+      "summary": "Zusammenfassung",
+      "summaryHint": "Aktueller Stand der Geschichte. Live-aktualisiert von partner_stories.",
+      "meta": "Meta",
+      "starred": "Starred",
+      "branch": "Zweigstelle",
+      "noBranch": "Keine Verzweigung verbunden",
+      "lastActivity": "Letzte Aktivität"
+    },
+    "knowledge": {
+      "empty": "Noch keine Wissensobjekte. Fügen Sie eines hinzu, um AISHA einen geschichtsspezifischen Kontext zu geben, aus dem es abgerufen werden kann.",
+      "create": "Wissensartikel hinzufügen",
+      "edit": "Bearbeiten",
+      "archive": "Archiv",
+      "save": "Speichern Sie",
+      "cancel": "Abbrechen",
+      "title": "Titel",
+      "titlePlaceholder": "Kurzer beschreibender Titel",
+      "itemType": "Typ",
+      "category": "Kategorie",
+      "categoryPlaceholder": "z.B. ux, Sicherheit, Einsatz",
+      "tags": "Tags (durch Komma getrennt)",
+      "body": "Körper (Abschrift)",
+      "bodyPlaceholderCreate": "## Überschrift\n\nVollständiger Markdown-Text, der von AISHA abgerufen werden kann.",
+      "bodyPlaceholderEdit": "Leer lassen, um den bestehenden Textkörper beizubehalten; neuen Inhalt eingeben, der ersetzt werden soll.",
+      "editorTitleCreate": "Neuer Wissensartikel",
+      "editorTitleEdit": "Wissensartikel bearbeiten",
+      "editorHint": "Alle Felder werden geprüft. Der Textkörper besteht aus Markdown; Tags werden als ai_context_tags[] gespeichert, um den Abruf zu erleichtern.",
+      "noTags": "Keine Tags",
+      "verified": "verifiziert",
+      "verifiedTooltip": "Überprüft und verifiziert",
+      "quarantined": "unter Quarantäne gestellt",
+      "quarantinedTooltip": "Ausgeschlossen vom Abruf bis zur Überprüfung durch den Menschen",
+      "fileUploadTitle": "Datei zu Ragnarok hochladen KB",
+      "fileUploadHint": "Dokumente werden von Ragnarok in Chunks + Einbettungen verarbeitet, die auf diese Geschichte zugeschnitten sind.",
+      "uploading": "Hochladen.."
+    },
+    "rulesets": {
+      "empty": "Es sind noch keine Regelsätze gebunden. AISHA fügt automatisch Regelsätze hinzu, wenn sie gegen diese Geschichte läuft.",
+      "bindingTitle": "Regelsatzbindung",
+      "bindingBy": "von",
+      "noRules": "Keine Regeln in dieser Bindung"
+    },
+    "bindings": {
+      "empty": "Noch keine Bot↔KB-Bindungen für diese Geschichte konfiguriert. Binden Sie Expertenregeln an Agenten, um das Verhalten von AISHA zu gestalten.",
+      "active": "aktiv",
+      "agentHint": "Expertenregeln für diesen Agenten",
+      "priority": "priorität",
+      "global": "weltweit",
+      "globalTooltip": "Globale Bindung (gilt für alle Geschichten)",
+      "enable": "Aktivieren Sie",
+      "disable": "Deaktivieren Sie"
+    },
+    "hippocampus": {
+      "empty": "Für diese Geschichte wurden noch keine Hippocampus-Signale erfasst. AISHA schreibt hier, wie sie aus Interaktionen lernt.",
+      "agentHint": "Gedächtnissignale, die von diesem Mittel im Hippocampus erfasst werden",
+      "avgImportance": "Durchschnittliche Bedeutung",
+      "expires": "läuft ab",
+      "reveal": "Enthüllen Sie",
+      "hide": "Ausblenden",
+      "promote": "Fördern Sie",
+      "suspend": "Aussetzen",
+      "forget": "Vergessen Sie"
+    },
+    "faithfulness": {
+      "title": "Treue - letzte 50 Runden",
+      "noData": "Noch keine Daten zur Treue. Die Punkte sammeln sich an, wenn AISHA die Geschichten verarbeitet.",
+      "error": "Konnte keine Treuedaten laden.",
+      "noScore": "-",
+      "high": "Hohes Vertrauen",
+      "medium": "Mittleres Vertrauen",
+      "low": "Geringes Vertrauen - Überprüfung",
+      "noData_tier": "Keine Daten",
+      "avg": "Durchschnitt"
+    }
+  }
+}

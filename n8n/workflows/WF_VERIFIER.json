@@ -1,0 +1,197 @@
+{
+  "name": "WF_VERIFIER",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "vf-trigger",
+      "name": "Execute Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare context for verifier agent\nconst input = $input.item.json;\n\n// Find dev_patch result from previous steps\nconst devPatchResult = (input.previous_results || []).find(\n  r => r.agent_slug === 'dev_patch'\n);\n\nconst chatInput = [\n  `[VERIFIER AGENT] Verify changes for run ${input.run_id}`,\n  `Task: ${input.task_kind}`,\n  input.story_id ? `Story ID: ${input.story_id}` : null,\n  `Risk Profile: ${input.risk_profile}`,\n  '',\n  devPatchResult ? `Branch: ${devPatchResult.result?.branch || 'unknown'}` : 'No dev_patch result found',\n  devPatchResult ? `Files modified: ${JSON.stringify(devPatchResult.result?.files_modified || [])}` : '',\n  devPatchResult ? `Patch summary: ${devPatchResult.result?.patch_summary || 'N/A'}` : '',\n  '',\n  'Instructions:',\n  '1. Review the changes against project rules (RPC-only, i18n, type safety)',\n  '2. Verify TypeScript compilation would pass',\n  '3. Verify relevant tests would pass',\n  '4. Check for security issues (no PII in logs, RLS, audit journal)',\n  '5. Return: { passed: boolean, issues: string[], verification_summary: string }'\n].filter(Boolean).join('\\n');\n\nreturn {\n  json: {\n    chatInput,\n    run_id: input.run_id,\n    story_id: input.story_id,\n    agent_slug: 'verifier',\n    branch: devPatchResult?.result?.branch || null,\n    session_id: `verifier-${input.run_id}`\n  }\n};"
+      },
+      "id": "vf-prepare",
+      "name": "Prepare Verify Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are the **verifier** agent in the AISHA pipeline. Your role is to verify code changes meet quality standards.\n\nYou verify:\n1. TypeScript strict compliance (no any, proper types)\n2. RPC-only pattern adherence (no .from().select())\n3. i18n compliance (no hardcoded strings in JSX)\n4. Security: no PII in logs, audit journal for sensitive ops, RLS\n5. Test coverage: relevant tests exist and would pass\n6. Code hygiene: no console.log, no @ts-ignore, no emoji in UI\n\nBe strict but fair. Report issues with specific file/line references.\nReturn a structured verdict: passed (boolean) + list of issues.",
+          "maxIterations": 8
+        }
+      },
+      "id": "vf-agent",
+      "name": "Verifier Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "routingStrategy": "reasoning",
+        "options": {
+          "temperature": 0.1,
+          "maxOutputTokens": 4096,
+          "maxRetries": 2
+        }
+      },
+      "id": "vf-llm",
+      "name": "Reasoning LLM",
+      "type": "n8n-nodes-aisha.aishaLlmRouter",
+      "typeVersion": 1,
+      "position": [
+        500,
+        520
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "__REMAP__",
+          "name": "OpenAi account"
+        },
+        "googlePalmApi": {
+          "id": "__REMAP__",
+          "name": "Google Gemini(PaLM) Api account"
+        },
+        "anthropicApi": {
+          "id": "__REMAP__",
+          "name": "Anthropic account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "toolName": "search_knowledge",
+        "toolDescription": "Search the AISHA knowledge base for verification rules and compliance patterns",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/functions/v1/mcp-knowledge-server",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "body": "={{ JSON.stringify({ method: 'tools/call', params: { name: 'search_knowledge', arguments: { query: $fromAI('query', 'Search query for verification rules') } } }) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "vf-tool-kb",
+      "name": "Knowledge Search",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [
+        700,
+        520
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse verifier agent output into structured result\nconst agentResult = $('Verifier Agent').item.json;\nconst output = agentResult.output || agentResult.text || '';\n\n// Try to extract structured data from agent output\nlet passed = true;\nlet issues = [];\n\n// Simple heuristic: if output contains 'fail', 'issue', 'violation' => not passed\nconst lowerOutput = output.toLowerCase();\nif (lowerOutput.includes('fail') || lowerOutput.includes('violation') || lowerOutput.includes('not passed')) {\n  passed = false;\n}\n\n// Try to parse JSON from output\ntry {\n  const jsonMatch = output.match(/\\{[\\s\\S]*\\}/);\n  if (jsonMatch) {\n    const parsed = JSON.parse(jsonMatch[0]);\n    if (typeof parsed.passed === 'boolean') passed = parsed.passed;\n    if (Array.isArray(parsed.issues)) issues = parsed.issues;\n  }\n} catch (e) {\n  // Not JSON, use heuristic\n}\n\nreturn {\n  json: {\n    agent_slug: 'verifier',\n    passed,\n    issues,\n    verification_summary: output,\n    verdict: passed ? 'pass' : 'fail'\n  }\n};"
+      },
+      "id": "vf-result",
+      "name": "Build Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Execute Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare Verify Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Verify Context": {
+      "main": [
+        [
+          {
+            "node": "Verifier Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reasoning LLM": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Verifier Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Search": {
+      "ai_tool": [
+        [
+          {
+            "node": "Verifier Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verifier Agent": {
+      "main": [
+        [
+          {
+            "node": "Build Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Prague"
+  },
+  "tags": [
+    {
+      "name": "agent"
+    },
+    {
+      "name": "pipeline"
+    },
+    {
+      "name": "aisha"
+    }
+  ]
+}

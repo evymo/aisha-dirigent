@@ -1,0 +1,56 @@
+{
+  "flowboard": {
+    "palette": {
+      "title": "Knotenpalette",
+      "subtitle": "= Verbundener Plugin-Katalog"
+    },
+    "kind": {
+      "trigger": "Auslöser",
+      "agent": "Agenten",
+      "tool": "MCP-Werkzeuge",
+      "action": "Aktionen",
+      "control": "Steuerung",
+      "gate": "Tore"
+    },
+    "canvas": {
+      "cannotConnect": "Verbindung zwischen {{from}} und {{to}} kann nicht hergestellt werden.",
+      "invalidConnection": "Ungültige Portverbindung.",
+      "valid": "gültig",
+      "errors": "{{count}}-Fehler",
+      "descriptionPlaceholder": "Beschreiben Sie, was der Ablauf bewirken soll…",
+      "askAisha": "Frag AISHA",
+      "save": "Speichern"
+    },
+    "page": {
+      "savedFlows": "Gespeicherte Abläufe",
+      "newFlow": "Neuer Ablauf",
+      "empty": "Noch keine Strömungen",
+      "loading": "Palette wird geladen…",
+      "saved": "Durchfluss gespeichert",
+      "saveFailed": "Der Ablauf konnte nicht gespeichert werden",
+      "loadFailed": "Der Ablauf konnte nicht geladen werden",
+      "run": "Laufen",
+      "running": "Laufen…",
+      "runStarted": "Durchlauf gestartet",
+      "runAwaitingApproval": "Ausführung angehalten – wartet auf Genehmigung",
+      "runFailed": "Der Ablauf konnte nicht ausgeführt werden",
+      "runResumed": "Der Durchfluss wurde wiederhergestellt"
+    },
+    "block": {
+      "consentTitle": "Genehmigung erforderlich",
+      "approved": "genehmigt",
+      "awaiting": "zur Genehmigung ausstehend",
+      "approveButton": "Genehmigen und fortfahren",
+      "runTitle": "Automatisierungslauf",
+      "stepTitle": "Automatisierungsschritt",
+      "status": {
+        "executed": "fertig",
+        "approved": "genehmigt",
+        "error": "Fehler",
+        "running": "Laufen",
+        "compliance_checkpoint": "Konformitätsprüfung",
+        "awaiting_approval": "zur Genehmigung ausstehend"
+      }
+    }
+  }
+}

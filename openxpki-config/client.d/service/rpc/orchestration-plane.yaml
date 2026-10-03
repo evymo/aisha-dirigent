@@ -1,0 +1,89 @@
+global:
+    realm: orchestration-plane
+    # servername must match the server-side config filename (realm.tpl/rpc/generic.yaml)
+    # so the certificate_enroll workflow finds rpc.generic.* (HMAC, policy, profile_map).
+    # Using the URL endpoint name ('orchestration-plane') would give rpc.orchestration-plane.*
+    # which doesn't exist — workflow hangs waiting for manual approval → HTTP 504.
+    servername: generic
+
+locale:
+    language: en_US
+
+logger:
+    level: INFO
+
+auth:
+    stack:
+     - _System
+
+input:
+    allow_raw_post: 1
+    parse_depth: 5
+
+# Section must exist to allow JOSE post but there are no settings yet
+jose: ~
+
+output:
+    use_http_status_codes: 1
+    headers: all
+
+# Method definitions — required on every RPC endpoint YAML. OpenXPKI 3.x
+# client routes `/rpc/<endpoint>/<method>` by loading
+# `client.d/service/rpc/<endpoint>.yaml` and looking up `<method>:` as a
+# top-level key. Without these blocks the client returns HTTP 404 for any
+# method call (and the per-realm endpoint is effectively unreachable).
+# Definitions kept identical to generic.yaml — only `global.realm` differs.
+
+RequestCertificate:
+    workflow: certificate_enroll
+    input:
+      - pkcs10
+      - profile
+      - comment
+      - signature
+    output:
+      - cert_identifier
+      - certificate
+      - chain
+      - error_code
+      - transaction_id
+    env:
+      - signer_cert
+    # server is NOT in env — it comes from global.servername above.
+    # Having both 'servername' and env:[server] is mutually exclusive in OpenXPKI
+    # Base.pm and throws a fatal exception → error 50010.
+    pickup:
+        workflow: check_enrollment
+        input:
+          - pkcs10
+          - transaction_id
+
+RevokeCertificate:
+    workflow: certificate_revocation_request_v2
+    input:
+      - cert_identifier
+      - reason_code
+      - comment
+      - invalidity_time
+    env:
+      - signer_cert
+    output:
+      - error_code
+
+TestConnection:
+    workflow: connection_test
+    env:
+      - signer_cert
+      - signer_chain
+    output:
+      - signer_cert
+      - signer_chain
+      - signer_trusted
+      - signer_authorized
+      - signer_validity_ok
+      - signer_revoked
+      - signer_cert_identifier
+      - signer_subject
+      - signer_subject_key_identifier
+      - signer_in_current_realm
+      - error_code

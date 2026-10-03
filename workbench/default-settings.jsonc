@@ -1,0 +1,44 @@
+{
+  "editor.fontFamily": "'Fira Code', 'Cascadia Code', Menlo, Monaco, 'Courier New', monospace",
+  "editor.fontSize": 14,
+  "editor.lineHeight": 1.6,
+  "workbench.colorTheme": "Default Dark Modern",
+  "workbench.startupEditor": "none",
+  "workbench.tips.enabled": false,
+  "telemetry.telemetryLevel": "off",
+  "update.mode": "manual",
+  "window.titleBarStyle": "custom",
+  "window.title": "${activeEditorShort}${separator}${rootName}${separator}AISHA Workbench",
+  "window.commandCenter": true,
+  // AISHA brand IDE chrome — editorial near-black + orange (the brand
+  // design system). Mirrors packages/design-tokens → dist/vscode-colors.json
+  // (npm run gen:tokens). Old navy/gold palette retired with the old logo.
+  "workbench.colorCustomizations": {
+    "titleBar.activeBackground": "#0E0E10",
+    "titleBar.activeForeground": "#e6e6e6",
+    "titleBar.inactiveBackground": "#0E0E10cc",
+    "activityBar.background": "#0E0E10",
+    "activityBar.foreground": "#FF6A1A",
+    "activityBarBadge.background": "#FF6A1A",
+    "activityBarBadge.foreground": "#ffffff",
+    "statusBar.background": "#0E0E10",
+    "statusBar.foreground": "#e6e6e6",
+    "sideBar.background": "#0A0A0C",
+    "sideBarSectionHeader.background": "#0E0E10",
+    "tab.activeBorderTop": "#FF6A1A",
+    "tab.activeBackground": "#0E0E10",
+    "focusBorder": "#FF6A1A",
+    "progressBar.background": "#FF6A1A",
+    "button.background": "#FF6A1A",
+    "button.foreground": "#ffffff",
+    "button.hoverBackground": "#E55A10",
+    "badge.background": "#FF6A1A",
+    "badge.foreground": "#ffffff"
+  },
+
+  // ── AISHA Dirigent — cloud backend defaults ──
+  // supabaseUrl enables bootstrap (anonKey is fetched automatically from .well-known)
+  "aisha.dirigent.supabaseUrl": "https://api.aisha.guru",
+  "aisha.dirigent.webUrl": "https://app.aisha.guru",
+  "aisha.dirigent.dashboardUrl": "https://appsmith.aisha.guru"
+}

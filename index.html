@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="%VITE_PUBLIC_BRAND_LANG%">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Brand identity (SEO + social cards) is injected at build time from
+      VITE_PUBLIC_BRAND_* env vars. Defaults preserve the upstream AISHA
+      / Evymo identity so a vanilla `git clone && build` reproduces the
+      original; instances override the same
+      env keys in their .env.coolify to bake their own SEO + social
+      previews into the shipped index.html — no runtime JS dependency
+      means crawlers + share previewers (Open Graph, Twitter Card, Slack
+      unfurl, Telegram preview) all see the right brand on first hit.
+
+      runtime <title> updates per-route still happen via the
+      useDocumentTitle hook + BrandContext, so navigation inside the
+      SPA keeps the title in sync with the current page subject and the
+      live brand. The static values here are the FIRST-PAINT fallback
+      and the source of truth for crawlers without a JS engine.
+
+      Per-hostname SEO (two brand hostnames on
+      the same single build) is NOT solved here — it requires either
+      SSR or an edge worker rewriting HTML per Host header. The
+      umbrella brand is the build-time default for that deployment;
+      therapy-first variant inherits the umbrella SEO until per-host
+      rendering lands. Tracked separately.
+    -->
+    <!--
+      Barva prvního vykreslení. Bez tohohle bloku drží `--primary` až do
+      doběhnutí RPC platformní oranžovou z src/index.css a načítací spinner
+      svítí cizí barvou (naměřeno 2026-08-30 na živém webu instance).
+      Runtime branding (BrandingThemeProvider) tenhle blok později přebije —
+      je unlayered a v <head> později, takže pořadí sedí a nic se needituje
+      dvakrát. Tady jde jen o ten úsek PŘED odpovědí API.
+    -->
+    <style>
+      :root { --primary: %VITE_PUBLIC_BRAND_PRIMARY%; --ring: %VITE_PUBLIC_BRAND_PRIMARY%; --brand: %VITE_PUBLIC_BRAND_PRIMARY%; }
+    </style>
+    <title>%VITE_PUBLIC_BRAND_TITLE%</title>
+    <meta name="description" content="%VITE_PUBLIC_BRAND_DESCRIPTION%">
+    <meta name="author" content="%VITE_PUBLIC_BRAND_AUTHOR%" />
+    <meta name="theme-color" content="%VITE_PUBLIC_BRAND_THEME_COLOR%" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="%VITE_PUBLIC_BRAND_OG_LOCALE%" />
+    <meta property="og:site_name" content="%VITE_PUBLIC_BRAND_OG_SITE_NAME%" />
+    <meta property="og:title" content="%VITE_PUBLIC_BRAND_TITLE%">
+    <meta property="og:description" content="%VITE_PUBLIC_BRAND_OG_DESCRIPTION%">
+    <meta property="og:image" content="%VITE_PUBLIC_BRAND_OG_IMAGE%">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="%VITE_PUBLIC_BRAND_TITLE%">
+    <meta name="twitter:description" content="%VITE_PUBLIC_BRAND_OG_DESCRIPTION%">
+    <meta name="twitter:image" content="%VITE_PUBLIC_BRAND_OG_IMAGE%">
+
+    <!--
+      ⛔ ŽÁDNÝ FONT Z CDN. Naměřeno 2026-08-10 na nasazené instanci:
+      tady stál <link> na Google Fonts (DM Sans + Playfair Display). CSP nasazená
+      nginxem (docker/nginx.conf) má `style-src 'self' 'unsafe-inline'`, takže ten
+      stylesheet prohlížeč ODMÍTL na každém hostu:
+        "Loading the stylesheet '…fonts.googleapis.com…' violates the following
+         Content-Security-Policy directive: style-src 'self' 'unsafe-inline'"
+      Obě rodiny navíc neměl kdo použít — `git grep` je našel v NULA CSS souborech
+      mimo tenhle odkaz. Stahovaly se tedy dvě rodiny, které nic nekreslí, a i
+      kdyby je někdo použil, nedoletěly by.
+
+      Písmo bere aplikace z `src/index.css` → `/fonts/nunito-sans/fonts.css`
+      (přibalený OSS řez, SIL OFL). Ověřeno v prohlížeči nad nasazenou instancí:
+      `document.fonts` hlásí 2 načtené řezy a `body` má "Nunito Sans".
+
+      Instance, která chce vlastní písmo, ho NEPŘIDÁVÁ sem — má na to kanál
+      `branding_profiles.font_faces` → `buildFontFaceCss` (viz
+      docs/branding/PER_INSTANCE_WEBFONTS.md). Ten emituje @font-face za běhu
+      a `font-src 'self' data:` znamená, že soubor musí hostit instance u sebe.
+      Hlídá to brána `zadny-font-z-ciziho-puvodu`.
+    -->
+</head>
+
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

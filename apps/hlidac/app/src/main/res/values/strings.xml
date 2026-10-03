@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stav_neni_spravce">This app does not manage the tablet. Set the tablet up from the QR code (factory reset, then tap the welcome screen six times).</string>
+    <string name="servis_nadpis">Service mode — kiosk is off</string>
+    <string name="aplikace_verze">App %1$s: %2$s</string>
+    <string name="aplikace_chybi">App %1$s is not installed.</string>
+    <string name="chybi_pin">Technician PIN is missing — the kiosk cannot be locked. Set the tablet up again from a QR code with a PIN.</string>
+    <string name="okno_info">Night update window: %1$s (only while charging)</string>
+    <string name="okno_odmitnuto">✗ Night window from the QR code rejected (%1$s) — %2$s applies. Create a new QR code with a window between 00:00 and 23:59.</string>
+    <string name="wifi">Wi-Fi</string>
+    <string name="nastaveni">Settings</string>
+    <string name="spustit_kiosk">Start kiosk</string>
+    <string name="uvolnit">Release tablet</string>
+    <string name="uvolnit_potvrzeni">Release the tablet? The kiosk ends and this app stops managing the device. Managing it again needs a factory reset and the QR code.</string>
+    <string name="spoustim_za">Starting %1$s in %2$d s</string>
+    <string name="servis_napoveda">Service: tap the title or this text %1$d times, then enter the technician PIN.</string>
+    <string name="okno_aktualizace">Night update in progress. The app starts again at %1$s.</string>
+    <string name="spustit_hned">Start now</string>
+    <string name="pin_nadpis">Technician PIN</string>
+    <string name="pin_spatne">Wrong PIN.</string>
+    <string name="pin_zamceno">Too many attempts. Try again in %1$d min.</string>
+    <string name="zamek_nejde_ukoncit">The lock could not be ended: %1$s</string>
+    <string name="roz_nacitam">Loading the app list…</string>
+    <string name="roz_bez_vybavy">Kiosk Admin does not know the platform address (the QR code carried no configuration).</string>
+    <string name="roz_seznam_chyba">The app list could not be loaded: %1$s</string>
+    <string name="roz_zadna">The platform offers no apps.</string>
+    <string name="roz_neuplna">An entry in the app list is incomplete.</string>
+    <string name="roz_aktualni">%1$s: version %2$d is current.</string>
+    <string name="roz_stahuji">%1$s: downloaded %2$d of %3$d MB</string>
+    <string name="roz_selhalo">%1$s: %2$s</string>
+    <string name="roz_otisk">%1$s: checksum does not match — package discarded.</string>
+    <string name="roz_odeslano">%1$s: handed to Android for installation…</string>
+    <string name="roz_nainstalovano">%1$s: installed.</string>
+    <string name="roz_ceka_potvrzeni">%1$s: Android asks to confirm the installation.</string>
+    <string name="roz_instalace_chyba">%1$s: installation FAILED (status %2$d): %3$s</string>
+    <string name="roz_chyba">Distribution failed: %1$s</string>
+    <string name="roz_hlidac_aktualizovan">Kiosk Admin updated to %1$s (%2$d).</string>
+    <string name="roz_sebe_odlozeno">Kiosk Admin will update itself next time — still installing: %1$s</string>
+    <string name="diag_hlidac">Kiosk Admin: %1$s (%2$d)</string>
+    <string name="diag_nabidka">Platform offers: %1$s</string>
+    <string name="diag_nabidka_nic">Platform offers: not loaded yet</string>
+    <string name="diag_api">Platform: %1$s</string>
+    <string name="diag_api_chybi">Platform: unknown (no configuration from QR)</string>
+    <string name="diag_zarizeni">Android %1$s · %2$s · %3$s</string>
+    <string name="diag_posledni">Last step: %1$s</string>
+    <string name="diag_posledni_nic">Last step: nothing yet</string>
+    <string name="aktualizovat_ted">Update now</string>
+    <string name="aktualizuji">Updating…</string>
+    <string name="kroky_nastaveni_prime">1. Keep the tablet on Wi-Fi.
+2. Apps install by themselves — progress is shown above. If nothing happens, tap Update now.
+3. Start the kiosk.</string>
+    <string name="diag_webview">WebView: %1$s</string>
+    <string name="diag_webview_chybi">WebView: none — signing in will not work</string>
+</resources>

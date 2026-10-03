@@ -1,0 +1,376 @@
+{
+  "builder": {
+    "panels": {
+      "blocks": "Библиотека блоков",
+      "properties": "Свойства",
+      "activity": "Активность агентов"
+    },
+    "blocks": {
+      "install-grid": {
+        "title": "Сетка установки",
+        "description": "Сетка карточек каналов установки и загрузки"
+      },
+      "modes": {
+        "title": "Карточки режимов",
+        "description": "Четыре нумерованные карточки режимов с тегами и чипами"
+      },
+      "cost-pillars": {
+        "title": "Столпы ценности",
+        "description": "Три столпа с крупными показателями"
+      },
+      "hero": {
+        "title": "Hero-секция",
+        "description": "Баннер на всю ширину с заголовком и CTA"
+      },
+      "features": {
+        "title": "Сетка функций",
+        "description": "Сетка карточек функций с иконками"
+      },
+      "pricing": {
+        "title": "Таблица цен",
+        "description": "Сравнительные тарифные планы"
+      },
+      "cta": {
+        "title": "Призыв к действию",
+        "description": "Выделенная секция действия"
+      },
+      "testimonials": {
+        "title": "Отзывы",
+        "description": "Карусель отзывов клиентов"
+      },
+      "faq": {
+        "title": "Часто задаваемые вопросы",
+        "description": "Аккордеон часто задаваемых вопросов"
+      },
+      "footer": {
+        "title": "Нижний колонтитул",
+        "description": "Нижний колонтитул с ссылками и информацией"
+      },
+      "contact": {
+        "title": "Контактная форма",
+        "description": "Форма для сбора запросов"
+      },
+      "trust-bar": {
+        "title": "Панель доверия",
+        "description": "Полоска с иконками отраслей"
+      },
+      "pillars": {
+        "title": "Столпы",
+        "description": "Три карточки ценностного предложения"
+      },
+      "how-it-works": {
+        "title": "Как это работает",
+        "description": "Пошаговый процесс"
+      },
+      "about": {
+        "title": "О нас",
+        "description": "Ценности и миссия компании"
+      },
+      "specialist-guild": {
+        "title": "Гильдия специалистов",
+        "description": "Уровни членства специалистов"
+      },
+      "hiring": {
+        "title": "Вакансии",
+        "description": "Карточки открытых позиций"
+      },
+      "stats-counter": {
+        "title": "Счётчик статистики",
+        "description": "Анимированная числовая статистика"
+      },
+      "project-configurator": {
+        "title": "Конфигуратор проекта",
+        "description": "Интерактивный выбор опций проекта"
+      },
+      "meeting": {
+        "title": "Блок встречи",
+        "description": "Планирование и управление встречами"
+      },
+      "questionnaire": {
+        "title": "Анкета",
+        "description": "Динамический блок опроса или формы"
+      },
+      "consent": {
+        "title": "Блок согласия",
+        "description": "Обмен данными и согласие на конфиденциальность"
+      },
+      "action": {
+        "title": "Блок действия",
+        "description": "Запрос действия пользователя: загрузка или планирование"
+      },
+      "info": {
+        "title": "Информационный блок",
+        "description": "Статический информационный контент"
+      },
+      "hero-slides": {
+        "title": "Слайды героя",
+        "description": "Динамическая карусель со слайдами героев из бэкенда"
+      },
+      "news-list": {
+        "title": "Список новостей",
+        "description": "Публикация новостных статей из бэкенда"
+      },
+      "contact-form": {
+        "title": "Контактная форма",
+        "description": "Интерактивная контактная форма с валидацией"
+      },
+      "archive-preview": {
+        "title": "Предварительный просмотр архива",
+        "description": "Архивирование списков документов из бэкенда"
+      },
+      "knowledge-preview": {
+        "title": "Темы знаний",
+        "description": "Вывод списка тем базы знаний из бэкенда"
+      },
+      "faq-accordion": {
+        "title": "Вопросы и ответы Аккордеон",
+        "description": "Часто задаваемые вопросы со сворачиваемыми категориями"
+      },
+      "timeline": {
+        "title": "Временная шкала",
+        "description": "Вертикальная шкала времени с событиями и вехами"
+      },
+      "data-table": {
+        "title": "Таблица данных",
+        "description": "Таблица со столбцами и строками для структурированных данных"
+      },
+      "ordered-list": {
+        "title": "Упорядоченный список",
+        "description": "Пронумерованные шаги с названиями и описаниями"
+      },
+      "product-catalog": {
+        "title": "Каталог продукции",
+        "description": "Сетка продуктов магазина с ценами и значками"
+      },
+      "news-browser": {
+        "title": "Браузер новостей",
+        "description": "Полный список новостных статей с карточками"
+      },
+      "knowledge-browser": {
+        "title": "Браузер знаний",
+        "description": "Темы знаний с поиском и фильтром видимости"
+      },
+      "archive-browser": {
+        "title": "Браузер архивов",
+        "description": "Полный архив с 4-осевой фильтрацией"
+      },
+      "studies-browser": {
+        "title": "Studies Browser",
+        "description": "Studies listing with tab filtering and funding progress"
+      },
+      "guild-directory": {
+        "title": "Каталог гильдий",
+        "description": "Специализированная торговая площадка с фильтрами и пагинацией"
+      },
+      "process-loop": {
+        "title": "Цикл процесса",
+        "description": "Непрерывный цикл пронумерованных шагов"
+      },
+      "layer-stack": {
+        "title": "Слойная структура",
+        "description": "Слои, расположенные друг над другом, каждый из которых опирается на предыдущий"
+      },
+      "signal-cards": {
+        "title": "Сигнальные карточки",
+        "description": "Ряд метрических сигнальных карточек"
+      },
+      "announcement-bar": {
+        "title": "Панель объявлений",
+        "description": "Узкий баннер во всю ширину страницы со ссылкой"
+      },
+      "aisha-pruvodce": {
+        "title": "Руководство по AISHA",
+        "description": "13-страничное руководство по ИИ для первых посетителей + тест из пяти вопросов (интерактивная презентация)"
+      },
+      "discussion-thread": {
+        "title": "Обсуждение",
+        "description": "Сообщения пользователей в виде веток под этим узлом контента"
+      }
+    },
+    "traits": {
+      "variant": "Вариант",
+      "bgColor": "Цвет фона",
+      "bgGradient": "Фоновый градиент",
+      "sectionPadding": "Прокладка секций",
+      "cssClass": "Класс CSS",
+      "colorScheme": "Цветовая схема"
+    },
+    "traitGroups": {
+      "template": "Шаблон",
+      "config": "Конфигурация",
+      "layout": "Макет",
+      "other": "Прочее"
+    },
+    "categories": {
+      "web": "Веб-блоки",
+      "workflow": "Блоки процессов"
+    },
+    "actions": {
+      "save": "Сохранить холст",
+      "publish": "Опубликовать",
+      "preview": "Предпросмотр",
+      "addBlock": "Добавить блок",
+      "removeBlock": "Удалить блок",
+      "undo": "Отменить",
+      "redo": "Повторить"
+    },
+    "status": {
+      "saving": "Сохранение...",
+      "saved": "Все изменения сохранены",
+      "error": "Ошибка сохранения",
+      "loading": "Загрузка холста...",
+      "translationsDenied": "Сохранено, а тексты нет — для записи текстов нужна роль admin или staff. Изменения остались только в этом холсте."
+    },
+    "agents": {
+      "blockAdded": "{{agent}} добавил(а) {{block}}",
+      "propertyChanged": "{{agent}} изменил(а) {{property}} в {{block}}",
+      "blockRemoved": "{{agent}} удалил(а) {{block}}",
+      "approved": "{{agent}} одобрил(а) {{block}}",
+      "rejected": "{{agent}} отклонил(а) {{block}}",
+      "occipitumProposal": "{{agent}} предложил новый дизайн холста"
+    },
+    "variants": {
+      "default": "По умолчанию",
+      "hero": {
+        "splitLeft": "Разделённый слева",
+        "minimal": "Минимальный"
+      },
+      "trust-bar": {
+        "statBar": "Панель статистики"
+      },
+      "pillars": {
+        "borderList": "Список с рамкой"
+      },
+      "how-it-works": {
+        "timelineSteps": "Шаги на таймлайне"
+      },
+      "about": {
+        "proseCentered": "Центрированный текст"
+      },
+      "specialist-guild": {
+        "horizontalBar": "Горизонтальная полоса"
+      },
+      "hiring": {
+        "listRows": "Строки списка"
+      },
+      "stats-counter": {
+        "cardGrid": "Сетка карточек"
+      },
+      "features": {
+        "textRows": "Текстовые строки"
+      },
+      "pricing": {
+        "horizontalCompare": "Горизонтальное сравнение"
+      },
+      "cta": {
+        "splitMedia": "Разделённое медиа"
+      },
+      "testimonials": {
+        "cardGrid": "Сетка карточек"
+      },
+      "faq": {
+        "twoColumn": "Два столбца"
+      },
+      "footer": {
+        "stacked": "Многослойный"
+      },
+      "contact": {
+        "splitInfo": "Разделённая информация"
+      },
+      "project-configurator": {
+        "stepWizard": "Пошаговый мастер"
+      },
+      "timeline": {
+        "horizontal": "Горизонтальный"
+      },
+      "data-table": {
+        "stripedCompact": "Полосатый компактный"
+      },
+      "ordered-list": {
+        "cardSteps": "Шаги-карточки"
+      }
+    },
+    "empty": {
+      "title": "Холст пока пуст",
+      "description": "Перетащите блоки из библиотеки, чтобы начать"
+    },
+    "sidebar": {
+      "blocks": "Блоки",
+      "styles": "Стили",
+      "traits": "Настройки",
+      "layers": "Слои",
+      "i18n": "Переводы",
+      "selectElement": "Выберите элемент для редактирования его свойств",
+      "emptyCanvas": "Холст пуст"
+    },
+    "i18n": {
+      "injectTranslations": "Предпросмотр переводов",
+      "noKeys": "На холсте нет переводимых элементов",
+      "keysFound": "{{count}} переводимых ключей"
+    },
+    "devices": {
+      "desktop": "Настольный компьютер",
+      "tablet": "Планшет",
+      "mobile": "Мобильный"
+    },
+    "pageSettings": {
+      "background": "Справочная информация",
+      "backgroundPlaceholder": "например, #fafafa или linear-gradient(...)",
+      "className": "Page CSS Class",
+      "classNamePlaceholder": "например, целевая страница",
+      "styleJson": "Стиль страницы JSON",
+      "styleJsonPlaceholder": "например, {\"maxWidth\": \"1200px\"}",
+      "invalidJson": "JSON стиля страницы должен быть корректным объектом JSON"
+    },
+    "schemes": {
+      "default": "По умолчанию",
+      "warmSunset": "Тёплый закат",
+      "coolOcean": "Прохладный океан",
+      "forestGreen": "Лесная зелень",
+      "darkElegant": "Тёмная элегантность",
+      "softLavender": "Мягкая лаванда",
+      "neutralSlate": "Нейтральный сланец"
+    },
+    "runtime": {
+      "limit": "Лимит элементов",
+      "columns": "Столбцы",
+      "autoplay": "Автовоспроизведение",
+      "interval": "Интервал (мс)",
+      "skipHref": "Адрес ссылки «Пропустить» (URL)",
+      "showFilters": "Показать фильтры",
+      "tag": "Закрепить за тегом",
+      "nodeType": {
+        "label": "Тип узла",
+        "news_article": "Новостная статья",
+        "web_page": "Веб-страница"
+      },
+      "nodeId": "ID узла"
+    },
+    "versions": {
+      "title": "История версий",
+      "restore": "Восстановить",
+      "restored": "Версия восстановлена",
+      "restoredDesc": "Страница восстановлена из выбранной версии.",
+      "restoreError": "Не удалось восстановить версию.",
+      "none": "Пока нет версий"
+    },
+    "templates": {
+      "title": "Шаблоны страниц",
+      "saveAs": "Сохранить как шаблон",
+      "namePlaceholder": "Название шаблона...",
+      "saved": "Шаблон сохранён",
+      "savedDesc": "Текущая страница сохранена как повторно используемый шаблон.",
+      "saveError": "Не удалось сохранить шаблон.",
+      "apply": "Применить",
+      "applied": "Шаблон применён",
+      "appliedDesc": "Шаблон применён к этой странице.",
+      "applyError": "Не удалось применить шаблон.",
+      "none": "Шаблоны недоступны"
+    },
+    "assets": {
+      "invalidType": "Неподдерживаемый тип файла",
+      "tooLarge": "Файл слишком большой (макс. 20 МБ)",
+      "uploadFailed": "Не удалось загрузить ассет"
+    }
+  }
+}

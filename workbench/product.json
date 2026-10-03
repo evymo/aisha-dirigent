@@ -1,0 +1,45 @@
+{
+  "nameShort": "AISHA Workbench",
+  "nameLong": "AISHA Workbench",
+  "applicationName": "aisha-workbench",
+  "dataFolderName": ".aisha-workbench",
+  "quality": "stable",
+  "urlProtocol": "aisha-workbench",
+  "reportIssueUrl": "${FORGEJO_BASE_URL}/aisha/aisha-workbench/issues",
+  "licenseUrl": "${FORGEJO_BASE_URL}/aisha/aisha-workbench/src/branch/main/LICENSE",
+  "serverLicense": [],
+  "serverLicensePrompt": "",
+  "darwinBundleIdentifier": "cz.id3a.aisha-workbench",
+  "win32AppUserModelId": "Evymo.AISHAWorkbench",
+  "win32DirName": "AISHA Workbench",
+  "win32NameVersion": "AISHA Workbench",
+  "win32ShellNameShort": "AISHA Workbench",
+  "win32MutexName": "aishaworkbench",
+  "win32RegValueName": "AISHAWorkbench",
+  "win32AppId": "{{E2A7D5C8-4F3B-4A9E-B1D6-8C2F5E7A9B3D}",
+  "extensionsGallery": {
+    "serviceUrl": "https://open-vsx.org/vscode/gallery",
+    "itemUrl": "https://open-vsx.org/vscode/item",
+    "resourceUrlTemplate": "https://open-vsx.org/vscode/unpkg/{publisher}/{name}/{version}/{path}",
+    "controlUrl": "",
+    "nlsBaseUrl": "",
+    "publisherUrl": ""
+  },
+  "extensionEnabledApiProposals": {},
+  "linkProtectionTrustedDomains": [
+    "https://*.${INTERNAL_TLD}",
+    "https://*.${PUBLIC_TLD}",
+    "https://*.evymo.com"
+  ],
+  "builtInExtensions": [],
+  "crashReporter": {
+    "productName": "aisha-workbench"
+  },
+  "enableTelemetry": false,
+  "sendASmile": {
+    "reportIssueUrl": "${FORGEJO_BASE_URL}/aisha/aisha-workbench/issues"
+  },
+  "updateUrl": "",
+  "checksumFailMoreInfoUrl": "${FORGEJO_BASE_URL}/aisha/aisha-workbench/wiki/Checksums",
+  "documentationUrl": "https://docs.evymo.com/workbench"
+}

@@ -1,0 +1,74 @@
+{
+  "rag": {
+    "baseline": {
+      "title": "Retrieval quality (last 7 days)",
+      "subtitle": "Nightly RAG eval against curated golden Q/A set",
+      "faithfulness": "Faithfulness",
+      "faithfulnessHint": "How much of the answer is supported by the retrieved context",
+      "answerRelevancy": "Answer relevancy",
+      "answerRelevancyHint": "How directly the answer addresses the question",
+      "contextPrecision": "Context precision",
+      "contextPrecisionHint": "Share of retrieved chunks that were relevant",
+      "contextRecall": "Context recall",
+      "contextRecallHint": "Share of needed information that was retrieved",
+      "compositeScore": "Composite score",
+      "evalRuns": "Eval runs",
+      "p90": "p90",
+      "p50": "p50",
+      "noData": "No eval data yet — run the nightly batch first",
+      "periodLabel": "Period",
+      "period24h": "Last 24 hours",
+      "period7d": "Last 7 days",
+      "period30d": "Last 30 days",
+      "embeddingModel": "Embedding model",
+      "llmModel": "LLM",
+      "allProfiles": "All profiles"
+    },
+    "chip": {
+      "high": "High faithfulness",
+      "medium": "Medium faithfulness",
+      "low": "Low faithfulness — verify before relying on this answer",
+      "noData": "Not evaluated",
+      "tooltip": "Faithfulness {{score}} · {{count}} citations"
+    },
+    "citations": {
+      "panelTitle": "Sources used",
+      "empty": "No citations recorded for this response",
+      "toggleShow": "Show sources",
+      "toggleHide": "Hide sources",
+      "openItem": "Open source",
+      "weight": "Weight {{value}}"
+    },
+    "feedback": {
+      "thumbsUp": "Answer was correct",
+      "thumbsDown": "Answer didn't match",
+      "reasonPlaceholder": "Optional: what was wrong?",
+      "submit": "Send feedback",
+      "saved": "Thanks, your feedback is logged"
+    },
+    "quarantine": {
+      "title": "Knowledge quarantine queue",
+      "subtitle": "Review items flagged by the ingestion safety scanner",
+      "queueTitle": "Flagged + quarantined items",
+      "queueDescription": "Items here are hidden from retrieval until reinstated",
+      "empty": "No flagged or quarantined items",
+      "score": "Safety score",
+      "reason": "Reason",
+      "reinstate": "Reinstate",
+      "reinstateReasonPlaceholder": "Why is this item safe? (audit trail)",
+      "reasonRequired": "Reinstate reason is required",
+      "confirmReinstate": "Reinstate item",
+      "reinstated": "Item reinstated",
+      "reinstatedDescription": "The item is now visible to retrieval again",
+      "reinstateError": "Failed to reinstate item"
+    },
+    "explainability": {
+      "panelTitle": "How this answer connects",
+      "empty": "No graph context — no upstream concepts or related runs were derived from the cited sources yet",
+      "depthLabel": "{{depth}} hop(s)",
+      "confidenceLabel": "{{pct}}% confidence",
+      "viaSeeds": "via {{labels}}{{extra}}",
+      "moreSeeds": " and {{n}} more"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+# Public keys to authenticate requests over the CLI interface
+auth:
+    admin:
+        key: |
+            -----BEGIN PUBLIC KEY-----
+            MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyTbzTBXvpzkX0obIK950sZOCtnGC
+            8xiSpZXWwmHVK7whZ1pHpCU2KQnVQFUGWFjcp+5+I3Yt/4WWGXnCHqMbgA==
+            -----END PUBLIC KEY-----
+        role: CA Operator

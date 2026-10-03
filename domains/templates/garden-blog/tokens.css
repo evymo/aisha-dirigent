@@ -1,0 +1,51 @@
+/* Garden blog — example template tokens. Brand-neutral, fork-freely.
+ * Warm, earthy palette for a hobby / gardening blog (light).
+ *
+ * Authored on :root so it matches the GrapesJS editor; PageRenderer maps :root →
+ * .gjs-page-content, so these cascade to BOTH the static chrome (via --color-*
+ * aliases) AND the live news-list runtime block (shadcn hsl(var(--token))).
+ * shadcn set MUST be bare-HSL triplets ("H S% L%"). */
+:root {
+  /* shadcn token set — consumed by the runtime React blocks (light garden). */
+  --background: 50 43% 97%;
+  --foreground: 107 20% 14%;
+  --card: 0 0% 100%;
+  --card-foreground: 107 20% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 107 20% 14%;
+  --muted: 50 32% 93%;
+  --muted-foreground: 94 7% 42%;
+  --primary: 97 45% 34%;          /* leaf green #4d7c2f */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 50 32% 93%;
+  --secondary-foreground: 107 20% 14%;
+  --accent: 36 65% 48%;           /* ochre #c98a2b */
+  --accent-foreground: 0 0% 100%;
+  --border: 51 21% 87%;
+  --input: 51 21% 87%;
+  --ring: 97 45% 34%;
+
+  /* template's own semantic names, ALIASED to the shadcn set → one palette. */
+  --color-bg: hsl(var(--background));
+  --color-fg: hsl(var(--foreground));
+  --color-muted: hsl(var(--muted-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-dark: hsl(97 46% 26%);   /* #3c6224 — no shadcn slot */
+  --color-primary-fg: hsl(var(--primary-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-border: hsl(var(--border));
+  --color-surface: hsl(var(--muted));
+  --color-surface-2: hsl(var(--card));
+
+  --font-display: 'Georgia', 'Times New Roman', serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 2rem;
+  --space-xl: 4rem;
+
+  --radius-sm: 6px;
+  --radius-md: 12px;
+}

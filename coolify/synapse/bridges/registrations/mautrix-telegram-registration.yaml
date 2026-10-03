@@ -1,0 +1,14 @@
+id: mautrix-telegram
+url: http://mautrix-telegram:29317
+as_token: ${AISHA_AS_TOKEN}_telegram
+hs_token: ${AISHA_HS_TOKEN}_telegram
+sender_localpart: telegrambot
+rate_limited: false
+namespaces:
+  users:
+    - exclusive: true
+      regex: '@telegram_.*'
+  aliases:
+    - exclusive: true
+      regex: '#telegram_.*'
+  rooms: []

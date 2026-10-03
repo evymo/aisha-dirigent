@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AISHA Service Catalog",
+  "description": "Katalog služeb — CO stack obsahuje. KDE to běží a pod jakými jmény říká deployment profil (config/profiles/*.json); obojí spojuje scripts/lib/derive-domains.mjs. Soubor je GENERICKÁ ŠABLONA: nesmí nést jméno ani doménu konkrétní instance.",
+  "type": "object",
+  "required": ["service_alias_prefix", "services"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "_comment": { "type": ["string", "array"], "items": { "type": "string" } },
+    "_service_alias_prefix_comment": { "type": ["string", "array"], "items": { "type": "string" } },
+    "service_alias_prefix": {
+      "type": "string",
+      "description": "Prefix síťových aliasů SDÍLENÉ infrastruktury (aisha-db, aisha-postgrest…). Jméno IMPLEMENTACE stacku — pro každou instanci stejné. NEZAMĚŇOVAT s APP_NAME_PREFIX, což je identita ZÁKAZNÍKA a jediné jméno jednoznačné na sdíleném hostiteli."
+    },
+    "services": {
+      "type": "object",
+      "description": "Klíč = id služby (používá se jako <ID>_URL, <ID>_PLACEMENT… v derivaci).",
+      "additionalProperties": { "$ref": "#/definitions/Service" }
+    },
+    "extras": {
+      "type": "object",
+      "description": "Volitelné doplňky mimo hlavní katalog (např. lokální profily modelů).",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "Service": {
+      "type": "object",
+      "required": ["role", "tier", "subdomain", "public", "compose", "placement", "depends_on"],
+      "properties": {
+        "role": { "type": "string", "description": "Krátký popis funkce služby ve stacku." },
+        "tier": {
+          "type": "string",
+          "enum": ["required", "important", "optional", "local-only"],
+          "description": "Vrstva důležitosti. Profil ji filtruje přes `tier_filter`; `local-only` se do cloudu nenasazuje."
+        },
+        "subdomain": {
+          "type": ["string", "null"],
+          "description": "Jméno služby v topologii. Z něj se skládá vnitřní i veřejná adresa. Služba s vnitřní adresou ho MUSÍ mít — bez něj by derivace neměla co vydat a spadla by (dřív tiše propadla na plochou adresu <kontejner>:<port>)."
+        },
+        "public": { "type": "boolean", "description": "Má služba veřejnou tvář?" },
+        "compose": {
+          "type": "string",
+          "pattern": "^docker-compose\\.",
+          "description": "Compose soubor, který službu definuje. Zároveň JEDINÝ domov jmen jejích kontejnerů — odkazy níž (`internal_url.service`, `internal_endpoints[].service`) míří do něj."
+        },
+        "placement": {
+          "type": "string",
+          "enum": ["frontend", "backend", "experimental"],
+          "description": "Role serveru, na kterém služba bydlí. Konkrétní stroj přiřazuje profil."
+        },
+        "depends_on": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Id jiných katalogových služeb, které musí být nasazené dřív."
+        },
+        "canonical_scope": {
+          "type": "string",
+          "enum": ["internal", "public"],
+          "description": "Která adresa je pro službu ta hlavní. `public` u služeb, ke kterým klient chodí z internetu (edge, netbird, registry)."
+        },
+        "internal_url": { "$ref": "#/definitions/InternalEndpoint" },
+        "internal_endpoints": {
+          "type": "array",
+          "description": "DALŠÍ endpointy téže služby — `internal_url` je jednotné číslo, ale core jich vystavuje šest a domain-services devět.",
+          "items": { "$ref": "#/definitions/InternalEndpoint" }
+        },
+        "internal_tcp_endpoints": {
+          "type": "array",
+          "description": "NE-HTTP endpointy téže služby (clamd 3310, redis 6379). Bez nich chodí TCP konzumenti po SDÍLENÉ síti, kde o jméno soupeří víc nájemníků najednou.",
+          "items": { "$ref": "#/definitions/InternalTcpEndpoint" }
+        },
+        "public_face": {
+          "$ref": "#/definitions/InternalEndpoint",
+          "description": "Endpoint, na který edge posílá VEŘEJNÝ provoz — obvykle oauth2-proxy před službou, ne služba sama. Kde chybí, je veřejnou tváří `internal_url`. Odkaz na compose službu + port; adresa se skládá až v derivaci (edgeMeshUpstream / edgeMeshHost), aby se žádné jméno kontejneru neopisovalo. Do 2026-08-21 tu stálo `edge_mesh_upstream` s literálem `http://${APP_NAME_PREFIX}-mesh-router:<port>` — hop místo cíle: edge pak mířil DNATem na dva pevné porty core peeru a provoz mcp/dirigent končil na imgproxy jádra (421)."
+        },
+        "extra_subdomains": { "type": "array", "items": { "type": "string" } },
+        "public_aliases": { "type": "array", "items": { "type": "string" } },
+        "public_aliases_env": { "type": "string" },
+        "public_aliases_include_primary": { "type": "boolean" },
+        "provision_when_env": {
+          "type": ["string", "array"],
+          "items": { "type": "string" },
+          "description": "Opt-in lane: služba se nasadí jen když je proměnná neprázdná."
+        },
+        "ephemeral": { "type": "boolean", "description": "Jednorázový job, ne dlouhoběžící služba." },
+        "external_connectivity": {
+          "enum": ["egress", "ingress", "both"],
+          "description": "Služba se DOTÝKÁ VNĚJŠKU — a v kterém směru. `egress` = volá ven sama (registry tahá obrazy). `ingress` = přijímá zvenčí (edge obsluhuje veřejnost). CHYBÍ-LI, služba na vnějšek nesahá a MÁ BÝT NEVIDITELNÁ: dosažitelná jen meshem, nikdy jinudy. ⛔ Doplněno 2026-08-22: schéma mělo 11 síťových vlastností a všechny popisovaly, JAK JE SLUŽBA DOSAŽITELNÁ — o směru, kterým se připojuje ona sama, model nevěděl nic. Bez toho se nedalo vyjmenovat, co se vnějšku dotýkat MUSÍ, a tedy ani vynutit, že zbytek je skrytý; třídilo se podle 'kdo koho potřebuje' a rostl seznam výjimek. Majitel 2026-08-22: 'kc můžeme mít na privátní síti, protože nepotřebuje se vůbec nikam připojovat; to musí jen registry a později edge' + 'jde mi o to to vše dělat de facto skrytě, ve smyslu bezpečnosti'."
+        },
+        "mesh_bootstrap_dependency": {
+          "type": "boolean",
+          "description": "Služba je PŘEDPOKLADEM enrollmentu do mesh (chicken-and-egg), takže na mesh stát nesmí — kdo ji potřebuje zevnitř, jde napřímo kontejnerovou sítí. Majitel 2026-08-19 pro auth. `mesh-conformance` ji nepočítá mezi nekonformní, `mesh-conformance-apply` ji přeskočí. Vždy s `_comment_mesh` (proč)."
+        },
+        "_comment_depends_on": { "type": ["string", "array"], "items": { "type": "string" }, "description": "PROČ jsou startovní závislosti právě takové — a hlavně proč tam něco NENÍ. Startovní závislost (kdo musí běžet, aby služba nastartovala) se snadno splete s běhovou (koho volá za provozu); záměna drží služby za sebou zbytečně a deformuje pořadí vln." },
+        "_comment_mesh": { "type": ["string", "array"], "items": { "type": "string" } },
+        "capabilities": { "type": "object", "additionalProperties": true },
+        "_comment": { "type": ["string", "array"], "items": { "type": "string" } },
+        "_comment_scope": { "type": ["string", "array"], "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "InternalEndpoint": {
+      "type": "object",
+      "required": ["service", "port"],
+      "properties": {
+        "service": {
+          "type": "string",
+          "description": "KLÍČ compose služby v souboru `compose` — ODKAZ na jméno kontejneru, nikoli jeho opis. Jméno se skládá až v derivaci z ${APP_NAME_PREFIX}. Opis by byl druhý domov téhož údaje a rozešel by se (naměřeno 2026-08-13 na všech 38 výskytech)."
+        },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "subdomain": { "type": "string", "description": "Jméno endpointu v topologii (u `internal_endpoints`)." },
+        "base_path": {
+          "type": "string",
+          "description": "Cesta, na které endpoint svůj kontrakt nabízí (OpenAI-kompatibilní servery `/v1`). Patří k DEKLARACI služby — bez ní si ji dolepuje každý volající zvlášť."
+        },
+        "env_aliases": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+          "description": "Další jména proměnné, pod kterými se adresa vydá (zpětná kompatibilita konzumentů)."
+        },
+        "_comment": { "type": ["string", "array"], "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "InternalTcpEndpoint": {
+      "type": "object",
+      "required": ["service", "port"],
+      "description": "NE-HTTP endpoint. Vlastní typ, protože se rozvádí JINAK: mesh-ingress je Caddy a rozlišuje podle `Host`, který TCP nemá. U TCP ale rozlišovat netřeba — sidecar běží v netns agenta, takže dvojice (mesh IP, port) je jednoznačná sama. Proto tu NENÍ `subdomain`.",
+      "properties": {
+        "service": {
+          "type": "string",
+          "description": "KLÍČ compose služby v souboru `compose` — ODKAZ na jméno kontejneru, nikoli jeho opis (týž zákon jako u InternalEndpoint)."
+        },
+        "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "env_aliases": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+          "description": "Jména proměnných, pod kterými konzumenti adresu očekávají."
+        },
+        "port_env_aliases": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+          "description": "Jména proměnných, pod kterými konzumenti očekávají PORT. Port patří katalogu stejně jako jméno — ručně zapsané číslo se rozejde (2026-09-17: RABBITMQ_PORT=5673 byl host port, služba poslouchá na 5672)."
+        },
+        "_comment": { "type": ["string", "array"], "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    }
+  }
+}

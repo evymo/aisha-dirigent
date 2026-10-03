@@ -1,0 +1,75 @@
+{
+  "applicationName": "Audience: Campaign Performance",
+  "version": 1,
+  "description": "Per-campaign analytics dashboard. Channels breakdown, delivery + engagement stats, top recipients.",
+  "dataSources": [
+    {
+      "name": "aisha-postgrest",
+      "type": "PostgresREST",
+      "endpoint": "{{appsmith.env.POSTGREST_URL}}",
+      "headers": { "Authorization": "Bearer {{appsmith.user.jwt}}" }
+    }
+  ],
+  "queries": [
+    {
+      "name": "listCampaigns",
+      "method": "GET",
+      "path": "/audience_admin_campaign_performance_v",
+      "queryParams": { "order": "created_at.desc" }
+    },
+    {
+      "name": "sendTest",
+      "method": "POST",
+      "path": "/rpc/audience_admin_send_test_campaign",
+      "body": {
+        "p_campaign_id": "{{selectedCampaign.id}}",
+        "p_recipient_user_id": "{{testRecipient.text}}",
+        "p_channel": "{{testChannel.selectedOptionValue}}"
+      }
+    }
+  ],
+  "widgets": [
+    { "type": "Text", "name": "title", "text": "Campaign Performance", "style": "heading" },
+    {
+      "type": "Table",
+      "name": "campaignList",
+      "dataSource": "{{listCampaigns.data}}",
+      "columns": [
+        { "field": "campaign_name", "label": "Campaign" },
+        { "field": "channels", "label": "Channels", "type": "chips" },
+        { "field": "total_recipients", "label": "Recipients" },
+        { "field": "open_rate", "label": "Open rate", "format": "percent" },
+        { "field": "is_active", "label": "Active", "type": "badge" }
+      ],
+      "onRowSelect": "{{store('selectedCampaign', row)}}"
+    },
+    {
+      "type": "Chart",
+      "name": "channelBreakdown",
+      "visible": "{{selectedCampaign}}",
+      "chartType": "bar",
+      "dataSource": "{{Object.entries(selectedCampaign.per_channel_stats ?? {}).map(([channel, stats]) => ({ channel, ...stats }))}}",
+      "x": "channel",
+      "series": ["sent", "opened", "clicked", "bounced"]
+    },
+    {
+      "type": "Container",
+      "name": "testSendPanel",
+      "visible": "{{selectedCampaign}}",
+      "children": [
+        { "type": "Text", "text": "Send test" },
+        { "type": "InputText", "name": "testRecipient", "placeholder": "Recipient user_id (UUID)" },
+        { "type": "Select", "name": "testChannel", "options": [
+          { "label": "Email", "value": "email" },
+          { "label": "Push", "value": "push" },
+          { "label": "SMS", "value": "sms" }
+        ]},
+        { "type": "Button", "name": "sendTestBtn", "label": "Send test", "onClick": "{{sendTest.run()}}" }
+      ]
+    }
+  ],
+  "permissions": {
+    "view": ["admin", "staff", "marketer"],
+    "edit": ["admin", "staff"]
+  }
+}

@@ -1,0 +1,74 @@
+# =============================================================================
+# Server Onboarding — Coolify Multi-Server Infrastructure (Forgejo Actions)
+# =============================================================================
+# Manually onboard a new server into the AISHA Coolify cluster.
+# Registers SSH key, creates server in Coolify, validates Docker,
+# optionally installs Forgejo runner.
+#
+# Usage: Forgejo UI -> Actions -> onboard-server -> Run workflow
+# =============================================================================
+
+name: Onboard Server
+
+on:
+  workflow_dispatch:
+    inputs:
+      server_name:
+        description: "Server name (e.g., backend, experimental)"
+        required: true
+        type: string
+      server_ip:
+        description: "Server IP (internal network)"
+        required: true
+        type: string
+      server_role:
+        description: "Server role"
+        required: true
+        type: choice
+        options:
+          - backend
+          - build
+          - staging
+      ssh_user:
+        description: "SSH user"
+        required: false
+        type: string
+        default: "root"
+      install_runner:
+        description: "Install Forgejo Actions runner"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: onboard-server
+  cancel-in-progress: false
+
+jobs:
+  onboard:
+    name: "Onboard: ${{ github.event.inputs.server_name }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run onboarding script
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          FORGEJO_API_TOKEN: ${{ secrets.FORGEJO_API_TOKEN }}
+          FORGEJO_URL: ${{ github.server_url }}
+          FORGEJO_OWNER: aisha
+          FORGEJO_REPO: aisha-dirigent
+        run: |
+          RUNNER_FLAG=""
+          if [ "${{ github.event.inputs.install_runner }}" = "true" ]; then
+            RUNNER_FLAG="--runner"
+          fi
+
+          bash scripts/coolify-server-onboard.sh \
+            --name "${{ github.event.inputs.server_name }}" \
+            --ip "${{ github.event.inputs.server_ip }}" \
+            --role "${{ github.event.inputs.server_role }}" \
+            --ssh-user "${{ github.event.inputs.ssh_user }}" \
+            $RUNNER_FLAG

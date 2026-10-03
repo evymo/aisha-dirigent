@@ -1,0 +1,32 @@
+{
+  "kanban": {
+    "pageTitle": "Stories kanban",
+    "pageSubtitle": "Drag a story across columns to change its kanban status. Transition rules + admin gating are enforced server-side.",
+    "moving": "Moving story…",
+    "lane": {
+      "stack": "Stack",
+      "userStories": "User stories"
+    },
+    "column": {
+      "empty": "No stories here"
+    },
+    "card": {
+      "priorityTooltip": "Priority",
+      "agentTooltip": "Current / latest agent",
+      "branchTooltip": "Default branch",
+      "runningLive": "Running now",
+      "costTooltip": "AI cost to date",
+      "liveSessionTooltip": "Live {{source}} session — {{phase}}"
+    },
+    "budget": {
+      "setTooltip": "Set AI budget",
+      "setShort": "Budget",
+      "dialogTitle": "Set AI budget",
+      "dialogDescription": "Lifetime AI spend ceiling for \"{{title}}\". Leave blank to remove the cap.",
+      "costLimitLabel": "Cost limit (USD)",
+      "costLimitPlaceholder": "e.g. 5.00",
+      "invalid": "Enter a non-negative amount.",
+      "saved": "Budget updated."
+    }
+  }
+}

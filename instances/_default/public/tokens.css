@@ -1,0 +1,27 @@
+/* Default instance tokens — the design language's own defaults ARE the default
+ * brand (@aisha/design-language ships them with zero specificity), so this file
+ * only loads the language's fonts and proves the override mechanism exists.
+ *
+ * An instance re-brands the surface by REPLACING this file in its overlay:
+ * override the semantic tokens (--bg, --surface, --text, --primary, …) under
+ * :root / [data-theme="daylight"] / [data-theme="carbon"] — plain selectors
+ * beat the package defaults regardless of load order. Ship no code. */
+
+/* ⛔ ŽÁDNÝ @import Z CDN. Naměřeno 2026-08-10 na nasazené instanci: tady stál
+ * `@import url("https://fonts.googleapis.com/…Archivo|Inter|IBM Plex Mono…")`.
+ * CSP z docker/nginx.conf má `style-src 'self' 'unsafe-inline'`, takže ho
+ * prohlížeč ODMÍTL — a to na KAŽDÉM hostu, ne jen u jedné instance.
+ *
+ * Rodiny samy zůstávají v hodnotách tokenů níž. Není to zbytečné: fungují jako
+ * kaskáda (kdo je má nainstalované lokálně, uvidí je) a nesou ZÁMĚR, ze kterého
+ * se generují mobilní artefakty. Chybělo jen doručení souborů.
+ *
+ * Doručit je lze dvěma cestami, obě CSP-čisté:
+ *   1) přibalit řezy vedle `public/fonts/<rodina>/` a načíst je jako
+ *      `/fonts/nunito-sans/fonts.css` — vzor, který v repu FUNGUJE
+ *      (subsety latin + latin-ext, unicode-range, font-display: swap, OFL);
+ *   2) instanční kanál `branding_profiles.font_faces` → `buildFontFaceCss`,
+ *      kde soubory hostí instance u sebe (viz docs/branding/PER_INSTANCE_WEBFONTS.md).
+ *
+ * `font-src 'self' data:` znamená, že cizí původ neprojde ani u varianty 2 —
+ * je to schválně. Hlídá brána `zadny-font-z-ciziho-puvodu`. */

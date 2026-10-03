@@ -1,0 +1,6 @@
+{
+  "$note": "Example demo template — a gardening BLOG (information / articles use-case). Brand-neutral, fork-freely. Seed it with svc-web-artifact /seed-default { \"source_dir\": \"garden-blog\" } or AISHA_SEED_DOMAIN=garden-blog.",
+  "title_key": "web.garden.title",
+  "description_key": "web.garden.description",
+  "slug": "index"
+}

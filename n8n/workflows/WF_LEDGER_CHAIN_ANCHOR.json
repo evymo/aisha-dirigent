@@ -1,0 +1,125 @@
+{
+  "name": "WF_LEDGER_CHAIN_ANCHOR",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "anchor-schedule-trigger",
+      "name": "Every 6 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SVC_BLOCKCHAIN_URL || 'http://svc-blockchain:3013' }}/chain-head-anchor",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={}",
+        "options": {
+          "timeout": 60000,
+          "allowUnauthorizedCerts": false
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "anchor-http-request",
+      "name": "Anchor Chain Head",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Evaluate the chain-head anchor result. This is the RECURRING commitment of\n// the audit-chain head to the Cosmos ledger — a later divergence between the DB\n// head and the last anchored head is now externally provable.\nconst r = $input.item.json;\n\nif (r.success) {\n  return { json: { outcome: 'anchored', head_hash: r.head_hash, cosmos_tx_hash: r.cosmos_tx_hash || null, anchor_id: r.anchor_id || null, rows_verified: r.rows_verified, anchored_at: new Date().toISOString() } };\n}\n\nif (r.skipped) {\n  return { json: { outcome: 'skipped', reason: r.reason, anchored_at: new Date().toISOString() } };\n}\n\nif (r.circuit_breaker) {\n  throw new Error('Circuit breaker: Cosmos node unreachable — chain head not anchored');\n}\n\n// A broken chain (409) or a failed broadcast (502) must surface loudly.\nthrow new Error(`Chain-head anchor failed: ${r.error || JSON.stringify(r)}`);"
+      },
+      "id": "anchor-evaluate",
+      "name": "Evaluate Anchor Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Every 6 Hours": {
+      "main": [
+        [
+          {
+            "node": "Anchor Chain Head",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anchor Chain Head": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Anchor Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": [
+    {
+      "name": "blockchain"
+    },
+    {
+      "name": "cosmos"
+    },
+    {
+      "name": "audit"
+    },
+    {
+      "name": "chain-head-anchor"
+    }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "__REMAP__"
+  }
+}

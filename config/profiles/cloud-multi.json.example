@@ -1,0 +1,53 @@
+{
+  "$schema": "../profiles.schema.json",
+  "id": "cloud-multi",
+  "app_name_prefix": "aisha",
+  "description": "Production multi-server Coolify deployment (Frontend + Backend + Experimental). Public *.aisha.example.com via Frontend edge, internal *.{server}.internal.example.com per server. Mesh OFF by default. All domains here are generic placeholders — replace them with your own TLDs (or set PUBLIC_TLD/INTERNAL_TLD/MESH_TLD in your operator env).",
+  "domain": {
+    "public_tld": "aisha.example.com",
+    "internal_tld": "internal.example.com",
+    "internal_pattern": "{subdomain}.{server}.{internal_tld}",
+    "public_pattern": "{subdomain}.{public_tld}",
+    "mesh_tld": "mesh.example.net",
+    "mesh_pattern": "{subdomain}.{mesh_tld}"
+  },
+  "servers": ["frontend", "backend", "experimental"],
+  "service_overrides": {
+    "core":           { "placement": "backend" },
+    "keycloak":       { "placement": "backend" },
+    "pki":            { "placement": "backend" },
+    "integration":    { "placement": "backend" },
+    "orchestration":  { "placement": "backend" },
+    "observability":  { "placement": "backend" },
+    "admin":          { "placement": "backend" },
+    "messaging":      { "placement": "backend" },
+    "edge":           { "placement": "frontend" },
+    "netbird":        { "placement": "frontend" },
+    "registry":       { "placement": "frontend" },
+    "monitoring":     { "placement": "frontend" },
+    "ledger":         { "placement": "experimental" },
+    "exec":           { "placement": "experimental" },
+    "llm-gateway":    { "placement": "backend", "legacy_env_var": "LLM_GATEWAY" },
+    "openclaw":       { "placement": "backend", "legacy_env_var": "OPENCLAW" },
+    "local-ingest":   { "placement": "experimental" },
+    "potok":          { "placement": "backend" }
+  },
+  "tier_filter": ["required", "important", "optional"],
+  "exclude": ["monitoring"],
+  "_exclude_notes": "monitoring (Dozzle) has no coolify/manifests/aisha.manifest entry — no cold-start path can create it, so emitting its logs.* domain produced a permanent cold-start-verify coverage FAIL for an expected-absent app. Excluded until it is wired into the manifest + deploy waves (then remove this exclude).",
+  "mesh_default": false,
+  "oauth2": {
+    "cookie_domains": ".backend.internal.example.com,.aisha.example.com",
+    "whitelist_domains": ".aisha.example.com,.backend.internal.example.com",
+    "_notes": "Multi-zone: services live on .backend.{internal_tld} (admin/dev), public alias on .{public_tld}. OAuth2 Proxy with comma-separated COOKIE_DOMAINS scopes cookies correctly across both zones (memory: feedback_oauth2_multi_zone_cookies.md)."
+  },
+  "oauth2_cookie_domains_per_server": {
+    "frontend": ".frontend.internal.example.com,.aisha.example.com",
+    "backend": ".backend.internal.example.com,.aisha.example.com",
+    "experimental": ".experimental.internal.example.com,.aisha.example.com"
+  },
+  "ai": {
+    "execution_mode": "cloud",
+    "_note": "Rezidence dat AI (local | hybrid | cloud). Šablona drží dnešní chování platformy; instance s modelem uvnitř meshe deklaruje local."
+  }
+}

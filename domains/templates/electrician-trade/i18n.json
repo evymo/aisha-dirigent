@@ -1,0 +1,323 @@
+{
+  "_note": "Translation values for every data-i18n-key this template references. Consumed by `npm --prefix services/svc-web-artifact run export-web-seed` → `translations` rows. EN + CS authored by hand; de/fr/ru/th filled by `node scripts/i18n/translate-template-i18n.mjs domains/templates/electrician-trade` (DeepL + context review). The brand wordmark is hand-set in all 6 locales so the filler leaves it Latin.",
+  "web.trade.brand": {
+    "en": "Brightwire Electrical",
+    "cs": "Brightwire Electrical",
+    "de": "Brightwire Electrical",
+    "fr": "Brightwire Electrical",
+    "ru": "Brightwire Electrical",
+    "th": "Brightwire Electrical"
+  },
+  "web.trade.footer.name": {
+    "en": "Brightwire Electrical",
+    "cs": "Brightwire Electrical",
+    "de": "Brightwire Electrical",
+    "fr": "Brightwire Electrical",
+    "ru": "Brightwire Electrical",
+    "th": "Brightwire Electrical"
+  },
+  "web.trade.title": {
+    "en": "Brightwire Electrical — local electrician",
+    "cs": "Brightwire Electrical — místní elektrikář",
+    "de": "Brightwire Electrical – Elektriker vor Ort",
+    "fr": "Brightwire Electrical — électricien local",
+    "ru": "Brightwire Electrical — местный электрик",
+    "th": "Brightwire Electrical — ช่างไฟฟ้าในพื้นที่"
+  },
+  "web.trade.description": {
+    "en": "A licensed local electrician: rewiring, fuse boards, EV chargers and fault-finding. Honest advice, tidy work.",
+    "cs": "Elektrikář s licencí: rekonstrukce elektroinstalace, rozvaděče, nabíječky pro elektromobily a hledání závad. Poctivá rada, čistá práce.",
+    "de": "Ein zugelassener Elektriker aus der Region: Neuverkabelung, Sicherungskästen, Ladestationen für Elektroautos und Fehlersuche. Ehrliche Beratung, saubere Arbeit.",
+    "fr": "Un électricien local agréé : réfection du câblage, tableaux électriques, bornes de recharge pour véhicules électriques et dépannage. Des conseils avisés, un travail soigné.",
+    "ru": "Сертифицированный местный электрик: замена электропроводки, монтаж распределительных щитов, установка зарядных устройств для электромобилей и поиск неисправностей. Честные рекомендации, аккуратная работа.",
+    "th": "ช่างไฟฟ้าท้องถิ่นที่ได้รับใบอนุญาต: ติดตั้งระบบไฟฟ้าใหม่, ตู้ฟิวส์, เครื่องชาร์จรถยนต์ไฟฟ้า, และค้นหาปัญหาไฟฟ้า. คำแนะนำที่ซื่อสัตย์, งานเรียบร้อย."
+  },
+  "web.trade.nav.services": {
+    "en": "Services",
+    "cs": "Služby",
+    "de": "Dienstleistungen",
+    "fr": "Services",
+    "ru": "Услуги",
+    "th": "บริการ"
+  },
+  "web.trade.nav.knowledge": {
+    "en": "Ask an electrician",
+    "cs": "Zeptejte se elektrikáře",
+    "de": "Fragen Sie einen Elektriker",
+    "fr": "Demandez conseil à un électricien",
+    "ru": "Обратитесь к электрику",
+    "th": "ถามช่างไฟฟ้า"
+  },
+  "web.trade.nav.quote": {
+    "en": "Get a quote",
+    "cs": "Poptávka",
+    "de": "Angebot anfordern",
+    "fr": "Demander un devis",
+    "ru": "Получить расценки",
+    "th": "ขอใบเสนอราคา"
+  },
+  "web.trade.hero.heading": {
+    "en": "Safe, tidy electrical work",
+    "cs": "Bezpečná a čistá elektrikářská práce",
+    "de": "Sichere und saubere Elektroarbeiten",
+    "fr": "Des installations électriques sûres et soignées",
+    "ru": "Безопасное и аккуратное выполнение электромонтажных работ",
+    "th": "งานไฟฟ้าที่ปลอดภัยและเป็นระเบียบ"
+  },
+  "web.trade.hero.body": {
+    "en": "One local electrician, on the tools for fifteen years. From a single socket to a full rewire — done properly, explained plainly, and left clean.",
+    "cs": "Jeden místní elektrikář, patnáct let v oboru. Od jediné zásuvky po kompletní rekonstrukci — uděláno pořádně, srozumitelně vysvětleno a po sobě uklizeno.",
+    "de": "Ein Elektriker aus der Gegend, der seit fünfzehn Jahren im Geschäft ist. Von einer einzelnen Steckdose bis hin zur kompletten Neuverkabelung – fachgerecht ausgeführt, verständlich erklärt und sauber hinterlassen.",
+    "fr": "Un électricien de la région, fort de quinze ans d'expérience. Qu'il s'agisse d'installer une simple prise ou de refaire tout le câblage, le travail est bien fait, expliqué clairement et laissé propre.",
+    "ru": "Местный электрик с пятнадцатилетним стажем. От установки одной розетки до полной замены электропроводки — работа выполнена качественно, все понятно объяснено, а на месте оставлено чисто.",
+    "th": "ช่างไฟฟ้าท้องถิ่นคนหนึ่ง ทำงานมาแล้วสิบห้าปี ตั้งแต่ซ่อมปลั๊กเดียวไปจนถึงเดินสายไฟใหม่ทั้งหลัง — ทำงานอย่างถูกต้อง อธิบายให้เข้าใจง่าย และเก็บงานเรียบร้อย"
+  },
+  "web.trade.hero.cta": {
+    "en": "Get a quote",
+    "cs": "Získat nabídku",
+    "de": "Angebot anfordern",
+    "fr": "Demander un devis",
+    "ru": "Получить расценки",
+    "th": "ขอใบเสนอราคา"
+  },
+  "web.trade.hero.trust": {
+    "en": "Licensed & insured · Same-week callouts",
+    "cs": "S licencí a pojištěním · Výjezdy do týdne",
+    "de": "Zugelassen und versichert · Einsatz noch in derselben Woche",
+    "fr": "Agrémenté et assuré · Interventions dans la semaine",
+    "ru": "Имеем лицензию и страховку · Выезд в течение недели",
+    "th": "ได้รับใบอนุญาตและประกันภัย · บริการถึงที่ภายในสัปดาห์เดียวกัน"
+  },
+  "web.trade.services.eyebrow": {
+    "en": "What I do",
+    "cs": "Co dělám",
+    "de": "Was ich mache",
+    "fr": "Ce que je fais",
+    "ru": "Чем я занимаюсь",
+    "th": "สิ่งที่ฉันทำ"
+  },
+  "web.trade.services.heading": {
+    "en": "Services",
+    "cs": "Služby",
+    "de": "Dienstleistungen",
+    "fr": "Services",
+    "ru": "Услуги",
+    "th": "บริการ"
+  },
+  "web.trade.svc.1.name": {
+    "en": "Rewires",
+    "cs": "Rekonstrukce elektroinstalace",
+    "de": "Neuverkabelungen",
+    "fr": "Recâblages",
+    "ru": "Замена проводки",
+    "th": "เดินสายไฟใหม่"
+  },
+  "web.trade.svc.1.desc": {
+    "en": "Full or partial rewiring for older homes, with as little mess and disruption as possible.",
+    "cs": "Kompletní nebo částečná rekonstrukce elektroinstalace ve starších domech, s co nejmenším nepořádkem a omezením provozu.",
+    "de": "Komplette oder teilweise Neuverkabelung älterer Häuser, mit möglichst wenig Unordnung und Beeinträchtigungen.",
+    "fr": "Réfection totale ou partielle de l'installation électrique dans les maisons anciennes, en causant le moins de désordre et de perturbations possible.",
+    "ru": "Полная или частичная замена электропроводки в старых домах с минимальными неудобствами и беспорядком.",
+    "th": "การเดินสายไฟใหม่ทั้งหมดหรือบางส่วนสำหรับบ้านเก่า โดยสร้างความรกรุงรังและการรบกวนให้น้อยที่สุด"
+  },
+  "web.trade.svc.2.name": {
+    "en": "Fuse board upgrades",
+    "cs": "Modernizace rozvaděče",
+    "de": "Modernisierung der Sicherungsanlage",
+    "fr": "Rénovation du tableau électrique",
+    "ru": "Модернизация распределительного щитка",
+    "th": "การอัปเกรดแผงวงจรไฟฟ้า"
+  },
+  "web.trade.svc.2.desc": {
+    "en": "Modern consumer units with the right protection — safer, and ready for what you add next.",
+    "cs": "Moderní rozvaděče se správnou ochranou — bezpečnější a připravené na to, co přidáte příště.",
+    "de": "Moderne Sicherungskästen mit dem richtigen Schutz – sicherer und bereit für Ihre nächsten Erweiterungen.",
+    "fr": "Des tableaux électriques modernes dotés d'une protection adaptée : plus sûrs et prêts à accueillir vos futurs équipements.",
+    "ru": "Современные распределительные щиты с надлежащей защитой — более безопасные и готовые к любым будущим изменениям.",
+    "th": "ตู้ไฟฟ้าสมัยใหม่พร้อมการป้องกันที่เหมาะสม — ปลอดภัยยิ่งขึ้น และพร้อมสำหรับสิ่งที่คุณจะเพิ่มต่อไป"
+  },
+  "web.trade.svc.3.name": {
+    "en": "EV charger installs",
+    "cs": "Instalace nabíječek pro elektromobily",
+    "de": "Installation von Ladestationen für Elektrofahrzeuge",
+    "fr": "Installation de bornes de recharge pour véhicules électriques",
+    "ru": "Установка зарядных устройств для электромобилей",
+    "th": "การติดตั้งเครื่องชาร์จรถยนต์ไฟฟ้า"
+  },
+  "web.trade.svc.3.desc": {
+    "en": "Home charge points fitted and tested, sized to your supply and your car.",
+    "cs": "Domácí nabíjecí stanice nainstalované a otestované, dimenzované podle vašeho přívodu a vozu.",
+    "de": "Installierte und geprüfte Ladestationen für zu Hause, abgestimmt auf Ihren Stromanschluss und Ihr Fahrzeug.",
+    "fr": "Installation et contrôle de bornes de recharge à domicile, adaptées à votre alimentation électrique et à votre véhicule.",
+    "ru": "Установка и проверка домашних зарядных станций, рассчитанных с учетом мощности вашей электросети и характеристик вашего автомобиля.",
+    "th": "ติดตั้งและทดสอบจุดชาร์จไฟฟ้าที่บ้าน ให้ขนาดเหมาะสมกับระบบไฟฟ้าและรถยนต์ของคุณ"
+  },
+  "web.trade.svc.4.name": {
+    "en": "Fault finding",
+    "cs": "Hledání závad",
+    "de": "Fehlersuche",
+    "fr": "Recherche de pannes",
+    "ru": "Поиск неисправностей",
+    "th": "การค้นหาข้อบกพร่อง"
+  },
+  "web.trade.svc.4.desc": {
+    "en": "Tripping breakers, dead sockets, flickering lights — tracked down and fixed at the source.",
+    "cs": "Vypadávající jističe, mrtvé zásuvky, blikající světla — vystopováno a opraveno přímo u zdroje.",
+    "de": "Ausgelöste Sicherungsautomaten, defekte Steckdosen, flackernde Lampen – aufgespürt und direkt an der Ursache behoben.",
+    "fr": "Disjoncteurs qui sautent, prises qui ne fonctionnent plus, lumières qui clignotent : nous identifions les causes et les réparons à la source.",
+    "ru": "Срабатывающие автоматические выключатели, неработающие розетки, мерцающий свет — нахожу причину и устраняю её прямо у источника.",
+    "th": "เบรกเกอร์ตัดไฟ, ปลั๊กไฟไม่ทำงาน, ไฟกระพริบ — ตรวจหาและแก้ไขที่ต้นเหตุ"
+  },
+  "web.trade.know.eyebrow": {
+    "en": "From the field",
+    "cs": "Z praxe",
+    "de": "Aus der Praxis",
+    "fr": "Sur le terrain",
+    "ru": "С места событий",
+    "th": "จากภาคสนาม"
+  },
+  "web.trade.know.heading": {
+    "en": "Ask an electrician",
+    "cs": "Zeptejte se elektrikáře",
+    "de": "Fragen Sie einen Elektriker",
+    "fr": "Demandez conseil à un électricien",
+    "ru": "Обратитесь к электрику",
+    "th": "ถามช่างไฟฟ้า"
+  },
+  "web.trade.know.intro": {
+    "en": "Straight answers to the questions I get asked most on the job — no jargon, no upselling.",
+    "cs": "Přímé odpovědi na otázky, které při práci dostávám nejčastěji — bez žargonu a bez nucení do zbytečností.",
+    "de": "Klare Antworten auf die Fragen, die mir bei meiner Arbeit am häufigsten gestellt werden – ohne Fachchinesisch, ohne aufdringliche Verkaufsgespräche.",
+    "fr": "Des réponses claires aux questions qui me sont le plus souvent posées au travail — sans jargon, sans tentatives de vente incitative.",
+    "ru": "Прямые ответы на вопросы, которые мне чаще всего задают на работе — без жаргона и без попыток продать что-то дополнительно.",
+    "th": "คำตอบตรงไปตรงมาสำหรับคำถามที่ฉันถูกถามบ่อยที่สุดในงาน — ไม่มีศัพท์เทคนิค ไม่มีการขายเพิ่ม"
+  },
+  "web.trade.faq.1.q": {
+    "en": "Why do my lights flicker?",
+    "cs": "Proč mi blikají světla?",
+    "de": "Warum flackern meine Lampen?",
+    "fr": "Pourquoi mes lumières clignotent-elles ?",
+    "ru": "Почему у меня мигает свет?",
+    "th": "ทำไมไฟของฉันกระพริบ?"
+  },
+  "web.trade.faq.1.a": {
+    "en": "Usually a loose connection somewhere on the circuit — annoying, but worth checking promptly, because the same loose joint that flickers a light can also heat up. If it's more than one room, it's worth a proper look.",
+    "cs": "Většinou jde o uvolněný spoj někde na okruhu — otravné, ale stojí za to to brzy zkontrolovat, protože tentýž uvolněný spoj, který rozbliká světlo, se může i zahřívat. Pokud jde o víc než jednu místnost, vyplatí se pořádná prohlídka.",
+    "de": "Meistens liegt es an einer losen Verbindung irgendwo im Stromkreis – ärgerlich, aber es lohnt sich, das sofort zu überprüfen, denn dieselbe lose Verbindung, die ein Licht flackern lässt, kann sich auch erhitzen. Wenn es in mehr als einem Raum auftritt, sollte man sich das genauer ansehen.",
+    "fr": "En général, c'est un mauvais contact quelque part dans le circuit — c'est agaçant, mais ça vaut la peine de vérifier rapidement, car ce même mauvais contact qui fait clignoter une lampe peut aussi chauffer. Si ça concerne plusieurs pièces, il vaut mieux y jeter un œil de plus près.",
+    "ru": "Обычно это ослабленное соединение где-то в цепи — это досадно, но стоит сразу же проверить, ведь то же самое ослабленное соединение, из-за которого мигает лампочка, может также нагреваться. Если это происходит в нескольких комнатах, стоит тщательно все проверить.",
+    "th": "โดยปกติแล้วมักจะมีจุดเชื่อมต่อหลวมอยู่ที่ใดสักแห่งในวงจร — แม้จะน่ารำคาญ แต่ก็ควรตรวจสอบโดยเร็ว เพราะข้อต่อที่หลวมเดียวกันนี้ซึ่งทำให้ไฟกระพริบ อาจทำให้เกิดความร้อนขึ้นได้เช่นกัน หากเกิดขึ้นมากกว่าหนึ่งห้อง ควรตรวจสอบอย่างละเอียด"
+  },
+  "web.trade.faq.2.q": {
+    "en": "Do I really need to upgrade my fuse board?",
+    "cs": "Opravdu potřebuji vyměnit rozvaděč?",
+    "de": "Muss ich meinen Sicherungskasten wirklich modernisieren?",
+    "fr": "Dois-je vraiment moderniser mon tableau électrique ?",
+    "ru": "Мне действительно нужно обновить распределительный щит?",
+    "th": "ฉันจำเป็นต้องอัพเกรดแผงฟิวส์ของฉันจริง ๆ หรือไม่?"
+  },
+  "web.trade.faq.2.a": {
+    "en": "Not always. If yours still uses rewireable fuses or has no RCD protection, an upgrade is a genuine safety improvement. If it's a modern unit in good order, I'll tell you to keep your money.",
+    "cs": "Ne vždy. Pokud ten váš ještě používá tavné pojistky nebo nemá proudový chránič, je výměna skutečným zlepšením bezpečnosti. Pokud je to moderní rozvaděč v dobrém stavu, řeknu vám, ať si peníze necháte.",
+    "de": "Nicht immer. Wenn Ihr Gerät noch mit austauschbaren Sicherungen ausgestattet ist oder keinen FI-Schutz hat, ist eine Modernisierung eine echte Verbesserung der Sicherheit. Handelt es sich um ein modernes Gerät in gutem Zustand, rate ich Ihnen, Ihr Geld lieber zu sparen.",
+    "fr": "Pas toujours. Si le vôtre utilise encore des fusibles à remplacer soi-même ou s'il n'est pas équipé d'un disjoncteur différentiel, une mise à niveau constitue un réel gain en matière de sécurité. S'il s'agit d'un appareil moderne en bon état, je vous conseillerai de ne pas dépenser votre argent.",
+    "ru": "Не всегда. Если в вашем щите до сих пор стоят проволочные предохранители или нет защиты УЗО, то его замена станет реальным шагом к повышению безопасности. Если же это современный щит в исправном состоянии, я посоветую вам не тратить деньги.",
+    "th": "ไม่เสมอไป หากของคุณยังคงใช้ฟิวส์ที่สามารถเปลี่ยนได้หรือไม่มีระบบป้องกัน RCD การอัปเกรดจะเป็นการปรับปรุงความปลอดภัยที่แท้จริง หากเป็นหน่วยที่ทันสมัยและอยู่ในสภาพดี ฉันจะบอกให้คุณเก็บเงินไว้"
+  },
+  "web.trade.faq.3.q": {
+    "en": "Is my old wiring safe?",
+    "cs": "Je moje stará elektroinstalace bezpečná?",
+    "de": "Ist meine alte Verkabelung sicher?",
+    "fr": "Mon ancien câblage est-il sûr ?",
+    "ru": "Безопасна ли моя старая электропроводка?",
+    "th": "สายไฟเก่าของฉันปลอดภัยหรือไม่?"
+  },
+  "web.trade.faq.3.a": {
+    "en": "Old isn't automatically unsafe — but cloth or rubber-sheathed cable, or anything that looks scorched, is worth testing. A quick inspection tells you where you actually stand instead of guessing.",
+    "cs": "Stará neznamená automaticky nebezpečná — ale kabely v textilním nebo pryžovém opletení, případně cokoli, co vypadá ohořele, stojí za přeměření. Rychlá prohlídka vám ukáže, jak na tom skutečně jste, místo abyste hádali.",
+    "de": "Alt heißt nicht automatisch unsicher – aber Kabel mit Stoff- oder Gummimantel oder alles, was versengt aussieht, sollte man überprüfen. Eine kurze Inspektion gibt Aufschluss darüber, wie es tatsächlich aussieht, statt nur zu raten.",
+    "fr": "Ce n'est pas parce qu'un câble est ancien qu'il est forcément dangereux, mais il vaut mieux vérifier les câbles gainés de tissu ou de caoutchouc, ou tout ce qui semble avoir brûlé. Une inspection rapide vous permettra de savoir exactement où vous en êtes, plutôt que de vous contenter de deviner.",
+    "ru": "Старый кабель не всегда означает, что он небезопасен, но кабели с тканевой или резиновой оболочкой, а также все, что выглядит обожженным, стоит проверить. Быстрый осмотр позволит вам точно определить состояние кабеля, а не гадать.",
+    "th": "เก่าไม่ได้แปลว่าไม่ปลอดภัยโดยอัตโนมัติ — แต่สายไฟที่หุ้มด้วยผ้าหรือยาง หรืออะไรก็ตามที่ดูมีรอยไหม้ ควรทดสอบก่อนใช้งาน การตรวจสอบอย่างรวดเร็วจะช่วยให้คุณรู้สภาพจริง แทนที่จะคาดเดา"
+  },
+  "web.trade.quote.eyebrow": {
+    "en": "Get in touch",
+    "cs": "Ozvěte se",
+    "de": "Kontaktieren Sie uns",
+    "fr": "Contactez-nous",
+    "ru": "Свяжитесь с нами",
+    "th": "ติดต่อเรา"
+  },
+  "web.trade.quote.heading": {
+    "en": "Request a quote",
+    "cs": "Poptat nabídku",
+    "de": "Angebot anfordern",
+    "fr": "Demander un devis",
+    "ru": "Запросить расценки",
+    "th": "ขอใบเสนอราคา"
+  },
+  "web.trade.quote.body": {
+    "en": "Tell me what you need and roughly where you are. No call centre — the message comes straight to me.",
+    "cs": "Napište mi, co potřebujete a zhruba kde jste. Žádné call centrum — zpráva chodí přímo mně.",
+    "de": "Sagen Sie mir, was Sie brauchen und wo Sie ungefähr sind. Kein Callcenter – die Nachricht kommt direkt bei mir an.",
+    "fr": "Dites-moi ce dont vous avez besoin et où vous vous trouvez, à peu près. Pas de centre d'appels : le message m'est transmis directement.",
+    "ru": "Сообщите, что вам нужно и где примерно вы находитесь. Это не колл-центр — сообщение поступает прямо ко мне.",
+    "th": "บอกฉันว่าคุณต้องการอะไรและคุณอยู่ที่ไหนโดยประมาณ ไม่มีศูนย์บริการทางโทรศัพท์ — ข้อความจะส่งตรงถึงฉัน"
+  },
+  "web.trade.quote.note": {
+    "en": "I usually reply the same day — same hour if it's urgent.",
+    "cs": "Obvykle odpovím týž den — pokud spěcháte, klidně i tutéž hodinu.",
+    "de": "Normalerweise antworte ich noch am selben Tag – bei dringenden Anfragen sogar noch in derselben Stunde.",
+    "fr": "Je réponds généralement le jour même — voire dans l'heure si c'est urgent.",
+    "ru": "Обычно я отвечаю в тот же день, а в срочных случаях — в тот же час.",
+    "th": "ฉันมักจะตอบกลับในวันเดียวกัน — ถ้าเป็นเรื่องด่วนจะตอบกลับภายในชั่วโมงเดียวกัน"
+  },
+  "web.trade.reviews.heading": {
+    "en": "What customers say",
+    "cs": "Co říkají zákazníci",
+    "de": "Was Kunden sagen",
+    "fr": "Ce que disent nos clients",
+    "ru": "Отзывы клиентов",
+    "th": "สิ่งที่ลูกค้าพูด"
+  },
+  "web.trade.review.1.text": {
+    "en": "“Turned up when he said, fixed it in an hour, and explained exactly what had gone wrong. Spotless afterwards.”",
+    "cs": "„Přijel, kdy řekl, do hodiny to spravil a přesně vysvětlil, co bylo špatně. A po sobě uklidil.“",
+    "de": "„Er kam, wie vereinbart, hat das Problem innerhalb einer Stunde behoben und genau erklärt, was schiefgelaufen war. Danach war alles einwandfrei.“",
+    "fr": "« Il est arrivé à l'heure prévue, a réparé le problème en une heure et m'a expliqué en détail ce qui n'allait pas. Tout était impeccable après son passage. »",
+    "ru": "«Приехал в назначенное время, починил за час и подробно объяснил, в чём была проблема. После этого всё работало как по маслу».",
+    "th": "\"มาถึงเมื่อเขาบอกไว้ ซ่อมเสร็จภายในหนึ่งชั่วโมง และอธิบายอย่างละเอียดว่าเกิดปัญหาอะไรขึ้น หลังจากนั้นสะอาดหมดจด\""
+  },
+  "web.trade.review.1.author": {
+    "en": "— Hana, kitchen rewire",
+    "cs": "— Hana, rekonstrukce v kuchyni",
+    "de": "— Hana, Neuverkabelung der Küche",
+    "fr": "— Hana, réfection de l'installation électrique de la cuisine",
+    "ru": "— Хана, замена электропроводки на кухне",
+    "th": "— ฮานะ, เดินสายไฟใหม่ในครัว"
+  },
+  "web.trade.review.2.text": {
+    "en": "“Talked me out of a job I didn't need and sorted the real problem instead. Rare and appreciated.”",
+    "cs": "„Rozmluvil mi práci, kterou jsem nepotřeboval, a vyřešil ten skutečný problém. Vzácné a cením si toho.“",
+    "de": "„Hat mir eine Reparatur ausgeredet, die ich gar nicht brauchte, und stattdessen das eigentliche Problem gelöst. Das ist selten und sehr zu schätzen.“",
+    "fr": "« Il m'a déconseillé des travaux dont je n'avais pas besoin et a plutôt réglé le vrai problème. C'est rare et j'ai beaucoup apprécié. »",
+    "ru": "«Отговорил меня от ненужной работы и вместо этого решил настоящую проблему. Такое встречается редко, и я очень это ценю».",
+    "th": "\"พูดจนฉันเลิกคิดจะรับงานที่ไม่จำเป็น แล้วช่วยจัดการปัญหาที่แท้จริงแทน เป็นสิ่งที่หาได้ยากและน่าชื่นชมมาก\""
+  },
+  "web.trade.review.2.author": {
+    "en": "— Marek, fuse board",
+    "cs": "— Marek, rozvaděč",
+    "de": "— Marek, Sicherungskasten",
+    "fr": "— Marek, tableau électrique",
+    "ru": "— Марек, распределительный щит",
+    "th": "— มาเร็ค, ตู้ฟิวส์"
+  },
+  "web.trade.footer.note": {
+    "en": "Licensed electrician · Serving the whole county",
+    "cs": "Elektrikář s licencí · Působím v celém kraji",
+    "de": "Zertifizierter Elektriker · Im gesamten Landkreis tätig",
+    "fr": "Électricien agréé · Intervient dans tout le département",
+    "ru": "Дипломированный электрик · Обслуживает весь округ",
+    "th": "ช่างไฟฟ้าที่ได้รับใบอนุญาต · ให้บริการทั่วทั้งเขต"
+  }
+}

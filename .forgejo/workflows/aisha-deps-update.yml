@@ -1,0 +1,93 @@
+# =============================================================================
+# AISHA dependency update sweep (Forgejo-native Dependabot replacement)
+# =============================================================================
+# Dependabot never ran on the primary forge (.github/ is mirror-only) and its
+# hand-maintained directory list drifted (11 packages, 6 services, the
+# dirigent extension and images/plugin-exec/shim were never covered).
+# scripts/aisha-deps-update.mjs discovers targets from package-lock.json files
+# instead, computes a minor+patch-only plan (majors stay bespoke PRs), gives
+# npm-audit findings a priority "security" group, and opens idempotent
+# `deps/*` PRs via the Forgejo API.
+#
+# Internal @aisha/* packages are NEVER bumped here — they flow through
+# aisha-packages-publish (the script reports Verdaccio version drift so the
+# operator merges the package bump first, publishes, then re-runs this sweep).
+#
+# Phases (docs/security/DEPS_UPDATE_RUNBOOK.md):
+#   1. cron runs are DRY-RUN — the plan lands in the job log
+#   2. operator dispatches with apply=true for dev/patch groups
+#   3. apply becomes the cron default once trusted (edit APPLY below)
+#   4. retire .github/dependabot.yml + flip npm-audit CI jobs to gating
+#
+# Required secrets:
+#   FORGEJO_API_TOKEN   PR creation (github.token lacks status/PR scope here)
+# Optional:
+#   AISHA_GATEWAY_URL + POSTGREST_SERVICE_TOKEN  audit beacon
+# =============================================================================
+
+name: AISHA Deps Update
+
+on:
+  schedule:
+    # Monday 02:00 UTC = 04:00 Europe/Prague (matches the dependabot cadence)
+    - cron: "0 2 * * 1"
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply (open PRs) — default is dry-run plan only"
+        required: false
+        type: boolean
+        default: false
+      target_filter:
+        description: "Substring filter on target paths (e.g. mobile-app, root)"
+        required: false
+        type: string
+        default: ""
+
+concurrency:
+  # One sweep at a time; a queued second run just recomputes the plan.
+  group: aisha-deps-update
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+  VERDACCIO_URL: ${{ vars.VERDACCIO_URL }}
+
+jobs:
+  sweep:
+    name: Dependency update sweep
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history is NOT needed; branches are created from origin/main
+          # fetched explicitly by the script.
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Configure git identity
+        run: |
+          git config user.name "aisha-deps-update"
+          git config user.email "noreply@evymo.com"
+
+      - name: Install root dependencies
+        # --ignore-scripts blocks install-script supply-chain execution;
+        # registry traffic flows through Verdaccio per the committed .npmrc.
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Run sweep
+        env:
+          FORGEJO_API_TOKEN: ${{ secrets.FORGEJO_API_TOKEN }}
+          AISHA_GATEWAY_URL: ${{ secrets.AISHA_GATEWAY_URL }}
+          POSTGREST_SERVICE_TOKEN: ${{ secrets.POSTGREST_SERVICE_TOKEN }}
+          APPLY: ${{ inputs.apply == true && '1' || '' }}
+          TARGET_FILTER: ${{ inputs.target_filter }}
+        run: |
+          node scripts/aisha-deps-update.mjs

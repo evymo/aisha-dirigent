@@ -1,0 +1,406 @@
+# =============================================================================
+# Manual Deploy — AISHA Platform (Forgejo Actions)
+# =============================================================================
+# Manually trigger deployment of a specific Coolify stack.
+# Useful for re-deploys, rollbacks, and infrastructure-only changes.
+#
+# DYNAMIC UUID RESOLUTION — no `COOLIFY_UUID_*` secrets required.
+# Stacks are looked up by application NAME via the Coolify
+# /api/v1/applications endpoint. Each --wipe rebuilds apps with new UUIDs,
+# so static UUID secrets would break on every rebuild — see
+# scripts/lib/coolify-resolve-uuid.sh for the shared resolver.
+#
+# Usage: Forgejo UI -> Actions -> Deploy -> Run workflow
+#   or via API: POST /repos/{owner}/{repo}/actions/workflows/deploy.yml/dispatches
+#
+# "all" deploys keycloak → core → web in correct dependency order.
+#
+# Required secrets:
+#   COOLIFY_API_TOKEN, COOLIFY_URL
+# Optional secrets for db-migrate + autopilot smoke:
+#   AISHA_DB_URL, POSTGREST_URL, POSTGREST_SERVICE_TOKEN,
+#   AISHA_LLM_GATEWAY_URL, OPENCLAW_URL,
+#   SVC_AI_CHAT_URL, SVC_AI_CHAT_SERVICE_TOKEN
+# =============================================================================
+
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: "Coolify stack to deploy (app name without 'aisha-' prefix; or 'all')"
+        required: true
+        type: choice
+        options:
+          - all
+          - web
+          - core
+          - keycloak
+          - integration
+          - langfuse
+          - admin
+          - n8n-restart
+          - pki
+          - staging
+          - llm-gateway
+          - openclaw
+          - langgraph-runner
+          - ai-chat
+          - realtime
+          - source-broker
+          - messaging
+          - clamav
+          - orchestration
+          - observability-stack
+          - edge
+          - netbird
+          - registry
+          - shared-redis
+          - ledger
+          - exec
+          # ⛔ NAMĚŘENO 2026-09-27: 16 appek z WAVES tu chybělo, takže ruční
+          # přenasazení přes CI pro ně neexistovalo (local-ingest s enginem z
+          # kola 8 se nedal dohnat jinak než ručně v Coolify). Výčet musí pokrýt
+          # KAŽDOU appku z `aisha-redeploy.mjs --print-waves` — hlídá brána
+          # stack-bez-deploy-ulohy („ruční dispatch zná každou appku z WAVES").
+          - domain-services
+          - extranet
+          - livekit
+          - local-ingest
+          - mesh-router-backend
+          - mesh-router-experimental
+          - model
+          - monitoring
+          - netinit-backend
+          - netinit-experimental
+          - netinit-frontend
+          - observability
+          - pgadmin
+          - playwright
+          - potok
+          - web-render
+      force:
+        description: "Force rebuild (ignore Coolify cache)"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-${{ github.event.inputs.stack }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: "Deploy: ${{ github.event.inputs.stack }}"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/lib/coolify-resolve-uuid.sh
+            scripts/lib/coolify-project-scope.mjs
+            scripts/lib/coolify-instance-scope.mjs
+            scripts/lib/instance-overlay.mjs
+            scripts/lib/config-env-files.mjs
+            scripts/lib/env-hodnota.mjs
+            scripts/lib/cli-entry.mjs
+            scripts/lib/coolify-http.mjs
+            scripts/deploy/refresh-overlay-cachebust.sh
+            scripts/deploy/overlay-cachebust.sh
+
+      - name: Execute deployment
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
+          # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
+          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
+          # deploy joby běží jen na push do main (kód z main), ne na PR.
+          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          STACK_INPUT: ${{ github.event.inputs.stack }}
+          FORCE_INPUT: ${{ github.event.inputs.force }}
+          # KTEROU instanci tenhle repozitář nasazuje. Proměnná repozitáře, ne tajná
+          # hodnota — je to identifikátor, ne přístupový údaj. Fork si nastaví svou.
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+        run: |
+          set -euo pipefail
+          BASE_URL="${COOLIFY_URL:?COOLIFY_URL must be set via repository secret}"
+          export COOLIFY_URL="$BASE_URL"
+
+          # Instance se ověří DŘÍV, než se čehokoli dotkneme. Na jednom Coolify
+          # stojí vedle sebe produkce několika zákazníků a jméno aplikace je jediné,
+          # co je odlišuje — takže nejistota v prefixu je nejistota v tom, ČÍ provoz
+          # se právě restartuje. Žádná výchozí hodnota: 2026-08-04 mířil dispatch
+          # z forku na upstream stack, protože prefix byl v kódu natvrdo.
+          if [ -z "${APP_NAME_PREFIX:-}" ]; then
+            echo "::error::APP_NAME_PREFIX není nastaven — nevím, KTEROU instanci mám nasadit, a proto nenasadím nic."
+            echo "::error::Nastav proměnnou repozitáře APP_NAME_PREFIX (prefix TVÉ instance). Výchozí hodnota se ZÁMĚRNĚ nedosazuje."
+            exit 1
+          fi
+          export APP_NAME_PREFIX
+          printf 'Instance: %s-* (Coolify %s)\n' "$APP_NAME_PREFIX" "$BASE_URL"
+
+          # Map stack label → Coolify application name.
+          # NOTE: web and keycloak historically lived inside the same compose
+          # as core (aisha-core stack). After Phase 5 onboarding they may be
+          # split into dedicated apps — resolver will find whichever is
+          # present and skip the rest with a clear warning.
+          map_app_name() {
+            # Prefix INSTANCE, ne natvrdo "aisha". Bez toho deploy z forku míří na
+            # cizí produkci — naměřeno 2026-08-04, kdy dispatch z forku
+            # nasadil upstream core místo fork core.
+            local PFX="${APP_NAME_PREFIX:?APP_NAME_PREFIX není nastaven — nevím, kterou instanci nasadit. Nastav proměnnou repozitáře; výchozí hodnota se ZÁMĚRNĚ nedosazuje.}"
+            case "$1" in
+              core)              echo "${PFX}-core" ;;
+              keycloak)          echo "${PFX}-keycloak" ;;
+              web)               echo "${PFX}-web" ;;
+              integration)       echo "${PFX}-integration" ;;
+              langfuse)          echo "${PFX}-langfuse" ;;
+              admin)             echo "${PFX}-admin" ;;
+              pki)               echo "${PFX}-pki" ;;
+              staging)           echo "${PFX}-staging" ;;
+              llm-gateway)       echo "${PFX}-llm-gateway" ;;
+              openclaw)          echo "${PFX}-openclaw" ;;
+              langgraph-runner)  echo "${PFX}-langgraph-runner" ;;
+              n8n-restart)       echo "${PFX}-n8n" ;;
+              ai-chat)           echo "${PFX}-ai-chat" ;;
+              realtime)          echo "${PFX}-realtime" ;;
+              source-broker)     echo "${PFX}-source-broker" ;;
+              messaging)         echo "${PFX}-messaging" ;;
+              clamav)            echo "${PFX}-clamav" ;;
+              orchestration)     echo "${PFX}-orchestration" ;;
+              observability-stack) echo "${PFX}-observability-stack" ;;
+              edge)              echo "${PFX}-edge" ;;
+              netbird)           echo "${PFX}-netbird" ;;
+              registry)          echo "${PFX}-registry" ;;
+              shared-redis)      echo "${PFX}-shared-redis" ;;
+              ledger)            echo "${PFX}-ledger" ;;
+              exec)              echo "${PFX}-exec" ;;
+              # Ostatní appky z WAVES: Coolify jméno = `<prefix>-<appka z manifestu>`
+              # (týž tvar jako vlny v CI). Jen tvar jména — neexistující appku
+              # odmítne resolver UUID níž, nic se nehádá.
+              *)                 if [[ "$1" =~ ^[a-z0-9]+(-[a-z0-9]+)*$ ]]; then echo "${PFX}-$1"; else echo ""; return 1; fi ;;
+            esac
+          }
+
+          deploy_stack() {
+            local STACK="$1"
+            local FORCE="$2"
+            local APP_NAME
+            APP_NAME=$(map_app_name "$STACK") || {
+              echo "::error::Unknown stack: $STACK"
+              return 1
+            }
+
+            # Dynamic UUID resolution — falls back to the shared bash resolver
+            local UUID
+            UUID=$(bash scripts/lib/coolify-resolve-uuid.sh "$APP_NAME" 2>&1 || true)
+            # ::error:: means the resolve itself broke (API silent, no token, no JSON
+            # runtime) — the stack's state is UNKNOWN, so "skipping" would be a claim
+            # nobody measured. ::notfound:: means the app really is not installed.
+            if printf '%s' "$UUID" | grep -q '::error::'; then
+              echo "::error::Could not resolve '$APP_NAME' — infrastructure, not a missing app: $UUID"
+              return 1
+            fi
+            if [ -z "$UUID" ] || printf '%s' "$UUID" | grep -q '::notfound::'; then
+              # Přeskočit smí JEN hromadný běh, kde se prochází katalog a část stacků
+              # v téhle instalaci prostě není. Když si někdo vyžádal JEDEN stack a ten
+              # neexistuje, je to chyba zadání nebo špatná instance — a tiché
+              # „přeskakuji“ by z toho udělalo zelené nasazení, které nic nenasadilo.
+              if [ "${STACK_INPUT:-}" != "all" ]; then
+                echo "::error::Stack '$STACK' (app '$APP_NAME') v Coolify NENÍ — vyžádané nasazení nelze provést."
+                echo "::error::Ověř APP_NAME_PREFIX (teď '${APP_NAME_PREFIX:-<nenastaven>}') a název stacku."
+                return 1
+              fi
+              echo "::warning::Stack '$STACK' (app '$APP_NAME') not present in Coolify — skipping (hromadný běh)"
+              return 0
+            fi
+
+            if [ "$STACK" = "n8n-restart" ]; then
+              printf 'Restarting n8n (uuid=%s)...\n' "${UUID:0:12}"
+              curl -sS -X POST "${BASE_URL}/api/v1/applications/${UUID}/restart" \
+                -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+                -H "Content-Type: application/json"
+              echo "n8n restart triggered"
+            else
+              # ⛔ Overlay cachebust MUSÍ být čerstvý DŘÍV, než se spustí build.
+              # BuildKit kešuje vrstvu podle textu příkazu, takže `git clone` overlay
+              # repa proběhne jednou a pak už nikdy — obraz veze design ze dne prvního
+              # buildu a nasazení přitom zezelená.
+              # Naměřeno 2026-08-31: AISHA_WEB_DESIGN_CACHEBUST stál na starém SHA a
+              # opravená paleta značky se do obrazu nedostala ani po opakovaných
+              # nasazeních. `aisha-redeploy.mjs` obnovu uměl, tahle cesta ne — patří
+              # proto ke KAŽDÉMU nasazení, ne k jedné cestě.
+              # Kód, ne jen „nenula" (recenze aisha-team 2026-09-24): 3 = NEDOKÁZÁNO
+              # (HEAD/zápis/envy), 1 = chyba ZADÁNÍ (argument, COOLIFY_API_TOKEN,
+              # COOLIFY_BASE_URL) — tu musí někdo opravit v konfiguraci, nesmí
+              # splynout s „nepodařilo se ověřit". Fail-soft zůstává.
+              local CB_RC=0
+              COOLIFY_BASE_URL="${BASE_URL}" \
+                bash scripts/deploy/refresh-overlay-cachebust.sh "$UUID" "$STACK" || CB_RC=$?
+              case "$CB_RC" in
+                0) : ;;
+                3) echo "::warning title=cachebust NEDOKÁZÁN::'$STACK' — overlay je deklarovaný, ale cachebust se neobnovil (HEAD nečitelný, zápis nebo envy selhaly); build vezme overlay z KEŠE (chybí FORGEJO_TOKEN?)" ;;
+                *) echo "::error title=cachebust: chyba zadání::'$STACK' — refresh-overlay-cachebust.sh kód ${CB_RC} (chybí argument, COOLIFY_API_TOKEN nebo COOLIFY_BASE_URL) — oprav konfiguraci workflow; build může vzít overlay z keše" ;;
+              esac
+
+              printf 'Deploying %s (uuid=%s, force=%s)...\n' "$STACK" "${UUID:0:12}" "$FORCE"
+              local HTTP_CODE
+              # ⛔ POST, ne GET. NAMĚŘENO 2026-09-23 (run 51695): Coolify na GET vrací
+              # HTTP 405 „This endpoint has changed to a POST request." — tahle cesta
+              # tedy nenasadila NIC. deploy-and-verify.sh volá POST od začátku.
+              HTTP_CODE=$(curl -s -o /tmp/deploy.txt -w "%{http_code}" --max-time 30 \
+                -X POST "${BASE_URL}/api/v1/deploy?uuid=${UUID}&force=${FORCE}" \
+                -H "Authorization: Bearer ${COOLIFY_API_TOKEN}")
+              echo "HTTP $HTTP_CODE"
+              cat /tmp/deploy.txt 2>/dev/null || true
+              if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+                echo "::error::Deploy failed for $STACK with HTTP $HTTP_CODE"
+                return 1
+              fi
+
+              # HTTP 200 znamená JEN „přijato do fronty“. Coolify vrací
+              # {"deployments":[{"message":"… queued","deployment_uuid":"…"}]} a
+              # kontejnery se v tu chvíli ještě nezměnily. Bez čekání na výsledek
+              # hlásí job úspěch nad nasazením, které teprve začalo — nebo spadne.
+              #
+              # Naměřeno 2026-08-04: deployment h13zel7tq31n04nuwz4frs7s skončil
+              # `failed` na chybějícím NETBIRD_DNS_IP, ale krok „Execute deployment“
+              # byl zelený, protože měřil jen návratový kód POSTu.
+              local DEPL_UUID
+              DEPL_UUID=$(sed -n 's/.*"deployment_uuid":"\([^"]*\)".*/\1/p' /tmp/deploy.txt | head -1)
+              if [ -z "$DEPL_UUID" ]; then
+                echo "::error::Coolify nevrátil deployment_uuid — nemám co sledovat a NEBUDU předpokládat úspěch."
+                return 1
+              fi
+
+              printf 'Čekám na dokončení nasazení %s…\n' "${DEPL_UUID:0:12}"
+              local WAITED=0 DEPL_STATUS=""
+              while [ "$WAITED" -lt 900 ]; do
+                DEPL_STATUS=$(curl -s --max-time 20 \
+                  "${BASE_URL}/api/v1/deployments/${DEPL_UUID}" \
+                  -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+                  | sed -n 's/.*"status":"\([^"]*\)".*/\1/p' | head -1)
+                case "$DEPL_STATUS" in
+                  finished|success) printf '✅ %s nasazen (%s)\n' "$STACK" "$DEPL_STATUS"; return 0 ;;
+                  failed|cancelled|error)
+                    echo "::error::Nasazení $STACK skončilo stavem '$DEPL_STATUS' — kontejnery NEJSOU na nové revizi."
+                    echo "::error::Log: ${BASE_URL}/api/v1/deployments/${DEPL_UUID}"
+                    return 1 ;;
+                esac
+                sleep 10
+                WAITED=$((WAITED + 10))
+              done
+              echo "::error::Nasazení $STACK se do 15 minut nedokončilo (poslední stav '${DEPL_STATUS:-neznámý}') — výsledek NEZNÁM, takže hlásím chybu."
+              return 1
+              echo "Deploy triggered for $STACK"
+            fi
+          }
+
+          if [ "$STACK_INPUT" = "all" ]; then
+            echo "=== Deploying ALL stacks (keycloak → core → web) ==="
+            deploy_stack "keycloak" "$FORCE_INPUT"
+            echo ""
+            echo "Waiting 30s for Keycloak to initialize..."
+            sleep 30
+            deploy_stack "core" "$FORCE_INPUT"
+            echo ""
+            echo "Waiting 30s for Core services to start..."
+            sleep 30
+            deploy_stack "web" "$FORCE_INPUT"
+            echo ""
+            echo "=== All stacks deployed ==="
+          else
+            deploy_stack "$STACK_INPUT" "$FORCE_INPUT"
+          fi
+
+      - name: DB migrate (core deploys only)
+        if: github.event.inputs.stack == 'all' || github.event.inputs.stack == 'core'
+        env:
+          AISHA_DB_URL: ${{ secrets.AISHA_DB_URL }}
+        run: |
+          # POZOR na to, co je tady autoritativní kanál. Migraci jádra provádí služba
+          # `migrate` UVNITŘ stacku (docker-compose.coolify.yml): má vlastní
+          # AISHA_DB_URL na `db:5432`, běží jednou (`restart: "no"`) a ostatní služby
+          # na ní visí přes depends_on. Nasazení, které se dokončilo, tedy migrovalo.
+          #
+          # Tenhle krok je DRUHÝ, volitelný kanál pro případ, že se migruje bez
+          # přestavby stacku. Chybějící AISHA_DB_URL proto není důvod k pádu —
+          # důkaz o migraci nese dokončený deployment, na který se výše čeká.
+          #
+          # Co je ale ZAKÁZANÉ: tvrdit „hotovo“, když se nemigrovalo ani jedním
+          # kanálem. Do 2026-08-04 tu stálo `::warning:: … skipping` + `exit 0`,
+          # takže nasazení bezpečnostní opravy RPC prošlo jako hotové, zatímco
+          # produkční databáze dál držela zranitelnou funkci.
+          if [ -z "${AISHA_DB_URL:-}" ]; then
+            echo "Migrace proběhla ve stacku (služba 'migrate'); druhý kanál se nepoužívá — AISHA_DB_URL není nastaveno."
+            echo "Důkazem je dokončený deployment ověřený v kroku 'Execute deployment', ne tenhle krok."
+            exit 0
+          fi
+          node scripts/db/migrate.mjs
+
+      - name: Health check (production endpoints)
+        if: github.event.inputs.stack == 'all' || github.event.inputs.stack == 'core' || github.event.inputs.stack == 'web'
+        env:
+          # Adresa ověření má JEDEN domov s CI (ci.yml, úloha Deploy: Core):
+          # DEPLOY_HEALTH_URL_CORE. ⛔ NAMĚŘENO 2026-09-27 na forku: dispatch core
+          # se NASADIL (Coolify finished, migrace ve stacku), ale krok spadl na
+          # „API_DOMAIN_PUBLIC required" — tajemství, které fork nemá a CI nepotřebuje.
+          DEPLOY_HEALTH_URL_CORE: ${{ secrets.DEPLOY_HEALTH_URL_CORE }}
+          STACK_INPUT: ${{ github.event.inputs.stack }}
+          API_DOMAIN_PUBLIC: ${{ secrets.API_DOMAIN_PUBLIC }}
+          APP_DOMAIN: ${{ secrets.APP_DOMAIN }}
+          KEYCLOAK_DOMAIN: ${{ secrets.KEYCLOAK_DOMAIN }}
+          KEYCLOAK_REALM: ${{ secrets.KEYCLOAK_REALM }}
+        run: |
+          set -uo pipefail
+          echo "Waiting 60s for deployment rollout..."
+          sleep 60
+          echo "Checking production health..."
+
+          check() {
+            local name="$1" url="$2"
+            local HTTP
+            HTTP=$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 "$url" 2>/dev/null || echo "000")
+            if [ "$HTTP" -ge 200 ] && [ "$HTTP" -lt 400 ]; then
+              echo "  OK   $name (HTTP $HTTP)"
+            else
+              echo "  FAIL $name (HTTP $HTTP)"
+            fi
+          }
+
+          if [ "${STACK_INPUT:-}" = "core" ] && [ -n "${DEPLOY_HEALTH_URL_CORE:-}" ]; then
+            # Týž bod jako CI (jen pro core — web a all měří i další povrchy níž);
+            # selhání = červená, žádné tiché přeskočení.
+            HTTP=$(curl -sS -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 15 "$DEPLOY_HEALTH_URL_CORE" 2>/dev/null || echo "000")
+            if [ "$HTTP" -ge 200 ] && [ "$HTTP" -lt 400 ]; then echo "  OK   core (DEPLOY_HEALTH_URL_CORE, HTTP $HTTP)"; exit 0; fi
+            echo "::error title=core neodpovídá::DEPLOY_HEALTH_URL_CORE vrátil HTTP $HTTP"; exit 1
+          fi
+          : "${API_DOMAIN_PUBLIC:?API_DOMAIN_PUBLIC required (workflow secret) — nebo DEPLOY_HEALTH_URL_CORE jako v CI}"
+          : "${APP_DOMAIN:?APP_DOMAIN required (workflow secret)}"
+          : "${KEYCLOAK_DOMAIN:?KEYCLOAK_DOMAIN required (workflow secret)}"
+          : "${KEYCLOAK_REALM:=aisha}"
+
+          check "Kong API"     "https://${API_DOMAIN_PUBLIC}/"
+          check "Auth (KC proxy)""https://${API_DOMAIN_PUBLIC}/auth/v1/health"
+          check "PostgREST"    "https://${API_DOMAIN_PUBLIC}/rest/v1/"
+          check "Web App"      "https://${APP_DOMAIN}/"
+          check "Keycloak"     "https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/.well-known/openid-configuration"
+
+      - name: Autopilot smoke (Phase 1-5 RPCs + decision paths)
+        if: github.event.inputs.stack == 'all' || github.event.inputs.stack == 'core'
+        env:
+          POSTGREST_URL: ${{ secrets.POSTGREST_URL }}
+          POSTGREST_SERVICE_TOKEN: ${{ secrets.POSTGREST_SERVICE_TOKEN }}
+          AISHA_LLM_GATEWAY_URL: ${{ secrets.AISHA_LLM_GATEWAY_URL }}
+          OPENCLAW_URL: ${{ secrets.OPENCLAW_URL }}
+          SVC_AI_CHAT_URL: ${{ secrets.SVC_AI_CHAT_URL }}
+          SVC_AI_CHAT_SERVICE_TOKEN: ${{ secrets.SVC_AI_CHAT_SERVICE_TOKEN }}
+        run: |
+          if [ -z "${POSTGREST_URL:-}" ] || [ -z "${POSTGREST_SERVICE_TOKEN:-}" ]; then
+            echo "::warning::POSTGREST_URL or POSTGREST_SERVICE_TOKEN missing — skipping autopilot smoke"
+            exit 0
+          fi
+          node scripts/smoke/autopilot-flow.mjs

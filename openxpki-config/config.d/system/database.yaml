@@ -1,0 +1,17 @@
+main:
+    debug: 0
+    type: MariaDB2
+    name: openxpki
+    host: pki-db
+    port: 3306
+    user: openxpki
+    passwd: __PKI_DB_PASSWORD__
+    # NOTE: __PKI_DB_PASSWORD__ is a placeholder rewritten at deploy time by
+    # pki-init container (sed replacement) before pki-server/pki-client start.
+    # See docker-compose.coolify-pki.yml → service `pki-init`.
+    # Rendered file lives in named volume `pki-config-rendered`.
+
+    # Retry connection on startup (DB container may start slower)
+    wait_on_init:
+        retry_count: 15
+        retry_interval: 5

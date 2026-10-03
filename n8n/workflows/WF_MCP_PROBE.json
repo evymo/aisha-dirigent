@@ -1,0 +1,245 @@
+{
+  "name": "WF_MCP_PROBE",
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "node-trigger",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        300
+      ],
+      "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/get_mcp_servers_due_probe",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"p_min_interval_seconds\": 300, \"p_limit\": 20}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "node-list-mcps",
+      "name": "List MCPs Due Probe",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        420,
+        300
+      ],
+      "onError": "stopWorkflow",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "node-split",
+      "name": "Split Per MCP",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        620,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/aisha_test_mcp_server",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"p_slug\": \"{{ $json.slug }}\", \"p_probe_method\": \"tools/list\"}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "node-audit-probe",
+      "name": "Audit Probe Intent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        820,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// aisha_test_mcp_server returned { test_id, payload: {transport, endpoint_url,\n// auth_kind, auth_env_var, probe_method, ...} }. We do the HTTP probe here\n// (n8n is the runtime; SSRF concerns are minimal because targets come from\n// our own mcp_server_registry — operator-curated, not user input).\n//\n// Note: stdio transport excluded by get_mcp_servers_due_probe upstream, so\n// here we handle http + sse + websocket. Websocket probes are emulated as\n// HTTP GET (just connectivity, not protocol-level handshake).\n\nconst auditResp = $input.first().json;\nconst payload = auditResp.payload || {};\nconst originalMcp = $('Split Per MCP').first().json;\n\nconst probeMethod = payload.probe_method || 'tools/list';\nconst transport = payload.transport || originalMcp.transport;\nconst endpointUrl = payload.endpoint_url || originalMcp.endpoint_url;\nconst authEnvVar = payload.auth_env_var || originalMcp.auth_env_var;\n\nif (!endpointUrl) {\n  return [\n    {\n      json: {\n        slug: originalMcp.slug,\n        skip: true,\n        ok: false,\n        latency_ms: 0,\n        error: 'no endpoint_url',\n        supported_methods: [],\n        sample_response_excerpt: null,\n      },\n    },\n  ];\n}\n\nconst probeStartedAt = Date.now();\nconst token = authEnvVar ? (process.env[authEnvVar] || '') : '';\n\nlet ok = false;\nlet latencyMs = 0;\nlet supportedMethods = [];\nlet sampleResponseExcerpt = null;\nlet error = null;\n\ntry {\n  // JSON-RPC 2.0 over HTTP — standard MCP transport. tools/list returns\n  // { jsonrpc, id, result: { tools: [{name, description, ...}, ...] } }.\n  const body = {\n    jsonrpc: '2.0',\n    id: auditResp.test_id || 'probe-1',\n    method: probeMethod,\n    params: {},\n  };\n\n  const headers = { 'Content-Type': 'application/json' };\n  if (token) headers.Authorization = `Bearer ${token}`;\n\n  // n8n's built-in fetch — AbortController not available in code-node sandbox,\n  // so rely on n8n's per-node timeout (set via options.timeout above in\n  // upstream node). 10s is enough for any well-configured MCP server.\n  const res = await fetch(endpointUrl, {\n    method: 'POST',\n    headers,\n    body: JSON.stringify(body),\n  });\n  latencyMs = Date.now() - probeStartedAt;\n\n  if (res.ok) {\n    const text = await res.text();\n    sampleResponseExcerpt = text.slice(0, 280);\n    try {\n      const parsed = JSON.parse(text);\n      const tools = parsed?.result?.tools;\n      if (Array.isArray(tools)) {\n        supportedMethods = tools.map((t) => t.name).slice(0, 50);\n      }\n      ok = true;\n    } catch (_) {\n      // body wasn't JSON but HTTP OK — degraded but reachable\n      ok = true;\n    }\n  } else {\n    ok = false;\n    error = `HTTP ${res.status}`;\n    sampleResponseExcerpt = (await res.text().catch(() => '')).slice(0, 280);\n  }\n} catch (err) {\n  latencyMs = Date.now() - probeStartedAt;\n  ok = false;\n  error = `network: ${String(err).slice(0, 200)}`;\n}\n\nreturn [\n  {\n    json: {\n      slug: originalMcp.slug,\n      ok,\n      latency_ms: latencyMs,\n      supported_methods: supportedMethods,\n      sample_response_excerpt: sampleResponseExcerpt,\n      error,\n      transport,\n      skip: false,\n    },\n  },\n];"
+      },
+      "id": "node-probe",
+      "name": "HTTP/SSE Probe",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/aisha_record_mcp_test_result",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"p_slug\": \"{{ $json.slug }}\", \"p_ok\": {{ $json.ok }}, \"p_latency_ms\": {{ $json.latency_ms }}, \"p_supported_methods\": {{ JSON.stringify($json.supported_methods || []) }}, \"p_sample_response_excerpt\": {{ $json.sample_response_excerpt === null ? 'null' : JSON.stringify($json.sample_response_excerpt) }}, \"p_error\": {{ $json.error === null ? 'null' : JSON.stringify($json.error) }}}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "node-record",
+      "name": "Record MCP Test Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1260,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "List MCPs Due Probe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List MCPs Due Probe": {
+      "main": [
+        [
+          {
+            "node": "Split Per MCP",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Per MCP": {
+      "main": [
+        [
+          {
+            "node": "Audit Probe Intent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit Probe Intent": {
+      "main": [
+        [
+          {
+            "node": "HTTP/SSE Probe",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP/SSE Probe": {
+      "main": [
+        [
+          {
+            "node": "Record MCP Test Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "pinData": {},
+  "versionId": "",
+  "triggerCount": 0,
+  "tags": [
+    {
+      "name": "autopilot"
+    },
+    {
+      "name": "mcp"
+    }
+  ]
+}

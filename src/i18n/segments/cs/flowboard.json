@@ -1,0 +1,56 @@
+{
+  "flowboard": {
+    "palette": {
+      "title": "Paleta uzlů",
+      "subtitle": "= federovaný katalog pluginů"
+    },
+    "kind": {
+      "trigger": "Spouštěče",
+      "agent": "Agenti",
+      "tool": "Nástroje MCP",
+      "action": "Akce",
+      "control": "Ovládání",
+      "gate": "Brány"
+    },
+    "canvas": {
+      "cannotConnect": "Nelze propojit {{from}} → {{to}}.",
+      "invalidConnection": "Neplatné připojení k portu.",
+      "valid": "platný",
+      "errors": "Chyby {{count}}",
+      "descriptionPlaceholder": "Popište, jak by měl tento postup fungovat…",
+      "askAisha": "Zeptejte se AISHA",
+      "save": "Uložit"
+    },
+    "page": {
+      "savedFlows": "Uložené toky",
+      "newFlow": "Nový tok",
+      "empty": "Zatím žádné toky",
+      "loading": "Načítání palety…",
+      "saved": "Průtok uložen",
+      "saveFailed": "Uložení toku se nezdařilo",
+      "loadFailed": "Načtení toku se nezdařilo",
+      "run": "Spustit",
+      "running": "Běh…",
+      "runStarted": "Spuštění průtokového měření",
+      "runAwaitingApproval": "Spuštění pozastaveno — čeká se na schválení",
+      "runFailed": "Spuštění toku se nezdařilo",
+      "runResumed": "Provoz byl obnoven"
+    },
+    "block": {
+      "consentTitle": "Je nutné schválení",
+      "approved": "schváleno",
+      "awaiting": "čeká na schválení",
+      "approveButton": "Schválit a pokračovat",
+      "runTitle": "Spuštění automatizace",
+      "stepTitle": "Krok automatizace",
+      "status": {
+        "executed": "hotovo",
+        "approved": "schváleno",
+        "error": "chyba",
+        "running": "běh",
+        "compliance_checkpoint": "kontrola dodržování předpisů",
+        "awaiting_approval": "čeká na schválení"
+      }
+    }
+  }
+}

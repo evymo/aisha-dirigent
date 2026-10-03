@@ -1,0 +1,575 @@
+{
+  "orderReview": {
+    "website": "Web",
+    "websitePlaceholder": "https://",
+    "title": "Ohodnoťte objednávku",
+    "editTitle": "Upravit hodnocení",
+    "description": "Podělte se o svou zkušenost s touto objednávkou",
+    "rating": "Hodnocení",
+    "comment": "Komentář (volitelné)",
+    "commentPlaceholder": "Napište nám o vaší zkušenosti...",
+    "ratingRequired": "Vyberte prosím hodnocení",
+    "createSuccess": "Děkujeme za vaše hodnocení!",
+    "updateSuccess": "Hodnocení bylo aktualizováno",
+    "yourReview": "Vaše hodnocení",
+    "leaveReview": "Zanechat hodnocení",
+    "availableIn": "Hodnocení dostupné za {{days}} dní"
+  },
+  "productReviews": {
+    "title": "Hodnocení zákazníků",
+    "basedOn": "Na základě {{count}} hodnocení",
+    "basedOn_one": "Na základě {{count}} hodnocení",
+    "showingLatest": "Zobrazeno {{shown}} z {{total}} hodnocení"
+  },
+  "shop": {
+    "sectionLabel": "Platforma",
+    "productsTitle": "Naše preparáty RTN",
+    "productsSubtitle": "Prozkoumejte naši řadu platformových nástrojů vycházejících z osvědčených oborových postupů. Nástroje zaměřené na kvalitu pro podporu spolehlivého dodávání.",
+    "cleanIngredients": "Čisté složení",
+    "euCompliant": "Splňuje normy EU",
+    "preorderNotice": "Preparáty RTN jsou dostupné k předobjednávce pouze registrovaným členům. Členství zahrnuje přístup k našim výzkumným clusterům a exkluzivním nabídkám preparátů RTN.",
+    "membersOnly": "Pouze pro členy",
+    "partnersOnly": "Pouze pro partnery",
+    "learnMore": "Více informací",
+    "viewProduct": "Zobrazit preparát",
+    "outOfStock": "Vyprodáno",
+    "noProducts": "Zatím nejsou k dispozici žádné preparáty RTN.",
+    "backToShop": "Zpět do obchodu",
+    "productNotFound": "Preparát nebyl nalezen.",
+    "addToCart": "Přidat do rituálu",
+    "aboutProduct": "O preparátu",
+    "signInToPurchase": "Pro předobjednávku a správu košíku se prosím přihlaste.",
+    "bridgeTitle": "Z archivu do současnosti",
+    "bridgeSubtitle": "Naše preparáty RTN jsou vyvíjeny na základě historického výzkumu, přetvořené s moderními bezpečnostními a kvalitativními standardy.",
+    "methodsStandards": "Přečtěte si naše metody a standardy",
+    "membershipCtaTitle": "Máte zájem o předobjednávku?",
+    "membershipCtaDescription": "Připojte se k našemu členskému programu pro přístup k předobjednávkám, účast ve výzkumných clusterech a exkluzivní členské výhody.",
+    "becomeMember": "Staňte se členem",
+    "exploreStudies": "Prozkoumat clustery",
+    "complianceNote": "Tyto preparáty RTN jsou doplňky stravy a nejsou určeny k diagnostice, léčbě, vyléčení nebo prevenci jakéhokoli onemocnění. Před zahájením užívání jakéhokoli nového doplňku se vždy poraďte se zdravotnickým odborníkem.",
+    "originSource": "Zdroj",
+    "originProduction": "Výroba",
+    "access": {
+      "viewOnly": "Jen prohlížení",
+      "preorder": "Předobjednávka",
+      "canOrder": "Objednat",
+      "autoApprove": "Automatické schválení",
+      "signInForAccess": "Pro zobrazení úrovně přístupu se přihlaste"
+    },
+    "emptyState": "Žádné produkty nenalezeny",
+    "viewDetail": "Zobrazit detail"
+  },
+  "shopBridge": {
+    "sectionLabel": "Z archivu do současnosti",
+    "title": "Jak překládáme historické preparáty",
+    "subtitle": "Historické preparáty informují naše moderní doplňky. Takto propojujeme historii se současností — s integritou, bezpečností a transparentností.",
+    "historicalRecord": "Historický záznam",
+    "historicalDescription": "Původní výrobní protokoly preparátů zdokumentované v archivech z let 1930–1970",
+    "modernStandards": "Moderní standardy",
+    "modernDescription": "GMP výroba, soulad s EU, testování bezpečnosti, jasné označení",
+    "principles": {
+      "noMedicalClaims": {
+        "title": "Žádná lékařská tvrzení",
+        "description": "Označeno jako doplňky stravy, nikoli léky"
+      },
+      "qualitySources": {
+        "title": "Kvalitní zdroje",
+        "description": "Bio byliny, kontrolované živočišné zdroje"
+      },
+      "fullTransparency": {
+        "title": "Plná transparentnost",
+        "description": "Odkazy na archiv na každé stránce preparátu"
+      }
+    },
+    "viewProducts": "Zobrazit moderní preparáty RTN",
+    "chooseExplore": "Pokud se rozhodnete prozkoumat naše moderní prezentace:"
+  },
+  "subscription": {
+    "authRequired": "Vyžadováno přihlášení",
+    "authRequiredDesc": "Pro podání žádosti o předplatné se prosím přihlaste.",
+    "activated": "Předplatné aktivováno",
+    "activatedDesc": "Vaše předplatné {{name}} je nyní aktivní.",
+    "purchaseFailed": "Odeslání žádosti selhalo",
+    "purchaseFailedDesc": "Nepodařilo se odeslat žádost o předplatné.",
+    "requested": "Žádost o předplatné odeslána",
+    "requestedDesc": "Vaše žádost o {{name}} byla odeslána a čeká na schválení.",
+    "requestFailed": "Žádost selhala",
+    "requestFailedDesc": "Nepodařilo se odeslat žádost o předplatné.",
+    "awaitingApproval": "Čeká na schválení",
+    "approved": "Schváleno - čeká na platbu",
+    "payNow": "Zaplatit",
+    "checkoutStarted": "Platební stránka otevřena",
+    "checkoutStartedDesc": "Dokončete platbu v novém okně.",
+    "checkoutFailed": "Nepodařilo se zahájit platbu",
+    "portalFailed": "Nepodařilo se otevřít správu předplatného",
+    "checkout": {
+      "selectPaymentType": "Vyberte způsob platby",
+      "oneTimePayment": "Jednorázová platba",
+      "oneTimeDesc": "Zaplatíte celou částku najednou za celé období předplatného.",
+      "recurringPayment": "Opakovaná platba",
+      "recurringDesc": "Automaticky se vám bude strhávat pravidelná částka.",
+      "recommended": "Doporučeno",
+      "billingFull": "Fakturace na celé období",
+      "billingMinimum": "Minimální závazek {{months}} měsíců",
+      "billingInterval": "Fakturace každých {{months}} měsíců"
+    }
+  },
+  "orders": {
+    "title": "Moje objednávky",
+    "subtitle": "Přehled vašich objednávek a jejich stavu.",
+    "noOrders": "Zatím žádné objednávky",
+    "noOrdersDescription": "Ještě jste neprovedli žádnou objednávku. Prozkoumejte náš obchod!",
+    "browseShop": "Prohlédnout obchod",
+    "orderNumber": "Objednávka",
+    "noOrdersDesc": "Ještě jste neprovedli žádnou objednávku. Prozkoumejte náš obchod!",
+    "order": "Objednávka",
+    "product": "Preparát",
+    "total": "Celkem",
+    "status": {
+      "pending": "Čeká na zpracování",
+      "processing": "Zpracovává se",
+      "shipped": "Odesláno",
+      "delivered": "Doručeno",
+      "cancelled": "Zrušeno",
+      "refunded": "Vráceno"
+    },
+    "paymentMethod": {
+      "card": "Kartou",
+      "bankTransfer": "Bankovní převod"
+    },
+    "paymentStatus": {
+      "pending": "Čeká",
+      "paid": "Zaplaceno",
+      "failed": "Selhalo",
+      "refunded": "Vráceno"
+    },
+    "invoice": {
+      "label": "Faktura",
+      "download": "Stáhnout fakturu",
+      "printError": "Nepodařilo se otevřít fakturu"
+    },
+    "bankTransfer": {
+      "awaitingPayment": "Čeká na bankovní převod",
+      "variableSymbol": "Variabilní symbol",
+      "dueDate": "Splatnost",
+      "viewDetails": "Zobrazit platební údaje"
+    }
+  },
+  "cart": {
+    "title": "Váš rituál",
+    "signInToView": "Přihlaste se pro zobrazení košíku",
+    "signInDescription": "Vytvořte si účet nebo se přihlaste pro přidání položek do vašeho rituálu.",
+    "empty": "Váš košík je prázdný",
+    "emptyDescription": "Prozkoumejte naše preparáty RTN a přidejte je do vašeho rituálu.",
+    "browseProducts": "Procházet preparáty RTN",
+    "total": "Celkem",
+    "proceedToCheckout": "Pokračovat k objednávce",
+    "shippingCalculated": "Doprava se vypočítá při placení",
+    "qty": "Ks",
+    "added": "Přidáno do rituálu",
+    "addedDescription": "Položka byla přidána do košíku.",
+    "removed": "Odebráno",
+    "removedDescription": "Položka byla odebrána z košíku."
+  },
+  "checkout": {
+    "title": "Objednávka",
+    "cartEmpty": "Váš košík je prázdný",
+    "cartEmptyDescription": "Před objednáním přidejte nějaké preparáty RTN do košíku.",
+    "continueShopping": "Pokračovat v prohlížení",
+    "contactInfo": "Kontaktní údaje a adresa",
+    "firstName": "Jméno",
+    "lastName": "Příjmení",
+    "email": "E-mail",
+    "phone": "Telefon",
+    "phonePlaceholder": "+420...",
+    "shippingMethod": "Způsob dopravy",
+    "selectPickupPoint": "Vyberte výdejní místo",
+    "selectedPickupPoint": "Vybrané výdejní místo",
+    "noPickupPoints": "Pro tuto zemi nejsou dostupná žádná výdejní místa",
+    "deliveryMethod": "Doručení",
+    "shippingAddress": "Dodací adresa",
+    "address": "Adresa",
+    "city": "Město",
+    "postalCode": "PSČ",
+    "country": "Země",
+    "stripeSecure": "Bezpečná platba přes Stripe. Údaje o kartě jsou šifrované a nikdy se neukládají na našich serverech.",
+    "proceedToPayment": "Pokračovat k platbě",
+    "processing": "Zpracovávám...",
+    "payment": {
+      "title": "Způsob platby",
+      "card": "Platební karta",
+      "cardDesc": "Bezpečná platba kartou přes Stripe.",
+      "bankTransfer": "Bankovní převod",
+      "bankTransferDesc": "Platba bankovním převodem s variabilním symbolem. Objednávka je zpracována po připsání platby.",
+      "bankTransferSecure": "Po vytvoření objednávky obdržíte platební údaje pro bankovní převod.",
+      "placeOrderBankTransfer": "Vytvořit objednávku"
+    },
+    "bankTransfer": {
+      "orderCreated": "Objednávka úspěšně vytvořena",
+      "orderCreatedDesc": "Dokončete prosím bankovní převod pomocí níže uvedených údajů.",
+      "orderRef": "Číslo objednávky:",
+      "paymentDetails": "Platební údaje",
+      "paymentDetailsDesc": "Použijte následující údaje pro provedení platby.",
+      "iban": "IBAN",
+      "bic": "BIC/SWIFT",
+      "variableSymbol": "Variabilní symbol",
+      "amount": "Částka",
+      "dueDate": "Datum splatnosti",
+      "copied": "Zkopírováno",
+      "copiedDesc": "{{field}} zkopírováno do schránky.",
+      "importantTitle": "Důležité",
+      "importantDesc": "Při převodu prosím uveďte přesný variabilní symbol. Zajistíte tak automatické spárování platby s objednávkou.",
+      "goToOrders": "Zobrazit moje objednávky",
+      "continueShopping": "Pokračovat v nákupu",
+      "orderNotFound": "Objednávka nenalezena",
+      "orderNotFoundDesc": "Objednávka, kterou hledáte, neexistuje nebo k ní nemáte přístup.",
+      "qrCode": {
+        "title": "QR platební kód",
+        "description": "Naskenujte tento QR kód v mobilním bankovnictví pro automatické vyplnění platebních údajů.",
+        "scanToPay": "Naskenujte pro platbu",
+        "ariaLabel": "QR kód pro platbu bankovním převodem"
+      }
+    },
+    "consents": {
+      "title": "Právní souhlasy"
+    },
+    "orderSummary": "Souhrn objednávky",
+    "subtotal": "Mezisoučet",
+    "shipping": {
+      "title": "Doprava",
+      "free": "Zdarma",
+      "packetaPickup": "Zásilkovna - výdejní místo",
+      "packetaPickupDesc": "Vyzvedněte si objednávku na 7 000+ místech po celé Evropě",
+      "packetaHome": "Doručení domů (Zásilkovna)",
+      "packetaHomeDesc": "Doručeno na vaši adresu do 2-4 pracovních dnů",
+      "personalPickup": "Osobní odběr",
+      "personalPickupDesc": "Vyzvednutí v naší pražské kanceláři (Karlín)",
+      "pickup": "Výdejní místo",
+      "pickupDesc": "Vyzvedněte si zásilku na tisících místech",
+      "zbox": "Z-BOX (balíkomat)",
+      "zboxDesc": "Síť samoobslužných balíkomatů dostupná 24/7",
+      "homeDelivery": "Doručení na adresu",
+      "homeDeliveryDesc": "Doručení kurýrem přímo k vám domů",
+      "deliverToSameAddress": "Doručit na adresu výše",
+      "deliverToDifferentAddress": "Doručit na jinou adresu",
+      "deliveringTo": "Doručení na:",
+      "carrierPickup": "Výdejní místo dopravce",
+      "carrierHome": "Kurýrní doručení domů",
+      "deliveryLocation": "Místo doručení",
+      "postalCodePlaceholder": "např. 110 00",
+      "freeShippingEarned": "Máte dopravu zdarma!",
+      "freeShippingRemaining": "Přidejte ještě za {{amount}} pro dopravu zdarma",
+      "freeShippingProgress": "Doprava zdarma od {{threshold}}",
+      "searchPickupPoint": "Hledat podle názvu nebo adresy...",
+      "searchZBox": "Hledat Z-BOXy podle názvu nebo adresy...",
+      "selectedPoint": "Vybrané výdejní místo",
+      "selectedZBox": "Vybraný Z-BOX",
+      "noPickupPointsFound": "Pro váš dotaz nebylo nalezeno žádné výdejní místo",
+      "noZBoxesFound": "Pro váš dotaz nebyl nalezen žádný Z-BOX",
+      "noCarriersAvailable": "Pro tuto zemi nejsou dostupní žádní dopravci",
+      "selectCarrier": "Vyberte dopravce",
+      "maxWeight": "Maximální {{weight}} kg",
+      "noCod": "Není možná dobírka",
+      "showingOfTotal": "Zobrazeno {{showing}} z {{total}}",
+      "open247": "Nonstop",
+      "withKeypad": "S klávesnicí",
+      "km": "km"
+    },
+    "validation": {
+      "firstNameRequired": "Jméno je povinné",
+      "lastNameRequired": "Příjmení je povinné",
+      "emailInvalid": "Neplatná emailová adresa",
+      "phoneRequired": "Telefon je povinný",
+      "addressRequired": "Adresa je povinná",
+      "cityRequired": "Město je povinné",
+      "postalCodeInvalid": "Neplatný formát PSČ",
+      "countryRequired": "Země je povinná",
+      "consentsRequired": "Prosím odsouhlaste všechny povinné souhlasy."
+    },
+    "countries": {
+      "CZ": "Česká republika",
+      "SK": "Slovensko",
+      "DE": "Německo",
+      "AT": "Rakousko",
+      "PL": "Polsko"
+    },
+    "messages": {
+      "success": "Objednávka úspěšně odeslána",
+      "successDesc": "Děkujeme za vaši objednávku! Brzy vám zašleme potvrzovací email.",
+      "error": "Objednávka selhala",
+      "errorDesc": "Při zpracování vaší objednávky došlo k chybě. Zkuste to prosím znovu.",
+      "validationError": "Chyba validace",
+      "validationErrorDesc": "Zkontrolujte prosím formulář pro chyby.",
+      "selectPickupPoint": "Prosím vyberte výdejní místo",
+      "addressRequired": "Prosím vyplňte dodací adresu",
+      "paymentSuccess": "Platba proběhla úspěšně!",
+      "paymentSuccessDesc": "Vaše objednávka byla potvrzena. Brzy obdržíte potvrzovací email.",
+      "paymentCancelled": "Platba zrušena",
+      "paymentCancelledDesc": "Vaše platba byla zrušena. Položky v košíku jsou stále uloženy.",
+      "consentsRequired": "Prosím odsouhlaste všechny povinné souhlasy."
+    },
+    "voucher": {
+      "title": "Voucher / Slevový kód",
+      "placeholder": "Zadejte kód",
+      "apply": "Použít",
+      "remove": "Odebrat",
+      "applied": "Voucher použit",
+      "appliedDesc": "Váš voucher byl úspěšně uplatněn na objednávku.",
+      "invalid": "Neplatný voucher",
+      "invalidDesc": "Zadaný kód je neplatný, expirovaný nebo nelze použít.",
+      "invalidProduct": "Produkt není v košíku",
+      "invalidProductDesc": "Tento voucher je platný pro produkt, který není v košíku.",
+      "discount": "Sleva z voucheru"
+    }
+  },
+  "products": {
+    "viewInShop": "Zobrazit v obchodě",
+    "viewArchive": "Zobrazit archivní dokumenty",
+    "exploreShop": "Prozkoumat obchod",
+    "joinStudy": "Zapojit se do clusteru",
+    "preOrder": "Předobjednat",
+    "ctaTitle": "Zájem o preparáty RTN?",
+    "ctaDescription": "Prozkoumejte naši kompletní řadu tkáňových přípravků nebo se zapojte do našeho observačního clusteru a přispějte k probíhajícímu výzkumu.",
+    "disclaimer": "Jedná se o doplněk stravy. Nejedná se o léčivo a není určeno k diagnostice, léčbě, vyléčení nebo prevenci jakéhokoliv onemocnění. Před použitím se poraďte se zdravotnickým odborníkem.",
+    "purchaseRequirements": {
+      "qualificationRequired": "Pro objednání preparátů RTN musíte úspěšně absolvovat kvalifikační test.",
+      "consentRequired": "Pro objednání preparátů RTN musíte podepsat informovaný souhlas."
+    },
+    "retisin": {
+      "name": "Demo Product 1 (DEMO-01)",
+      "badge": "Nukleoproteinový Imunomodulátor",
+      "tagline": "Metabolický akcelerátor a regenerační podpora",
+      "description": "Z pohledu molekulární biologie Retisin cílí na fundamentální obnovu buněčné energetiky a imunitního dohledu. Jeho primárním benefitem je modulace 'terénu' organismu – tedy optimalizace prostředí pro regenerační procesy. Působí jako silné roborans (posilující prostředek), které historicky prokazovalo schopnost zvyšovat celkovou rezistenci organismu a tlumit kvasné procesy (často asociované s Warburgovým efektem u patologických tkání) ve prospěch oxidativního metabolismu. Je ideální pro stavy vyčerpanosti, rekonvalescenci po invazivních zákrocích či radioterapii a pro podporu krvetvorby.",
+      "imageAlt": "Demo Product 1 30ml kapky",
+      "origin": {
+        "title": "Původ a výroba",
+        "description": "Deproteinovaný etanolový extrakt z bovinní tkáně se specifickým spektrem nízkomolekulárních bioaktivních látek.",
+        "source": {
+          "title": "Bovinní tkáň",
+          "description": "Získáváno z certifikovaných chovů s přísnou kontrolou kvality."
+        },
+        "production": {
+          "title": "Extrakce",
+          "description": "Specifická etanolová extrakce zachovávající nízkomolekulární bioaktivní látky."
+        }
+      },
+      "benefitsTitle": "Klíčové benefity",
+      "benefits": {
+        "energy": {
+          "title": "Obnova buněčné energetiky",
+          "description": "Cílí na fundamentální obnovu buněčné energetiky a optimalizaci metabolických procesů."
+        },
+        "immunity": {
+          "title": "Imunitní dohled",
+          "description": "Moduluje 'terén' organismu a optimalizuje prostředí pro regenerační procesy."
+        },
+        "resistance": {
+          "title": "Zvýšení rezistence",
+          "description": "Historicky prokazované zvýšení celkové odolnosti organismu a tlumení kvasných procesů."
+        },
+        "recovery": {
+          "title": "Rekonvalescence",
+          "description": "Ideální pro stavy vyčerpanosti, po invazivních zákrocích či radioterapii a pro podporu krvetvorby."
+        }
+      },
+      "compositionTitle": "Účinné látky",
+      "substances": {
+        "nucleotides": "Volné nukleotidy a nukleosidy (AMP, CMP, GMP, IMP, UMP) - esenciální pro syntézu DNA/RNA a energii (ATP)",
+        "peptides": "Bioaktivní peptidy a oligopeptidy (defensiny, hemocidiny) s imunomodulační funkcí",
+        "aminoAcids": "Spektrum volných aminokyselin a derivátů (taurin) pro neuroendokrinní regulaci"
+      },
+      "usageTitle": "Pokyny k užívání",
+      "usage": {
+        "application": {
+          "title": "Aplikace",
+          "description": "Perorálně. Doporučuje se aplikace pod jazyk pro rychlou absorpci přes sliznici a bypass jaterního metabolismu (first-pass effect). Forma: 30ml kapky (roztok)."
+        },
+        "distribution": {
+          "title": "Dávkování",
+          "description": "Obvyklá suplementace zahrnuje 1–2 ml denně (cca 20–40 kapek), ideálně nalačno nebo s odstupem od jídla pro maximalizaci vstřebatelnosti peptidických složek."
+        },
+        "chronic": {
+          "title": "Dlouhodobé užívání",
+          "description": "Vhodné pro dlouhodobé užívání v cyklech (např. 3 měsíce užívání, 1 měsíc pauza) pro udržení citlivosti receptorů."
+        }
+      }
+    },
+    "floristen": {
+      "name": "Demo Product 2 (DEMO-02)",
+      "badge": "Fytochemické protizánětlivé agens",
+      "tagline": "Selektivní extrakce pro chronické záněty",
+      "description": "Floristen představuje unikátní přístup k fytoterapii chronických zánětů. Na rozdíl od běžných extraktů třezalky je tento preparát navržen tak, aby eliminoval fototoxické složky a maximalizoval nespecifický protizánětlivý účinek. Mechanismus spočívá v inhibici proliferativních zánětlivých procesů a podpoře rezorpce infiltrátů (zánětlivých ložisek). Historicky se osvědčil u chronických gynekologických zánětů a stavů rezistentních na antibiotickou léčbu, kde působí jako „herbal shield“ (bylinný štít) a podporuje prokrvení tkání.",
+      "imageAlt": "Demo Product 2 30ml kapky",
+      "origin": {
+        "title": "Původ a výroba",
+        "description": "Specificky připravený hydroalkoholický extrakt z Hypericum perforatum (třezalka tečkovaná), zaměřený na vodorozpustnou frakci.",
+        "source": {
+          "title": "Hypericum perforatum",
+          "description": "Třezalka tečkovaná"
+        },
+        "production": {
+          "title": "Selektivní extrakce",
+          "description": "Eliminace fototoxických složek, maximalizace nespecifického protizánětlivého účinku."
+        }
+      },
+      "benefitsTitle": "Klíčové benefity",
+      "benefits": {
+        "antiInflammatory": {
+          "title": "Protizánětlivý účinek",
+          "description": "Maximalizovaný nespecifický protizánětlivý účinek, inhibice proliferativních zánětlivých procesů."
+        },
+        "resorption": {
+          "title": "Podpora rezorpce",
+          "description": "Podpora rezorpce infiltrátů (zánětlivých ložisek)."
+        },
+        "shield": {
+          "title": "Bylinný štít",
+          "description": "Působí jako bylinný štít u chronických stavů a podporuje prokrvení tkání."
+        },
+        "safety": {
+          "title": "Bezpečnost",
+          "description": "Navržen k eliminaci fototoxických složek běžných u extraktů třezalky."
+        }
+      },
+      "compositionTitle": "Účinné látky",
+      "substances": {
+        "flavonoids": "Flavonoidy (kvercetin, rutin, hyperosid, amentoflavon) - silná antioxidační aktivita, modulace zánětu",
+        "phloroglucinols": "Floroglucinoly (limitované, modifikované hyperforin/adhyperforin) - zachován antimikrobiální potenciál, minimalizovány interakce",
+        "naphthodianthrones": "Naftodiantrony (limitované, minimalizovaný hypericin) - snížené riziko fotosenzitivity, zachován antivirový potenciál"
+      },
+      "usageTitle": "Pokyny k užívání",
+      "usage": {
+        "application": {
+          "title": "Aplikace",
+          "description": "Perorálně, rozmíchat v malém množství vody nebo aplikovat přímo. Forma: 30ml kapky (roztok)."
+        },
+        "distribution": {
+          "title": "Dávkování",
+          "description": "Standardně 20–30 kapek 2–3× denně. U chronických stavů je klíčová dlouhodobost podávání (minimálně 6–8 týdnů) pro nasycení tkání flavonoidy."
+        },
+        "warning": {
+          "title": "Upozornění",
+          "description": "Přestože je extrakt modifikován, doporučuje se opatrnost při slunění a konzultace s lékařem při souběžném užívání imunosupresiv či hormonální antikoncepce."
+        }
+      }
+    },
+    "lyastin": {
+      "name": "Demo Product 3 (DEMO-03)",
+      "badge": "Lipidomický regenerátor",
+      "tagline": "Vaskulární protektivum a regenerace membrán",
+      "description": "Lyastin cílí na integritu buněčných membrán a mikrocirkulaci. Jeho hlavním benefitem je zlepšení trofiky (výživy) ischemických tkání a podpora regenerace endotelu cév. Funguje na principu dodání esenciálních stavebních kamenů pro opravu buněčných stěn, čímž působí vazodilatačně a spasmolyticky. Je indikován pro podporu periferního prokrvení, regeneraci po cévních příhodách a u stavů spojených s degenerací tkání v důsledku hypoxie (nedostatku kyslíku).",
+      "imageAlt": "Demo Product 3 30ml kapky",
+      "origin": {
+        "title": "Původ a výroba",
+        "description": "Etanol-éterický extrakt z bovinní tkáně se zaměřením na lipidovou frakci.",
+        "source": {
+          "title": "Bovinní tkáň",
+          "description": "Lipidová frakce"
+        },
+        "production": {
+          "title": "Extrakt",
+          "description": "Etanol-éterický extrakt"
+        }
+      },
+      "benefitsTitle": "Klíčové benefity",
+      "benefits": {
+        "membrane": {
+          "title": "Integrita membrán",
+          "description": "Cílí na integritu buněčných membrán a dodává stavební kameny pro jejich opravu."
+        },
+        "circulation": {
+          "title": "Mikrocirkulace a trofika",
+          "description": "Zlepšení výživy ischemických tkání, podpora regenerace endotelu cév."
+        },
+        "vasodilation": {
+          "title": "Vazodilatace",
+          "description": "Působí vazodilatačně a spasmolyticky."
+        },
+        "indications": {
+          "title": "Indikace",
+          "description": "Podpora periferního prokrvení, regenerace po cévních příhodách, stavy spojené s hypoxií."
+        }
+      },
+      "compositionTitle": "Účinné látky",
+      "substances": {
+        "phospholipids": "Fosfolipidy (fosfatidylcholiny, sfingomyeliny, fosfoethanolaminy) - kritické pro fluiditu a funkčnost membrán",
+        "lipoproteins": "Lipoproteiny a steroly - podpora transportu lipidů a stability membrán",
+        "fattyAcids": "Mastné kyseliny (optimalizovaný poměr n-3 a n-6) - regulace zánětlivé odpovědi na úrovni membrán"
+      },
+      "usageTitle": "Pokyny k užívání",
+      "usage": {
+        "application": {
+          "title": "Aplikace",
+          "description": "Perorálně. Vzhledem k lipidové povaze je vhodné užívat s jídlem obsahujícím tuky pro lepší absorpci, nebo přímo. Forma: 30ml kapky (roztok)."
+        },
+        "distribution": {
+          "title": "Dávkování",
+          "description": "1–2 ml denně (cca 20–40 kapek). U stavů vyžadujících intenzivní regeneraci tkání (např. poúrazové stavy, proleženiny) lze dávkování krátkodobě zvýšit."
+        },
+        "synergy": {
+          "title": "Kombinace",
+          "description": "Historicky vykazuje silnou synergii s Floristenem (u zánětlivých a nekrotických procesů)."
+        }
+      }
+    },
+    "rtnDuo": {
+      "name": "Demo Product 4 (Demo Product 1 + Demo Product 2)",
+      "badge": "Synergický Imunometabolický Komplex",
+      "tagline": "Metabolická stimulace a protizánětlivá clona",
+      "description": "Tento kombinovaný preparát využívá synergie mezi metabolickou stimulací (Retisin) a protizánětlivou clonou (Floristen). Zatímco Retisin dodává 'palivo' a signální molekuly pro imunitní buňky (nukleotidy, peptidy), Floristen moduluje zánětlivé prostředí a snižuje oxidační stres. Forma spreje umožňuje rychlou aplikaci přes sliznice dutiny ústní, což zajišťuje okamžitou dostupnost pro slizniční imunitu (IgA) a systémovou cirkulaci. Je ideální pro akutní podporu imunity, při prvních příznacích viróz nebo jako prevence v zátěžových obdobích.",
+      "imageAlt": "RTN Demo Product 4 Sprej",
+      "origin": {
+        "title": "Původ a složení",
+        "description": "Kombinace bioaktivních spekter obou parentálních preparátů (Retisin + Floristen) ve formě spreje.",
+        "source": {
+          "title": "Kombinovaný zdroj",
+          "description": "Nukleoproteinová frakce z Retisinu a flavonoidní frakce z Floristenu."
+        },
+        "production": {
+          "title": "Synergická formulace",
+          "description": "Forma spreje pro maximální biologickou dostupnost a okamžitou absorpci sliznicí."
+        }
+      },
+      "benefitsTitle": "Klíčové benefity",
+      "benefits": {
+        "synergy": {
+          "title": "Synergický efekt",
+          "description": "Kombinace podporuje utilizaci kyslíku ve tkáních a současně tlumí patologickou proliferaci."
+        },
+        "metabolic": {
+          "title": "Metabolická podpora",
+          "description": "Dodává 'palivo' a signální molekuly pro imunitní buňky (z Retisinu)."
+        },
+        "inflammation": {
+          "title": "Modulace zánětu",
+          "description": "Moduluje zánětlivé prostředí a snižuje oxidační stres (z Floristenu)."
+        },
+        "absorption": {
+          "title": "Rychlá absorpce",
+          "description": "Sprej umožňuje rychlou aplikaci přes sliznice, obchází trávicí trakt a degradaci."
+        }
+      },
+      "compositionTitle": "Účinné látky",
+      "substances": {
+        "nucleoproteins": "Nukleoproteinová frakce (z Retisinu) - regenerace DNA, syntéza proteinů v imunitních buňkách",
+        "flavonoids": "Flavonoidní frakce (z Floristenu) - kvercetin a rutin pro stabilizaci kapilár a zhášení volných radikálů",
+        "complex": "Synergický komplex - silný regenerační a obranný efekt"
+      },
+      "usageTitle": "Pokyny k užívání",
+      "usage": {
+        "application": {
+          "title": "Aplikace",
+          "description": "Sublinguálně (pod jazyk) nebo na sliznici hrdla pomocí rozprašovače. Před použitím protřepat. Forma: 30ml sprej (kombinovaný roztok)."
+        },
+        "distribution": {
+          "title": "Dávkování",
+          "description": "Preventivně: 3–5 vstřiků 2× denně. Akutní podpora: 5 vstřiků každé 3–4 hodiny během prvních dnů zátěže."
+        },
+        "note": {
+          "title": "Poznámka",
+          "description": "Forma spreje je navržena pro maximální compliance (dodržování léčby) a biologickou dostupnost, obchází degradaci v trávicím traktu."
+        }
+      }
+    }
+  }
+}

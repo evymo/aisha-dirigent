@@ -1,0 +1,25 @@
+{
+  "name": "@aisha/svc-web-render",
+  "version": "0.1.0",
+  "license": "Elastic-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aisha/security": "*",
+    "fastify": "^5.2.0",
+    "pino": "^9.5.0",
+    "@aisha/web-canvas": "*",
+    "jsdom": "^25.0.1",
+    "isomorphic-dompurify": "^2.19.0"
+  },
+  "devDependencies": {
+    "@types/jsdom": "^21.1.7"
+  }
+}

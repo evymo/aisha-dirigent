@@ -1,0 +1,14 @@
+{
+  "api-gateway.description": "API Gateway หลักสำหรับการกำหนดเส้นทางและการแปลง",
+  "api-gateway.name": "API Gateway",
+  "auth-module.description": "โมดูลสำหรับการยืนยันตัวตนและการอนุญาต",
+  "auth-module.name": "Auth Module",
+  "caching.description": "การแคชที่มีประสิทธิภาพเพื่อเวลาตอบสนองที่ดีขึ้น",
+  "caching.name": "Caching",
+  "ci-pipeline.description": "CI Pipeline สำหรับการทดสอบอัตโนมัติและการรวมระบบ",
+  "ci-pipeline.name": "CI Pipeline",
+  "load-balancer.description": "โมดูลสำหรับการปรับสมดุลโหลดและประสิทธิภาพ",
+  "load-balancer.name": "Load Balancer",
+  "monitoring.description": "เครื่องมือตรวจสอบสำหรับการสังเกตระบบ",
+  "monitoring.name": "Monitoring"
+}

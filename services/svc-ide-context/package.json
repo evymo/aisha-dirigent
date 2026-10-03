@@ -1,0 +1,35 @@
+{
+  "name": "@aisha/svc-ide-context",
+  "version": "0.1.0",
+  "license": "Elastic-2.0",
+  "private": true,
+  "type": "module",
+  "description": "Backend single-source-of-truth for dynamic agent instruction broadcasting across IDEs (Claude Code, Cursor, Copilot, JetBrains future). Phase 13.1 of canonical 90-day plan.",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aisha/postgrest-client": "*",
+    "@aisha/cache-redis": "*",
+    "@aisha/observability": "*",
+    "@aisha/security": "*",
+    "@fastify/websocket": "^11.0.0",
+    "eta": "^4.6.0",
+    "fastify": "^5.3.3",
+    "ioredis": "^5.4.1",
+    "jose": "^6.0.11",
+    "pino": "^9.6.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.17",
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  }
+}

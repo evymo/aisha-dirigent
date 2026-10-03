@@ -1,0 +1,123 @@
+{
+  "name": "WF_SLA_AUTO_ESCALATION",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "sla-cron",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ================================================================\n// CHECK BREACHED SLAs\n// Query sla_tracking for entries that have breached threshold\n// but haven't been escalated yet.\n// ================================================================\nconst supabaseUrl = $env?.AISHA_POSTGREST_URL || '';\nconst serviceKey = $env?.AISHA_POSTGREST_SERVICE_KEY || '';\n\nconst SLA_BREACH_MS = 30 * 60 * 1000; // 30 minutes\nconst cutoff = new Date(Date.now() - SLA_BREACH_MS).toISOString();\n\ntry {\n  const res = await fetch(\n    `${supabaseUrl}/rest/v1/sla_tracking?first_response_at=is.null&sla_breached=eq.false&first_message_at=lt.${encodeURIComponent(cutoff)}&select=id,story_id,matrix_room_id,first_message_at`,\n    {\n      headers: {\n        'apikey': serviceKey,\n        'Authorization': `Bearer ${serviceKey}`,\n      },\n    }\n  );\n\n  const breached = await res.json();\n\n  if (!Array.isArray(breached) || breached.length === 0) {\n    return { json: { action: 'no_breaches', count: 0 } };\n  }\n\n  return breached.map(item => ({\n    json: {\n      action: 'escalate',\n      slaId: item.id,\n      storyId: item.story_id,\n      matrixRoomId: item.matrix_room_id,\n      firstMessageAt: item.first_message_at,\n      waitingMinutes: Math.round((Date.now() - new Date(item.first_message_at).getTime()) / 60000),\n    },\n  }));\n} catch (err) {\n  return { json: { action: 'error', error: err.message } };\n}"
+      },
+      "id": "sla-check",
+      "name": "Check Breached SLAs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.action }}",
+              "value2": "escalate"
+            }
+          ]
+        }
+      },
+      "id": "sla-filter",
+      "name": "Has Breaches?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ================================================================\n// ESCALATE — Mark SLA as breached and send notification\n// ================================================================\nconst supabaseUrl = $env?.AISHA_POSTGREST_URL || '';\nconst serviceKey = $env?.AISHA_POSTGREST_SERVICE_KEY || '';\nconst synapseUrl = $env?.SYNAPSE_ADMIN_URL || 'http://synapse:8008';\nconst aishaToken = $env?.AISHA_MATRIX_ACCESS_TOKEN || '';\n\nconst slaId = $json.slaId;\nconst storyId = $json.storyId;\nconst roomId = $json.matrixRoomId;\nconst waitingMinutes = $json.waitingMinutes;\n\ntry {\n  // 1. Mark SLA as breached\n  await fetch(\n    `${supabaseUrl}/rest/v1/sla_tracking?id=eq.${slaId}`,\n    {\n      method: 'PATCH',\n      headers: {\n        'Content-Type': 'application/json',\n        'apikey': serviceKey,\n        'Authorization': `Bearer ${serviceKey}`,\n        'Prefer': 'return=minimal',\n      },\n      body: JSON.stringify({\n        sla_breached: true,\n        escalated_at: new Date().toISOString(),\n      }),\n    }\n  );\n\n  // 2. Send AISHA escalation message to Matrix room\n  if (roomId && aishaToken) {\n    const txnId = 'm.sla.' + Date.now() + '.' + Math.random().toString(36).slice(2, 8);\n    const escalationMsg = `⚠️ **SLA Breach Alert**\\n\\nThis conversation has been waiting for a response for **${waitingMinutes} minutes** (SLA threshold: 30 min).\\n\\nAuto-escalating to the next available guild expert. Please respond as soon as possible.`;\n\n    await fetch(\n      `${synapseUrl}/_matrix/client/v3/rooms/${encodeURIComponent(roomId)}/send/m.room.message/${txnId}`,\n      {\n        method: 'PUT',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': `Bearer ${aishaToken}`,\n        },\n        body: JSON.stringify({\n          msgtype: 'm.text',\n          body: escalationMsg,\n          format: 'org.matrix.custom.html',\n          formatted_body: escalationMsg.replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>').replace(/\\n/g, '<br/>'),\n        }),\n      }\n    );\n  }\n\n  // 3. Log to audit_journal\n  await fetch(\n    `${supabaseUrl}/rest/v1/audit_journal`,\n    {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n        'apikey': serviceKey,\n        'Authorization': `Bearer ${serviceKey}`,\n        'Prefer': 'return=minimal',\n      },\n      body: JSON.stringify({\n        action: 'aisha.sla_breach_escalation',\n        entity_type: 'sla_tracking',\n        entity_id: slaId,\n        metadata: {\n          story_id: storyId,\n          waiting_minutes: waitingMinutes,\n          room_id: roomId,\n        },\n      }),\n    }\n  );\n\n  return { json: { success: true, slaId, waitingMinutes, escalated: true } };\n} catch (err) {\n  return { json: { success: false, error: err.message, slaId } };\n}"
+      },
+      "id": "sla-escalate",
+      "name": "Escalate & Notify",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// No breaches — nothing to do\nreturn { json: { action: 'no_breaches', status: 'ok' } };"
+      },
+      "id": "sla-noop",
+      "name": "No Breaches",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, 400]
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Check Breached SLAs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Breached SLAs": {
+      "main": [
+        [
+          {
+            "node": "Has Breaches?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Breaches?": {
+      "main": [
+        [
+          {
+            "node": "Escalate & Notify",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Breaches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Prague"
+  },
+  "tags": [
+    {
+      "name": "aisha"
+    },
+    {
+      "name": "sla"
+    }
+  ]
+}

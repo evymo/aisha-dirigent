@@ -1,0 +1,66 @@
+# syntax=docker/dockerfile:1
+# Dockerfile.svc-playwright-runner — E2E runner (polling worker)
+# Standalone Dockerfile (build CONTEXT = REPO ROOT), stejně jako svc-agent-runner.
+#
+# ⛔ PROČ VŮBEC VZNIKL (naměřeno 2026-08-25):
+# Služba dřív běžela na holém `mcr.microsoft.com/playwright` a zdroják si brala
+# BIND MOUNTEM z repa na cílovém uzlu:
+#
+#     image:      mcr.microsoft.com/playwright:v1.59.1-jammy
+#     volumes:    - ./services/svc-playwright-runner:/app/runner:ro
+#     entrypoint: ["node", "/app/runner/src/worker.js"]
+#
+# To nemohlo nastartovat NIKDY, hned ze tří důvodů:
+#   1. v repu je `src/worker.ts`, ne `.js` — a `tsc` nikdo nespouštěl
+#   2. `tsconfig` má `outDir: ./dist`, takže i po překladu by `src/worker.js`
+#      neexistoval; entrypoint mířil do zdrojů, ne do výstupu
+#   3. mount jde z ČERSTVÉHO KLONU, kde `node_modules` (gitignorovaný) není,
+#      takže by chyběly i závislosti
+# Projev: `Cannot find module '/app/runner/src/worker.js'`, restart smyčka
+# (16+ restartů). Snímky v .coolify-deploy-snapshots ukazují týž stav
+# 22., 23. i 25. 8. — vada je stará, jen ji nikdo nečetl, protože
+# `<fork>-playwright` je v SOFT_DEPLOY_APPS a nasazení neblokuje.
+#
+# Registry-free workspace build — @aisha/* jsou monorepo workspace balíčky,
+# překládají se ze zdroje. Žádné Verdaccio, žádný token v buildu.
+#
+# Runtime základ je OBRAZ PLAYWRIGHTU, ne node:alpine: nese prohlížeče
+# (`PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`). Verze `@playwright/test`
+# v package.json se s ním MUSÍ shodovat, jinak si npm balíček sáhne po
+# prohlížeči, který v obrazu není.
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/node:22-alpine AS build
+WORKDIR /app
+# Celé repo, aby npm rozřešil workspace graf a nasymlinkoval @aisha/*.
+COPY . .
+RUN npm ci --workspace=@aisha/svc-playwright-runner --include-workspace-root --include=dev --ignore-scripts
+RUN npm run build --workspace=@aisha/security && \
+    npm run build --workspace=@aisha/svc-playwright-runner
+# Prod-only závislosti ČISTOU reinstalací (ne `npm prune` — ten na hlubokých
+# stromech vyhodil i hoistnuté prod balíčky). packages/*/dist z kroku výš
+# přežije smazání node_modules; `npm ci` obnoví workspace symlinky.
+RUN rm -rf node_modules services/svc-playwright-runner/node_modules \
+ && npm ci --workspace=@aisha/svc-playwright-runner --omit=dev --ignore-scripts
+# Ať runtime COPY nikdy nespadne na chybějícím adresáři.
+RUN mkdir -p services/svc-playwright-runner/node_modules
+# Fail LOUD: každá deklarovaná prod závislost se musí v obrazu rozřešit, jinak
+# se to zlomí TADY, a ne restart smyčkou v produkci.
+RUN node scripts/verify-runtime-deps.mjs services/svc-playwright-runner
+
+FROM mcr.microsoft.com/playwright:v1.59.1-jammy
+WORKDIR /app
+ENV NODE_ENV=production
+# Hoistnuté node_modules z kořene + adresář workspace balíčku, na který míří
+# symlink @aisha/security (jeho cíl musí cestovat, jinak ERR_MODULE_NOT_FOUND).
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/packages/security packages/security
+COPY --from=build /app/services/svc-playwright-runner/package.json services/svc-playwright-runner/package.json
+COPY --from=build /app/services/svc-playwright-runner/dist services/svc-playwright-runner/dist
+# Vnořené (nehoistnuté) závislosti služby musí cestovat taky.
+COPY --from=build /app/services/svc-playwright-runner/node_modules services/svc-playwright-runner/node_modules
+# iproute2: entrypoint v compose staví routu do mesh (brána AISHA_GATEWAY_URL je mesh jméno na
+# jiném uzlu). Obraz playwright běží jako root už dnes; routa na tom nic nemění.
+RUN apt-get update && apt-get install -y --no-install-recommends iproute2 && rm -rf /var/lib/apt/lists/*
+WORKDIR /app/services/svc-playwright-runner
+CMD ["node", "dist/worker.js"]

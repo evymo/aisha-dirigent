@@ -1,0 +1,368 @@
+# docker-compose.local.yml — AISHA local development stack
+#
+# Doplňkový k AISHA core stack CLI (které spouští db, postgrest, auth, studio).
+# Tento compose dodává AISHA-specifické služby:
+#
+# Profily:
+#   - insight: Elasticsearch + Ragnarok + Maestro (Alquist Insight stack)
+#   - vllm:    vLLM Embedding + Generation (vyžaduje NVIDIA GPU)
+#
+# Použití:
+#   docker compose -f docker-compose.local.yml --profile insight up -d
+#   docker compose -f docker-compose.local.yml --profile vllm up -d
+#
+# Spouští se přes `npm run setup -- --with-insight` (resp. --with-backend pro
+# zpětnou kompatibilitu — alias na --with-insight).
+#
+# Frontend NIKDY nesmí volat Maestro přímo — vždy přes svc-ai-chat /story-consult
+# orchestraci (Tao + Psyche + Hippocampus + governance brain wiringem).
+
+services:
+  # ---------------------------------------------------------------------------
+  # Elasticsearch — vector backend pro Ragnarok hybrid search (BM25 + KNN)
+  # ---------------------------------------------------------------------------
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.3
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-local-elasticsearch
+    profiles: ["insight"]
+    environment:
+      ES_JAVA_OPTS: "-Xms1g -Xmx1g"
+      discovery.type: "single-node"
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+    ports:
+      - "9200:9200"
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Ragnarok — Alquist Insight RAG engine (FastAPI/Uvicorn)
+  # ---------------------------------------------------------------------------
+  ragnarok:
+    build:
+      context: .
+      dockerfile: Dockerfile.ragnarok
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-local-ragnarok
+    profiles: ["insight"]
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      RAGNAROK_CONTAINER_PORT: "9696"
+      RAGNAROK_LOG_LEVEL: "info"
+      RAGNAROK_API_KEY: ${RAGNAROK_API_KEY:?RAGNAROK_API_KEY must be delivered by cold-start env (generate-secrets) — a default credential is a credential everyone knows}
+      DEPLOYMENT: "local"
+      ES_URL: "http://elasticsearch:9200"
+      ES_USER: "elastic"
+      ES_PASSWORD: ""
+      ES_INDEX_EMBEDDINGS: "aisha-kb-local"
+      ES_INDEX_HIGHLIGHT_CHUNKS: "aisha-highlight-chunks-local"
+      ES_MAX_VECTOR_DIM: "2048"
+      ES_LOGGING_ENABLED: "false"
+      # ── Insight backend providers (per Ragnarok upstream LLMFactory schema) ──
+      # ModelProvider enum (packages/insight/common/common/models/enums.py):
+      #   "OpenAI" | "vLLM" | "Cohere"
+      # Pro vLLM je nutný BASE_URL (vLLM server URL, OpenAI-compatible API).
+      # Pro OpenAI default base URL.
+      DEFAULT_PROVIDER_LLM: ${INSIGHT_LLM_PROVIDER:-OpenAI}
+      DEFAULT_MODEL_LLM: ${INSIGHT_LLM_MODEL:-gpt-4o-mini}
+      DEFAULT_BASE_URL_LLM: ${INSIGHT_LLM_BASE_URL:-}
+      DEFAULT_PROVIDER_EMB: ${INSIGHT_EMB_PROVIDER:-OpenAI}
+      DEFAULT_MODEL_EMB: ${INSIGHT_EMB_MODEL:-text-embedding-3-small}
+      DEFAULT_BASE_URL_EMB: ${INSIGHT_EMB_BASE_URL:-}
+      # OpenAI auth — relevant jen když PROVIDER_LLM=OpenAI nebo PROVIDER_EMB=OpenAI.
+      # OPENAI_TYPE Pydantic enum přijímá: OpenAI | AzureOpenAI | None.
+      # AzureOpenAI navíc vyžaduje OPENAI_ENDPOINT.
+      OPENAI_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_TYPE: "${INSIGHT_OPENAI_TYPE:-None}"
+      OPENAI_ENDPOINT: ${INSIGHT_OPENAI_ENDPOINT:-None}
+      # Cohere reranking (Ragnarok upstream default PROVIDER_RERANK=Cohere).
+      # Pro AISHA default disabled (None) — reranking je nice-to-have, ne USP.
+      COHERE_KEY: ${COHERE_API_KEY:-}
+      # PROVIDER_RERANK je required enum (ModelProvider) — nepřijímá None.
+      # Default Cohere; pokud COHERE_KEY není set, Ragnarok rerank step skipne
+      # (graceful degrade BM25+KNN bez 2nd-stage rerank).
+      DEFAULT_PROVIDER_RERANK: ${INSIGHT_RERANK_PROVIDER:-Cohere}
+      # Ragnarok je samostatný RAG engine; Kronos / Mongo / MinIO sám nepoužívá,
+      # ale Pydantic config.py je vyžaduje jako required fields. Placeholdery jsou OK.
+      KRONOS_API_KEY: ${KRONOS_API_KEY:?KRONOS_API_KEY must be delivered by cold-start env (generate-secrets) — a default credential is a credential everyone knows}
+      MAESTRO_API_KEY: ${MAESTRO_API_KEY:?MAESTRO_API_KEY must be delivered by cold-start env (generate-secrets) — a default credential is a credential everyone knows}
+      MONGO_CONN_STR: "mongodb://not-integrated:27017"
+      MINIO_SECRET_KEY: "not-integrated-aisha-shared-storage"
+      PACKAGE_REGISTRY_TOKEN: "not-used-in-self-hosted"
+      CONTEXT_ENABLED: "false"
+    ports:
+      - "9696:9696"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9696/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # AISHA Kronos shim — soft adapter Maestro → AISHA RPC + Ragnarok.
+  # Maestru poskytuje Kronos-compatible API (sessions, nlp/rag, projects, …)
+  # bez upstream Kronos (žádný Mongo, žádný MinIO).
+  # Detail: services/svc-aisha-kronos-shim/src/server.ts.
+  # ---------------------------------------------------------------------------
+  aisha-kronos-shim:
+    build:
+      context: .
+      dockerfile: Dockerfile.svc-aisha-kronos-shim
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-local-kronos-shim
+    profiles: ["insight"]
+    depends_on:
+      ragnarok:
+        condition: service_healthy
+    networks:
+      # Default network (Insight stack) + coolify network (kde aisha-postgrest
+      # a aisha-db žijí). Shim tak může proxovat na PG persistence pro session/turn
+      # AISHA-side audit, plus zůstává v Insight network pro Ragnarok HTTP.
+      - default
+      - coolify
+    environment:
+      PORT: "9625"
+      LOG_LEVEL: "info"
+      KRONOS_API_KEY: ${KRONOS_API_KEY:?KRONOS_API_KEY must be delivered by cold-start env (generate-secrets) — a default credential is a credential everyone knows}
+      RAGNAROK_URL: "http://ragnarok:9696"
+      RAGNAROK_API_KEY: ${RAGNAROK_API_KEY:?RAGNAROK_API_KEY must be delivered by cold-start env (generate-secrets) — a default credential is a credential everyone knows}
+      # PostgREST přes coolify network (aisha-postgrest:3000). POSTGREST_SERVICE_TOKEN
+      # z .env.coolify (regenerated v cold-start).
+      POSTGREST_URL: ${POSTGREST_URL:?POSTGREST_URL must be generated by topology resolver}
+      POSTGREST_SERVICE_TOKEN: ${POSTGREST_SERVICE_TOKEN:-}
+      INSIGHT_DEFAULT_LANG: ${INSIGHT_DEFAULT_LANG:-cs-CZ}
+    ports:
+      - "9625:9625"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:9625/health >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Maestro — Alquist Insight Dialog Management (Alexa Prize USP)
+  #
+  # Volaný z `services/svc-ai-chat` jako LLM provider adapter, NIKDY přímo
+  # z frontendu. CONTEXT_ENABLED=true je KRITICKÉ — bez něj Maestro neudrží
+  # multi-turn state (= ztráta USP). Gate test insight-usp-integrity to kontroluje.
+  #
+  # Maestro hovoří s AISHA přes aisha-kronos-shim (Kronos-compatible adapter,
+  # nikoli upstream Kronos s Mongo/MinIO). Shim proxuje na AISHA RPC +
+  # Ragnarok přímo.
+  # ---------------------------------------------------------------------------
+  maestro:
+    build:
+      context: .
+      dockerfile: Dockerfile.maestro
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-local-maestro
+    profiles: ["insight"]
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      aisha-kronos-shim:
+        condition: service_healthy
+    environment:
+      MAESTRO_CONTAINER_PORT: "8020"
+      MAESTRO_LOG_LEVEL: "info"
+      MAESTRO_API_KEY: ${MAESTRO_API_KEY:?MAESTRO_API_KEY must be delivered by cold-start env (generate-secrets) — a default credential is a credential everyone knows}
+      DEPLOYMENT: "local"
+      ES_URL: "http://elasticsearch:9200"
+      ES_USER: "elastic"
+      ES_PASSWORD: ""
+      ES_INDEX_EMBEDDINGS: "aisha-kb-local"
+      ES_INDEX_HIGHLIGHT_CHUNKS: "aisha-highlight-chunks-local"
+      ES_INDEX_LOGS: "aisha-insight-logs-local"
+      ES_MAX_VECTOR_DIM: "2048"
+      ES_LOGGING_ENABLED: "false"
+      RAGNAROK_URL: "http://ragnarok:9696"
+      RAGNAROK_API_KEY: ${RAGNAROK_API_KEY:?RAGNAROK_API_KEY must be delivered by cold-start env (generate-secrets) — a default credential is a credential everyone knows}
+      # ── Insight backend providers (per Ragnarok upstream LLMFactory) ──
+      DEFAULT_PROVIDER_LLM: ${INSIGHT_LLM_PROVIDER:-OpenAI}
+      DEFAULT_MODEL_LLM: ${INSIGHT_LLM_MODEL:-gpt-4o-mini}
+      DEFAULT_BASE_URL_LLM: ${INSIGHT_LLM_BASE_URL:-}
+      DEFAULT_PROVIDER_EMB: ${INSIGHT_EMB_PROVIDER:-OpenAI}
+      DEFAULT_MODEL_EMB: ${INSIGHT_EMB_MODEL:-text-embedding-3-small}
+      DEFAULT_BASE_URL_EMB: ${INSIGHT_EMB_BASE_URL:-}
+      OPENAI_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_TYPE: "${INSIGHT_OPENAI_TYPE:-None}"
+      OPENAI_ENDPOINT: ${INSIGHT_OPENAI_ENDPOINT:-None}
+      COHERE_KEY: ${COHERE_API_KEY:-}
+      # PROVIDER_RERANK je required enum (ModelProvider) — nepřijímá None.
+      # Default Cohere; pokud COHERE_KEY není set, Ragnarok rerank step skipne
+      # (graceful degrade BM25+KNN bez 2nd-stage rerank).
+      DEFAULT_PROVIDER_RERANK: ${INSIGHT_RERANK_PROVIDER:-Cohere}
+      CONTEXT_ENABLED: "true"
+      CONTEXT_WINDOW_SIZE: "10"
+      # Maestro hovoří s aisha-kronos-shim (Kronos-compatible adapter), který
+      # uvnitř proxuje na AISHA RPC + Ragnarok. Žádný upstream Kronos s Mongo/MinIO.
+      KRONOS_URL: "http://aisha-kronos-shim:9625"
+      KRONOS_API_KEY: ${KRONOS_API_KEY:?KRONOS_API_KEY must be delivered by cold-start env (generate-secrets) — a default credential is a credential everyone knows}
+      MONGO_CONN_STR: "mongodb://not-integrated:27017"
+      MINIO_SECRET_KEY: "not-integrated-aisha-shared-storage"
+      PACKAGE_REGISTRY_TOKEN: "not-used-in-self-hosted"
+    ports:
+      - "8020:8020"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8020/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 5
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # vLLM Embedding — opt-in pro on-prem GPU (Qwen3-Embedding-0.6B)
+  # ---------------------------------------------------------------------------
+  vllm-embedding:
+    image: ${VLLM_IMAGE:-vllm/vllm-openai:v0.6.6}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-local-vllm-embedding
+    profiles: ["vllm"]
+    command:
+      - "--model=Qwen/Qwen3-Embedding-0.6B"
+      - "--gpu-memory-utilization=0.1"
+      - "--max-num-seqs=1"
+      - "--port=8000"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: "all"
+      NVIDIA_DRIVER_CAPABILITIES: "compute,utility"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8123:8000"
+    volumes:
+      - vllm-models:/root/.cache/huggingface
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # vLLM Generation — opt-in pro on-prem GPU (Qwen3-30B-A3B)
+  #
+  # Phase 12 WP 2.2 — performance tuning:
+  #   --enable-prefix-caching     KV-cache reuse across multi-turn prompts
+  #                               (Maestro multi-turn dialogues hit cache
+  #                               often → 2-3× TTFT improvement)
+  #   --max-num-batched-tokens    raise from default 4096 → 8192 for higher
+  #                               throughput at concurrency >8
+  #   --max-num-seqs              explicit 256 (matches vLLM default but is
+  #                               documented here for ops review)
+  #
+  # NOT enabled yet (see docs/perf/VLLM_TUNING_RUNBOOK.md):
+  #   --speculative-model         needs Qwen3-family draft model selection +
+  #                               vLLM 0.6.6 MoE-target compatibility audit
+  #                               (Qwen3-30B-A3B is MoE; spec-decoding draft
+  #                               must share the vocabulary for token-level
+  #                               verification to make sense)
+  # ---------------------------------------------------------------------------
+  vllm-generation:
+    image: ${VLLM_IMAGE:-vllm/vllm-openai:v0.6.6}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-local-vllm-generation
+    profiles: ["vllm"]
+    command:
+      - "--model=Qwen/Qwen3-30B-A3B"
+      - "--gpu-memory-utilization=0.7"
+      - "--port=8000"
+      - "--enable-prefix-caching"
+      - "--max-num-batched-tokens=8192"
+      - "--max-num-seqs=256"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: "all"
+      NVIDIA_DRIVER_CAPABILITIES: "compute,utility"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8100:8000"
+    volumes:
+      - vllm-models:/root/.cache/huggingface
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # vLLM Reranker — opt-in pro on-prem GPU (bge-reranker-v2-m3)
+  #
+  # Phase 12 WP 4.3 — Stage-2 rerank rollout per RAG Step 6.1 preflight.
+  # bge-reranker-v2-m3 is 568M params, multilingual, FP16 → ~1.2 GB VRAM.
+  # GPU budget audit:
+  #   generation  -> 0.70 utilisation
+  #   embedding   -> 0.10 utilisation
+  #   reranker    -> 0.15 utilisation (this row)
+  #   = 0.95 total, leaves 5 % headroom for activations/KV cache spikes
+  #
+  # NOTE: bge-reranker is NOT a chat/completion model — it's a cross-encoder
+  # scorer. vLLM v0.6+ exposes it via the /score endpoint (--task=score),
+  # NOT /v1/chat/completions. svc-mcp-knowledge calls it via the
+  # capability-resolver pattern (purpose='rag.rerank').
+  #
+  # Canary rollout per profile:
+  #   See docs/perf/VLLM_RERANKER_RUNBOOK.md §3 for the staged enable
+  #   sequence. context_profiles.rerank_provider controls which profile
+  #   uses which reranker (NULL = disabled, 'vllm_local' = this service,
+  #   'cohere' = paid fallback).
+  # ---------------------------------------------------------------------------
+  vllm-reranker:
+    image: ${VLLM_IMAGE:-vllm/vllm-openai:v0.6.6}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-local-vllm-reranker
+    profiles: ["vllm"]
+    command:
+      - "--model=BAAI/bge-reranker-v2-m3"
+      - "--task=score"
+      - "--max-model-len=8192"
+      - "--gpu-memory-utilization=0.15"
+      - "--port=8000"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: "all"
+      NVIDIA_DRIVER_CAPABILITIES: "compute,utility"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ports:
+      - "8124:8000"
+    volumes:
+      # Shared model cache with vllm-embedding + vllm-generation — no
+      # redundant download. Per §-1.12 R4.
+      - vllm-models:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/v1/models || exit 1"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  elasticsearch-data:
+    driver: local
+  vllm-models:
+    driver: local
+
+networks:
+  # Default Insight network (auto-created jako evymo-ai-orchestrator_default).
+  default:
+    driver: bridge
+  # External coolify network — kde běží aisha-postgrest, aisha-db, aisha-keycloak.
+  # Shim potřebuje tuto network pro PG persistence sessions/turns přes mcp_store_agent_memory.
+  coolify:
+    external: true
+    name: coolify

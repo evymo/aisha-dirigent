@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "outDir": "./dist",
+    "rootDir": "./src"
+  },
+  "include": ["src/**/*"],
+  // ⛔ TESTY SE DO PRODUKČNÍHO OBRAZU NEKOMPILUJÍ.
+  //
+  // NAMĚŘENO 2026-09-04: nasazení `exec` selhalo na
+  //   src/__tests__/broker-204.unit.test.ts: error TS2307:
+  //   Cannot find module 'vitest'
+  // Build obrazu spouští `npx tsc` nad `src/**/*`, jenže produkční
+  // instalace nemá devDependencies — `vitest` tam prostě není a být nemá.
+  //
+  // ⭐ Vada nebyla v testech ani v instalaci, ale v UNIVERZU PŘEKLADU:
+  // zahrnovalo soubory, které do běhového artefaktu nepatří. Typová
+  // kontrola testů je práce testovacího běhu (`vitest` má vlastní
+  // překlad), ne buildu obrazu.
+  "exclude": ["node_modules", "dist", "src/**/__tests__/**", "src/**/*.test.ts", "src/**/*.spec.ts"]
+}

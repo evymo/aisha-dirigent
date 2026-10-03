@@ -1,0 +1,172 @@
+{
+  "_comment": "Allowlist for scripts/db/check-fk-relationship-gaps.mjs (the DB-architect relationship lens). Each entry is a `*_id`-named column with NO foreign-key constraint, but a high-precision signal (same-named column is an FK elsewhere, or a <stem>/<stem>s table exists) says it probably SHOULD be one. Identity-keyed on table.column: a NEW gap is a NEW identity = a hard fail in verify-cold-start-apply.sh. This file is the snapshot of PRE-EXISTING gaps — the gate guards against regressions while the architect drives the count down. To clear an entry: add a FOREIGN KEY in aisha/db/sql/tables/<table>.sql (or aisha/db/sql/constraints/) and regenerate baseline (npm run db:init:generate). To re-snapshot after intentional change: npm run db:schema:gaps:baseline.",
+  "_generated_at": "2026-06-02",
+  "_candidate_count": 95,
+  "allowlist": [
+    {
+      "table": "acs_intents",
+      "column": "ai_run_id",
+      "reason": "Intentionally unconstrained — optional anchor to ai_runs, NULL/placeholder during pre-run admission (an ACS intent is journaled before/independently of any ai_run; a placeholder int_0…0 anchor must never FK-fail). Mirrors ai_decisions.run_id / ai_trace_events.run_id (likewise unconstrained). Heuristic: ai_run_id is an enforced FK elsewhere → ai_runs."
+    },
+    {
+      "table": "agent_live_sessions",
+      "column": "session_id",
+      "reason": "Intentionally unconstrained (not a relational FK). agent_live_sessions.session_id is the source-dimensioned external agent session key (e.g. Claude Code CLAUDE_SESSION_ID), UNIQUE-constrained as the row's natural key — NOT a reference to public_chat_sessions (name-heuristic false positive; an agent/IDE session is not a chat session). Every genuinely relational column here carries an enforced FK: story_id→partner_stories, user_id→aisha_auth.users, agent_run_id→agent_runs, ai_run_id→ai_runs. Guarded against NEW drift."
+    },
+    {
+      "table": "ai_decisions",
+      "column": "run_id",
+      "reason": "Intentionally unconstrained — append-only E0 decision journal (one row per dispatch). run_id is the ai_runs.id the decision is carried on, NULL during pre-run admission: the decision is journaled BEFORE the run exists (Invariant I1/I3 — no dispatch without a journaled decision — so the write must never fail on a not-yet-existing run, and the journal fact must survive a later run purge). Mirrors ai_trace_events.run_id (the trace thread this decision_id is threaded onto), which is likewise unconstrained."
+    },
+    {
+      "table": "ai_decisions",
+      "column": "story_id",
+      "reason": "Intentionally unconstrained — denormalized for the RLS chain. The canonical link is run_id → ai_runs → story; story_id is a denormalized copy so RLS can filter a story's decisions without a join. Mirrors ai_runs.story_id ('story_id' is an enforced FK elsewhere → partner_stories), which is likewise denormalized + unconstrained."
+    },
+    {
+      "table": "audit_journal",
+      "column": "session_id",
+      "reason": "Pre-existing unenforced relationship (baseline snapshot). 'session_id' is an enforced FK elsewhere → public_chat_sessions; no FK constraint here. Guarded against NEW drift — add a FOREIGN KEY in the table SoT to clear."
+    },
+    {
+      "table": "dirigent_nudges",
+      "column": "conversation_id",
+      "reason": "Pre-existing unenforced relationship (baseline snapshot). 'conversation_id' is an enforced FK elsewhere → chat_conversations; no FK constraint here. Guarded against NEW drift — add a FOREIGN KEY in the table SoT to clear."
+    },
+    {
+      "table": "federated_source_sessions",
+      "column": "user_id",
+      "reason": "Záměrně bez FK (ADR-004, komentář tabulky): trezor relací federovaného zdroje drží token uživatele u zdroje, který u zdroje bez expirace platí, dokud ho někdo výslovně neodhlásí. ON DELETE CASCADE by se smazáním uživatele zahodil evidenci i šifrový text a token by u zdroje žil navždy; SET NULL by zase ztratil vazbu na AAD. Osiřelé relace (uživatel neexistuje) odvolá a odhlásí u zdroje federated_source_session_logout_due — test federace-trezor-relaci „osiřelá relace“. Heuristika: user_id je FK jinde → users."
+    },
+    {
+      "table": "github_app_installations",
+      "column": "installation_id",
+      "reason": "Pre-existing unenforced relationship (baseline snapshot). 'installation_id' is an enforced FK elsewhere → github_app_installations; no FK constraint here. Guarded against NEW drift — add a FOREIGN KEY in the table SoT to clear."
+    },
+    {
+      "table": "graph_nodes",
+      "column": "source_id",
+      "reason": "Intentionally unconstrained — POLYMORPHIC provenance paired with the sibling source_table column (source_table+source_id point at whichever origin table produced the node). Name-heuristic false positive vs the new #679 agent_knowledge_sources; the only enforced source_id→agent_knowledge_sources FK is document_registry (added by #679)."
+    },
+    {
+      "table": "health_metrics",
+      "column": "source_id",
+      "reason": "Intentionally unconstrained — POLYMORPHIC ref (comment: \"Reference to source record (health_check_in.id, etc.)\"): points at different origin tables, not a single-table FK. Heuristic false positive vs the new agent_knowledge_sources."
+    },
+    {
+      "table": "integration_events",
+      "column": "installation_id",
+      "reason": "Pre-existing unenforced relationship (baseline snapshot). 'installation_id' is an enforced FK elsewhere → github_app_installations; no FK constraint here. Guarded against NEW drift — add a FOREIGN KEY in the table SoT to clear."
+    },
+    {
+      "table": "knowledge_items",
+      "column": "author_id",
+      "reason": "Intentionally unconstrained — a MIRRORED copy cannot be stricter than its source. sync_expert_rule_to_knowledge_item maps NEW.author_partner_id into this column, and expert_rules.author_partner_id deliberately carries no FK (stated in aisha/db/tests/schema/08_expert_rule_mirror.sql: 'author_partner_id is NOT NULL but carries no FK; the sync looks up the display name in partner_profiles (none here => NULL author, which is fine)'). Note also that despite the name this holds a partner_profiles id, NOT a user id. Constrain the SOURCE column first if this should ever become enforceable."
+    },
+    {
+      "table": "knowledge_items",
+      "column": "source_id",
+      "reason": "Intentionally unconstrained — cross-lingual CONCEPT dedup key, not a source FK: knowledge_source_concept_id = COALESCE(source_id, id) (trg) groups translations of the same item. Heuristic false positive vs the new agent_knowledge_sources."
+    },
+    {
+      "table": "knowledge_moderation_queue",
+      "column": "resource_id",
+      "reason": "Intentionally unconstrained — POLYMORPHIC, and the column directly above declares the set: resource_type CHECK IN ('topic','post','expert_rule','agent'). resource_id points at whichever of those four tables the type names, so no single FK can express it. (production_resources is not even one of them — it belongs to manufacturing and merely shares the word 'resource'.)"
+    },
+    {
+      "table": "openclaw_notifications",
+      "column": "campaign_id",
+      "reason": "Pre-existing unenforced relationship (baseline snapshot). 'campaign_id' is an enforced FK elsewhere → notification_campaigns; no FK constraint here. Guarded against NEW drift — add a FOREIGN KEY in the table SoT to clear."
+    },
+    {
+      "table": "openclaw_notifications",
+      "column": "user_id",
+      "reason": "Pre-existing unenforced relationship (baseline snapshot). 'user_id' is an enforced FK elsewhere → users; no FK constraint here. Guarded against NEW drift — add a FOREIGN KEY in the table SoT to clear."
+    },
+    {
+      "table": "rag_eval_runs",
+      "column": "batch_id",
+      "reason": "Intentionally unconstrained — a CORRELATION id grouping one evaluation run-set, not a relationship. There is no rag_eval_batches table (the RAG eval domain has only rag_eval_golden, rag_eval_baselines and rag_eval_runs), and fn_record_rag_eval_run_audited takes p_batch_id from its caller without resolving it anywhere. The similarly-named production_batches belongs to manufacturing — a different domain that merely shares the English word 'batch'."
+    },
+    {
+      "table": "story_labels",
+      "column": "resource_id",
+      "reason": "Pre-existing unenforced relationship (baseline snapshot). 'resource_id' is an enforced FK elsewhere → production_resources; no FK constraint here. Guarded against NEW drift — add a FOREIGN KEY in the table SoT to clear."
+    },
+    {
+      "table": "story_pulse_beats",
+      "column": "source_id",
+      "reason": "Intentionally unconstrained — polymorphic provenance. (source_type, source_id) names the REGIME that produced the beat and spans unrelated tables (member_product_plans, production_milestones, ai_tasks, questionnaires, …), so no single FK target exists; the pair is interpreted by source_type exactly like story_entries.(subject_type, subject_id). Every genuinely single-target column on this table carries an enforced FK: assigned_to_user_id/closed_by/created_by→aisha_auth.users, closing_entry_id→story_entries. Heuristic fired because 'source_id' is an enforced FK elsewhere."
+    },
+    {
+      "table": "story_rulesets",
+      "column": "story_id",
+      "reason": "Pre-existing unenforced relationship (baseline snapshot). 'story_id' is an enforced FK elsewhere → partner_stories; no FK constraint here. Guarded against NEW drift — add a FOREIGN KEY in the table SoT to clear."
+    },
+    {
+      "table": "tc_drivers",
+      "column": "group_id",
+      "reason": "Intentionally unconstrained — this is the SOURCE SYSTEM's own integer id mirrored into our table, not a platform uuid reference. The tc_* tables are a mirror of the vendor's fleet data: enforcing a foreign key here would make import ORDER load-bearing (a ride can arrive before the driver row, a child group before its parent) and would reject records the source considers valid. Identity resolution against platform entities happens through twin_external_refs, not through a hard FK on the mirror. (2026-09-28: signal fk_elsewhere fired only because twin_relation_proposals.group_id is a real FK to twin_relation_proposal_groups — a different concept with the same column name.)"
+    },
+    {
+      "table": "tc_groups",
+      "column": "parent_id",
+      "reason": "Intentionally unconstrained — this is the SOURCE SYSTEM's own integer id mirrored into our table, not a platform uuid reference. The tc_* tables are a mirror of the vendor's fleet data: enforcing a foreign key here would make import ORDER load-bearing (a ride can arrive before the driver row, a child group before its parent) and would reject records the source considers valid. Identity resolution against platform entities happens through twin_external_refs, not through a hard FK on the mirror."
+    },
+    {
+      "table": "tc_rides",
+      "column": "tc_driver_id",
+      "reason": "Intentionally unconstrained — this is the SOURCE SYSTEM's own integer id mirrored into our table, not a platform uuid reference. The tc_* tables are a mirror of the vendor's fleet data: enforcing a foreign key here would make import ORDER load-bearing (a ride can arrive before the driver row, a child group before its parent) and would reject records the source considers valid. Identity resolution against platform entities happens through twin_external_refs, not through a hard FK on the mirror."
+    },
+    {
+      "table": "tc_vehicles",
+      "column": "group_id",
+      "reason": "Intentionally unconstrained — this is the SOURCE SYSTEM's own integer id mirrored into our table, not a platform uuid reference. The tc_* tables are a mirror of the vendor's fleet data: enforcing a foreign key here would make import ORDER load-bearing (a ride can arrive before the driver row, a child group before its parent) and would reject records the source considers valid. Identity resolution against platform entities happens through twin_external_refs, not through a hard FK on the mirror. (2026-09-28: signal fk_elsewhere fired only because twin_relation_proposals.group_id is a real FK to twin_relation_proposal_groups — a different concept with the same column name.)"
+    },
+    {
+      "table": "tc_vehicles",
+      "column": "tc_vehicle_id",
+      "reason": "Intentionally unconstrained — this is the SOURCE SYSTEM's own integer id mirrored into our table, not a platform uuid reference. The tc_* tables are a mirror of the vendor's fleet data: enforcing a foreign key here would make import ORDER load-bearing (a ride can arrive before the driver row, a child group before its parent) and would reject records the source considers valid. Identity resolution against platform entities happens through twin_external_refs, not through a hard FK on the mirror."
+    },
+    {
+      "table": "token_production_events",
+      "column": "transaction_id",
+      "reason": "Intentionally unconstrained — 'transaction_id' is a text external/on-chain transaction reference (sits beside blockchain_tx_hash), NOT an internal FK. token_transactions.id is uuid, so the name-heuristic pairing is type-incompatible. Heuristic false positive vs the new token_transactions ledger table."
+    },
+    {
+      "table": "training_examples",
+      "column": "source_id",
+      "reason": "Intentionally unconstrained — POLYMORPHIC provenance paired with source_type (comment: \"ID of origin record (ai_feedback.id, knowledge_items.id, etc.)\"; source_type = \"Origin table: ai_feedback, knowledge_items, expert_rules, ragnarok_doc\"). Not a single-table FK. Heuristic false positive vs the new agent_knowledge_sources."
+    },
+    {
+      "table": "twin_events",
+      "column": "story_id",
+      "reason": "Intentionally unconstrained, and the table SoT says so in its own header and column comment: \"story_id = vazba na obchodní případ (story spine) — bez FK: story žije ve vlastní doméně, událost ji jen referencuje.\" The twin substrate is domain-neutral: a hard FK would bind the generic carrier to one domain's table. Contrast inside the same table: twin_id / related_twin_id / place_twin_id ARE real FKs to twin_entities."
+    },
+    {
+      "table": "user_sessions",
+      "column": "session_id",
+      "reason": "Pre-existing unenforced relationship (baseline snapshot). 'session_id' is an enforced FK elsewhere → public_chat_sessions; no FK constraint here. Guarded against NEW drift — add a FOREIGN KEY in the table SoT to clear."
+    },
+    {
+      "table": "wd_drivers",
+      "column": "group_id",
+      "reason": "Intentionally unconstrained — this is the SOURCE SYSTEM's own integer id mirrored into our table, not a platform uuid reference. The wd_* tables are a mirror of the vendor's fleet data: enforcing a foreign key here would make import ORDER load-bearing (a ride can arrive before the driver row, a child group before its parent) and would reject records the source considers valid. Identity resolution against platform entities happens through twin_external_refs, not through a hard FK on the mirror. (2026-09-28: signal fk_elsewhere fired only because twin_relation_proposals.group_id is a real FK to twin_relation_proposal_groups — a different concept with the same column name.)"
+    },
+    {
+      "table": "wd_drivers",
+      "column": "wd_driver_id",
+      "reason": "Parent alternate key for Webdispecink driver imports: wd_driver_id is the unique external id from the vendor API and is intentionally referenced by wd_rides / wd_vehicle_positions_*. It is not a child relationship source column; the UUID id remains the row PK while wd_driver_id is UNIQUE for stable vendor correlation."
+    },
+    {
+      "table": "wd_vehicles",
+      "column": "wd_car_id",
+      "reason": "Parent alternate key for Webdispecink vehicle imports: wd_car_id is the unique external id from the vendor API and is intentionally referenced by wd_rides / wd_vehicle_positions_*. It is not a child relationship source column; the UUID id remains the row PK while wd_car_id is UNIQUE for stable vendor correlation."
+    },
+    {
+      "table": "production_inventory_events",
+      "column": "ref_id",
+      "reason": "Polymorphic reference: ref_type names the referenced entity (batch, shipment, …) and ref_id is its id, so there is no single parent table to hold a FOREIGN KEY. Flagged from 2026-09-29 only by the name heuristic, after twin_ref_davky.ref_id (bulk identity approval journal) gained a real FK to twin_external_refs; production_inventory_events.ref_id never points to twin_external_refs."
+    }
+  ]
+}

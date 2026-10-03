@@ -1,0 +1,137 @@
+# syntax=docker/dockerfile:1
+# Dockerfile.svc-source-broker — Source broker microservice (port 8090)
+#
+# Standalone Dockerfile (avoids Coolify's ARG-injection explosion for inline
+# compose dockerfiles). Build context = REPO ROOT.
+#
+# Workspace-aware, registry-free build — the same hermetic pattern as
+# Dockerfile.svc-plugin-system (see its header for the full rationale).
+# @aisha/security + @aisha/observability + @aisha/audience-types are monorepo
+# WORKSPACE packages (packages/*), not published to any registry; they resolve
+# via npm workspace symlinks. The previous form COPYed the service dir + a service-local
+# package-lock.json — that lockfile was removed when services became workspace
+# members (the root lockfile is the only one), so `npm ci` failed EUSAGE on
+# every from-scratch build.
+
+ARG REGISTRY_PROXY=
+
+# ── Zdrojové adaptéry z instančního overlaye ─────────────────────────────────
+# Který zdrojový systém instance federuje (a jak se na něj ptát) ví INSTANCE,
+# ne platforma. Adaptér proto žije v instančním repu v `source-adapters/<jméno>/`
+# (vlastní package.json + package-lock.json) a sem přichází klonem — táž dráha
+# jako téma Keycloaku (Dockerfile.keycloak), povrchy a SQL instance.
+#
+# ⛔ NAMĚŘENO 2026-09-14: dosavadní model „fork si adaptér přidá jako workspace
+# a doplní si build krok" nutil fork nést v jádře jméno instance — plugin,
+# workspace, řádky tohoto Dockerfilu. Brána stack-nesmi-znat-jmeno-instance
+# našla ve forku 62 výskytů a push forku neprošel.
+#
+# DEKLARACE JE OBSAH INSTANČNÍHO REPA: URL a ref odvozuje env-doktor
+# z `AISHA_INSTANCE_DATA_GIT_URL` (bez přihlašovacích údajů). Prázdná URL =
+# instance overlay nedeklaruje. Overlay bez adresáře `source-adapters/` =
+# instance adaptéry nedeklaruje; obraz je nenese a /source/* odpovídá
+# 501 not_configured — stav instalace bez zdrojového systému, ne chyba.
+#
+# Fail-closed tam, kde by ticho lhalo: URL zadaná a prázdný CACHEBUST (klon by
+# se zakešoval z prvního buildu), selhaný klon, adaptér bez package-lock.json.
+# Token jde BuildKit secretem, nikdy build ARGem — důvod v Dockerfile.keycloak
+# (Coolify vkládá ARG za každý FROM, hodnota by skončila v `docker history`).
+FROM ${REGISTRY_PROXY}library/alpine:3.20 AS source-adapters
+ARG SOURCE_ADAPTER_OVERLAY_GIT_URL=
+ARG SOURCE_ADAPTER_OVERLAY_REF=
+ARG SOURCE_ADAPTER_OVERLAY_PATH=source-adapters
+# ⛔ CACHEBUST — bez něj se overlay nasadí jednou a už nikdy (viz Dockerfile.keycloak).
+ARG SOURCE_ADAPTER_OVERLAY_CACHEBUST=
+RUN --mount=type=secret,id=forgejo_token,required=false \
+    mkdir -p /adapters && \
+    if [ -z "$SOURCE_ADAPTER_OVERLAY_GIT_URL" ]; then \
+      echo "[source-adapters] přeskočeno (SOURCE_ADAPTER_OVERLAY_GIT_URL nenastaveno) — instance overlay nedeklaruje"; \
+    else \
+      [ -n "$SOURCE_ADAPTER_OVERLAY_CACHEBUST" ] || { \
+        echo "[source-adapters] CHYBA: SOURCE_ADAPTER_OVERLAY_GIT_URL je zadané, ale SOURCE_ADAPTER_OVERLAY_CACHEBUST prázdné." >&2; \
+        echo "[source-adapters]        BuildKit by klon zakešoval a nasadil adaptéry z PRVNÍHO buildu — tiše." >&2; exit 1; }; \
+      apk add --no-cache git >/dev/null || { echo "[source-adapters] CHYBA: git se nenainstaloval" >&2; exit 1; }; \
+      URL="$SOURCE_ADAPTER_OVERLAY_GIT_URL"; \
+      FORGEJO_TOKEN="$(cat /run/secrets/forgejo_token 2>/dev/null || true)"; \
+      case "$URL" in *@*) : ;; https://*) [ -n "$FORGEJO_TOKEN" ] && URL="https://${FORGEJO_TOKEN}@${URL#https://}" ;; esac; \
+      git clone --quiet --depth 1 ${SOURCE_ADAPTER_OVERLAY_REF:+--branch "$SOURCE_ADAPTER_OVERLAY_REF"} "$URL" /tmp/overlay \
+        || { echo "[source-adapters] CHYBA: klon instančního repa selhal" >&2; exit 1; }; \
+      if [ -d "/tmp/overlay/${SOURCE_ADAPTER_OVERLAY_PATH}" ]; then \
+        cp -RL "/tmp/overlay/${SOURCE_ADAPTER_OVERLAY_PATH}/." /adapters/ \
+          || { echo "[source-adapters] CHYBA: kopie selhala — visící symlink?" >&2; exit 1; }; \
+        echo "[source-adapters] cachebust=${SOURCE_ADAPTER_OVERLAY_CACHEBUST}"; \
+        echo "[source-adapters] adaptéry z instance: $(ls /adapters | tr '\n' ' ')"; \
+        find /adapters -type f | sort | xargs cat 2>/dev/null | md5sum | sed 's/^/[source-adapters] otisk obsahu: /'; \
+      else \
+        echo "[source-adapters] instance adaptéry nedeklaruje (${SOURCE_ADAPTER_OVERLAY_PATH}/ v overlayi není)"; \
+      fi; \
+      rm -rf /tmp/overlay; \
+    fi
+
+FROM ${REGISTRY_PROXY}library/node:22-alpine AS build
+WORKDIR /app
+# Whole repo so npm can resolve the full workspace graph + symlink @aisha/*.
+COPY . .
+# Install this service's workspace + root deps (resolves @aisha/* via symlinks).
+RUN npm ci --workspace=@aisha/svc-source-broker --include-workspace-root --include=dev --ignore-scripts
+# Build internal deps in order, then the service. audience-types (IDataSource /
+# MemberTier / registry contracts) is a workspace dep of the new source-read
+# runtime — compile it before the service or a clean Docker tsc fails
+# (Cannot find module '@aisha/audience-types').
+RUN npm run build --workspace=@aisha/security && \
+    npm run build --workspace=@aisha/observability && \
+    npm run build --workspace=@aisha/audience-types && \
+    npm run build --workspace=@aisha/svc-source-broker
+# Adaptéry z overlaye se staví TADY — po audience-types (jejich typy se najdou
+# procházením nahoru do /app/node_modules) a PŘED pruningem kořene. Každý má
+# vlastní lockfile a vlastní node_modules; `source-adapters/` není workspace,
+# takže `npm ci` v něm běží samostatně. Adaptér bez lockfilu build ZASTAVÍ:
+# `npm install` by vyrobil strom, který nikdo nezkontroloval.
+# `--omit=peer`: kontrakt (@aisha/audience-types, jen typy) je peer závislost,
+# a překládat se má proti TOMU, který broker implementuje — ten z tohoto obrazu,
+# ne proti kopii z registru, kterou si adaptér zamkl kdysi.
+COPY --from=source-adapters /adapters /app/source-adapters
+RUN for d in /app/source-adapters/*/; do \
+      [ -d "$d" ] || continue; \
+      n="$(basename "$d")"; \
+      [ -f "$d/package.json" ] && [ -f "$d/package-lock.json" ] \
+        || { echo "[source-adapters] CHYBA: $n nemá package.json + package-lock.json" >&2; exit 1; }; \
+      (cd "$d" && npm ci --include=dev --omit=peer --ignore-scripts && npm run build && npm prune --omit=dev --omit=peer) \
+        || { echo "[source-adapters] CHYBA: adaptér $n se nepostavil" >&2; exit 1; }; \
+      [ -d "$d/dist" ] || { echo "[source-adapters] CHYBA: $n po buildu nemá dist/" >&2; exit 1; }; \
+      echo "[source-adapters] postaven: $n"; \
+    done
+# Drop devDependencies for this workspace.
+RUN npm prune --workspace=@aisha/svc-source-broker --omit=dev
+# Guarantee the service's own node_modules dir exists so the runtime COPY below
+# never fails — and carries any dep npm nested HERE instead of hoisting to root.
+RUN mkdir -p services/svc-source-broker/node_modules
+
+FROM ${REGISTRY_PROXY}library/node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+# Resolved node_modules (root-hoisted) + the dep-chain workspace dirs, copied
+# WHOLE (not just dist/) so nested non-hoisted runtime deps travel with them —
+# see Dockerfile.svc-plugin-system for the ERR_MODULE_NOT_FOUND history.
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/packages/security packages/security
+COPY --from=build /app/packages/observability packages/observability
+COPY --from=build /app/packages/audience-types packages/audience-types
+# Zdrojové adaptéry se načítají V PROCESU brokeru při startu, z cesty
+# v SOURCE_ADAPTER_PLUGIN_ENTRY (/app/plugins/<jméno>/dist/index.js). Adresář
+# nese jen to, co instance deklarovala (viz stage source-adapters); prázdný je
+# legitimní. Každý adaptér si veze vlastní běhové node_modules.
+COPY --from=build /app/source-adapters /app/plugins
+COPY --from=build /app/services/svc-source-broker/package.json services/svc-source-broker/package.json
+COPY --from=build /app/services/svc-source-broker/dist services/svc-source-broker/dist
+COPY --from=build /app/services/svc-source-broker/node_modules services/svc-source-broker/node_modules
+WORKDIR /app/services/svc-source-broker
+EXPOSE 8090
+# Mesh routu staví entrypoint v compose JAKO ROOT a práva hned zahodí přes
+# `exec su-exec node …` (vzor: gateway, brána mesh-lane-miri-jmenem-ne-hopem).
+# ⛔ NAMĚŘENO 2026-09-16 na guru: s `USER node` v obrazu služba routu postavit
+# nemohla, mesh jméno se přeložilo a NESPOJILO — svc-ai-chat vypršel na PostgREST,
+# MCP, lokálním modelu, companion i integration, a nic to nehlásilo jako chybu.
+RUN apk add --no-cache su-exec iproute2
+CMD ["node", "dist/server.js"]

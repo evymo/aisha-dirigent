@@ -1,0 +1,14 @@
+id: mautrix-signal
+url: http://mautrix-signal:29328
+as_token: ${AISHA_AS_TOKEN}_signal
+hs_token: ${AISHA_HS_TOKEN}_signal
+sender_localpart: signalbot
+rate_limited: false
+namespaces:
+  users:
+    - exclusive: true
+      regex: '@signal_.*'
+  aliases:
+    - exclusive: true
+      regex: '#signal_.*'
+  rooms: []

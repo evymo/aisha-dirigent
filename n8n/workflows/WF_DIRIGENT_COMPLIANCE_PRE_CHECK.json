@@ -1,0 +1,78 @@
+{
+  "name": "WF_DIRIGENT_COMPLIANCE_PRE_CHECK",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "dirigent/compliance_pre_check",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "pre-check-trigger",
+      "name": "Pre-Check Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// PreToolUse playbook — backend pre-check before tool runs.\n// PRIMARY defense is Vrstva 1 local regex hooks (.claude/hooks/aisha-advise-*).\n// This playbook handles cases that need DB context (e.g. file path matches\n// a published rule binding for the active story).\n//\n// MVP: derive a soft compliance hint from path heuristics. Future: query\n// expert_rule_subscriptions JOIN story_rulesets for story-scoped pattern\n// matches.\nconst body = $input.first().json.body || $input.first().json;\nif (body.event !== 'pre_tool') {\n  throw new Error(`WF_DIRIGENT_COMPLIANCE_PRE_CHECK expects event=pre_tool, got ${body.event}`);\n}\nconst toolInput = body.tool_input || {};\nconst filePath = String(toolInput.file_path || '');\nconst command = String(toolInput.command || '');\n\nconst hints = [];\n// Path-based hints (mirror feedback_fix_at_source_of_truth.md)\nif (/^aisha\\/db\\/migrations\\//.test(filePath) && !/^.{0,200}archive/.test(filePath)) {\n  hints.push('Migrace v aisha/db/migrations/: ujisti se, že paired SoT pair v aisha/db/sql/ je v sync (gate enforces).');\n}\nif (/baseline\\.json$|baseline\\.sql$/.test(filePath)) {\n  hints.push('Baseline file je AUTO-GENERATED — needitovat ručně, opravit at source-of-truth a regenerovat.');\n}\nif (/\\.aisha\\//.test(filePath) && !/dirigent\\.template\\.json|static-defense-payload\\.json/.test(filePath)) {\n  hints.push('.aisha/ je generated territory (per feedback_aisha_dir_is_generated.md) — opravit producer, ne file in place.');\n}\nif (/aisha-branding\\.baseline\\.json/.test(filePath)) {\n  hints.push('aisha-branding.baseline.json je gate — fix code, nikoliv baseline (feedback_no_workarounds_rewrite_dont_remove.md).');\n}\n\nconst advisory = hints.length ? `🛡️ AISHA Pre-Check:\\n- ${hints.join('\\n- ')}` : '';\nreturn [{\n  json: {\n    advisory,\n    decision: 'allow',\n    _audit: { event: 'pre_tool', story_id: body.story_id, session_id: body.session_id, file_path: filePath, command: command.slice(0,80), hint_count: hints.length }\n  }\n}];"
+      },
+      "id": "path-check",
+      "name": "Path Heuristic",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_integration_action",
+        "rpcParams": "={{ JSON.stringify({ p_action_key: 'dirigent.compliance_pre_check.completed', p_integration: 'wf_dirigent_compliance_pre_check', p_payload: $json._audit }) }}",
+        "authMode": "service_role",
+        "options": { "timeout": 3000, "auditTrail": false },
+        "onError": "continueRegularOutput"
+      },
+      "id": "audit-log",
+      "name": "Audit Log",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "credentials": {
+        "aishaPostgrestApi": { "id": "__REMAP__", "name": "AISHA PostgREST" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ advisory: $('Path Heuristic').first().json.advisory, decision: 'allow' }) }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [900, 300]
+    }
+  ],
+  "connections": {
+    "Pre-Check Trigger": { "main": [[{ "node": "Path Heuristic", "type": "main", "index": 0 }]] },
+    "Path Heuristic": { "main": [[{ "node": "Audit Log", "type": "main", "index": 0 }]] },
+    "Audit Log": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

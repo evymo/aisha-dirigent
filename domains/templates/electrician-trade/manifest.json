@@ -1,0 +1,6 @@
+{
+  "$note": "Example demo template — a solo ELECTRICIAN / trade specialist. Lights up lead-capture + field-knowledge: a services grid, an 'ask an electrician' FAQ drawn from experience, and a quote-request form. The form is a STATIC demo — wiring it to live submission needs the flagged follow-up (a public `lead_submissions` table + `capture_lead` RPC; the existing ContactFormBlock runtime block is a UI-only stub today). Brand-neutral, fork-freely. Seed with /seed-default { \"source_dir\": \"electrician-trade\" } or AISHA_SEED_DOMAIN=electrician-trade.",
+  "title_key": "web.trade.title",
+  "description_key": "web.trade.description",
+  "slug": "index"
+}

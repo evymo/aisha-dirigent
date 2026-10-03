@@ -1,0 +1,99 @@
+# Cursor Rules — AI Platform
+
+> Auto-generated from AISHA Expert Overlay ruleset.
+> **Do not edit manually** — regenerate via `npm run gen:ide`.
+> Generated: 2026-04-05 06:24:33.870009+00
+## Architecture Pattern
+
+### RPC-Only Pattern
+
+RPC-Only Architecture:
+- supabase.rpc("function_name", { p_param: value }) for ALL data access
+- No .from("table").select() ever
+- No .select("*") — always list explicit columns
+- Sensitive data functions use _audited suffix with audit_journal logging
+- SECURITY DEFINER for anon functions + SET search_path TO 'public'
+- REVOKE ALL FROM PUBLIC + explicit GRANT TO authenticated/anon
+
+## Coding Standard
+
+### AISHA Development Laws
+
+MANDATORY rules for all AISHA platform code:
+1. Hook-Only Data Access — API calls ONLY from custom hooks
+2. No any types — use proper TypeScript types or unknown + type guard
+3. Zod Validation — all external data MUST pass Zod schema
+4. i18n for all UI text — use t("key"), no hardcoded strings
+5. No console.log — use safeError()
+6. No emoji in UI — use lucide-react icons
+7. RPC-Only — no direct .from() queries
+
+### i18n Rules
+
+i18n Absolute Rules:
+- const { t } = useTranslation()
+- No hardcoded strings in JSX
+- No fallbacks: t("key", "Fallback") MASKS missing translations
+- Add EN key to src/i18n/segments/en/*.json, CS to cs/*.json
+- Run npm run i18n:check before commit
+
+## Security Practice
+
+### Audit Journal Pattern
+
+Audit Logging:
+- Every sensitive operation: INSERT INTO audit_journal(user_id, action, metadata)
+- NEVER store PII in metadata — only IDs
+
+### SECURITY DEFINER Pattern
+
+SECURITY DEFINER Rules:
+- Functions with GRANT TO anon MUST use SECURITY DEFINER
+- SET search_path TO 'public' is MANDATORY
+- REVOKE ALL ON FUNCTION FROM PUBLIC before any GRANT
+- GRANT EXECUTE TO anon, authenticated explicitly
+
+## Testing Strategy
+
+### Testing Rules
+
+Testing Rules:
+- Run ONLY relevant tests: npm run test:run -- src/tests/hooks/useMyHook.test.ts
+- NEVER run all tests unless pre-PR
+- Mock MUST match implementation
+- Use vi.mocked(supabase.rpc) consistently
+
+## Devops Pipeline
+
+### Migration Workflow
+
+Migration Rules:
+1. Create: supabase/migrations/YYYYMMDDHHMMSS_description.sql
+2. Register: npm run db:migration:register
+3. Apply: npm run db:migrate:local
+4. Types: npm run db:types:gen:local
+5. Verify: npx tsc --noEmit
+NEVER archive migrations!
+
+## Integration Pattern
+
+### AISHA Hook Design Patterns
+
+Hook Design Patterns:
+- Every hook: src/hooks/useFeatureName.ts + barrel export
+- GET: useQuery with queryKey, queryFn (supabase.rpc), Zod parse
+- Mutation: useMutation + invalidateQueries on success
+
+## Documentation Standard
+
+### Enterprise Source Onboarding
+
+Enterprise source onboarding povinný:
+- Každý nový datový zdroj musí projít onboarding procesem dle SOURCE_ONBOARDING_CONTRACT.md
+- Implementační návod: SOURCE_APPLICATION_ONBOARDING_HANDBOOK.md
+- Bez schváleného onboardingu nesmí data vstoupit do produkce
+- Governance index: GOVERNANCE_INDEX.md
+- Knowledge loop SLA: KNOWLEDGE_LOOP_SLA.md
+
+
+<!-- gen:metadata {"story_id":null,"output_path":".cursorrules","length_chars":null,"adapter":"cursorrules","payload_version":1,"fingerprint":null,"generated_at":"2026-04-05 06:24:33.870009+00"} -->

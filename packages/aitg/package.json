@@ -1,0 +1,47 @@
+{
+  "name": "@aisha/aitg",
+  "version": "0.1.1",
+  "license": "Elastic-2.0",
+  "description": "OWASP AI Testing Guide (AITG) v1 \u2014 primitives shared across orchestrator services. Catalog metadata, Zod schemas, classifiers, the run emitter, and the `withAitgGuard()` call-site middleware live here so any service touching an LLM call can verify itself with one import.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./catalog": "./dist/catalog.js",
+    "./schemas": "./dist/schemas.js",
+    "./classifiers": "./dist/classifiers.js",
+    "./runner": "./dist/runner.js",
+    "./guard": "./dist/guard.js",
+    "./continuous": "./dist/continuous.js",
+    "./automation": "./dist/automation.js"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit",
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "pretest": "test -d node_modules || npm install --no-fund --no-audit --prefer-offline"
+  },
+  "dependencies": {
+    "@aisha/security": "file:../security",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.3"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "publishConfig": {
+    "access": "restricted"
+  }
+}

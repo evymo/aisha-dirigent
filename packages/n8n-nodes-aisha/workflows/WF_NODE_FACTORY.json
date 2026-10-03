@@ -1,0 +1,291 @@
+{
+  "id": "PLACEHOLDER_NODE_FACTORY",
+  "name": "WF_NODE_FACTORY",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 3 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "cron-weekly",
+      "name": "Weekly Monday 03:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [200, 300],
+      "notes": "Weekly check for pending node factory requests. Can also be triggered manually."
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "node-factory",
+        "options": {
+          "responseMode": "lastNode"
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook: Node Factory Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 520],
+      "webhookId": "node-factory-webhook",
+      "notes": "POST /webhook/node-factory with { nodeName, description, operations[], category }"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize input from both triggers (cron = poll DB, webhook = direct request)\nconst webhookBody = $input.item.json.body || $input.item.json;\n\n// If from cron, fetch pending requests from DB\nif (!webhookBody.nodeName) {\n  // Cron trigger — fetch pending node_factory_request events\n  const supabaseUrl = $env.AISHA_POSTGREST_URL;\n  const resp = await fetch(`${supabaseUrl}/rest/v1/rpc/get_pending_node_factory_requests`, {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\n      'apikey': $env.AISHA_POSTGREST_SERVICE_KEY,\n      'Authorization': `Bearer ${$env.AISHA_POSTGREST_SERVICE_KEY}`,\n    },\n    body: JSON.stringify({ p_limit: 5 }),\n  });\n  const requests = await resp.json();\n  if (!Array.isArray(requests) || requests.length === 0) {\n    return [{ json: { skip: true, message: 'No pending node factory requests' } }];\n  }\n  return requests.map(r => ({\n    json: {\n      nodeName: r.node_name,\n      description: r.description,\n      operations: r.operations || ['execute'],\n      category: r.category || 'custom',\n      rpcFunctions: r.rpc_functions || [],\n      includeAudit: r.include_audit !== false,\n      requestId: r.id,\n      source: 'cron',\n    }\n  }));\n}\n\n// Webhook trigger — direct request\nreturn [{\n  json: {\n    nodeName: webhookBody.nodeName,\n    description: webhookBody.description || `Custom AISHA node: ${webhookBody.nodeName}`,\n    operations: webhookBody.operations || ['execute'],\n    category: webhookBody.category || 'custom',\n    rpcFunctions: webhookBody.rpcFunctions || [],\n    includeAudit: webhookBody.includeAudit !== false,\n    requestId: webhookBody.requestId || `webhook-${Date.now()}`,\n    source: 'webhook',\n  }\n}];"
+      },
+      "id": "normalize-input",
+      "name": "Normalize Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.skip }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "skip-check",
+      "name": "Has Requests?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STAGE 1: Generate node code using AishaNodeFactory logic\nconst request = $input.item.json;\n\nconst className = request.nodeName.replace(/[^a-zA-Z0-9]/g, '');\nconst nodeId = className.charAt(0).toLowerCase() + className.slice(1);\n\n// Generate the node TypeScript code\nconst operations = request.operations.map(op => `'${op}'`).join(' | ');\nconst opsArray = request.operations.map(op => {\n  return `{ name: '${op.charAt(0).toUpperCase() + op.slice(1)}', value: '${op}' }`;\n}).join(',\\n\\t\\t\\t\\t\\t');\n\nconst rpcCases = request.rpcFunctions.map(fn => {\n  return `\\t\\t\\t\\tcase '${fn}':\\n\\t\\t\\t\\t\\trpcFunction = '${fn}';\\n\\t\\t\\t\\t\\trpcParams = {};\\n\\t\\t\\t\\t\\tbreak;`;\n}).join('\\n');\n\nconst auditBlock = request.includeAudit ? `\n\\t\\t\\t// Audit trail\n\\t\\t\\ttry {\n\\t\\t\\t\\tawait fetch(supabaseUrl + '/rest/v1/rpc/insert_audit_journal_entry', {\n\\t\\t\\t\\t\\tmethod: 'POST',\n\\t\\t\\t\\t\\theaders: {\n\\t\\t\\t\\t\\t\\t'Content-Type': 'application/json',\n\\t\\t\\t\\t\\t\\t'apikey': credentials.serviceRoleKey,\n\\t\\t\\t\\t\\t\\t'Authorization': \\`Bearer \\${credentials.serviceRoleKey}\\`,\n\\t\\t\\t\\t\\t},\n\\t\\t\\t\\t\\tbody: JSON.stringify({\n\\t\\t\\t\\t\\t\\tp_action: 'CUSTOM_NODE_EXECUTE',\n\\t\\t\\t\\t\\t\\tp_metadata: { node: '${className}', operation },\n\\t\\t\\t\\t\\t}),\n\\t\\t\\t\\t});\n\\t\\t\\t} catch { /* audit is best-effort */ }` : '';\n\nconst code = `import { IExecuteFunctions, INodeExecutionData, INodeType, INodeTypeDescription } from 'n8n-workflow';\n\nexport class ${className} implements INodeType {\n\\tdescription: INodeTypeDescription = {\n\\t\\tdisplayName: 'AISHA ${request.description.substring(0, 40)}',\n\\t\\tname: 'aisha${className}',\n\\t\\ticon: 'file:aisha.svg',\n\\t\\tgroup: ['transform'],\n\\t\\tversion: 1,\n\\t\\tsubtitle: '={{$parameter[\"operation\"]}}',\n\\t\\tdescription: '${request.description.replace(/'/g, \"\\\\'\").substring(0, 120)}',\n\\t\\tdefaults: { name: '${className}' },\n\\t\\tinputs: ['main'],\n\\t\\toutputs: ['main'],\n\\t\\tcredentials: [{ name: 'aishaPostgrestApi', required: true }],\n\\t\\tproperties: [\n\\t\\t\\t{\n\\t\\t\\t\\tdisplayName: 'Operation',\n\\t\\t\\t\\tname: 'operation',\n\\t\\t\\t\\ttype: 'options',\n\\t\\t\\t\\tnoDataExpression: true,\n\\t\\t\\t\\toptions: [${opsArray}],\n\\t\\t\\t\\tdefault: '${request.operations[0]}',\n\\t\\t\\t},\n\\t\\t],\n\\t};\n\n\\tasync execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {\n\\t\\tconst items = this.getInputData();\n\\t\\tconst results: INodeExecutionData[] = [];\n\\t\\tconst credentials = await this.getCredentials('aishaPostgrestApi');\n\\t\\tconst supabaseUrl = credentials.supabaseUrl as string;\n\n\\t\\tfor (let i = 0; i < items.length; i++) {\n\\t\\t\\ttry {\n\\t\\t\\t\\tconst operation = this.getNodeParameter('operation', i) as string;\n\\t\\t\\t\\tlet rpcFunction = '';\n\\t\\t\\t\\tlet rpcParams: Record<string, unknown> = {};\n\n\\t\\t\\t\\tswitch (operation) {\n${rpcCases || '\\t\\t\\t\\tdefault:\\n\\t\\t\\t\\t\\tthrow new Error(\\`Unknown operation: \\${operation}\\`);'}\n\\t\\t\\t\\t}\n\n\\t\\t\\t\\tconst resp = await fetch(supabaseUrl + '/rest/v1/rpc/' + rpcFunction, {\n\\t\\t\\t\\t\\tmethod: 'POST',\n\\t\\t\\t\\t\\theaders: {\n\\t\\t\\t\\t\\t\\t'Content-Type': 'application/json',\n\\t\\t\\t\\t\\t\\t'apikey': credentials.serviceRoleKey as string,\n\\t\\t\\t\\t\\t\\t'Authorization': \\`Bearer \\${credentials.serviceRoleKey}\\`,\n\\t\\t\\t\\t\\t},\n\\t\\t\\t\\t\\tbody: JSON.stringify(rpcParams),\n\\t\\t\\t\\t});\n\n\\t\\t\\t\\tconst data = await resp.json();\n\\t\\t\\t\\tif (!resp.ok) throw new Error(data.message || JSON.stringify(data));\n\\t\\t\\t\\tresults.push({ json: typeof data === 'object' ? data : { result: data } });${auditBlock}\n\\t\\t\\t} catch (error) {\n\\t\\t\\t\\tif (this.continueOnFail()) {\n\\t\\t\\t\\t\\tresults.push({ json: { error: (error as Error).message } });\n\\t\\t\\t\\t} else {\n\\t\\t\\t\\t\\tthrow error;\n\\t\\t\\t\\t}\n\\t\\t\\t}\n\\t\\t}\n\\t\\treturn [results];\n\\t}\n}\n`;\n\nreturn [{\n  json: {\n    ...request,\n    generatedCode: code,\n    className,\n    nodeId,\n    stage: 'generated',\n  }\n}];"
+      },
+      "id": "generate-node",
+      "name": "Generate Node Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [920, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STAGE 2: Validate generated code\nconst item = $input.item.json;\nconst code = item.generatedCode;\nconst issues = [];\n\n// Structure checks\nif (!code.includes('implements INodeType')) issues.push('Missing INodeType implementation');\nif (!code.includes('description:')) issues.push('Missing description property');\nif (!code.includes('async execute')) issues.push('Missing execute method');\nif (!code.includes('continueOnFail')) issues.push('Missing continueOnFail error handling');\n\n// Security checks\nif (code.includes('eval(') || code.includes('new Function(')) issues.push('SECURITY: eval/Function detected');\nif (code.includes('.select(\"*\")') || code.includes(\".select('*')\")) issues.push('SECURITY: select(\"*\") detected');\nif (code.includes('console.log')) issues.push('HYGIENE: console.log found (use audit instead)');\n\n// Naming convention\nif (!item.className.startsWith('Aisha')) issues.push('NAMING: Class name must start with Aisha');\n\nconst isValid = issues.length === 0;\n\nreturn [{\n  json: {\n    ...item,\n    validation: {\n      isValid,\n      issues,\n      checkedAt: new Date().toISOString(),\n    },\n    stage: isValid ? 'validated' : 'validation_failed',\n  }\n}];"
+      },
+      "id": "validate-node",
+      "name": "Validate Code",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1140, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.validation.isValid }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "validation-gate",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1360, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STAGE 3: Generate test plan for the validated node\nconst item = $input.item.json;\nconst className = item.className;\nconst operations = item.operations;\n\nconst testCases = [\n  `describe('${className}', () => {`,\n  `  it('should have correct node description', () => {`,\n  `    const node = new ${className}();`,\n  `    expect(node.description.name).toBe('aisha${className}');`,\n  `    expect(node.description.version).toBe(1);`,\n  `  });`,\n  '',\n  ...operations.map(op => [\n    `  it('should execute ${op} operation', async () => {`,\n    `    const ctx = createMockExecuteFunctions({ operation: '${op}' });`,\n    `    setupFetchMock({ success: true });`,\n    `    const node = new ${className}();`,\n    `    const result = await node.execute.call(ctx);`,\n    `    expect(result[0]).toBeDefined();`,\n    `  });`,\n    '',\n  ].join('\\n')).flat(),\n  `  it('should handle errors with continueOnFail', async () => {`,\n  `    const ctx = createMockExecuteFunctions({ operation: '${operations[0]}', continueOnFail: true });`,\n  `    setupFetchMock({ message: 'Test error' }, false);`,\n  `    const node = new ${className}();`,\n  `    const result = await node.execute.call(ctx);`,\n  `    expect(result[0][0].json.error).toBeDefined();`,\n  `  });`,\n  `});`,\n];\n\nconst testCode = [\n  `import { describe, it, expect, beforeEach } from 'vitest';`,\n  `import { ${className} } from '../nodes/${className}/${className}.node';`,\n  `import { createMockExecuteFunctions, setupFetchMock } from './helpers/mockFactory';`,\n  '',\n  ...testCases,\n].join('\\n');\n\nreturn [{\n  json: {\n    ...item,\n    generatedTestCode: testCode,\n    testCount: operations.length + 2,\n    stage: 'tested',\n  }\n}];"
+      },
+      "id": "generate-tests",
+      "name": "Generate Tests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1580, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// STAGE 4: Register node in agent_catalog via Supabase RPC\nconst item = $input.item.json;\nconst supabaseUrl = $env.AISHA_POSTGREST_URL;\nconst serviceKey = $env.AISHA_POSTGREST_SERVICE_KEY;\n\ntry {\n  const resp = await fetch(`${supabaseUrl}/rest/v1/rpc/register_custom_node`, {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\n      'apikey': serviceKey,\n      'Authorization': `Bearer ${serviceKey}`,\n    },\n    body: JSON.stringify({\n      p_node_name: item.className,\n      p_node_type: `n8n-nodes-aisha.aisha${item.className}`,\n      p_description: item.description,\n      p_operations: item.operations,\n      p_category: item.category,\n      p_metadata: {\n        generated_at: new Date().toISOString(),\n        test_count: item.testCount,\n        source: item.source,\n        request_id: item.requestId,\n        validation: item.validation,\n      },\n    }),\n  });\n\n  const data = await resp.json();\n  \n  return [{\n    json: {\n      ...item,\n      registration: {\n        success: resp.ok,\n        data,\n      },\n      stage: 'registered',\n    }\n  }];\n} catch (error) {\n  return [{\n    json: {\n      ...item,\n      registration: {\n        success: false,\n        error: error.message,\n      },\n      stage: 'registration_failed',\n    }\n  }];\n}"
+      },
+      "id": "register-node",
+      "name": "Register in Catalog",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1800, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env?.AISHA_POSTGREST_URL || '' }}/rest/v1/rpc/insert_audit_journal_entry",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"p_action\": \"NODE_FACTORY_{{ $json.stage === 'registered' ? 'SUCCESS' : 'FAILED' }}\",\n  \"p_metadata\": {\n    \"area\": \"n8n\",\n    \"severity\": \"{{ $json.stage === 'registered' ? 'info' : 'warning' }}\",\n    \"node_name\": \"{{ $json.className }}\",\n    \"operations\": {{ JSON.stringify($json.operations) }},\n    \"stage\": \"{{ $json.stage }}\",\n    \"request_id\": \"{{ $json.requestId }}\",\n    \"source\": \"{{ $json.source }}\",\n    \"test_count\": {{ $json.testCount || 0 }},\n    \"validation_issues\": {{ JSON.stringify($json.validation?.issues || []) }}\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "audit-log",
+      "name": "Audit: Node Factory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2020, 300],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Z7oSSowoqk0ZgB8X",
+          "name": "Supabase Service Role"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Final output — summarize what happened\nconst item = $input.item.json;\n\nreturn [{\n  json: {\n    status: item.stage === 'registered' ? 'SUCCESS' : 'COMPLETED_WITH_ISSUES',\n    nodeName: item.className,\n    nodeType: `n8n-nodes-aisha.aisha${item.className}`,\n    operations: item.operations,\n    category: item.category,\n    generatedAt: new Date().toISOString(),\n    validation: item.validation,\n    registration: item.registration,\n    testCount: item.testCount,\n    codeLength: item.generatedCode?.length || 0,\n    nextSteps: [\n      'Review generated code in PR',\n      'Run tests: cd packages/n8n-nodes-aisha && npm test',\n      'Deploy: npm run deploy:n8n --coolify',\n    ],\n  }\n}];"
+      },
+      "id": "output-summary",
+      "name": "Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validation failed — log issues and notify\nconst item = $input.item.json;\n\nreturn [{\n  json: {\n    status: 'VALIDATION_FAILED',\n    nodeName: item.className,\n    issues: item.validation.issues,\n    suggestion: 'Fix issues and re-submit via webhook or wait for next cron cycle.',\n    stage: 'validation_failed',\n    requestId: item.requestId,\n    source: item.source,\n  }\n}];"
+      },
+      "id": "validation-failed",
+      "name": "Validation Failed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1580, 500]
+    },
+    {
+      "parameters": {
+        "content": "# 🏭 Node Factory — Self-Orchestration\n\nAisha Dirigent generates her own n8n community nodes.\n\n**Triggers:**\n- Weekly cron (Monday 3:00) — checks DB for pending requests\n- Webhook POST /webhook/node-factory — direct requests\n\n**Pipeline:**\n1. Normalize request\n2. Generate TypeScript code\n3. Validate (structure + security)\n4. Generate test suite\n5. Register in agent_catalog\n6. Audit log\n\n**Self-orchestration:** Aisha is her own client.\nShe can request new tools when existing ones don't cover a use case.",
+        "width": 400,
+        "height": 340,
+        "color": 6
+      },
+      "id": "note-overview",
+      "name": "WF_NODE_FACTORY",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [140, 100]
+    }
+  ],
+  "connections": {
+    "Weekly Monday 03:00": {
+      "main": [
+        [
+          { "node": "Normalize Request", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Webhook: Node Factory Request": {
+      "main": [
+        [
+          { "node": "Normalize Request", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Normalize Request": {
+      "main": [
+        [
+          { "node": "Has Requests?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Has Requests?": {
+      "main": [
+        [
+          { "node": "Generate Node Code", "type": "main", "index": 0 }
+        ],
+        []
+      ]
+    },
+    "Generate Node Code": {
+      "main": [
+        [
+          { "node": "Validate Code", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Validate Code": {
+      "main": [
+        [
+          { "node": "Valid?", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          { "node": "Generate Tests", "type": "main", "index": 0 }
+        ],
+        [
+          { "node": "Validation Failed", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Generate Tests": {
+      "main": [
+        [
+          { "node": "Register in Catalog", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Register in Catalog": {
+      "main": [
+        [
+          { "node": "Audit: Node Factory", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Validation Failed": {
+      "main": [
+        [
+          { "node": "Audit: Node Factory", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Audit: Node Factory": {
+      "main": [
+        [
+          { "node": "Summary", "type": "main", "index": 0 }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "tags": [
+    { "name": "aisha" },
+    { "name": "self-orchestration" },
+    { "name": "node-factory" }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

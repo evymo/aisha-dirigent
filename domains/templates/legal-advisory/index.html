@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n-key="web.legal.title">Hartwell &amp; Roe — legal advisory</title>
+    <meta name="description" data-i18n-key="web.legal.description"
+      content="A modern law practice with answers grounded in our own case files and documents." />
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header" data-section="header">
+      <div class="wrap">
+        <a class="brand" href="/">
+          <span class="brand__mark" aria-hidden="true">§</span>
+          <span data-i18n-key="web.legal.brand">Hartwell &amp; Roe</span>
+        </a>
+        <nav class="nav">
+          <a href="#areas" data-i18n-key="web.legal.nav.areas">Practice areas</a>
+          <a href="#knowledge" data-i18n-key="web.legal.nav.knowledge">Knowledge base</a>
+          <a href="#contact" data-i18n-key="web.legal.nav.contact">Contact</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" data-section="hero">
+        <div class="wrap">
+          <h1 data-i18n-key="web.legal.hero.heading">Clear advice, grounded in the documents that matter</h1>
+          <p data-i18n-key="web.legal.hero.body">
+            We pair experienced counsel with a searchable knowledge base built from our own
+            contracts, filings and precedents — so the answer you get is precise, fast and traceable.
+          </p>
+          <a class="btn" href="#contact" data-i18n-key="web.legal.hero.cta">Book a consultation</a>
+        </div>
+      </section>
+
+      <section class="section" id="areas" data-section="areas">
+        <div class="wrap">
+          <p class="section__eyebrow" data-i18n-key="web.legal.areas.eyebrow">What we do</p>
+          <h2 class="section__title" data-i18n-key="web.legal.areas.heading">Practice areas</h2>
+          <div class="areas">
+            <div class="area">
+              <h3 data-i18n-key="web.legal.area.1.name">Contracts &amp; commercial</h3>
+              <p data-i18n-key="web.legal.area.1.desc">Drafting, review and negotiation — with clause precedents at our fingertips.</p>
+            </div>
+            <div class="area">
+              <h3 data-i18n-key="web.legal.area.2.name">Employment</h3>
+              <p data-i18n-key="web.legal.area.2.desc">Agreements, policies and disputes, handled with care and current case law.</p>
+            </div>
+            <div class="area">
+              <h3 data-i18n-key="web.legal.area.3.name">Property &amp; real estate</h3>
+              <p data-i18n-key="web.legal.area.3.desc">Transactions, leases and due diligence, mapped against our document archive.</p>
+            </div>
+            <div class="area">
+              <h3 data-i18n-key="web.legal.area.4.name">Disputes &amp; resolution</h3>
+              <p data-i18n-key="web.legal.area.4.desc">Pragmatic strategy backed by a searchable record of past matters.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="knowledge" data-section="knowledge">
+        <div class="wrap">
+          <h2 class="section__title" data-i18n-key="web.legal.kb.heading">Ask our knowledge base</h2>
+          <!-- LIVE knowledge base (instance data): renders the firm's own
+               knowledge_topics via the knowledge-preview runtime block. Ships
+               EMPTY — the operator adds their documents/topics in admin — so the
+               capability is real, never a fabricated count. -->
+          <div data-runtime-block="knowledge-preview" data-block-config='{"limit":4}'></div>
+        </div>
+      </section>
+
+      <section class="section cta" id="contact" data-section="contact">
+        <div class="wrap">
+          <h2 class="section__title" data-i18n-key="web.legal.cta.heading">Talk to a lawyer</h2>
+          <p data-i18n-key="web.legal.cta.body">Tell us what you're facing. We'll reply within one business day with clear next steps.</p>
+          <a class="btn" href="mailto:hello@example.law" data-i18n-key="web.legal.cta.button">Book a consultation</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer" data-section="footer">
+      <div class="wrap">
+        <span data-i18n-key="web.legal.footer.name">Hartwell &amp; Roe Legal Advisory</span>
+        <span data-i18n-key="web.legal.footer.note">Information only — not legal advice until we are engaged.</span>
+      </div>
+    </footer>
+  </body>
+</html>

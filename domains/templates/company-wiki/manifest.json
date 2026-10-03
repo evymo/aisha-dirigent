@@ -1,0 +1,9 @@
+{
+  "$note": "Example demo template — a public company WIKI / handbook. The MULTI-PAGE + per-page i18n showcase: a hub plus three article pages, all sharing tokens.css + styles.css. Each page becomes its own web_pages row; every page is fully localised. Brand-neutral, fork-freely. Seed with /seed-default { \"source_dir\": \"company-wiki\" } or AISHA_SEED_DOMAIN=company-wiki.",
+  "pages": [
+    { "slug": "index", "html": "index.html", "title_key": "web.wiki.title", "description_key": "web.wiki.description" },
+    { "slug": "getting-started", "html": "getting-started.html", "title_key": "web.wiki.gs.title", "description_key": "web.wiki.gs.description" },
+    { "slug": "remote-work", "html": "remote-work.html", "title_key": "web.wiki.rw.title", "description_key": "web.wiki.rw.description" },
+    { "slug": "security-basics", "html": "security-basics.html", "title_key": "web.wiki.sec.title", "description_key": "web.wiki.sec.description" }
+  ]
+}

@@ -1,0 +1,263 @@
+# =============================================================================
+# Kiosk: balíčky z CI — postavit, podepsat, zveřejnit, deklarovat
+# =============================================================================
+# ⭐ ROZHODNUTÍ MAJITELE 2026-09-24: build appek i Kiosk Admina se spustí SÁM
+# a balíček se do úložiště dostane bez člověka. Vyžádání je zvednutá verze
+# v datech instance. Tahle úloha ji DOŽENE: build → podpis (tajemství forku) →
+# generic registr (neměnný) → PR s artefaktem do dat instance → sloučení po
+# zelené. Dál už existující cesta: storage-auth si balíček doplní ze `zdroj`
+# a Kiosk Admin ho rozdá v nočním okně.
+#
+# ⭐ KONVERGENCE, NE UDÁLOST. Plán (scripts/ci/kiosk-balicky.mjs) porovná, co
+# data CHTĚJÍ, co registr MÁ a co deklarace UVÁDÍ. Build běží jen na
+# „postavit"; jinak úloha skončí za minutu. Zmeškaný nebo spadlý běh dožene
+# příští.
+#
+# Rozvrh: v :37 každou hodinu, mimo 01–04 UTC (tam běží supply-chain). Runner
+# je jeden, sdílený, s kapacitou 2 — domluveno s RIQi 2026-09-25.
+# ⛔ Rozvrh VYPNUTÝ do kola 12 (jen workflow_dispatch). Návrat, až platí obojí:
+# (1) anon klíč z API; (2) token read:package + FORGEJO_URL doručené do
+# <fork>-domain-services. Do té doby by přestavěný ruční artefakt z 28. 9.
+# storage-auth ze `zdroj` nestáhl. Pak je přestavba záměr (C1, 24. 9.).
+#
+# Build APPKY kiosku (Řidič) potřebuje veřejnou tvář instance (AISHA_INSTANCE_ENV):
+# skládá ji scripts/ci/verejna-tvar.mjs z derivace profilu, výbavy kiosku a anon
+# klíče OVĚŘENÉHO proti nasazenému webu — žádná druhá ruční kopie trezoru.
+#
+# Tajemství forku (zadává majitel; hodnoty nikde jinde):
+#   KIOSK_BALICKY_TOKEN   čtení dat instance, write:package, PR do dat instance
+#   HLIDAC_KEYSTORE_B64 · HLIDAC_KEY_ALIAS · HLIDAC_KEYSTORE_PASSWORD · HLIDAC_KEY_PASSWORD
+#   INSTANCE_OVERLAY_REPO (už je) — host/vlastník/repo dat instance
+#   ANDROID_KEYSTORE_B64 · ANDROID_KEYSTORE_ALIAS · ANDROID_KEYSTORE_PASSWORD · ANDROID_KEY_PASSWORD
+# Anon klíč instance NENÍ tajemství forku: build Řidiče ho čte z veřejné konfigurace
+# API (/.well-known/app-config.json) a ověří proti nasazenému webu (majitel 28. 9.).
+# Proměnná forku: APP_NAME_PREFIX (identita instance; týž domov jako deploy.yml)
+name: "Kiosk: balíčky z CI"
+
+on:
+  workflow_dispatch:
+
+# Dva běhy nad týmž registrem by postavily TUTÉŽ verzi dvakrát s různým
+# otiskem — a registr je neměnný. Proto jeden po druhém, nic se neruší.
+concurrency:
+  group: kiosk-balicky
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  plan:
+    name: "Plán: co postavit a deklarovat"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      cesta: ${{ steps.plan.outputs.cesta }}
+      kiosk_admin: ${{ steps.plan.outputs.kiosk_admin }}
+      appky: ${{ steps.plan.outputs.appky }}
+      deklarovat: ${{ steps.plan.outputs.deklarovat }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Data instance
+        env:
+          DATA_REPO: ${{ secrets.INSTANCE_OVERLAY_REPO }}
+          KIOSK_BALICKY_TOKEN: ${{ secrets.KIOSK_BALICKY_TOKEN }}
+        run: bash scripts/ci/data-instance.sh "$RUNNER_TEMP/data"
+
+      - name: Plán
+        id: plan
+        env:
+          FORGEJO_URL: ${{ github.server_url }}
+          VLASTNIK_BALICKU: ${{ github.repository_owner }}
+          KIOSK_BALICKY_TOKEN: ${{ secrets.KIOSK_BALICKY_TOKEN }}
+        run: node scripts/ci/kiosk-balicky.mjs plan --data "$RUNNER_TEMP/data"
+
+  kiosk-admin:
+    name: "Kiosk Admin: build, podpis, registr"
+    needs: plan
+    if: needs.plan.outputs.kiosk_admin == 'postavit'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # compileSdk 36; build-tools 35.0.0 je výchozí pro AGP 8.13 (apps/hlidac).
+      - name: JDK a Android SDK
+        run: bash scripts/ci/android-prostredi.sh "platforms;android-36" "build-tools;35.0.0"
+
+      - name: Gradle (ověřená distribuce)
+        run: bash scripts/ci/gradle.sh
+
+      - name: Data instance
+        env:
+          DATA_REPO: ${{ secrets.INSTANCE_OVERLAY_REPO }}
+          KIOSK_BALICKY_TOKEN: ${{ secrets.KIOSK_BALICKY_TOKEN }}
+        run: bash scripts/ci/data-instance.sh "$RUNNER_TEMP/data"
+
+      # ⛔ Klíč jen do RUNNER_TEMP, jen pro vlastníka, a pryč v každém případě
+      # (krok „Uklidit klíč" níž běží i po pádu).
+      - name: Podpisový klíč
+        env:
+          HLIDAC_KEYSTORE_B64: ${{ secrets.HLIDAC_KEYSTORE_B64 }}
+        run: |
+          set -euo pipefail
+          if [ -z "${HLIDAC_KEYSTORE_B64:-}" ]; then
+            echo "::error title=kiosk-balicky::tajemství HLIDAC_KEYSTORE_B64 chybí — Kiosk Admin se ladicím klíčem nestaví (tablety by ho odmítly)"
+            exit 1
+          fi
+          umask 077
+          printf '%s' "$HLIDAC_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/kiosk-admin.jks"
+          echo "HLIDAC_KEYSTORE_PATH=$RUNNER_TEMP/kiosk-admin.jks" >> "$GITHUB_ENV"
+
+      # build.sh: jednotkové testy + release + otisk podpisu APK proti
+      # `signing.certSha256` z deklarace. Jiný klíč = pád, ne balík, který
+      # tablety odmítnou.
+      - name: Build
+        env:
+          HLIDAC_INSTANCE: ${{ runner.temp }}/data/${{ needs.plan.outputs.cesta }}
+          HLIDAC_KEY_ALIAS: ${{ secrets.HLIDAC_KEY_ALIAS }}
+          HLIDAC_KEYSTORE_PASSWORD: ${{ secrets.HLIDAC_KEYSTORE_PASSWORD }}
+          HLIDAC_KEY_PASSWORD: ${{ secrets.HLIDAC_KEY_PASSWORD }}
+        run: bash apps/hlidac/scripts/build.sh
+
+      - name: Zveřejnit v registru
+        env:
+          FORGEJO_URL: ${{ github.server_url }}
+          VLASTNIK_BALICKU: ${{ github.repository_owner }}
+          KIOSK_BALICKY_TOKEN: ${{ secrets.KIOSK_BALICKY_TOKEN }}
+        run: >-
+          node scripts/ci/kiosk-balicky.mjs zverejni --data "$RUNNER_TEMP/data"
+          --druh kiosk-admin --apk apps/hlidac/app/build/outputs/apk/release/app-release.apk
+
+      - name: Uklidit klíč
+        if: always()
+        run: rm -f "$RUNNER_TEMP/kiosk-admin.jks"
+
+  appky:
+    name: "Appky kiosku: build, podpis, registr"
+    needs: plan
+    if: needs.plan.outputs.appky != '' && needs.plan.outputs.appky != '[]'
+    runs-on: ubuntu-latest
+    # Build appky (prebuild + Gradle) trvá ~40 min; runner je sdílený.
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: JDK a Android SDK
+        run: bash scripts/ci/android-prostredi.sh "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;27.1.12297006"
+
+      - name: Data instance
+        env:
+          DATA_REPO: ${{ secrets.INSTANCE_OVERLAY_REPO }}
+          KIOSK_BALICKY_TOKEN: ${{ secrets.KIOSK_BALICKY_TOKEN }}
+        run: bash scripts/ci/data-instance.sh "$RUNNER_TEMP/data"
+
+      # Pořadí jako v mobile-android.yml: kořen → balíčky → mobil (mobil závisí
+      # na @aisha/knock-protocol přes `file:`).
+      - name: Závislosti a sdílené balíčky
+        run: |
+          set -euo pipefail
+          bash scripts/ci/npm-ci.sh
+          npm run build:packages
+          bash scripts/ci/npm-ci.sh --prefix mobile-app
+
+      # ⛔ Klíč jen do RUNNER_TEMP, jen pro vlastníka, a pryč v každém případě.
+      #    build-android.sh bez klíče u APK jen VARUJE — tady je jeho chybění STOP.
+      - name: Podpisový klíč
+        env:
+          ANDROID_KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for T in ANDROID_KEYSTORE_B64 ANDROID_KEYSTORE_ALIAS ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_PASSWORD; do
+            if [ -z "$(printenv "$T")" ]; then
+              echo "::error title=kiosk-balicky::tajemství $T chybí — appku ladicím klíčem nestavím (tablety by ji odmítly)"
+              exit 1
+            fi
+          done
+          umask 077
+          printf '%s' "$ANDROID_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/appka.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/appka.jks" >> "$GITHUB_ENV"
+
+      # Pro každou appku: veřejná tvář (ověřený anon klíč) → build nad povrchem
+      # z dat instance → otisk podpisu = deklarace → registr.
+      - name: Build, podpis, registr
+        env:
+          APPKY: ${{ needs.plan.outputs.appky }}
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+          ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          FORGEJO_URL: ${{ github.server_url }}
+          VLASTNIK_BALICKU: ${{ github.repository_owner }}
+          KIOSK_BALICKY_TOKEN: ${{ secrets.KIOSK_BALICKY_TOKEN }}
+        run: |
+          set -euo pipefail
+          N=$(node -e 'console.log(JSON.parse(process.env.APPKY).length)')
+          for i in $(seq 0 $((N - 1))); do
+            B=$(node -e "console.log(JSON.parse(process.env.APPKY)[$i].balicek)")
+            P=$(node -e "console.log(JSON.parse(process.env.APPKY)[$i].povrch)")
+            echo "::group::$B ← surfaces/$P"
+            ( umask 077; AISHA_INSTANCE_CONFIG_DIR="$RUNNER_TEMP/data" node scripts/ci/verejna-tvar.mjs --povrch "$P" > "$RUNNER_TEMP/instance.env" )
+            # ⛔ BEZ AISHA_APP_VERSION_FILE: overlay ji odvodí sám. Nastavená na version.json
+            # overlaye z ní app-profile.sh udělá VERSION_FILE a instance-overlay-apply.sh
+            # pak kopíruje soubor sám na sebe → `cp` skončí chybou a `set -e` build zastaví
+            # (naměřeno 29. 9. lokálně: „… are identical (not copied)").
+            AISHA_INSTANCE_OVERLAY="$RUNNER_TEMP/data/surfaces/$P" \
+            AISHA_INSTANCE_ENV="$RUNNER_TEMP/instance.env" \
+              bash mobile-app/scripts/build-android.sh --apk --clean
+            node scripts/ci/kiosk-balicky.mjs zverejni --data "$RUNNER_TEMP/data" --balicek "$B" \
+              --apk mobile-app/android/app/build/outputs/apk/release/app-release.apk
+            # Další appka staví z čistého stromu (build-provenance.sh měří vstup).
+            git checkout -- mobile-app
+            echo "::endgroup::"
+          done
+
+      - name: Uklidit klíč a tvář
+        if: always()
+        run: rm -f "$RUNNER_TEMP/appka.jks" "$RUNNER_TEMP/instance.env"
+
+  deklarace:
+    name: "Deklarace: PR s artefakty do dat instance"
+    needs: [plan, kiosk-admin, appky]
+    # Běží i bez buildu (registr má, deklarace neuvádí) a i po pádu buildu
+    # — deklaruje to, co registr SKUTEČNĚ má; plán si to přepočítá.
+    if: always() && needs.plan.result == 'success' && (needs.plan.outputs.deklarovat == 'ano' || needs.kiosk-admin.result == 'success' || needs.appky.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Data instance
+        env:
+          DATA_REPO: ${{ secrets.INSTANCE_OVERLAY_REPO }}
+          KIOSK_BALICKY_TOKEN: ${{ secrets.KIOSK_BALICKY_TOKEN }}
+        run: bash scripts/ci/data-instance.sh "$RUNNER_TEMP/data"
+
+      - name: PR a sloučení po zelené
+        env:
+          FORGEJO_URL: ${{ github.server_url }}
+          VLASTNIK_BALICKU: ${{ github.repository_owner }}
+          KIOSK_BALICKY_TOKEN: ${{ secrets.KIOSK_BALICKY_TOKEN }}
+          DATA_REPO: ${{ secrets.INSTANCE_OVERLAY_REPO }}
+          BEH_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_number }}
+        run: node scripts/ci/kiosk-balicky.mjs deklaruj --data "$RUNNER_TEMP/data"

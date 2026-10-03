@@ -1,0 +1,14 @@
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: auth-login-screen
+    timeout: 30000
+# ⛔ `auth-magic-send` v appce NENÍ — přihlašovací údaje řeší Keycloak na své
+# stránce (viz hlavička `login.tsx`). Scénář tvrdil, že appka nabízí odeslání
+# magic linku, a tvrdil to od `a3caa5dc3`. Opraveno 2026-09-04 na to, co
+# obrazovka SKUTEČNĚ nabízí.
+- assertVisible:
+    id: auth-oauth-keycloak

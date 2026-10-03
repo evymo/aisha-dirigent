@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n-key="web.wiki.sec.title">Security basics everyone should know · Northwind Handbook</title>
+    <meta name="description" data-i18n-key="web.wiki.sec.description"
+      content="The few security habits that matter most: strong unique passwords, a password manager, and 2FA." />
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="topbar" data-section="topbar">
+      <div class="wrap">
+        <a class="brand" href="index.html">
+          <span class="brand__mark" aria-hidden="true">¶</span>
+          <span data-i18n-key="web.wiki.brand">Northwind Handbook</span>
+        </a>
+        <div class="search">
+          <input type="search" placeholder="Search the handbook…" data-i18n-key="web.wiki.search.placeholder" aria-label="Search" />
+        </div>
+        <nav class="topnav">
+          <a href="index.html" data-i18n-key="web.wiki.topnav.home">Home</a>
+          <a href="getting-started.html" data-i18n-key="web.wiki.topnav.handbook">Handbook</a>
+        </nav>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <div class="layout">
+        <aside class="sidebar" data-section="sidebar">
+          <div class="sidebar__group">
+            <p class="sidebar__title" data-i18n-key="web.wiki.sidebar.start">Getting started</p>
+            <ul>
+              <li><a href="getting-started.html" data-i18n-key="web.wiki.nav.welcome">Welcome</a></li>
+            </ul>
+          </div>
+          <div class="sidebar__group">
+            <p class="sidebar__title" data-i18n-key="web.wiki.sidebar.policies">Policies &amp; security</p>
+            <ul>
+              <li><a href="remote-work.html" data-i18n-key="web.wiki.nav.remote">Working remotely</a></li>
+              <li><a href="security-basics.html" class="is-active" data-i18n-key="web.wiki.nav.security">Security basics</a></li>
+            </ul>
+          </div>
+        </aside>
+
+        <article class="article" data-section="article">
+          <nav class="breadcrumb">
+            <a href="index.html" data-i18n-key="web.wiki.breadcrumb.home">Home</a> /
+            <span data-i18n-key="web.wiki.sidebar.policies">Policies &amp; security</span>
+          </nav>
+          <h1 data-i18n-key="web.wiki.sec.heading">Security basics everyone should know</h1>
+          <p class="meta" data-i18n-key="web.wiki.sec.meta">Updated last week · 3 min read</p>
+          <div class="prose">
+            <p data-i18n-key="web.wiki.sec.intro">You don't need to be a security expert. A handful of habits cover the vast majority of real risk — and they take an afternoon to set up once, then look after themselves.</p>
+
+            <h2 data-i18n-key="web.wiki.sec.s1.title">Use a password manager</h2>
+            <p data-i18n-key="web.wiki.sec.s1.body">Every account should have a long, random password you've never used anywhere else, and the only sane way to do that is a password manager. Let it generate and remember them — you only memorise one strong passphrase for the manager itself. Reusing a password is the single most common way accounts get taken over.</p>
+
+            <h2 data-i18n-key="web.wiki.sec.s2.title">Turn on two-factor</h2>
+            <p data-i18n-key="web.wiki.sec.s2.body">Two-factor authentication means a stolen password alone isn't enough to get in. Switch it on for email, the password manager, and anything that touches customer data — an app-based code or a hardware key, not SMS where you can avoid it. If something ever feels off, change the password and tell us; we would much rather hear a false alarm than miss a real one.</p>
+
+            <div class="callout">
+              <strong data-i18n-key="web.wiki.sec.callout">Remember:</strong>
+              <span data-i18n-key="web.wiki.sec.calloutBody">We will never ask for your password — not over chat, not over email, not on a call. Anyone who does is not us.</span>
+            </div>
+          </div>
+          <p class="editnote" data-i18n-key="web.wiki.editnote">This page is open — anyone can suggest an edit, and the full history is public.</p>
+        </article>
+      </div>
+    </div>
+
+    <footer class="site-footer" data-section="footer">
+      <div class="wrap">
+        <span data-i18n-key="web.wiki.footer.name">Northwind Handbook</span>
+        <span data-i18n-key="web.wiki.footer.note">Open by default — edit history is public.</span>
+      </div>
+    </footer>
+  </body>
+</html>

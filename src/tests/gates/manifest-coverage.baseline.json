@@ -1,0 +1,12 @@
+{
+  "$comment": "Aplikace, které manifest ZAKLÁDÁ, ale topologie jim neumí odvodit adresu. Snapshot 2026-09-05. Ráčna: nový výskyt je CHYBA, opravený musí ze seznamu zmizet. REGENERUJ přes `node scripts/gen-manifest-coverage-baseline.mjs --write`, needituj ručně.",
+  "$comment_proc": "⛔ NAMĚŘENO 2026-09-04 na produkci <fork>: `coolify-story-init.sh` aplikaci podle manifestu ZALOŽÍ, `derive-domains.mjs` jí ale odmítne dát adresu, a díru zaplní fallback z `config/domains.env.example` — tedy VĚROHODNĚ VYPADAJÍCÍ nesmysl (`netbird.aisha.example.com`, `https://`). Prázdno by spadlo hlasitě; příklad projde do produkce. Ta dvě čísla (manifest × topologie) neporovnával nikdo.",
+  "$comment_brany": "Kontrola ctí `provision_when_env` — tutéž bránu má story-init (provision_gate_skips) i resolver. Bez ní hlásila jako vadu shodu tří míst: 4 z 9 nálezů na cloud-multi byly plané (source-broker, local-ingest, extranet, potok).",
+  "$comment_dluh": "Zbylé položky jsou skutečný dluh: stack se nasazuje, ale v `config/services.json` není, takže mu resolver nemůže odvodit ani adresu, ani mesh trasy. Splácí se katalogovou deklarací — přesně tak, jak se 2026-09-05 splatil stack `<fork>`.",
+  "bez_katalogu": [
+    "livekit",
+    "observability-stack",
+    "pgadmin"
+  ],
+  "mimo_profil": []
+}

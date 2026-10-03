@@ -1,0 +1,15 @@
+# Paths removed from the PUBLIC snapshot (github.com/evymo/aisha-orchestrator).
+# The upstream tree is never modified by this list — only the published tree is.
+# One gitignore-style pattern per line; put the reason in the comment above it.
+# Consumed by scripts/release/public-snapshot.mjs (see docs/release/PUBLIC_PREVIEW.md).
+
+# Dependabot never ran on the primary forge (dependency updates: scripts/aisha-deps-update.mjs).
+# On the public mirror it only opened pull requests nobody merged (66 branches by 2026-09) and
+# the gate `owasp-orchestrator-adoption` still expects the file upstream, so it stays there.
+.github/dependabot.yml
+
+# Owner's decision 2026-10-03: nothing runs on GitHub — no tests, no deploys, no signing. CI and
+# deployment live on the upstream forge (.forgejo/workflows/). The mirror workflows stay upstream,
+# where four gates read them (ci-deploy-honesty, no-hardcoded-coolify-uuids, owasp-orchestrator-adoption,
+# sbom-coverage); in a public clone those four gates therefore report the files as missing.
+.github/workflows/

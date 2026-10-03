@@ -1,0 +1,385 @@
+{
+  "name": "WF_MODEL_ADVISORY",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "ma-cron",
+      "name": "Weekly Monday 06:00 UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "model-advisory",
+        "options": {
+          "responseMode": "lastNode"
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "ma-webhook",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/get_agent_catalog_admin",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "options": {
+          "timeout": 15000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "ma-fetch-agents",
+      "name": "Fetch Agent Catalog",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * Filter active agents and prepare per-agent analysis items.\n * Each item carries agent metadata needed for cost + traces analysis.\n */\nconst agents = $input.first().json;\nconst agentList = Array.isArray(agents) ? agents : [agents];\n\nconst now = new Date();\nconst year = now.getFullYear();\nconst week = Math.ceil(((now - new Date(year, 0, 1)) / 86400000 + new Date(year, 0, 1).getDay() + 1) / 7);\nconst yearWeek = `${year}W${String(week).padStart(2, '0')}`;\n\nreturn agentList\n  .filter(a => a.is_active)\n  .map(agent => ({\n    json: {\n      agent_slug: agent.slug,\n      default_model: agent.default_model,\n      safety_level: agent.safety_level,\n      year_week: yearWeek,\n    }\n  }));"
+      },
+      "id": "ma-prepare-agents",
+      "name": "Prepare Active Agents",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/simulate_model_tier_cost",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_monthly_call_count",
+              "value": "10000"
+            },
+            {
+              "name": "p_task_type",
+              "value": "chat"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "ma-cost-sim",
+      "name": "Simulate Tier Cost",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        920,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/fn_get_agent_performance_snapshot",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_agent_slug",
+              "value": "={{ $('Prepare Active Agents').item.json.agent_slug }}"
+            },
+            {
+              "name": "p_hours_window",
+              "value": "168"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "ma-perf-snapshot",
+      "name": "7-Day Performance Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        920,
+        500
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * WF_MODEL_ADVISORY — Analyze cost-quality delta.\n *\n * Combines cost simulation with 7-day performance snapshot to detect:\n * 1. Cost Overrun — agent costs exceed threshold, cheaper model with similar quality exists\n * 2. Quality Gap — agent quality is below acceptable threshold, better model recommended\n * 3. Efficiency Win — same quality achievable at lower cost tier\n *\n * Output: one item if advisory needed, empty if current config is optimal.\n */\nconst agent = $('Prepare Active Agents').item.json;\nconst costSim = $('Simulate Tier Cost').first().json;\nconst perfSnap = $('7-Day Performance Snapshot').first().json;\n\n// Extract performance metrics\nconst avgOverall = perfSnap?.avg_overall ?? 0;\nconst errorRate = perfSnap?.error_rate ?? 0;\nconst totalEvents = perfSnap?.total_events ?? 0;\n\n// Skip agents with insufficient data (< 50 events in 7 days)\nif (totalEvents < 50) {\n  return [];\n}\n\nconst tiers = costSim?.tiers ?? {};\nconst tierEntries = Object.entries(tiers);\n\n// Find current tier for this agent's model\nlet currentTierName = null;\nlet currentTierData = null;\nfor (const [tierName, tierData] of tierEntries) {\n  if (tierData.model_id === agent.default_model) {\n    currentTierName = tierName;\n    currentTierData = tierData;\n    break;\n  }\n}\n\nif (!currentTierData) {\n  // Model not in tier system — skip\n  return [];\n}\n\n// Thresholds\nconst QUALITY_THRESHOLD = 0.65;     // Minimum acceptable quality score\nconst ERROR_RATE_THRESHOLD = 0.10;  // Max acceptable error rate\nconst COST_SAVING_THRESHOLD = 0.20; // Min 20% cost saving to recommend downgrade\n\nconst proposals = [];\n\n// Check 1: Quality too low → recommend upgrade\nif (avgOverall > 0 && avgOverall < QUALITY_THRESHOLD && errorRate < ERROR_RATE_THRESHOLD) {\n  // Find next tier up with better expected quality\n  const higherTiers = tierEntries.filter(([, td]) =>\n    td.monthly_cost_usd > currentTierData.monthly_cost_usd\n  );\n  if (higherTiers.length > 0) {\n    const [recTierName, recTierData] = higherTiers[0];\n    proposals.push({\n      agent_slug: agent.agent_slug,\n      anomaly_key: `model_tier_recommendation_${agent.year_week}`,\n      category: 'model',\n      current_model: agent.default_model,\n      current_monthly_cost: currentTierData.monthly_cost_usd,\n      description: `Agent \"${agent.agent_slug}\" quality score (${avgOverall.toFixed(3)}) is below threshold (${QUALITY_THRESHOLD}). ` +\n        `Recommending upgrade from ${currentTierName} (${agent.default_model}) to ${recTierName} (${recTierData.model_id}). ` +\n        `Monthly cost delta: +$${(recTierData.monthly_cost_usd - currentTierData.monthly_cost_usd).toFixed(2)}.`,\n      proposed_model: recTierData.model_id,\n      proposed_monthly_cost: recTierData.monthly_cost_usd,\n      quality_score: avgOverall,\n      reason: 'quality_gap',\n      risk_level: 'medium',\n      title: `Upgrade ${agent.agent_slug} model for quality`,\n    });\n  }\n}\n\n// Check 2: High quality + high cost → recommend downgrade\nif (avgOverall >= 0.85 && errorRate < 0.03) {\n  const cheaperTiers = tierEntries.filter(([, td]) =>\n    td.monthly_cost_usd < currentTierData.monthly_cost_usd\n  );\n  if (cheaperTiers.length > 0) {\n    // Pick cheapest tier\n    const [recTierName, recTierData] = cheaperTiers.sort((a, b) =>\n      a[1].monthly_cost_usd - b[1].monthly_cost_usd\n    )[0];\n    const savingPct = (currentTierData.monthly_cost_usd - recTierData.monthly_cost_usd) / currentTierData.monthly_cost_usd;\n    if (savingPct >= COST_SAVING_THRESHOLD) {\n      proposals.push({\n        agent_slug: agent.agent_slug,\n        anomaly_key: `model_tier_recommendation_${agent.year_week}`,\n        category: 'model',\n        current_model: agent.default_model,\n        current_monthly_cost: currentTierData.monthly_cost_usd,\n        description: `Agent \"${agent.agent_slug}\" has high quality (${avgOverall.toFixed(3)}) with low error rate (${(errorRate * 100).toFixed(1)}%). ` +\n          `Potential ${(savingPct * 100).toFixed(0)}% cost saving by downgrading from ${currentTierName} (${agent.default_model}) ` +\n          `to ${recTierName} (${recTierData.model_id}). Monthly saving: $${(currentTierData.monthly_cost_usd - recTierData.monthly_cost_usd).toFixed(2)}.`,\n        proposed_model: recTierData.model_id,\n        proposed_monthly_cost: recTierData.monthly_cost_usd,\n        quality_score: avgOverall,\n        reason: 'efficiency_win',\n        risk_level: 'low',\n        title: `Downgrade ${agent.agent_slug} model to save cost`,\n      });\n    }\n  }\n}\n\n// Check 3: Error rate spike → flag for review\nif (errorRate >= ERROR_RATE_THRESHOLD) {\n  proposals.push({\n    agent_slug: agent.agent_slug,\n    anomaly_key: `model_error_spike_${agent.year_week}`,\n    category: 'reliability',\n    current_model: agent.default_model,\n    current_monthly_cost: currentTierData?.monthly_cost_usd ?? 0,\n    description: `Agent \"${agent.agent_slug}\" error rate (${(errorRate * 100).toFixed(1)}%) exceeds threshold (${(ERROR_RATE_THRESHOLD * 100).toFixed(0)}%). ` +\n      `Total events: ${totalEvents}, error count: ${Math.round(errorRate * totalEvents)}. ` +\n      `Review model configuration and error patterns.`,\n    proposed_model: agent.default_model,\n    proposed_monthly_cost: currentTierData?.monthly_cost_usd ?? 0,\n    quality_score: avgOverall,\n    reason: 'error_spike',\n    risk_level: 'high',\n    title: `Review ${agent.agent_slug} — high error rate`,\n  });\n}\n\nreturn proposals.map(p => ({ json: p }));"
+      },
+      "id": "ma-analyze",
+      "name": "Analyze Cost-Quality Delta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/fn_create_improvement_proposal",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_agent_slug",
+              "value": "={{ $json.agent_slug }}"
+            },
+            {
+              "name": "p_title",
+              "value": "={{ $json.title }}"
+            },
+            {
+              "name": "p_description",
+              "value": "={{ $json.description }}"
+            },
+            {
+              "name": "p_category",
+              "value": "={{ $json.category }}"
+            },
+            {
+              "name": "p_metadata",
+              "value": "={{ JSON.stringify({ source: 'wf_model_advisory', reason: $json.reason, anomaly_key: $json.anomaly_key, current_model: $json.current_model, proposed_model: $json.proposed_model, quality_score: $json.quality_score, current_monthly_cost: $json.current_monthly_cost, proposed_monthly_cost: $json.proposed_monthly_cost, risk_level: $json.risk_level }) }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 500
+            }
+          }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "ma-create-proposal",
+      "name": "Create Improvement Proposal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        400
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "/**\n * WF_MODEL_ADVISORY — Aggregate results for logging/response.\n */\nconst items = $input.all();\nconst proposals = items.map(i => i.json);\n\nreturn [{\n  json: {\n    workflow: 'WF_MODEL_ADVISORY',\n    proposals_created: proposals.length,\n    agents_analyzed: [...new Set(proposals.map(p => p.agent_slug || p.p_agent_slug))].length,\n    completed_at: new Date().toISOString(),\n    results: proposals,\n  }\n}];"
+      },
+      "id": "ma-summary",
+      "name": "Advisory Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Weekly Monday 06:00 UTC": {
+      "main": [
+        [
+          {
+            "node": "Fetch Agent Catalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Fetch Agent Catalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Agent Catalog": {
+      "main": [
+        [
+          {
+            "node": "Prepare Active Agents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Active Agents": {
+      "main": [
+        [
+          {
+            "node": "Simulate Tier Cost",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "7-Day Performance Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simulate Tier Cost": {
+      "main": [
+        [
+          {
+            "node": "Analyze Cost-Quality Delta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7-Day Performance Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Analyze Cost-Quality Delta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Cost-Quality Delta": {
+      "main": [
+        [
+          {
+            "node": "Create Improvement Proposal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Improvement Proposal": {
+      "main": [
+        [
+          {
+            "node": "Advisory Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

@@ -1,0 +1,271 @@
+{
+  "name": "WF_PUBLIC_CHATBOT",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "public-chat",
+        "options": {
+          "rawBody": false
+        },
+        "responseMode": "lastNode"
+      },
+      "id": "pc-webhook",
+      "name": "Public Chat Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ================================================================\n// PREPARE INPUT — Load dynamic config from DB, resolve personality\n// ================================================================\nconst body = $input.item.json.body || {};\nconst query = body.message || body.query || body.text || '';\nconst channelSlug = body.channel || 'default';\nconst visitorId = body.visitor_id || body.session_id || 'anon-' + Date.now();\n\nif (!query) {\n  return { json: { error: 'Missing message in request body', status: 400 } };\n}\n\n// 1. Load channel config from DB\nconst supabaseUrl = $env?.AISHA_POSTGREST_URL || ($env?.AISHA_POSTGREST_URL || '');\nconst serviceKey = $env?.AISHA_POSTGREST_SERVICE_KEY || '';\n\nconst configRes = await fetch(\n  `${supabaseUrl}/rest/v1/rpc/get_active_channel_config`,\n  {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\n      'apikey': serviceKey,\n      'Authorization': `Bearer ${serviceKey}`,\n    },\n    body: JSON.stringify({ p_channel_slug: channelSlug }),\n  }\n);\nconst channelConfig = await configRes.json();\n\nif (channelConfig?.error) {\n  return { json: { error: channelConfig.error, status: 404 } };\n}\n\n// 2. Get or create session\nconst sessionRes = await fetch(\n  `${supabaseUrl}/rest/v1/rpc/get_or_create_public_chat_session`,\n  {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\n      'apikey': serviceKey,\n      'Authorization': `Bearer ${serviceKey}`,\n    },\n    body: JSON.stringify({\n      p_channel_id: channelConfig.channel_id,\n      p_visitor_id: visitorId,\n      p_metadata: body.visitor_metadata || {},\n    }),\n  }\n);\nconst session = await sessionRes.json();\n\n// 3. Record user message\nawait fetch(\n  `${supabaseUrl}/rest/v1/rpc/record_public_chat_message`,\n  {\n    method: 'POST',\n    headers: {\n      'Content-Type': 'application/json',\n      'apikey': serviceKey,\n      'Authorization': `Bearer ${serviceKey}`,\n    },\n    body: JSON.stringify({\n      p_session_id: session.session_id,\n      p_role: 'user',\n      p_content: query,\n      p_metadata: { source: body.source || 'api', channel: channelSlug },\n    }),\n  }\n);\n\n// 4. Resolve personality context (if enabled)\nlet personalityBlock = '';\nif (channelConfig.personality_enabled) {\n  try {\n    const mcpUrl = `${supabaseUrl}/functions/v1/mcp-knowledge-server`;\n    const mcpToken = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n    const personalityRes = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n        'Authorization': `Bearer ${mcpToken}`,\n      },\n      body: JSON.stringify({\n        jsonrpc: '2.0',\n        id: Date.now(),\n        method: 'tools/call',\n        params: {\n          name: 'compose_context',\n          arguments: {\n            profile: channelConfig.context_profile || 'public_chat',\n            task_kind: 'public_chat',\n            include_personality: true,\n          },\n        },\n      }),\n    });\n    const pResult = await personalityRes.json();\n    if (pResult?.result?.content?.[0]?.text) {\n      const ctx = JSON.parse(pResult.result.content[0].text);\n      personalityBlock = ctx.personality_context || '';\n    }\n  } catch (e) {\n    // Personality is optional — continue without it\n  }\n}\n\n// 5. Build dynamic system prompt\nconst guardrails = channelConfig.guardrails || {};\nconst guardrailsBlock = `\n## Guardrails\n- Max response length: concise, under 300 words\n- Blocked topics: ${(guardrails.blocked_topics || []).join(', ') || 'none'}\n- PII redaction: ${guardrails.pii_redaction ? 'enabled' : 'disabled'}\n- External links: ${guardrails.allow_external_links ? 'allowed' : 'not allowed'}\n- Languages: ${(guardrails.allowed_languages || ['cs', 'en']).join(', ')}\n`;\n\nconst systemPrompt = [\n  personalityBlock,\n  channelConfig.system_prompt || '',\n  guardrailsBlock,\n  '\\n## Context\\nYou are responding to a public visitor on the ' + channelConfig.display_name + ' channel.',\n  '\\nRespond in the language the visitor uses. Be helpful, friendly, and concise.',\n].filter(Boolean).join('\\n\\n');\n\n// 6. Build conversation history for context\nconst history = (session.messages || []).map(m => ({\n  role: m.role,\n  content: m.content,\n}));\n\nreturn {\n  json: {\n    chatInput: query,\n    systemPrompt,\n    session_id: session.session_id,\n    channel_config: channelConfig,\n    history,\n    metadata: {\n      source: body.source || 'api',\n      channel: channelSlug,\n      visitor_id: visitorId,\n      timestamp: new Date().toISOString(),\n    },\n  },\n};"
+      },
+      "id": "pc-prepare",
+      "name": "Prepare Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ================================================================\n// ROUTING GATE — Check routing rules and decide agent path\n// ================================================================\nconst input = $input.item.json;\nconst config = input.channel_config || {};\nconst rules = config.routing_rules?.rules || [];\nconst query = (input.chatInput || '').toLowerCase();\nconst guardrails = config.guardrails || {};\n\n// Check rate limiting (basic — production should use Redis)\n// For now, trust the edge function to handle rate limiting\n\n// Check escalation keywords\nconst escalationKeywords = guardrails.escalation_keywords || [];\nconst shouldEscalate = escalationKeywords.some(kw => query.includes(kw.toLowerCase()));\n\n// Check routing rules\nlet delegateTo = null;\nlet routeReason = 'default';\n\nif (shouldEscalate) {\n  delegateTo = 'WF_DIRIGENT_AGENT';\n  routeReason = 'escalation_keyword';\n} else {\n  for (const rule of rules) {\n    if (rule.trigger === 'knowledge_query' && (\n      query.includes('jak') || query.includes('co je') || \n      query.includes('how') || query.includes('what is') ||\n      query.includes('explain') || query.includes('vysvětli')\n    )) {\n      delegateTo = rule.delegate_to;\n      routeReason = 'knowledge_query';\n      break;\n    }\n    if (rule.trigger === 'product_inquiry' && (\n      query.includes('produkt') || query.includes('product') ||\n      query.includes('cena') || query.includes('price') ||\n      query.includes('objednat') || query.includes('order')\n    )) {\n      delegateTo = rule.delegate_to;\n      routeReason = 'product_inquiry';\n      break;\n    }\n  }\n}\n\nreturn {\n  json: {\n    ...input,\n    routing: {\n      delegate_to: delegateTo,\n      reason: routeReason,\n      should_escalate: shouldEscalate,\n    },\n  },\n};"
+      },
+      "id": "pc-routing",
+      "name": "Routing Gate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "={{ $json.systemPrompt }}",
+          "maxIterations": 5,
+          "returnIntermediateSteps": false
+        },
+        "text": "={{ $json.chatInput }}",
+        "promptType": "define"
+      },
+      "id": "pc-agent",
+      "name": "Public Chat Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "routingStrategy": "auto",
+        "modelOverride": "={{ $json.channel_config?.model || '' }}",
+        "options": {
+          "temperature": "={{ $json.channel_config?.temperature || 0.7 }}",
+          "maxOutputTokens": "={{ $json.channel_config?.max_tokens || 2048 }}",
+          "topP": 0.9,
+          "maxRetries": 2
+        }
+      },
+      "id": "pc-llm",
+      "name": "LLM Router",
+      "type": "n8n-nodes-aisha.aishaLlmRouter",
+      "typeVersion": 1,
+      "position": [
+        880,
+        520
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.session_id || 'public-' + Date.now() }}",
+        "contextWindowLength": 10
+      },
+      "id": "pc-memory",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        1020,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// ================================================================\n// FORMAT RESPONSE — Record assistant message, build API response\n// ================================================================\nconst agentOutput = $input.item.json;\nconst response = agentOutput.output || agentOutput.text || JSON.stringify(agentOutput);\n\n// Get metadata from previous nodes\nconst allItems = $('Routing Gate').all();\nconst meta = allItems?.[0]?.json || {};\nconst sessionId = meta.session_id;\nconst channelConfig = meta.channel_config || {};\nconst routing = meta.routing || {};\n\n// Record assistant message\nconst supabaseUrl = $env?.AISHA_POSTGREST_URL || ($env?.AISHA_POSTGREST_URL || '');\nconst serviceKey = $env?.AISHA_POSTGREST_SERVICE_KEY || '';\n\nif (sessionId) {\n  await fetch(\n    `${supabaseUrl}/rest/v1/rpc/record_public_chat_message`,\n    {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n        'apikey': serviceKey,\n        'Authorization': `Bearer ${serviceKey}`,\n      },\n      body: JSON.stringify({\n        p_session_id: sessionId,\n        p_role: 'assistant',\n        p_content: response,\n        p_metadata: {\n          model: channelConfig.model,\n          routing: routing.reason,\n          channel: channelConfig.slug,\n        },\n      }),\n    }\n  );\n}\n\n// Capture personality signal (fire-and-forget)\nif (channelConfig.personality_enabled) {\n  try {\n    const mcpUrl = `${supabaseUrl}/functions/v1/mcp-knowledge-server`;\n    const mcpToken = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n    // Detect basic signals\n    const userMsg = (meta.chatInput || '').toLowerCase();\n    let signalType = 'engagement_burst';\n    if (userMsg.includes('děkuj') || userMsg.includes('thank') || userMsg.includes('super')) signalType = 'gratitude';\n    if (userMsg.includes('nefunguje') || userMsg.includes('broken') || userMsg.includes('error')) signalType = 'frustration';\n    \n    fetch(mcpUrl, {\n      method: 'POST',\n      headers: {\n        'Content-Type': 'application/json',\n        'Authorization': `Bearer ${mcpToken}`,\n      },\n      body: JSON.stringify({\n        jsonrpc: '2.0',\n        id: Date.now(),\n        method: 'tools/call',\n        params: {\n          name: 'capture_personality_signal',\n          arguments: {\n            signal_type: signalType,\n            context: `public_chat:${channelConfig.slug}`,\n          },\n        },\n      }),\n    }).catch(() => {}); // fire-and-forget\n  } catch (e) { /* ignore */ }\n}\n\nreturn {\n  json: {\n    success: true,\n    session_id: sessionId,\n    response,\n    channel: channelConfig.slug || 'unknown',\n    routing: routing.reason || 'default',\n    timestamp: new Date().toISOString(),\n  },\n};"
+      },
+      "id": "pc-format",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "name": "search_knowledge",
+        "description": "Search the AISHA knowledge base for public information. Returns expert rules, guides, and FAQ content with relevance ranking.\n\nInput: JSON object with: query (string), category (optional string), limit (optional number, default 10).",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: search_knowledge (public-scoped)\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': `Bearer ${token}`,\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: {\n      name: 'search_knowledge',\n      arguments: {\n        query: args.query || '',\n        category: args.category || undefined,\n        limit: Math.min(args.limit || 10, 20),\n        visibility: 'public',\n      },\n    },\n  }),\n});\n\nconst result = await res.json();\nconst content = result?.result?.content?.[0]?.text || JSON.stringify(result);\nreturn content;"
+      },
+      "id": "pc-tool-search",
+      "name": "MCP: search_knowledge",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        740,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "name": "search_ragnarok",
+        "description": "Search the AISHA document archive using hybrid search (full-text + semantic vectors). Returns passages from verified documents.\n\nInput: JSON object with: query (string), limit (optional number, default 5).",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: search_ragnarok (public-scoped)\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': `Bearer ${token}`,\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: {\n      name: 'search_ragnarok',\n      arguments: {\n        query: args.query || '',\n        limit: Math.min(args.limit || 5, 10),\n      },\n    },\n  }),\n});\n\nconst result = await res.json();\nconst content = result?.result?.content?.[0]?.text || JSON.stringify(result);\nreturn content;"
+      },
+      "id": "pc-tool-ragnarok",
+      "name": "MCP: search_ragnarok",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        740,
+        660
+      ]
+    },
+    {
+      "parameters": {
+        "name": "get_knowledge_item",
+        "description": "Get a specific knowledge item by its slug or ID. Returns the full content including markdown body.\n\nInput: JSON object with: slug (string) or id (string UUID).",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: get_knowledge_item\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { slug: query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': `Bearer ${token}`,\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: {\n      name: 'get_knowledge_item',\n      arguments: args,\n    },\n  }),\n});\n\nconst result = await res.json();\nconst content = result?.result?.content?.[0]?.text || JSON.stringify(result);\nreturn content;"
+      },
+      "id": "pc-tool-item",
+      "name": "MCP: get_knowledge_item",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        740,
+        800
+      ]
+    }
+  ],
+  "connections": {
+    "Public Chat Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Input": {
+      "main": [
+        [
+          {
+            "node": "Routing Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Routing Gate": {
+      "main": [
+        [
+          {
+            "node": "Public Chat Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Public Chat Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Router": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Public Chat Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Public Chat Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: search_knowledge": {
+      "ai_tool": [
+        [
+          {
+            "node": "Public Chat Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: search_ragnarok": {
+      "ai_tool": [
+        [
+          {
+            "node": "Public Chat Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: get_knowledge_item": {
+      "ai_tool": [
+        [
+          {
+            "node": "Public Chat Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

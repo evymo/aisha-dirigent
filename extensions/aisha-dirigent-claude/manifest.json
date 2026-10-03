@@ -1,0 +1,174 @@
+{
+  "manifest_version": "0.3",
+  "name": "aisha-dirigent",
+  "display_name": "AISHA Dirigent",
+  "version": "0.7.0",
+  "description": "AISHA Dirigent for Claude — governance rules, seed/merge tracking, model routing, health, and local-LLM cost/usage, exposed as MCP tools.",
+  "long_description": "Brings the AISHA Dirigent governance overlay into Claude Desktop. Tracks database seeds and git merges, exposes the active rule set, recommends an LLM tier/model via the router-coach, reports environment health, and surfaces local-LLM (Ollama/Docker/vLLM) availability and cost/usage — all backed by a local, zero-dependency MCP server reading your project's .aisha/ state.",
+  "author": {
+    "name": "evymo",
+    "url": "https://github.com/evymo"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/evymo/aisha-dirigent"
+  },
+  "homepage": "https://github.com/evymo/aisha-dirigent",
+  "icon": "icon.png",
+  "license": "Elastic-2.0",
+  "keywords": [
+    "aisha",
+    "dirigent",
+    "governance",
+    "mcp",
+    "rules",
+    "routing",
+    "devops"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/server/index.mjs"
+      ],
+      "env": {
+        "AISHA_WORKSPACE": "${user_config.workspace_root}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "aisha_session",
+      "description": "Current Dirigent session:"
+    },
+    {
+      "name": "aisha_story",
+      "description": "Active story / development direction:"
+    },
+    {
+      "name": "aisha_decisions",
+      "description": "Recent Dirigent decisions / reports captured in .aisha/reports (routing choices, gate outcomes, proposals)."
+    },
+    {
+      "name": "aisha_active_rules",
+      "description": "Contextual rule subset Dirigent currently applies (by category)."
+    },
+    {
+      "name": "aisha_ruleset",
+      "description": "Ruleset fingerprint, context profile, expertise level and active LLM slot profile."
+    },
+    {
+      "name": "aisha_sync_instructions",
+      "description": "Regenerate IDE instruction files from the AISHA ruleset (the Dirigent `gen:ide` pipeline):"
+    },
+    {
+      "name": "aisha_seed_status",
+      "description": "Database seed tracking:"
+    },
+    {
+      "name": "aisha_merge_status",
+      "description": "Git merge / branch tracking:"
+    },
+    {
+      "name": "aisha_db_convergence",
+      "description": "Migration / schema convergence tracking:"
+    },
+    {
+      "name": "aisha_models",
+      "description": "Discover local LLM models from OpenAI-compatible endpoints (Ollama, Docker Model Runner, LM Studio, vLLM) and show the configured slot profiles."
+    },
+    {
+      "name": "aisha_route",
+      "description": "Recommend an LLM tier/model for a task using the Dirigent router-coach slot profiles in .aisha/dirigent.template.json."
+    },
+    {
+      "name": "aisha_cost_usage",
+      "description": "Cost / token usage overview:"
+    },
+    {
+      "name": "aisha_feed",
+      "description": "Recent Dirigent activity / communication feed assembled from .aisha state:"
+    },
+    {
+      "name": "aisha_health",
+      "description": "Environment health:"
+    },
+    {
+      "name": "aisha_bringup",
+      "description": "Bring up the local AISHA stack via the shared entry-point `npm run stack:bringup` (non-interactive, health-gated, JSON output) when no backend is reachable."
+    },
+    {
+      "name": "aisha_scan_env",
+      "description": "Scan the workspace:"
+    },
+    {
+      "name": "aisha_overlay_plan",
+      "description": "Preview what the AISHA backend would compose for this project:"
+    },
+    {
+      "name": "aisha_compose_overlay",
+      "description": "Compose Claude Code artifacts for this project via the AISHA gen:ide pipeline (backend-parameterized:"
+    },
+    {
+      "name": "aisha_scaffold",
+      "description": "Author a project-tailored Claude Code artifact (skill | hook | command | agent) into .claude/, pre-filled with project context."
+    },
+    {
+      "name": "aisha_compliance",
+      "description": "Summarize the project's compliance posture:"
+    },
+    {
+      "name": "aisha_estimate",
+      "description": "Estimate the USD cost of a task across the router slot profiles, from a token count and the per-slot model mapping in .aisha/dirigent.template.json."
+    },
+    {
+      "name": "aisha_onboard",
+      "description": "Summarize the enterprise source-onboarding process (classification, consent, namespace ACL, approval flow) from the project's onboarding contract + handbook."
+    },
+    {
+      "name": "aisha_proposals",
+      "description": "List improvement proposals from the AISHA self-learning loop (backend MCP tool get_improvement_proposals)."
+    },
+    {
+      "name": "aisha_spend_pending",
+      "description": "List agent runs blocked awaiting spend approval (PostgREST rpc list_pending_spend_approvals)."
+    },
+    {
+      "name": "aisha_spend_approve",
+      "description": "Approve a blocked spend run (PostgREST rpc approve_task_spend_audited)."
+    },
+    {
+      "name": "aisha_spend_reject",
+      "description": "Reject a blocked spend run (PostgREST rpc reject_task_spend_audited)."
+    }
+  ],
+  "tools_generated": false,
+  "user_config": {
+    "workspace_root": {
+      "type": "directory",
+      "title": "AISHA workspace",
+      "description": "Path to your AISHA project — the folder containing .aisha/ and package.json.",
+      "required": true
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=22"
+    }
+  },
+  "_meta": {
+    "guru.aisha.dirigent": {
+      "generated_by": "gen:ide claude-app adapter",
+      "do_not_edit": true,
+      "ruleset_fingerprint": null
+    }
+  }
+}

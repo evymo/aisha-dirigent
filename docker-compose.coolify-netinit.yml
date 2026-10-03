@@ -1,0 +1,144 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify-netinit.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+services:
+  netinit:
+    image: library/docker:27-cli
+    container_name: ${APP_NAME_PREFIX:?identita instance}-netinit
+    restart: "no"
+    network_mode: none
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      SHARED_NET: ${APP_NAME_PREFIX:?identita instance}-shared-net
+      MESH_NET: ${MESH_DNS_NETWORK:?vydává generate-secrets}
+      MESH_SUBNET: ${MESH_DNS_SUBNET:?vydává generate-secrets (deriveSubnets)}
+      MESH_ENABLED: ${MESH_ENABLED:-false}
+      DRY_RUN: ${DRY_RUN:-0}
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        # Idempotentně: síť buď je, nebo ji založíme. Souběh dvou warmupů na
+        # témž hostu skončí "already exists" — to NENÍ chyba, jen prohraný závod.
+        zaloz() {  # $$1 = jméno, $$2 = volitelný subnet ("" = neurčovat)
+          if [ -z "$$1" ]; then
+            echo "[netinit] FATAL: prázdné jméno sítě — proměnná nedorazila" >&2
+            return 1
+          fi
+          if docker network inspect "$$1" >/dev/null 2>&1; then
+            # Existuje — ale se SPRÁVNÝM rozsahem? Síť s jiným subnetem než
+            # deklarovaným je tichá neshoda: kontejnery dostanou adresy z jiného
+            # rozsahu, než na jaký míří `dns:` a pinovaná IP resolveru.
+            if [ -n "$$2" ]; then
+              mam=$$(docker network inspect "$$1" --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}' 2>/dev/null || true)
+              if [ "$$mam" != "$$2" ]; then
+                # Neshoda rozsahu. PRÁZDNOU síť recyklujeme, obsazenou nikdy.
+                #
+                # Naměřeno 2026-08-13 při --wipe: rozsah se přestal dědit z vaultu
+                # a začal odvozovat z identity, jenže SÍŤ na hostiteli zůstala se
+                # starým rozsahem — wipe maže aplikace a volumes, sítě ne. Vlna 0
+                # proto padala na hostech, kde ta síť z dřívějška zbyla, a jediná
+                # náprava byl ruční zásah na serveru. To je přesně to, co nemá
+                # existovat: hláška slibovala „wipe ji vytvoří znovu", ale nikdo
+                # to nedělal.
+                #
+                # Bezpečné je to jen bez připojených kontejnerů — a rozhoduje
+                # DOCKER, ne náš odhad: `network rm` sám odmítne síť s aktivními
+                # endpointy ("has active endpoints"), takže mezi počítáním a
+                # mazáním se nedá prohrát závod. Počet níž slouží jen hlášce.
+                #
+                # DRY_RUN je tu skutečná pojistka, ne obřad: náhled nasazení
+                # nesmí sáhnout na sítě hostitele. Zároveň to drží kontrakt,
+                # který v repu platí pro KAŽDOU destruktivní operaci
+                # (scripts/audit/destructive-ops-survey.mjs).
+                obsazeno=$$(docker network inspect "$$1" --format '{{len .Containers}}' 2>/dev/null || echo '?')
+                if [ "$${DRY_RUN:-0}" = "1" ] && [ "$$obsazeno" = "0" ]; then
+                  echo "[netinit] DRY_RUN: $$1 má rozsah '$$mam' místo '$$2' a je prázdná — smazal a založil bych ji znovu"
+                  return 0
+                fi
+                if [ "$${DRY_RUN:-0}" != "1" ] && [ "$$obsazeno" = "0" ]; then
+                  chyba=$$(docker network rm "$$1" 2>&1) || true
+                fi
+                if ! docker network inspect "$$1" >/dev/null 2>&1; then
+                  echo "[netinit] $$1 měla rozsah '$$mam', deklarovaný je '$$2' — byla PRÁZDNÁ, zakládám znovu"
+                else
+                  echo "[netinit] FATAL: $$1 existuje se subnetem '$$mam', deklarovaný je '$$2'." >&2
+                  echo "[netinit]   Připojených kontejnerů: $$obsazeno — nepřekresluji, odpojilo by je to." >&2
+                  echo "[netinit]   Náprava: zastavit, co na ní visí, nebo override MESH_DNS_SUBNET." >&2
+                  return 1
+                fi
+              fi
+            fi
+            # Po recyklaci výš už síť existovat NEMUSÍ — pak se propadneme do
+            # vytvoření níž. Bez téhle podmínky by se smazaná síť nikdy
+            # nezaložila a `zaloz` by vrátil úspěch nad prázdnem.
+            if docker network inspect "$$1" >/dev/null 2>&1; then
+              echo "[netinit] $$1 už existuje$${2:+ ($$2)}"
+              return 0
+            fi
+          fi
+          # Chybu vytvoření NEPOLYKÁME: „nepodařilo se" neřekne, jestli je vinen
+          # překryv rozsahu s cizím nájemníkem, chybějící oprávnění nebo překlep.
+          # (2026-08-11: kolize 10.99.0.0/24 s cizí sítí stála hodinu hledání.)
+          if chyba=$$(docker network create $${2:+--subnet "$$2"} "$$1" 2>&1); then
+            echo "[netinit] $$1 vytvořeno$${2:+ ($$2)}"
+          elif docker network inspect "$$1" >/dev/null 2>&1; then
+            echo "[netinit] $$1 vytvořil souběžný běh"
+          else
+            echo "[netinit] FATAL: $$1$${2:+ ($$2)} se nepodařilo vytvořit: $$chyba" >&2
+            case "$$chyba" in
+              *"Pool overlaps"*)
+                echo "[netinit]   Rozsah už na tomhle hostu drží jiná síť (typicky jiný nájemník)." >&2
+                echo "[netinit]   Subnety se odvozují z identity instance (generate-secrets::deriveSubnets)," >&2
+                echo "[netinit]   takže tohle znamená zděděnou hodnotu nebo kolizi hashů — override v manifestu." >&2 ;;
+            esac
+            return 1
+          fi
+        }
+        # Sdílená instanční síť: subnet NEURČUJEME. Nikdo si na ní nepinuje IP,
+        # takže ať ho vybere Docker — dvě instance na jednom hostu se tak
+        # nepotkají na "Pool overlaps".
+        zaloz "$$SHARED_NET" ""
+        # mesh-DNS: při zapnutém meshi je subnet POVINNÝ, mesh-router si na ní
+        # pinuje ipv4_address. Bez meshe se zakládá BEZ subnetu — ale zakládá se.
+        #
+        # ⛔ NAMĚŘENO 2026-09-04 na produkci <fork>. Dřív se při MESH_ENABLED=false
+        # nezakládala vůbec — jenže 24 compose souborů ji deklaruje jako EXTERNAL
+        # nepodmíněně, takže na profilu bez meshe nenastartovalo nic, co ji zmiňuje:
+        #   network <fork>-mesh-dns declared as external, but could not be found
+        # `edge` se postavil, obrazy se přenesly na cíl, a spadl až start kontejneru.
+        # Osmý výskyt téhož vzorce za jedno nasazení: profil službu vyloučí, ale
+        # něco statického ji dál vyžaduje.
+        #
+        # Prázdná síť bez meshe nic nestojí a nic nedělá — jen splní deklaraci.
+        # Opačné řešení (podmínit `external` ve 24 souborech) by tutéž podmínku
+        # rozsypalo na 24 míst, tedy přesně to, co tenhle stack jinde odstraňuje.
+        if [ "$$MESH_ENABLED" = "true" ]; then
+          zaloz "$$MESH_NET" "$$MESH_SUBNET"
+        else
+          echo "[netinit] mesh vypnutý — $$MESH_NET zakládám BEZ subnetu (deklarují ho compose jako external)"
+          zaloz "$$MESH_NET" ""
+        fi
+        # HLÍDKA: kontejner po práci NEskončí. Coolify čte logy i stav jen u
+        # běžící aplikace (změřeno 2026-08-11: GET /logs na exited app → 400
+        # "Application is not running"), takže jednorázový kontejner nemá jak
+        # PROKÁZAT, že práci odvedl — "deployment finished" říká jen to, že se
+        # spustil. Místo vyprávění v logu se měří výsledek: healthcheck níže se
+        # ptá hostitele, zda sítě existují, a zdraví aplikace je tak přímo
+        # důkaz odvedené práce. Vlna 0 díky tomu nepotřebuje žádnou speciální
+        # větev — čeká na running:healthy jako každá jiná vlna.
+        echo "[netinit] hotovo — držím hlídku, zdraví = sítě existují"
+        while :; do sleep 3600; done
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          docker network inspect "$$SHARED_NET" >/dev/null 2>&1
+          && { [ "$$MESH_ENABLED" != "true" ]
+          || docker network inspect "$$MESH_NET" >/dev/null 2>&1; }
+      interval: 5s
+      timeout: 5s
+      retries: 6
+      start_period: 20s

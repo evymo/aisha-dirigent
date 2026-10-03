@@ -1,0 +1,32 @@
+{
+  "kanban": {
+    "pageTitle": "Geschichten Kanban",
+    "pageSubtitle": "Ziehen Sie eine Story über die Spalten, um ihren Kanban-Status zu ändern. Übergangsregeln und Admin-Gating werden server-seitig durchgesetzt.",
+    "moving": "Bewegende Geschichte..",
+    "lane": {
+      "stack": "Stapel",
+      "userStories": "Anwenderberichte"
+    },
+    "column": {
+      "empty": "Keine Geschichten hier"
+    },
+    "card": {
+      "priorityTooltip": "Priorität",
+      "agentTooltip": "Aktueller / neuester Vertreter",
+      "branchTooltip": "Standard-Zweigstelle",
+      "runningLive": "Läuft jetzt",
+      "costTooltip": "Bisherige KI-Kosten",
+      "liveSessionTooltip": "Live-Sitzung {{source}} — {{phase}}"
+    },
+    "budget": {
+      "setTooltip": "KI-Budget festlegen",
+      "setShort": "Budget",
+      "dialogTitle": "KI-Budget festlegen",
+      "dialogDescription": "Lebenslange KI-Ausgabenobergrenze für „{{title}}“. Leer lassen, um das Limit zu entfernen.",
+      "costLimitLabel": "Kostenlimit (USD)",
+      "costLimitPlaceholder": "z. B. 5.00",
+      "invalid": "Geben Sie einen nicht-negativen Betrag ein.",
+      "saved": "Budget aktualisiert."
+    }
+  }
+}

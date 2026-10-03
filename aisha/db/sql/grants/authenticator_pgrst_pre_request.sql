@@ -1,0 +1,11 @@
+-- PostgREST in-database config: wire the JIT first-request hook as db-pre-request.
+--
+-- Set via a role-level GUC (NOT the compose env PGRST_DB_PRE_REQUEST) because the
+-- core compose is at the Coolify ARG_MAX ceiling and must not grow. PostgREST runs
+-- with db-config enabled (default), so it reads pgrst.* settings from the
+-- authenticator role at startup / on `NOTIFY pgrst, 'reload config'`. The
+-- authenticator role is created earlier by infra/pg17/000_init_roles_schemas.sql,
+-- so this ALTER resolves on both fresh cold-start and existing-DB re-migrate.
+-- The value is a string resolved per-request; no ordering dependency on the
+-- function existing at SET time. Idempotent.
+ALTER ROLE authenticator SET pgrst.db_pre_request = 'public.aisha_pre_request';

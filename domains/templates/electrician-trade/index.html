@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n-key="web.trade.title">Brightwire Electrical — local electrician</title>
+    <meta name="description" data-i18n-key="web.trade.description"
+      content="A licensed local electrician: rewiring, fuse boards, EV chargers and fault-finding. Honest advice, tidy work." />
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header" data-section="header">
+      <div class="wrap">
+        <a class="brand" href="/">
+          <span class="brand__mark" aria-hidden="true">⚡</span>
+          <span data-i18n-key="web.trade.brand">Brightwire Electrical</span>
+        </a>
+        <nav class="nav">
+          <a href="#services" data-i18n-key="web.trade.nav.services">Services</a>
+          <a href="#knowledge" data-i18n-key="web.trade.nav.knowledge">Ask an electrician</a>
+          <a href="#quote" data-i18n-key="web.trade.nav.quote">Get a quote</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" data-section="hero">
+        <div class="wrap">
+          <h1>
+            <span data-i18n-key="web.trade.hero.heading">Safe, tidy electrical work</span>
+            <span class="spark" aria-hidden="true"> ⚡</span>
+          </h1>
+          <p data-i18n-key="web.trade.hero.body">
+            One local electrician, on the tools for fifteen years. From a single socket to a full
+            rewire — done properly, explained plainly, and left clean.
+          </p>
+          <div class="hero__cta">
+            <a class="btn" href="#quote" data-i18n-key="web.trade.hero.cta">Get a quote</a>
+            <span class="hero__trust" data-i18n-key="web.trade.hero.trust">Licensed &amp; insured · Same-week callouts</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="services" data-section="services">
+        <div class="wrap">
+          <p class="section__eyebrow" data-i18n-key="web.trade.services.eyebrow">What I do</p>
+          <h2 class="section__title" data-i18n-key="web.trade.services.heading">Services</h2>
+          <div class="services">
+            <div class="svc">
+              <h3 data-i18n-key="web.trade.svc.1.name">Rewires</h3>
+              <p data-i18n-key="web.trade.svc.1.desc">Full or partial rewiring for older homes, with as little mess and disruption as possible.</p>
+            </div>
+            <div class="svc">
+              <h3 data-i18n-key="web.trade.svc.2.name">Fuse board upgrades</h3>
+              <p data-i18n-key="web.trade.svc.2.desc">Modern consumer units with the right protection — safer, and ready for what you add next.</p>
+            </div>
+            <div class="svc">
+              <h3 data-i18n-key="web.trade.svc.3.name">EV charger installs</h3>
+              <p data-i18n-key="web.trade.svc.3.desc">Home charge points fitted and tested, sized to your supply and your car.</p>
+            </div>
+            <div class="svc">
+              <h3 data-i18n-key="web.trade.svc.4.name">Fault finding</h3>
+              <p data-i18n-key="web.trade.svc.4.desc">Tripping breakers, dead sockets, flickering lights — tracked down and fixed at the source.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section know" id="knowledge" data-section="knowledge">
+        <div class="wrap">
+          <p class="section__eyebrow" data-i18n-key="web.trade.know.eyebrow">From the field</p>
+          <h2 class="section__title" data-i18n-key="web.trade.know.heading">Ask an electrician</h2>
+          <p class="faq__intro" data-i18n-key="web.trade.know.intro">Straight answers to the questions I get asked most on the job — no jargon, no upselling.</p>
+          <div class="faq__item">
+            <p class="faq__q" data-i18n-key="web.trade.faq.1.q">Why do my lights flicker?</p>
+            <p class="faq__a" data-i18n-key="web.trade.faq.1.a">Usually a loose connection somewhere on the circuit — annoying, but worth checking promptly, because the same loose joint that flickers a light can also heat up. If it's more than one room, it's worth a proper look.</p>
+          </div>
+          <div class="faq__item">
+            <p class="faq__q" data-i18n-key="web.trade.faq.2.q">Do I really need to upgrade my fuse board?</p>
+            <p class="faq__a" data-i18n-key="web.trade.faq.2.a">Not always. If yours still uses rewireable fuses or has no RCD protection, an upgrade is a genuine safety improvement. If it's a modern unit in good order, I'll tell you to keep your money.</p>
+          </div>
+          <div class="faq__item">
+            <p class="faq__q" data-i18n-key="web.trade.faq.3.q">Is my old wiring safe?</p>
+            <p class="faq__a" data-i18n-key="web.trade.faq.3.a">Old isn't automatically unsafe — but cloth or rubber-sheathed cable, or anything that looks scorched, is worth testing. A quick inspection tells you where you actually stand instead of guessing.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="section quote" id="quote" data-section="quote">
+        <div class="wrap">
+          <p class="section__eyebrow" data-i18n-key="web.trade.quote.eyebrow">Get in touch</p>
+          <h2 class="section__title" data-i18n-key="web.trade.quote.heading">Request a quote</h2>
+          <p class="quote__body" data-i18n-key="web.trade.quote.body">Tell me what you need and roughly where you are. No call centre — the message comes straight to me.</p>
+          <!-- Live contact form: the contact-form runtime block POSTs to submit_lead
+               (subject dropdown hidden; accepts email or phone for a trades quote). -->
+          <div data-runtime-block="contact-form" data-block-config='{"source":"electrician-trade","subject":false,"contactMode":"emailOrPhone"}'></div>
+          <p class="form__note" data-i18n-key="web.trade.quote.note">I usually reply the same day — same hour if it's urgent.</p>
+        </div>
+      </section>
+
+      <section class="section" data-section="reviews">
+        <div class="wrap">
+          <h2 class="section__title" data-i18n-key="web.trade.reviews.heading">What customers say</h2>
+          <div class="reviews">
+            <div class="review">
+              <p class="review__text" data-i18n-key="web.trade.review.1.text">“Turned up when he said, fixed it in an hour, and explained exactly what had gone wrong. Spotless afterwards.”</p>
+              <p class="review__author" data-i18n-key="web.trade.review.1.author">— Hana, kitchen rewire</p>
+            </div>
+            <div class="review">
+              <p class="review__text" data-i18n-key="web.trade.review.2.text">“Talked me out of a job I didn't need and sorted the real problem instead. Rare and appreciated.”</p>
+              <p class="review__author" data-i18n-key="web.trade.review.2.author">— Marek, fuse board</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer" data-section="footer">
+      <div class="wrap">
+        <span data-i18n-key="web.trade.footer.name">Brightwire Electrical</span>
+        <span data-i18n-key="web.trade.footer.note">Licensed electrician · Serving the whole county</span>
+      </div>
+    </footer>
+  </body>
+</html>

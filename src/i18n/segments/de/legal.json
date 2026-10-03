@@ -1,0 +1,208 @@
+{
+  "legal": {
+    "privacyPolicy": {
+      "title": "Datenschutzerklärung",
+      "lastUpdated": "Zuletzt aktualisiert: 4. Juli 2026",
+      "fullText": "## 1. Wer ist der Verantwortliche?\n\nDie AISHA-Plattform unter aisha.guru (der „Dienst“) wird von **Evymo** („wir“, der „Betreiber“) betrieben, der als Verantwortlicher für Ihre personenbezogenen Daten fungiert. Bei allen Fragen zum Datenschutz kontaktieren Sie uns bitte unter **ask@aisha.guru**.\n\nDer Dienst wird derzeit als **öffentliche Vorschau** angeboten. Diese Richtlinie beschreibt, wie wir während der Vorschau mit personenbezogenen Daten umgehen.\n\n## 2. Welche personenbezogenen Daten wir verarbeiten\n\n- **Kontodaten** – Ihr Name, Ihre E-Mail-Adresse und Ihre Anmeldedaten. Die Identitätsprüfung und Authentifizierung erfolgt über unsere selbst gehostete Keycloak-Instanz; Kontodaten werden nicht an externe Identitätsanbieter weitergegeben, es sei denn, Sie entscheiden sich dafür, sich über einen solchen anzumelden.\n- **Von Ihnen erstellte Inhalte** – Projekte, Dokumente, Einträge in der Wissensdatenbank und andere Materialien, die Sie im Dienst speichern.\n- **Daten zur KI-Interaktion** – die von Ihnen übermittelten Eingabeaufforderungen, die generierten Antworten und zugehörige Metadaten (Zeitstempel, ausgewähltes Modell). Diese Daten sind erforderlich, um den Dienst bereitzustellen und Fehlfunktionen zu untersuchen.\n- **Audit- und Sicherheitsprotokolle** — privilegierte und sicherheitsrelevante Aktionen werden zum Schutz des Dienstes und seiner Nutzer in einem Audit-Protokoll aufgezeichnet.\n\nWir verwenden **keine** Analysetools von Drittanbietern, Werbe-Tracker oder Fingerprinting. Die Webanwendung speichert in Ihrem Browser lediglich Ihre Spracheinstellung und Ihre Authentifizierungssitzung.\n\n## 3. Zwecke und Rechtsgrundlagen (Art. 6 DSGVO)\n\n- Bereitstellung des von Ihnen abonnierten Dienstes — Erfüllung eines Vertrags (Art. 6 Abs. 1 Buchstabe b).\n- Sicherheit, Missbrauchsprävention und Audit-Protokollierung — unser berechtigtes Interesse (Art. 6 Abs. 1 Buchstabe f).\n- Optionale Funktionen, die Sie aktivieren (z. B. Produktneuigkeiten) — Ihre Einwilligung (Art. 6 Abs. 1 Buchstabe a), die Sie jederzeit widerrufen können.\n- Einhaltung gesetzlicher Verpflichtungen (Art. 6 Abs. 1 Buchstabe c).\n\n## 4. KI-Anbieter als Auftragsverarbeiter\n\nWenn Sie KI-Funktionen nutzen, wird der Inhalt Ihrer Anfrage (sowie der erforderliche Kontext) über unser LLM-Gateway an den für Ihre Instanz konfigurierten KI-Modellanbieter übermittelt, der als unser Auftragsverarbeiter fungiert. Wir verkaufen Ihre Daten nicht und gestatten deren Nutzung nicht zu Werbezwecken. Falls ein konfigurierter Anbieter Daten außerhalb der EU/des EWR verarbeitet, sind die Übermittlungen durch geeignete Garantien wie die EU-Standardvertragsklauseln abgesichert.\n\n## 5. Wo Ihre Daten gespeichert werden\n\nAnwendungsdaten werden in einer selbst gehosteten PostgreSQL-Datenbank und Identitätsdaten in einer selbst gehosteten Keycloak-Instanz auf einer Infrastruktur in der Europäischen Union (Tschechische Republik) gespeichert.\n\n## 6. Aufbewahrungsfristen\n\n- **Kontodaten und Inhalte**: solange Ihr Konto besteht.\n- **Konto-Löschung**: Sie können die Löschung jederzeit auf der Seite **/account-deletion** beantragen. Der Antrag unterliegt einer 30-tägigen Karenzfrist (während der Sie ihn widerrufen können); nach deren Ablauf werden Ihr Konto und Ihre Inhalte gelöscht.\n- **Audit- und Sicherheitsprotokolle**: werden für einen begrenzten Zeitraum aufbewahrt, der für die Sicherheit und die Einhaltung gesetzlicher Vorschriften erforderlich ist, und anschließend gelöscht.\n- **Sicherungskopien**: Gelöschte Daten bleiben in den Sicherungskopien erhalten, da diese im Rahmen der Sicherungszyklen rotieren.\n\n## 7. Ihre Rechte\n\nGemäß der DSGVO haben Sie das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch sowie das Recht, Ihre Einwilligung jederzeit zu widerrufen. Die Löschung können Sie direkt unter **/account-deletion** beantragen, die Datenübertragbarkeit über die Datenexportfunktion nutzen; für alle anderen Anliegen wenden Sie sich bitte an **ask@aisha.guru**. Sie haben außerdem das Recht, eine Beschwerde bei einer Aufsichtsbehörde einzureichen – in der Tschechischen Republik ist dies das Amt für den Schutz personenbezogener Daten (ÚOOÚ, uoou.gov.cz).\n\n## 8. Sicherheit\n\nDer Zugriff auf Daten erfolgt nach dem Prinzip der geringsten Berechtigungen, wird durch Sicherheit auf Zeilenebene in der Datenbank geschützt und bei der Übertragung verschlüsselt; privilegierte Aktionen werden im Audit-Protokoll aufgezeichnet.\n\n## 9. Änderungen an dieser Richtlinie\n\nWir behalten uns vor, diese Richtlinie zu aktualisieren, insbesondere im Zuge der Weiterentwicklung der Vorschauversion hin zur allgemeinen Verfügbarkeit. Wesentliche Änderungen werden im Dienst bekannt gegeben.\n\nFragen? **ask@aisha.guru**"
+    },
+    "termsOfService": {
+      "title": "Nutzungsbedingungen",
+      "lastUpdated": "Zuletzt aktualisiert: 4. Juli 2026",
+      "fullText": "## 1. Wer wir sind und was diese Bedingungen regeln\n\nDiese Nutzungsbedingungen (die „Bedingungen“) regeln die Nutzung der AISHA-Plattform unter aisha.guru (der „Dienst“), die von **Evymo** („wir“, der „Betreiber“) betrieben wird. Kontakt: **ask@aisha.guru**. Durch die Erstellung eines Kontos oder die Nutzung des Dienstes erklären Sie sich mit diesen Bedingungen einverstanden.\n\n## 2. Öffentliche Vorschau\n\nDer Dienst wird als **öffentliche Vorschau** bereitgestellt:\n\n- Verfügbarkeit, Funktionen und Leistung werden **nicht garantiert** und können sich ohne Vorankündigung ändern;\n- Vorschau-Daten **können zurückgesetzt werden**; wir werden vor jedem geplanten Reset im Dienst eine angemessene Vorankündigung veröffentlichen;\n- Funktionen können jederzeit hinzugefügt, geändert oder entfernt werden.\n\nBitte bewahren Sie eigene Kopien aller wichtigen Daten auf – hierfür steht Ihnen die Datenexportfunktion zur Verfügung.\n\n## 3. Ihr Konto\n\nKonten werden über unseren selbst gehosteten Identitätsdienst (Keycloak) verwaltet. Sie sind dafür verantwortlich, Ihre Zugangsdaten vertraulich zu behandeln und haften für alle Aktivitäten unter Ihrem Konto. Sie müssen korrekte Angaben machen und rechtlich in der Lage sein, diese Vereinbarung abzuschließen.\n\n## 4. Zulässige Nutzung\n\nEs ist Ihnen untersagt: (a) den Dienst für rechtswidrige Aktivitäten zu nutzen; (b) zu versuchen, sich unbefugten Zugriff auf Daten, Konten oder die Infrastruktur zu verschaffen; (c) den Dienst zu sondieren, zu scannen oder zu stören, es sei denn, Sie melden eine Sicherheitslücke verantwortungsbewusst an ask@aisha.guru; (d) den Dienst nutzen, um Malware, Spam oder Inhalte zu erzeugen oder zu verbreiten, die Rechte Dritter verletzen; (e) den gehosteten Dienst weiterverkaufen oder ihn Dritten als Managed Service zur Verfügung stellen. Wir sind berechtigt, Konten, die gegen diese Bedingungen verstoßen, zu sperren oder zu kündigen.\n\n## 5. Ihre Inhalte\n\nSie behalten alle Rechte an den von Ihnen erstellten oder hochgeladenen Inhalten. Sie gewähren uns eine nicht-exklusive Lizenz zur Bereitstellung, Speicherung, Verarbeitung und Anzeige dieser Inhalte, und zwar ausschließlich in dem Umfang, der für den Betrieb und die Bereitstellung des Dienstes erforderlich ist. Wir verwenden Ihre Inhalte nicht für Werbezwecke.\n\n## 6. Von KI generierte Ergebnisse\n\nDer Dienst erzeugt Ergebnisse unter Verwendung großer Sprachmodelle. KI-Ergebnisse können ungenau, unvollständig oder verzerrt sein und werden ausschließlich zu Ihrer Bewertung bereitgestellt – siehe den Haftungsausschluss. Sie sind dafür verantwortlich, KI-Ergebnisse zu überprüfen, bevor Sie sich darauf verlassen oder sie weitergeben.\n\n## 7. Plattformlizenz\n\nDer Quellcode der AISHA-Plattform unterliegt der **Elastic License 2.0 (ELv2)** – siehe die Dateien „LICENSE“ und „NOTICE“ im Quellcode-Repository. Diese Bedingungen regeln Ihre Nutzung des gehosteten Dienstes; sie gewähren keine über die ELv2 hinausgehenden Rechte am Quellcode.\n\n## 8. Datenschutz\n\nDie Verarbeitung personenbezogener Daten ist in der Datenschutzerklärung beschrieben. Die Löschung Ihres Kontos kann unter /account-deletion beantragt werden.\n\n## 9. Gewährleistungen und Haftung\n\nDer Preview-Dienst wird **„wie besehen“ und „wie verfügbar“** bereitgestellt, ohne Gewährleistungen jeglicher Art, soweit dies gesetzlich zulässig ist. In gleichem Maße haften wir nicht für indirekte oder Folgeschäden, Datenverluste oder entgangenen Gewinn, die sich aus der Nutzung des Preview-Dienstes ergeben. Keine Bestimmung dieser Nutzungsbedingungen schließt eine Haftung aus, die nach geltendem Recht nicht ausgeschlossen werden kann.\n\n## 10. Kündigung\n\nSie können die Nutzung des Dienstes jederzeit einstellen und Ihr Konto unter /account-deletion löschen. Wir können den Zugang bei Verstößen gegen diese Nutzungsbedingungen oder aus Sicherheitsgründen aussetzen oder beenden; soweit dies angemessen ist, werden wir Sie darüber informieren.\n\n## 11. Änderungen dieser Nutzungsbedingungen\n\nWir können diese Nutzungsbedingungen während der Vorschauphase aktualisieren. Wesentliche Änderungen werden im Dienst bekannt gegeben; die fortgesetzte Nutzung nach dem Datum des Inkrafttretens gilt als Zustimmung zu den aktualisierten Nutzungsbedingungen.\n\n## 12. Anwendbares Recht\n\nDiese Nutzungsbedingungen unterliegen dem Recht der Tschechischen Republik. Zwingende Verbraucherschutzbestimmungen Ihres Wohnsitzlandes bleiben davon unberührt.\n\nKontakt: **ask@aisha.guru**"
+    },
+    "accountDeletion": {
+      "title": "Konto löschen",
+      "description": "Löschen Sie Ihr Konto und die damit verbundenen Daten endgültig.",
+      "warning": "Diese Maßnahme ist endgültig. Nach Ablauf der 30-tägigen Karenzfrist werden Ihr Konto und Ihre Daten unwiderruflich gelöscht.",
+      "consequences": {
+        "title": "Was passiert, wenn Sie Ihr Konto löschen?",
+        "items": [
+          "Ihr Profil und Ihr Anmeldekonto (die in unserem Identitätsdienst verwaltet werden) werden endgültig gelöscht.",
+          "Alle von Ihnen erstellten Inhalte – Projekte, Dokumente und Einträge in der Wissensdatenbank – werden gelöscht.",
+          "Ihr KI-Gesprächsverlauf und Ihre Interaktionsprotokolle werden gelöscht.",
+          "Ihre aktiven Sitzungen und API-Token werden ungültig gemacht und der Zugriff auf den Dienst wird gesperrt.",
+          "Die mit Ihrem Konto verknüpften Freigaben und Einladungen werden gelöscht.",
+          "Nach Ablauf der 30-tägigen Karenzfrist ist die Löschung endgültig und kann nicht rückgängig gemacht werden."
+        ]
+      },
+      "dataRetention": {
+        "title": "Datenspeicherung nach der Löschung",
+        "content": "Ihr Löschantrag unterliegt einer 30-tägigen Karenzfrist, während der Sie ihn auf dieser Seite widerrufen können. Nach Ablauf der Karenzfrist werden Ihre Daten gelöscht. Ein minimaler Datensatz über den Löschantrag sowie Einträge im Sicherheits- und Prüfprotokoll können aufbewahrt werden, sofern dies gesetzlich vorgeschrieben ist oder zum Schutz des Dienstes erforderlich ist, wie in der Datenschutzerklärung beschrieben."
+      },
+      "confirmation": {
+        "title": "Löschung bestätigen",
+        "instructions": "Geben Sie zur Bestätigung die E-Mail-Adresse Ihres Kontos ein. Sie können uns auch mitteilen, warum Sie sich abmelden – das hilft uns, den Dienst zu verbessern.",
+        "emailLabel": "Die E-Mail-Adresse Ihres Kontos",
+        "emailPlaceholder": "name@example.com",
+        "emailMismatch": "Die E-Mail-Adresse stimmt nicht mit der E-Mail-Adresse Ihres Kontos überein.",
+        "reasonLabel": "Grund für den Austritt (optional)",
+        "reasonPlaceholder": "Möchten Sie uns noch etwas mitteilen? (optional)",
+        "reasons": {
+          "notUseful": "Der Service war für mich nicht hilfreich.",
+          "privacyConcerns": "Datenschutzbedenken",
+          "tooComplicated": "Der Service ist zu kompliziert.",
+          "foundAlternative": "Ich habe eine Alternative gefunden",
+          "temporaryBreak": "Ich brauche einfach mal eine Pause",
+          "other": "Sonstiges"
+        }
+      },
+      "buttons": {
+        "delete": "Löschung des Kontos beantragen",
+        "deleting": "Anfrage wird gesendet…",
+        "cancel": "Löschanfrage abbrechen",
+        "goBack": "Zurück"
+      },
+      "success": {
+        "title": "Anfrage eingegangen",
+        "message": "Wir haben Ihre Anfrage erhalten. Ihr Konto wird nach Ablauf der 30-tägigen Karenzfrist gelöscht, sofern Sie die Anfrage nicht widerrufen."
+      },
+      "error": {
+        "title": "Die Anfrage ist fehlgeschlagen",
+        "message": "Ihr Löschantrag konnte nicht übermittelt werden. Bitte versuchen Sie es erneut.",
+        "contactSupport": "Sollte das Problem weiterhin bestehen, kontaktieren Sie uns bitte unter ask@aisha.guru."
+      },
+      "requestSubmitted": {
+        "title": "Löschantrag eingereicht",
+        "message": "Ihr Konto soll nach einer 30-tägigen Karenzfrist gelöscht werden. Sie können den Antrag jederzeit vor dem geplanten Termin widerrufen, indem Sie zu dieser Seite zurückkehren."
+      },
+      "banner": {
+        "title": "Konto-Löschung steht noch aus",
+        "message": "Ihr Konto soll am {{date}} gelöscht werden.",
+        "daysRemaining": "{{count}} Tage verbleibend",
+        "daysRemaining_other": "Noch {{count}} Tage",
+        "cancelRequest": "Löschung rückgängig machen",
+        "cancelling": "Abbrechen…",
+        "cancelled": "Der Löschantrag wurde zurückgezogen."
+      }
+    },
+    "dataExport": {
+      "title": "Daten exportieren",
+      "description": "Laden Sie eine Kopie der mit Ihrem Konto verknüpften personenbezogenen Daten und Inhalte herunter (Datenübertragbarkeit gemäß Art. 20 DSGVO).",
+      "button": "Export anfordern",
+      "processing": "Ihr Export wird vorbereitet…",
+      "ready": "Ihr Export ist fertig.",
+      "download": "Export herunterladen",
+      "includes": {
+        "title": "Der Export umfasst",
+        "items": [
+          "Deine Profil- und Kontodaten",
+          "Inhalte, die Sie im Dienst erstellt haben",
+          "Ihr KI-Gesprächsverlauf",
+          "Aufzeichnungen über die von Ihnen erteilten Einwilligungen",
+          "Ihre Einstellungen und Präferenzen",
+          "Ein Protokoll der Aktionen in Bezug auf Ihr Konto"
+        ]
+      },
+      "format": "Der Export wird als maschinenlesbares Archiv (JSON) bereitgestellt.",
+      "success": "Der Export wurde erfolgreich erstellt.",
+      "error": "Der Export konnte nicht erstellt werden. Bitte versuchen Sie es erneut oder wenden Sie sich an ask@aisha.guru."
+    },
+    "consents": {
+      "gdpr": "Ich stimme der Verarbeitung meiner personenbezogenen Daten durch {{operatorName}} gemäß der Datenschutzerklärung zu.",
+      "terms": "Ich habe die Nutzungsbedingungen gelesen und stimme ihnen zu.",
+      "professional": "Ich bestätige, dass die von mir gemachten Angaben korrekt sind und dass ich, sofern zutreffend, in meiner beruflichen Eigenschaft handle.",
+      "notMedicalAdvice": "Mir ist bewusst, dass die vom Dienst bereitgestellten Inhalte, einschließlich der von KI generierten Ergebnisse, keine medizinische, rechtliche oder sonstige fachliche Beratung darstellen.",
+      "marketing": "Ich bin damit einverstanden, gelegentlich Neuigkeiten und Produktinformationen von {{operatorName}} zu erhalten (optional, kann jederzeit widerrufen werden).",
+      "research": "Ich bin damit einverstanden, dass meine Daten in anonymisierter Form für Forschungszwecke und zur Verbesserung der Dienstleistungen verwendet werden dürfen (optional).",
+      "knowledgeCheck": "Ich bestätige, dass ich die mir zur Verfügung gestellten Informationen gelesen und verstanden habe.",
+      "informedConsent": "Ich erteile meine Einwilligung nach Aufklärung zur Teilnahme an {{studyName}}, das von {{organizerName}} organisiert wird, wie in den Teilnehmerinformationen beschrieben.",
+      "commitment": "Ich verpflichte mich, die bereitgestellten Anweisungen zu befolgen und den Dienst gemäß den Nutzungsbedingungen zu nutzen."
+    },
+    "legalDisclaimer": {
+      "title": "Rechtlicher Hinweis",
+      "lastUpdated": "Zuletzt aktualisiert: 4. Juli 2026",
+      "fullText": "## KI-generierte Inhalte\n\nDie AISHA-Plattform generiert Inhalte mithilfe großer Sprachmodelle (KI). KI-Ergebnisse können **ungenau, unvollständig, veraltet oder voreingenommen** sein und falsche Informationen in einem selbstbewussten Tonfall präsentieren. Überprüfen Sie wichtige Informationen stets anhand zuverlässiger, unabhängiger Quellen, bevor Sie darauf reagieren.\n\n## Keine professionelle Beratung\n\nNichts, was vom Dienst bereitgestellt wird – einschließlich KI-generierter Ergebnisse –, stellt eine rechtliche, medizinische, finanzielle, steuerliche oder sonstige professionelle Beratung dar. Wenn Sie professionelle Beratung benötigen, wenden Sie sich an einen qualifizierten Fachmann auf dem jeweiligen Gebiet.\n\n## Ihre Verantwortung\n\nSie sind dafür verantwortlich, wie Sie die Ergebnisse des Dienstes nutzen. Verwenden Sie KI-Ergebnisse nicht als alleinige Grundlage für Entscheidungen mit rechtlichen, gesundheitlichen, finanziellen oder anderen schwerwiegenden Konsequenzen. Überprüfen und validieren Sie die Ergebnisse, bevor Sie sie weitergeben oder sich darauf verlassen.\n\n## Status der Vorschau\n\nDer Dienst wird als öffentliche Vorschau angeboten: Verfügbarkeit und Verhalten können sich ändern, und die Ergebnisse können je nach Modellversion und Konfiguration variieren.\n\n## Probleme melden\n\nSollte der Dienst schädliche, rechtswidrige oder ernsthaft irreführende Ergebnisse liefern, melden Sie dies bitte an **ask@aisha.guru**, damit wir dem nachgehen können.\n\nBetreiber: **Evymo** · Kontakt: **ask@aisha.guru**"
+    },
+    "orderConfirmation": {
+      "title": "Auftragsbestätigung",
+      "subtitle": "Vielen Dank für Ihre Bestellung.",
+      "protocolNumber": "Protokollnummer",
+      "date": "Datum",
+      "operatorSection": {
+        "title": "Plattformbetreiber",
+        "content": "Die Plattform wird von Evymo betrieben. Kontakt: ask@aisha.guru."
+      },
+      "organizerSection": {
+        "title": "Veranstalter",
+        "content": "Die Angaben zum Veranstalter sind in den beigefügten Bestellunterlagen aufgeführt."
+      },
+      "processorSection": {
+        "title": "Datenverarbeiter",
+        "content": "Die Angaben zum Auftragsverarbeiter sind in den beigefügten Auftragsunterlagen aufgeführt."
+      },
+      "orderDetails": {
+        "title": "Bestelldetails",
+        "tableHeaders": {
+          "product": "Produkt",
+          "internalCode": "Interner Code",
+          "gtin": "GTIN",
+          "quantity": "Anzahl",
+          "unitPrice": "Stückpreis",
+          "total": "Gesamt"
+        },
+        "subtotal": "Zwischensumme",
+        "shipping": "Versand",
+        "totalAmount": "Gesamtbetrag"
+      },
+      "shippingInfo": {
+        "title": "Versand",
+        "packetaPickup": "Packeta-Abholstelle",
+        "packetaHome": "Packeta-Lieferung nach Hause",
+        "personalPickup": "Persönliche Abholung"
+      },
+      "consentsSection": {
+        "title": "Erteilte Genehmigungen",
+        "description": "Im Rahmen dieses Beschlusses wurden folgende Genehmigungen erteilt:",
+        "signedAt": "Unterzeichnet in"
+      },
+      "studyNote": "Sofern dieser Auftrag Teil einer Studie ist, richtet sich die Teilnahme nach den Studienunterlagen und den erteilten Einwilligungen.",
+      "disclaimer": "Diese Bestätigung wurde elektronisch erstellt und ist auch ohne Unterschrift gültig."
+    },
+    "manufacturingProtocol": {
+      "title": "Herstellungsprotokoll",
+      "subtitle": "Chargenfertigung und Qualitätsprotokoll",
+      "protocolNumber": "Protokollnummer",
+      "batchInfo": {
+        "title": "Informationen zur Charge",
+        "batchCode": "Chargennummer",
+        "productName": "Produktname",
+        "internalCode": "Interner Code",
+        "gtin": "GTIN",
+        "batchLot": "Charge/LOT",
+        "productionDate": "Herstellungsdatum",
+        "expiryDate": "Verfallsdatum",
+        "serialNumber": "Seriennummer",
+        "consumerVariant": "Verbraucherausführung",
+        "certificationRef": "Zertifizierungsreferenz"
+      },
+      "production": {
+        "title": "Produktion",
+        "rawMaterialLot": "Rohstoff-Charge",
+        "supplier": "Lieferant",
+        "yieldPercent": "Rendite (%)"
+      },
+      "qualityControl": {
+        "title": "Qualitätskontrolle",
+        "approved": "Genehmigt",
+        "approvedAt": "Genehmigt am",
+        "inspector": "Inspektor",
+        "notes": "Anmerkungen",
+        "statusApproved": "Genehmigt",
+        "statusRejected": "Abgelehnt",
+        "statusPending": "Ausstehend"
+      },
+      "gs1Barcode": {
+        "title": "GS1-Barcode",
+        "description": "GS1 DataMatrix, in dem die Produktidentifikation und die Chargendaten kodiert sind.",
+        "encodedString": "Kodierte Zeichenfolge"
+      },
+      "signatures": {
+        "title": "Unterschriften",
+        "productionManager": "Produktionsleiter",
+        "qualityManager": "Qualitätsmanager",
+        "date": "Datum",
+        "signature": "Unterschrift"
+      }
+    }
+  }
+}

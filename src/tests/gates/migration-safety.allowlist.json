@@ -1,0 +1,49 @@
+{
+  "_comment": "Allowlist for scripts/db/check-migration-safety.mjs (the migration-safety lens). Each entry is a Squawk prod-safety violation (lock/data-loss/breaking DDL) in a delta migration. Identity-keyed on file::rule::line: migrations are append-only, so a NEW violation is a NEW identity = a hard fail in test:gates. This is the snapshot of PRE-EXISTING smells \u2014 the gate guards against NEW unsafe DDL while the inventory is driven down. Rule selection is in .squawk.toml. Re-snapshot: npm run db:migrations:lint:baseline.",
+  "_generated_at": "2026-07-03",
+  "_violation_count": 11,
+  "allowlist": [
+    {
+      "file": "aisha/db/migrations/20260627150000_hub_price_layers.sql",
+      "rule": "require-concurrent-index-creation",
+      "line": 29,
+      "level": "Warning",
+      "message": "During normal index creation, table updates are blocked, but reads are still allowed."
+    },
+    {
+      "file": "aisha/db/migrations/20260627160000_hub_supplier_offer_reprice.sql",
+      "rule": "require-concurrent-index-creation",
+      "line": 39,
+      "level": "Warning",
+      "message": "During normal index creation, table updates are blocked, but reads are still allowed."
+    },
+    {
+      "file": "aisha/db/migrations/20260627160000_hub_supplier_offer_reprice.sql",
+      "rule": "require-concurrent-index-creation",
+      "line": 40,
+      "level": "Warning",
+      "message": "During normal index creation, table updates are blocked, but reads are still allowed."
+    },
+    {
+      "file": "aisha/db/migrations/20260627160000_hub_supplier_offer_reprice.sql",
+      "rule": "require-concurrent-index-creation",
+      "line": 60,
+      "level": "Warning",
+      "message": "During normal index creation, table updates are blocked, but reads are still allowed."
+    },
+    {
+      "file": "aisha/db/migrations/20260627160000_hub_supplier_offer_reprice.sql",
+      "rule": "require-concurrent-index-creation",
+      "line": 61,
+      "level": "Warning",
+      "message": "During normal index creation, table updates are blocked, but reads are still allowed."
+    },
+    {
+      "file": "aisha/db/migrations/20260628090000_hub_pair_vehicle_id_text.sql",
+      "rule": "changing-column-type",
+      "line": 22,
+      "level": "Warning",
+      "message": "Changing a column type requires an `ACCESS EXCLUSIVE` lock on the table which blocks reads and writes while the table is rewritten. Changing the type of the column may also break other clients reading from the table."
+    }
+  ]
+}

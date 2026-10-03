@@ -1,0 +1,15 @@
+# Dockerfile.pki-db — MariaDB with baked OpenXPKI schema init
+# Avoids Coolify bind-mount trap: file-level bind-mounts on remote workers
+# silently resolve to empty directories, causing MariaDB to never run the SQL.
+# The schema is COPYed at build time from the repo.
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/mariadb:11.4
+COPY openxpki-config/contrib/sql/schema-mariadb.sql /docker-entrypoint-initdb.d/schema-mariadb.sql
+# Reconcile stored credentials to the current env on every start, THEN hand off
+# to the stock entrypoint — a rotated PKI_DB_PASSWORD must be re-applied to an
+# existing volume, else OpenXPKI is stranded on the old password (incident
+# 2026-07-05). See the script header for the full rationale.
+COPY openxpki-config/contrib/pki-db-reconcile-entrypoint.sh /usr/local/bin/pki-db-reconcile-entrypoint.sh
+RUN chmod +x /usr/local/bin/pki-db-reconcile-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/pki-db-reconcile-entrypoint.sh"]
+CMD ["mariadbd"]

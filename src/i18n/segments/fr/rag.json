@@ -1,0 +1,74 @@
+{
+  "rag": {
+    "baseline": {
+      "title": "Qualité du retrieval (7 derniers jours)",
+      "subtitle": "Évaluation RAG nocturne sur un ensemble Q/R de référence",
+      "faithfulness": "Fidélité",
+      "faithfulnessHint": "Dans quelle mesure la réponse est étayée par le contexte récupéré",
+      "answerRelevancy": "Pertinence de la réponse",
+      "answerRelevancyHint": "Dans quelle mesure la réponse répond directement à la question",
+      "contextPrecision": "Précision du contexte",
+      "contextPrecisionHint": "Part des extraits récupérés qui étaient pertinents",
+      "contextRecall": "Rappel du contexte",
+      "contextRecallHint": "Part des informations nécessaires qui ont été récupérées",
+      "compositeScore": "Score composite",
+      "evalRuns": "Exécutions d'évaluation",
+      "p90": "p90",
+      "p50": "p50",
+      "noData": "Aucune donnée d'évaluation — lancez d'abord le batch nocturne",
+      "periodLabel": "Période",
+      "period24h": "Dernières 24 heures",
+      "period7d": "7 derniers jours",
+      "period30d": "30 derniers jours",
+      "embeddingModel": "Modèle d'embedding",
+      "llmModel": "LLM",
+      "allProfiles": "Tous les profils"
+    },
+    "chip": {
+      "high": "Fidélité élevée",
+      "medium": "Fidélité moyenne",
+      "low": "Faible fidélité — vérifiez avant de vous fier à la réponse",
+      "noData": "Non évalué",
+      "tooltip": "Fidélité {{score}} · {{count}} citations"
+    },
+    "citations": {
+      "panelTitle": "Sources utilisées",
+      "empty": "Aucune citation enregistrée pour cette réponse",
+      "toggleShow": "Afficher les sources",
+      "toggleHide": "Masquer les sources",
+      "openItem": "Ouvrir la source",
+      "weight": "Poids {{value}}"
+    },
+    "feedback": {
+      "thumbsUp": "Réponse correcte",
+      "thumbsDown": "Réponse incorrecte",
+      "reasonPlaceholder": "Facultatif : qu'est-ce qui n'allait pas ?",
+      "submit": "Envoyer le retour",
+      "saved": "Merci, votre retour a été enregistré"
+    },
+    "quarantine": {
+      "title": "File de quarantaine de la connaissance",
+      "subtitle": "Examinez les éléments signalés par le scanner de sécurité d'ingestion",
+      "queueTitle": "Éléments signalés et mis en quarantaine",
+      "queueDescription": "Ces éléments sont masqués du retrieval jusqu'à leur réactivation",
+      "empty": "Aucun élément signalé ou en quarantaine",
+      "score": "Score de sécurité",
+      "reason": "Raison",
+      "reinstate": "Réactiver",
+      "reinstateReasonPlaceholder": "Pourquoi cet élément est-il sûr ? (piste d'audit)",
+      "reasonRequired": "La raison de réactivation est requise",
+      "confirmReinstate": "Réactiver l'élément",
+      "reinstated": "Élément réactivé",
+      "reinstatedDescription": "L'élément est de nouveau visible pour le retrieval",
+      "reinstateError": "Échec de la réactivation"
+    },
+    "explainability": {
+      "panelTitle": "Comment cette réponse se connecte",
+      "empty": "Pas de contexte de graphe — aucun concept en amont ni exécution connexe n'a encore été dérivé des sources citées",
+      "depthLabel": "{{depth}} saut(s)",
+      "confidenceLabel": "Confiance {{pct}} %",
+      "viaSeeds": "via {{labels}}{{extra}}",
+      "moreSeeds": " et {{n}} autres"
+    }
+  }
+}

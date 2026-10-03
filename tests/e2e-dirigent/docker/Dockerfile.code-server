@@ -1,0 +1,86 @@
+# code-server with AISHA Dirigent extension pre-installed.
+#
+# Build context: tests/e2e-dirigent/
+# Pre-requisite: run scripts/build-extension-vsix.mjs first to produce
+#                .artifacts/aisha-dirigent.vsix
+#
+# Listens on :8443 with --auth none (test isolation only).
+
+# code-server 4.121.0 ships VS Code 1.121.0 — matches extension's
+# "engines": { "vscode": "^1.99.0" } constraint (1.96.4 in older
+# code-server tags fails the engine check at install time).
+# Per-fork pull-through cache host — defaults to evymo's value. Forks
+# override via `--build-arg REGISTRY_DOMAIN=...` to route through their cache.
+ARG REGISTRY_DOMAIN=cache.aisha.guru
+FROM ${REGISTRY_DOMAIN}/codercom/code-server:4.121.0
+
+USER root
+
+# Pre-installed extension VSIX
+COPY .artifacts/aisha-dirigent.vsix /tmp/aisha-dirigent.vsix
+
+# Install as the code-server user so the extension lives in the right home.
+# Leftover /tmp/aisha-dirigent.vsix (~455 KB, owned by root from prior COPY)
+# is harmless — sticky-bit /tmp prevents `rm` from coder anyway.
+USER coder
+RUN code-server --install-extension /tmp/aisha-dirigent.vsix --force
+
+# Pre-create workspace mount point (volume overrides at runtime)
+USER root
+RUN mkdir -p /workspace && chown -R coder:coder /workspace
+
+# /entrypoint.d hook (base image runs every executable here before
+# code-server starts — see /usr/bin/entrypoint.sh and
+# https://github.com/coder/code-server/issues/5177).
+#
+# /workspace gets replaced by a host-owned (mode 0755) bind mount at
+# runtime, on which `coder` (uid 1000) only has read+execute — so the
+# AISHA Dirigent extension's first .aisha/ write (session.json,
+# dirigent.local.json, active-rules.json, ...) fails with EACCES before
+# code-server even finishes starting, regardless of whether the extension
+# is online or offline. Pre-create the scaffold and fix ownership here,
+# using coder's passwordless sudo, before code-server starts.
+RUN mkdir -p /entrypoint.d \
+ && printf '%s\n' \
+   '#!/bin/sh' \
+   'set -eu' \
+   'sudo mkdir -p /workspace/.aisha/backups /workspace/.aisha/i18n /workspace/.aisha/briefs' \
+   'sudo chown -R coder:coder /workspace/.aisha' \
+   > /entrypoint.d/00-aisha-workspace.sh \
+ && chmod +x /entrypoint.d/00-aisha-workspace.sh
+
+# Pre-seed user-level VS Code settings to disable Workspace Trust gating.
+# Without this, the extension activates but stays in Restricted Mode and
+# its statusbar contribution + watchers don't run — defeating the test.
+# (.vscode/settings.json in workspace can only disable trust AFTER trust;
+# pre-trust must come from user settings.)
+RUN mkdir -p /home/coder/.local/share/code-server/User \
+ && echo '{ \
+   "security.workspace.trust.enabled": false, \
+   "security.workspace.trust.startupPrompt": "never", \
+   "security.workspace.trust.banner": "never", \
+   "security.workspace.trust.emptyWindow": false, \
+   "workbench.startupEditor": "none", \
+   "telemetry.telemetryLevel": "off", \
+   "extensions.autoCheckUpdates": false, \
+   "update.mode": "none" \
+ }' > /home/coder/.local/share/code-server/User/settings.json \
+ && chown -R coder:coder /home/coder/.local
+USER coder
+
+# Telemetry off, no auth (test only)
+ENV DISABLE_TELEMETRY=true \
+    AISHA_GATEWAY_URL=http://mock-backend:3030 \
+    AISHA_MCP_TOKEN=test-token-e2e
+
+EXPOSE 8443
+
+HEALTHCHECK --interval=5s --timeout=3s --start-period=30s --retries=20 \
+  CMD wget -q -O - http://127.0.0.1:8443/healthz || exit 1
+
+CMD ["code-server", \
+     "--bind-addr", "0.0.0.0:8443", \
+     "--auth", "none", \
+     "--disable-telemetry", \
+     "--disable-update-check", \
+     "/workspace"]

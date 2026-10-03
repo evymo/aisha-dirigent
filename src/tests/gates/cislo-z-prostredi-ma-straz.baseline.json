@@ -1,0 +1,104 @@
+{
+  "$comment": "ROHATKA třídy `parseInt(process.env.X ?? '…')`. Tohle NENÍ seznam „povoleno navždy“ — je to seznam DLUHU, který smí jen ubývat. Nový klíč v existujícím souboru = ČERVENÁ; klíč, který ze souboru zmizel a zůstal tady = taky ČERVENÁ, protože rohatka je OBOUSTRANNÁ: když dluh klesne, musí se rovnou utáhnout, jinak by brána povolila návrat. Stejné pravidlo jako u build-time-tajemstvi.baseline.json.",
+  "$proc": "Naměřeno 2026-09-10 a znovu 2026-09-22: 55 míst ve 21 službách. Brána, která by je hlásila plošně, by byla na mainu červená a spadla by na první cizí PR — proto se existující dluh PŘIZNÁVÁ jmenovitě a zakazuje se jen PŘIRŮSTEK. Opravou je stráž `num(v, d)` (vzor services/svc-knock/src/config.ts).",
+  "$klice": "Rohatka stojí na JMÉNECH proměnných, ne na číslech ani řádcích. Číslo by nechytlo výměnu (jeden pryč, jiný přidán) a řádky se posunou při každé editaci nad nimi. Jméno klíče je navíc čitelné: je vidět, CO přesně je grandfatherované.",
+  "soubory": {
+    "services/gateway/src/config.ts": [
+      "GATEWAY_PORT",
+      "SPA_PINHOLE_TTL",
+      "SPA_REDIS_DB"
+    ],
+    "services/storage-auth/src/config.ts": [
+      "CLAMD_PORT",
+      "CLAMD_TIMEOUT_MS",
+      "DOWNLOAD_URL_TTL",
+      "MAX_FILE_SIZE_MB",
+      "STORAGE_AUTH_PORT",
+      "UPLOAD_URL_TTL"
+    ],
+    "services/svc-agent-runner/src/config.ts": [
+      "CLAUDE_CLI_TIMEOUT_MS",
+      "CLAUDE_POLL_GRACE_SECONDS",
+      "CLAUDE_POLL_INTERVAL_MS",
+      "DEFAULT_TIMEOUT_MS",
+      "EXEC_CPU_PERIOD",
+      "EXEC_CPU_QUOTA",
+      "MAX_CONCURRENT_CLAUDE_RUNS",
+      "MAX_TIMEOUT_MS",
+      "SVC_AGENT_RUNNER_PORT"
+    ],
+    "services/svc-ai-chat/src/config.ts": [
+      "OMNI_ADMIT_BUDGET_MS",
+      "OMNI_DEFAULT_MAX_OUTPUT_TOKENS",
+      "OMNI_DISPATCH_BUDGET_MS_HIGH",
+      "OMNI_DISPATCH_BUDGET_MS_INTERACTIVE",
+      "OMNI_REQUEST_MAX_TOKENS_DEFAULT",
+      "OMNI_SENSITIVITY_REGISTRY_TTL_MS",
+      "SVC_AI_CHAT_PORT"
+    ],
+    "services/svc-aisha-kronos-shim/src/config.ts": [
+      "PORT"
+    ],
+    "services/svc-aitg-probes/src/config.ts": [
+      "SVC_AITG_PROBES_PORT"
+    ],
+    "services/svc-blockchain/src/config.ts": [
+      "CIRCUIT_BREAKER_TIMEOUT_MS",
+      "PORT"
+    ],
+    "services/svc-communications/src/config.ts": [
+      "OTP_LENGTH",
+      "OTP_MAX_ATTEMPTS",
+      "OTP_TTL_MINUTES",
+      "SVC_COMMUNICATIONS_PORT"
+    ],
+    "services/svc-fio-bank/src/config.ts": [
+      "SVC_FIO_BANK_PORT"
+    ],
+    "services/svc-github-app/src/config.ts": [
+      "PORT",
+      "TOKEN_CACHE_TTL_MS"
+    ],
+    "services/svc-health-ai/src/config.ts": [
+      "SVC_HEALTH_AI_PORT"
+    ],
+    "services/svc-homeassistant/src/config.ts": [
+      "SVC_HOMEASSISTANT_PORT"
+    ],
+    "services/svc-livekit/src/config.ts": [
+      "SVC_LIVEKIT_PORT"
+    ],
+    "services/svc-matrix/src/config.ts": [
+      "SVC_MATRIX_PORT"
+    ],
+    "services/svc-mcp-knowledge/src/config.ts": [
+      "PORT"
+    ],
+    "services/svc-openclaw/src/config.ts": [
+      "NOTIFY_TIMEOUT_MS",
+      "OPENCLAW_RATE_LIMIT_MAX",
+      "PLANNER_TIMEOUT_MS",
+      "PORT"
+    ],
+    "services/svc-packeta/src/config.ts": [
+      "DEFAULT_SHIPPING_COST_CZK",
+      "FREE_SHIPPING_THRESHOLD",
+      "PACKETA_BRANCH_FEED_TTL",
+      "PACKETA_CARRIER_FEED_TTL",
+      "SVC_PACKETA_PORT"
+    ],
+    "services/svc-pki-bridge/src/config.ts": [
+      "SVC_PKI_BRIDGE_PORT"
+    ],
+    "services/svc-plugin-system/src/config.ts": [
+      "PLUGIN_TIMEOUT_MS",
+      "SVC_PLUGIN_SYSTEM_PORT"
+    ],
+    "services/svc-push/src/config.ts": [
+      "SVC_PUSH_PORT"
+    ],
+    "services/svc-stripe/src/config.ts": [
+      "SVC_STRIPE_PORT"
+    ]
+  }
+}

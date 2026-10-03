@@ -1,0 +1,176 @@
+#!/bin/sh
+# =============================================================================
+# Pre-push hook — důkladná úroveň (push), oproti rychlé úrovni (pre-commit)
+# =============================================================================
+# Tiering — každá úroveň má svůj rozsah, nic se nepouští dvakrát zbytečně:
+#   pre-commit = rychlá zpětná vazba per commit (tsc, lint, i18n segmenty, guardy)
+#   pre-push   = celé offline CI JEDNOU (gates + unit + validate:static + i18n)
+#                + build — aby se nepushlo nic, co by spadlo v CI / na produkci.
+#
+# ⭐ PODLE CEST, FAIL-CLOSED (2026-09-25). Plná sada trvá naprázdno ≈ 10 min
+# (tsc 48 s · gates 142 s · test:run 252 s · services 98 s · zbytek ~50 s) a pod
+# zátěží 27–79 min; ve sdílené frontě slotů pak 5minutová úloha čekala 99 min.
+# Hook proto spouští jen to, čeho se změna týká — a rozhoduje o tom TÝŽ směrovač
+# jako CI (scripts/ci/zmenene-cesty.sh přes scripts/ci/prepush-vyber.sh), ne kopie.
+# Při jakékoli nejistotě (merge commit v rozsahu, nová větev bez base, > 250 cest,
+# rozpor směrování, pád skriptu) běží CELÁ sada a hook řekne proč. Co se přeskočí,
+# se VYPÍŠE — žádný tichý skip. Plnou sadu si vynutíš: AISHA_PREPUSH_VSE=1 git push …
+# Vždy běží: preflight, tsc, lint, test:gates, validate:static, i18n:check
+# (brány jsou zákony nad celým repem; třikrát se už ukázalo, že cestový předfiltr
+# nad nimi byl slepý přesně na PR, kvůli kterým existují).
+#
+# Skip: HUSKY=0 git push ...   (nebo git push --no-verify)
+# =============================================================================
+
+# Ensure Node.js from .nvmrc (shell default may be a stale system version)
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+nvm use >/dev/null 2>&1 || true
+
+# Cache zelených stromů (scripts/lib/ci-zelene.mjs): tentýž strom s TÝMIŽ vstupy (node,
+# nainstalované závislosti, sestavené packages/*/dist, .env* soubory, proměnné sady,
+# schopnosti prostředí) už CELOU sadou prošel → opakované měření nad stejným vstupem
+# nic nového nezjistí (naměřeno 2026-09-25: push téhož commitu do forku i upstreamu
+# = 2× ~40 min v těžkém slotu). Jen při úplné shodě klíče a do 24 h; zapisuje se jen
+# celá zelená sada. Vynutit běh: AISHA_CI_ZNOVU=1 git push. Serverová CI se nemění.
+CI_BEH=$$
+if node scripts/ci-zelene.mjs --over --beh "$CI_BEH"; then exit 0; fi
+
+echo "Pre-push: dukladne kontroly..."
+
+# 0a. Instalace sedí na lockfile? — za zlomek sekundy, PŘED ~10 min sadou.
+#    Symlinkované / zastaralé node_modules jinak padnou až v test:services na
+#    `Cannot find module` v balíku, na který změna nesahá (naměřeno 2026-09-24),
+#    a čtou se jako vada kódu. Nelze-li instalaci ověřit, je to taky STOP.
+echo "  > Instalace node_modules vs package-lock.json..."
+node scripts/lib/instalace-sedi.mjs || exit 1
+
+# ── 0b. Výběr podle cest (fail-closed) ─────────────────────────────────────────
+# stdin hooku = řádky "<local ref> <local sha> <remote ref> <remote sha>"; $1 = remote.
+REZIM=vse
+DUVOD="výběr se nespustil"
+ZMENENO=0
+APP=true; SERVICES_CHANGE=true; EXTENSION=true; N8N_NODES=true; SURFACES=true; DOCS_ONLY=false
+PLAN=$(bash scripts/ci/prepush-vyber.sh "${1:-origin}" 2>/dev/null) || PLAN="rezim=vse
+duvod=prepush-vyber.sh skončil chybou"
+# key=value → proměnné; bereme jen známé klíče a jen hodnoty true|false (žádný eval nad cizím textem)
+OLDIFS=$IFS; IFS='
+'
+for radek in $PLAN; do
+  klic=${radek%%=*}; hodnota=${radek#*=}
+  case "$klic" in
+    rezim) REZIM=$hodnota ;;
+    duvod) DUVOD=$hodnota ;;
+    zmeneno) ZMENENO=$hodnota ;;
+    app|services_change|extension|n8n_nodes|surfaces|docs_only)
+      case "$hodnota" in
+        true|false)
+          case "$klic" in
+            app) APP=$hodnota ;; services_change) SERVICES_CHANGE=$hodnota ;;
+            extension) EXTENSION=$hodnota ;; n8n_nodes) N8N_NODES=$hodnota ;;
+            surfaces) SURFACES=$hodnota ;; docs_only) DOCS_ONLY=$hodnota ;;
+          esac ;;
+        *) REZIM=vse; DUVOD="nečitelná hodnota $klic=$hodnota" ;;
+      esac ;;
+  esac
+done
+IFS=$OLDIFS
+# Režim, který hook nezná, je taky nejistota: plná sada a nahlas proč (ne důvod z plánu, který nečteme).
+case "$REZIM" in
+  vse|vyber) ;;
+  *) DUVOD="neznámý režim '$REZIM' → plná sada"; REZIM=vse ;;
+esac
+
+if [ "$REZIM" != "vyber" ]; then
+  echo "  > Podle cest: CELÁ sada — $DUVOD"
+  APP=true; SERVICES_CHANGE=true; EXTENSION=true; N8N_NODES=true; SURFACES=true; DOCS_ONLY=false
+else
+  echo "  > Podle cest: $ZMENENO změněných cest (commity + pracovní strom); vždy: preflight, tsc, lint, gates, validate:static, i18n"
+  [ "$APP" = true ]              && echo "    · test:run (unit) a build: BĚŽÍ (app=true)"        || echo "    · test:run (unit) a build: PŘESKOČENO (app=false — změna mimo src/apps/packages/config/compose/db)"
+  [ "$SERVICES_CHANGE" = true ]  && echo "    · test:services + pluginy: BĚŽÍ (services_change=true)" || echo "    · test:services + pluginy: PŘESKOČENO (services_change=false — nic v services/plugins/packages)"
+  [ "$EXTENSION" = true ]        && echo "    · extension: BĚŽÍ (extension=true)"               || echo "    · extension: PŘESKOČENO (extension=false — nic v extensions/aisha-dirigent, packages/workbench-core)"
+  [ "$N8N_NODES" = true ]        && echo "    · n8n-nodes: BĚŽÍ (n8n_nodes=true)"               || echo "    · n8n-nodes: PŘESKOČENO (n8n_nodes=false — nic v packages/n8n-nodes-aisha)"
+  [ "$DOCS_ONLY" = true ]        && echo "    · jen dokumentace (docs_only=true): unit/services/extension/n8n/build se nespouští; brány ano"
+fi
+[ "$APP" = true ]             || export AISHA_SMOKE_SKIP_UNIT=1
+[ "$SERVICES_CHANGE" = true ] || export AISHA_SMOKE_SKIP_SERVICES=1
+
+# 1. Stack-smoke (preflight + full offline suite — runs each check ONCE)
+#    test:stack:ci = phase 1 preflight (vyrobí worktree-state artefakty:
+#    submodule, source-truth-report.json) + phase 2 offline, která pouští:
+#      tsc --noEmit · lint · test:gates (~2500) · validate:static ·
+#      i18n:check · test:run (~5400 unit testů) · test:services
+#    → proto je tu NEopakujeme jako samostatné kroky. Dříve pre-push pouštěl
+#    test:run (+ validate:static + i18n:check) DVAKRÁT za jeden push (2× ~15 min
+#    a dvojí expozice flaky-timeoutům u pomalých testů). Pokrytí beze změny —
+#    každá kontrola běží právě jednou; unit/services se vynechají JEN podle cest výš
+#    (AISHA_SMOKE_SKIP_UNIT / _SERVICES) a stack-smoke přeskok vypíše.
+#    (Warmup je offline vypnutý — síťové smoke běží až post-deploy.)
+echo "  > Stack-smoke (preflight + offline: tsc, lint, gates, validate:static, i18n, unit, services)..."
+# ⛔ „NEZMĚŘENO" SE NESMÍ ZTRATIT NA ROUŘE. `||` slévá každý nenulový kód do
+#    jednoho, takže běh, který NIC nenaměřil (zamrzlý worker, nefunkční měřidlo),
+#    dostal touž hlášku jako padlá brána: „oprav pred pushem". Člověk pak hledá
+#    vadu, která nemusí existovat. Push se nepouští ani tak — neověřeno není
+#    ověřeno — ale diagnóza musí sedět. Kód 75 = NEZMĚŘENO (scripts/test/verdikt-kody.mjs).
+npm run test:stack:ci
+STACK_RC=$?
+if [ "$STACK_RC" = "75" ]; then
+  echo "NEZMĚŘENO Stack-smoke nic nenaměřila ani při opakování — to NENÍ nález."
+  echo "  Žádná brána nespadla; jen se nikdo nedozvěděl, jak dopadly. Zopakuj běh."
+  echo "  Na zatíženém stroji se stejnou souběžností jako CI:"
+  echo "      VITEST_MAX_WORKERS=2 npm run test:stack:ci"
+  exit 75
+fi
+if [ "$STACK_RC" != "0" ]; then
+  echo "FAIL Stack-smoke selhala — oprav pred pushem"
+  exit 1
+fi
+
+# 2. JS workspace sub-balíčky — test:stack:ci pokrývá offline suite HLAVNÍ app
+#    (src/, services/ přes test:run + gates), ale NE samostatné JS workspace
+#    balíčky `extensions/aisha-dirigent` a `packages/n8n-nodes-aisha`. Ty CI
+#    spouští jako vlastní path-filtrované joby (.forgejo/workflows/ci.yml:
+#    test-extension / n8n-nodes) — a TÝŽ filtr (extension / n8n_nodes ze
+#    zmenene-cesty.sh) rozhoduje i tady. Bez výběru (rezim=vse) běží obě vždy.
+#    (Těžší suity — mobile-app, cosmos/Go, plné svc integrační testy — zůstávají
+#    CI-gated; sem nepatří kvůli délce a infra závislostem.)
+if [ "$EXTENSION" = true ]; then
+  echo "  > Extension (offline parity s CI)..."
+  npm --prefix extensions/aisha-dirigent test || {
+    echo "FAIL Extension testy selhaly — oprav pred pushem"
+    exit 1
+  }
+fi
+if [ "$N8N_NODES" = true ]; then
+  echo "  > n8n-nodes (offline parity s CI)..."
+  npm --prefix packages/n8n-nodes-aisha test || {
+    echo "FAIL n8n-nodes testy selhaly — oprav pred pushem"
+    exit 1
+  }
+fi
+
+# 2b. Pluginy — plugin ŽIJE MIMO npm workspace (to je přesně to, co dělá konektor
+#     dodavatele skutečně volitelným), takže ho nevidí ani test:run, ani gates.
+#     Doloženo 2026-07-26: eurowag-telematics měl sadu, která od svého vzniku ani
+#     jednou neproběhla. Filtr services_change zahrnuje plugins/ i packages/.
+if [ "$SERVICES_CHANGE" = true ]; then
+  echo "  > Pluginy (offline sady mimo workspace)..."
+  npm run test:plugins || {
+    echo "FAIL Plugin testy selhaly — oprav pred pushem"
+    exit 1
+  }
+fi
+
+# 3. Build — jediné, co test:stack:ci přeskakuje (AISHA_SMOKE_SKIP_BUILD=1).
+#    Vite build stojí na src/ + packages/ (+ apps/ u povrchů) — přesně příznaky app/surfaces.
+if [ "$APP" = true ] || [ "$SURFACES" = true ]; then
+  echo "  > Build..."
+  npm run build || {
+    echo "FAIL Build selhal — oprav pred pushem"
+    exit 1
+  }
+fi
+
+# Zapisuje JEN celá sada (REZIM=vse z výběru podle cest výš) — výběr by strom falešně prohlásil za zelený.
+node scripts/ci-zelene.mjs --zapis --beh "$CI_BEH" --rezim "$REZIM" || true
+echo "OK Pre-push: vse OK — push povolen"

@@ -1,0 +1,56 @@
+/* Café — example template tokens. Brand-neutral, fork-freely.
+ * Dark espresso + cream + warm caramel: a cosy coffee-house at night.
+ *
+ * Authored on :root so it matches the GrapesJS editor; at render PageRenderer
+ * maps :root → .gjs-page-content (the page wrapper), so these tokens cascade to
+ * BOTH the static chrome (via the --color-* aliases) AND the live runtime blocks
+ * (product-catalog etc., which read the shadcn token set hsl(var(--token))).
+ * One palette, plain CSS inheritance — no global brand override, no !important.
+ *
+ * The shadcn set MUST be bare-HSL triplets ("H S% L%") — Tailwind wraps them as
+ * hsl(var(--token)); a hex value here would silently fall back to the app brand. */
+:root {
+  /* shadcn token set — consumed by the runtime React blocks (dark café). */
+  --background: 20 19% 9%;
+  --foreground: 33 48% 91%;
+  --card: 27 14% 13%;
+  --card-foreground: 33 48% 91%;
+  --popover: 27 14% 13%;
+  --popover-foreground: 33 48% 91%;
+  --muted: 30 16% 15%;
+  --muted-foreground: 31 20% 65%;
+  --primary: 33 56% 51%;          /* caramel #c98a3d */
+  --primary-foreground: 20 19% 9%;
+  --secondary: 30 16% 15%;
+  --secondary-foreground: 33 48% 91%;
+  --accent: 32 63% 67%;           /* latte #e0b078 */
+  --accent-foreground: 20 19% 9%;
+  --border: 24 21% 19%;
+  --input: 24 21% 19%;
+  --ring: 33 56% 51%;
+
+  /* template's own semantic names, ALIASED to the shadcn set → one palette,
+   * so the existing styles.css chrome reads exactly what the blocks read. */
+  --color-bg: hsl(var(--background));
+  --color-fg: hsl(var(--foreground));
+  --color-muted: hsl(var(--muted-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-dark: hsl(33 61% 41%);   /* #a86f29 — no shadcn slot */
+  --color-primary-fg: hsl(var(--primary-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-border: hsl(var(--border));
+  --color-surface: hsl(var(--card));
+  --color-surface-2: hsl(var(--muted));
+
+  --font-display: 'Baskerville', 'Hoefler Text', 'Georgia', serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 2rem;
+  --space-xl: 4rem;
+
+  --radius-sm: 6px;
+  --radius-md: 14px;
+}

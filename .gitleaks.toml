@@ -1,0 +1,153 @@
+# gitleaks configuration — AISHA platform
+# ---------------------------------------------------------------------------
+# Portable, standard-format secret denylist/allowlist. The ALWAYS-ON CI
+# enforcement lives in src/tests/gates/no-committed-secrets.gate.test.ts (it
+# decodes JWT payloads, which gitleaks regexes cannot). This config is the
+# companion for local / pre-commit scanning and on-demand CI:
+#
+#     gitleaks detect --config .gitleaks.toml --no-banner       # full history
+#     gitleaks protect --staged --config .gitleaks.toml         # pre-commit
+#
+# This config is the lenient HISTORY-scan companion:
+#   - service_role JWTs (RLS-bypassing)            -> FLAGGED
+#   - the 2026-06 rotated/compromised signature    -> FLAGGED
+#   - Supabase *demo* fixtures (iss:supabase-demo)  -> ALLOWED (public, only to
+#                                                      avoid noise on old commits)
+#   - anon keys (public-by-design, RLS-enforced)    -> ALLOWED (ditto)
+# The vitest gate is STRICTER (the forward enforcer): PR #275 env-vars the demo
+# fixtures and anon keys too, so the current tree carries no committed platform
+# JWT at all — gitleaks' allowlist here exists only for scanning pre-#275 history.
+# ---------------------------------------------------------------------------
+
+title = "AISHA gitleaks config"
+
+[extend]
+# Inherit gitleaks' built-in provider rules (AWS, GCP, Stripe, generic JWT, …).
+useDefault = true
+
+# --- AISHA-specific rules -------------------------------------------------
+
+[[rules]]
+id = "aisha-service-role-jwt"
+description = "Supabase service_role JWT (bypasses RLS) — source from env / n8n credential, never commit. Real self-hosted tokens are role-first ({\"role\":\"service_role\",...}); the public demo fixtures are issuer-first and are NOT matched here."
+# base64url of `{"role":"service_role` followed by the rest of the JWT.
+regex = '''eyJyb2xlIjoic2VydmljZV9yb2xl[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{20,}'''
+keywords = ["eyJyb2xlIjoic2VydmljZV9yb2xl"]
+
+[[rules]]
+id = "aisha-coolify-api-token"
+description = "Coolify v4 API token (Laravel Sanctum shape: <id>|<40+ alphanumerics>) — lives in the operator vault / CI secret, never in the tree. Added after the 2026-10-01 history audit found one that no built-in rule matched."
+regex = '''\b\d{1,6}\|[A-Za-z0-9]{40,}'''
+
+[[rules]]
+id = "aisha-compromised-credential"
+description = "Known compromised/rotated service_role credential signature (2026-06 incident) — must never reappear in the tree."
+regex = '''bm0yshgJ-kbz2HPNakc3iIUH6YvY6DQeo5T6Eo79cB4'''
+keywords = ["bm0yshgJ"]
+
+# --- Allowlist: intentionally-committed PUBLIC tokens ---------------------
+
+[allowlist]
+description = """
+Public, intentionally-committed values that are NOT secrets (JWTs + storage
+slot names):
+ - Supabase *demo* fixtures (iss:supabase-demo) used by e2e + local-dev stacks.
+ - anon keys (role:anon) — public-by-design, shipped to clients; access is
+   enforced server-side by RLS. See mobile-app/src/config/api.ts for rationale.
+"""
+regexes = [
+  '''ImlzcyI6InN1cGFiYXNlLWRlbW8i''',                 # base64url of "iss":"supabase-demo" (any demo fixture)
+  '''CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0''',  # demo anon signature
+  '''EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU''',  # demo service_role signature
+  '''nMF7gANM1EM0UePzWpRiJ6TE7QaOB-kEgXbs1qYAMbY''',  # public production anon key (by-design)
+  # JMÉNO PŘIHRÁDKY, NE POVĚŘENÍ. Pod tímhle řetězcem leží v SecureStore klíč
+  # trezoru offline fronty; sám o sobě neotevře nic a je stejně veřejný jako
+  # název souboru. Pravidlo `generic-api-key` se chytá na tvar `*_KEY = "…"`.
+  # ⛔ Vyjmuta je HODNOTA, ne soubor: `trezorStore.ts` pracuje se skutečným
+  # klíčovým materiálem a hlídat se dál MUSÍ. Cesta v `paths` by ho odkryla celý.
+  '''aisha_trezor_key_v1''',
+  # FIXTURA JWT Z BRÁNY `deklarace-v-compose-ma-zapisovatele` (2026-09-12).
+  # Otisk nasazené instance potřebuje pro ANON_KEY/SERVICE_ROLE_KEY hodnotu
+  # TVARU JWT (tři segmenty base64url), kterou doktor kontroluje. Segmenty
+  # dekódované: `{"alg":"HS256"}` · `{"role":"testfork"}` · `testfork-podpis` —
+  # žádný vydavatel, žádný podpis, nic to neotevře.
+  #
+  # ⛔ VYJMUTA JE HODNOTA, NE CESTA — táž volba jako výš: vyjmutý je jen podpisový
+  # segment `testfork-podpis` v base64url; skutečný token ho nikdy nenese.
+  #
+  # ⭐ V AKTUÁLNÍM STROMU UŽ LITERÁL NENÍ — fixtura se od téhož dne skládá za
+  # běhu z JSON částí. Výjimka je pro HISTORII (commit 3025c91ec): skener čte
+  # diffy commitů a ty se zpětně nemění. Až bude za horizontem skenu, může zmizet.
+  '''dGVzdGZvcmstcG9kcGlz''',
+  # ATRAPY KLÍČŮ Z TESTŮ DVEŘÍ (2026-09-10). Testy průkazu zařízení potřebují
+  # hodnotu, která soukromý klíč PŘEDSTAVUJE — jinak nejde dokázat, že se
+  # neodesílá a nezobrazuje. Pravidlo `private-key` se chytá na PEM hlavičku,
+  # takže atrapa vypadá jako klíč.
+  #
+  # ⛔ VYJMUTA JE HODNOTA, NE CESTA — táž volba jako u `aisha_trezor_key_v1` výš.
+  # Vyjmutí souborů by v nich přestalo hlídat i klíč OPRAVDOVÝ. Takhle projdou
+  # právě tyhle tři prázdné výplně (`fake`, `x`, `TAJNE`) a nic jiného: skutečný
+  # klíč má v těle base64, které sem nesedne.
+  #
+  # ⚠️ Vzor sedí na to, co skener SKUTEČNĚ zachytí — `…END PRIVATE KEY----` se
+  # ČTYŘMI pomlčkami (pátou do nálezu nebere) a `\n` jako dva znaky zpětné
+  # lomítko + n, protože tak to stojí ve zdrojáku. Naměřeno, ne odhadnuto.
+  #
+  # ⭐ V AKTUÁLNÍM STROMU UŽ ŽÁDNÁ Z NICH NENÍ — atrapy jsou přepsané na značku
+  # bez PEM hlaviček. Výjimka je pro HISTORII: skener čte diffy commitů a ty se
+  # zpětně nemění. Až budou za horizontem skenu, může zmizet.
+  '''-----BEGIN PRIVATE KEY-----(\\nfake\\n|x|TAJNE)-----END PRIVATE KEY----''',
+  # ATRAPA JWT_SECRET Z TESTU RELACE TABLETU (F2, 2026-09-29). Test brány vydává
+  # token relace zařízení a ověřuje ho týmž tajemstvím v mocku `config` — hodnota
+  # musí být dost dlouhá pro HS256, takže ji `generic-api-key` čte jako klíč
+  # (`postgrestJwtSecret: '…'`, `JWT_SECRET_TEST = '…'`). Nic neotevře: žádná
+  # instance ho nemá, skutečné JWT_SECRET vyrábí generate-secrets.
+  #
+  # ⛔ VYJMUTA JE HODNOTA, NE CESTA — táž volba jako výš: zarizeni-klic.test.ts
+  # dál hlídá každý jiný řetězec. Skener čte diffy commitů (651c354a4), takže
+  # přepsat test by nestačilo — sken kola by nález viděl v historii.
+  '''test-jwt-secret-0123456789abcdefghijklmnop''',
+  # VEŘEJNÝ PŘÍKLAD KLÍČE A SOLI Z DOKUMENTACE IMGPROXY (2026-09-24, #1069).
+  # Testy podpisu doručení obrázků (storage-auth: imgproxy-podpis.test.ts,
+  # public-proxy.test.ts) srovnávají podpis s nezávislou implementací právě na
+  # těchto dvou hodnotách z dokumentace imgproxy — referenční vektory, žádná
+  # instance je nepoužívá. Pravidlo `generic-api-key` se chytá na tvar `KEY = '<hex>'`.
+  #
+  # ⛔ VYJMUTA JE HODNOTA, NE CESTA — táž volba jako u `aisha_trezor_key_v1` výš.
+  # Skutečný klíč instance (IMGPROXY_KEY/SALT z trezoru) sem nesedne, soubory
+  # se hlídají dál.
+  #
+  # ⭐ V AKTUÁLNÍM STROMU LITERÁL NENÍ — obě hodnoty se od téhož dne skládají za
+  # běhu. Výjimka je pro HISTORII commitu e2654496a: skener čte diffy commitů
+  # a ty se zpětně nemění. Až bude za horizontem skenu, může zmizet.
+  '''943b421c9eb07c830af81030552c86009268de4e532ba2ee2eab8247c6da0881''',
+  '''520f986b998545b4785e0defbc4f3c1203f22de2374a3d53cb7a7fe9fea309c5''',
+  # ATRAPY KLÍČŮ Z BRÁNY WRAPPERU (#1080, commit a01ef9a7c, 2026-09-25). Test chování
+  # entrypoint-wrapper.sh potřeboval hodnoty klíče trezoru; první verze je měla jako
+  # literály `VAULT_ENCRYPTION_KEY: "klic-trezoru-2|3"` a generic-api-key se na ten tvar chytil.
+  # ⛔ VYJMUTA JE HODNOTA, NE CESTA — táž volba jako výš.
+  # ⭐ V AKTUÁLNÍM STROMU UŽ LITERÁL NENÍ — atrapy se od f74c32d1b skládají za běhu.
+  # Výjimka je pro HISTORII: skener čte diffy commitů větve. Až bude za horizontem skenu, může zmizet.
+  '''klic-trezoru-[23]''',
+  # VEŘEJNÝ KLÍČ MINISIGN, KTERÝM MinIO PODEPISUJE VYDÁNÍ (#1072, 2026-09-27).
+  # docker/minio/Dockerfile staví MinIO ze zdroje a do obrazu dává totéž prostředí
+  # jako oficiální vydání — mj. `MINIO_UPDATE_MINISIGN_PUBKEY`, VEŘEJNÝ klíč
+  # (minisign Ed25519, prefix `RW`), kterým binárka ověřuje podpis aktualizace.
+  # Nic neotevře; je veřejně v každém vydání MinIO. Pravidlo `generic-api-key`
+  # se chytá na tvar `*_KEY="<vysoká entropie>"` (naměřeno gitleaks 8.18.4 z CI,
+  # entropie 5,04; lokální 8.30.1 ho nehlásí).
+  # ⛔ VYJMUTA JE HODNOTA, NE CESTA — táž volba jako výš: Dockerfile se hlídá dál.
+  '''RWTx5Zr1tiHQLwG9keckT0c45M3AGeHD6IvimQHpyRywVWGbP1aVSGav''',
+]
+paths = [
+  '''src/tests/gates/no-committed-secrets\.gate\.test\.ts''',  # the enforcing gate references fragments
+  '''docs/security/SERVICE_ROLE_KEY_ROTATION\.md''',        # the incident runbook references redacted fragments
+  '''\.gitleaks\.toml''',                                    # this config references the patterns it bans
+  '''packages/security/src/__tests__/logger\.test\.ts''',   # canonical jwt.io example, a redaction-test fixture
+  # Táž třída jako logger.test.ts: brána, jejímž JEDINÝM smyslem je dokázat, že
+  # se klientský secret NIKDY nedostane do diagnostiky. Fixtura tedy secret
+  # PŘEDSTAVOVAT musí — a test pak tvrdí, že ve výstupu není. Skener to rozlišit
+  # nedokáže (entropie 3.79 → generic-api-key), takže by nutil buď fixturu
+  # oslabit (a s ní i důkaz), nebo bránu nepsat.
+  '''src/tests/gates/pki-renewer-token-failure-diagnosis\.gate\.test\.ts''',
+]

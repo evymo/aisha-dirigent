@@ -1,0 +1,152 @@
+{
+  "name": "WF_BLOCKCHAIN_SYNC",
+  "nodes": [
+    {
+      "parameters": {
+        "exchange": "aisha.blockchain",
+        "queue": "aisha.blockchain.sync",
+        "options": {
+          "acknowledge": "executionFinishes",
+          "jsonParseBody": true,
+          "assertQueue": true,
+          "durable": true
+        }
+      },
+      "id": "bc-rabbitmq-trigger",
+      "name": "RabbitMQ Trigger",
+      "type": "n8n-nodes-base.rabbitmqTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ],
+      "credentials": {
+        "rabbitmq": {
+          "id": "__REMAP__",
+          "name": "RabbitMQ"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse blockchain sync message from RabbitMQ\nconst raw = $input.item.json;\n\nconst audit_record_id = raw.audit_record_id;\nconst correlation_id = raw.correlation_id;\nconst event_type = raw.event_type;\nconst reference_table = raw.reference_table;\nconst reference_id = raw.reference_id;\nconst token_transaction_id = raw.token_transaction_id || null;\nconst retry_count = raw.retry_count || 0;\n\nif (!audit_record_id) {\n  throw new Error(`Invalid blockchain sync message: missing audit_record_id`);\n}\n\nreturn {\n  json: {\n    audit_record_id,\n    correlation_id,\n    event_type,\n    reference_table,\n    reference_id,\n    token_transaction_id,\n    retry_count,\n    received_at: new Date().toISOString()\n  }\n};"
+      },
+      "id": "bc-parse",
+      "name": "Parse Sync Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/functions/v1/cosmos-ledger-sync",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 30000,
+          "allowUnauthorizedCerts": false
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "bc-cosmos-sync",
+      "name": "Cosmos Ledger Sync",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Evaluate sync result\nconst response = $input.item.json;\nconst statusCode = $input.item.json?.statusCode || 200;\n\nconst audit_record_id = $('Parse Sync Message').item.json.audit_record_id;\nconst correlation_id = $('Parse Sync Message').item.json.correlation_id;\n\nif (response.success) {\n  return {\n    json: {\n      outcome: 'confirmed',\n      audit_record_id,\n      correlation_id,\n      cosmos_tx_hash: response.cosmos_tx_hash || null,\n      processed_at: new Date().toISOString()\n    }\n  };\n}\n\nif (response.skipped) {\n  return {\n    json: {\n      outcome: 'skipped',\n      audit_record_id,\n      correlation_id,\n      reason: response.reason,\n      processed_at: new Date().toISOString()\n    }\n  };\n}\n\n// circuit_breaker → reject message so RabbitMQ requeues\nif (response.circuit_breaker) {\n  throw new Error(`Circuit breaker: Cosmos node unreachable for ${audit_record_id}`);\n}\n\n// Failed but not exhausted → ack (status already updated in DB)\nreturn {\n  json: {\n    outcome: response.status === 'exhausted' ? 'exhausted' : 'failed',\n    audit_record_id,\n    correlation_id,\n    error: response.error,\n    retry_count: response.retry_count,\n    processed_at: new Date().toISOString()\n  }\n};"
+      },
+      "id": "bc-evaluate",
+      "name": "Evaluate Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "RabbitMQ Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Sync Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Sync Message": {
+      "main": [
+        [
+          {
+            "node": "Cosmos Ledger Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cosmos Ledger Sync": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "tags": [
+    {
+      "name": "blockchain"
+    },
+    {
+      "name": "cosmos"
+    },
+    {
+      "name": "queue"
+    }
+  ],
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "__REMAP__"
+  }
+}

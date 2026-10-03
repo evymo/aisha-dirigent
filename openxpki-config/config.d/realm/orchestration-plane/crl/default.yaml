@@ -1,0 +1,22 @@
+# CRL profile for orchestration-plane realm
+validity:
+    nextupdate: "+000001"
+    renewal: "+0000000800"
+    lastcrl: 20500101
+
+digest: sha384
+
+extensions:
+    authority_info_access:
+        critical: 0
+        ca_issuers: https://${PKI_DOMAIN}/download/orchestration-plane-ca.crt
+        ocsp: https://${PKI_DOMAIN}/ocsp/orchestration-plane
+
+    authority_key_identifier:
+        critical: 0
+        keyid: 1
+        issuer: 0
+
+    issuer_alt_name:
+        critical: 0
+        copy: 0

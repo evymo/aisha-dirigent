@@ -1,0 +1,106 @@
+# =============================================================================
+# Claude app release — build + publish aisha-dirigent.mcpb
+# =============================================================================
+# Builds the AISHA Dirigent Claude Desktop Extension (.mcpb) and attaches it to
+# the Forgejo release for the tag. The Claude app + packager are ZERO runtime
+# dependencies (Node stdlib only), so no `npm ci` is needed — the release stays
+# fast and reproducible.
+#
+# Release the Claude app independently of the monorepo version by pushing a tag
+# with the `claude-app-v` prefix, e.g.:
+#     git tag claude-app-v0.6.1 && git push --tags
+# (The app's own version is inherited from the VS Code Dirigent extension; see
+#  scripts/ide-adapters/adapter-claude-app.mjs::appVersion.)
+#
+# The full drift gate + composition tests run in the main CI (ci.yml Web:Tests
+# lane → `npm run test:scripts`) whenever src/, scripts/, or the claude-app
+# change. This workflow additionally gates the release on the zero-dep node:test
+# suite.
+# =============================================================================
+
+name: Claude App Release
+
+on:
+  push:
+    tags:
+      - "claude-app-v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build + validate only; do not attach to a release"
+        required: false
+        type: boolean
+        default: false
+
+concurrency:
+  group: claude-app-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  build:
+    name: Build + publish aisha-dirigent.mcpb
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Test (claude-app, zero-dep node:test)
+        run: npm run test:claude-app
+
+      - name: Build .mcpb (regenerate + validate + pack)
+        run: node scripts/package-claude-app.mjs
+
+      - name: Checksum
+        run: |
+          cd dist/claude-app
+          sha256sum aisha-dirigent.mcpb > aisha-dirigent.mcpb.sha256
+          cat aisha-dirigent.mcpb.sha256
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: aisha-dirigent-mcpb
+          path: |
+            dist/claude-app/aisha-dirigent.mcpb
+            dist/claude-app/aisha-dirigent.mcpb.sha256
+          if-no-files-found: error
+
+      - name: Attach to Forgejo release
+        if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != true
+        env:
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN || github.token }}
+          SERVER_URL: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          # Best-effort: attach the .mcpb to the release for this tag via the
+          # Forgejo API. Creates the release if it doesn't exist yet. Soft-fails
+          # so a token/scope gap never fails the build — the artifact is already
+          # uploaded above. (No heredocs: a column-0 terminator inside a YAML
+          # `run: |` block ends the literal early — see aisha-packages-publish.yml.)
+          if [ -z "$FORGEJO_TOKEN" ]; then echo "no token; skipping release attach"; exit 0; fi
+          API="${SERVER_URL}/api/v1/repos/${REPO}/releases"
+          REL_ID=$(curl -sS -H "Authorization: token ${FORGEJO_TOKEN}" "${API}/tags/${REF_NAME}" | jq -r '.id // empty' || true)
+          if [ -z "$REL_ID" ]; then
+            REL_ID=$(curl -sS -X POST -H "Authorization: token ${FORGEJO_TOKEN}" -H "Content-Type: application/json" \
+              -d "{\"tag_name\":\"${REF_NAME}\",\"name\":\"${REF_NAME}\",\"body\":\"AISHA Dirigent Claude app ${REF_NAME}\"}" \
+              "${API}" | jq -r '.id // empty' || true)
+          fi
+          if [ -z "$REL_ID" ]; then echo "could not resolve/create release for ${REF_NAME} (non-fatal); artifact still uploaded"; exit 0; fi
+          for f in aisha-dirigent.mcpb aisha-dirigent.mcpb.sha256; do
+            curl -sS -X POST -H "Authorization: token ${FORGEJO_TOKEN}" \
+              -F "attachment=@dist/claude-app/${f}" \
+              "${API}/${REL_ID}/assets?name=${f}" \
+              && echo "attached ${f} to ${REF_NAME}" || echo "attach ${f} failed (non-fatal)"
+          done

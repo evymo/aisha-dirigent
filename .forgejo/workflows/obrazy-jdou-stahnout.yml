@@ -1,0 +1,59 @@
+# =============================================================================
+# Obrazy jdou stáhnout — každý připnutý obraz existuje ve veřejném zdroji
+# =============================================================================
+# ⛔ PROČ: obraz může zmizet ze světa BEZ jediné změny v repu.
+#   2026-09-11  Docker Hub smazal minio/minio + minio/mc → 12 h výpadek core.
+#   2026-09-24  quay.io/minio/* přestal vydávat (401 i s anonymním tokenem);
+#               nasazení prošla jen díky lokálním kopiím na hostech.
+# Brány v test:gates hlídají TVAR odkazu (bez :latest, repozitář u proxy);
+# EXISTENCI nehlídalo nic. Proto kontrola běží pravidelně, ne jen na PR.
+#
+# Měří se veřejný ORIGINÁL (bez ${REGISTRY_PROXY}) — každý fork musí jít
+# nasadit i bez naší cache (požadavek majitele 2026-09-25).
+#
+# Měří piny + compose (image:, inline FROM) + kořenové Dockerfile* (FROM) —
+# co se SKUTEČNĚ stahuje (mrtvý pin element-call v0.10.4 vs. inline v0.20.1).
+#
+# Výsledek: CHYBÍ → běh ČERVENÝ (::error u pinu). NEZMĚŘENO (síť, 5xx) → jen
+# ::warning, běh zelený — výpadek sítě není „obraz zmizel".
+# Lehká úloha (~40 HTTP dotazů), žádný checkout mimo dva soubory.
+# Cron: lichá minuta mimo 01–04 UTC (tam běží supply-chain všech forků).
+# Hlídá obrazy-jdou-stahnout.gate.test.ts.
+# =============================================================================
+name: Obrazy jdou stáhnout
+on:
+  schedule:
+    - cron: "41 5 * * *"
+  workflow_dispatch:
+
+jobs:
+  obrazy:
+    name: "Obrazy: každý pin jde stáhnout z veřejného zdroje"
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Bez cone mode: soubory VÝSLOVNĚ, ne náhodou sourozenců (cone mode by
+          # kořenové soubory přibalil sám — na tom se stavět nemá). Cesty s lomítkem
+          # uprostřed jsou ukotvené ke kořeni i bez úvodního; `/` jen u vzorů s `*`.
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            config/image-versions.env
+            /docker-compose*.yml
+            Dockerfile*
+            scripts/registry/obraz-jde-stahnout.mjs
+            scripts/lib/cli-entry.mjs
+            scripts/lib/env-hodnota.mjs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Změřit každý připnutý obraz
+        shell: bash
+        run: |
+          rc=0
+          node scripts/registry/obraz-jde-stahnout.mjs || rc=$?
+          # 1 = aspoň jeden CHYBÍ → červeně. 2 = jen NEZMĚŘENO → varování, ne pád.
+          if [ "$rc" -eq 1 ]; then exit 1; fi
+          if [ "$rc" -eq 2 ]; then echo "::warning title=obrazy NEZMĚŘENY::část pinů se nepodařilo změřit (síť/registr) — výsledek není „dostupné"."; fi
+          exit 0

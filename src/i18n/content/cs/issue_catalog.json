@@ -1,0 +1,18 @@
+{
+  "downtime.description": "Neplánované výpadky a nedostupnost služeb",
+  "downtime.name": "Výpadky",
+  "integration-errors.description": "Chyby, selhání nebo timeouty integrací",
+  "integration-errors.name": "Chyby integrace",
+  "latency.description": "Vysoké doby odezvy a nízký výkon systému",
+  "latency.name": "Latence",
+  "memory-leak.description": "Postupné narůstání paměti a problémy se synchronizací dat",
+  "memory-leak.name": "Memory leak",
+  "mood-changes.description": "Záplava alertů, falešné poplachy nebo šum v monitoringu",
+  "mood-changes.name": "Změny nálady",
+  "sleep-issues.description": "Timeout chyby a ztráta dostupnosti",
+  "sleep-issues.name": "Problémy s timeoutem",
+  "slow-queries.description": "Obtíže s rychlostí dotazů a odezvou DB",
+  "slow-queries.name": "Pomalé dotazy",
+  "ui-glitches.description": "Vizuální chyby, problémy s vykreslováním a rozložením",
+  "ui-glitches.name": "UI závady"
+}

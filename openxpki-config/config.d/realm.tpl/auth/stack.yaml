@@ -1,0 +1,28 @@
+# Operator/WebUI login stacks. The upstream Anonymous (unauthenticated
+# WebUI guest) stack and the Testing (hardcoded shared-password demo
+# accounts) stack have been REMOVED — they are insecure primitives and
+# must never ship in an AISHA deployment. The only interactive login is
+# LocalPassword (operator credential rendered from env, see handler.yaml).
+
+# Regular operator login via the password handler defined in
+# handler.yaml as "LocalPassword" (digest rendered from env at deploy).
+LocalPassword:
+    label: User Login
+    description: Login with username and password
+    handler: LocalPassword
+    type: passwd
+
+# Login with a client certificate, needs to be setup on the webserver
+Certificate:
+    label: Client certificate
+    description: Login using a client certificate
+    handler: Certificate
+    type: x509
+    sign:
+        # This is the public key matching the private one given in webui/default.conf
+        # Use "openssl pkey -pubout" to create the required string from the private key
+        # key: MFkwEwYHK.......pK7qV/FmDw==
+
+# The default handler for automated interfaces, hidden from the UI
+_System:
+    handler: System

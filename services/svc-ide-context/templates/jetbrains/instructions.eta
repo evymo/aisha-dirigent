@@ -1,0 +1,44 @@
+<%
+// Eta template: jetbrains/instructions.eta — Phase 13 WP 13.2
+// Receives: it = WorkspaceContextEnvelope
+// Output:   application/json — JetBrains AI Assistant config artifact
+//
+// JSON shape is contract — schemaVersion=1 must remain stable for the
+// JetBrains plugin (WP 13.6 stub). NO inline HTML delimiters here;
+// safe-write merge uses JSON-aware semantics in the bridge client.
+const payload = {
+  schemaVersion: 1,
+  aishaContext: {
+    generated_at: it.generated_at,
+    workspace_id: it.workspace_id,
+    is_privileged: it.is_privileged,
+    counts: {
+      stories: (it.stories || []).length,
+      active_runs: (it.active_runs || []).length,
+      pending_approvals: (it.pending_approvals || []).length,
+      deploy_state: (it.deploy_state || []).length,
+    },
+    summary: {
+      stories: (it.stories || []).map(function (s) {
+        return {
+          id: s.id,
+          title: s.title,
+          status: s.status,
+          delivery_status: s.delivery_status,
+          is_stack_default: s.is_stack_default,
+        };
+      }),
+      pending_approvals: it.pending_approvals || [],
+    },
+  },
+  rules: [
+    "Hook-Only Data Access",
+    "No `any` types",
+    "Zod validation for external data",
+    "i18n for all UI text (no hardcoded strings)",
+    "safeError() instead of console.log",
+    "No emoji in UI — lucide-react icons",
+    "RPC-Only — no .from() queries",
+  ],
+};
+%><%~ JSON.stringify(payload, null, 2) %>

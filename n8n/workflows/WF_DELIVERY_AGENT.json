@@ -1,0 +1,377 @@
+{
+  "name": "WF_DELIVERY_AGENT",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "delivery-agent",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Delivery Agent Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse incoming request for delivery operations\nconst body = $input.item.json.body || $input.item.json;\nconst query = body.query || body.message || body.text || '';\n\nlet chatInput = query;\nif (!chatInput && body.action) {\n  // Structured request\n  switch (body.action) {\n    case 'transition':\n      chatInput = `Transition story ${body.story_id} to status \"${body.target_status}\". ` +\n        (body.reason ? `Reason: ${body.reason}` : '');\n      break;\n    case 'timeline':\n      chatInput = `Show the delivery timeline for story ${body.story_id}.`;\n      break;\n    case 'environments':\n      chatInput = `List all environments for story ${body.story_id}.`;\n      break;\n    case 'setup_env':\n      chatInput = `Set up ${body.env_type || 'staging'} environment for story ${body.story_id}. ` +\n        (body.url ? `URL: ${body.url}` : '');\n      break;\n    case 'estimate':\n      chatInput = `Estimate effort for story ${body.story_id}. ` +\n        (body.description ? `Description: ${body.description}` : '');\n      break;\n    default:\n      chatInput = `Delivery task: ${JSON.stringify(body)}`;\n  }\n}\n\nreturn {\n  json: {\n    chatInput,\n    session_id: body.session_id || body.story_id || 'delivery-' + Date.now(),\n    context: {\n      story_id: body.story_id,\n      action: body.action,\n      source: body.source || 'webhook',\n    }\n  }\n};"
+      },
+      "id": "prepare-input",
+      "name": "Prepare Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=Jsi **AISHA Delivery Agent** — autonomní subsystém Dirigenta pro správu delivery lifecycle.\n\n## Role v orchestraci\nJsi subsystém řízený Dirigentem. Dirigent ti deleguje delivery úlohy. Tvůj výstup je strukturovaný SIGNÁL zpět Dirigentovi.\n\n## Operační protokol\n\n### Při transition requestu:\n1. `get_story_context({ story_id })` — zjisti aktuální stav\n2. `get_allowed_transitions({ story_id })` — ověř co je povoleno\n3. Pokud transition povolena → `transition_delivery_status({ story_id, new_status, ... })`\n4. Pokud NE → vysvětli proč a navrhni alternativu\n5. `get_delivery_timeline({ story_id })` — vrať aktualizovanou timeline\n\n### Při environment requestu:\n1. Ověř že story je alespoň `in_progress`\n2. `manage_story_environment({ story_id, ... })` — upsert\n3. Vrať aktualizovaný stav environments\n\n### Při health checku (stuck story detection):\n1. `get_story_context({ story_id })` — zjisti stav a dobu v aktuálním stavu\n2. `get_delivery_timeline({ story_id })` — analyzuj historii\n3. `get_allowed_transitions({ story_id })` — možnosti posunu\n4. Vyhodnoť: je story stuck? (>5 dní ve stejném stavu = warning, >10 dní = alert)\n5. `suggest_next_step` pokud je story stuck\n\n## Delivery State Machine\n```\nbacklog → analyzing → matched → scaffolding → ready\n→ in_progress → in_review → done\n     ↓              ↓\n  blocked     changes_requested → in_progress\n     ↓\n  in_progress\n```\n\n## SIGNÁLNÍ PROTOKOL — Formát odpovědi\n\nVŽDY vrať strukturovanou odpověď:\n```json\n{\n  \"signal\": \"delivery_result\",\n  \"action\": \"transition\" | \"environment\" | \"health_check\" | \"timeline\",\n  \"story_id\": \"uuid\",\n  \"result\": \"success\" | \"blocked\" | \"not_allowed\" | \"stuck\",\n  \"current_status\": \"aktuální stav story\",\n  \"previous_status\": \"předchozí stav (při transition)\",\n  \"days_in_status\": 0,\n  \"is_stuck\": false,\n  \"next_steps\": [\"doporučené další kroky\"],\n  \"requires_human\": false,\n  \"summary\": \"Stručné shrnutí\"\n}\n```\n\nDirigent tento signál přijme a rozhodne:\n- `result: 'stuck'` → Dirigent spustí deblokační playbook\n- `result: 'blocked'` → Dirigent posoudí severity a příp. eskaluje\n- `result: 'success'` → Dirigent pokračuje v pipeline\n\n## Pravidla\n- VŽDY ověř allowed transitions PŘED provedením\n- K transition VŽDY přidej důvod (metadata.reason)\n- NIKDY neprováděj compliance checks — to je úloha Compliance Agenta\n- Odpovídej v jazyce dotazu",
+          "maxIterations": 8
+        }
+      },
+      "id": "ai-agent",
+      "name": "Delivery Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "routingStrategy": "auto",
+        "modelOverride": "",
+        "options": {
+          "temperature": 0.2,
+          "maxOutputTokens": 4096,
+          "topP": 0.9,
+          "maxRetries": 2
+        }
+      },
+      "id": "llm-router",
+      "name": "LLM Router",
+      "type": "n8n-nodes-aisha.aishaLlmRouter",
+      "typeVersion": 1,
+      "position": [
+        500,
+        520
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "__REMAP__",
+          "name": "Google Gemini(PaLM) Api account"
+        },
+        "openAiApi": {
+          "id": "__REMAP__",
+          "name": "OpenAi account"
+        },
+        "anthropicApi": {
+          "id": "__REMAP__",
+          "name": "Anthropic account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.session_id || 'delivery-default' }}",
+        "contextWindowLength": 5
+      },
+      "id": "memory",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        680,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format the delivery agent response\nconst agentOutput = $input.item.json;\nconst context = $('Prepare Input').item.json.context;\n\nreturn {\n  json: {\n    success: true,\n    agent: 'delivery',\n    response: agentOutput.output || agentOutput.text || agentOutput,\n    context: {\n      story_id: context.story_id,\n      action: context.action,\n    },\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "format-output",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_n8n_trace_event",
+        "rpcParams": "={\n  \"p_event_type\": \"n8n_workflow\",\n  \"p_agent_slug\": \"delivery\",\n  \"p_operation\": \"delivery_agent\",\n  \"p_status\": \"ok\",\n  \"p_request_summary\": {\n    \"story_id\": \"{{ $('Prepare Input').item.json.context.story_id || '' }}\",\n    \"action\": \"{{ $('Prepare Input').item.json.context.action || 'query' }}\"\n  }\n}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "log-trace",
+      "name": "Log Trace Event",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        900,
+        500
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "name": "transition_delivery_status",
+        "description": "Transition a story's delivery_status using the validated state machine. Checks allowed transitions, role requirements, records the transition, and creates an audit log entry.\n\nInput: JSON object. Parameters:\n  - story_id (required): string — UUID of the partner story.\n  - new_status (required): string — Target delivery status. Allowed values: analyzing, matched, scaffolding, ready, in_progress, blocked\n  - trigger_source (optional): string — What triggered this transition (manual, workflow, webhook, extension, system).\n  - metadata (optional): object — Optional metadata to attach to the transition record.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: transition_delivery_status\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n  jsonrpc: '2.0',\n  id: Date.now(),\n  method: 'tools/call',\n  params: { name: 'transition_delivery_status', arguments: args }\n});\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error (transition_delivery_status): ' + (e.message || String(e));\n}\n\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-transition_delivery_status",
+      "name": "MCP: transition_delivery_status",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "name": "get_delivery_timeline",
+        "description": "Get the delivery status transition timeline for a story. Shows all state changes with who triggered them and when.\n\nInput: JSON object. Parameters:\n  - story_id (required): string — UUID of the partner story.\n  - limit (optional): number — Maximum number of transitions to return (default: 50, max: 100).",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: get_delivery_timeline\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n  jsonrpc: '2.0',\n  id: Date.now(),\n  method: 'tools/call',\n  params: { name: 'get_delivery_timeline', arguments: args }\n});\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error (get_delivery_timeline): ' + (e.message || String(e));\n}\n\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-get_delivery_timeline",
+      "name": "MCP: get_delivery_timeline",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "name": "get_allowed_transitions",
+        "description": "Get the list of allowed next delivery statuses for a story based on its current delivery_status.\n\nInput: JSON object. Parameters:\n  - story_id (required): string — UUID of the partner story.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: get_allowed_transitions\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n  jsonrpc: '2.0',\n  id: Date.now(),\n  method: 'tools/call',\n  params: { name: 'get_allowed_transitions', arguments: args }\n});\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error (get_allowed_transitions): ' + (e.message || String(e));\n}\n\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-get_allowed_transitions",
+      "name": "MCP: get_allowed_transitions",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "name": "manage_story_environment",
+        "description": "Create or update a story deployment environment (preview, staging, production). Manages URLs, branches, deploy provider info, and deploy status.\n\nInput: JSON object. Parameters:\n  - story_id (required): string — UUID of the partner story.\n  - environment (required): string — Environment type: preview, staging, or production.\n  - url (optional): string — Environment URL.\n  - branch (optional): string — Git branch mapped to this environment.\n  - deploy_provider (optional): string — Deploy provider: coolify, vercel, netlify, manual, other.\n  - deploy_id (optional): string — Provider-specific deployment ID.\n  - deploy_status (optional): string — Current deploy status: pending, building, deployed, failed, stopped.\n  - config (optional): object — Additional configuration as JSON.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: manage_story_environment\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n  jsonrpc: '2.0',\n  id: Date.now(),\n  method: 'tools/call',\n  params: { name: 'manage_story_environment', arguments: args }\n});\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error (manage_story_environment): ' + (e.message || String(e));\n}\n\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-manage_story_environment",
+      "name": "MCP: manage_story_environment",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "name": "get_story_environments",
+        "description": "List all deployment environments (preview, staging, production) for a story with their URLs, branches, and deploy status.\n\nInput: JSON object. Parameters:\n  - story_id (required): string — UUID of the partner story.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: get_story_environments\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n  jsonrpc: '2.0',\n  id: Date.now(),\n  method: 'tools/call',\n  params: { name: 'get_story_environments', arguments: args }\n});\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error (get_story_environments): ' + (e.message || String(e));\n}\n\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-get_story_environments",
+      "name": "MCP: get_story_environments",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "name": "get_story_context",
+        "description": "Get the full delivery context for a partner story, including repository details, ruleset fingerprint, build configuration, participants and active expert rules preview.\n\nInput: JSON object. Parameters:\n  - story_id (required): string — UUID of the partner story",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: get_story_context\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n  jsonrpc: '2.0',\n  id: Date.now(),\n  method: 'tools/call',\n  params: { name: 'get_story_context', arguments: args }\n});\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error (get_story_context): ' + (e.message || String(e));\n}\n\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-get_story_context",
+      "name": "MCP: get_story_context",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        1000
+      ]
+    }
+  ],
+  "connections": {
+    "Delivery Agent Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Input": {
+      "main": [
+        [
+          {
+            "node": "Delivery Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delivery Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Trace Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Delivery Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: transition_delivery_status": {
+      "ai_tool": [
+        [
+          {
+            "node": "Delivery Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: get_delivery_timeline": {
+      "ai_tool": [
+        [
+          {
+            "node": "Delivery Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: get_allowed_transitions": {
+      "ai_tool": [
+        [
+          {
+            "node": "Delivery Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: manage_story_environment": {
+      "ai_tool": [
+        [
+          {
+            "node": "Delivery Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: get_story_environments": {
+      "ai_tool": [
+        [
+          {
+            "node": "Delivery Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: get_story_context": {
+      "ai_tool": [
+        [
+          {
+            "node": "Delivery Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Router": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Delivery Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n-key="web.default.title">Your Aisha stack is online</title>
+    <meta
+      name="description"
+      data-i18n-key="web.default.description"
+      content="A self-managed Aisha instance. Customize this page through the admin interface, upload your own design, or let Aisha help you redesign."
+    />
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header" data-section="header">
+      <div class="brand">
+        <span class="brand__mark" aria-hidden="true">◊</span>
+        <span class="brand__name" data-i18n-key="web.default.title">Your Aisha stack</span>
+      </div>
+    </header>
+
+    <main class="content">
+      <section class="hero" data-section="welcome">
+        <h1 data-i18n-key="web.default.welcome.heading">Welcome to your Aisha stack</h1>
+        <p data-i18n-key="web.default.welcome.body">
+          This is the default starter page. Your stack is up, the backend is live, and you
+          can now make it your own.
+        </p>
+      </section>
+
+      <section class="what" data-section="what">
+        <h2 data-i18n-key="web.default.what.heading">What lives in this stack</h2>
+        <p data-i18n-key="web.default.what.body">
+          Authentication, storage, story-driven workflows, AI gateway, audit trail —
+          all the building blocks are wired up. You only customize the design.
+        </p>
+      </section>
+
+      <section class="cta" data-section="cta">
+        <h2 data-i18n-key="web.default.cta.heading">Customize this page</h2>
+        <p>
+          <a
+            class="cta__button"
+            href="/admin/stories"
+            data-i18n-key="web.default.cta.button"
+            >Open admin</a
+          >
+        </p>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <small>Aisha stack &mdash; default seed. Replace via <code>/admin/stories</code>.</small>
+    </footer>
+  </body>
+</html>

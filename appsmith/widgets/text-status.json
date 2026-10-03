@@ -1,0 +1,23 @@
+{
+  "widgetName": "{{widgetId}}",
+  "displayName": "Status Text",
+  "type": "TEXT_WIDGET",
+  "version": 1,
+  "rightColumn": "{{rightColumn}}",
+  "topRow": "{{topRow}}",
+  "bottomRow": "{{bottomRow}}",
+  "leftColumn": "{{leftColumn}}",
+  "isVisible": true,
+  "label": "{{label}}",
+  "props": {
+    "text": "{{ {{value_query}}.data || 'unknown' }}",
+    "textAlign": "LEFT",
+    "fontSize": "1rem",
+    "fontStyle": "BOLD",
+    "textColor": "{{ ({{status_map_json}})[{{value_query}}.data] || '#666' }}",
+    "backgroundColor": "transparent",
+    "borderRadius": "8px"
+  },
+  "isCanvas": false,
+  "tags": ["aisha-ops", "{{section}}", "status"]
+}

@@ -1,0 +1,27 @@
+{
+  "name": "@aisha/event-worker",
+  "version": "0.1.0",
+  "license": "Elastic-2.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/worker.ts",
+    "start": "node dist/worker.js"
+  },
+  "dependencies": {
+    "@aisha/observability": "*",
+    "@aisha/security": "*",
+    "pg": "^8.16.0",
+    "ioredis": "^5.6.1",
+    "pino": "^9.6.0",
+    "undici": "^7.8.0",
+    "@aisha/acs-sdk": "*",
+    "@aisha/acs-contracts": "*"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.4",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  }
+}

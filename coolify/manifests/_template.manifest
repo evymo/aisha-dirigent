@@ -1,0 +1,28 @@
+# ==============================================================================
+# Coolify Story Manifest — TEMPLATE
+# ==============================================================================
+# Kopíruj tento soubor a uprav pro novou story:
+#   cp coolify/manifests/_template.manifest coolify/manifests/nova-story.manifest
+#
+# Pak spusť:
+#   bash scripts/coolify-story-init.sh --manifest coolify/manifests/nova-story.manifest
+#
+# Placement guide (viz docs/deploy/MULTI_SERVER_COOLIFY.md):
+#   frontend  — HTTP frontend, API gateway, admin UI (has Traefik)
+#   backend   — Database, game server, headless backend (12 GB RAM, no Traefik)
+#   experimental  — AI inference, ML models, staging (8 GB RAM, isolated)
+#   build  — Build only (no runtime containers)
+# ==============================================================================
+
+story: CHANGE_ME
+repo: aisha/CHANGE_ME
+branch: main
+
+# Příklad: Frontend na Frontend
+# app: frontend:frontend:docker-compose.coolify-STORY.yml
+
+# Příklad: Backend na Backend
+# app: backend:backend:docker-compose.coolify-STORY-backend.yml
+
+# Příklad: AI na Experimental
+# app: ai:experimental:docker-compose.coolify-STORY-ai.yml

@@ -1,0 +1,3 @@
+-- RLS: roles
+
+ALTER TABLE public.roles ENABLE ROW LEVEL SECURITY;

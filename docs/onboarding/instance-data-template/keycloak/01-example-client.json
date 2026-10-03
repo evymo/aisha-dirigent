@@ -1,0 +1,19 @@
+{
+  "_note": "TEMPLATE — one OIDC client per file (Keycloak ClientRepresentation). Copy into your PRIVATE instance-data repo under keycloak/ and rename NN-<your-app>-client.json. Upserted into the app realm by keycloak/configure-realms.sh + scripts/instance-rollout.sh (PUT when clientId exists, POST otherwise — idempotent). Replace example.com with your instance's public host. NEVER put a real client secret here: leave it out for public clients, or inject it at runtime for confidential clients (env/Vault), not as a literal.",
+  "clientId": "example-app",
+  "name": "Example Instance App",
+  "enabled": true,
+  "protocol": "openid-connect",
+  "publicClient": true,
+  "standardFlowEnabled": true,
+  "directAccessGrantsEnabled": false,
+  "redirectUris": [
+    "https://app.example.com/*"
+  ],
+  "webOrigins": [
+    "https://app.example.com"
+  ],
+  "attributes": {
+    "post.logout.redirect.uris": "https://app.example.com/*"
+  }
+}

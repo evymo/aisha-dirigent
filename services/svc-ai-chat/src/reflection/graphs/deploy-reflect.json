@@ -1,0 +1,46 @@
+{
+  "name": "deploy-reflect",
+  "display_name": "Deploy Reflection (AISHA self-use)",
+  "description": "Pilot graph for AISHA's own deployment reflection. Generator proposes deploy plan, critic evaluates compliance/risk/completeness, convergence_gate loops until threshold or max_iterations, openclaw_sandbox dry-runs the plan, interrupt awaits human approval for sandbox warnings, cosmos_anchor records the final decision, hippocampus_write captures the learning.",
+  "context": "reflection",
+  "version": 1,
+  "is_active": true,
+  "metadata": {
+    "mode": "strict",
+    "pilot": true,
+    "owner": "platform"
+  },
+  "graph": {
+    "entry": "soulforge_classify",
+    "nodes": [
+      { "id": "soulforge_classify",  "type": "soulforge_classify",  "config": {} },
+      { "id": "soulforge_optimize",  "type": "soulforge_optimize",  "config": { "max_history_chars": 6000 } },
+      { "id": "hippocampus_read",    "type": "hippocampus_read",    "config": { "limit": 5, "min_importance": 3 } },
+      { "id": "openclaw_plan",       "type": "openclaw_plan",       "config": { "task_type": "deploy" } },
+      { "id": "generator",           "type": "generator",           "config": { "slot": "ember", "temperature": 0.3 } },
+      { "id": "critic",              "type": "critic",              "config": { "rules": ["compliance","risk","completeness"], "slot": "verify" } },
+      { "id": "convergence_gate",    "type": "convergence_gate",    "config": { "min_score": 0.85, "max_iterations": 3 } },
+      { "id": "corrector",           "type": "corrector",           "config": { "slot": "ember" } },
+      { "id": "openclaw_sandbox",    "type": "openclaw_sandbox",    "config": { "timeout_s": 120 } },
+      { "id": "interrupt",           "type": "interrupt",           "config": { "channel": "telegram", "approver": "dirigent", "reason": "sandbox_warnings" } },
+      { "id": "cosmos_anchor",       "type": "cosmos_anchor",       "config": {} },
+      { "id": "hippocampus_write",   "type": "hippocampus_write",   "config": { "importance": "critic_score" } }
+    ],
+    "edges": [
+      { "from": "soulforge_classify", "to": "soulforge_optimize" },
+      { "from": "soulforge_optimize", "to": "hippocampus_read" },
+      { "from": "hippocampus_read",   "to": "openclaw_plan" },
+      { "from": "openclaw_plan",      "to": "generator" },
+      { "from": "generator",          "to": "critic" },
+      { "from": "critic",             "to": "convergence_gate" },
+      { "from": "convergence_gate",   "to": "corrector",        "condition": "convergence_result == 'retry'" },
+      { "from": "convergence_gate",   "to": "openclaw_sandbox", "condition": "convergence_result == 'pass'" },
+      { "from": "convergence_gate",   "to": "hippocampus_write","condition": "convergence_result == 'exhausted'" },
+      { "from": "corrector",          "to": "generator" },
+      { "from": "openclaw_sandbox",   "to": "interrupt",        "condition": "warnings.length > 0" },
+      { "from": "openclaw_sandbox",   "to": "cosmos_anchor",    "condition": "warnings.length == 0" },
+      { "from": "interrupt",          "to": "cosmos_anchor",    "condition": "approved == true" },
+      { "from": "cosmos_anchor",      "to": "hippocampus_write" }
+    ]
+  }
+}

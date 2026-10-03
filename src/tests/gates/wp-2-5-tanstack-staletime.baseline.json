@@ -1,0 +1,1405 @@
+{
+  "findings": [
+    {
+      "file": "src/hooks/useAccountDeletion.ts",
+      "line": 45,
+      "snippet": "} = useQuery<AccountDeletionRequest | null>({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useAdminApiKeys.ts",
+      "line": 27,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminContributions.ts",
+      "line": 39,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminContributions.ts",
+      "line": 66,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminDeletionRequests.ts",
+      "line": 41,
+      "snippet": "return useQuery<AdminDeletionRequest[]>({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminDistribution.ts",
+      "line": 49,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminDistribution.ts",
+      "line": 89,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminDistributionForecast.ts",
+      "line": 38,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminDistributionForecast.ts",
+      "line": 81,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminHeroSlides.ts",
+      "line": 48,
+      "snippet": "const query = useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminMemberSubscriptions.ts",
+      "line": 60,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminNewsArticles.ts",
+      "line": 43,
+      "snippet": "const query = useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminOrders.ts",
+      "line": 78,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminPartners.ts",
+      "line": 38,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProduction.ts",
+      "line": 90,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProduction.ts",
+      "line": 118,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProduction.ts",
+      "line": 139,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProduction.ts",
+      "line": 157,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProduction.ts",
+      "line": 177,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProduction.ts",
+      "line": 197,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProduction.ts",
+      "line": 217,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProduction.ts",
+      "line": 238,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionEnhancements.ts",
+      "line": 58,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionEnhancements.ts",
+      "line": 235,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionEnhancements.ts",
+      "line": 358,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionEnhancements.ts",
+      "line": 400,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionErp.ts",
+      "line": 186,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionErp.ts",
+      "line": 252,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionErp.ts",
+      "line": 318,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionErp.ts",
+      "line": 347,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionErp.ts",
+      "line": 415,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionErp.ts",
+      "line": 441,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionErp.ts",
+      "line": 466,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionErp.ts",
+      "line": 494,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionFlow.ts",
+      "line": 156,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionFlow.ts",
+      "line": 233,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionFlow.ts",
+      "line": 313,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionFlow.ts",
+      "line": 347,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionFlow.ts",
+      "line": 476,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProductionFlow.ts",
+      "line": 513,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminProducts.ts",
+      "line": 20,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminQuestionnaires.ts",
+      "line": 79,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminQuestionnaires.ts",
+      "line": 104,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminQuestionnaires.ts",
+      "line": 323,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminStudies.ts",
+      "line": 33,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminStudies.ts",
+      "line": 61,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminStudies.ts",
+      "line": 91,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminStudyConsents.ts",
+      "line": 65,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminStudyConsents.ts",
+      "line": 88,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminStudyConsents.ts",
+      "line": 113,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminStudyConsents.ts",
+      "line": 138,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminStudyConsents.ts",
+      "line": 157,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminSubscriptionPackages.ts",
+      "line": 63,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminWebPages.ts",
+      "line": 41,
+      "snippet": "const query = useQuery<WebPageAdminList[]>({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAdminWebPages.ts",
+      "line": 66,
+      "snippet": "return useQuery<WebPageAdminDetail | null>({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useAgentTools.ts",
+      "line": 87,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useArchiveAdmin.ts",
+      "line": 56,
+      "snippet": "return useQuery({",
+      "category": "admin",
+      "recommendedStaleMs": 60000,
+      "note": "Admin metrics - 60 sec"
+    },
+    {
+      "file": "src/hooks/useBiomarkerReferenceRanges.ts",
+      "line": 29,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useBiomarkerReferenceRanges.ts",
+      "line": 50,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useCertifiedPartners.ts",
+      "line": 100,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/useConsultantPatients.ts",
+      "line": 106,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useConsultantPatients.ts",
+      "line": 167,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useDataSharingConsent.ts",
+      "line": 38,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useDataSharingConsent.ts",
+      "line": 63,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useDataSharingConsent.ts",
+      "line": 133,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useDataSharingConsent.ts",
+      "line": 159,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useDataSharingConsent.ts",
+      "line": 187,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useDataSharingConsent.ts",
+      "line": 218,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useDynamicOnboarding.ts",
+      "line": 13,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useDynamicOnboarding.ts",
+      "line": 231,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useDynamicTranslations.ts",
+      "line": 51,
+      "snippet": "const query = useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useDynamicTranslations.ts",
+      "line": 76,
+      "snippet": "const query = useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useDynamicTranslations.ts",
+      "line": 102,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useDynamicTranslations.ts",
+      "line": 248,
+      "snippet": "const { data: translations } = useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useExpertRules.ts",
+      "line": 125,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useFlowNodeMonitoring.ts",
+      "line": 70,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useInvitations.ts",
+      "line": 156,
+      "snippet": "const { data: invitations, isLoading } = useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useKnowledgeBase.ts",
+      "line": 107,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useKnowledgeBase.ts",
+      "line": 117,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useKnowledgeBase.ts",
+      "line": 264,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useLabelTemplates.ts",
+      "line": 24,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useLabelTemplates.ts",
+      "line": 50,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useLabelTemplates.ts",
+      "line": 80,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useLeaderboard.ts",
+      "line": 166,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useMemberAccessSummary.ts",
+      "line": 95,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useMemberDataSharingUI.ts",
+      "line": 26,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useMemberDiary.ts",
+      "line": 156,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useMemberDiary.ts",
+      "line": 185,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useMemberDosage.ts",
+      "line": 64,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useMemberDosage.ts",
+      "line": 91,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useMyClients.ts",
+      "line": 19,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useMyClients.ts",
+      "line": 38,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useMyTimeline.ts",
+      "line": 204,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useMyTimeline.ts",
+      "line": 311,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/usePartnerAvailabilityManager.ts",
+      "line": 24,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartnerAvailabilityManager.ts",
+      "line": 112,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartnerDashboard.ts",
+      "line": 146,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartnerDashboard.ts",
+      "line": 198,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartnerDashboard.ts",
+      "line": 251,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartnerReviews.ts",
+      "line": 19,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartnerReviews.ts",
+      "line": 76,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartnerTemplates.ts",
+      "line": 32,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartners.ts",
+      "line": 192,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartners.ts",
+      "line": 250,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartners.ts",
+      "line": 276,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartners.ts",
+      "line": 320,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartners.ts",
+      "line": 356,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartners.ts",
+      "line": 400,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartners.ts",
+      "line": 481,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartners.ts",
+      "line": 524,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartners.ts",
+      "line": 553,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartners.ts",
+      "line": 675,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePartners.ts",
+      "line": 766,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/usePatientTracking.ts",
+      "line": 264,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useProductTransparency.ts",
+      "line": 38,
+      "snippet": "return useQuery<ProductTransparency>({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useProductTransparency.ts",
+      "line": 60,
+      "snippet": "return useQuery<BatchDetailTransparency>({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useProductionLogs.ts",
+      "line": 43,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useProductionLogs.ts",
+      "line": 78,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useProductionTokens.ts",
+      "line": 52,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useProductionTokens.ts",
+      "line": 98,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useProtocolSensorData.ts",
+      "line": 75,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/usePublicChatChannels.ts",
+      "line": 131,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/usePublicChatChannels.ts",
+      "line": 156,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/usePublicProducts.ts",
+      "line": 39,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useQuestionnaireAggregation.ts",
+      "line": 109,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useQuestionnaireAggregation.ts",
+      "line": 164,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useRIIMembership.ts",
+      "line": 23,
+      "snippet": "const umbrellaStudyQuery = useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useRIIMembership.ts",
+      "line": 38,
+      "snippet": "const registrationQuery = useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useRIIMembership.ts",
+      "line": 72,
+      "snippet": "const questionnaireQuery = useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useRIIMembership.ts",
+      "line": 120,
+      "snippet": "const { data } = useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useRoleDefinitions.ts",
+      "line": 72,
+      "snippet": "const { data: roles = [], isLoading, error, refetch } = useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useRoleDefinitions.ts",
+      "line": 171,
+      "snippet": "const { data: roleDefinitions = [] } = useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useSessionMonitoring.ts",
+      "line": 152,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useSessionMonitoring.ts",
+      "line": 246,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useStoryDeliveryContext.ts",
+      "line": 53,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/useStoryLoop.ts",
+      "line": 74,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/useStoryLoop.ts",
+      "line": 171,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/useStoryLoop.ts",
+      "line": 208,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/useStoryLoop.ts",
+      "line": 243,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/useStoryLoop.ts",
+      "line": 273,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/useStoryLoop.ts",
+      "line": 301,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/useStoryLoop.ts",
+      "line": 332,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/useStoryLoopDiscussions.ts",
+      "line": 92,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/useStoryLoopDiscussions.ts",
+      "line": 132,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/useStoryParticipants.ts",
+      "line": 38,
+      "snippet": "return useQuery({",
+      "category": "story",
+      "recommendedStaleMs": 30000,
+      "note": "Story-scoped - 30 sec"
+    },
+    {
+      "file": "src/hooks/useStudies.ts",
+      "line": 97,
+      "snippet": "const query = useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useStudyConsent.ts",
+      "line": 15,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useStudyFunding.ts",
+      "line": 317,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useStudyFunding.ts",
+      "line": 375,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useStudyFunding.ts",
+      "line": 440,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useStudyFunding.ts",
+      "line": 469,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useStudyFunding.ts",
+      "line": 534,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useStudyFunding.ts",
+      "line": 582,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useStudyQuestionnaires.ts",
+      "line": 111,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useStudyQuestionnaires.ts",
+      "line": 144,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useStudyQuestionnaires.ts",
+      "line": 193,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useSubscriptionPurchase.ts",
+      "line": 44,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTestQuestions.ts",
+      "line": 37,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTestQuestions.ts",
+      "line": 101,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTestQuestions.ts",
+      "line": 227,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTestResults.ts",
+      "line": 53,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTestResults.ts",
+      "line": 93,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTokenomics.ts",
+      "line": 198,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTokenomics.ts",
+      "line": 254,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTokenomics.ts",
+      "line": 342,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTokenomics.ts",
+      "line": 503,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTokenomics.ts",
+      "line": 557,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTokenomics.ts",
+      "line": 646,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTokens.ts",
+      "line": 195,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTokens.ts",
+      "line": 313,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTrackingDataSync.ts",
+      "line": 125,
+      "snippet": "const healthDataQuery = useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTrackingDataSync.ts",
+      "line": 146,
+      "snippet": "const summaryQuery = useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useTrackingDocuments.ts",
+      "line": 149,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useUnclaimedUsers.ts",
+      "line": 28,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    },
+    {
+      "file": "src/hooks/useWearableConnections.ts",
+      "line": 37,
+      "snippet": "return useQuery({",
+      "category": "unknown",
+      "recommendedStaleMs": 60000,
+      "note": "Default 60 sec - review case-by-case"
+    }
+  ],
+  "total": 175
+}

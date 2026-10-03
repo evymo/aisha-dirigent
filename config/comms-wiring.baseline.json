@@ -1,0 +1,87 @@
+{
+  "_comment": "Ratcheting baseline for the comms-wiring self-consistency gate (src/tests/gates/comms-wiring-consistency.gate.test.ts). It enumerates every KNOWN-BROKEN cross-component comms binding — a Postgres channel with a producer but no LISTENer (or a LISTENer but no producer), or a Redis subscription with no publisher. The gate DERIVES the current binding graph from source (scripts/lib/comms-wiring.mjs) and fails if: (a) a NEW orphan appears that is not listed here (drift — wire it, or add it here with a tracking reason), or (b) a listed orphan is no longer orphaned (it got wired — REMOVE it here so the debt ratchets down). This is the structural self-consistency discipline: architectural drift is caught by a script, not a reviewer's attention. Do NOT add an entry to silence a NEW break without a real tracking reference — that defeats the gate. Source of the findings: docs/architecture/APPLICATION_FLOW_MAP.md + docs/remediation/NEXT_STEPS.md (P0-C, B1-B8).",
+  "pg_event_fabric": {
+    "_note": "Postgres NOTIFY producers live as pg_notify('<chan>', …) in aisha/db/sql/**; the ONLY runtime LISTENer is event-worker (services/event-worker/src/config.ts pgChannels). Their intersection is currently just agent_run_queued.",
+    "producer_without_consumer": [
+      {
+        "channel": "acs_message",
+        "producer": "aisha/db/sql/functions/acs_message_log_notify.sql",
+        "tracking": "flow-map/event-fabric",
+        "reason": "acsInbound handler is wired into worker.ts but event-worker never LISTENs 'acs_message', so the NOTIFY is dropped by Postgres. Pure orphan (no pg_net path)."
+      },
+      {
+        "channel": "ai_proactive_dispatch",
+        "producer": "aisha/db/sql/functions/fn_dispatch_proactive_triggers.sql",
+        "tracking": "flow-map/event-fabric + pg_net-bridge",
+        "reason": "Intended dual-path (in-cluster LISTEN + n8n pg_net bridge); no LISTENer and the pg_net lane is inert (extension unprovisioned, GUC unset)."
+      },
+      {
+        "channel": "ale_feedback_ready",
+        "producer": "aisha/db/sql/functions/fn_notify_ai_feedback_ready.sql",
+        "tracking": "flow-map/event-fabric + pg_net-bridge",
+        "reason": "No in-cluster LISTENer; pg_net bridge to n8n WF_ALE_FEEDBACK_PROCESSOR is inert."
+      },
+      {
+        "channel": "kb_ragnarok_sync",
+        "producer": "aisha/db/sql/functions/fn_notify_knowledge_change.sql",
+        "tracking": "flow-map/event-fabric + pg_net-bridge",
+        "reason": "No in-cluster LISTENer; pg_net bridge to n8n WF_KB_RAGNAROK_SYNC is inert."
+      },
+      {
+        "channel": "kb_embedding_sync",
+        "producer": "aisha/db/sql/functions/fn_queue_embedding_generation.sql",
+        "tracking": "flow-map/event-fabric + pg_net-bridge",
+        "reason": "No in-cluster LISTENer; pg_net bridge to generate-knowledge-embeddings edge-fn is inert."
+      },
+      {
+        "channel": "expert_rule_changed",
+        "producer": "aisha/db/sql/functions/fn_notify_rule_change.sql",
+        "tracking": "flow-map/event-fabric + pg_net-bridge",
+        "reason": "No in-cluster LISTENer; pg_net bridge to n8n WF_RULE_PROPAGATION is inert."
+      },
+      {
+        "channel": "blockchain_sync",
+        "producer": "aisha/db/sql/functions/fn_queue_blockchain_sync.sql",
+        "tracking": "flow-map/event-fabric + pg_net-bridge",
+        "reason": "No in-cluster LISTENer; pg_net bridge to blockchain-dispatch edge-fn is inert."
+      }
+    ],
+    "consumer_without_producer": [
+      {
+        "channel": "db_changes",
+        "consumer": "services/event-worker/src/config.ts",
+        "tracking": "NEXT_STEPS.md P0-C B8 (browser realtime rail)",
+        "reason": "No pg_notify('db_changes') producer exists in aisha/db/sql — the generic row-change trigger factory was never authored. Kills the postgres_changes realtime rail at layer 1."
+      },
+      {
+        "channel": "realtime_broadcast",
+        "consumer": "services/event-worker/src/config.ts",
+        "tracking": "NEXT_STEPS.md P0-C B8 (broadcast rail)",
+        "reason": "No producer; the fn_pg_notify_broadcast factory that would emit chat/presence broadcasts does not exist."
+      },
+      {
+        "channel": "storage_events",
+        "consumer": "services/event-worker/src/config.ts",
+        "tracking": "remediation/av-scan-pipeline-wired",
+        "reason": "No producer; the storage upload/delete-complete NOTIFY was never wired (see the RED av-scan-pipeline-wired gate)."
+      },
+      {
+        "channel": "playwright_run_queued",
+        "consumer": "services/event-worker/src/config.ts",
+        "tracking": "flow-map/event-fabric",
+        "reason": "No pg_notify('playwright_run_queued') producer; the e2e-run-claimable trigger that would wake svc-playwright-runner was never authored."
+      }
+    ]
+  },
+  "redis_channels": {
+    "_note": "Redis channel names are inline literals / prefix constants across the services. Dynamic subscriptions (ws-gateway browser topics, event-worker computed ws:db:<schema>.<table>) are NOT tracked here — only statically-named subscriptions with no matching publisher literal.",
+    "subscriber_without_publisher": [
+      {
+        "channel": "ws:db_changes",
+        "consumer": "services/svc-ide-context/src/lib/subscriber.ts",
+        "tracking": "NEXT_STEPS.md P0-C B8 (realtime rail)",
+        "reason": "svc-ide-context subscribes to the literal 'ws:db_changes' (DB_CHANGES_CHANNEL), but event-worker only ever publishes computed 'ws:db:<schema>.<table>' — it never emits the literal 'ws:db_changes'. Dead name mismatch; the source comment asserting it is 'published by event-worker' is false."
+      }
+    ]
+  }
+}

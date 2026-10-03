@@ -1,0 +1,53 @@
+{
+  "name": "@aisha/ide-bridge",
+  "version": "0.1.1",
+  "license": "Elastic-2.0",
+  "description": "Client-side bridge between IDE workspaces (Claude Code, Cursor, GitHub Copilot) and AISHA svc-ide-context. Syncs CLAUDE.md/.cursorrules/copilot-instructions.md with safe-write semantics \u2014 preserves user-authored sections, backs up before write, supports realtime updates via WebSocket reconnect-with-backoff. Phase 13 WP 13.3.",
+  "private": false,
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "aisha-ide-bridge": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./safe-write": {
+      "types": "./dist/safe-write.d.ts",
+      "default": "./dist/safe-write.js"
+    },
+    "./bridge": {
+      "types": "./dist/bridge.d.ts",
+      "default": "./dist/bridge.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ws": "^8.18.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.17",
+    "@types/ws": "^8.5.13",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

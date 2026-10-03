@@ -1,0 +1,795 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify-pki.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+x-openxpki-image: &openxpki-image
+  image: ${REGISTRY_PROXY}whiterabbitsecurity/openxpki3:3.32.8
+
+services:
+  pki-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.pki-init
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-pki-stack-init
+    restart: "no"
+    environment:
+      PKI_CLIENT_KEY_B64: "${PKI_CLIENT_KEY_B64:-}"
+      PKI_DB_PASSWORD: "${PKI_DB_PASSWORD:?Set PKI_DB_PASSWORD in Coolify env}"
+      PKI_SVAULT_KEY: "${PKI_SVAULT_KEY}"
+      PKI_DOMAIN: "${PKI_DOMAIN:-pki.local}"
+      OPENXPKI_RPC_HMAC: "${OPENXPKI_RPC_HMAC:-}"
+      OPENXPKI_OPERATOR_PASSWORD: "${OPENXPKI_OPERATOR_PASSWORD}"
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        # Pojistka u spotřeby — proč tady a ne v compose: docs/compose-notes/.
+        [ -n "$${PKI_DB_PASSWORD}" ] || { echo "FATAL: PKI_DB_PASSWORD je prazdne — ucet by vznikl bez pouzitelneho hesla." >&2; exit 1; }
+        mkdir -p /certs/pki /pki-keys /rendered
+        # Svazek NAHRAZUJE systémové kořeny (netbird-agent míří SSL_CERT_FILE na
+        # tenhle soubor), takže MUSÍ nést i veřejné CA — jinak selže ověření
+        # každého veřejného certifikátu (Let's Encrypt na OIDC endpointu) a
+        # kontejner se točí v pádu. Týž zákon jako assemble-ca-bundle.sh v ostatních
+        # stacích; hlídá brána pki-ca-bundle-system-merge.
+        cat /staging/aisha-ca-bundle.pem /etc/ssl/certs/ca-certificates.crt > /certs/pki/aisha-ca-bundle.pem
+        if [ -n "$${PKI_CLIENT_KEY_B64:-}" ]; then
+          echo "$${PKI_CLIENT_KEY_B64}" | base64 -d > /pki-keys/client.key
+          chmod 600 /pki-keys/client.key
+          echo 'PKI init: CA bundle + client key written'
+        else
+          echo 'PKI init: CA bundle written (no client key — set PKI_CLIENT_KEY_B64)'
+        fi
+        # Render OpenXPKI config tree → named volume with secrets substituted.
+        # Idempotent: rerun přepíše config templates ale neztratí TLS assets
+        # (gen pouze pokud chybí — viz níže).
+        find /rendered -mindepth 1 -maxdepth 1 ! -name 'tls' -exec rm -rf {} +
+        cp -a /template/. /rendered/ 2>/dev/null || true
+        # Substitute env-driven domain vars (PKI_DOMAIN, INTERNAL_TLD, MESH_TLD) into
+        # realm, CRL, and profile config files that carry AIA/OCSP/CRL URLs.
+        # SCOPED to exactly those 3 vars — a bare `envsubst` (no shell-format arg)
+        # substitutes EVERY $$VAR, which clobbers OpenXPKI's own connector shorthand
+        # `_map_x: $$context_key` (e.g. is_valid_key.yaml's $$cert_profile /
+        # $$csr_key_params / $$csr_key_alg) to EMPTY, because those aren't env vars.
+        # That silently broke certificate_enroll at PROFILE_SET ("no actions
+        # available") → no cert issued → netbird mesh TLS down → core crash-loop.
+        # The shell-format arg makes envsubst touch ONLY these names; $$cert_profile
+        # et al. pass through untouched.
+        #
+        # ⛔ `$$` I TADY V KOMENTÁŘI: tohle je YAML literal scalar, takže řádky s `#`
+        # nejsou YAML komentáře, ale OBSAH řetězce — compose je interpoluje. Jedno
+        # `$` tu vyrobí `variable is not set` varování a preflight-compose označí
+        # celý soubor za FAIL, což zablokuje každý deploy se stackem pki.
+        find /rendered/config.d -name '*.yaml' | while read -r f; do
+          envsubst '$${PKI_DOMAIN} $${INTERNAL_TLD} $${MESH_TLD}' < "$$f" > "$$f.tmp" && mv "$$f.tmp" "$$f"
+        done
+        # Bake the pki-realm-bootstrap.sh script into the rendered config
+        # volume so pki-realm-bootstrap can pick it up. Coolify v4 silently
+        # corrupts file-level bind mounts on remote workers (creates an
+        # empty dir at the bind target), so we route the script through a
+        # named volume that pki-realm-bootstrap also mounts.
+        mkdir -p /rendered/local/scripts
+        cp /staging/pki-realm-bootstrap.sh /rendered/local/scripts/pki-realm-bootstrap.sh
+        chmod +x /rendered/local/scripts/pki-realm-bootstrap.sh
+        echo 'PKI init: pki-realm-bootstrap.sh staged at /rendered/local/scripts/'
+        cp /staging/pki-crl-issue.sh /rendered/local/scripts/pki-crl-issue.sh
+        chmod +x /rendered/local/scripts/pki-crl-issue.sh
+        echo 'PKI init: pki-crl-issue.sh staged at /rendered/local/scripts/'
+        # ── System crypto.yaml — render z PKI_SVAULT_KEY env (variant B) ────
+        # Source-of-truth template baked do image (aisha/templates/...). Bez
+        # tohoto kroku pki-server selže s missing svault → datapool encryption
+        # nemůže fungovat. Validace: PKI_SVAULT_KEY musí být ≥ 64 hex chars
+        # (32 bytes; openssl rand -hex 32). Žádný default — pokud chybí, fail.
+        # Double-dollar = literal $ for the in-container shell, NOT compose
+        # interpolation. Keep the :- form here: the :? form in sh aborts AT THE
+        # EXPANSION, which would make the explicit FATAL branch below dead code
+        # and surface a raw shell error instead of the diagnostic. The env key is
+        # guarded at compose level; this is the in-container safety net.
+        if [ -z "$${PKI_SVAULT_KEY:-}" ]; then
+          echo "FATAL: PKI_SVAULT_KEY env not set; cannot render crypto.yaml" >&2
+          exit 1
+        fi
+        # Place template, then substitute placeholder. Use awk (not sed) — value
+        # contains hex which sed could treat as regex; awk handles literal replace.
+        awk -v key="$${PKI_SVAULT_KEY}" '{ gsub(/__PKI_SVAULT_KEY__/, key); print }' \
+          /staging/openxpki-system-crypto.yaml.template \
+          > /rendered/config.d/system/crypto.yaml
+        chmod 600 /rendered/config.d/system/crypto.yaml
+        # Replace placeholder in database.yaml (no envsubst dep needed)
+        sed -i "s|__PKI_DB_PASSWORD__|$${PKI_DB_PASSWORD}|g" /rendered/config.d/system/database.yaml
+        # ── RPC HMAC secret — used by svc-pki-bridge for auto-approved enrollment ──
+        # OPENXPKI_RPC_HMAC is generated by aisha-cold-start.sh and persisted
+        # in .env.coolify/Coolify env, like the rest of our stack-internal
+        # secrets. pki-init renders this exact value into OpenXPKI config and
+        # pki-bridge reads the same env var; runtime containers must not
+        # independently generate or recover a different HMAC.
+        #
+        # OpenXPKI reads RPC config from `realm/<name>/rpc/generic.yaml` first,
+        # then falls back to `realm.tpl/rpc/generic.yaml` (template) if the
+        # per-realm file is absent. Per-realm rpc/generic.yaml is NOT shipped
+        # in this repo (only realm.tpl/rpc/generic.yaml has `hmac:` defined),
+        # so the substitution scans the whole `config.d` tree (covers `realm/`
+        # AND `realm.tpl/`) — any future RPC config file location is also
+        # covered without another silent failure.
+        if [ -z "$${OPENXPKI_RPC_HMAC:-}" ]; then
+          echo "FATAL: OPENXPKI_RPC_HMAC env not set; run scripts/aisha-cold-start.sh or scripts/coolify-deploy-init.sh so the generated stack secret is pushed to Coolify." >&2
+          exit 1
+        fi
+        SUBST_COUNT="$(find /rendered/config.d -name 'generic.yaml' -path '*/rpc/*' -print0 \
+          | xargs -0 grep -l '__PKI_RPC_HMAC__' 2>/dev/null | wc -l)"
+        find /rendered/config.d -name 'generic.yaml' -path '*/rpc/*' \
+          -exec sed -i "s|__PKI_RPC_HMAC__|$${OPENXPKI_RPC_HMAC}|g" {} +
+        echo "PKI init: substituted __PKI_RPC_HMAC__ in $${SUBST_COUNT} RPC config file(s)"
+        # Verify the placeholder is fully eliminated — if a new file location
+        # appears that this loop misses, fail loudly rather than ship broken.
+        # Match NON-COMMENT occurrences only: `^[^#]*TOKEN` hits the token solely
+        # when nothing before it on the line is a `#`, so a placeholder MENTIONED
+        # in a doc comment (auth/handler.yaml + scep/generic.yaml describe the
+        # __PKI_RPC_HMAC__ flow) is correctly ignored while a real
+        # `hmac: __PKI_RPC_HMAC__` value is still caught. The bare-token grep
+        # false-FATAL'd pki-init on those comments → aisha-pki down (2026-07-13).
+        if find /rendered/config.d -name '*.yaml' -exec grep -lE '^[^#]*__PKI_RPC_HMAC__' {} \; | grep -q .; then
+          echo "FATAL: __PKI_RPC_HMAC__ placeholder still present after substitution — pki-bridge will get HTTP 500 on every cert request." >&2
+          find /rendered/config.d -name '*.yaml' -exec grep -HnE '^[^#]*__PKI_RPC_HMAC__' {} \; >&2
+          exit 1
+        fi
+        echo "PKI init: rendered RPC HMAC from generated Coolify env"
+        # ── Operator password hash — the single WebUI/operator credential ──
+        # handler.yaml ships `digest: __PKI_OPERATOR_PASSWORD_HASH__` (no secret in
+        # git). Resolve the digest in priority order:
+        #   1. OPENXPKI_OPERATOR_PASSWORD_HASH — a BYO $5$ digest (operator-supplied).
+        #   2. else openssl passwd -5 of OPENXPKI_OPERATOR_PASSWORD — the plaintext
+        #      that generate-secrets.mjs auto-emits. Hashed HERE, inside this Linux
+        #      container where `openssl passwd -5` exists — NOT on the operator's host
+        #      (macOS openssl lacks -5). This makes a cold-start fully automatic: no
+        #      manual hash push, no host-side crypt (closes the 2026-07-13 --wipe gap
+        #      where the digest was unset → pki-init FATAL). Operator reads the
+        #      plaintext from the aisha-pki app env for WebUI login.
+        OPHASH="$${OPENXPKI_OPERATOR_PASSWORD_HASH-}"
+        if [ -z "$$OPHASH" ] && [ -n "$${OPENXPKI_OPERATOR_PASSWORD-}" ]; then
+          OPHASH="$$(printf '%s' "$${OPENXPKI_OPERATOR_PASSWORD}" | openssl passwd -5 -stdin)"
+          echo "PKI init: derived operator digest from OPENXPKI_OPERATOR_PASSWORD"
+        fi
+        if [ -z "$$OPHASH" ]; then
+          echo "FATAL: no operator credential — set OPENXPKI_OPERATOR_PASSWORD (generate-secrets.mjs emits it) or a BYO OPENXPKI_OPERATOR_PASSWORD_HASH on the aisha-pki app env. An empty digest would leave the operator account with no usable password." >&2
+          exit 1
+        fi
+        # Value is a $5$ crypt digest (contains $); awk literal replace avoids sed
+        # delimiter/regex pitfalls.
+        find /rendered/config.d -name 'handler.yaml' -path '*/auth/*' -print0 \
+          | while IFS= read -r -d '' handler_file; do
+              awk -v h="$$OPHASH" \
+                '{ gsub(/__PKI_OPERATOR_PASSWORD_HASH__/, h); print }' \
+                "$${handler_file}" > "$${handler_file}.tmp" \
+                && mv "$${handler_file}.tmp" "$${handler_file}"
+            done
+        # Same comment-aware check as the RPC HMAC guard above (see rationale
+        # there): flag only NON-COMMENT occurrences so a documented placeholder
+        # name never false-FATALs the operator-hash render.
+        if find /rendered/config.d -name '*.yaml' -exec grep -lE '^[^#]*__PKI_OPERATOR_PASSWORD_HASH__' {} \; | grep -q .; then
+          echo "FATAL: __PKI_OPERATOR_PASSWORD_HASH__ placeholder still present after substitution — operator login would be broken." >&2
+          find /rendered/config.d -name '*.yaml' -exec grep -HnE '^[^#]*__PKI_OPERATOR_PASSWORD_HASH__' {} \; >&2
+          exit 1
+        fi
+        echo "PKI init: rendered operator password hash from Coolify env"
+        # ── Enrollment challenge password (optional, secondary to HMAC) ──
+        # rpc/scep generic.yaml ship `value: __PKI_ENROLL_CHALLENGE__`. Render
+        # from OPENXPKI_ENROLL_CHALLENGE; unset renders empty (challenge is
+        # unused — HMAC is the auth path and allow_man_authen is 0).
+        find /rendered/config.d -name 'generic.yaml' \( -path '*/rpc/*' -o -path '*/scep/*' \) \
+          -exec sed -i "s|__PKI_ENROLL_CHALLENGE__|$${OPENXPKI_ENROLL_CHALLENGE:-}|g" {} +
+        echo "PKI init: rendered enrollment challenge from Coolify env"
+        # ── Per-instance TLS gen (self-signed) ──────────────────────────────
+        # State of the art: žádné secrety v gitu, generujeme per-instance, persist
+        # ve volume pki-config-rendered (idempotent — gen pouze pokud chybí).
+        # Apache HTTPS = self-signed (akceptovatelné, je za Traefik/LE proxy).
+        # End-entity klíč = self-signed bootstrap; pro produkční rotation
+        # přepneme na podpis realm CA klíčem (PKI_REALM_CA_KEY_B64) — TBD.
+        mkdir -p /rendered/tls/private /rendered/tls/endentity /rendered/tls/chain
+        cd /rendered/tls
+        if [ ! -s server.key ] || [ ! -s server.crt ]; then
+          echo "PKI init: generating self-signed Apache TLS (CN=${PKI_DOMAIN}, 730d)..."
+          openssl req -newkey rsa:2048 -nodes -keyout server.key -x509 -days 730 \
+            -out server.crt \
+            -subj "/CN=${PKI_DOMAIN}/O=AISHA/OU=PKI WebUI" \
+            -addext "subjectAltName=DNS:${PKI_DOMAIN}" 2>/dev/null
+          chmod 600 server.key
+        else
+          echo "PKI init: Apache TLS exists (volume-persisted) — keeping"
+        fi
+        if [ ! -s private/openxpki.pem ] || [ ! -s endentity/openxpki.crt ]; then
+          echo "PKI init: generating self-signed end-entity bootstrap key..."
+          openssl req -newkey rsa:2048 -nodes -keyout private/openxpki.pem -x509 -days 730 \
+            -out endentity/openxpki.crt \
+            -subj "/CN=pki-webui/O=AISHA" \
+            -addext "basicConstraints=critical,CA:FALSE" \
+            -addext "keyUsage=digitalSignature,keyEncipherment" \
+            -addext "extendedKeyUsage=serverAuth" \
+            -addext "subjectAltName=DNS:pki-webui,DNS:aisha-pki-webui,DNS:localhost,IP:127.0.0.1" 2>/dev/null
+          chmod 600 private/openxpki.pem
+        else
+          echo "PKI init: end-entity TLS exists (volume-persisted) — keeping"
+        fi
+        # Public CA chain (z aisha-ca-bundle.pem, baked do image)
+        cp /staging/aisha-ca-bundle.pem chain.pem
+        cp /staging/aisha-ca-bundle.pem chain/aisha-ca-bundle.pem
+        echo 'PKI init: config rendered + TLS materialized'
+        ls -la /certs/pki/ /pki-keys/ /rendered/tls/ 2>/dev/null || true
+    volumes:
+      - pki-certs:/certs/pki
+      - pki-client-key:/pki-keys
+      - pki-config-rendered:/rendered
+      - pki-keys:/etc/openxpki/local/keys
+    healthcheck:
+      disable: true
+    networks:
+      - internal
+  pki-db:
+    build:
+      context: .
+      dockerfile: Dockerfile.pki-db
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-pki-db
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password --max-connections=${PKI_DB_MAX_CONN:-200}
+    cpus: ${PKI_DB_CPUS:-1.0}
+    mem_limit: ${PKI_DB_MEM:-1g}
+    environment:
+      MYSQL_DATABASE: openxpki
+      MYSQL_USER: openxpki
+      MYSQL_PASSWORD: ${PKI_DB_PASSWORD:?Set PKI_DB_PASSWORD in Coolify env}
+      MYSQL_ROOT_PASSWORD: ${PKI_DB_ROOT_PASSWORD:?Set PKI_DB_ROOT_PASSWORD in Coolify env}
+    volumes:
+      - pki-db-data:/var/lib/mysql
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "mariadb-admin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 60s
+    expose:
+      - "3306"
+  pki-server:
+    <<: *openxpki-image
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-pki-server
+    restart: unless-stopped
+    cpus: ${PKI_SERVER_CPUS:-1.0}
+    mem_limit: ${PKI_SERVER_MEM:-3g}
+    environment:
+      PKI_DEFAULT_SECRET: "${PKI_DEFAULT_SECRET:?Set PKI_DEFAULT_SECRET in Coolify env (openssl rand -hex 32)}"
+      REALMS: "identity-plane data-plane orchestration-plane"
+      PKI_BOOTSTRAP_DIAG: "${PKI_BOOTSTRAP_DIAG:-1}"
+      AISHA_CA_NAME: "${AISHA_CA_NAME:-}"
+      AISHA_OPERATOR_ORG: "${AISHA_OPERATOR_ORG:-}"
+      APP_NAME_PREFIX: "${APP_NAME_PREFIX:?identita instance — dodává generate-secrets/cold-start}"
+    command:
+      - sh
+      - -c
+      - |
+        set +e
+        echo "=== PKI SERVER STARTUP $(date -u) ==="
+        echo "--- /etc/openxpki/config.d/system/ contents ---"
+        ls -la /etc/openxpki/config.d/system/ 2>&1 || true
+        echo "--- crypto.yaml first 60 lines ---"
+        head -60 /etc/openxpki/config.d/system/crypto.yaml 2>&1 || true
+        echo "--- database.yaml first 40 lines ---"
+        head -40 /etc/openxpki/config.d/system/database.yaml 2>&1 || true
+        echo "--- realms.yaml ---"
+        cat /etc/openxpki/config.d/system/realms.yaml 2>&1 || true
+        echo "--- openxpki version + DB connect probe ---"
+        /usr/bin/openxpkictl --version 2>&1 || true
+
+        # Start the OpenXPKI daemon in the background so we can run the
+        # realm bootstrap against its socket. The daemon stays in foreground
+        # via `wait` at the end so docker compose treats this as a normal
+        # service.
+        # Log permissions for /diag/openxpki-state cross-container read:
+        #
+        # 1. Set process umask 0022 BEFORE daemon starts. log4perl's `mode`
+        #    parameter is open-mode (append vs truncate), NOT POSIX perms —
+        #    perms are inherited from process umask. Default openxpki container
+        #    umask is 0077 (files 0600), too tight for pki-bridge node user
+        #    to read via :ro mount. 0022 gives 0644 group/other-readable.
+        #
+        # 2. chmod existing files (idempotency — covers volume reuse where
+        #    files predate the umask change). Failure non-fatal.
+        #
+        # 3. Background chmod loop AFTER daemon start: log4perl recreates log
+        #    files on logrotate (recreate=1 + check_interval=120s); those
+        #    recreated files would otherwise inherit umask of the rotate
+        #    sentinel. The loop keeps them 0644 every minute. Stops on
+        #    daemon exit (parent wait).
+        umask 0022
+        echo "--- umask set to 0022 (log files → 0644) ---"
+        chmod 0755 /var/log/openxpki-server 2>/dev/null || true
+        chmod 0644 /var/log/openxpki-server/*.log 2>/dev/null || true
+        echo "--- starting openxpkid in background ---"
+        /usr/bin/openxpkictl start server --nd &
+        # $$! preserved for bash so DAEMON_PID gets the real background PID;
+        # without escape, docker compose interpolates $! to empty and bash's
+        # `wait $$DAEMON_PID` later becomes `wait ` (no-op). The whole socket-
+        # wait loop below also escapes every bash-local var the same way.
+        DAEMON_PID=$$!
+
+        # Wait for the openxpkid socket to appear (up to 120s).
+        echo "--- waiting for /run/openxpkid/openxpkid.sock ---"
+        WAITED=0
+        while [ ! -S /run/openxpkid/openxpkid.sock ] && [ $$WAITED -lt 120 ]; do
+          sleep 2
+          WAITED=$$((WAITED + 2))
+        done
+        if [ ! -S /run/openxpkid/openxpkid.sock ]; then
+          echo "WARN: openxpkid socket did not appear after 120s — skipping bootstrap"
+        else
+          echo "--- socket appeared after $${WAITED}s ---"
+          if [ -f /etc/openxpki/local/scripts/pki-realm-bootstrap.sh ]; then
+            echo "=== running pki-realm-bootstrap.sh inline ==="
+            sh /etc/openxpki/local/scripts/pki-realm-bootstrap.sh
+            BOOTSTRAP_RC=$$?
+            echo "=== bootstrap exited with rc=$$BOOTSTRAP_RC ==="
+          else
+            echo "WARN: /etc/openxpki/local/scripts/pki-realm-bootstrap.sh not found — pki-init may not have staged it"
+          fi
+
+          # CRL issuer loop. OpenXPKI has the crl_issuance workflow and the
+          # publishing connector but NO scheduler to call them — upstream solves
+          # this with a cron entry outside the container, which a container-only
+          # deploy never gets. Without this loop revocations pile up in
+          # CRL_ISSUANCE_PENDING and the certificates stay valid to every
+          # validator: measured 856 such certificates on a live install, with
+          # zero CRLs ever issued and nothing reporting a problem.
+          #
+          # Backgrounded, and after the realm bootstrap so the signer alias
+          # exists. The script polls for the CA itself, so ordering is a
+          # nicety rather than a requirement. It holds no state: crl_issuance
+          # CANCELs itself inside the realm's renewal window, so re-asking is
+          # free and the CA stays the single authority on when a CRL is due.
+          if [ -f /etc/openxpki/local/scripts/pki-crl-issue.sh ]; then
+            echo "=== starting pki-crl-issue.sh in background ==="
+            sh /etc/openxpki/local/scripts/pki-crl-issue.sh &
+          else
+            echo "WARN: /etc/openxpki/local/scripts/pki-crl-issue.sh not found — CRLs will NEVER be issued"
+          fi
+        fi
+
+        # Background chmod loop for log4perl recreates (step 3 of perms plan
+        # above). Doesn't matter if recreate fires under a different umask;
+        # this brings perms back to 0644 within 60s. Runs as long as parent
+        # script (loop dies when container exits).
+        (while sleep 60; do
+          chmod 0644 /var/log/openxpki-server/*.log 2>/dev/null || true
+        done) &
+
+        # Stay attached to the daemon so docker compose / Coolify see this
+        # as a long-running service. $${DAEMON_PID} escaped — without escape
+        # compose substitutes to empty and `wait` returns immediately, exiting
+        # the script (and the container).
+        wait $${DAEMON_PID}
+    tmpfs:
+      - /tmp
+    volumes:
+      - pki-config-rendered:/etc/openxpki
+      - pki-keys:/etc/openxpki/local/keys
+      - pki-client-key:/home/pkiadm/.oxi:ro
+      - pki-log:/var/log/openxpki-server
+      - pki-socket:/run/openxpkid
+      - pki-download:/var/www/download
+      - pki-softhsm:/var/lib/softhsm/tokens
+    healthcheck:
+      test: /usr/bin/openxpkictl status server
+      # Jedno spuštění = 3,5–5,8 s CPU (naměřeno 09-29) → takt 2 min, rychle jen při startu.
+      # Proč přesně tyhle hodnoty: docs/compose-notes/ u řádku `interval: 120s`.
+      interval: 120s
+      start_interval: 10s
+      timeout: 30s
+      retries: 3
+      start_period: 180s
+    depends_on:
+      pki-init:
+        condition: service_completed_successfully
+      pki-db:
+        condition: service_healthy
+    networks:
+      - internal
+
+  pki-client:
+    <<: *openxpki-image
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-pki-client
+    restart: unless-stopped
+    command: /usr/bin/openxpkictl start client --nd
+    tmpfs:
+      - /tmp
+    volumes:
+      - pki-config-rendered:/etc/openxpki
+      - pki-log-ui:/var/log/openxpki-client
+      - pki-socket:/run/openxpkid
+      - pki-client-socket:/run/openxpki-clientd
+    healthcheck:
+      test: /usr/bin/openxpkictl status client
+      # Týž nástroj a táž cena jako u pki-server (viz tam) — takt stejně.
+      interval: 120s
+      start_interval: 10s
+      timeout: 30s
+      retries: 3
+      start_period: 180s
+    depends_on:
+      pki-server:
+        condition: service_healthy
+    networks:
+      - internal
+
+  pki-webui:
+    <<: *openxpki-image
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-pki-webui
+    restart: unless-stopped
+    command: 
+      - sh
+      - -c
+      - |
+        # Clear default apache site
+        rm -f /etc/apache2/sites-enabled/*
+        printf 'ServerName pki-webui\n' >/etc/apache2/conf-available/aisha-servername.conf
+        a2enconf aisha-servername >/dev/null
+        # Copy the correct site config from the named volume (pki-init placed it there)
+        cp /etc/openxpki/contrib/apache2-openxpki-site.conf /etc/apache2/sites-enabled/openxpki.conf
+        /usr/bin/start-webserver apache
+    volumes:
+      - pki-config-rendered:/etc/openxpki:ro
+      - pki-client-socket:/run/openxpki-clientd
+      - pki-download:/var/www/download:ro
+    expose:
+      - "80"
+      - "443"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:80/healthcheck/ping || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 180s
+    depends_on:
+      pki-client:
+        condition: service_healthy
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-pki-webui
+  pki-auth:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1-alpine
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-pki-auth
+    restart: unless-stopped
+    extra_hosts:
+      - "${KEYCLOAK_DOMAIN_PUBLIC}:host-gateway"
+      # Druhé jméno MUSÍ být různé (extra_hosts je mapa, duplicita = „must be a
+      # mapping“); resolver vydá přímou doménu, nebo .invalid sentinel — výklad:
+      # docs/compose-notes/docker-compose.coolify-pki.yml.md
+      - "${KEYCLOAK_EXTRA_HOST_ALIAS:?vydává derive-domains; bez něj by extra_hosts nesl duplicitu nebo prázdné jméno}:host-gateway"
+    environment:
+      OAUTH2_PROXY_PROVIDER: keycloak-oidc
+      OAUTH2_PROXY_CLIENT_ID: ${OIDC_CLIENT_PREFIX:-}pki-proxy
+      OAUTH2_PROXY_CLIENT_SECRET: ${PKI_OIDC_SECRET}
+      OAUTH2_PROXY_OIDC_ISSUER_URL: https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}
+      OAUTH2_PROXY_SKIP_OIDC_DISCOVERY: "true"
+      OAUTH2_PROXY_LOGIN_URL: https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth
+      OAUTH2_PROXY_REDEEM_URL: https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token
+      OAUTH2_PROXY_OIDC_JWKS_URL: https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs
+      OAUTH2_PROXY_PROFILE_URL: https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/userinfo
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_UPSTREAMS: http://${APP_NAME_PREFIX:?identita instance}-pki-webui:80
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_COOKIE_SECRET: ${PKI_COOKIE_SECRET}
+      OAUTH2_PROXY_COOKIE_SECURE: "true"
+      OAUTH2_PROXY_COOKIE_NAME: _aisha_pki_proxy
+      OAUTH2_PROXY_COOKIE_DOMAINS: ${OAUTH2_COOKIE_DOMAINS}
+      OAUTH2_PROXY_COOKIE_SAMESITE: lax
+      OAUTH2_PROXY_REDIRECT_URL: https://${PKI_DOMAIN}/oauth2/callback
+      OAUTH2_PROXY_ALLOWED_GROUPS: pki_admin,pki_operator
+      OAUTH2_PROXY_OIDC_GROUPS_CLAIM: roles
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
+      OAUTH2_PROXY_PASS_USER_HEADERS: "true"
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_SILENCE_PING_LOGGING: "true"
+      OAUTH2_PROXY_SKIP_AUTH_ROUTES: "^/healthcheck/ping$,^/\\.well-known/.*"
+    expose:
+      - "4180"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:4180/ping || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      pki-webui:
+        condition: service_healthy
+    networks:
+      - internal
+      - coolify
+    labels:
+      - "coolify.managed=true"
+      - "traefik.docker.network=coolify"
+
+  pki-bridge:
+    build:
+      context: .
+      dockerfile: services/svc-pki-bridge/Dockerfile
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-pki-bridge
+    restart: unless-stopped
+    environment:
+      PORT: "3040"
+      LOG_LEVEL: "${PKI_BRIDGE_LOG_LEVEL:-info}"
+      KEYCLOAK_URL: https://${KEYCLOAK_DOMAIN_PUBLIC}
+      KEYCLOAK_INTERNAL_URL: ${KEYCLOAK_INTERNAL_URL:?KEYCLOAK_INTERNAL_URL must be generated by topology resolver}
+      PKI_BOOTSTRAP_JWKS: ${PKI_BOOTSTRAP_JWKS:-}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:?realm je DEKLAROVANÁ konstanta (keycloak/*-realm.json), ne literál ve stack kódu — doručuje cold-start env}
+      PKI_BRIDGE_JWT_AUDIENCE: pki-proxy
+      OPENXPKI_RPC_URL: http://${APP_NAME_PREFIX:?identita instance}-pki-webui:80/rpc
+      OPENXPKI_RPC_HMAC: "${OPENXPKI_RPC_HMAC:-}"
+      OPENXPKI_REALM: orchestration-plane
+      PKI_CERT_PROFILE: tls-server
+      PKI_KEY_ALGORITHM: P-384
+      PKI_ALLOWED_SAN_PATTERNS: "*.${MESH_TLD},*.backend.${INTERNAL_TLD},netbird-internal-tls,netbird-signal,netbird-management"
+    volumes:
+      - pki-config-rendered:/etc/openxpki:ro
+      - pki-keys:/etc/openxpki/local/keys:ro
+      - pki-log:/var/log/openxpki-server:ro
+    expose:
+      - "3040"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3040/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      pki-webui:
+        condition: service_healthy
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-pki-bridge
+          - ${PKI_BRIDGE_DOMAIN:?vydává derive-domains — alias MUSÍ být totéž jméno, které volá PKI_BRIDGE_URL}
+      coolify:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-pki-bridge
+      mesh-dns:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-pki-bridge
+    labels:
+      - "coolify.managed=true"
+      - "traefik.docker.network=coolify"
+      - "traefik.enable=true"
+
+  pki-renewer:
+    build:
+      context: .
+      dockerfile: Dockerfile.pki-init
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-pki-renewer
+    restart: unless-stopped
+    environment:
+      KEYCLOAK_URL: https://${KEYCLOAK_DOMAIN_PUBLIC}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      PKI_ISSUER_CLIENT_ID: aisha-pki-issuer
+      PKI_ISSUER_CLIENT_SECRET: "${AISHA_PKI_ISSUER_CLIENT_SECRET:?Set AISHA_PKI_ISSUER_CLIENT_SECRET in Coolify env (generated by cold-start)}"
+      PKI_BRIDGE_URL: http://${APP_NAME_PREFIX:?identita instance}-pki-bridge:3040
+      COOLIFY_API_TOKEN: "${COOLIFY_API_TOKEN:-}"
+      COOLIFY_API: "${COOLIFY_BASE_URL}/api/v1"
+      # Kdo po rotaci koorene CA musi znovu stahnout bundle. ODVOZENO
+      # (scripts/lib/derive-bundle-consumers.mjs), nikdy rucne: renewer mel
+      # seznam natvrdo a nikdo tuhle promennou nenastavoval, takze vychozi
+      # hodnota BYLA tou hodnotou -- a chybel v ni i `pki` sam.
+      BUNDLE_CONSUMER_ROLES: "${BUNDLE_CONSUMER_ROLES:-}"
+      RENEW_INTERVAL_HOURS: "6"
+      RENEW_THRESHOLD_DAYS: "21"
+      RENEW_SERVICES: "core.${MESH_TLD},netbird.${MESH_TLD}"
+    command: ["/usr/local/bin/pki-renewer.sh"]
+    volumes:
+      - pki-certs:/certs/pki
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/pki-renewer-alive || exit 1"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      pki-bridge:
+        condition: service_healthy
+    networks:
+      - internal
+
+  netbird-agent:
+    # Mesh komponenta — bez meshe nemá co dělat. Profil "mesh" zapíná
+    # coolify-deploy-init.sh podle MESH_ENABLED; hlídá brána mesh-profil-drzi.
+    profiles: ["mesh"]
+    image: ${IMAGE_NETBIRD}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-pki--netbird
+    cap_add:
+      - NET_ADMIN
+      - SYS_RESOURCE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    depends_on:
+      pki-init:
+        condition: service_completed_successfully
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        if [ -z "$${NB_SETUP_KEY:-}" ]; then
+          echo "[netbird-agent] NB_SETUP_KEY empty for hostname=$${NB_HOSTNAME:-<unset>}"
+          echo "[netbird-agent] State: PENDING_BOOTSTRAP — awaiting netbird-bootstrap.sh + redeploy."
+          trap 'echo "[netbird-agent] received TERM — exiting idle"; exit 0' TERM INT
+          while :; do sleep 3600 & wait "$$!" || true; done
+        fi
+        if ! command -v netbird >/dev/null 2>&1; then
+          echo "[netbird-agent] FATAL: netbird binary not in PATH" >&2
+          exit 127
+        fi
+        echo "[netbird-agent] Bridge mode — own netns, no host daemon conflict."
+        echo "[netbird-agent] DNS proxy disabled — pki receives inbound mesh only."
+        # ⛔ NETBIRD 0.70 NEPÍŠE config.json (naměřeno 2026-09-06). Stav drží
+        # `default.json` + `active_profile.json`; podmínka na legacy cestu proto
+        # neplatila NIKDE — změřeno na 6 z 6 agentů včetně cizího nájemníka.
+        # Následek: agent se při KAŽDÉM startu zapsal jako NOVÝ peer, dostal
+        # novou mesh IP, a DNS záznam osiřel. Edge pak volal na starou adresu
+        # („dial 100.112.246.17:3002: no route to host") → live.<tld> 502.
+        # Je to ta příčina, proč se „mesh DNS se neprovisionuje samo" vracelo
+        # dokola: nešlo o provisioning, ale o ztrátu identity při restartu.
+        # Legacy cesta zůstává kvůli starším agentům — stačí KTERÝKOLI stavový
+        # soubor; teprve když není žádný, je zápis do meshe opravdu první.
+        CONFIG_FILE="$${NB_CONFIG_FILE:-/etc/netbird/config.json}"
+        if [ "$${NB_FORCE_REENROLL:-0}" = "1" ]; then
+          echo "[netbird-agent] NB_FORCE_REENROLL=1 — wiping local NetBird state before enrollment."
+          rm -rf /etc/netbird/* 2>/dev/null || true
+        fi
+        for _nb_stav in "$$CONFIG_FILE" /etc/netbird/default.json /var/lib/netbird/default.json; do
+          if [ -s "$$_nb_stav" ]; then CONFIG_FILE="$$_nb_stav"; break; fi
+        done
+        if [ -s "$$CONFIG_FILE" ]; then
+          echo "[netbird-agent] Existing config found at $$CONFIG_FILE — reconnecting without setup key."
+          set -- --foreground-mode --disable-dns --management-url "$${NB_MANAGEMENT_URL}" --hostname "$${NB_HOSTNAME}"
+        else
+          echo "[netbird-agent] No existing config — enrolling as $${NB_HOSTNAME} via $${NB_MANAGEMENT_URL}."
+          set -- --foreground-mode --disable-dns --management-url "$${NB_MANAGEMENT_URL}" --setup-key "$${NB_SETUP_KEY}" --hostname "$${NB_HOSTNAME}"
+        fi
+        trap 'echo "[netbird-agent] received TERM — exiting"; exit 0' TERM INT
+        while :; do
+          netbird up "$$@" || true
+          echo "[netbird-agent] netbird up exited — retry in 15s; container stays UP (never trips Coolify restart-limit)."
+          sleep 15 & wait "$$!" || true
+        done
+    extra_hosts:
+      - "${NETBIRD_MESH_HOST}:${NETBIRD_MGMT_HOST:-host-gateway}"
+    volumes:
+      - netbird-pki-data-v3:/etc/netbird
+      - netbird-pki-data-v3:/var/lib/netbird
+      - pki-certs:/certs/pki:ro
+    environment:
+      NB_SETUP_KEY: ${NETBIRD_STACK_KEY_BACKEND}
+      NB_MANAGEMENT_URL: https://${NETBIRD_MESH_HOST}:${NETBIRD_MESH_PORT:-33073}
+      NB_SSL_TRUST_BUNDLE: /certs/pki/aisha-ca-bundle.pem
+      SSL_CERT_FILE: /certs/pki/aisha-ca-bundle.pem
+      NB_HOSTNAME: backend-pki
+      NB_FORCE_REENROLL: ${NB_FORCE_REENROLL:-0}
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -z \"$$NB_SETUP_KEY\" ]; then exit 0; fi; ip -o addr show wt0 2>/dev/null | grep -qE 'inet 100\\.'"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 8
+    restart: unless-stopped
+    networks:
+      - internal
+
+  pki-mesh-ingress:
+    # Mesh komponenta — bez meshe nemá co dělat. Profil "mesh" zapíná
+    # coolify-deploy-init.sh podle MESH_ENABLED; hlídá brána mesh-profil-drzi.
+    profiles: ["mesh"]
+    image: ${IMAGE_CADDY}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-model--mesh-ingress
+    restart: unless-stopped
+    network_mode: "service:netbird-agent"
+    depends_on:
+      netbird-agent:
+        condition: service_started
+    environment:
+      PKI_MESH_INGRESS_ROUTES: ${PKI_MESH_INGRESS_ROUTES:-}
+      # TÝŽ seznam, jaký dostává gateway — jeden zdroj (`lib/derive-subnets.mjs`).
+      # Bez něj Caddy `x-forwarded-for` přepíše a klientská adresa se ztratí.
+      GATEWAY_TRUSTED_PROXIES: ${GATEWAY_TRUSTED_PROXIES:-}
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        if [ -z "$${PKI_MESH_INGRESS_ROUTES:-}" ]; then
+          echo "[mesh-ingress] PKI_MESH_INGRESS_ROUTES prázdné — derivace nic nevydala nebo se nedoručila."
+          echo "[mesh-ingress] Naslouchám jen na health, aby bylo VIDĚT, že tabulka chybí."
+          # ⛔ STAV BEZ TABULKY MUSÍ BÝT VIDĚT SONDĚ (naměřeno 2026-09-03).
+          # Záložní Caddyfile poslouchal na :8000, ale healthcheck sonduje :80 —
+          # port této služby. Sonda tedy dostala „connection refused" místo
+          # navrženého 503 „bez směrovací tabulky", a diagnóza vedla k „zavřený
+          # port" místo ke skutečné příčině. Neshoda byla v 15 z 16 stacků;
+          # jediný, kde porty seděly, byl `model`, jehož vlastní port JE 8000 —
+          # vzor se trefil sám sebou a vada byla ze zdroje neviditelná.
+          printf ':80 {\n  handle /__mesh_health {\n    respond "no-routes" 503\n  }\n  handle {\n    respond "mesh-ingress bez směrovací tabulky" 503\n  }\n}\n' > /etc/caddy/Caddyfile
+        else
+          : > /etc/caddy/Caddyfile
+          # ⛔ NAMĚŘENO 2026-08-31: brána viděla `x-forwarded-for` s JEDINÝM
+          # prvkem — adresou svého souseda (mesh-router edge). To je podpis
+          # NAHRAZENÍ, ne řetězu: Caddy bez `trusted_proxies` příchozí hlavičce
+          # nedůvěřuje a přepíše ji tím, kdo se právě připojil. Každý náš skok
+          # tak řetěz zahodil a klientská adresa se ke dveřím NEDOSTALA —
+          # `enforce` by zamkl i majitele.
+          #
+          # Hodnota se NEOPISUJE: je to TÝŽ seznam, jaký dostává gateway
+          # (`lib/derive-subnets.mjs` → GATEWAY_TRUSTED_PROXIES). Dva tvary
+          # (čárky pro env, mezery pro Caddy), jeden zdroj — kdyby si je každý
+          # skládal sám, chůze zprava by v každém prvku končila jinde.
+          if [ -n "$${GATEWAY_TRUSTED_PROXIES:-}" ]; then
+            printf '{\n  servers {\n    trusted_proxies static %s\n  }\n}\n\n' \
+              "$$(echo "$${GATEWAY_TRUSTED_PROXIES}" | tr ',' ' ')" >> /etc/caddy/Caddyfile
+          else
+            # Nedoručený seznam se NEDOSAZUJE. Bez něj Caddy řetěz přepíše —
+            # to je vada, ale TICHÁ; tady se aspoň řekne nahlas.
+            echo "[mesh-ingress] GATEWAY_TRUSTED_PROXIES nedoručen — x-forwarded-for bude PŘEPSÁN, klientská adresa se ztratí"
+          fi
+          PORTS=$$(echo "$${PKI_MESH_INGRESS_ROUTES}" | tr ';' '\n' | cut -d'|' -f1 | sort -un)
+          for P in $$PORTS; do
+            printf ':%s {\n  handle /__mesh_health {\n    respond "ok" 200\n  }\n' "$$P" >> /etc/caddy/Caddyfile
+            echo "$${PKI_MESH_INGRESS_ROUTES}" | tr ';' '\n' | while IFS='|' read -r RP RH RT; do
+              [ "$$RP" = "$$P" ] || continue
+              M=$$(echo "$$RH" | cut -d, -f1 | cut -d. -f1 | tr '-' '_')
+              HOSTS=$$(echo "$$RH" | tr ',' ' ')
+              printf '  @%s host %s\n  handle @%s {\n    reverse_proxy http://%s\n  }\n' "$$M" "$$HOSTS" "$$M" "$$RT" >> /etc/caddy/Caddyfile
+            done
+            printf '  handle {\n    respond "mesh-ingress: Host nepatri na tento port" 421\n  }\n}\n' >> /etc/caddy/Caddyfile
+          done
+          echo "[mesh-ingress] tabulka: $$(echo "$${PKI_MESH_INGRESS_ROUTES}" | tr ';' '\n' | wc -l) tras na $$(echo "$$PORTS" | wc -w) portech"
+        fi
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/__mesh_health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  netbird-pki-data-v3:
+    name: ${APP_NAME_PREFIX:?}_netbird-pki-data
+  pki-certs:
+    name: ${APP_NAME_PREFIX:?}_pki-stack-certs
+  pki-client-key:
+    name: ${APP_NAME_PREFIX:?}_pki-client-key
+  pki-db-data:
+    name: ${APP_NAME_PREFIX:?}_pki-db-data
+  pki-socket:
+    name: ${APP_NAME_PREFIX:?}_pki-socket
+  pki-client-socket:
+    name: ${APP_NAME_PREFIX:?}_pki-client-socket
+  pki-log:
+    name: ${APP_NAME_PREFIX:?}_pki-log
+  pki-log-ui:
+    name: ${APP_NAME_PREFIX:?}_pki-log-ui
+  pki-download:
+    name: ${APP_NAME_PREFIX:?}_pki-download
+  pki-softhsm:
+    name: ${APP_NAME_PREFIX:?}_pki-softhsm
+  pki-config-rendered:
+    name: ${APP_NAME_PREFIX:?}_pki-config-rendered
+  pki-keys:
+    name: ${APP_NAME_PREFIX:?}_pki-keys
+networks:
+  internal:
+    external: true
+    name: ${APP_NAME_PREFIX:?identita instance}-shared-net
+  coolify:
+    external: true
+    name: coolify
+  mesh-dns:
+    external: true
+    name: ${MESH_DNS_NETWORK:?vydává generate-secrets}

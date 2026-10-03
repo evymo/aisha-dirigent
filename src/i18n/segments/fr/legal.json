@@ -1,0 +1,208 @@
+{
+  "legal": {
+    "privacyPolicy": {
+      "title": "Politique de confidentialité",
+      "lastUpdated": "Dernière mise à jour : 4 juillet 2026",
+      "fullText": "## 1. Qui est le responsable du traitement ?\n\nLa plateforme AISHA accessible à l'adresse aisha.guru (le « Service ») est exploitée par **Evymo** (« nous », l’« Opérateur »), qui agit en tant que responsable du traitement de vos données à caractère personnel. Pour toute question relative à la confidentialité, contactez-nous à l’adresse **ask@aisha.guru**.\n\nLe Service est actuellement proposé en **version préliminaire publique**. La présente politique décrit la manière dont nous traitons les données à caractère personnel pendant cette phase de prévisualisation.\n\n## 2. Quelles données à caractère personnel traitons-nous ?\n\n- **Données de compte** — votre nom, votre adresse e-mail et vos historiques de connexion. L’identité et l’authentification sont gérées par notre instance Keycloak auto-hébergée ; les données de compte ne sont pas partagées avec des fournisseurs d’identité externes, sauf si vous choisissez de vous connecter via l’un d’entre eux.\n- **Contenu que vous créez** — projets, documents, entrées de la base de connaissances et autres éléments que vous stockez dans le Service.\n- **Données d’interaction avec l’IA** — les requêtes que vous soumettez, les réponses générées et les métadonnées associées (horodatages, modèle sélectionné). Ces données sont nécessaires pour fournir le Service et pour enquêter sur les dysfonctionnements.\n- **Journaux d’audit et de sécurité** — les actions privilégiées et liées à la sécurité sont consignées dans un journal d’audit afin de protéger le Service et ses utilisateurs.\n\nNous n’utilisons **pas** d’outils d’analyse tiers, de traceurs publicitaires ni de techniques d’empreinte numérique. L’application web ne stocke dans votre navigateur que votre préférence linguistique et votre session d’authentification.\n\n## 3. Finalités et bases juridiques (art. 6 du RGPD)\n\n- Fourniture du Service auquel vous vous êtes inscrit — exécution d’un contrat (art. 6, paragraphe 1, point b)).\n- Sécurité, prévention des abus et journalisation d’audit — notre intérêt légitime (art. 6, paragraphe 1, point f)).\n- Fonctionnalités optionnelles auxquelles vous adhérez (par exemple, les actualités sur les produits) — votre consentement (art. 6, paragraphe 1, point a)), que vous pouvez retirer à tout moment.\n- Respect des obligations légales (art. 6, paragraphe 1, point c)).\n\n## 4. Les fournisseurs d’IA en tant que sous-traitants\n\nLorsque vous utilisez des fonctionnalités d’IA, le contenu de votre requête (ainsi que le contexte nécessaire) est transmis via notre passerelle LLM au fournisseur du modèle d’IA configuré pour votre instance, qui agit en tant que notre sous-traitant. Nous ne vendons pas vos données et n’autorisons pas leur utilisation à des fins publicitaires. Lorsqu’un fournisseur configuré traite des données en dehors de l’UE/EEE, les transferts sont couverts par des garanties appropriées telles que les clauses contractuelles types de l’UE.\n\n## 5. Où vos données sont-elles stockées ?\n\nLes données d’application sont stockées dans une base de données PostgreSQL auto-hébergée et les données d’identité dans une instance Keycloak auto-hébergée, sur une infrastructure située dans l’Union européenne (République tchèque).\n\n## 6. Conservation\n\n- **Données de compte et contenu** : tant que votre compte existe.\n- **Suppression du compte** : vous pouvez demander la suppression à tout moment sur la page **/account-deletion**. La demande est soumise à un délai de grâce de 30 jours (pendant lequel vous pouvez l'annuler) ; à l'issue de ce délai, votre compte et son contenu sont supprimés.\n- **Journaux d’audit et de sécurité** : conservés pendant une durée limitée nécessaire à la sécurité et à la conformité légale, puis supprimés.\n- **Sauvegardes** : les données effacées sont conservées dans les sauvegardes au fur et à mesure que les cycles de sauvegarde se renouvellent.\n\n## 7. Vos droits\n\nEn vertu du RGPD, vous disposez des droits d’accès, de rectification, d’effacement, de limitation du traitement, de portabilité des données et d’opposition, ainsi que du droit de retirer votre consentement à tout moment. Vous pouvez exercer votre droit à l’effacement directement à l’adresse **/account-deletion** et votre droit à la portabilité via la fonction d’exportation des données ; pour toute autre demande, écrivez à **ask@aisha.guru**. Vous disposez également du droit de déposer une réclamation auprès d’une autorité de contrôle — en République tchèque, il s’agit de l’Office pour la protection des données à caractère personnel (ÚOOÚ, uoou.gov.cz).\n\n## 8. Sécurité\n\nL’accès aux données respecte le principe du moindre privilège, est protégé par une sécurité au niveau des lignes dans la base de données et chiffré lors du transfert ; les actions privilégiées sont consignées dans le journal d’audit.\n\n## 9. Modifications de la présente politique\n\nNous pouvons mettre à jour la présente politique, notamment à mesure que la version préliminaire évolue vers une disponibilité générale. Les modifications importantes seront annoncées dans le Service.\n\nDes questions ? **ask@aisha.guru**"
+    },
+    "termsOfService": {
+      "title": "Conditions d'utilisation",
+      "lastUpdated": "Dernière mise à jour : 4 juillet 2026",
+      "fullText": "## 1. Qui sommes-nous et quel est le champ d'application des présentes Conditions ?\n\nLes présentes Conditions générales d'utilisation (les « Conditions ») régissent l'utilisation de la plateforme AISHA accessible à l'adresse aisha.guru (le « Service »), exploitée par **Evymo** (« nous », l'« Opérateur »). Contact : **ask@aisha.guru**. En créant un compte ou en utilisant le Service, vous acceptez les présentes Conditions.\n\n## 2. Préversion publique\n\nLe Service est fourni en tant que **préversion publique** :\n\n- la disponibilité, les fonctionnalités et les performances ne sont **pas garanties** et peuvent être modifiées sans préavis ;\n- les données de la préversion **peuvent être réinitialisées** ; nous vous en informerons dans un délai raisonnable au sein du Service avant toute réinitialisation prévue ;\n- des fonctionnalités peuvent être ajoutées, modifiées ou supprimées à tout moment.\n\nVeuillez conserver vos propres copies de tout élément important — la fonction d’exportation des données est disponible à cette fin.\n\n## 3. Votre compte\n\nLes comptes sont gérés via notre service d’identité auto-hébergé (Keycloak). Vous êtes responsable de la confidentialité de vos identifiants et de toutes les activités effectuées sous votre compte. Vous devez fournir des informations exactes et avoir la capacité juridique de conclure le présent contrat.\n\n## 4. Utilisation acceptable\n\nVous ne devez pas : (a) utiliser le Service à des fins illégales ; (b) tenter d’obtenir un accès non autorisé aux données, aux comptes ou à l’infrastructure ; (c) sonder, analyser ou perturber le Service, sauf pour signaler une vulnérabilité de manière responsable à ask@aisha.guru ; (d) utiliser le Service pour générer ou diffuser des logiciels malveillants, du spam ou du contenu portant atteinte aux droits de tiers ; (e) revendre le Service hébergé ou le fournir à des tiers en tant que service géré. Nous pouvons suspendre ou résilier les comptes qui enfreignent les présentes Conditions.\n\n## 5. Votre contenu\n\nVous conservez tous les droits sur le contenu que vous créez ou téléchargez. Vous nous accordez une licence non exclusive pour héberger, stocker, traiter et afficher ce contenu uniquement dans la mesure nécessaire au fonctionnement et à la fourniture du Service. Nous n’utilisons pas votre contenu à des fins publicitaires.\n\n## 6. Résultats générés par l’IA\n\nLe Service produit des résultats à l’aide de grands modèles linguistiques. Les résultats générés par l’IA peuvent être inexacts, incomplets ou biaisés et sont fournis à titre d’évaluation uniquement — voir la Clause de non-responsabilité. Il vous incombe de vérifier les résultats générés par l’IA avant de vous y fier ou de les partager.\n\n## 7. Licence de la plateforme\n\nLe code source de la plateforme AISHA est soumis à la licence **Elastic License 2.0 (ELv2)** — voir les fichiers LICENSE et NOTICE dans le dépôt de code source. Les présentes Conditions régissent votre utilisation du Service hébergé ; elles n’accordent aucun droit sur le code source au-delà de ceux prévus par l’ELv2.\n\n## 8. Confidentialité\n\nLe traitement des données à caractère personnel est décrit dans la Politique de confidentialité. La suppression de votre compte peut être demandée à l’adresse /account-deletion.\n\n## 9. Garanties et responsabilité\n\nLe Service en avant-première est fourni **« tel quel » et « tel que disponible »**, sans garantie d’aucune sorte, dans toute la mesure permise par la loi. Dans la même mesure, nous ne sommes pas responsables des dommages indirects ou consécutifs, de la perte de données ou du manque à gagner résultant de l’utilisation du Service en avant-première. Aucune disposition des présentes Conditions n’exclut la responsabilité qui ne peut être exclue en vertu du droit applicable.\n\n## 10. Résiliation\n\nVous pouvez cesser d’utiliser le Service et supprimer votre compte à tout moment à l’adresse /account-deletion. Nous pouvons suspendre ou résilier votre accès en cas de violation des présentes Conditions ou pour des raisons de sécurité ; lorsque cela est raisonnable, nous vous en informerons.\n\n## 11. Modifications des présentes Conditions\n\nNous pouvons mettre à jour les présentes Conditions pendant la période de préversion. Les modifications importantes seront annoncées au sein du Service ; la poursuite de l’utilisation après la date d’entrée en vigueur vaut acceptation des Conditions mises à jour.\n\n## 12. Droit applicable\n\nLes présentes Conditions sont régies par le droit de la République tchèque. Les dispositions impératives en matière de protection des consommateurs de votre pays de résidence restent inchangées.\n\nContact : **ask@aisha.guru**"
+    },
+    "accountDeletion": {
+      "title": "Supprimer le compte",
+      "description": "Supprimer définitivement votre compte et les données qui y sont associées.",
+      "warning": "Cette action est définitive. À l'issue du délai de grâce de 30 jours, votre compte et vos données seront supprimés de manière irréversible.",
+      "consequences": {
+        "title": "Que se passe-t-il lorsque vous supprimez votre compte ?",
+        "items": [
+          "Votre profil et votre compte de connexion (gérés dans notre service d'identité) seront définitivement supprimés.",
+          "Tout le contenu que vous avez créé — projets, documents et articles de la base de connaissances — sera supprimé.",
+          "L'historique de vos conversations avec l'IA et les journaux d'interaction seront supprimés.",
+          "Vos sessions actives et vos jetons API seront invalidés et votre accès au Service sera révoqué.",
+          "Les partages et les invitations associés à votre compte seront annulés.",
+          "À l'issue du délai de grâce de 30 jours, la suppression est définitive et ne peut être annulée."
+        ]
+      },
+      "dataRetention": {
+        "title": "Conservation des données après leur suppression",
+        "content": "Votre demande de suppression entre dans une période de grâce de 30 jours, pendant laquelle vous pouvez l'annuler sur cette page. À l'issue de cette période de grâce, vos données seront effacées. Une trace minimale de la demande de suppression ainsi que certaines entrées du journal de sécurité et d'audit peuvent être conservées lorsque la loi l'exige ou afin de protéger le Service, comme décrit dans la Politique de confidentialité."
+      },
+      "confirmation": {
+        "title": "Confirmer la suppression",
+        "instructions": "Pour confirmer, saisissez l'adresse e-mail associée à votre compte. Vous pouvez également nous indiquer la raison de votre départ : cela nous aidera à améliorer le Service.",
+        "emailLabel": "L'adresse e-mail associée à votre compte",
+        "emailPlaceholder": "name@example.com",
+        "emailMismatch": "L'adresse e-mail indiquée ne correspond pas à celle associée à votre compte.",
+        "reasonLabel": "Motif de départ (facultatif)",
+        "reasonPlaceholder": "Souhaitez-vous nous ajouter quelque chose ? (facultatif)",
+        "reasons": {
+          "notUseful": "Ce service ne m'a pas été utile",
+          "privacyConcerns": "Préoccupations en matière de confidentialité",
+          "tooComplicated": "Ce service est trop compliqué",
+          "foundAlternative": "J'ai trouvé une alternative",
+          "temporaryBreak": "J'ai juste besoin d'une pause",
+          "other": "Autres"
+        }
+      },
+      "buttons": {
+        "delete": "Demander la suppression de mon compte",
+        "deleting": "Envoi de la demande…",
+        "cancel": "Annuler la demande de suppression",
+        "goBack": "Retour"
+      },
+      "success": {
+        "title": "Demande reçue",
+        "message": "Nous avons bien reçu votre demande. Votre compte sera supprimé à l'issue de la période de grâce de 30 jours, sauf si vous annulez cette demande."
+      },
+      "error": {
+        "title": "Échec de la requête",
+        "message": "Votre demande de suppression n'a pas pu être envoyée. Veuillez réessayer.",
+        "contactSupport": "Si le problème persiste, contactez-nous à l'adresse ask@aisha.guru."
+      },
+      "requestSubmitted": {
+        "title": "Demande de suppression soumise",
+        "message": "La suppression de votre compte est prévue à l'issue d'un délai de grâce de 30 jours. Vous pouvez annuler cette demande à tout moment avant la date prévue en revenant sur cette page."
+      },
+      "banner": {
+        "title": "Suppression du compte en attente",
+        "message": "La suppression de votre compte est prévue pour le {{date}}.",
+        "daysRemaining": "{{count}} jour(s) restants",
+        "daysRemaining_other": "Il reste {{count}} jours",
+        "cancelRequest": "Annuler la suppression",
+        "cancelling": "Annulation…",
+        "cancelled": "La demande de suppression a été annulée."
+      }
+    },
+    "dataExport": {
+      "title": "Exporter vos données",
+      "description": "Téléchargez une copie des données à caractère personnel et du contenu associés à votre compte (portabilité des données en vertu de l'article 20 du RGPD).",
+      "button": "Demander l'exportation",
+      "processing": "Préparation de votre exportation…",
+      "ready": "Votre exportation est prête.",
+      "download": "Télécharger l'exportation",
+      "includes": {
+        "title": "L'exportation comprend",
+        "items": [
+          "Votre profil et les données de votre compte",
+          "Contenu que vous avez créé sur le Service",
+          "L'historique de vos conversations avec l'IA",
+          "Historique des autorisations que vous avez accordées",
+          "Vos paramètres et préférences",
+          "Historique des opérations liées à votre compte"
+        ]
+      },
+      "format": "L'exportation est fournie sous la forme d'une archive lisible par machine (JSON).",
+      "success": "L'exportation a été créée avec succès.",
+      "error": "L'exportation n'a pas pu être créée. Veuillez réessayer ou contacter ask@aisha.guru."
+    },
+    "consents": {
+      "gdpr": "J'accepte que mes données personnelles soient traitées par {{operatorName}} conformément à la Politique de confidentialité.",
+      "terms": "J'ai lu les Conditions générales d'utilisation et j'accepte de m'y conformer.",
+      "professional": "Je certifie que les informations que j'ai fournies sont exactes et, le cas échéant, que j'agis à titre professionnel.",
+      "notMedicalAdvice": "Je comprends que le contenu fourni par le Service, y compris les résultats générés par l'IA, ne constitue en aucun cas un avis médical, juridique ou tout autre avis professionnel.",
+      "marketing": "J'accepte de recevoir de temps à autre des actualités et des informations sur les nouveaux produits de la part de {{operatorName}} (facultatif, possibilité de se désabonner à tout moment).",
+      "research": "J'accepte que mes données puissent être utilisées sous forme anonymisée à des fins de recherche et d'amélioration des services (facultatif).",
+      "knowledgeCheck": "Je confirme avoir lu et compris les informations qui m'ont été fournies.",
+      "informedConsent": "Je donne mon consentement éclairé à ma participation à {{studyName}}, organisé par {{organizerName}}, tel que décrit dans la fiche d'information destinée aux participants.",
+      "commitment": "Je m'engage à respecter les instructions fournies et à utiliser le Service conformément aux Conditions générales d'utilisation."
+    },
+    "legalDisclaimer": {
+      "title": "Mentions légales",
+      "lastUpdated": "Dernière mise à jour : 4 juillet 2026",
+      "fullText": "## Contenu généré par l'IA\n\nLa plateforme AISHA génère du contenu à l'aide de grands modèles linguistiques (IA). Les résultats fournis par l'IA peuvent être **inexacts, incomplets, obsolètes ou biaisés**, et peuvent présenter des informations erronées avec un ton qui semble sûr de lui. Vérifiez toujours les informations importantes auprès de sources fiables et indépendantes avant d'agir en conséquence.\n\n## Absence de conseil professionnel\n\nAucun élément fourni par le Service — y compris les résultats générés par l’IA — ne constitue un conseil juridique, médical, financier, fiscal ou tout autre conseil professionnel. Si vous avez besoin d’un conseil professionnel, consultez un professionnel qualifié dans le domaine concerné.\n\n## Votre responsabilité\n\nVous êtes responsable de l’utilisation que vous faites des résultats fournis par le Service. N’utilisez pas les résultats générés par l’IA comme seule base pour prendre des décisions ayant des conséquences juridiques, sanitaires, financières ou autres conséquences importantes. Vérifiez et validez les résultats avant de les partager ou de vous y fier.\n\n## Statut « Aperçu public »\n\nLe Service est proposé en « aperçu public » : sa disponibilité et son fonctionnement peuvent évoluer, et les résultats peuvent varier selon les versions et les configurations du modèle.\n\n## Signaler un problème\n\nSi le Service produit des résultats préjudiciables, illégaux ou gravement trompeurs, veuillez le signaler à **ask@aisha.guru** afin que nous puissions mener une enquête.\n\nOpérateur : **Evymo** · Contact : **ask@aisha.guru**"
+    },
+    "orderConfirmation": {
+      "title": "Confirmation de commande",
+      "subtitle": "Merci pour votre commande.",
+      "protocolNumber": "Numéro de protocole",
+      "date": "Date",
+      "operatorSection": {
+        "title": "Opérateur de plateforme",
+        "content": "La plateforme est gérée par Evymo. Contact : ask@aisha.guru."
+      },
+      "organizerSection": {
+        "title": "Organisateur",
+        "content": "Les coordonnées de l'organisateur figurent dans la documentation jointe à la commande."
+      },
+      "processorSection": {
+        "title": "Processeur de données",
+        "content": "Les coordonnées du sous-traitant figurent dans la documentation relative à la commande ci-jointe."
+      },
+      "orderDetails": {
+        "title": "Détails de la commande",
+        "tableHeaders": {
+          "product": "Produit",
+          "internalCode": "Code interne",
+          "gtin": "GTIN",
+          "quantity": "Quantité",
+          "unitPrice": "Prix unitaire",
+          "total": "Total"
+        },
+        "subtotal": "Sous-total",
+        "shipping": "Livraison",
+        "totalAmount": "Montant total"
+      },
+      "shippingInfo": {
+        "title": "Livraison",
+        "packetaPickup": "Point de retrait Packeta",
+        "packetaHome": "Livraison à domicile Packeta",
+        "personalPickup": "Retrait en magasin"
+      },
+      "consentsSection": {
+        "title": "Autorisations accordées",
+        "description": "Les autorisations suivantes ont été accordées dans le cadre de cette décision :",
+        "signedAt": "Signé à"
+      },
+      "studyNote": "Si cette commande s'inscrit dans le cadre d'une étude, la participation est régie par la documentation relative à l'étude et les consentements accordés.",
+      "disclaimer": "Cette confirmation a été générée par voie électronique et est valable sans signature."
+    },
+    "manufacturingProtocol": {
+      "title": "Protocole de fabrication",
+      "subtitle": "Registre de production par lots et de qualité",
+      "protocolNumber": "Numéro de protocole",
+      "batchInfo": {
+        "title": "Informations sur le lot",
+        "batchCode": "Code de lot",
+        "productName": "Nom du produit",
+        "internalCode": "Code interne",
+        "gtin": "GTIN",
+        "batchLot": "Lot",
+        "productionDate": "Date de production",
+        "expiryDate": "Date de péremption",
+        "serialNumber": "Numéro de série",
+        "consumerVariant": "Version grand public",
+        "certificationRef": "Référence de certification"
+      },
+      "production": {
+        "title": "Production",
+        "rawMaterialLot": "Lot de matière première",
+        "supplier": "Fournisseur",
+        "yieldPercent": "Rendement (%)"
+      },
+      "qualityControl": {
+        "title": "Contrôle qualité",
+        "approved": "Approuvé",
+        "approvedAt": "Approuvé le",
+        "inspector": "Inspecteur",
+        "notes": "Remarques",
+        "statusApproved": "Approuvé",
+        "statusRejected": "Rejeté",
+        "statusPending": "En attente"
+      },
+      "gs1Barcode": {
+        "title": "Code-barres GS1",
+        "description": "Code DataMatrix GS1 contenant l'identification du produit et les données relatives au lot.",
+        "encodedString": "Chaîne encodée"
+      },
+      "signatures": {
+        "title": "Signatures",
+        "productionManager": "Responsable de production",
+        "qualityManager": "Responsable qualité",
+        "date": "Date",
+        "signature": "Signature"
+      }
+    }
+  }
+}

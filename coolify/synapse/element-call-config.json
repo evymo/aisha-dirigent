@@ -1,0 +1,15 @@
+{
+  "default_server_config": {
+    "m.homeserver": {
+      "base_url": "https://${MATRIX_DOMAIN}",
+      "server_name": "${MATRIX_DOMAIN}"
+    }
+  },
+  "livekit": {
+    "livekit_service_url": "wss://${LIVEKIT_DOMAIN}"
+  },
+  "sfu": {
+    "livekit_service_url": "wss://${LIVEKIT_DOMAIN}"
+  },
+  "brand": "Evymo Call"
+}

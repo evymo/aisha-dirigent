@@ -1,0 +1,45 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify-registry.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+services:
+  registry-cache:
+    image: registry:2
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-registry-cache
+    restart: unless-stopped
+    environment:
+      REGISTRY_PROXY_REMOTEURL: "https://registry-1.docker.io"
+      REGISTRY_PROXY_USERNAME: ${REGISTRY_PROXY_USERNAME:-}
+      REGISTRY_PROXY_PASSWORD: ${REGISTRY_PROXY_PASSWORD:-}
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+      REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY: /var/lib/registry
+      REGISTRY_HTTP_ADDR: "0.0.0.0:5000"
+      REGISTRY_HTTP_HEADERS_X-Content-Type-Options: "[nosniff]"
+    volumes:
+      - registry-cache-data:/var/lib/registry
+    expose:
+      - "5000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:5000/v2/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - internal
+      - coolify
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=true"
+      - "traefik.docker.network=coolify"
+
+networks:
+  internal:
+    external: true
+    name: ${APP_NAME_PREFIX:?identita instance}-shared-net
+  coolify:
+    external: true
+    name: coolify
+
+volumes:
+  registry-cache-data:
+    name: ${APP_NAME_PREFIX:?}_registry-cache-data

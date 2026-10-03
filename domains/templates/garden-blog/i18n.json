@@ -1,0 +1,163 @@
+{
+  "_note": "Translation values for every data-i18n-key this template references. Consumed by `npm --prefix services/svc-web-artifact run export-web-seed` → emitted as `translations` rows. EN + CS authored by hand; de/fr/ru/th filled by `node scripts/i18n/translate-template-i18n.mjs domains/templates/garden-blog` (DeepL + context review).",
+  "web.garden.title": {
+    "en": "The Quiet Garden — a gardening journal",
+    "cs": "Tichá zahrada — zahradnický deník",
+    "de": "Der stille Garten — ein Garten-Tagebuch",
+    "fr": "Le Jardin tranquille — un journal de jardinage",
+    "ru": "«Тихий сад» — журнал о садоводстве",
+    "th": "สวนเงียบสงบ — บันทึกการทำสวน"
+  },
+  "web.garden.description": {
+    "en": "Seasonal notes, growing guides and small joys from the garden.",
+    "cs": "Sezónní poznámky, návody na pěstování a malé radosti ze zahrady.",
+    "de": "Saisonale Notizen, Anleitungen zum Gärtnern und kleine Freuden aus dem Garten.",
+    "fr": "Notes saisonnières, conseils de culture et petits bonheurs du jardin.",
+    "ru": "Сезонные заметки, советы по выращиванию и маленькие радости из сада.",
+    "th": "บันทึกตามฤดูกาล, คู่มือการเพาะปลูก และความสุขเล็ก ๆ จากสวน"
+  },
+  "web.garden.brand": {
+    "en": "The Quiet Garden",
+    "cs": "Tichá zahrada",
+    "de": "Der stille Garten",
+    "fr": "Le jardin tranquille",
+    "ru": "Тихий сад",
+    "th": "สวนเงียบสงบ"
+  },
+  "web.garden.nav.articles": {
+    "en": "Articles",
+    "cs": "Články",
+    "de": "Artikel",
+    "fr": "Articles",
+    "ru": "Статьи",
+    "th": "บทความ"
+  },
+  "web.garden.nav.topics": {
+    "en": "Topics",
+    "cs": "Témata",
+    "de": "Themen",
+    "fr": "Thèmes",
+    "ru": "Темы",
+    "th": "หัวข้อ"
+  },
+  "web.garden.nav.subscribe": {
+    "en": "Subscribe",
+    "cs": "Odebírat",
+    "de": "Abonnieren",
+    "fr": "S'abonner",
+    "ru": "Подписаться",
+    "th": "สมัครสมาชิก"
+  },
+  "web.garden.hero.heading": {
+    "en": "Notes from the garden",
+    "cs": "Poznámky ze zahrady",
+    "de": "Notizen aus dem Garten",
+    "fr": "Notes du jardin",
+    "ru": "Заметки из сада",
+    "th": "บันทึกจากสวน"
+  },
+  "web.garden.hero.body": {
+    "en": "Down-to-earth writing about growing food and flowers — what worked, what didn't, and the small wins that keep us digging.",
+    "cs": "Praktické psaní o pěstování zeleniny a květin — co se povedlo, co ne, a malé úspěchy, kvůli kterým má smysl rýt dál.",
+    "de": "Ehrliche Berichte über den Anbau von Gemüse und Blumen – was geklappt hat, was nicht, und die kleinen Erfolge, die uns weitermachen lassen.",
+    "fr": "Des récits simples sur la culture des légumes et des fleurs : ce qui a marché, ce qui n'a pas marché, et ces petites victoires qui nous donnent envie de continuer.",
+    "ru": "Простые и честные записи о выращивании овощей и цветов — что удалось, а что нет, и о тех маленьких победах, которые заставляют нас не сдаваться.",
+    "th": "การเขียนที่เรียบง่ายเกี่ยวกับการปลูกอาหารและดอกไม้ — สิ่งที่ได้ผล สิ่งที่ไม่ได้ผล และความสำเร็จเล็กๆ ที่ทำให้เรายังคงขุดต่อไป"
+  },
+  "web.garden.articles.heading": {
+    "en": "Latest from the journal",
+    "cs": "Nejnovější z deníku",
+    "de": "Neuestes aus dem Tagebuch",
+    "fr": "Dernières notes du journal",
+    "ru": "Последние новости из журнала",
+    "th": "ล่าสุดจากวารสาร"
+  },
+  "web.garden.topics.heading": {
+    "en": "Browse by topic",
+    "cs": "Procházet podle tématu",
+    "de": "Nach Thema suchen",
+    "fr": "Parcourir par thème",
+    "ru": "Просмотр по темам",
+    "th": "เรียกดูตามหัวข้อ"
+  },
+  "web.garden.topic.1": {
+    "en": "Vegetables",
+    "cs": "Zelenina",
+    "de": "Gemüse",
+    "fr": "Légumes",
+    "ru": "Овощи",
+    "th": "ผัก"
+  },
+  "web.garden.topic.2": {
+    "en": "Flowers",
+    "cs": "Květiny",
+    "de": "Blumen",
+    "fr": "Fleurs",
+    "ru": "Цветы",
+    "th": "ดอกไม้"
+  },
+  "web.garden.topic.3": {
+    "en": "Soil & compost",
+    "cs": "Půda a kompost",
+    "de": "Erde & Kompost",
+    "fr": "Terreau et compost",
+    "ru": "Почва и компост",
+    "th": "ดินและปุ๋ยหมัก"
+  },
+  "web.garden.topic.4": {
+    "en": "Tools",
+    "cs": "Nářadí",
+    "de": "Werkzeuge",
+    "fr": "Outils",
+    "ru": "Инструменты",
+    "th": "เครื่องมือ"
+  },
+  "web.garden.topic.5": {
+    "en": "Season by season",
+    "cs": "Sezónu po sezóně",
+    "de": "Saison für Saison",
+    "fr": "Saison après saison",
+    "ru": "Сезон за сезоном",
+    "th": "ฤดูกาลต่อฤดูกาล"
+  },
+  "web.garden.news.heading": {
+    "en": "Grow with us",
+    "cs": "Pěstujte s námi",
+    "de": "Wachsen Sie mit uns",
+    "fr": "Cultivons ensemble",
+    "ru": "Растите вместе с нами",
+    "th": "เติบโตไปพร้อมกับเรา"
+  },
+  "web.garden.news.body": {
+    "en": "One short letter a month — what to sow, what to harvest, and a story from the plot.",
+    "cs": "Jeden krátký dopis měsíčně — co zasít, co sklízet a příběh ze záhonu.",
+    "de": "Ein kurzer Brief pro Monat – was man säen und ernten sollte und eine Geschichte vom Beet.",
+    "fr": "Une petite lettre par mois : quoi semer, quoi récolter et une anecdote de mon potager.",
+    "ru": "Одно короткое письмо в месяц — что сеять, что собирать и история с огорода.",
+    "th": "จดหมายสั้นหนึ่งฉบับต่อเดือน — จะปลูกอะไร เก็บเกี่ยวอะไร และเรื่องราวจากแปลงปลูก"
+  },
+  "web.garden.news.placeholder": {
+    "en": "your@email.com",
+    "cs": "vas@email.cz",
+    "de": "your@email.com",
+    "fr": "your@email.com",
+    "ru": "your@email.com",
+    "th": "your@email.com"
+  },
+  "web.garden.news.button": {
+    "en": "Subscribe",
+    "cs": "Odebírat",
+    "de": "Abonnieren",
+    "fr": "S'abonner",
+    "ru": "Подписаться",
+    "th": "สมัครสมาชิก"
+  },
+  "web.garden.footer.text": {
+    "en": "The Quiet Garden — written by hand, grown with patience.",
+    "cs": "Tichá zahrada — psáno rukou, pěstováno s trpělivostí.",
+    "de": "Der stille Garten – von Hand geschrieben, mit Geduld gepflegt.",
+    "fr": "Le Jardin tranquille — écrit à la main, cultivé avec patience.",
+    "ru": "«Тихий сад» — написано от руки, выращено с терпением.",
+    "th": "สวนเงียบสงบ — เขียนด้วยลายมือ เติบโตด้วยความอดทน"
+  }
+}

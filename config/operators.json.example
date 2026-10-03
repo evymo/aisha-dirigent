@@ -1,0 +1,21 @@
+{
+  "$schema-note": "TEMPLATE. Copy to config/operators.json (gitignored) and fill REAL operator emails, OR provide the roster via the AISHA_OPERATORS env var (same JSON shape, single line). Real emails are PII and must NEVER be committed to the (public) repo. No user_id/sub is ever stored — provision-operators.mjs resolves each operator's LIVE Keycloak sub by email at cold-start, so the roster survives a fresh Keycloak (--wipe).",
+  "$primary-admin-note": "The PRIMARY admin account + password come from the environment (AISHA_PRIMARY_ADMIN_EMAIL + a cold-start-generated password written back to env), not from this file. The entries below are additional operators who may hold admin/escalated roles.",
+  "$auto-create-note": "Roster operators whose email has NO Keycloak account after a --wipe are auto-created by provision-operators.mjs (default; opt out with AISHA_OPERATORS_CREATE_MISSING=0 or --no-create) with a one-time temporary password printed ONCE to the cold-start terminal in a [TEMP-PASSWORD] block — never persisted — and first login forces a password change (UPDATE_PASSWORD required action); existing accounts are never modified.",
+  "operators": [
+    {
+      "email": "operator@example.com",
+      "username": "operator",
+      "displayName": "Primary Operator",
+      "language": "en",
+      "roles": ["admin", "staff"]
+    },
+    {
+      "email": "second.operator@example.com",
+      "username": "second",
+      "displayName": "Second Operator",
+      "language": "en",
+      "roles": ["admin", "member"]
+    }
+  ]
+}

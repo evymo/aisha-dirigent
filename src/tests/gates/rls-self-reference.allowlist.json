@@ -1,0 +1,11 @@
+{
+  "_comment": "Allowlist for scripts/db/check-rls-self-reference.mjs (DB_SECURITY_INVARIANTS.md Follow-up #3). That check runs public.aisha_assert_rls_self_reference() against the cold-start catalog (verify-cold-start-apply.sh step 5/5) and FLAGS any RLS policy whose USING/WITH CHECK queries its own table in a FROM/JOIN (Postgres 42P17 infinite-recursion risk). Identity-keyed on table::policy: a NEW self-reference is a NEW identity = a hard fail. To clear a flag: reroute the policy through a STABLE SECURITY DEFINER helper (the is_story_partner pattern), or — if it's a heuristic false positive or genuinely safe — add it here WITH a reason. Keep this list MINIMAL; every entry is a known recursion risk a human vouched can wait.",
+  "_generated_at": "2026-05-31T00:00:00Z",
+  "allowlist": [
+    {
+      "table": "public.call_participants",
+      "policy": "Participants can view room members",
+      "reason": "Pre-existing self-reference: the USING clause queries call_participants (a FROM/JOIN on its own table) to check room membership — the same 42P17 vector that 20260530130000_fix_story_participants_rls_recursion already rerouted for story_participants. The fix is to route it through a STABLE SECURITY DEFINER helper (an is_call_participant() mirror of is_story_partner()); that touches call-room access semantics owned by the realtime-comms team, so it is allowlisted here (not surgically rewritten) per DB_SECURITY_INVARIANTS.md Follow-up #3. This gate now guards against any NEW self-reference while this known one is driven to zero by its owner."
+    }
+  ]
+}

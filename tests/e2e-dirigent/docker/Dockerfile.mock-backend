@@ -1,0 +1,29 @@
+# Mock AISHA backend for e2e — fastify + tsx
+#
+# Build context: tests/e2e-dirigent/
+# Listens on :3030 (PORT env override).
+
+# Per-fork pull-through cache host — defaults to evymo's value. Forks
+# override via `--build-arg REGISTRY_DOMAIN=...` to route through their cache.
+ARG REGISTRY_DOMAIN=cache.aisha.guru
+FROM ${REGISTRY_DOMAIN}/library/node:22-alpine
+
+WORKDIR /app
+
+# Layer cache: install ONLY runtime deps for the mock backend.
+# We deliberately DON'T COPY the e2e suite package.json — it lists node-pty
+# in devDependencies which triggers a native node-gyp build under alpine
+# that we don't need here.
+RUN npm init -y > /dev/null && \
+    npm install --no-audit --no-fund fastify@^4.28.1 tsx@^4.22.0
+
+# Server + fixtures
+COPY mock-backend/ ./mock-backend/
+
+ENV PORT=3030 HOST=0.0.0.0 NODE_ENV=test
+EXPOSE 3030
+
+HEALTHCHECK --interval=5s --timeout=3s --start-period=10s --retries=12 \
+  CMD wget -q -O - http://127.0.0.1:3030/health || exit 1
+
+CMD ["npx", "tsx", "mock-backend/server.ts"]

@@ -1,0 +1,61 @@
+{
+  "warmup": {
+    "title": "Stack warmup",
+    "subtitle": "Bootstrap the platform's baseline knowledge into the stack-default story",
+    "statusDone": "Warmup complete",
+    "stepperAria": "Warmup wizard step progress",
+    "progressLabel": "Step {{current}} of {{total}} · {{count}} step(s) completed",
+    "stepMarked": {
+      "title": "Step recorded",
+      "description": "Marked {{step}} as completed"
+    },
+    "stepMarkedError": "Failed to record warmup step",
+    "steps": {
+      "welcome": {
+        "title": "Welcome",
+        "headline": "Let's warm up your AISHA stack",
+        "description": "This wizard walks you through preparing the platform's baseline knowledge in the stack-default story. Everything you set up here is automatically inherited by every subsequent story via the existing per-story isolation + globals retrieval.",
+        "defaultPresent": "Stack-default story is present and ready to receive knowledge.",
+        "defaultMissing": "Stack-default story is missing — run the cold-start bootstrap first.",
+        "cta": "Got it — continue"
+      },
+      "kb_upload": {
+        "title": "Upload knowledge",
+        "headline": "Upload your initial knowledge sources",
+        "description": "Upload and tag the documents, FAQs, expert rules, and other sources that should become the platform's baseline. These items will be retrieved as globals for every story.",
+        "requirement": "Need at least {{min}} knowledge item to continue",
+        "currentCount": "Currently in stack-default: {{count}} item(s)",
+        "cta": "Mark uploads complete"
+      },
+      "rules_setup": {
+        "title": "Review profiles",
+        "headline": "Review context profiles + expert rules",
+        "description": "Context profiles determine which knowledge layers (KB retrieval, ruleset, graph context, learnings) get composed into the LLM prompt and in what order. Confirm the defaults make sense for your install.",
+        "body": "Open the context profiles page to review or adjust the rulesets — or just acknowledge that the defaults are fine for the first pass. You can come back later.",
+        "openProfiles": "Open context profiles",
+        "acknowledge": "or acknowledge defaults and continue",
+        "cta": "Acknowledge and continue"
+      },
+      "test_query": {
+        "title": "Test a query",
+        "headline": "Run a test chat against the default story",
+        "description": "Verify that retrieval, citations, and the graph trail all flow end-to-end before you call the warmup done.",
+        "body": "Open the stack-default story, ask a question about one of the items you uploaded, then verify the response shows up correctly with sources + graph context.",
+        "checkCitations": "The citation panel under the answer lists the chunks AISHA used",
+        "checkGraph": "The explainability panel shows the multi-hop graph trail to discovered concepts",
+        "checkRoute": "The route plan (in admin AI runs) shows the chat hit the expected context profile",
+        "openStory": "Open default story",
+        "cta": "Test query verified"
+      },
+      "complete": {
+        "title": "Done",
+        "headline": "Warmup complete",
+        "description": "The platform's baseline is set. New stories will inherit it via compose_context kb_retrieval globals + graph_context layer.",
+        "body": "From this point on the wizard won't redirect you anymore. You can always return to this page to review the warmup audit history.",
+        "cta": "Mark warmup complete",
+        "backToAdmin": "Back to admin overview",
+        "lastActivity": "Last warmup activity: {{iso}}"
+      }
+    }
+  }
+}

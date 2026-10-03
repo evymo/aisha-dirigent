@@ -1,0 +1,213 @@
+# ============================================================================
+# Experimental Kata Containers prereq playbook
+# ============================================================================
+# One-shot installation of containerd + Kata Containers (kata-fc Firecracker
+# and kata-dragonball DragonBall VMMs) on Experimental. After this runs successfully,
+# Coolify can deploy aisha-exec (docker-compose.coolify-exec.yml) and the
+# svc-agent-runner will be able to spawn isolated workloads via the Docker
+# socket using per-run profiles ('kata-firecracker' → 'kata-fc',
+# 'kata-dragonball' → 'kata-dragonball').
+#
+# Run:
+#   ansible-playbook -i infra/ansible/inventory.ini infra/ansible/experimental-kata.yml
+#
+# Inventory should define a 'experimental' host with 'ansible_user=root' (or sudo).
+# ============================================================================
+---
+- name: Provision Kata Containers on Experimental
+  hosts: experimental
+  become: true
+  gather_facts: true
+
+  vars:
+    kata_version: "3.4.0"
+    kata_release_url: "https://github.com/kata-containers/kata-containers/releases/download/{{ kata_version }}/kata-static-{{ kata_version }}-amd64.tar.xz"
+    kata_install_root: /opt/kata
+    docker_daemon_json: /etc/docker/daemon.json
+    aisha_exec_network: aisha-exec-net
+
+  tasks:
+    # ── Pre-flight ────────────────────────────────────────────────────────
+    - name: Verify CPU virtualization (KVM) is available
+      ansible.builtin.shell: |
+        if [ ! -e /dev/kvm ]; then
+          echo "MISSING_KVM"
+          exit 1
+        fi
+        if ! grep -E '(vmx|svm)' /proc/cpuinfo > /dev/null; then
+          echo "NO_HARDWARE_VIRT"
+          exit 1
+        fi
+        echo "OK"
+      register: kvm_check
+      changed_when: false
+      failed_when: kvm_check.rc != 0
+
+    - name: Ensure base packages are installed
+      ansible.builtin.apt:
+        name:
+          - curl
+          - jq
+          - xz-utils
+          - ca-certificates
+          - apt-transport-https
+          - gnupg
+          - lsb-release
+        state: present
+        update_cache: true
+
+    # ── Docker (containerd-backed) ────────────────────────────────────────
+    - name: Add Docker GPG key
+      ansible.builtin.apt_key:
+        url: https://download.docker.com/linux/debian/gpg
+        state: present
+
+    - name: Add Docker apt repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/debian {{ ansible_distribution_release }} stable"
+        state: present
+        filename: docker
+
+    - name: Install Docker + containerd
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Ensure docker service is enabled and started
+      ansible.builtin.systemd:
+        name: docker
+        enabled: true
+        state: started
+
+    # ── Kata Containers (static release, both Firecracker + DragonBall) ───
+    - name: Create Kata install directory
+      ansible.builtin.file:
+        path: "{{ kata_install_root }}"
+        state: directory
+        mode: "0755"
+
+    - name: Check if Kata is already installed
+      ansible.builtin.stat:
+        path: "{{ kata_install_root }}/bin/kata-runtime"
+      register: kata_installed
+
+    - name: Download Kata static release
+      ansible.builtin.get_url:
+        url: "{{ kata_release_url }}"
+        dest: "/tmp/kata-static.tar.xz"
+        mode: "0644"
+      when: not kata_installed.stat.exists
+
+    - name: Extract Kata static release into install root
+      ansible.builtin.unarchive:
+        src: "/tmp/kata-static.tar.xz"
+        dest: "{{ kata_install_root }}"
+        remote_src: true
+        extra_opts: [--strip-components=3]
+      when: not kata_installed.stat.exists
+
+    - name: Symlink Kata binaries into /usr/local/bin
+      ansible.builtin.file:
+        src: "{{ kata_install_root }}/bin/{{ item }}"
+        dest: "/usr/local/bin/{{ item }}"
+        state: link
+        force: true
+      loop:
+        - kata-runtime
+        - containerd-shim-kata-v2
+      when: not kata_installed.stat.exists
+
+    # ── Configure both VMM profiles ───────────────────────────────────────
+    - name: Ensure /etc/kata-containers exists
+      ansible.builtin.file:
+        path: /etc/kata-containers
+        state: directory
+        mode: "0755"
+
+    - name: Stage Firecracker config (kata-fc)
+      ansible.builtin.copy:
+        src: "{{ kata_install_root }}/share/defaults/kata-containers/configuration-fc.toml"
+        dest: /etc/kata-containers/configuration-fc.toml
+        remote_src: true
+        force: false
+        mode: "0644"
+
+    - name: Stage DragonBall config (kata-dragonball)
+      ansible.builtin.copy:
+        src: "{{ kata_install_root }}/share/defaults/kata-containers/configuration-dragonball.toml"
+        dest: /etc/kata-containers/configuration-dragonball.toml
+        remote_src: true
+        force: false
+        mode: "0644"
+
+    # ── Register both runtimes with Docker daemon ─────────────────────────
+    - name: Ensure /etc/docker exists
+      ansible.builtin.file:
+        path: /etc/docker
+        state: directory
+        mode: "0755"
+
+    - name: Render Docker daemon.json with Kata runtimes
+      ansible.builtin.copy:
+        dest: "{{ docker_daemon_json }}"
+        mode: "0644"
+        content: |
+          {
+            "default-runtime": "runc",
+            "runtimes": {
+              "kata-fc": {
+                "path": "/usr/local/bin/containerd-shim-kata-v2",
+                "runtimeArgs": ["--config", "/etc/kata-containers/configuration-fc.toml"]
+              },
+              "kata-dragonball": {
+                "path": "/usr/local/bin/containerd-shim-kata-v2",
+                "runtimeArgs": ["--config", "/etc/kata-containers/configuration-dragonball.toml"]
+              }
+            },
+            "log-driver": "json-file",
+            "log-opts": { "max-size": "100m", "max-file": "3" }
+          }
+      notify: restart docker
+
+    # ── Pre-create the exec network (so svc-agent-runner doesn't race) ────
+    - name: Ensure aisha-exec-net Docker network exists
+      ansible.builtin.shell: |
+        docker network inspect {{ aisha_exec_network }} >/dev/null 2>&1 \
+          || docker network create --driver bridge {{ aisha_exec_network }}
+      register: net_create
+      changed_when: "'Created' in net_create.stdout or net_create.rc == 0"
+
+    # ── Smoke test (best-effort, non-fatal) ───────────────────────────────
+    - name: Pull hello-world image for smoke test
+      ansible.builtin.shell: docker pull hello-world:latest
+      changed_when: false
+
+    - name: Run hello-world under kata-fc (smoke)
+      ansible.builtin.shell: docker run --rm --runtime=kata-fc hello-world
+      register: smoke_fc
+      ignore_errors: true
+      changed_when: false
+
+    - name: Run hello-world under kata-dragonball (smoke)
+      ansible.builtin.shell: docker run --rm --runtime=kata-dragonball hello-world
+      register: smoke_db
+      ignore_errors: true
+      changed_when: false
+
+    - name: Report smoke test outcome
+      ansible.builtin.debug:
+        msg:
+          - "kata-fc smoke: {{ 'PASS' if smoke_fc.rc == 0 else 'FAIL — ' + (smoke_fc.stderr | default('')) | truncate(200) }}"
+          - "kata-dragonball smoke: {{ 'PASS' if smoke_db.rc == 0 else 'FAIL — ' + (smoke_db.stderr | default('')) | truncate(200) }}"
+
+  handlers:
+    - name: restart docker
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted

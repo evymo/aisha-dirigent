@@ -1,0 +1,14 @@
+{
+  "_comment": "STUB — intentionally invalid. The real file is rendered from app-config.template.json by scripts/render-app-config.mjs (cold-start + Dockerfile.web build), which hard-fails on missing env. If a client ever sees __VAR__ values here, the render step did not run — fix the build/deploy env, never edit this file by hand.",
+  "aisha_url": "https://__API_DOMAIN_PUBLIC__",
+  "anon_key": "__ANON_KEY__",
+  "keycloak_url": "https://__KEYCLOAK_DOMAIN__/realms/__KEYCLOAK_REALM__",
+  "redirect_url": "aisha-dirigent://oauth-callback",
+  "matrix_homeserver_url": "https://__MATRIX_DOMAIN__",
+  "matrix_service_url": "https://__API_DOMAIN_PUBLIC__/functions/v1/matrix-token-exchange",
+  "mcp_url": "https://__API_DOMAIN_PUBLIC__/functions/v1/mcp-knowledge-server",
+  "orchestration_url": "https://__DIRIGENT_DOMAIN__",
+  "n8n_trigger_url": "https://__API_DOMAIN_PUBLIC__/admin/n8n-trigger",
+  "web_url": "https://__APP_DOMAIN__",
+  "version": 3
+}

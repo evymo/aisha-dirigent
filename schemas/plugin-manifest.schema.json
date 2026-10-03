@@ -1,0 +1,515 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://evymo.local/schemas/plugin-manifest.schema.json",
+  "title": "AISHA Plugin Manifest",
+  "description": "Manifest contract for plugins assimilated by AISHA. Defines identity, capabilities, lifecycle, sandbox policy and dependency resolution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "version",
+    "kind",
+    "trust_tier",
+    "capabilities",
+    "lifecycle"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$",
+      "description": "Unique plugin slug (lowercase, hyphens, 3-64 chars)."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9.]+)?$",
+      "description": "Semantic version (e.g. 1.0.0, 2.1.0-beta.1)."
+    },
+    "name": {
+      "type": "string",
+      "maxLength": 128,
+      "description": "Human-readable plugin name."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 1000,
+      "description": "Short description of what the plugin does."
+    },
+    "author": {
+      "type": "string",
+      "maxLength": 128,
+      "description": "Author or organization name."
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "web_tracking",
+        "auth_provider",
+        "backend_provider",
+        "automation_node",
+        "full_stack",
+        "agent",
+        "data_source"
+      ],
+      "description": "Plugin kind — determines load strategy, runtime behaviour AND the materialization target: every kind maps to a materialize_* function that turns an approved manifest into a resolver-visible registry row (agent→agent_catalog, backend_provider→ai_provider_registry, automation_node→custom_node_registry, auth_provider→auth_provider_registry, web_tracking→web_tracking_registry, data_source→agent_knowledge_sources; full_stack composes). 'agent' is a marketplace agent (declarative run-as-story or executable call-mode). 'data_source' is an ingest connector loaded by the source-broker plugin host (IDataSource), NOT the compute sandbox — and NOT backend_provider, which is LLM-shaped."
+    },
+    "trust_tier": {
+      "type": "string",
+      "enum": [
+        "internal",
+        "partner",
+        "external"
+      ],
+      "description": "Trust level — internal: full trust, partner: verified, external: sandboxed."
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z]+\\..+$"
+      },
+      "minItems": 1,
+      "description": "Granted capability URIs (e.g. rpc.get_partner_stats, http.GET./metrics, cron.daily_rollup)."
+    },
+    "config_schema": {
+      "type": "object",
+      "description": "JSON Schema (object) konfigurace pluginu pro tenanta. Čtou ho DB funkce activate_data_source, get_data_source_secret_status a set_data_source_secrets: `required` a `properties.*.secret` (pověření). Tvar sjednocen s manifesty a konzumenty 2026-09-16.",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "properties"
+      ],
+      "properties": {
+        "type": {
+          "const": "object"
+        },
+        "required": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "type"
+            ],
+            "properties": {
+              "type": {
+                "type": "string",
+                "enum": [
+                  "string",
+                  "number",
+                  "integer",
+                  "boolean"
+                ]
+              },
+              "description": {
+                "type": "string"
+              },
+              "default": {},
+              "secret": {
+                "type": "boolean",
+                "description": "Pověření — ukládá se přes set_data_source_secrets, nikdy do konfigurace."
+              }
+            }
+          }
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "web_entry": {
+          "type": "string",
+          "description": "Relative path to web module entry (e.g. web/index.ts)."
+        },
+        "backend_entry": {
+          "type": "string",
+          "description": "Relative path to backend module entry (e.g. backend/index.ts)."
+        },
+        "n8n_entry": {
+          "type": "string",
+          "description": "Relative path to n8n node entry (e.g. n8n/node.ts)."
+        },
+        "migrations_dir": {
+          "type": "string",
+          "description": "Relative path to SQL migrations directory."
+        },
+        "load_strategy": {
+          "type": "string",
+          "enum": [
+            "hot",
+            "cold"
+          ],
+          "default": "hot",
+          "description": "Load strategy hint. Runtime may override based on kind (auth/backend = always cold)."
+        }
+      },
+      "description": "Entry points for each module type."
+    },
+    "sandbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeout_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 30000,
+          "default": 5000,
+          "description": "Maximum execution time in milliseconds."
+        },
+        "network_allowlist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Allowed network destinations (glob patterns, e.g. *.google-analytics.com)."
+        },
+        "max_memory_mb": {
+          "type": "integer",
+          "minimum": 8,
+          "maximum": 256,
+          "default": 64,
+          "description": "Maximum memory usage in MB."
+        },
+        "rpc_allowlist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "RPC functions the plugin may call from the sandbox. The broker reads them from the APPROVED sandbox policy (get_plugin_sandbox_policy); empty = no writes."
+        }
+      },
+      "description": "Sandbox policy for external plugins."
+    },
+    "agent_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Run-as-story template — present only for kind='agent' declarative agents. Consumed by install_agent_as_story to mint a consumer-owned story.",
+      "properties": {
+        "rule_slugs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Published expert_rule slugs composed into the installed story's ruleset."
+        },
+        "knowledge_items": {
+          "type": "array",
+          "description": "Knowledge items hydrated under the new (consumer-owned) story_id.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "title",
+              "body_markdown"
+            ],
+            "properties": {
+              "title": {
+                "type": "string",
+                "maxLength": 256
+              },
+              "body_markdown": {
+                "type": "string"
+              },
+              "summary": {
+                "type": "string"
+              },
+              "item_type": {
+                "type": "string",
+                "enum": [
+                  "expert_rule",
+                  "engineering_doc",
+                  "domain_doc",
+                  "playbook",
+                  "case_study",
+                  "personality_trait",
+                  "core_value"
+                ],
+                "default": "domain_doc"
+              },
+              "ai_context_tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "context_profile": {
+          "type": "string"
+        },
+        "tech_stack": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "domain": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "risk_profile": {
+          "type": "string"
+        },
+        "build_config": {
+          "type": "object"
+        }
+      }
+    },
+    "dependencies": {
+      "type": "object",
+      "description": "PŘÍMÉ npm závislosti zdroje pluginu (balík → verze). scripts/plugins/build.mjs je porovná s tím, co bundler skutečně zabalil; nesoulad je chyba buildu.",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "provider_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "kind=backend_provider materialization contract → ai_provider_registry (read by materialize_backend_provider). Secrets stay in env: auth_env_var is a NAME.",
+      "properties": {
+        "display_name": {
+          "type": "string"
+        },
+        "backend_kind": {
+          "type": "string",
+          "enum": [
+            "direct_cloud",
+            "llm_gateway",
+            "local_ollama",
+            "local_vllm",
+            "mcp_server"
+          ]
+        },
+        "endpoint_url": {
+          "type": "string"
+        },
+        "health_url": {
+          "type": "string"
+        },
+        "auth_kind": {
+          "type": "string",
+          "enum": [
+            "bearer",
+            "api_key_header",
+            "none"
+          ],
+          "default": "bearer"
+        },
+        "auth_env_var": {
+          "type": "string",
+          "description": "Env var NAME holding the credential — never the value."
+        },
+        "supports_chat": {
+          "type": "boolean",
+          "default": true
+        },
+        "supports_tool_use": {
+          "type": "boolean",
+          "default": false
+        },
+        "supports_vision": {
+          "type": "boolean",
+          "default": false
+        },
+        "supports_batch": {
+          "type": "boolean",
+          "default": false
+        },
+        "supports_streaming": {
+          "type": "boolean",
+          "default": true
+        },
+        "cost_class": {
+          "type": "string",
+          "enum": [
+            "budget",
+            "standard",
+            "premium"
+          ],
+          "default": "standard"
+        },
+        "global": {
+          "type": "boolean",
+          "default": false,
+          "description": "true = base/global row visible to every instance; default scopes to the approving instance."
+        },
+        "metadata": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "backend_kind"
+      ]
+    },
+    "node_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "kind=automation_node materialization contract → custom_node_registry (read by materialize_automation_node). deployed_to_n8n stays with the provision pipeline.",
+      "properties": {
+        "node_name": {
+          "type": "string",
+          "description": "Defaults to the plugin id."
+        },
+        "display_name": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string",
+          "default": "0.1.0"
+        },
+        "description": {
+          "type": "string"
+        },
+        "category": {
+          "type": "string",
+          "default": "aisha"
+        },
+        "n8n_node_type": {
+          "type": "string"
+        },
+        "package_json": {
+          "type": "object"
+        }
+      }
+    },
+    "auth_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "kind=auth_provider materialization contract → auth_provider_registry (read by materialize_auth_provider). Lands DISABLED — an IdP is an inbound trust boundary; the operator enables. client_secret_env_var is a NAME.",
+      "properties": {
+        "display_name": {
+          "type": "string"
+        },
+        "protocol": {
+          "type": "string",
+          "enum": [
+            "oidc",
+            "oauth2",
+            "saml",
+            "ldap"
+          ]
+        },
+        "issuer_url": {
+          "type": "string"
+        },
+        "client_id": {
+          "type": "string"
+        },
+        "client_secret_env_var": {
+          "type": "string",
+          "description": "Env var NAME holding the client secret — never the value."
+        },
+        "config": {
+          "type": "object",
+          "description": "Non-secret protocol config (scopes, claim mappings, button hints under config.button)."
+        },
+        "priority": {
+          "type": "integer",
+          "default": 100
+        },
+        "global": {
+          "type": "boolean",
+          "default": false
+        },
+        "metadata": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "protocol"
+      ]
+    },
+    "tracking_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "kind=web_tracking materialization contract → web_tracking_registry (read by materialize_web_tracking). Lands DISABLED (privacy boundary); loading is additionally consent-gated per visitor via consent_category.",
+      "properties": {
+        "display_name": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string",
+          "enum": [
+            "matomo",
+            "plausible",
+            "umami",
+            "custom"
+          ]
+        },
+        "script_url": {
+          "type": "string"
+        },
+        "site_id": {
+          "type": "string"
+        },
+        "consent_category": {
+          "type": "string",
+          "enum": [
+            "essential",
+            "analytics",
+            "marketing"
+          ],
+          "default": "analytics"
+        },
+        "config": {
+          "type": "object"
+        },
+        "global": {
+          "type": "boolean",
+          "default": false
+        },
+        "metadata": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "provider"
+      ]
+    },
+    "source_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "kind=data_source materialization contract → agent_knowledge_sources (read by materialize_data_source). Lands is_active=false BY CONSTRUCTION: activation requires the instance's 4D classification (Source Onboarding Contract) — the plugin declares WHAT it can read, the instance classifies and binds credentials. WHERE the adapter runs is declared by `host`: `sandbox` (default) = a connector packaged by scripts/plugins/build.mjs and run by the plugin-exec shim; `source-broker` = an IDataSource module svc-source-broker's plugin host imports in-process from its image (not packaged, not sandboxed).",
+      "properties": {
+        "source_slug": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "description": "Defaults to the plugin id."
+        },
+        "namespace": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]*(/[a-z0-9][a-z0-9_-]*)+$"
+        },
+        "adapter_entry": {
+          "type": "string",
+          "description": "Module path. host=sandbox: the build packages it into a sandbox artifact. host=source-broker: the build only checks it exists; the broker image carries the compiled module (SourceAdapterModule) and loads it via SOURCE_ADAPTER_PLUGIN_ENTRY."
+        },
+        "host": {
+          "type": "string",
+          "enum": [
+            "sandbox",
+            "source-broker"
+          ],
+          "default": "sandbox",
+          "description": "Where the adapter runs. `source-broker` opts an in-process IDataSource out of sandbox packaging — it may use what the sandbox disables (e.g. a native pg client). Unknown values are an error, never a silent sandbox. Resolved by scripts/plugins/host.mjs."
+        },
+        "default_config": {
+          "type": "object",
+          "description": "Declared defaults (poll cadence, plausibility bounds). NEVER credentials and NEVER the 4D classification — those are instance data."
+        }
+      },
+      "required": [
+        "namespace"
+      ]
+    }
+  }
+}

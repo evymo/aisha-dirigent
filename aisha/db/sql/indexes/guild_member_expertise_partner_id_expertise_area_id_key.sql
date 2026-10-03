@@ -1,0 +1,3 @@
+-- Index: guild_member_expertise_partner_id_expertise_area_id_key
+
+CREATE UNIQUE INDEX guild_member_expertise_partner_id_expertise_area_id_key ON public.guild_member_expertise USING btree (partner_id, expertise_area_id);

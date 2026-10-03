@@ -1,0 +1,31 @@
+diff --git a/build/lib/policies/policyGenerator.ts b/build/lib/policies/policyGenerator.ts
+index e0de81f..5eca94d 100644
+--- a/build/lib/policies/policyGenerator.ts
++++ b/build/lib/policies/policyGenerator.ts
+@@ -161,10 +161,25 @@ async function getTranslations(): Promise<Translations> {
+ 	const version = parseVersion(packageJson.version);
+ 	const languageIds = Object.keys(Languages);
+ 
+-	return await Promise.all(languageIds.map(
++	// AISHA: jazykove balicky se ptaji MICROSOFT MARKETPLACE API
++	// (ms-ceintl.vscode-language-pack-* pres POST /extensionquery), jenze
++	// VSCodium miri galerii na Open VSX. Ten dotaz proto neselhava prechodne --
++	// nemuze uspet NIKDY a shodi build jeste pred generovanim politik.
++	//
++	// Funkce uz vys dvakrat dela "Skipping policy localization" + return [],
++	// takze chybejici preklady jsou podporovany stav, ne vyjimka. Drzime tyz
++	// vzorec po jednotlivych jazycich: co se nepodari stahnout, se preskoci.
++	// Nasledek: sablony politik (ADMX / .mobileconfig) zustanou anglicky --
++	// samotne aplikace ani .dmg se to netyka.
++	const results = await Promise.all(languageIds.map(
+ 		languageId => getNLS(extensionGalleryServiceUrl, resourceUrlTemplate, languageId, version)
+ 			.then(languageTranslations => ({ languageId, languageTranslations }))
++			.catch((err: Error) => {
++				console.warn(`Skipping policy localization for '${languageId}': ${err.message}`);
++				return undefined;
++			})
+ 	));
++	return results.filter((r): r is { languageId: string; languageTranslations: LanguageTranslations } => r !== undefined);
+ }
+ 
+ async function windowsMain(policies: Policy[], translations: Translations) {

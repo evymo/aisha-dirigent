@@ -1,0 +1,105 @@
+{
+  "storyDetail": {
+    "missingId": "Chybějící id příběhu v adrese URL",
+    "notFound": "Příběh nebyl nalezen.",
+    "backToList": "Všechny příběhy",
+    "stackBadge": "Výchozí nastavení zásobníku",
+    "studyLink": "Související studie",
+    "stackRedirectError": "Nepodařilo se vyřešit výchozí id příběhu zásobníku: {{message}}",
+    "stackRedirectEmpty": "ensure_stack_default_story nevrátil žádné id; zkontrolujte oprávnění služby.",
+    "tabs": {
+      "overview": "Přehled",
+      "timeline": "Časová osa",
+      "knowledge": "Znalosti",
+      "rulesets": "Sady pravidel",
+      "bindings": "Vázání",
+      "hippocampus": "Hippocampus"
+    },
+    "timeline": {
+      "feedTitle": "Podávání informací o činnosti",
+      "railTitle": "Branch + deploy",
+      "empty": "K tomuto příběhu zatím nebyly zaznamenány žádné události. AISHA bude tento kanál doplňovat v průběhu práce.",
+      "railEmpty": "K tomuto příběhu zatím nejsou připojeny žádné nasazené aplikace.",
+      "branch": "Pobočka",
+      "active": "Aktivní",
+      "lastSwitch": "Poslední přepínač",
+      "lastRollback": "Poslední vrácení",
+      "noActivity": "Zatím žádná aktivita při nasazování"
+    },
+    "overview": {
+      "summary": "Souhrn",
+      "summaryHint": "Aktuální stav příběhu. Živě aktualizováno z partner_stories.",
+      "meta": "Meta",
+      "starred": "Hvězdička",
+      "branch": "Pobočka",
+      "noBranch": "Žádná propojená pobočka",
+      "lastActivity": "Poslední aktivita"
+    },
+    "knowledge": {
+      "empty": "Zatím žádné položky znalostí. Přidejte jednu, aby AISHA získala kontext pro konkrétní příběh.",
+      "create": "Přidání položky znalostí",
+      "edit": "Upravit",
+      "archive": "Archiv",
+      "save": "Uložit",
+      "cancel": "Zrušit",
+      "title": "Název",
+      "titlePlaceholder": "Krátký popisný název",
+      "itemType": "Typ",
+      "category": "Kategorie",
+      "categoryPlaceholder": "např. ux, zabezpečení, nasazení",
+      "tags": "Značky (oddělené čárkou)",
+      "body": "Tělo (markdown)",
+      "bodyPlaceholderCreate": "## Nadpis\n\nÚplné tělo markdown, ze kterého může AISHA načítat.",
+      "bodyPlaceholderEdit": "Nechte prázdné, aby zůstalo zachováno stávající tělo; zadejte nový obsah, který má být nahrazen.",
+      "editorTitleCreate": "Nová položka znalostí",
+      "editorTitleEdit": "Upravit položku znalostí",
+      "editorHint": "Všechna pole jsou kontrolována. Tělo je markdown; tagy jsou uloženy jako ai_context_tags[] pro posílení načítání.",
+      "noTags": "Žádné značky",
+      "verified": "ověřeno",
+      "verifiedTooltip": "Zkontrolováno a ověřeno",
+      "quarantined": "v karanténě",
+      "quarantinedTooltip": "Vyloučeno z vyhledávání až do přezkoumání člověkem",
+      "fileUploadTitle": "Nahrát soubor do Ragnarok KB",
+      "fileUploadHint": "Ragnarok zpracovává dokumenty na části + vložené části, které se vztahují k tomuto příběhu.",
+      "uploading": "Nahrávání.."
+    },
+    "rulesets": {
+      "empty": "Zatím žádné vazby na sadu pravidel. AISHA připojuje sady pravidel automaticky, když běží proti tomuto příběhu.",
+      "bindingTitle": "Vazba na sadu pravidel",
+      "bindingBy": "podle",
+      "noRules": "Žádná pravidla v této vazbě"
+    },
+    "bindings": {
+      "empty": "Pro tento příběh zatím nejsou nakonfigurovány žádné vazby bot↔KB. Přiřaďte agentům expertní pravidla, abyste mohli utvářet chování AISHA.",
+      "active": "aktivní",
+      "agentHint": "Odborná pravidla připojená k tomuto agentovi",
+      "priority": "priorita",
+      "global": "globální",
+      "globalTooltip": "Globální vazba (platí pro všechny příběhy)",
+      "enable": "Povolit",
+      "disable": "Zakázat"
+    },
+    "hippocampus": {
+      "empty": "Pro tento příběh zatím nebyly zachyceny žádné signály z hipokampu. AISHA zde píše, jak se učí z interakcí.",
+      "agentHint": "Paměťové signály zachycené tímto prostředkem v hipokampu",
+      "avgImportance": "Průměrný význam",
+      "expires": "platnost končí",
+      "reveal": "Odhalení",
+      "hide": "Skrýt",
+      "promote": "Podporovat",
+      "suspend": "Pozastavit",
+      "forget": "Zapomeňte na"
+    },
+    "faithfulness": {
+      "title": "Věrnost - posledních 50 kol",
+      "noData": "Zatím žádné údaje o věrnosti. Skóre se sčítají, jak AISHA zpracovává příběhové obraty.",
+      "error": "Nepodařilo se načíst data věrnosti.",
+      "noScore": "-",
+      "high": "Vysoká důvěra",
+      "medium": "Střední důvěra",
+      "low": "Nízká důvěra - recenze",
+      "noData_tier": "Žádné údaje",
+      "avg": "Průměr"
+    }
+  }
+}

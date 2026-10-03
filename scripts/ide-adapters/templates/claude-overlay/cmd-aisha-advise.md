@@ -1,0 +1,53 @@
+# AISHA Dirigent — Manual Advisor Review
+
+Invoke the read-only AISHA Dirigent expert advisor subagent to review the
+current branch / staged changes / specific files against the active story
+ruleset and best-practice expectations.
+
+This is the manual companion to the runtime advisory hooks
+(`.claude/hooks/aisha-advise-*.sh`). The hooks fire on every Edit/Write/Bash
+and are local + cheap; this command spawns a deeper review as a separate
+subagent context.
+
+## Arguments: $ARGUMENTS
+
+## Instructions
+
+1. **Determine review scope** from `$ARGUMENTS`:
+   - Empty → review uncommitted changes (`git diff` + dirty files)
+   - File path(s) → review those specific files
+   - `branch` → review entire branch vs main (`git diff main...HEAD`)
+   - `staged` → review staged changes only
+
+2. **Load active story context** (if any):
+   - Read `.aisha/story.json` → story_id
+   - This will be used by the subagent for ruleset alignment
+
+3. **Invoke the advisor subagent** via the Task tool:
+   ```
+   Task({
+     subagent_type: "aisha-advisor",
+     description: "Expert review of <scope>",
+     prompt: "Review <scope description>. Story: <story_id>. Focus areas: <inferred from file types>. Return structured posudek per the SKILL.md template."
+   })
+   ```
+
+4. **Display the structured output** the subagent returns. Format:
+   - Observed patterns (positive)
+   - Best-practice deviations (with rule slugs + file:line)
+   - Suggested directions (text only, no patches)
+   - Severity + Confidence + Recommended next action
+
+5. **Critical reminder to the user**: the advisor is **read-only** — it
+   produces an expert posudek, never a patch. The main agent (you) decide
+   whether and how to apply the suggestions.
+
+## Notes
+
+- The subagent uses MCP tools `mcp__aisha-knowledge__*` to look up rules from
+  the live Dirigent KB. If MCP is unreachable, the advisor will note this in
+  the output and fall back to repo-local CLAUDE.md.
+- Subagent tools restricted to: Read, Grep, Glob, mcp__aisha-knowledge__*
+  (no Bash/Edit/Write — enforces read-only review by tool-level constraint).
+- For runtime auto-advisory (every tool call), see `.claude/hooks/aisha-advise-*.sh` —
+  those are always-on; this command is on-demand.

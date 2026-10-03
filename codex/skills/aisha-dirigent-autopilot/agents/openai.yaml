@@ -1,0 +1,8 @@
+interface:
+  display_name: "AISHA Dirigent Autopilot"
+  short_description: "Hybrid Aisha and Codex delivery autopilot"
+  brand_color: "#0F766E"
+  default_prompt: "Use $aisha-dirigent-autopilot to health-check the workspace, route through Aisha when available, and continue in local fallback mode when remote services fail."
+
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,30 @@
+{
+  "name": "reasoning-tree-reflect",
+  "display_name": "Reasoning Tree (single-run Tree-of-Thoughts)",
+  "description": "E1 single-run Tree-of-Thoughts deliberation. tot_planner seeds the root + sizes the wave by REUSING the #443 deliberation kernel (planDeliberation), tot_expand fans out wave_width journaled drafters, tot_evaluate scores them Sure/Maybe/Impossible (critic-style 0..1), tot_search holds all BFS/DFS/beam + budget policy and loops back to expand or terminates. node_type is free text and the graph is JSONB, so this is pure wire-up — no DB migration. Edges read ONLY the flat tot_action/tot_done fields the guarded edge grammar supports.",
+  "context": "reflection",
+  "version": 1,
+  "is_active": true,
+  "metadata": {
+    "mode": "deliberation",
+    "pilot": true,
+    "owner": "platform",
+    "phase": "E1.2"
+  },
+  "graph": {
+    "entry": "tot_planner",
+    "max_iterations": 40,
+    "nodes": [
+      { "id": "tot_planner",  "type": "tot_planner",  "config": {} },
+      { "id": "tot_expand",   "type": "tot_expand",   "config": { "slot": "semantic", "temperature": 0.7, "max_tokens": 512 } },
+      { "id": "tot_evaluate", "type": "tot_evaluate", "config": { "slot": "verify", "max_tokens": 1024 } },
+      { "id": "tot_search",   "type": "tot_search",   "config": {} }
+    ],
+    "edges": [
+      { "from": "tot_planner",  "to": "tot_expand" },
+      { "from": "tot_expand",   "to": "tot_evaluate" },
+      { "from": "tot_evaluate", "to": "tot_search" },
+      { "from": "tot_search",   "to": "tot_expand", "condition": "tot_action == 'expand'" }
+    ]
+  }
+}

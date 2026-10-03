@@ -1,0 +1,18 @@
+{
+  "downtime.description": "Ungeplante Ausfaelle und Nichtverfuegbarkeit von Diensten",
+  "downtime.name": "Ausfälle",
+  "integration-errors.description": "Fehler, Ausfaelle oder Timeouts bei Integrationen",
+  "integration-errors.name": "Integrationsfehler",
+  "latency.description": "Hohe Antwortzeiten und verminderte Systemleistung",
+  "latency.name": "Latenz",
+  "memory-leak.description": "Memory Leak und Datensynchronisationsprobleme",
+  "memory-leak.name": "Memory Leak",
+  "mood-changes.description": "Alert-Stuerme, Fehlalarme oder Monitoring-Rauschen",
+  "mood-changes.name": "Instabile Benachrichtigungen",
+  "sleep-issues.description": "Timeout-Fehler und inaktive Verbindungsabbrueche",
+  "sleep-issues.name": "Timeout-Fehler",
+  "slow-queries.description": "Datenbank-Engpaesse und Abfrageoptimierungsprobleme",
+  "slow-queries.name": "Langsame Abfragen",
+  "ui-glitches.description": "Visuelle Fehler, Rendering-Probleme und Layout-Fehler",
+  "ui-glitches.name": "UI-Fehler"
+}

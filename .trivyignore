@@ -1,0 +1,17 @@
+# Trivy CVE allowlist — Phase 12 WP 3.8
+#
+# Format: one CVE ID per line, optional comment after `#`.
+# Every entry MUST include:
+#   - WHY accepted (transient dep, no exploit path, business decision)
+#   - WHEN to re-evaluate (target date or release)
+#   - WHO approved (PR author or security review)
+#
+# Audit: `npm run gate:supply-chain` (gate test asserts every entry has
+# justification + expiry not in the past).
+#
+# Example (none yet — repo starts clean):
+#
+# CVE-2024-XXXXX  # JustifiedRisk: transitive via foo@1.2.3; no exploit path
+#                 # in our usage (we don't call the vulnerable API).
+#                 # Re-evaluate: 2026-08-01 when foo@2.0 ships fix.
+#                 # Approved-by: zdenbe @ 2026-05-20

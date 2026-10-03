@@ -1,0 +1,12 @@
+global:
+    realm: orchestration-plane
+    # servername from URL calabel
+
+logger:
+    level: INFO
+
+auth:
+    stack: _System
+
+output:
+    headers: all

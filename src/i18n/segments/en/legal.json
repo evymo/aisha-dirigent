@@ -1,0 +1,208 @@
+{
+  "legal": {
+    "privacyPolicy": {
+      "title": "Privacy Policy",
+      "lastUpdated": "Last updated: 4 July 2026",
+      "fullText": "## 1. Who is the controller\n\nThe AISHA platform at aisha.guru (the \"Service\") is operated by **Evymo** (\"we\", the \"Operator\"), who acts as the controller of your personal data. For all privacy matters, contact us at **ask@aisha.guru**.\n\nThe Service is currently offered as a **public preview**. This policy describes how we handle personal data during the preview.\n\n## 2. What personal data we process\n\n- **Account data** — your name, e-mail address and sign-in records. Identity and authentication are handled by our self-hosted Keycloak instance; account data is not shared with external identity providers unless you choose to sign in through one.\n- **Content you create** — projects, documents, knowledge-base entries and other material you store in the Service.\n- **AI interaction data** — the prompts you submit, the responses generated and related metadata (timestamps, selected model). This data is necessary to provide the Service and to investigate malfunctions.\n- **Audit and security logs** — privileged and security-relevant actions are recorded in an audit journal to protect the Service and its users.\n\nWe do **not** use third-party analytics, advertising trackers or fingerprinting. The web application stores only your language preference and your authentication session in your browser.\n\n## 3. Purposes and legal bases (Art. 6 GDPR)\n\n- Providing the Service you signed up for — performance of a contract (Art. 6(1)(b)).\n- Security, abuse prevention and audit logging — our legitimate interest (Art. 6(1)(f)).\n- Optional features you opt into (e.g. product news) — your consent (Art. 6(1)(a)), which you can withdraw at any time.\n- Compliance with legal obligations (Art. 6(1)(c)).\n\n## 4. AI providers as processors\n\nWhen you use AI features, the content of your request (and the necessary context) is transmitted through our LLM gateway to the AI model provider configured for your instance, which acts as our processor. We do not sell your data and we do not permit its use for advertising. Where a configured provider processes data outside the EU/EEA, transfers are covered by appropriate safeguards such as the EU Standard Contractual Clauses.\n\n## 5. Where your data is stored\n\nApplication data is stored in a self-hosted PostgreSQL database and identity data in a self-hosted Keycloak instance, on infrastructure located in the European Union (Czech Republic).\n\n## 6. Retention\n\n- **Account data and content**: for as long as your account exists.\n- **Account deletion**: you can request erasure at any time on the **/account-deletion** page. The request enters a 30-day grace period (during which you can cancel it); after it expires, your account and content are erased.\n- **Audit and security logs**: kept for a limited period necessary for security and legal compliance, then deleted.\n- **Backups**: erased data leaves backups as backup cycles rotate.\n\n## 7. Your rights\n\nUnder the GDPR you have the right of access, rectification, erasure, restriction of processing, data portability and objection, and the right to withdraw consent at any time. You can exercise erasure directly at **/account-deletion** and portability via the data export function; for anything else, write to **ask@aisha.guru**. You also have the right to lodge a complaint with a supervisory authority — in the Czech Republic the Office for Personal Data Protection (ÚOOÚ, uoou.gov.cz).\n\n## 8. Security\n\nAccess to data follows the principle of least privilege, is protected by row-level security in the database and encrypted in transit, and privileged actions are recorded in the audit journal.\n\n## 9. Changes to this policy\n\nWe may update this policy, in particular as the preview evolves towards general availability. Material changes will be announced in the Service.\n\nQuestions? **ask@aisha.guru**"
+    },
+    "termsOfService": {
+      "title": "Terms of Service",
+      "lastUpdated": "Last updated: 4 July 2026",
+      "fullText": "## 1. Who we are and what these Terms cover\n\nThese Terms of Service (the \"Terms\") govern the use of the AISHA platform at aisha.guru (the \"Service\"), operated by **Evymo** (\"we\", the \"Operator\"). Contact: **ask@aisha.guru**. By creating an account or using the Service you agree to these Terms.\n\n## 2. Public preview\n\nThe Service is provided as a **public preview**:\n\n- availability, features and performance are **not guaranteed** and may change without notice;\n- preview data **may be reset**; we will give reasonable advance notice in the Service before any planned reset;\n- features may be added, changed or removed at any time.\n\nPlease keep your own copies of anything important — the data export function is available for this purpose.\n\n## 3. Your account\n\nAccounts are managed through our self-hosted identity service (Keycloak). You are responsible for keeping your credentials confidential and for all activity under your account. You must provide accurate information and be legally capable of entering into this agreement.\n\n## 4. Acceptable use\n\nYou must not: (a) use the Service for unlawful activity; (b) attempt to gain unauthorized access to data, accounts or infrastructure; (c) probe, scan or disrupt the Service other than by reporting a vulnerability responsibly to ask@aisha.guru; (d) use the Service to generate or distribute malware, spam or content that infringes third-party rights; (e) resell the hosted Service or provide it to third parties as a managed service. We may suspend or terminate accounts that violate these Terms.\n\n## 5. Your content\n\nYou retain all rights to the content you create or upload. You grant us a non-exclusive licence to host, store, process and display that content solely to the extent needed to operate and provide the Service. We do not use your content for advertising.\n\n## 6. AI-generated output\n\nThe Service produces output using large language models. AI output may be inaccurate, incomplete or biased and is provided for your evaluation only — see the Legal Disclaimer. You are responsible for reviewing AI output before relying on it or sharing it.\n\n## 7. Platform licence\n\nThe AISHA platform source code is licensed under the **Elastic License 2.0 (ELv2)** — see the LICENSE and NOTICE files in the source repository. These Terms govern your use of the hosted Service; they do not grant any rights to the source code beyond those in ELv2.\n\n## 8. Privacy\n\nThe processing of personal data is described in the Privacy Policy. Erasure of your account can be requested at /account-deletion.\n\n## 9. Warranties and liability\n\nThe preview Service is provided **\"as is\" and \"as available\"**, without warranties of any kind, to the maximum extent permitted by law. To the same extent, we are not liable for indirect or consequential damages, loss of data or loss of profit arising from the use of the preview Service. Nothing in these Terms excludes liability that cannot be excluded under applicable law.\n\n## 10. Termination\n\nYou may stop using the Service and delete your account at any time at /account-deletion. We may suspend or terminate access for violations of these Terms or for security reasons; where reasonable, we will notify you.\n\n## 11. Changes to these Terms\n\nWe may update these Terms during the preview. Material changes will be announced in the Service; continued use after the effective date constitutes acceptance of the updated Terms.\n\n## 12. Governing law\n\nThese Terms are governed by the laws of the Czech Republic. Mandatory consumer-protection provisions of your country of residence remain unaffected.\n\nContact: **ask@aisha.guru**"
+    },
+    "accountDeletion": {
+      "title": "Delete account",
+      "description": "Permanently delete your account and the data associated with it.",
+      "warning": "This action is permanent. Once the 30-day grace period expires, your account and data will be irreversibly deleted.",
+      "consequences": {
+        "title": "What happens when you delete your account",
+        "items": [
+          "Your profile and sign-in account (managed in our identity service) will be permanently deleted.",
+          "All content you have created — projects, documents and knowledge-base entries — will be deleted.",
+          "Your AI conversation history and interaction logs will be deleted.",
+          "Your active sessions and API tokens will be invalidated and access to the Service revoked.",
+          "Shares and invitations linked to your account will be cancelled.",
+          "After the 30-day grace period the deletion is final and cannot be undone."
+        ]
+      },
+      "dataRetention": {
+        "title": "Data retention after deletion",
+        "content": "Your deletion request enters a 30-day grace period, during which you can cancel it on this page. After the grace period, your data is erased. A minimal record of the deletion request and security/audit log entries may be retained where required by law or to protect the Service, as described in the Privacy Policy."
+      },
+      "confirmation": {
+        "title": "Confirm deletion",
+        "instructions": "To confirm, enter the e-mail address of your account. You can also tell us why you are leaving — it helps us improve the Service.",
+        "emailLabel": "Your account e-mail",
+        "emailPlaceholder": "name@example.com",
+        "emailMismatch": "The e-mail does not match your account e-mail address.",
+        "reasonLabel": "Reason for leaving (optional)",
+        "reasonPlaceholder": "Anything else you would like to tell us? (optional)",
+        "reasons": {
+          "notUseful": "The service was not useful for me",
+          "privacyConcerns": "Privacy concerns",
+          "tooComplicated": "The service is too complicated",
+          "foundAlternative": "I found an alternative",
+          "temporaryBreak": "I just need a break",
+          "other": "Other"
+        }
+      },
+      "buttons": {
+        "delete": "Request account deletion",
+        "deleting": "Submitting request…",
+        "cancel": "Cancel deletion request",
+        "goBack": "Go back"
+      },
+      "success": {
+        "title": "Request received",
+        "message": "We have received your request. Your account will be deleted after the 30-day grace period unless you cancel the request."
+      },
+      "error": {
+        "title": "Request failed",
+        "message": "Your deletion request could not be submitted. Please try again.",
+        "contactSupport": "If the problem persists, contact us at ask@aisha.guru."
+      },
+      "requestSubmitted": {
+        "title": "Deletion request submitted",
+        "message": "Your account is scheduled for deletion after a 30-day grace period. You can cancel the request at any time before the scheduled date by returning to this page."
+      },
+      "banner": {
+        "title": "Account deletion pending",
+        "message": "Your account is scheduled for deletion on {{date}}.",
+        "daysRemaining": "{{count}} day remaining",
+        "daysRemaining_other": "{{count}} days remaining",
+        "cancelRequest": "Cancel deletion",
+        "cancelling": "Cancelling…",
+        "cancelled": "The deletion request has been cancelled."
+      }
+    },
+    "dataExport": {
+      "title": "Export your data",
+      "description": "Download a copy of the personal data and content associated with your account (data portability under Art. 20 GDPR).",
+      "button": "Request export",
+      "processing": "Preparing your export…",
+      "ready": "Your export is ready.",
+      "download": "Download export",
+      "includes": {
+        "title": "The export includes",
+        "items": [
+          "Your profile and account data",
+          "Content you have created in the Service",
+          "Your AI conversation history",
+          "Records of the consents you have granted",
+          "Your settings and preferences",
+          "A log of actions related to your account"
+        ]
+      },
+      "format": "The export is provided as a machine-readable archive (JSON).",
+      "success": "The export was created successfully.",
+      "error": "The export could not be created. Please try again or contact ask@aisha.guru."
+    },
+    "consents": {
+      "gdpr": "I consent to the processing of my personal data by {{operatorName}} as described in the Privacy Policy.",
+      "terms": "I have read and agree to the Terms of Service.",
+      "professional": "I confirm that the information I have provided is accurate and, where applicable, that I am acting in a professional capacity.",
+      "notMedicalAdvice": "I understand that content provided by the Service, including AI-generated output, does not constitute medical, legal or other professional advice.",
+      "marketing": "I agree to receive occasional news and product updates from {{operatorName}} (optional, can be withdrawn at any time).",
+      "research": "I agree that my data may be used in anonymized form for research and service improvement (optional).",
+      "knowledgeCheck": "I confirm that I have read and understood the information provided to me.",
+      "informedConsent": "I give my informed consent to participation in {{studyName}} organized by {{organizerName}}, as described in the participant information.",
+      "commitment": "I undertake to follow the instructions provided and to use the Service in accordance with the Terms of Service."
+    },
+    "orderConfirmation": {
+      "title": "Order confirmation",
+      "subtitle": "Thank you for your order.",
+      "protocolNumber": "Protocol number",
+      "date": "Date",
+      "operatorSection": {
+        "title": "Platform operator",
+        "content": "The platform is operated by Evymo. Contact: ask@aisha.guru."
+      },
+      "organizerSection": {
+        "title": "Organizer",
+        "content": "The details of the organizer are stated in the accompanying order documentation."
+      },
+      "processorSection": {
+        "title": "Data processor",
+        "content": "The details of the data processor are stated in the accompanying order documentation."
+      },
+      "orderDetails": {
+        "title": "Order details",
+        "tableHeaders": {
+          "product": "Product",
+          "internalCode": "Internal code",
+          "gtin": "GTIN",
+          "quantity": "Quantity",
+          "unitPrice": "Unit price",
+          "total": "Total"
+        },
+        "subtotal": "Subtotal",
+        "shipping": "Shipping",
+        "totalAmount": "Total amount"
+      },
+      "shippingInfo": {
+        "title": "Shipping",
+        "packetaPickup": "Packeta pickup point",
+        "packetaHome": "Packeta home delivery",
+        "personalPickup": "Personal pickup"
+      },
+      "consentsSection": {
+        "title": "Granted consents",
+        "description": "The following consents were granted as part of this order:",
+        "signedAt": "Signed at"
+      },
+      "studyNote": "If this order is part of a study, participation is governed by the study documentation and the consents granted.",
+      "disclaimer": "This confirmation was generated electronically and is valid without a signature."
+    },
+    "manufacturingProtocol": {
+      "title": "Manufacturing protocol",
+      "subtitle": "Batch production and quality record",
+      "protocolNumber": "Protocol number",
+      "batchInfo": {
+        "title": "Batch information",
+        "batchCode": "Batch code",
+        "productName": "Product name",
+        "internalCode": "Internal code",
+        "gtin": "GTIN",
+        "batchLot": "Batch/LOT",
+        "productionDate": "Production date",
+        "expiryDate": "Expiry date",
+        "serialNumber": "Serial number",
+        "consumerVariant": "Consumer variant",
+        "certificationRef": "Certification reference"
+      },
+      "production": {
+        "title": "Production",
+        "rawMaterialLot": "Raw material LOT",
+        "supplier": "Supplier",
+        "yieldPercent": "Yield (%)"
+      },
+      "qualityControl": {
+        "title": "Quality control",
+        "approved": "Approved",
+        "approvedAt": "Approved at",
+        "inspector": "Inspector",
+        "notes": "Notes",
+        "statusApproved": "Approved",
+        "statusRejected": "Rejected",
+        "statusPending": "Pending"
+      },
+      "gs1Barcode": {
+        "title": "GS1 barcode",
+        "description": "GS1 DataMatrix encoding the product identification and batch data.",
+        "encodedString": "Encoded string"
+      },
+      "signatures": {
+        "title": "Signatures",
+        "productionManager": "Production manager",
+        "qualityManager": "Quality manager",
+        "date": "Date",
+        "signature": "Signature"
+      }
+    },
+    "legalDisclaimer": {
+      "title": "Legal Disclaimer",
+      "lastUpdated": "Last updated: 4 July 2026",
+      "fullText": "## AI-generated content\n\nThe AISHA platform generates content using large language models (AI). AI output may be **inaccurate, incomplete, outdated or biased**, and it may present incorrect information in a confident tone. Always verify important information against reliable, independent sources before acting on it.\n\n## No professional advice\n\nNothing provided by the Service — including AI-generated output — constitutes legal, medical, financial, tax or any other professional advice. If you need professional advice, consult a qualified professional in the relevant field.\n\n## Your responsibility\n\nYou are responsible for how you use the output of the Service. Do not use AI output as the sole basis for decisions with legal, health, financial or other significant consequences. Review and validate output before sharing it or relying on it.\n\n## Preview status\n\nThe Service is offered as a public preview: availability and behaviour may change, and results may vary between model versions and configurations.\n\n## Reporting problems\n\nIf the Service produces harmful, unlawful or seriously misleading output, please report it to **ask@aisha.guru** so we can investigate.\n\nOperator: **Evymo** · Contact: **ask@aisha.guru**"
+    }
+  }
+}

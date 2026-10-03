@@ -1,0 +1,105 @@
+{
+  "storyDetail": {
+    "missingId": "Identité de l'article manquante dans l'URL",
+    "notFound": "L'article n'a pas été trouvé.",
+    "backToList": "Toutes les histoires",
+    "stackBadge": "Défaut de pile",
+    "studyLink": "Étude liée",
+    "stackRedirectError": "Échec de la résolution de l'identifiant de l'histoire par défaut de la pile : {{message}}",
+    "stackRedirectEmpty": "ensure_stack_default_story n'a renvoyé aucun identifiant ; vérifiez les permissions du service.",
+    "tabs": {
+      "overview": "Vue d'ensemble",
+      "timeline": "Chronologie",
+      "knowledge": "Connaissances",
+      "rulesets": "Jeux de règles",
+      "bindings": "Fixations",
+      "hippocampus": "Hippocampe"
+    },
+    "timeline": {
+      "feedTitle": "Flux d'activité",
+      "railTitle": "Branche + déploiement",
+      "empty": "Aucun événement n'a encore été enregistré pour cette histoire. AISHA alimentera ce fil au fur et à mesure de son travail.",
+      "railEmpty": "Aucune application déployée n'est encore liée à cette histoire.",
+      "branch": "Branche",
+      "active": "Actif",
+      "lastSwitch": "Dernier interrupteur",
+      "lastRollback": "Dernier retour en arrière",
+      "noActivity": "Pas encore d'activité de déploiement"
+    },
+    "overview": {
+      "summary": "Résumé",
+      "summaryHint": "État actuel de l'histoire. Mise à jour en direct à partir de partner_stories.",
+      "meta": "Méta",
+      "starred": "Étoilé",
+      "branch": "Branche",
+      "noBranch": "Pas de branche liée",
+      "lastActivity": "Dernière activité"
+    },
+    "knowledge": {
+      "empty": "Il n'y a pas encore d'éléments de connaissance. Ajoutez-en un pour donner à AISHA un contexte spécifique à l'histoire dans lequel elle pourra puiser.",
+      "create": "Ajouter un élément de connaissance",
+      "edit": "Editer",
+      "archive": "Archives",
+      "save": "Économiser",
+      "cancel": "Annuler",
+      "title": "Titre",
+      "titlePlaceholder": "Titre descriptif court",
+      "itemType": "Type",
+      "category": "Catégorie",
+      "categoryPlaceholder": "par exemple, ux, sécurité, déploiement",
+      "tags": "Tags (séparés par des virgules)",
+      "body": "Corps (markdown)",
+      "bodyPlaceholderCreate": "## Intitulé\n\nCorps de texte complet que AISHA peut extraire.",
+      "bodyPlaceholderEdit": "Laisser vide pour conserver le corps existant ; taper le nouveau contenu à remplacer.",
+      "editorTitleCreate": "Nouvel élément de connaissance",
+      "editorTitleEdit": "Modifier un élément de connaissance",
+      "editorHint": "Tous les champs sont vérifiés. Le corps est en markdown ; les balises sont stockées en tant que ai_context_tags[] pour faciliter la récupération.",
+      "noTags": "Pas d'étiquette",
+      "verified": "vérifié",
+      "verifiedTooltip": "Examiné et vérifié",
+      "quarantined": "mis en quarantaine",
+      "quarantinedTooltip": "Exclus de la recherche jusqu'à ce qu'un examen humain soit effectué",
+      "fileUploadTitle": "Télécharger le fichier sur Ragnarok KB",
+      "fileUploadHint": "Les documents sont traités par Ragnarok en morceaux + embeddings correspondant à cette histoire.",
+      "uploading": "Téléchargement.."
+    },
+    "rulesets": {
+      "empty": "Il n'y a pas encore de règles liées. AISHA fixe automatiquement des règles lorsqu'elle rencontre cette histoire.",
+      "bindingTitle": "Liaison avec le jeu de règles",
+      "bindingBy": "par",
+      "noRules": "Pas de règles dans cet engagement"
+    },
+    "bindings": {
+      "empty": "Aucun bot↔KB n'a encore été configuré pour cette histoire. Liez des règles d'experts aux agents pour façonner le comportement d'AISHA.",
+      "active": "actif",
+      "agentHint": "Règles d'experts attachées à cet agent",
+      "priority": "priorité",
+      "global": "mondial",
+      "globalTooltip": "Obligation globale (s'applique à toutes les histoires)",
+      "enable": "Activer",
+      "disable": "Désactiver"
+    },
+    "hippocampus": {
+      "empty": "Aucun signal d'hippocampe n'a encore été capturé pour cette histoire. AISHA écrit ici au fur et à mesure qu'elle apprend des interactions.",
+      "agentHint": "Signaux de mémoire captés par cet agent de l'hippocampe",
+      "avgImportance": "Importance moyenne",
+      "expires": "expire",
+      "reveal": "Révéler",
+      "hide": "Cacher",
+      "promote": "Promouvoir",
+      "suspend": "Suspendre",
+      "forget": "Oublier"
+    },
+    "faithfulness": {
+      "title": "Fidélité - 50 derniers tours",
+      "noData": "Pas encore de données sur la fidélité. Les scores s'accumulent au fur et à mesure qu'AISHA traite les tournures de l'histoire.",
+      "error": "Impossible de charger les données de fidélité.",
+      "noScore": "-",
+      "high": "Confiance élevée",
+      "medium": "Confiance moyenne",
+      "low": "Manque de confiance - révision",
+      "noData_tier": "Pas de données",
+      "avg": "Moyenne"
+    }
+  }
+}

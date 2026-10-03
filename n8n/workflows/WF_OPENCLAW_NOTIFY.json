@@ -1,0 +1,278 @@
+{
+  "name": "WF_OPENCLAW_NOTIFY",
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "seconds",
+              "secondsInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "node-trigger",
+      "name": "Every 30s",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/openclaw_notifications?status=eq.queued&order=created_at.asc&limit=50",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-list-pending",
+      "name": "List Queued Notifications",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        420,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "node-split",
+      "name": "Split Per Notification",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/openclaw_notifications?id=eq.{{ $json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"status\": \"sending\", \"attempt_count\": {{ ($json.attempt_count || 0) + 1 }}, \"updated_at\": \"{{ $now.toISO() }}\"}",
+        "options": {}
+      },
+      "id": "node-mark-sending",
+      "name": "Mark Sending",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        860,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.OPENCLAW_URL }}/api/dispatch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"notification_id\": \"{{ $json.id }}\", \"channel\": \"{{ $json.channel }}\", \"recipient\": {{ $json.recipient === null ? 'null' : ('\"' + $json.recipient + '\"') }}, \"template\": \"{{ $json.template }}\", \"payload\": {{ JSON.stringify($json.payload) }}}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "node-dispatch",
+      "name": "Dispatch via OpenClaw",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "OpenClaw API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize OpenClaw dispatch response into outbox status update.\nconst id = $('Split Per Notification').first().json.id;\nconst attempts = ($('Split Per Notification').first().json.attempt_count || 0) + 1;\nconst maxAttempts = $('Split Per Notification').first().json.max_attempts || 5;\nconst resp = $input.first().json;\nconst statusCode = resp?.statusCode ?? 0;\nconst ok = statusCode >= 200 && statusCode < 300;\nlet status, nextRetryAt = null, error = null;\nif (ok) {\n  status = 'sent';\n} else if (attempts >= maxAttempts) {\n  status = 'failed';\n  error = `dispatch_failed_after_${attempts}_attempts (status ${statusCode})`;\n} else {\n  status = 'failed';\n  // Exponential backoff: 1m, 2m, 4m, 8m, 16m\n  const backoffMin = Math.pow(2, attempts - 1);\n  nextRetryAt = new Date(Date.now() + backoffMin * 60_000).toISOString();\n  error = `dispatch_failed (status ${statusCode})`;\n}\nreturn [{ json: { id, status, sent_at: ok ? new Date().toISOString() : null, next_retry_at: nextRetryAt, error } }];"
+      },
+      "id": "node-normalize",
+      "name": "Normalize Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/openclaw_notifications?id=eq.{{ $json.id }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=minimal"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"status\": \"{{ $json.status }}\", \"sent_at\": {{ $json.sent_at === null ? 'null' : ('\"' + $json.sent_at + '\"') }}, \"next_retry_at\": {{ $json.next_retry_at === null ? 'null' : ('\"' + $json.next_retry_at + '\"') }}, \"error\": {{ $json.error === null ? 'null' : ('\"' + ($json.error || '').replace(/\"/g, '\\\\\"') + '\"') }}, \"updated_at\": \"{{ $now.toISO() }}\"}",
+        "options": {}
+      },
+      "id": "node-update-status",
+      "name": "Persist Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1520,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 30s": {
+      "main": [
+        [
+          {
+            "node": "List Queued Notifications",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Queued Notifications": {
+      "main": [
+        [
+          {
+            "node": "Split Per Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Per Notification": {
+      "main": [
+        [
+          {
+            "node": "Mark Sending",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mark Sending": {
+      "main": [
+        [
+          {
+            "node": "Dispatch via OpenClaw",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dispatch via OpenClaw": {
+      "main": [
+        [
+          {
+            "node": "Normalize Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Result": {
+      "main": [
+        [
+          {
+            "node": "Persist Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

@@ -1,0 +1,7 @@
+ARG MATRIX_RTC_AUTH_BASE_IMAGE=ghcr.io/element-hq/lk-jwt-service:0.2.1
+
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/busybox:1.37.0-musl AS busybox
+FROM ${MATRIX_RTC_AUTH_BASE_IMAGE}
+
+COPY --from=busybox /bin/busybox /bin/busybox

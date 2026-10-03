@@ -1,0 +1,34 @@
+appId: ${APP_ID}
+---
+- launchApp
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible:
+      id: auth-login-screen
+    timeout: 30000
+# Switch to password mode
+# Přihlášení přes poskytovatele identity (heslo appka nemá, viz login-success).
+- tapOn:
+    id: auth-oauth-keycloak
+- extendedWaitUntil:
+    visible:
+      id: tab-home
+    timeout: 30000
+- tapOn:
+    id: tab-stories
+- extendedWaitUntil:
+    visible:
+      id: projects-screen
+    timeout: 15000
+- tapOn:
+    id: tab-profile
+- extendedWaitUntil:
+    visible:
+      id: profile-screen
+    timeout: 15000
+- tapOn:
+    id: tab-wallet
+- extendedWaitUntil:
+    visible:
+      id: wallet-screen
+    timeout: 15000

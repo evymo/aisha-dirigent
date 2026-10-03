@@ -1,0 +1,919 @@
+{
+  "common": {
+    "loading": "Načítání...",
+    "error": "Chyba",
+    "retry": "Zkusit znovu",
+    "save": "Uložit",
+    "cancel": "Zrušit",
+    "back": "Zpět",
+    "settings": "Nastavení",
+    "logout": "Odhlásit se",
+    "login": "Přihlásit se",
+    "ok": "OK",
+    "or": "nebo",
+    "try_again": "Zkuste to prosím znovu.",
+    "app_name": "{{brandFull}}"
+  },
+  "auth": {
+    "email": "E-mail",
+    "password": "Heslo",
+    "sign_in": "Přihlásit se",
+    "sign_in_title": "{{brandFull}}",
+    "sign_in_subtitle": "Přihlaste se ke svému účtu",
+    "invalid_credentials": "Neplatné přihlašovací údaje",
+    "session_expired": "Relace vypršela, přihlašte se znovu",
+    "biometric_prompt": "Ověřte svou identitu",
+    "biometric_unlock": "Odemknout pomocí {name}",
+    "biometric_offer_title": "Biometrické přihlášení",
+    "biometric_offer_message": "Chcete příště použít {name} pro rychlé přihlášení?",
+    "success_title": "Úspěch",
+    "registration_success_desc": "Váš účet byl vytvořen. Zkontrolujte e-mail pro ověření a poté se přihlaste.",
+    "registration_error_title": "Registrace selhala",
+    "registration_error_desc": "Nepodařilo se vytvořit účet. Zkuste to prosím znovu.",
+    "login_error_title": "Přihlášení selhalo",
+    "magicLink": {
+      "sent": "Magic link odeslán",
+      "checkEmailDesc": "Odeslali jsme 6místný kód na",
+      "enterCode": "Ověřovací kód",
+      "codePlaceholder": "123456",
+      "verifyCode": "Ověřit kód",
+      "resend": "Odeslat znovu",
+      "usePassword": "Použít heslo",
+      "useMagicLink": "Použít magic link",
+      "changeEmail": "Změnit e-mail",
+      "sendLink": "Odeslat Magic Link"
+    },
+    "oauth": {
+      "divider": "nebo pokračujte přes",
+      "apple": "Pokračovat přes Apple",
+      "google": "Pokračovat přes Google",
+      "keycloak": "Pokračovat přes {{brand}} ID",
+      "processing": "Přihlašujeme vás...",
+      "success": "Ověření úspěšné",
+      "redirecting_back": "Přesměrování zpět na přihlášení..."
+    },
+    "register": {
+      "subtitle": "Vytvořte si účet {{brandFull}}",
+      "full_name": "Celé jméno",
+      "full_name_placeholder": "Jan Novák",
+      "password_hint": "Minimálně 8 znaků",
+      "confirm_password": "Potvrdit heslo",
+      "submit": "Vytvořit účet",
+      "have_account": "Již máte účet?",
+      "login_link": "Přihlásit se"
+    },
+    "login": {
+      "noAccount": "Nemáte účet?",
+      "register": "Registrovat se"
+    },
+    "errors": {
+      "accountNotFound": "Účet nenalezen",
+      "mustRegisterFirst": "S tímto e-mailem neexistuje žádný účet. Zaregistrujte se prosím.",
+      "verificationFailed": "Ověření selhalo",
+      "invalidCode": "Zadaný kód je neplatný nebo vypršel. Zkuste to znovu.",
+      "missing_tokens": "Nepodařilo se dokončit ověření. Nebyly přijaty žádné tokeny.",
+      "login_failed": "Přihlášení selhalo. Zkuste to prosím znovu."
+    },
+    "validation": {
+      "fill_all_fields": "Vyplňte prosím všechna pole.",
+      "password_length": "Heslo musí mít alespoň 8 znaků.",
+      "passwords_mismatch": "Hesla se neshodují.",
+      "fill_email_password": "Zadejte prosím svůj e-mail."
+    },
+    "diagnostics": {
+      "show": "Zobrazit diagnostiku",
+      "hide": "Skrýt diagnostiku"
+    },
+    "webview": {
+      "title": "Přihlášení RIQ ID",
+      "blocked": "Sem se z přihlášení nejde — v aplikaci se přihlašujete jen jménem a heslem RIQ ID."
+    }
+  },
+  "dashboard": {
+    "title": "Přehled",
+    "projects": "Projekty",
+    "active": "Aktivní",
+    "blocked": "Blokované",
+    "messages": "Čekající zprávy",
+    "sentry": "Nevyřešené chyby",
+    "vulnerabilities": "Kritické zranitelnosti",
+    "build": "Build status",
+    "last_deploy": "Poslední deploy",
+    "validate": "Validátor"
+  },
+  "projects": {
+    "title": "Projekty",
+    "empty": "Žádné projekty",
+    "status": "Stav",
+    "priority": "Priorita",
+    "agent": "Agent",
+    "progress": "Postup",
+    "messages_pending": "čekajících zpráv",
+    "complexity": "Složitost",
+    "created": "Vytvořeno",
+    "checklist": "Checklist",
+    "consult_aisha": "Konzultovat s {{assistant}}",
+    "conversations": "Konverzace",
+    "no_conversations": "Žádné konverzace"
+  },
+  "chat": {
+    "title": "{{assistant}} Chat",
+    "placeholder": "Napište zprávu pro {{assistant}}...",
+    "send": "Odeslat",
+    "empty": "Začněte konverzaci s {{assistant}}",
+    "thinking": "{{assistant}} přemýšlí...",
+    "story_context": "Kontext příběhu",
+    "new_conversation": "Nová konverzace"
+  },
+  "monitor": {
+    "title": "Monitoring",
+    "sentry_issues": "Sentry Issues",
+    "vulnerabilities": "Zranitelnosti",
+    "metrics": "Metriky",
+    "agents": "Agenti",
+    "no_issues": "Žádné nevyřešené issues",
+    "analyze": "Analyzovat s {{assistant}}",
+    "requests_24h": "Požadavků za 24h",
+    "error_rate": "Chybovost",
+    "avg_response": "Prům. odezva",
+    "active_users": "Aktivní uživatelé"
+  },
+  "settings": {
+    "title": "Nastavení",
+    "backend_url": "Adresa serveru",
+    "backend_url_placeholder": "https://api.example.com",
+    "anon_key": "Anon Key",
+    "test_connection": "Otestovat spojení",
+    "connection_ok": "Spojení OK",
+    "connection_failed": "Spojení selhalo",
+    "reset_to_default": "Obnovit výchozí",
+    "language": "Jazyk",
+    "notifications": "Notifikace",
+    "enable_push": "Povolit push notifikace",
+    "about": "O aplikaci",
+    "version": "Verze",
+    "environment": "Prostředí",
+    "env_custom": "Vlastní",
+    "env_custom_hint": "Zadejte URL vašeho Supabase",
+    "apply_environment": "Použít",
+    "env_switched": "Prostředí změněno",
+    "env_switched_desc": "Budete přesměrováni na přihlášení.",
+    "current_env": "Aktivní"
+  },
+  "startup": {
+    "error_title": "Spuštění aplikace selhalo",
+    "error_subtitle": "Zkontrolujte nastavení připojení a zkuste to znovu."
+  },
+  "questionnaire": {
+    "title": "Dotazník",
+    "list_title": "Dotazníky",
+    "next": "Další",
+    "submit": "Odeslat",
+    "completed": "Dokončeno",
+    "pending": "Čeká",
+    "expired": "Vypršelo",
+    "status_pending": "Čeká na vyplnění",
+    "status_completed": "Dokončeno",
+    "status_expired": "Vypršelo",
+    "empty": "Žádné dotazníky"
+  },
+  "validator": {
+    "title": "Pocket Validator",
+    "subtitle": "Interaktivní Definition of Done kontrola",
+    "run": "Spustit validaci",
+    "running": "Validuji...",
+    "passed": "Prošlo",
+    "failed": "Neproslo",
+    "dod_checklist": "DoD Checklist",
+    "effort": "Odhad náročnosti",
+    "complexity": "Složitost",
+    "hours": "Hodiny",
+    "confidence": "Spolehlivost",
+    "tests_pass": "Testy prochází",
+    "build_pass": "Build prochází",
+    "typescript_strict": "TypeScript strict",
+    "gate_tests": "Gate testy",
+    "lint_clean": "Lint čistý",
+    "i18n_complete": "i18n kompletní",
+    "rpc_only": "RPC-only pattern",
+    "no_select_star": "Žádné .select(*)",
+    "no_pii_logs": "Žádné PII v logách",
+    "rls_policies": "RLS politiky",
+    "tsdoc_exports": "TSDoc na exportech"
+  },
+  "home": {
+    "title": "Domů",
+    "points": "Body",
+    "streak": "Série",
+    "rank": "Pořadí",
+    "my_stories": "Moje příběhy",
+    "no_stories": "Zatím žádné příběhy",
+    "reminders": "Dnešní připomínky",
+    "active_studies": "Aktivní studie",
+    "view_all_stories": "Zobrazit všechny příběhy",
+    "action_stories": "Příběhy",
+    "action_leaderboard": "Žebříček",
+    "action_studies": "Studie"
+  },
+  "story": {
+    "no_entries": "Zatím žádné záznamy",
+    "compose_placeholder": "Napište zprávu...",
+    "description": "Popis",
+    "labels": "Štítky",
+    "reminders": "Připomínky",
+    "tab_thread": "Vlákno",
+    "tab_timeline": "Časová osa",
+    "no_timeline": "Zatím žádná aktivita",
+    "tab_chat": "Chat",
+    "chat_no_room": "Pro tuto story zatím není chat",
+    "chat_empty": "Zatím žádné zprávy",
+    "chat_placeholder": "Zpráva…",
+    "chat_aisha": "{{assistant}}",
+    "chat_team": "Tým",
+    "chat_voice": "Hlas",
+    "chat_aisha_welcome": "Zeptej se {{assistant}} na tuhle story",
+    "chat_aisha_placeholder": "Zeptej se {{assistant}}…",
+    "chat_ruleset": "ruleset",
+    "chat_context": "kontext",
+    "voice_title": "Hlasový kanál story",
+    "voice_participants": "účastníků",
+    "voice_ready": "LiveKit token připraven",
+    "voice_join": "Připojit hlas",
+    "voice_hold": "Podržte pro mluvení",
+    "voice_leave": "Opustit",
+    "voice_status": {
+      "disconnected": "Odpojeno",
+      "connecting": "Připojuji",
+      "connected": "Připojeno",
+      "error": "Chyba připojení"
+    }
+  },
+  "stories": {
+    "title": "Příběhy",
+    "empty": "Žádné příběhy",
+    "status": "Stav",
+    "messages_pending": "čekajících zpráv"
+  },
+  "profile": {
+    "title": "Profil",
+    "tokens": "Tokeny",
+    "membership": "Členství",
+    "completeness": "Kompletnost profilu",
+    "leaderboard": "Žebříček",
+    "notifications": "Notifikace",
+    "settings": "Nastavení",
+    "logout": "Odhlásit se",
+    "health": "Zdraví",
+    "privacy": "Soukromí a data",
+    "admin": "Admin",
+    "operations": "Provoz"
+  },
+  "health": {
+    "title": "Zdravotní check-in",
+    "pain": "Úroveň bolesti",
+    "sleep": "Kvalita spánku",
+    "energy": "Úroveň energie",
+    "mood": "Nálada",
+    "medication": "Medikace",
+    "notes": "Poznámky",
+    "submit": "Odeslat check-in",
+    "success": "Check-in uložen!",
+    "trends": "Trendy",
+    "no_data": "Zatím žádné check-iny",
+    "log": "Zaznamenat check-in",
+    "notes_placeholder": "Poznámky (volitelné)",
+    "logged": "Check-in uložen",
+    "logged_desc": "Váš check-in byl zaznamenán.",
+    "history": "Historie",
+    "steps_30d": "Trend kroků (30d)",
+    "labs": "Laboratorní výsledky",
+    "no_labs": "Žádné laboratorní výsledky",
+    "dosing": "Dávkování",
+    "no_dosing": "Žádné záznamy dávkování",
+    "symptoms": "Symptomy",
+    "no_symptoms": "Žádné probíhající symptomy"
+  },
+  "leaderboard": {
+    "title": "Žebříček",
+    "your_rank": "Vaše pořadí",
+    "all_tokens": "Vše",
+    "governance": "Governance",
+    "impact": "Dopad",
+    "data": "Data",
+    "empty": "Zatím žádné záznamy"
+  },
+  "notifications": {
+    "title": "Notifikace",
+    "empty": "Žádné notifikace",
+    "mark_read": "Označit jako přečtené",
+    "mark_all_read": "Označit vše jako přečtené"
+  },
+  "errors": {
+    "title": "Chyba",
+    "generic": "Něco se pokazilo. Zkuste to prosím znovu.",
+    "network": "Chyba sítě. Zkontrolujte připojení.",
+    "session_expired": "Relace vypršela. Přihlaste se znovu.",
+    "permission_denied": "Nemáte oprávnění k této akci.",
+    "not_found": "Nenalezeno.",
+    "rate_limit": "Příliš mnoho požadavků. Zkuste to za chvíli.",
+    "validation": "Neplatná data."
+  },
+  "wallet": {
+    "title": "Peněženka",
+    "address": "Vaše {{brand}} adresa",
+    "copied": "Adresa zkopírována!",
+    "governance": "Hlasovat o návrzích",
+    "history": "Historie transakcí",
+    "noTransactions": "Žádné transakce.",
+    "required": "Je potřeba peněženka. Nejprve ji vytvořte nebo importujte.",
+    "setup": {
+      "title": "{{brand}} peněženka",
+      "subtitle": "Vytvořte nebo importujte Cosmos peněženku pro hlasování o návrzích a správu tokenů.",
+      "create": "Vytvořit novou peněženku",
+      "import": "Importovat existující peněženku",
+      "mnemonicPlaceholder": "Zadejte 24 slov obnovovací fráze…",
+      "confirmImport": "Importovat peněženku"
+    },
+    "backup": {
+      "title": "Zálohujte seed frázi",
+      "warning": "Zapište si těchto 24 slov a bezpečně je uložte. Toto je JEDINÝ způsob obnovy peněženky.",
+      "done": "Mám seed frázi uloženou"
+    },
+    "delete": {
+      "title": "Smazat peněženku",
+      "message": "Tato akce je nevratná. Ujistěte se, že máte zálohu seed fráze.",
+      "confirm": "Smazat",
+      "button": "Smazat peněženku"
+    }
+  },
+  "governance": {
+    "title": "Správa",
+    "subtitle": "Hlasujte o aktivních návrzích a formujte ekosystém {{brand}}.",
+    "walletRequired": "Pro hlasování potřebujete {{brand}} peněženku. Přejděte na záložku Peněženka.",
+    "noProposals": "Žádné aktivní návrhy.",
+    "votingEnds": "Hlasování končí",
+    "voteSuccess": "Hlas odeslán!",
+    "voteFailed": "Hlasování selhalo"
+  },
+  "signTx": {
+    "title": "Podpis transakce",
+    "heading": "Zkontrolovat a podepsat",
+    "description": "Ověřte se biometrikou pro podpis této transakce.",
+    "messages": "Zprávy",
+    "memo": "Poznámka",
+    "sign": "Podepsat a odeslat",
+    "signing": "Podepisuji…",
+    "success": "Transakce potvrzena",
+    "failed": "Transakce selhala"
+  },
+  "claimReward": {
+    "title": "Nárokovat odměny",
+    "subtitle": "Vyberte si vydělané {{brand}} tokeny on-chain.",
+    "walletRequired": "Pro nárok odměn potřebujete {{brand}} peněženku.",
+    "noRewards": "Žádné odměny k nároku.",
+    "claim": "Nárokovat",
+    "success": "Odměna nárokována!",
+    "failed": "Nárok selhal"
+  },
+  "kanban": {
+    "move_title": "Přesunout story",
+    "no_moves": "Žádné možné přesuny",
+    "statuses": {
+      "inbox": "Příchozí",
+      "in_progress": "Probíhá",
+      "blocked": "Blokováno",
+      "review": "Kontrola",
+      "testing": "Testování",
+      "done": "Hotovo",
+      "archived": "Archivováno",
+      "deployed": "Nasazeno"
+    }
+  },
+  "studies": {
+    "list_title": "Studie",
+    "detail_title": "Studie",
+    "my_studies": "Moje studie",
+    "discover": "Objevit",
+    "none_available": "Momentálně žádné dostupné studie",
+    "funding": "Financování",
+    "questionnaires": "Dotazníky",
+    "no_questionnaires": "Zatím žádné naplánované dotazníky",
+    "consent": "Souhlas",
+    "required": "Povinné",
+    "consent_note": "Zkontrolujte a přijměte souhlasy před zápisem.",
+    "required_accepted": "povinných přijato",
+    "consent_required_title": "Vyžadován souhlas",
+    "consent_required_desc": "Před zápisem přijměte všechny povinné souhlasy.",
+    "consent_contract_error": "Nastavení souhlasů pro tuto studii není kompletní. Zkuste to později nebo kontaktujte podporu.",
+    "enroll": "Zapsat se do studie",
+    "enroll_ok": "Zapsáno",
+    "enroll_ok_desc": "Jste zapsáni. Naplánované dotazníky se zobrazí zde.",
+    "status": {
+      "pending": "Čeká",
+      "screening": "Screening",
+      "enrolled": "Zapsán",
+      "active": "Aktivní",
+      "completed": "Dokončeno",
+      "withdrawn": "Odstoupeno"
+    },
+    "qstatus": {
+      "pending": "Ke splnění",
+      "completed": "Dokončeno",
+      "expired": "Vypršelo"
+    }
+  },
+  "services": {
+    "title": "Předplatné a služby",
+    "subscription": "Předplatné",
+    "next_billing": "Další platba",
+    "free_tier": "Bezplatný tarif — bez aktivního předplatného",
+    "free_tier_short": "Zdarma",
+    "product_access": "Přístup k produktům",
+    "expires": "Vyprší",
+    "llm_quota": "LLM kvóta",
+    "tokens_remaining": "tokenů zbývá",
+    "packages": "Balíčky",
+    "reward_rules": "Pravidla odměn"
+  },
+  "operations": {
+    "title": "Provoz",
+    "appointments": "Schůzky",
+    "appointment": "Schůzka",
+    "no_appointments": "Žádné schůzky",
+    "orders": "Objednávky",
+    "order": "Objednávka",
+    "no_orders": "Žádné objednávky",
+    "cart": "Košík",
+    "no_cart": "Košík je prázdný",
+    "vouchers": "Vouchery",
+    "no_vouchers": "Žádné vouchery",
+    "wearables": "Wearables",
+    "wearable": "Wearable",
+    "no_wearables": "Žádná wearable připojení"
+  },
+  "privacy": {
+    "title": "Soukromí a compliance",
+    "compliance": "Compliance",
+    "discount_eligible": "Nárok na slevu",
+    "score": "Skóre",
+    "completed": "Splněno",
+    "streak": "Série",
+    "consents": "Souhlasy",
+    "no_consents": "Žádné zaznamenané souhlasy",
+    "granted": "Uděleno",
+    "revoked": "Odvoláno",
+    "data_sharing": "Sdílení dat",
+    "no_sharing": "Nesdílíte data s partnery",
+    "partner": "Partner",
+    "expires": "Vyprší",
+    "devices": "Zařízení",
+    "no_devices": "Žádná registrovaná zařízení",
+    "device": "Zařízení"
+  },
+  "admin": {
+    "title": "Admin · Operátor",
+    "not_authorized": "Vyžadován administrátorský přístup",
+    "api_stats": "API (24h)",
+    "requests_24h": "Requesty",
+    "error_rate": "Chybovost",
+    "avg_response": "Prům. odezva",
+    "active_users": "Aktivní uživatelé",
+    "no_data": "Žádné metriky",
+    "top_endpoints": "Top endpointy",
+    "agents": "AI agenti",
+    "no_agents": "Žádná aktivita agentů",
+    "runs": "běhů",
+    "tokenomics": "Tokenomika",
+    "token_configs": "Konfigurace tokenů",
+    "transaction_summary": "Souhrn transakcí",
+    "footer_note": "Operátorský pohled — jen admin/staff"
+  },
+  "naturel": {
+    "words": {
+      "choiceVariants": "Na branách ti dám {{count}} rovnocenné varianty s trade-offy, bez předvýběru.",
+      "choiceSteps": "Povedu tě krok za krokem — doporučená volba bude předvybraná a po rozhodnutí řeknu, co následuje.",
+      "choiceRecommendation": "Přinesu jedno doporučení s dopadem; další varianty budou sbalené na klik.",
+      "messageBrief": "Zprávy stručně: souhrn první, detaily sbalené.",
+      "messageRich": "Zprávy s detailem: čísla, zdroje a souvislosti rovnou.",
+      "messageStandard": "Zprávy standardně: souhrn + detail na vyžádání.",
+      "evidenceInline": "Zdroje a provenance ukážu hned u čísel.",
+      "evidenceOnDemand": "Zdroje budou na klik (provenance nikdy nechybí).",
+      "cadenceDigest": "Podněty nasbírám do ranního briefu ({{at}}).",
+      "cadenceLive": "Podněty ponesu průběžně, jak přicházejí.",
+      "deferOption": "Odklad rozhodnutí nabídnu jako legitimní volbu — velké brány nechám na dopoledne.",
+      "inviteOthers": "K rozhodnutí půjde jedním klikem přizvat kolegu i s podkladem."
+    },
+    "steps": {
+      "podani": {
+        "overline": "Kalibrace 1/3 · první brána",
+        "question": "Mám ti věci předkládat spíš…",
+        "opt0": {
+          "title": "Jako varianty k porovnání — vyberu si.",
+          "detail": "ukážu dopady a trade-offy vedle sebe"
+        },
+        "opt1": {
+          "title": "Jako hotové doporučení — potvrdím a jedu.",
+          "detail": "jedna věta, dopad, tlačítko"
+        },
+        "opt2": {
+          "title": "Veď mě krok za krokem.",
+          "detail": "jeden jasný další krok po druhém"
+        }
+      },
+      "forma": {
+        "overline": "Kalibrace 2/3 · první výstup",
+        "question": "První výstup ti mám poslat jako…",
+        "opt0": {
+          "title": "Stručný souhrn.",
+          "detail": "podstata na pár řádků, detail na klik"
+        },
+        "opt1": {
+          "title": "Detail se zdroji a čísly.",
+          "detail": "provenance a souvislosti rovnou"
+        },
+        "opt2": {
+          "title": "Tabulku.",
+          "detail": "sloupce, čísla mono, dá se řadit"
+        }
+      },
+      "kadence": {
+        "overline": "Kalibrace 3/3 · tempo",
+        "question": "Podněty ode mě chceš…",
+        "opt0": {
+          "title": "Průběžně, jak věci přicházejí.",
+          "detail": "živý tok, výjimky hned"
+        },
+        "opt1": {
+          "title": "Jednou ráno v briefu.",
+          "detail": "klidné shrnutí v 08:00, urgence výjimečně"
+        }
+      }
+    },
+    "calibration": {
+      "doneOverline": "Kalibrace · hotovo",
+      "doneTitle": "Takhle s tebou budu mluvit:",
+      "save": "Uložit můj styl →",
+      "back": "← Upravit",
+      "skip": "Rovnou pracovat",
+      "footnote": "Preference, ne diagnóza — profil vidíš jen ty a fakta nikdy nemění.",
+      "noWrongAnswer": "Není správná odpověď — vyber, co je ti nejblíž. Kdykoli to změníš v „Můj styl\".",
+      "deniedTitle": "Nepustili nás dovnitř — vypadá to na jinou síť. Zaklepej a zkus to znovu.",
+      "saveError": "Uložení se nepovedlo. Zkus to prosím znovu.",
+      "knockAction": "Zaklepat na dveře"
+    },
+    "arch": {
+      "kurator": "Kurátor",
+      "dispecer": "Dispečer",
+      "dokoncovac": "Dokončovač",
+      "metodik": "Metodik",
+      "ladic": "Ladič"
+    },
+    "axes": {
+      "initiative": {
+        "name": "N1 · Iniciativa",
+        "lo": "témata otvírám já",
+        "hi": "reaguji na podněty"
+      },
+      "choice": {
+        "name": "N2 · Šíře volby",
+        "lo": "chci varianty",
+        "hi": "veď mě"
+      },
+      "grain": {
+        "name": "N4 · Zrno",
+        "lo": "stačí celek",
+        "hi": "chci detail"
+      },
+      "closure": {
+        "name": "N5 · Uzávěr",
+        "lo": "otevřené konce zvládám",
+        "hi": "potřebuji uzavřeno"
+      },
+      "register": {
+        "name": "N6 · Registr",
+        "lo": "věcně",
+        "hi": "lidsky"
+      }
+    },
+    "style": {
+      "title": "Můj styl s {{assistant}}",
+      "emptyTitle": "Profil zatím není.",
+      "emptyHint": "Projdi kalibraci (3 volby) — do té doby platí bezpečné výchozí podání.",
+      "startCalibration": "Spustit kalibraci",
+      "confidence": "jistota {{pct}} %",
+      "howNow": "Jak to teď dělám",
+      "switchChoice": "Přepnout podání voleb",
+      "variants": "Varianty",
+      "recommendation": "Doporučení",
+      "steps": "Krok za krokem",
+      "live": "Průběžně",
+      "digest": "Ranní brief",
+      "lock": "Zamknout (přestat se učit)",
+      "unlock": "Odemknout učení",
+      "recalibrate": "Re-kalibrace",
+      "reset": "Vypnout a smazat profil",
+      "resetTitle": "Smazat profil?",
+      "resetBody": "Uložený styl se smaže a platí bezpečné výchozí podání. Kalibraci můžeš kdykoli projít znovu.",
+      "resetConfirm": "Smazat",
+      "privacy": "Tvá explicitní volba vždy přebije odhad. Profil patří tobě — manažer ani HR ho nevidí; nikdy nevstupuje do hodnocení."
+    }
+  },
+  "extranet": {
+    "source": "Zdroj",
+    "blockUnavailable": "Blok teď není dostupný.",
+    "blockType": "Typ bloku: {{type}}",
+    "moreRows": "…a dalších {{n}}",
+    "queueEmpty": "Nic nečeká na potvrzení.",
+    "tower": {
+      "flag": {
+        "green": "Jede",
+        "yellow": "Kontrola",
+        "red": "Blokováno",
+        "box": "Čeká na člověka",
+        "finish": "Doručeno"
+      },
+      "inPhase": "Ve fázi",
+      "notMeasured": "—",
+      "waitingFor": "Čeká na"
+    },
+    "porada": {
+      "overline": "Extranet · Denní porada",
+      "title": "Denní porada",
+      "toTabs": "Na hlavní",
+      "loadError": "Poradu se teď nepodařilo načíst. Zkus to táhnutím dolů.",
+      "emptyTitle": "Zatím tu nic není.",
+      "emptyHint": "Jakmile poběží evidence a datové zdroje, uvidíš tu denní přehled: provoz, lidi, peníze, smlouvy a rozhodnutí k potvrzení — s doslovnou citací a zdrojem u každého čísla."
+    },
+    "wf": {
+      "progress": "Běhy procesů",
+      "mySteps": "Moje milníky",
+      "timeline": "Dění v procesech"
+    },
+    "tape": {
+      "done": "Hotovo dnes",
+      "now": "Teď",
+      "ahead": "Přede mnou",
+      "position": "{{n}}. ze {{total}} dnes",
+      "handover": "Předání a podpis",
+      "goal": "Složit",
+      "moreItems": "+{{n}} další"
+    },
+    "sections": {
+      "pick": "Sekce",
+      "inactive": "Zatím nepřipojeno"
+    },
+    "day": {
+      "label": "Den",
+      "current": "podle nastavení bloku",
+      "clear": "Zrušit výběr",
+      "weekdays": "po,út,st,čt,pá,so,ne",
+      "months": "leden,únor,březen,duben,květen,červen,červenec,srpen,září,říjen,listopad,prosinec"
+    },
+    "target": {
+      "open": "Otevřít: {{label}}"
+    },
+    "kpi_state": {
+      "warning": "pozor",
+      "loss": "ztráta",
+      "ok": "v pořádku"
+    },
+    "overline": "Extranet",
+    "profile": {
+      "unmatchedTitle": "Tahle appka míří na sekci, která tu není",
+      "unmatchedHint": "Profil buildu jmenuje {{sections}}, ale server ti tuhle sekci nevydal. Buď ji nemáš přiřazenou, nebo je překlep v nasazení — nahlas to prosím, appka si to nedomyslí."
+    },
+    "blockFailed": "Data se teď nedaří načíst.",
+    "blockFailedHint": "Není to chyba na vaší straně — zkuste to prosím za chvíli znovu.",
+    "blockNoAccess": "K těmto údajům zatím nemáte přístup.",
+    "actionTitle": "Akce",
+    "actionNone": "Tady žádná akce není.",
+    "actionSubmit": "Provést",
+    "actionCancel": "Zrušit",
+    "actionDone": "Zapsáno.",
+    "actionFailed": "Akce se nezapsala. Zkuste to znovu.",
+    "actionRequired": "povinné",
+    "actionYes": "Ano",
+    "actionNo": "Ne"
+  },
+  "workflow": {
+    "steps": {
+      "overline": "Provoz",
+      "title": "Moje kroky",
+      "emptyTitle": "Žádné čekající kroky",
+      "emptyHint": "Až vám bude přiřazen krok procesu (např. předání dodávky), objeví se tady.",
+      "loadError": "Kroky se nepodařilo načíst. Zkuste to prosím znovu.",
+      "recipient": "Přebírající (jméno)",
+      "recipientPlaceholder": "Kdo zásilku převzal",
+      "itemsOk": "Položky souhlasí",
+      "deviation": "Odchylka (krok selhal)",
+      "note": "Vyjádření k dodávce",
+      "notePlaceholder": "Co na místě neodpovídá dokladu — množství, stav zboží, poškození. Nepovinné.",
+      "submit": "Potvrdit dokončení",
+      "submitDeviation": "Uložit odchylku",
+      "submitting": "Ukládám…",
+      "completed": "Krok dokončen.",
+      "rewarded": "Krok dokončen · +{{amount}} {{token}}",
+      "queuedOffline": "Bez signálu — uloženo a odešle se samo (fotek: {{n}}).",
+      "queuedAfterFailure": "Odeslání se nepovedlo — práce je uložená a odešle se sama.",
+      "queuedLocked": "Uloženo. Spojení je, ale server nás nepustil dál — zaklepejte.",
+      "queuedKnocked": "Uloženo. Zařízení zaťukalo samo — fronta to zkusí znovu.",
+      "knockAction": "Zaklepat",
+      "completeError": "Dokončení se nepodařilo. Zkuste to prosím znovu.",
+      "doneSection": "Dokončené",
+      "status": {
+        "completed": "dokončeno",
+        "failed": "odchylka",
+        "pending": "čeká",
+        "in_progress": "probíhá"
+      },
+      "recipientLast": "Posledně přebíral: {{name}} — klepnutím doplnit"
+    },
+    "step": {
+      "mineTitle": "Váš krok",
+      "dispatchTitle": "Dispečerský pohled",
+      "dispatchHint": "Tenhle krok patří někomu jinému. Odbavit ho můžete, ale do evidence se zapíše, že jste ho potvrdili vy.",
+      "notFoundTitle": "Krok není dostupný",
+      "notFoundHint": "Buď neexistuje, nebo na něj nemáte nárok.",
+      "backToMine": "← Zpět na moje kroky",
+      "state": "Stav",
+      "doc": "Doklad",
+      "due": "Termín",
+      "assignedTo": "Přiřazeno",
+      "role": "Role",
+      "assignedTwin": "Řidič / vozidlo",
+      "completedBy": "Uzavřel",
+      "deviationLabel": "Odchylka",
+      "deviationFlag": "Ano — krok skončil odchylkou",
+      "noteLabel": "Vyjádření k dodávce",
+      "pathTitle": "Cesta dokladu",
+      "cargoSection": "Náklad a doklad",
+      "cargoSource": "Dodací list {{doc}}",
+      "itemName": "Materiál",
+      "itemQty": "Množství",
+      "itemsPending": "Čeká na kontrolu"
+    }
+  },
+  "handover": {
+    "signature": "Podpis převzetí",
+    "signHere": "Podepište se prstem",
+    "clear": "Smazat",
+    "signatureTooLarge": "Podpis je příliš velký — smažte a podepište se znovu.",
+    "moment": {
+      "nadpis": "Převzetí dodávky",
+      "komu": "Odběratel",
+      "kam": "Kam",
+      "vozidlo": "Vozidlo",
+      "veta": "Podpisem potvrzuji převzetí dodávky {{predmet}}.",
+      "vetaBezPredmetu": "Podpisem potvrzuji převzetí dodávky.",
+      "podat": "Podat k podpisu",
+      "hotovo": "Hotovo",
+      "zrusit": "Zpět",
+      "podepsano": "✓ Podepsáno",
+      "znovu": "Znovu"
+    },
+    "signatureTooShort": "Podepište se, prosím — samotný dotek podpis není.",
+    "cta": {
+      "start": "Předání a podpis",
+      "agree": "Souhlasí · k podpisu",
+      "confirm": "Potvrdit předání"
+    },
+    "sheet": {
+      "title": "Předání · {{kam}}",
+      "back": "Zpět"
+    },
+    "step": {
+      "check": "Kontrola",
+      "sign": "Podpis"
+    },
+    "missing": {
+      "podpis": "Chybí podpis přebírajícího.",
+      "jmeno": "Chybí jméno přebírajícího.",
+      "obe": "Chybí podpis a jméno přebírajícího."
+    },
+    "extra": {
+      "title": "Jen když je co řešit",
+      "hint": "Nic z toho není povinné — čas a místo předání zapisujeme sami.",
+      "claim": "Výhrada",
+      "claimPlaceholder": "Např. 2 obrubníky s odštípnutou hranou — převzato s výhradou.",
+      "claimCancel": "Zrušit výhradu",
+      "claimHint": "Zapíše se k předání a uvidí ji dispečink."
+    },
+    "sign": {
+      "title": "Podpis přebírajícího",
+      "cargo": "Materiál",
+      "claim": "S výhradou",
+      "claimYes": "ano · zápis přiložen"
+    },
+    "done": {
+      "title": "Předáno",
+      "sent": "Odesláno na dispečink",
+      "next": "Další jízda",
+      "continue": "Pokračovat",
+      "signedBy": "Podpis",
+      "signed": "✓ podepsáno",
+      "photos": "Fotografie",
+      "pieces": "{{n}} ks",
+      "claim": "Výhrada"
+    }
+  },
+  "evidence": {
+    "photos": "Foto",
+    "photo": "Fotografie",
+    "cameraDeniedTitle": "Kamera není povolená",
+    "cameraDenied": "Bez přístupu ke kameře fotku nepořídím. Povolit jde v Nastavení.",
+    "captureFailedTitle": "Fotku se nepodařilo pořídit",
+    "captureFailed": "Zkuste to prosím znovu.",
+    "deleted": "Fotka smazána",
+    "undo": "Vrátit"
+  },
+  "meter": {
+    "value": "Stav měřidla",
+    "valuePlaceholder": "např. 12345,6",
+    "suggested": "Appka vyčetla: {{value}} — zkontroluj a případně přepiš",
+    "valueRequired": "Zadej hodnotu, kterou vidíš na displeji.",
+    "saved": "Odečet uložen · {{value}}",
+    "savedNoPhoto": "Odečet uložen · {{value}} (fotku se nepodařilo odeslat)",
+    "queuedOffline": "Bez signálu — odečet {{value}} uložen a odešle se sám."
+  },
+  "knock": {
+    "title": "Zaklepat",
+    "intro": "Server neodpovídá, nebo vás odmítá. Zadejte kód a zaklepejte — teprve pak vás pustí dál.",
+    "code_label": "Kód",
+    "action": "Zaklepat",
+    "sent": "Zaťukáno",
+    "sent_desc": "Dveře na zaťukání zásadně neodpovídají — jestli se otevřely, se pozná jedině tím, že projde další požadavek. Zkuste to znovu.",
+    "try_again_now": "Zkusit znovu",
+    "not_sent": "Neodesláno",
+    "unknown_error": "Neznámá chyba",
+    "not_configured": "Nemám čím zaťukat",
+    "not_configured_desc": "Chybí údaje o tom, kam se ťuká. Ťukat naslepo nemá smysl: zaťukání na špatnou adresu vypadá stejně jako zaťukání správné — tedy nijak. Doplňte do sestavení:",
+    "fromLogin": "Nejde se připojit? Zaklepat na dveře",
+    "device_title": "Toto zařízení",
+    "device_none": "Zařízení nemá vlastní průkaz. Ťuká se tedy jen ručně kódem.",
+    "device_enroll": "Zavést toto zařízení",
+    "device_enrolled": "Zařízení má vlastní průkaz.",
+    "device_pending": "Průkaz sám o sobě nic neotevírá. Pošlete otisk správci; dokud ho neschválí, ťuká se ručně.",
+    "tablet_waiting": "Čeká na schválení správcem — v administraci: Zařízení → Průkazy pro dveře.",
+    "tablet_approved": "Schváleno. Tablet si dveře otevírá sám.",
+    "tablet_revoked": "Průkaz byl odvolán. Tablet dveře sám neotevře.",
+    "tablet_door_closed": "Ohlásit se jde jen hned po zaťukání kódem technika. Zaťukejte a zkuste to znovu.",
+    "tablet_failed": "Ohlášení se nepovedlo: {{duvod}}",
+    "tablet_retry": "Ohlásit znovu",
+    "device_fingerprint": "Otisk pro správce",
+    "device_forget": "Zapomenout zařízení",
+    "device_error": "S průkazem zařízení je potíž"
+  },
+  "fronta": {
+    "ceka": "⏳ Čeká na odeslání: {{n}}",
+    "odesila": "↑ Odesílá se… ({{n}})",
+    "nevim": "⚠️ Nevím, co čeká na odeslání",
+    "vyzaduje-cloveka": "⚠️ Samo se neodešle: {{n}}",
+    "zkusit": "Zkusit teď"
+  },
+  "kiosk": {
+    "title": "Dnešní rozvozy",
+    "podle_ridice": "Podle řidiče",
+    "podle_vozidla": "Podle vozidla",
+    "k_predani": "{{pocet}} k předání",
+    "hotovo": "{{pocet}} hotovo",
+    "predano": "Předáno",
+    "prazdne": "Dnes tu nic k předání není.",
+    "vyber": "Vyberte, kdo veze nebo čím se veze.",
+    "prihlasit": "Přihlásit se ke svému účtu",
+    "odhlasit": "Odhlásit se",
+    "odhlasit_fronta": "Na tabletu jsou neodeslaná předání. Odešlou se, až se na tomto tabletu znovu přihlásíte. Odhlásit přesto?",
+    "prihlasen_jako": "Přihlášen: {name} · tablet vás o půlnoci odhlásí sám",
+    "tablet": "Tablet v kabině",
+    "pruvodce_nacitam": "Tablet se připojuje…",
+    "zavedeni_nadpis": "Zavedení tabletu",
+    "zavedeni_nezname": "Server tento tablet nezná — ohlaste ho znovu kódem technika.",
+    "zavedeni_krok1": "Technik zadá kód dveří.",
+    "zavedeni_krok2": "Tablet zaklepe a sám se ohlásí se svým otiskem.",
+    "zavedeni_krok3": "Správce ho schválí v administraci (Zařízení → Průkazy pro dveře). Pak už tablet běží sám.",
+    "zavedeni_kod": "Kód technika",
+    "zavedeni_akce": "Zaklepat a ohlásit",
+    "zavedeni_bezi": "Klepu a ohlašuji…",
+    "zavedeni_dvere": "Dveře se neotevřely. Buď je špatně kód technika, nebo server dveře pro tablety ještě nemá zapnuté (správce). Zkuste to znovu.",
+    "zavedeni_neodeslano": "Zaklepat se nepodařilo: {{duvod}}",
+    "zavedeni_chyba": "Zavedení se nepovedlo: {{duvod}}",
+    "zavedeni_nenastaveno": "Tablet nemá od správce zařízení nastavené dveře. Obraťte se na servis.",
+    "ceka_nadpis": "Čeká na schválení",
+    "ceka_text": "Správce tablet schválí v administraci: Zařízení → Průkazy pro dveře. Tablet se ptá sám.",
+    "pripojuji_nadpis": "Schváleno — připojuji",
+    "pripojuji_text": "Tablet si otevírá dveře vlastním průkazem a bere si přístup k dnešním rozvozům.",
+    "odvolano_nadpis": "Tablet byl odvolán",
+    "odvolano_text": "Obraťte se na správce. Pokud tablet znovu schválí, připojí se sám.",
+    "vyprselo_nadpis": "Oprávnění tabletu vypršelo",
+    "vyprselo_text": "Správce ho obnoví v administraci. Tablet se pak připojí sám.",
+    "vadny_nadpis": "Klíč tabletu je poškozený",
+    "vadny_text": "Servis: symbol dveří nahoře → Zapomenout zařízení → zavést znovu.",
+    "porucha_nadpis": "Nelze se spojit se serverem",
+    "znovu_za": "Zkusím znovu za {{s}} s",
+    "zkusit_hned": "Zkusit hned",
+    "rozvozy_chyba": "Rozvozy se teď nepodařilo načíst — zkouším znovu.",
+    "doklad": "Dodací list",
+    "ridic": "Řidič",
+    "vozidlo": "Vozidlo",
+    "zpet_na_rozvozy": "← Zpět na rozvozy"
+  }
+}

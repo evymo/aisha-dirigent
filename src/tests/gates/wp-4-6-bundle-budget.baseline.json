@@ -1,0 +1,57 @@
+{
+  "summary": {
+    "generated_at": "2026-05-19T23:56:37.024Z",
+    "total_chunks": 5,
+    "total_gzip_bytes": 2883462,
+    "budget_violations": 2,
+    "regressions": 0
+  },
+  "chunks": {
+    "shared": {
+      "rawBytes": 5544839,
+      "gzipBytes": 1440273,
+      "category": "lazy"
+    },
+    "vendor": {
+      "rawBytes": 3826275,
+      "gzipBytes": 1134049,
+      "category": "vendor"
+    },
+    "admin": {
+      "rawBytes": 888566,
+      "gzipBytes": 164616,
+      "category": "lazy"
+    },
+    "member": {
+      "rawBytes": 192514,
+      "gzipBytes": 37350,
+      "category": "lazy"
+    },
+    "partner": {
+      "rawBytes": 173478,
+      "gzipBytes": 31480,
+      "category": "lazy"
+    }
+  },
+  "violations": [
+    {
+      "file": "dist/assets/shared-DnrA1mI5.js",
+      "name": "shared-DnrA1mI5.js",
+      "rawBytes": 5544839,
+      "gzipBytes": 1440273,
+      "category": "lazy",
+      "budgetBytes": 256000,
+      "overBytes": 1184273
+    },
+    {
+      "file": "dist/assets/vendor-B40qJDAZ.js",
+      "name": "vendor-B40qJDAZ.js",
+      "rawBytes": 3826275,
+      "gzipBytes": 1134049,
+      "category": "vendor",
+      "budgetBytes": 512000,
+      "overBytes": 622049
+    }
+  ],
+  "regressions": []
+}

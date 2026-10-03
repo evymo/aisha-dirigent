@@ -1,0 +1,54 @@
+{
+  "name": "@aisha/knock-protocol",
+  "version": "0.5.1",
+  "license": "Elastic-2.0",
+  "description": "Wire format for the SPA knock: frame encode/decode, HOTP/TOTP over HMAC-SHA256, verification and rejection-reason classification. Crypto primitives are INJECTED, not imported, so the same module runs on Node (gateway, UDP listener) and in React Native (mobile app) — one source of truth for what a valid knock is. Node adapter in ./node.",
+  "private": false,
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "default": "./dist/node.js"
+    },
+    "./door": {
+      "types": "./dist/door.d.ts",
+      "default": "./dist/door.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "ioredis": "^5.4.1",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.3"
+  },
+  "peerDependencies": {
+    "ioredis": "^5.4.1"
+  },
+  "peerDependenciesMeta": {
+    "ioredis": {
+      "optional": true
+    }
+  }
+}

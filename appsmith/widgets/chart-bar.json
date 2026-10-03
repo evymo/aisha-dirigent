@@ -1,0 +1,29 @@
+{
+  "widgetName": "{{widgetId}}",
+  "displayName": "Bar Chart",
+  "type": "CHART_WIDGET",
+  "version": 3,
+  "rightColumn": "{{rightColumn}}",
+  "topRow": "{{topRow}}",
+  "bottomRow": "{{bottomRow}}",
+  "leftColumn": "{{leftColumn}}",
+  "isVisible": true,
+  "label": "{{title}}",
+  "props": {
+    "chartType": "COLUMN_CHART",
+    "chartName": "{{title}}",
+    "chartData": {
+      "{{series_id}}": {
+        "seriesName": "{{series_name}}",
+        "data": "{{ {{query_name}}.data?.map(r => ({ x: r['{{x_field}}'], y: r['{{y_field}}'] })) }}"
+      }
+    },
+    "xAxisName": "{{x_label}}",
+    "yAxisName": "{{y_label}}",
+    "primaryColor": "#4F46E5",
+    "borderRadius": "8px",
+    "boxShadow": "0px 1px 3px rgba(0,0,0,0.08)"
+  },
+  "isCanvas": false,
+  "tags": ["aisha-ops", "{{section}}", "chart"]
+}

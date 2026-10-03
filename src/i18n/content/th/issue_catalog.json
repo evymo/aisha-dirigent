@@ -1,0 +1,18 @@
+{
+  "downtime.description": "การหยุดทำงานที่ไม่ได้วางแผนและบริการไม่พร้อมใช้งาน",
+  "downtime.name": "เวลาหยุดทำงาน",
+  "integration-errors.description": "ข้อผิดพลาด ความล้มเหลว หรือ timeout ในการรวมระบบ",
+  "integration-errors.name": "ข้อผิดพลาดการรวมระบบ",
+  "latency.description": "เวลาตอบสนองสูงและประสิทธิภาพระบบลดลง",
+  "latency.name": "เวลาแฝง",
+  "memory-leak.description": "การใช้หน่วยความจำเพิ่มขึ้นอย่างต่อเนื่อง",
+  "memory-leak.name": "หน่วยความจำรั่ว",
+  "mood-changes.description": "พายุการแจ้งเตือน การแจ้งเตือนผิด หรือสัญญาณรบกวนจากการตรวจสอบ",
+  "mood-changes.name": "การแจ้งเตือนไม่เสถียร",
+  "sleep-issues.description": "ข้อผิดพลาด timeout และการตัดการเชื่อมต่อที่ไม่ใช้งาน",
+  "sleep-issues.name": "ปัญหา Timeout",
+  "slow-queries.description": "คอขวดฐานข้อมูลและปัญหาการเพิ่มประสิทธิภาพคำค้น",
+  "slow-queries.name": "คำค้นช้า",
+  "ui-glitches.description": "บั๊กทางภาพ ปัญหาการเรนเดอร์และเลย์เอาท์",
+  "ui-glitches.name": "ข้อผิดพลาด UI"
+}

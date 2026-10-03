@@ -1,0 +1,39 @@
+label: Data Plane TLS Server
+
+style:
+    00_service_style:
+        label: Database/Broker TLS
+        description: TLS server certificate for ${AISHA_OPERATOR_ORG} data services
+        ui:
+            subject:
+                - hostname
+                - hostname2
+                - application_name
+            info:
+                - requestor_realname
+                - requestor_email
+                - comment
+
+        subject:
+            dn: CN=[% hostname.lower %],O=${AISHA_OPERATOR_ORG},OU=Data Plane
+            san:
+                dns:
+                  - "[% hostname.lower %]"
+                  - "[% FOREACH entry = hostname2 %][% entry.lower %] | [% END %]"
+
+        metadata:
+            requestor: "[% requestor_realname %]"
+            email: "[% requestor_email %]"
+            entity: "[% hostname FILTER lower %]"
+
+    # Used by automated PKCS#10 enrollment via RPC/HMAC (svc-pki-bridge).
+    # cert_subject_style: enroll in rpc/generic.yaml routes here.
+    enroll:
+        subject:
+            dn: CN=[% CN.0 %],O=${AISHA_OPERATOR_ORG},OU=Data Plane
+            san:
+                dns: "[% FOREACH entry = SAN_DNS %][% entry.lower %] | [% END %]"
+                ip:  "[% FOREACH entry = SAN_IP  %][% entry %]           | [% END %]"
+
+        metadata:
+            entity: "[% CN.0 FILTER lower %]"

@@ -1,0 +1,6 @@
+{
+  "version": "1.0.0",
+  "description": "Registry of approved non-baseline migrations. Managed by: npm run db:migration:register",
+  "note": "Baseline-only state: no non-baseline migrations are currently present in aisha/db/migrations/.",
+  "migrations": []
+}

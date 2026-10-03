@@ -1,0 +1,25 @@
+{
+  "name": "@aisha/surface-blocks",
+  "version": "0.1.0",
+  "description": "Surface-agnostic block contract: schema-versioned view-models with mandatory provenance, fail-closed sensitivity, signed read-only snapshots. Upstream candidate (PR-7/PR-9 payload part).",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "schemas"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.8"
+  },
+  "license": "Elastic-2.0"
+}

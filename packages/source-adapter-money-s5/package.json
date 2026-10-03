@@ -1,0 +1,39 @@
+{
+  "name": "@aisha/source-adapter-money-s5",
+  "version": "0.1.0",
+  "description": "Generic svc-source-broker adapter for Money (Seyfor) S5 API — operational documents (delivery notes '.', issued invoices './invoices') over OAuth2 client_credentials + GraphQL. First-party ecosystem connector; any instance binds its own Money endpoint via the story spine.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./invoices": {
+      "types": "./dist/invoices.d.ts",
+      "default": "./dist/invoices.js"
+    },
+    "./invoices-via-svc-money": {
+      "types": "./dist/invoices-via-svc-money.d.ts",
+      "default": "./dist/invoices-via-svc-money.js"
+    }
+  },
+  "files": [
+    "dist",
+    "docs",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@aisha/audience-types": "*"
+  },
+  "devDependencies": {
+    "@aisha/audience-types": "*"
+  },
+  "license": "Elastic-2.0"
+}

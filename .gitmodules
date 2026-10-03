@@ -1,0 +1,18 @@
+[submodule "packages/insight"]
+	path = packages/insight
+	# RELATIVE on purpose (OSS-side submodule; allowlisted in the
+	# public-oss-boundary gate): a relative URL resolves against the parent
+	# clone's remote INCLUDING credentials, so Coolify's tokened build clone,
+	# CI checkout auth and local keychains all inherit automatically. The
+	# absolute private URL broke EVERY Coolify deploy (anonymous submodule
+	# clone → "could not read Username"; 2026-07-04), and org-level privacy
+	# hides even public repos, so an absolute URL cannot work pre-publication.
+	# Relative also follows forks: a fork cloned from its own host resolves
+	# ../insight.git to ITS mirror, not upstream's.
+	url = ../insight.git
+[submodule "packages/potok"]
+	path = packages/potok
+	url = ../potok.git
+[submodule "packages/local-ingest"]
+	path = packages/local-ingest
+	url = ../aisha-local-ingest.git

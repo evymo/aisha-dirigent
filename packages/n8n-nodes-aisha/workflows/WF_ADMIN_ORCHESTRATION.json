@@ -1,0 +1,410 @@
+{
+  "id": "AdminOrchestration001",
+  "name": "WF_ADMIN_ORCHESTRATION",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "admin-bridge",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Admin Bridge Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "admin-bridge-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate and route incoming admin bridge request\nconst body = $input.item.json.body || {};\nconst { service, operation, params } = body;\n\nif (!service || !operation) {\n  return [{\n    json: {\n      error: true,\n      message: 'Missing required fields: service, operation',\n      validServices: ['nocodb', 'langfuse', 'health'],\n      example: { service: 'nocodb', operation: 'list_tables', params: {} }\n    }\n  }];\n}\n\nreturn [{\n  json: {\n    service,\n    operation,\n    params: params || {},\n    requestedAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "validate-request",
+      "name": "Validate Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.error }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "is-error",
+      "name": "Valid Request?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.message }) }}"
+      },
+      "id": "respond-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.service }}",
+                    "rightValue": "nocodb",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputLabel": "NocoDB"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.service }}",
+                    "rightValue": "langfuse",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputLabel": "Langfuse"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.service }}",
+                    "rightValue": "health",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputLabel": "Health"
+            }
+          ]
+        }
+      },
+      "id": "route-service",
+      "name": "Route by Service",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        900,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "service": "nocodb",
+        "operation": "={{ $json.operation }}",
+        "tableId": "={{ $json.params.tableId || '' }}",
+        "recordId": "={{ $json.params.recordId || '' }}",
+        "recordData": "={{ JSON.stringify($json.params.recordData || {}) }}",
+        "viewName": "={{ $json.params.viewName || '' }}",
+        "viewType": "={{ $json.params.viewType || 'grid' }}",
+        "limit": "={{ $json.params.limit || 25 }}",
+        "offset": "={{ $json.params.offset || 0 }}",
+        "where": "={{ $json.params.where || '' }}",
+        "formula": "={{ $json.params.formula || '' }}"
+      },
+      "id": "nocodb-ops",
+      "name": "NocoDB Operations",
+      "type": "n8n-nodes-aisha.aishaAdminBridge",
+      "typeVersion": 1,
+      "position": [
+        1140,
+        100
+      ],
+      "credentials": {
+        "aishaNocoDbApi": {
+          "id": "nocodb-cred-id",
+          "name": "AISHA NocoDB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "service": "langfuse",
+        "operation": "={{ $json.operation }}",
+        "traceName": "={{ $json.params.traceName || '' }}",
+        "langfuseLimit": "={{ $json.params.limit || 50 }}",
+        "traceId": "={{ $json.params.traceId || '' }}",
+        "scoreName": "={{ $json.params.scoreName || 'quality' }}",
+        "scoreValue": "={{ $json.params.scoreValue || 1 }}"
+      },
+      "id": "langfuse-ops",
+      "name": "Langfuse Operations",
+      "type": "n8n-nodes-aisha.aishaAdminBridge",
+      "typeVersion": 1,
+      "position": [
+        1140,
+        300
+      ],
+      "credentials": {
+        "aishaLangfuseApi": {
+          "id": "langfuse-cred-id",
+          "name": "AISHA Langfuse"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "service": "health",
+        "operation": "={{ $json.operation }}",
+        "serviceName": "={{ $json.params.serviceName || '' }}"
+      },
+      "id": "health-ops",
+      "name": "Health Operations",
+      "type": "n8n-nodes-aisha.aishaAdminBridge",
+      "typeVersion": 1,
+      "position": [
+        1140,
+        500
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "Z7oSSowoqk0ZgB8X",
+          "name": "AISHA PostgREST"
+        },
+        "aishaNocoDbApi": {
+          "id": "nocodb-cred-id",
+          "name": "AISHA NocoDB"
+        },
+        "aishaLangfuseApi": {
+          "id": "langfuse-cred-id",
+          "name": "AISHA Langfuse"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge result back with request metadata for audit logging\nconst result = $input.item.json;\nconst requestedAt = $('Validate Request').item.json.requestedAt;\nconst service = $('Validate Request').item.json.service;\nconst operation = $('Validate Request').item.json.operation;\n\nreturn [{\n  json: {\n    success: result.success !== false,\n    service,\n    operation,\n    requestedAt,\n    completedAt: new Date().toISOString(),\n    data: result\n  }\n}];"
+      },
+      "id": "merge-results",
+      "name": "Merge Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env?.AISHA_POSTGREST_URL || '' }}/rest/v1/rpc/log_integration_action",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_service_name: $json.service, p_action: 'admin_bridge_' + $json.operation, p_action_detail: { requestedAt: $json.requestedAt, completedAt: $json.completedAt, success: $json.success }, p_status: $json.success ? 'success' : 'failure', p_duration_ms: new Date($json.completedAt) - new Date($json.requestedAt) }) }}"
+      },
+      "id": "log-action",
+      "name": "Log Action",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1580,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Z7oSSowoqk0ZgB8X",
+          "name": "AISHA Supabase (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1580,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Admin Bridge Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Request": {
+      "main": [
+        [
+          {
+            "node": "Valid Request?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Request?": {
+      "main": [
+        [
+          {
+            "node": "Route by Service",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Service": {
+      "main": [
+        [
+          {
+            "node": "NocoDB Operations",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Langfuse Operations",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Health Operations",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "NocoDB Operations": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Langfuse Operations": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health Operations": {
+      "main": [
+        [
+          {
+            "node": "Merge Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Results": {
+      "main": [
+        [
+          {
+            "node": "Log Action",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": true
+  },
+  "staticData": {}
+}

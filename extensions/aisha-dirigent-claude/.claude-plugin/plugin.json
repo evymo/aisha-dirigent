@@ -1,0 +1,19 @@
+{
+  "name": "aisha-dirigent",
+  "description": "AISHA Dirigent for Claude — governance rules, seed/merge tracking, model routing, health, and local-LLM cost/usage, exposed as MCP tools.",
+  "version": "0.7.0",
+  "author": {
+    "name": "evymo",
+    "url": "https://github.com/evymo"
+  },
+  "homepage": "https://github.com/evymo/aisha-dirigent",
+  "repository": "https://github.com/evymo/aisha-dirigent",
+  "license": "Elastic-2.0",
+  "keywords": [
+    "aisha",
+    "dirigent",
+    "governance",
+    "mcp",
+    "rules"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "$note": "TEMPLATE — copy into your PRIVATE instance-data repo as top-level operators.json and fill REAL operator emails there (never here in the public repo). No user_id/sub is stored; provision-operators.mjs resolves each operator's live Keycloak sub by email at cold-start, so the roster survives a fresh Keycloak (--wipe). Missing accounts are auto-created with a one-time temp password printed once to the cold-start/rollout terminal; existing accounts are never modified. Opt out of creation with AISHA_OPERATORS_CREATE_MISSING=0. Full annotated template: config/operators.json.example.",
+  "operators": [
+    {
+      "email": "owner@example.com",
+      "username": "owner",
+      "displayName": "Instance Owner",
+      "language": "en",
+      "roles": ["admin", "staff"]
+    },
+    {
+      "email": "operator@example.com",
+      "username": "operator",
+      "displayName": "Second Operator",
+      "language": "en",
+      "roles": ["staff"]
+    }
+  ]
+}

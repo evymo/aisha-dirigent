@@ -1,0 +1,33 @@
+/* Company wiki / handbook — example template tokens. Brand-neutral, fork-freely.
+ * Clean documentation-site palette: paper white, ink text, calm indigo, sky link.
+ * Sans-serif throughout (a docs/product feel) — deliberately distinct from the
+ * serif-led legal/farm/café templates. This is the multi-page + i18n showcase. */
+:root {
+  --color-bg: #ffffff;
+  --color-fg: #1f2328;
+  --color-muted: #656d76;
+  --color-primary: #4f46e5;
+  --color-primary-dark: #4338ca;
+  --color-primary-fg: #ffffff;
+  --color-accent: #0ea5e9;
+  --color-border: #d0d7de;
+  --color-surface: #f6f8fa;
+  --color-surface-2: #ffffff;
+  --color-code-bg: #f1f3f5;
+
+  --font-display: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
+
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 2rem;
+  --space-xl: 4rem;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+
+  --sidebar-w: 250px;
+  --content-max: 760px;
+}

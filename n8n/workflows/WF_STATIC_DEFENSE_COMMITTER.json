@@ -1,0 +1,333 @@
+{
+  "name": "WF_STATIC_DEFENSE_COMMITTER",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "static-defense-committer",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "committer-trigger",
+      "name": "Committer Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate webhook input.\n//\n// Trigger contexts (any of):\n//   - Operator clicks 'Publish' in Appsmith UI; UI posts here AFTER\n//     aisha_publish_static_defense_rule RPC succeeds\n//   - Aisha autonomous loop after publish RPC\n//\n// Payload shape: { rule_id: string, action: 'published' | 'deprecated',\n//                  approver?: string }\n//\n// Output: enriched payload for downstream nodes\n\nconst body = $input.first().json.body || $input.first().json;\nconst ruleId = body.rule_id;\nconst action = body.action;\nconst approver = body.approver;\n\nif (!ruleId || typeof ruleId !== 'string') {\n  throw new Error('rule_id required (string)');\n}\nif (!['published', 'deprecated'].includes(action)) {\n  throw new Error(\"action must be 'published' or 'deprecated' (got: \" + action + ')');\n}\nif (!/^[a-z][a-z0-9-]+$/.test(ruleId)) {\n  throw new Error('rule_id must be kebab-case (got: ' + ruleId + ')');\n}\n\nconst timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);\nconst branchName = `aisha/static-defense/${action}-${ruleId}-${timestamp.slice(8, 14)}`;\n\nreturn [{\n  json: {\n    rule_id: ruleId,\n    action,\n    approver: approver || null,\n    branch_name: branchName,\n    timestamp,\n    requested_at: new Date().toISOString(),\n  },\n}];"
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "aisha_get_active_static_defense_rules",
+        "rpcParams": "={{ JSON.stringify({ p_category: 'semgrep' }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "fetch-active-rules",
+      "name": "Fetch Active Rules",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        660,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate .semgrep/aisha-rules.yml content from the active rules.\n//\n// MIRRORS scripts/gen-static-defense.mjs renderSemgrepYaml() exactly — the\n// two paths MUST produce byte-identical output so the static-defense-\n// generator-integrity gate (which compares committed YAML against the\n// from-seed-rendered version) doesn't fail.\n//\n// Drift between this Code node and the script is detected by gate test\n// static-defense-committer-flow.gate.test.ts.\n\nconst rules = $('Fetch Active Rules').first().json;\nif (!Array.isArray(rules)) {\n  throw new Error('Expected array of rules from aisha_get_active_static_defense_rules, got: ' + typeof rules);\n}\n\nconst SEMGREP_HEADER = `###############################################################################\n# AISHA orchestrator — local Semgrep rules.\n#\n# AUTO-GENERATED from public.aisha_static_defense_rules table.\n# DO NOT EDIT MANUALLY — regenerate via \\`npm run gen:static-defense\\`.\n#\n# To add or modify a rule:\n#   1. INSERT/UPDATE in aisha_static_defense_rules via Appsmith UI OR\n#      RPC propose_static_defense_rule / publish_static_defense_rule\n#   2. Run \\`npm run gen:static-defense\\` locally (needs DB) OR add a new\n#      seed-style migration touching aisha_static_defense_rules\n#   3. Commit the regenerated YAML. The .aisha/ payload cache stays LOCAL\n#      (gitignored) — CI regenerates from the seed migration via --from-seed.\n#\n# Rule severity convention:\n#   ERROR   — blocks the workflow (matches OWASP A-category violations)\n#   WARNING — surfaces but doesn't block (style/maintainability)\n#   INFO    — informational, for trend tracking\n###############################################################################\n\n`;\n\nconst semgrepRules = rules.filter((r) => r.category === 'semgrep');\nconst lines = [SEMGREP_HEADER, 'rules:'];\n\nfor (const rule of semgrepRules) {\n  lines.push('');\n  if (rule.owasp_category) {\n    lines.push(`  # ${rule.owasp_category} — ${rule.rule_id}`);\n  }\n  lines.push(`  - id: ${rule.rule_id}`);\n\n  // pattern-either\n  const patterns = Array.isArray(rule.semgrep_pattern) ? rule.semgrep_pattern : null;\n  if (patterns && patterns.length > 0) {\n    lines.push('    pattern-either:');\n    for (const p of patterns) {\n      const key = Object.keys(p)[0];\n      lines.push(`      - ${key}: ${JSON.stringify(p[key])}`);\n    }\n  }\n\n  // paths\n  if (rule.semgrep_paths && (rule.semgrep_paths.include || rule.semgrep_paths.exclude)) {\n    lines.push('    paths:');\n    if (rule.semgrep_paths.include) {\n      lines.push('      include:');\n      for (const inc of rule.semgrep_paths.include) {\n        lines.push(`        - ${JSON.stringify(inc)}`);\n      }\n    }\n    if (rule.semgrep_paths.exclude) {\n      lines.push('      exclude:');\n      for (const exc of rule.semgrep_paths.exclude) {\n        lines.push(`        - ${JSON.stringify(exc)}`);\n      }\n    }\n  }\n\n  // message (block scalar)\n  if (rule.semgrep_message) {\n    lines.push('    message: |');\n    for (const msgLine of rule.semgrep_message.split('\\n')) {\n      lines.push('      ' + msgLine);\n    }\n  }\n\n  lines.push(`    severity: ${rule.severity}`);\n  if (rule.languages && rule.languages.length > 0) {\n    lines.push(`    languages: [${rule.languages.join(', ')}]`);\n  }\n}\n\nconst yamlContent = lines.join('\\n') + '\\n';\nconst base64Content = Buffer.from(yamlContent, 'utf-8').toString('base64');\n\nreturn [{\n  json: {\n    ...$('Validate Input').first().json,\n    yaml_content: yamlContent,\n    yaml_base64: base64Content,\n    rule_count: semgrepRules.length,\n    yaml_path: '.semgrep/aisha-rules.yml',\n  },\n}];"
+      },
+      "id": "generate-yaml",
+      "name": "Generate YAML",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/branches",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"new_branch_name\": \"{{ $json.branch_name }}\", \"old_branch_name\": \"main\"}",
+        "options": {
+          "timeout": 15000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "create-branch",
+      "name": "Create Forgejo Branch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "Forgejo API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/contents/{{ $('Generate YAML').first().json.yaml_path }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"content\": \"{{ $('Generate YAML').first().json.yaml_base64 }}\",\n  \"message\": \"chore(static-defense): regenerate aisha-rules.yml after {{ $('Validate Input').first().json.action }} of {{ $('Validate Input').first().json.rule_id }}\\n\\nAuto-committed by WF_STATIC_DEFENSE_COMMITTER after operator approval.\\nRule lifecycle: {{ $('Validate Input').first().json.action }}\\nApprover: {{ $('Validate Input').first().json.approver || 'autonomous' }}\\nActive rules in DB: {{ $('Generate YAML').first().json.rule_count }}\",\n  \"branch\": \"{{ $('Validate Input').first().json.branch_name }}\"\n}",
+        "options": {
+          "timeout": 15000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "write-yaml",
+      "name": "Write Regenerated YAML",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "Forgejo API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/pulls",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"title\": \"chore(static-defense): {{ $('Validate Input').first().json.action }} rule {{ $('Validate Input').first().json.rule_id }}\",\n  \"body\": \"Auto-generated by WF_STATIC_DEFENSE_COMMITTER.\\n\\n## Summary\\n\\nRule lifecycle event: **{{ $('Validate Input').first().json.action }}** for rule_id **{{ $('Validate Input').first().json.rule_id }}**\\n\\nApprover: {{ $('Validate Input').first().json.approver || 'autonomous' }}\\n\\nActive Semgrep rules after this change: {{ $('Generate YAML').first().json.rule_count }}\\n\\n## Source of truth\\n\\nDB table `public.aisha_static_defense_rules` is the SoT. This PR regenerates `.semgrep/aisha-rules.yml` to reflect the current DB state.\\n\\n## Verification\\n\\nCI gate `static-defense-generator-integrity.gate.test.ts` verifies the YAML matches the seed migration. If this PR is RED, the operator must regenerate locally and force-push to fix the migration ↔ YAML drift.\\n\\n## Audit trail\\n\\nSee `audit_journal` rows with action `static_defense_rule_{{ $('Validate Input').first().json.action }}` for full provenance.\",\n  \"head\": \"{{ $('Validate Input').first().json.branch_name }}\",\n  \"base\": \"main\"\n}",
+        "options": {
+          "timeout": 15000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "create-pr",
+      "name": "Create Pull Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        300
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "Forgejo API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_integration_action",
+        "rpcParams": "={{ JSON.stringify({ p_integration: 'static-defense-committer', p_action_key: 'commit_success', p_payload: { rule_id: $('Validate Input').first().json.rule_id, action: $('Validate Input').first().json.action, branch_name: $('Validate Input').first().json.branch_name, pr_url: $('Create Pull Request').first().json.html_url || null, rule_count: $('Generate YAML').first().json.rule_count } }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": true
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "log-success",
+      "name": "Log Success",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1760,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"ok\": true,\n  \"rule_id\": \"{{ $('Validate Input').first().json.rule_id }}\",\n  \"action\": \"{{ $('Validate Input').first().json.action }}\",\n  \"branch\": \"{{ $('Validate Input').first().json.branch_name }}\",\n  \"pr_url\": \"{{ $('Create Pull Request').first().json.html_url || null }}\",\n  \"rule_count\": {{ $('Generate YAML').first().json.rule_count }}\n}"
+      },
+      "id": "respond-ok",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1980,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Committer Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Fetch Active Rules",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Active Rules": {
+      "main": [
+        [
+          {
+            "node": "Generate YAML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate YAML": {
+      "main": [
+        [
+          {
+            "node": "Create Forgejo Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Forgejo Branch": {
+      "main": [
+        [
+          {
+            "node": "Write Regenerated YAML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write Regenerated YAML": {
+      "main": [
+        [
+          {
+            "node": "Create Pull Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Pull Request": {
+      "main": [
+        [
+          {
+            "node": "Log Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Success": {
+      "main": [
+        [
+          {
+            "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "active": false
+}

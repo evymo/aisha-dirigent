@@ -1,0 +1,23 @@
+/* Neutral design tokens for the default Aisha stack landing page.
+ * No Aisha brand identifiers — operators can override freely. */
+:root {
+  --color-bg: #ffffff;
+  --color-fg: #18181b;
+  --color-muted: #71717a;
+  --color-primary: #2563eb;
+  --color-primary-fg: #ffffff;
+  --color-border: #e4e4e7;
+  --color-surface: #fafafa;
+
+  --font-display: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 2rem;
+  --space-xl: 4rem;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+}

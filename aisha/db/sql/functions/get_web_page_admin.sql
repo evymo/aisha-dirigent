@@ -1,0 +1,59 @@
+-- Function: public.get_web_page_admin
+-- Description: Returns a single web page with canvas data for admin editing.
+--   Multi-site: exposes branding_profile_id.
+-- Security: SECURITY DEFINER, authenticated only
+-- Created: 2026-04-11
+
+CREATE OR REPLACE FUNCTION public.get_web_page_admin(p_id uuid)
+RETURNS TABLE (
+  id uuid,
+  slug text,
+  title_key text,
+  description_key text,
+  canvas_data jsonb,
+  canvas_html text,
+  canvas_css text,
+  status text,
+  sort_order integer,
+  is_active boolean,
+  og_image_url text,
+  page_settings jsonb,
+  branding_profile_id uuid,
+  created_at timestamptz,
+  updated_at timestamptz
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+SET search_path = public
+AS $$
+BEGIN
+  IF NOT public.is_admin_or_staff() THEN
+    RAISE EXCEPTION 'Unauthorized';
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    wp.id,
+    wp.slug,
+    wp.title_key,
+    wp.description_key,
+    wp.canvas_data,
+    wp.canvas_html,
+    wp.canvas_css,
+    wp.status,
+    wp.sort_order,
+    wp.is_active,
+    wp.og_image_url,
+    wp.page_settings,
+    wp.branding_profile_id,
+    wp.created_at,
+    wp.updated_at
+  FROM web_pages wp
+  WHERE wp.id = p_id;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_web_page_admin(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_web_page_admin(uuid) TO authenticated;

@@ -1,0 +1,46 @@
+--- stock/app_Actions_Server_CleanupDocker.php	2026-09-05 14:32:20
++++ live/app_Actions_Server_CleanupDocker.php	2026-09-05 14:32:22
+@@ -53,7 +53,7 @@
+         $commands = [
+             'docker container prune -f --filter "label=coolify.managed=true" --filter "label!=coolify.proxy=true" --filter "label!=coolify.type=database" --filter "label!=coolify.type=application" --filter "label!=coolify.type=service"',
+             $imagePruneCmd,
+-            'docker builder prune -af',
++            $this->buildCachePruneCommand($server),
+             "docker run --rm -v {$buildxMetadataVolume}:/root/.docker/buildx -v /var/run/docker.sock:/var/run/docker.sock {$helperImageWithVersion} docker buildx prune --builder coolify-railpack -af 2>/dev/null || true",
+             "docker images --filter before=$helperImageWithVersion --filter reference=$helperImage | grep $helperImage | awk '{print $3}' | xargs -r docker rmi -f",
+             "docker images --filter before=$realtimeImageWithVersion --filter reference=$realtimeImage | grep $realtimeImage | awk '{print $3}' | xargs -r docker rmi -f",
+@@ -83,6 +83,34 @@
+     }
+ 
+     /**
++     * Prune the build cache down to a floor instead of wiping it.
++     *
++     * `docker builder prune -af` removes every cached layer, so the first build
++     * after each cleanup starts from nothing. On a dedicated build server, which
++     * builds continuously, that is the difference between a fast incremental build
++     * and a full one -- measured on this fleet, 60 GB of cache had been rebuilt
++     * within hours of a wipe, so the wipe bought nothing and cost every build.
++     *
++     * BuildKit already evicts least-recently-used entries first; it only needs to
++     * be told how much room to leave. The floor is derived from
++     * docker_cleanup_threshold -- the setting the operator has already used to say
++     * how full this machine may get -- so no second knob is invented for the same
++     * decision. It is computed on the server because that is where the disk is.
++     *
++     * Falls back to the previous behaviour on daemons without --min-free-space
++     * (Docker dropped --keep-storage in favour of it in 29.x, so both eras exist).
++     */
++    private function buildCachePruneCommand(Server $server): string
++    {
++        $freePercent = max(1, 100 - (int) $server->settings->docker_cleanup_threshold);
++
++        return 'total=$(df -BG --output=size / | tail -1 | tr -dc "0-9") && '
++            .'min=$(( total * '.$freePercent.' / 100 )) && '
++            .'docker builder prune -f --min-free-space ${min}GB 2>/dev/null '
++            .'|| docker builder prune -af';
++    }
++
++    /**
+      * Build a docker image prune command that excludes application image repositories.
+      *
+      * Since docker image prune doesn't support excluding by repository name directly,

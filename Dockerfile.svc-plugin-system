@@ -1,0 +1,69 @@
+# syntax=docker/dockerfile:1
+# Dockerfile.svc-plugin-system — Plugin execution system microservice (port 3029)
+#
+# Standalone Dockerfile (avoids Coolify's ARG-injection explosion for inline
+# compose dockerfiles). Build context = REPO ROOT (docker-compose.coolify.yml).
+#
+# Workspace-aware, registry-free build. @aisha/security + @aisha/observability
+# are monorepo WORKSPACE packages (packages/*), not published to any registry.
+# They resolve via npm workspace symlinks — `npm ci --workspace=...
+# --include-workspace-root`. This is HERMETIC: the build depends only on the
+# git tree, never on the Verdaccio registry (npm.id3a.cz) having a published
+# @aisha/* version.
+#
+# Why this replaced the old `.npmrc` + `npm install` form: those Dockerfiles
+# mapped the @aisha scope to npm.id3a.cz and `npm install`ed. The internal
+# packages are NOT published there, so npm fell back to public npmjs.org and
+# failed `npm notarget` / E404 whenever a cached layer was busted (e.g. any
+# repo change reaching the build context). That made cold-start non-
+# reproducible: a from-scratch build of the core stack depended on a registry
+# holding versions that only ever lived in the monorepo. Workspaces remove
+# that dependency entirely — internal code is built from source, every time.
+
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/node:22-alpine AS build
+WORKDIR /app
+# Whole repo so npm can resolve the full workspace graph + symlink @aisha/*.
+COPY . .
+# Install this service's workspace + root deps (resolves @aisha/* via symlinks).
+RUN npm ci --workspace=@aisha/svc-plugin-system --include-workspace-root --include=dev --ignore-scripts
+# Build internal deps in order, then the service.
+RUN npm run build --workspace=@aisha/security && \
+    npm run build --workspace=@aisha/observability && \
+    npm run build --workspace=@aisha/postgrest-client && \
+    npm run build --workspace=@aisha/svc-plugin-system
+# Drop devDependencies for this workspace.
+RUN npm prune --workspace=@aisha/svc-plugin-system --omit=dev
+# Guarantee the service's own node_modules dir exists so the runtime COPY below
+# never fails — and carries any dep npm nested HERE instead of hoisting to root.
+RUN mkdir -p services/svc-plugin-system/node_modules
+
+FROM ${REGISTRY_PROXY}library/node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+# Resolved node_modules (root-hoisted) + the dep-chain workspace dirs. Each
+# dep dir is copied WHOLE (not just dist/) so any nested node_modules that did
+# NOT hoist to the root — notably @aisha/observability's @opentelemetry/* tree,
+# which the SDK static-imports at load time — travels with it. Copying the
+# whole dir is the robust form: it can't silently miss a nested runtime dep the
+# way an enumerated dist-only COPY can (that bit gateway once: ERR_MODULE_NOT_FOUND
+# @opentelemetry/auto-instrumentations-node).
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/packages/security packages/security
+COPY --from=build /app/packages/observability packages/observability
+COPY --from=build /app/packages/postgrest-client packages/postgrest-client
+COPY --from=build /app/services/svc-plugin-system/package.json services/svc-plugin-system/package.json
+COPY --from=build /app/services/svc-plugin-system/dist services/svc-plugin-system/dist
+# Nested (non-hoisted) deps live under the service's own node_modules — copy
+# them too, else Node can't resolve them at runtime (ERR_MODULE_NOT_FOUND).
+COPY --from=build /app/services/svc-plugin-system/node_modules services/svc-plugin-system/node_modules
+WORKDIR /app/services/svc-plugin-system
+EXPOSE 3029
+# Mesh routu staví entrypoint v compose JAKO ROOT a práva hned zahodí přes
+# `exec su-exec node …` (vzor: gateway, brána mesh-lane-miri-jmenem-ne-hopem).
+# ⛔ NAMĚŘENO 2026-09-16 na guru: s `USER node` v obrazu služba routu postavit
+# nemohla, mesh jméno se přeložilo a NESPOJILO — svc-ai-chat vypršel na PostgREST,
+# MCP, lokálním modelu, companion i integration, a nic to nehlásilo jako chybu.
+RUN apk add --no-cache su-exec iproute2
+CMD ["node", "dist/server.js"]

@@ -1,0 +1,102 @@
+{
+  "name": "WF_OCCIPITUM_REDESIGN",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "web-artifact-redesign",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Web Artifact Redesign Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Load the redesign job (kind='redesign', source_type='llm_redesign') + its seed canvas\nconst gatewayUrl = $env.AISHA_GATEWAY_URL;\nconst serviceKey = $env.AISHA_SERVICE_KEY;\nconst body = $input.first().json.body ?? $input.first().json;\nconst job_id = body.job_id;\nif (!job_id) throw new Error('job_id required');\n\nconst res = await fetch(`${gatewayUrl}/rest/v1/web_artifact_jobs?id=eq.${job_id}&select=id,story_id,seed_canvas_data,brief,slot_profile,creativity_seed,metadata,status`, {\n  headers: {\n    'apikey': serviceKey,\n    'authorization': `Bearer ${serviceKey}`,\n    'accept': 'application/json'\n  }\n});\nif (!res.ok) throw new Error(`load job ${res.status}`);\nconst rows = await res.json();\nif (!rows.length) throw new Error('job not found');\nconst job = rows[0];\n\nif (!['pending', 'processing'].includes(job.status)) {\n  throw new Error(`job in unexpected status: ${job.status}`);\n}\n\nreturn [{ json: { ...job, llm_mock: ($env.AISHA_LLM_MOCK === '1' || $env.AISHA_LLM_MOCK === 'true') } }];"
+      },
+      "id": "load-job",
+      "name": "Load Redesign Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mark processing via RPC\nconst gatewayUrl = $env.AISHA_GATEWAY_URL;\nconst serviceKey = $env.AISHA_SERVICE_KEY;\nconst { id: job_id, status } = $input.first().json;\n\nif (status === 'pending') {\n  const res = await fetch(`${gatewayUrl}/rest/v1/rpc/mark_web_artifact_processing`, {\n    method: 'POST',\n    headers: {\n      'content-type': 'application/json',\n      'apikey': serviceKey,\n      'authorization': `Bearer ${serviceKey}`\n    },\n    body: JSON.stringify({ p_job_id: job_id })\n  });\n  if (!res.ok) {\n    const t = await res.text();\n    throw new Error(`mark_processing failed: ${res.status} ${t}`);\n  }\n}\nreturn $input.all();"
+      },
+      "id": "mark-processing",
+      "name": "Mark Processing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Real LLM redesign through the Aisha router.\n//\n// Calls /functions/v1/ai-generate with task_kind='occipitum_redesign'.\n// The workflow does NOT pick a model — svc-ai-chat delegates to\n// route_task RPC (dirigent decision tree + agent_catalog), which\n// picks the agent + model based on platform-level config.\n// Operator-side constraints (brief, prior_style_bands, slot_hint)\n// are passed as advisory `constraints`; Aisha may or may not honor.\n//\n// AISHA_LLM_MOCK is honored server-side. After the LLM returns\n// ProjectData JSON, we enforce HARD GATE invariants:\n//   - every data-runtime-block placeholder preserved verbatim\n//   - every data-i18n-key preserved\n// On failure: fail_web_artifact_ingest RPC writes a web_artifact_failed\n// story_entry with reason.\n\nconst gatewayUrl = $env.AISHA_GATEWAY_URL;\nconst serviceKey = $env.AISHA_SERVICE_KEY;\nconst job = $input.first().json;\nconst seed = job.seed_canvas_data ?? {};\nconst seedHtml = seed.pages?.[0]?.component ?? '';\nconst brief = job.brief ?? 'Restyle this canvas while preserving every content text and every data-runtime-block placeholder verbatim.';\n\nfunction extractPlaceholders(html) {\n  const matches = Array.from(html.matchAll(/<[^>]*data-runtime-block=\"([^\"]+)\"[^>]*data-block-config='([^']*)'[^>]*>/g));\n  return matches.map((m) => ({ blockType: m[1], config: m[2] }));\n}\n\nfunction extractI18nKeys(html) {\n  const matches = Array.from(html.matchAll(/data-i18n-key=\"([^\"]+)\"/g));\n  return Array.from(new Set(matches.map((m) => m[1]))).sort();\n}\n\nconst seedPlaceholders = extractPlaceholders(seedHtml);\nconst seedI18n = extractI18nKeys(seedHtml);\n\nconst systemPrompt = `You are OCCIPITUM — AISHA's visual cortex.\\n\\nMission: redesign the GIVEN canvas while preserving:\\n  1. Every <... data-runtime-block=\"...\" ...> placeholder verbatim (count + types + data-block-config JSON identical)\\n  2. Every data-i18n-key attribute and its position\\n  3. Every visible text node (case-insensitive whitespace-normalised match)\\n\\nYou MAY:\\n  - restyle wrapper elements (typography, spacing, colors)\\n  - rearrange decorative layout\\n  - add tasteful animations through CSS classes (no inline JS)\\n\\nYou MUST NOT:\\n  - drop, rename, or duplicate any data-runtime-block placeholder\\n  - alter visible content text\\n  - emit any <script> or on*= attributes\\n\\nOPERATOR BRIEF: ${brief}\\n\\nOUTPUT FORMAT (return ONLY this JSON, no markdown fences):\\n{\\n  \"pages\": [{ \"component\": \"<body>...preserved+restyled HTML...</body>\" }],\\n  \"styles\": [],\\n  \"_occipitum_rationale\": {\\n    \"style_band\": \"<one of: experimental_brutalist | editorial_storytelling | luxury_immersive>\",\\n    \"preservation_checklist\": {\\n      \"runtime_blocks_preserved\": <number>,\\n      \"i18n_keys_preserved\": <number>,\\n      \"content_texts_preserved\": <number>\\n    }\\n  }\\n}`;\n\nconst userPrompt = `Seed canvas HTML:\\n${seedHtml}\\n\\nPlaceholders to preserve: ${seedPlaceholders.length}\\ni18n keys to preserve: ${seedI18n.length}`;\n\nconst genRes = await fetch(`${gatewayUrl}/functions/v1/ai-generate`, {\n  method: 'POST',\n  headers: { 'content-type': 'application/json', 'authorization': `Bearer ${serviceKey}` },\n  body: JSON.stringify({\n    task_kind: 'occipitum_redesign',\n    risk_profile: 'low',\n    story_id: job.story_id,\n    domain: ['web', 'design'],\n    constraints: {\n      brief,\n      slot_hint: job.slot_profile ?? null,\n      prior_style_bands: job.metadata?.style_band_history ?? [],\n      runtime_blocks_to_preserve: seedPlaceholders.length,\n      i18n_keys_to_preserve: seedI18n.length\n    },\n    system: systemPrompt,\n    messages: [{ role: 'user', content: userPrompt }],\n    max_tokens: 8000,\n    json_mode: true,\n    metadata: { job_id: job.id, story_id: job.story_id }\n  })\n});\n\nif (!genRes.ok) {\n  const detail = await genRes.text();\n  await fetch(`${gatewayUrl}/rest/v1/rpc/fail_web_artifact_ingest`, {\n    method: 'POST',\n    headers: { 'content-type': 'application/json', 'apikey': serviceKey, 'authorization': `Bearer ${serviceKey}` },\n    body: JSON.stringify({ p_job_id: job.id, p_error_message: `ai_generate_failed: ${genRes.status} ${detail}` })\n  });\n  throw new Error(`/ai-generate ${genRes.status}: ${detail}`);\n}\n\nconst genBody = await genRes.json();\nlet projectData;\ntry {\n  projectData = JSON.parse(genBody.text);\n} catch (parseErr) {\n  await fetch(`${gatewayUrl}/rest/v1/rpc/fail_web_artifact_ingest`, {\n    method: 'POST',\n    headers: { 'content-type': 'application/json', 'apikey': serviceKey, 'authorization': `Bearer ${serviceKey}` },\n    body: JSON.stringify({ p_job_id: job.id, p_error_message: `ai_generate_invalid_json: ${parseErr.message}` })\n  });\n  throw new Error('AI generate returned non-JSON output');\n}\n\nconst proposedHtml = projectData.pages?.[0]?.component ?? '';\nconst styleBand = projectData._occipitum_rationale?.style_band ?? 'editorial_storytelling';\n\nconst outPlaceholders = extractPlaceholders(proposedHtml);\nconst outI18n = extractI18nKeys(proposedHtml);\nconst missingPlaceholders = seedPlaceholders.filter((p) => !outPlaceholders.find((o) => o.blockType === p.blockType));\nconst missingI18n = seedI18n.filter((k) => !outI18n.includes(k));\n\nif (missingPlaceholders.length || missingI18n.length) {\n  await fetch(`${gatewayUrl}/rest/v1/rpc/fail_web_artifact_ingest`, {\n    method: 'POST',\n    headers: { 'content-type': 'application/json', 'apikey': serviceKey, 'authorization': `Bearer ${serviceKey}` },\n    body: JSON.stringify({\n      p_job_id: job.id,\n      p_error_message: `runtime_block_invariant_violated: dropped=${missingPlaceholders.map((p) => p.blockType).join(',')}; missing_i18n=${missingI18n.join(',')}`\n    })\n  });\n  throw new Error('Verify gate rejected redesign (invariant violation).');\n}\n\nconst proposedCanvas = {\n  ...seed,\n  ...projectData,\n  pages: [{ ...(seed.pages?.[0] ?? {}), ...projectData.pages?.[0], component: proposedHtml }]\n};\n\nreturn [{ json: { job_id: job.id, story_id: job.story_id, proposedCanvas, proposedHtml, styleBand, mockMode: !!genBody.mock, provider: genBody.provider, model: genBody.model, run_id: genBody.run_id, agent_slug: genBody.agent_slug, usage: genBody.usage } }];"
+      },
+      "id": "redesign-step",
+      "name": "Redesign + Verify Invariants",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Persist proposed canvas via complete_web_artifact_ingest RPC\nconst gatewayUrl = $env.AISHA_GATEWAY_URL;\nconst serviceKey = $env.AISHA_SERVICE_KEY;\nconst { job_id, proposedCanvas, proposedHtml, styleBand, mockMode } = $input.first().json;\n\nconst res = await fetch(`${gatewayUrl}/rest/v1/rpc/complete_web_artifact_ingest`, {\n  method: 'POST',\n  headers: {\n    'content-type': 'application/json',\n    'apikey': serviceKey,\n    'authorization': `Bearer ${serviceKey}`\n  },\n  body: JSON.stringify({\n    p_job_id: job_id,\n    p_canvas_data: proposedCanvas,\n    p_canvas_html: proposedHtml,\n    p_canvas_css: '',\n    p_extracted_tokens: null,\n    p_metadata: { style_band: styleBand, mock_mode: mockMode }\n  })\n});\n\nif (!res.ok) {\n  const t = await res.text();\n  throw new Error(`complete failed: ${res.status} ${t}`);\n}\n\nawait fetch(`${gatewayUrl}/rest/v1/rpc/log_integration_action`, {\n  method: 'POST',\n  headers: {\n    'content-type': 'application/json',\n    'apikey': serviceKey,\n    'authorization': `Bearer ${serviceKey}`\n  },\n  body: JSON.stringify({\n    p_integration: 'n8n',\n    p_action_key: 'web_artifact.redesign.complete',\n    p_payload: { job_id, style_band: styleBand, mock_mode: mockMode },\n    p_tags: ['stack', 'story', 'web_artifact', 'redesign', 'complete']\n  })\n});\n\nreturn [{ json: { job_id, status: 'ready_for_review' } }];"
+      },
+      "id": "complete-job",
+      "name": "Complete Redesign Job",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond",
+      "name": "Respond to Caller",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Web Artifact Redesign Webhook": {
+      "main": [[{ "node": "Load Redesign Job", "type": "main", "index": 0 }]]
+    },
+    "Load Redesign Job": {
+      "main": [[{ "node": "Mark Processing", "type": "main", "index": 0 }]]
+    },
+    "Mark Processing": {
+      "main": [[{ "node": "Redesign + Verify Invariants", "type": "main", "index": 0 }]]
+    },
+    "Redesign + Verify Invariants": {
+      "main": [[{ "node": "Complete Redesign Job", "type": "main", "index": 0 }]]
+    },
+    "Complete Redesign Job": {
+      "main": [[{ "node": "Respond to Caller", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    { "name": "stack" },
+    { "name": "story" },
+    { "name": "web_artifact" },
+    { "name": "redesign" }
+  ]
+}

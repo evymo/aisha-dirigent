@@ -1,0 +1,136 @@
+{
+  "$comment": "Audience — operator overview over the audience module's admin views (audience_admin_*_v). Built by build-aisha-appsmith.mjs (render-only; import is a follow-up, same as aisha-ops). Backend-agnostic and PARAMETRIC: it reads aisha's OWN data (profiles, partner_profiles, story_entries, ...); a source broker (svc-source-broker) is just one OPTIONAL source parameter (a CRM source, AdWords, ...) that enriches engagement metrics — not a dependency. Works on a standalone aisha stack with no external source. Deliberately named 'Audience' (the module's own abstraction), NOT 'CRM' — the abstraction spans domains/genres and 'CRM' would pin it to one. NOTE: the audience admin views are RLS-gated to admin/staff, so on import point the datasource Authorization at an operator/admin JWT (not anon).",
+  "applicationName": "Audience",
+  "applicationSlug": "audience",
+  "applicationColor": "#7c3aed",
+  "applicationIcon": "users",
+  "workspaceId": "{{WORKSPACE_ID}}",
+  "exportedApplication": {
+    "name": "Audience",
+    "slug": "audience",
+    "color": "#7c3aed",
+    "icon": "users"
+  },
+  "datasourceList": [
+    {
+      "name": "AISHA Postgres REST",
+      "pluginId": "restapi-plugin",
+      "datasourceConfiguration": {
+        "url": "{{POSTGREST_URL}}/rest/v1",
+        "headers": [
+          { "key": "apikey", "value": "{{ANON_KEY}}" },
+          { "key": "Authorization", "value": "Bearer {{ANON_KEY}}" },
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept-Profile", "value": "public" }
+        ]
+      }
+    }
+  ],
+  "pageList": [
+    {
+      "$comment": "Page 1: Overview — KPI cards + tier funnel chart + recent contacts. KPIs use .data.length of capped list queries (operator can swap for count RPCs).",
+      "pageName": "Overview",
+      "pageSlug": "overview",
+      "isHidden": false,
+      "isDefault": true,
+      "queries": [
+        {
+          "name": "listContacts",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": { "httpMethod": "GET", "path": "/audience_admin_contact_directory_v?select=user_id&limit=1000" }
+        },
+        {
+          "name": "listPartners",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": { "httpMethod": "GET", "path": "/audience_admin_contact_directory_v?select=user_id&member_tier=eq.partner&limit=1000" }
+        },
+        {
+          "name": "listOpenFollowups",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": { "httpMethod": "GET", "path": "/audience_admin_followup_queue_v?select=task_id&status=neq.completed&limit=1000" }
+        },
+        {
+          "name": "listActivities",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": { "httpMethod": "GET", "path": "/audience_admin_activities_v?select=event_id&limit=1000" }
+        },
+        {
+          "name": "getTierFunnel",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": { "httpMethod": "GET", "path": "/audience_admin_tier_funnel_v?order=member_tier" }
+        },
+        {
+          "name": "getRecentContacts",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": { "httpMethod": "GET", "path": "/audience_admin_contact_directory_v?order=last_communication_at.desc.nullslast&limit=12" }
+        }
+      ],
+      "widgets": "{{OVERVIEW_WIDGETS}}",
+      "_widgetSlots": ["statbox-total-contacts", "statbox-partners", "statbox-open-followups", "statbox-activities", "chart-tier-funnel", "table-recent-contacts"]
+    },
+    {
+      "$comment": "Page 2: Contacts — full contact directory with tier + tags + last communication.",
+      "pageName": "Contacts",
+      "pageSlug": "contacts",
+      "isHidden": false,
+      "queries": [
+        {
+          "name": "listContactDirectory",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": { "httpMethod": "GET", "path": "/audience_admin_contact_directory_v?order=display_name&limit=500" }
+        }
+      ],
+      "widgets": "{{CONTACTS_WIDGETS}}",
+      "_widgetSlots": ["table-contact-directory"]
+    },
+    {
+      "$comment": "Page 3: Activities — actor activity feed (logins, events, communications) across all connected sources.",
+      "pageName": "Activities",
+      "pageSlug": "activities",
+      "isHidden": false,
+      "queries": [
+        {
+          "name": "listActivityFeed",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": { "httpMethod": "GET", "path": "/audience_admin_activities_v?order=occurred_at.desc&limit=500" }
+        }
+      ],
+      "widgets": "{{ACTIVITIES_WIDGETS}}",
+      "_widgetSlots": ["table-activities"]
+    },
+    {
+      "$comment": "Page 4: Follow-ups — operator to-do queue bucketed overdue/today/this_week/later.",
+      "pageName": "Follow-ups",
+      "pageSlug": "followups",
+      "isHidden": false,
+      "queries": [
+        {
+          "name": "listFollowupQueue",
+          "datasource": "AISHA Postgres REST",
+          "actionConfiguration": { "httpMethod": "GET", "path": "/audience_admin_followup_queue_v?order=due_at&limit=500" }
+        }
+      ],
+      "widgets": "{{FOLLOWUPS_WIDGETS}}",
+      "_widgetSlots": ["table-followup-queue"]
+    }
+  ],
+  "applicationDetail": {
+    "navigation": {
+      "showNavbar": true,
+      "logoConfiguration": "APPSMITH_LOGO_DEFAULT"
+    },
+    "themeSetting": {
+      "primaryColor": "#7c3aed",
+      "fontFamily": "System Default",
+      "borderRadius": "8px",
+      "boxShadow": "0 1px 3px rgba(0,0,0,0.1)"
+    }
+  },
+  "_metadata": {
+    "schema_version": "1.0",
+    "created_by": "build-aisha-appsmith.mjs",
+    "spec_reference": "appsmith-templates/audience/README.md",
+    "regenerable": true,
+    "manual_locked_widgets": []
+  }
+}

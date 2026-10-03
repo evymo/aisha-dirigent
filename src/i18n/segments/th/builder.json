@@ -1,0 +1,376 @@
+{
+  "builder": {
+    "panels": {
+      "blocks": "คลังบล็อก",
+      "properties": "คุณสมบัติ",
+      "activity": "กิจกรรมของเอเจนต์"
+    },
+    "blocks": {
+      "install-grid": {
+        "title": "กริดการติดตั้ง",
+        "description": "กริดการ์ดช่องทางการติดตั้งและดาวน์โหลด"
+      },
+      "modes": {
+        "title": "การ์ดโหมด",
+        "description": "การ์ดโหมดสี่ใบพร้อมแท็กและชิป"
+      },
+      "cost-pillars": {
+        "title": "เสาหลักคุณค่า",
+        "description": "สามเสาหลักพร้อมตัวเลขสถิติขนาดใหญ่"
+      },
+      "hero": {
+        "title": "ส่วน Hero",
+        "description": "แบนเนอร์เต็มความกว้างพร้อมหัวข้อและ CTA"
+      },
+      "features": {
+        "title": "ตารางฟีเจอร์",
+        "description": "ตารางการ์ดฟีเจอร์พร้อมไอคอน"
+      },
+      "pricing": {
+        "title": "ตารางราคา",
+        "description": "แผนราคาเปรียบเทียบ"
+      },
+      "cta": {
+        "title": "เรียกร้องให้ดำเนินการ",
+        "description": "ส่วนการดำเนินการที่เน้น"
+      },
+      "testimonials": {
+        "title": "คำรับรอง",
+        "description": "แถบเลื่อนรีวิวจากลูกค้า"
+      },
+      "faq": {
+        "title": "คำถามที่พบบ่อย",
+        "description": "อคอร์เดียนคำถามที่พบบ่อย"
+      },
+      "footer": {
+        "title": "ส่วนท้าย",
+        "description": "ส่วนท้ายของหน้าพร้อมลิงก์และข้อมูล"
+      },
+      "contact": {
+        "title": "แบบฟอร์มติดต่อ",
+        "description": "แบบฟอร์มสำหรับรวบรวมคำถาม"
+      },
+      "trust-bar": {
+        "title": "แถบความน่าเชื่อถือ",
+        "description": "แถบไอคอนอุตสาหกรรม"
+      },
+      "pillars": {
+        "title": "เสาหลัก",
+        "description": "การ์ดคุณค่าสามใบ"
+      },
+      "how-it-works": {
+        "title": "วิธีการทำงาน",
+        "description": "ขั้นตอนกระบวนการ"
+      },
+      "about": {
+        "title": "เกี่ยวกับเรา",
+        "description": "ค่านิยมและพันธกิจของบริษัท"
+      },
+      "specialist-guild": {
+        "title": "สมาคมผู้เชี่ยวชาญ",
+        "description": "ระดับสมาชิกผู้เชี่ยวชาญ"
+      },
+      "hiring": {
+        "title": "รับสมัครงาน",
+        "description": "การ์ดตำแหน่งงานว่าง"
+      },
+      "stats-counter": {
+        "title": "ตัวนับสถิติ",
+        "description": "สถิติตัวเลขเคลื่อนไหว"
+      },
+      "project-configurator": {
+        "title": "ตัวกำหนดค่าโครงการ",
+        "description": "ตัวเลือกตัวเลือกโครงการแบบโต้ตอบ"
+      },
+      "meeting": {
+        "title": "บล็อกการประชุม",
+        "description": "กำหนดเวลาและจัดการการประชุม"
+      },
+      "questionnaire": {
+        "title": "แบบสอบถาม",
+        "description": "บล็อกแบบสำรวจหรือฟอร์มแบบไดนามิก"
+      },
+      "consent": {
+        "title": "บล็อกความยินยอม",
+        "description": "การแชร์ข้อมูลและความยินยอมด้านความเป็นส่วนตัว"
+      },
+      "action": {
+        "title": "บล็อกการดำเนินการ",
+        "description": "คำขอการดำเนินการของผู้ใช้ เช่น อัปโหลดหรือกำหนดเวลา"
+      },
+      "info": {
+        "title": "บล็อกข้อมูล",
+        "description": "เนื้อหาข้อมูลแบบคงที่"
+      },
+      "hero-slides": {
+        "title": "สไลด์ฮีโร่",
+        "description": "แกลเลอรีหมุนแบบไดนามิกพร้อมสไลด์ฮีโร่จากระบบหลังบ้าน"
+      },
+      "news-list": {
+        "title": "รายการข่าว",
+        "description": "บทความข่าวที่เผยแพร่จากระบบหลังบ้าน"
+      },
+      "contact-form": {
+        "title": "แบบฟอร์มติดต่อ",
+        "description": "แบบฟอร์มติดต่อแบบโต้ตอบพร้อมการตรวจสอบความถูกต้อง"
+      },
+      "archive-preview": {
+        "title": "การดูตัวอย่างเอกสารเก็บถาวร",
+        "description": "เอกสารบันทึกการจัดเก็บจากระบบหลังบ้าน"
+      },
+      "knowledge-preview": {
+        "title": "หัวข้อความรู้",
+        "description": "รายการหัวข้อฐานความรู้จากระบบหลังบ้าน"
+      },
+      "faq-accordion": {
+        "title": "คำถามที่พบบ่อยแบบขยายได้",
+        "description": "คำถามที่พบบ่อยพร้อมหมวดหมู่ที่สามารถพับได้"
+      },
+      "timeline": {
+        "title": "ไทม์ไลน์",
+        "description": "ไทม์ไลน์แนวตั้งพร้อมเหตุการณ์และเหตุการณ์สำคัญ"
+      },
+      "data-table": {
+        "title": "ตารางข้อมูล",
+        "description": "ตารางที่มีคอลัมน์และแถวสำหรับข้อมูลที่มีโครงสร้าง"
+      },
+      "ordered-list": {
+        "title": "รายการแบบมีลำดับ",
+        "description": "ขั้นตอนที่มีหมายเลขพร้อมชื่อเรื่องและคำอธิบาย"
+      },
+      "product-catalog": {
+        "title": "แคตตาล็อกสินค้า",
+        "description": "ตะกร้าสินค้าพร้อมราคาและสัญลักษณ์"
+      },
+      "news-browser": {
+        "title": "เบราว์เซอร์ข่าว",
+        "description": "รายการข่าวเต็มรูปแบบพร้อมการ์ด"
+      },
+      "knowledge-browser": {
+        "title": "เบราว์เซอร์ความรู้",
+        "description": "หัวข้อความรู้พร้อมตัวกรองการค้นหาและการมองเห็น"
+      },
+      "archive-browser": {
+        "title": "โปรแกรมเรียกดูคลังข้อมูล",
+        "description": "คลังข้อมูลเต็มรูปแบบพร้อมการกรองแบบ 4 แกน"
+      },
+      "studies-browser": {
+        "title": "Studies Browser",
+        "description": "Studies listing with tab filtering and funding progress"
+      },
+      "guild-directory": {
+        "title": "ไดเรกทอรีสมาคม",
+        "description": "ตลาดเฉพาะทางพร้อมตัวกรองและการจัดหน้า"
+      },
+      "process-loop": {
+        "title": "วงจรกระบวนการ",
+        "description": "วงจรต่อเนื่องของขั้นตอนที่มีหมายเลข"
+      },
+      "layer-stack": {
+        "title": "ชั้นซ้อน",
+        "description": "ชั้นที่ซ้อนกัน แต่ละชั้นก่อตัวขึ้นจากชั้นที่อยู่ด้านล่าง"
+      },
+      "signal-cards": {
+        "title": "การ์ดสัญญาณ",
+        "description": "แถวของการ์ดสัญญาณเมตริก"
+      },
+      "announcement-bar": {
+        "title": "แถบประกาศ",
+        "description": "แบนเนอร์เต็มความกว้างแบบบางพร้อมลิงก์"
+      },
+      "aisha-pruvodce": {
+        "title": "คู่มือ AISHA",
+        "description": "คู่มือ AI สำหรับการเยี่ยมชมครั้งแรก 13 สไลด์ + แบบทดสอบห้าคำถาม (ชุดนำเสนอแบบโต้ตอบ)"
+      },
+      "discussion-thread": {
+        "title": "การอภิปราย",
+        "description": "โพสต์ของผู้ใช้แบบเธรดใต้โหนดเนื้อหานี้"
+      }
+    },
+    "traits": {
+      "variant": "ตัวแปร",
+      "bgColor": "สีพื้นหลัง",
+      "bgGradient": "พื้นหลังไล่เฉดสี",
+      "sectionPadding": "การเติมช่องว่างในส่วน",
+      "cssClass": "คลาส CSS",
+      "colorScheme": "โทนสี"
+    },
+    "traitGroups": {
+      "template": "เทมเพลต",
+      "config": "การกำหนดค่า",
+      "layout": "เลย์เอาต์",
+      "other": "อื่นๆ"
+    },
+    "categories": {
+      "web": "บล็อกเว็บ",
+      "workflow": "บล็อกเวิร์กโฟลว์"
+    },
+    "actions": {
+      "save": "บันทึกแคนวาส",
+      "publish": "เผยแพร่",
+      "preview": "ดูตัวอย่าง",
+      "addBlock": "เพิ่มบล็อก",
+      "removeBlock": "ลบบล็อก",
+      "undo": "เลิกทำ",
+      "redo": "ทำซ้ำ"
+    },
+    "status": {
+      "saving": "กำลังบันทึก...",
+      "saved": "บันทึกการเปลี่ยนแปลงทั้งหมดแล้ว",
+      "error": "บันทึกล้มเหลว",
+      "loading": "กำลังโหลดแคนวาส...",
+      "translationsDenied": "บันทึกแล้ว แต่ข้อความไม่ได้บันทึก — การเขียนข้อความต้องใช้สิทธิ์ admin หรือ staff การแก้ไขยังอยู่เฉพาะในผืนผ้าใบนี้"
+    },
+    "agents": {
+      "blockAdded": "{{agent}} เพิ่ม {{block}}",
+      "propertyChanged": "{{agent}} เปลี่ยน {{property}} ใน {{block}}",
+      "blockRemoved": "{{agent}} ลบ {{block}}",
+      "approved": "{{agent}} อนุมัติ {{block}}",
+      "rejected": "{{agent}} ปฏิเสธ {{block}}",
+      "occipitumProposal": "{{agent}} เสนอการออกแบบผืนผ้าใบใหม่"
+    },
+    "variants": {
+      "default": "ค่าเริ่มต้น",
+      "hero": {
+        "splitLeft": "แยกซ้าย",
+        "minimal": "น้อยที่สุด"
+      },
+      "trust-bar": {
+        "statBar": "แถบสถิติ"
+      },
+      "pillars": {
+        "borderList": "รายการมีขอบ"
+      },
+      "how-it-works": {
+        "timelineSteps": "ขั้นตอนไทม์ไลน์"
+      },
+      "about": {
+        "proseCentered": "ข้อความตรงกลาง"
+      },
+      "specialist-guild": {
+        "horizontalBar": "แถบแนวนอน"
+      },
+      "hiring": {
+        "listRows": "แถวรายการ"
+      },
+      "stats-counter": {
+        "cardGrid": "ตารางการ์ด"
+      },
+      "features": {
+        "textRows": "แถวข้อความ"
+      },
+      "pricing": {
+        "horizontalCompare": "เปรียบเทียบแนวนอน"
+      },
+      "cta": {
+        "splitMedia": "สื่อแยก"
+      },
+      "testimonials": {
+        "cardGrid": "ตารางการ์ด"
+      },
+      "faq": {
+        "twoColumn": "สองคอลัมน์"
+      },
+      "footer": {
+        "stacked": "ซ้อนกัน"
+      },
+      "contact": {
+        "splitInfo": "ข้อมูลแยก"
+      },
+      "project-configurator": {
+        "stepWizard": "ตัวช่วยทีละขั้น"
+      },
+      "timeline": {
+        "horizontal": "แนวนอน"
+      },
+      "data-table": {
+        "stripedCompact": "ลายทางกะทัดรัด"
+      },
+      "ordered-list": {
+        "cardSteps": "ขั้นตอนการ์ด"
+      }
+    },
+    "empty": {
+      "title": "ยังไม่มีแคนวาส",
+      "description": "ลากบล็อกจากคลังเพื่อเริ่มสร้าง"
+    },
+    "sidebar": {
+      "blocks": "บล็อก",
+      "styles": "สไตล์",
+      "traits": "การตั้งค่า",
+      "layers": "เลเยอร์",
+      "i18n": "การแปล",
+      "selectElement": "เลือกองค์ประกอบเพื่อแก้ไขคุณสมบัติ",
+      "emptyCanvas": "แคนวาสว่างเปล่า"
+    },
+    "i18n": {
+      "injectTranslations": "ดูตัวอย่างการแปล",
+      "noKeys": "ไม่มีองค์ประกอบที่แปลได้บนแคนวาส",
+      "keysFound": "{{count}} คีย์ที่แปลได้"
+    },
+    "devices": {
+      "desktop": "เดสก์ท็อป",
+      "tablet": "แท็บเล็ต",
+      "mobile": "มือถือ"
+    },
+    "pageSettings": {
+      "background": "พื้นหลังของหน้า",
+      "backgroundPlaceholder": "เช่น #fafafa หรือ linear-gradient(...)",
+      "className": "Page CSS Class",
+      "classNamePlaceholder": "เช่น หน้าแลนดิ้ง",
+      "styleJson": "รูปแบบหน้า JSON",
+      "styleJsonPlaceholder": "เช่น {\"maxWidth\":\"1200px\"}",
+      "invalidJson": "รูปแบบหน้า JSON ต้องเป็นออบเจ็กต์ JSON ที่ถูกต้อง"
+    },
+    "schemes": {
+      "default": "ค่าเริ่มต้น",
+      "warmSunset": "พระอาทิตย์ตกอบอุ่น",
+      "coolOcean": "มหาสมุทรเย็น",
+      "forestGreen": "เขียวป่า",
+      "darkElegant": "มืดหรูหรา",
+      "softLavender": "ลาเวนเดอร์อ่อน",
+      "neutralSlate": "สีเทาเป็นกลาง"
+    },
+    "runtime": {
+      "limit": "จำกัดรายการ",
+      "columns": "คอลัมน์",
+      "autoplay": "เล่นอัตโนมัติ",
+      "interval": "ช่วงเวลา (มิลลิวินาที)",
+      "skipHref": "ลิงก์ข้ามเป้าหมาย (URL)",
+      "showFilters": "แสดงตัวกรอง",
+      "tag": "ปักหมุดที่แท็ก",
+      "nodeType": {
+        "label": "ประเภทโหนด",
+        "news_article": "บทความข่าว",
+        "web_page": "หน้าเว็บ"
+      },
+      "nodeId": "รหัสโหนด"
+    },
+    "versions": {
+      "title": "ประวัติเวอร์ชัน",
+      "restore": "กู้คืน",
+      "restored": "กู้คืนเวอร์ชันแล้ว",
+      "restoredDesc": "หน้าถูกกู้คืนจากเวอร์ชันที่เลือก",
+      "restoreError": "ไม่สามารถกู้คืนเวอร์ชันได้",
+      "none": "ยังไม่มีเวอร์ชัน"
+    },
+    "templates": {
+      "title": "เทมเพลตหน้า",
+      "saveAs": "บันทึกเป็นเทมเพลต",
+      "namePlaceholder": "ชื่อเทมเพลต...",
+      "saved": "บันทึกเทมเพลตแล้ว",
+      "savedDesc": "บันทึกหน้าปัจจุบันเป็นเทมเพลตที่นำกลับมาใช้ได้",
+      "saveError": "ไม่สามารถบันทึกเทมเพลตได้",
+      "apply": "นำไปใช้",
+      "applied": "ใช้เทมเพลตแล้ว",
+      "appliedDesc": "เทมเพลตถูกนำไปใช้กับหน้านี้แล้ว",
+      "applyError": "ไม่สามารถใช้เทมเพลตได้",
+      "none": "ไม่มีเทมเพลตที่ใช้ได้"
+    },
+    "assets": {
+      "invalidType": "ไม่รองรับประเภทไฟล์",
+      "tooLarge": "ไฟล์ใหญ่เกินไป (สูงสุด 20 MB)",
+      "uploadFailed": "อัปโหลดแอสเซ็ตไม่สำเร็จ"
+    }
+  }
+}

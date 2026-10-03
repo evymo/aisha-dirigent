@@ -1,0 +1,35 @@
+# ============================================================================
+# docker-compose.local.source-broker.yml
+# ============================================================================
+# LOCAL-DEV overlay for the federation broker. Merged ON TOP of the canonical
+# docker-compose.coolify-source-broker.yml so local and prod run the SAME
+# standardized component — this file carries ONLY the local-structural deltas
+# (host networking, loopback port binding, talk-to-PostgREST-directly, and the
+# dev /sync bypass).
+#
+# The federation VALUES (SOURCE_*, POSTGRES_URL, mantra, BROKER_DOMAIN, …) are
+# NOT here: docker compose resolves the canonical compose's ${VAR:?} from the
+# PROJECT env (.env.coolify), which scripts/local/up.sh fills with local values.
+# That keeps this overlay thin and the canonical compose the single source.
+#
+#   docker compose --env-file .env.coolify \
+#     -f docker-compose.coolify-source-broker.yml \
+#     -f docker-compose.local.source-broker.yml up -d --build svc-source-broker
+services:
+  svc-source-broker:
+    image: svc-source-broker:local
+    container_name: svc-source-broker-local
+    depends_on:
+      - db
+    ports:
+      - "127.0.0.1:8090:8090"
+    extra_hosts:
+      # reach the external source app running on the host
+      - "host.docker.internal:host-gateway"
+    environment:
+      # local talks to PostgREST directly; prod routes via the gateway alias
+      POSTGREST_URL: "http://postgrest:3000"
+      # ── dev ONLY — relax the /sync admin guard locally. NEVER set in prod: the
+      #    canonical compose deliberately omits it, and the federation-stack-
+      #    integrity gate fails if this bypass ever appears outside this overlay.
+      BROKER_DEV_ALLOW_UNAUTHED_SYNC: "true"

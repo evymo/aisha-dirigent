@@ -1,0 +1,28 @@
+{
+  "name": "@aisha/svc-knock",
+  "version": "1.0.0",
+  "license": "Elastic-2.0",
+  "description": "SPA knock listener — UDP only, never replies. Verifies the frame and writes the opened IP into the shared door map.",
+  "private": true,
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aisha/cache-redis": "*",
+    "@aisha/knock-protocol": "*",
+    "@aisha/observability": "*",
+    "@aisha/security": "*",
+    "fastify": "^5.3.3",
+    "ioredis": "^5.4.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.4"
+  }
+}

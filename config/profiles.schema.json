@@ -1,0 +1,337 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AISHA Deployment Profile",
+  "description": "Tvar instalace — KDE služby z katalogu běží a pod jakými jmény. Katalog (config/services.json) říká CO stack obsahuje; obojí spojuje scripts/lib/derive-domains.mjs. Profil je GENERICKÁ ŠABLONA: TLD ani identita zákazníka se sem nepíšou, dodává je instance.",
+  "type": "object",
+  "required": [
+    "id",
+    "description",
+    "domain",
+    "servers",
+    "tier_filter",
+    "mesh_default"
+  ],
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string",
+      "description": "Identifikátor profilu; musí odpovídat jménu souboru (AISHA_PROFILE ho vybírá)."
+    },
+    "description": {
+      "type": "string"
+    },
+    "app_name_prefix": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "Identita ZÁKAZNÍKA, když ji profil předepisuje. Zpravidla null — dodává ji instance přes APP_NAME_PREFIX. Dosadit ji odhadem nelze: adresa složená z cizího prefixu míří do cizí produkce."
+    },
+    "domain": {
+      "type": "object",
+      "required": [
+        "internal_pattern",
+        "public_pattern",
+        "mesh_pattern"
+      ],
+      "properties": {
+        "public_tld": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "null = dodá instance (PUBLIC_TLD). V repu se TLD nedeklaruje."
+        },
+        "internal_tld": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mesh_tld": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "internal_pattern": {
+          "type": "string",
+          "description": "Vzor vnitřní adresy, např. {subdomain}.{server}.{internal_tld}."
+        },
+        "public_pattern": {
+          "type": "string"
+        },
+        "mesh_pattern": {
+          "type": "string"
+        },
+        "_notes": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "direct_scope": {
+          "type": "string",
+          "enum": [
+            "public_face",
+            "no_mesh_internal"
+          ],
+          "description": "Co nese rozsah `direct`: 'public_face' (výchozí, #934) = veřejná tvář, kdykoli existuje; 'no_mesh_internal' = jméno v routované zóně uzlu — technický přístup ke stroji bez edge i bez meshe. Volí se podle toho, KAM routuje veřejný wildcard: míří-li na uzel edge a služba běží jinde, veřejná tvář jako direct vyrábí smyčku edge→edge."
+        },
+        "subdomain_prefix": {
+          "type": "string",
+          "description": "Předpona poddomén této instance (např. `<instance>` → <instance>-n8n.…). Odvozuje ji prefixProZonu() v scripts/lib/derive-domains.mjs; schéma ji do 2026-09-03 nedeklarovalo, takže profil, který ji NASTAVOVAL a resolver POUŽÍVAL, byl podle schématu neplatný."
+        },
+        "shared_zone_prefix": {
+          "type": "string",
+          "description": "Předpona pro sdílenou zónu; sourozenec subdomain_prefix, čte ji tentýž prefixProZonu()."
+        }
+      },
+      "additionalProperties": false
+    },
+    "servers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/Role"
+      },
+      "description": "Role serverů, které tenhle tvar má. Jednouzlová instalace uvádí jednu."
+    },
+    "server_bindings": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Slot → JMÉNO serveru v Coolify (ne UUID — ten se při re-provisioningu mění). Klíče jsou sloty včetně `build`, proto ne Role. Čte derive-domains.mjs (`server_bindings`); chybějící = strukturální odvození slotu."
+    },
+    "service_overrides": {
+      "type": "object",
+      "description": "Per-službu přepis katalogu pro tenhle tvar (typicky placement při kolokaci).",
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "placement": {
+            "$ref": "#/definitions/Role"
+          },
+          "legacy_env_var": {
+            "type": "string"
+          },
+          "subdomain": {
+            "type": "string",
+            "description": "Podadresa služby (např. `auth` → auth.<tld>)."
+          },
+          "external_domain": {
+            "type": "string",
+            "description": "Výslovná vnější adresa služby. Má přednost před odvozeným tvarem — derive-domains.mjs ř. 799–806. Hostname JEDNÉ instance sem v šabloně nepatří: patří do profilu v privátním overlayi."
+          },
+          "public": {
+            "type": "boolean",
+            "description": "Rozhodnutí INSTANCE, zda nasazená služba dostane veřejnou tvář na edge — přebíjí `public` z katalogu (derive-domains.mjs: `override.public ?? svc.public`). Vyžaduje `_comment_public`: vystavení i zavření je rozhodnutí s důvodem, ne přepínač (brána vystaveni-musi-mit-duvod)."
+          }
+        },
+        "patternProperties": {
+          "^_comment_[a-z0-9_]+$": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Důvod přepisu klíče za podtržítkem (`_comment_public` → `public`). Prázdný řetězec není důvod."
+          }
+        },
+        "dependencies": {
+          "public": [
+            "_comment_public"
+          ]
+        },
+        "additionalProperties": false
+      }
+    },
+    "tier_filter": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "required",
+          "important",
+          "optional",
+          "local-only"
+        ]
+      },
+      "description": "Které vrstvy katalogu se v tomhle tvaru nasazují."
+    },
+    "include": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Služby zařazené i proti tier_filter."
+    },
+    "include_local_only": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "exclude": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "mesh_default": {
+      "type": "boolean",
+      "description": "Výchozí stav mesh pro tenhle tvar; MESH_ENABLED ho přebíjí."
+    },
+    "deploy_concurrency": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Kolik nasazení smí aisha-redeploy mít současně v letu (od triggeru po koncový stav). Chybí = 1 (sériově). Vyšší hodnota jen tam, kde uzly unesou souběžné obrazy — disková brána hlídá každé spuštění zvlášť."
+    },
+    "surfaces": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "shell",
+          "subdomain"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "shell": {
+            "type": "string",
+            "minLength": 1
+          },
+          "subdomain": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "additionalProperties": false
+      },
+      "description": "Povrchové SPA (extranet, …) — nejsou služby katalogu, ale mají veřejné jméno. derive-domains.mjs z nich skládá AISHA_SURFACES a SURFACE_ORIGINS (CORS) a na chybějícím poli padá."
+    },
+    "edge_profiles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "description": "Compose profily UVNITŘ edge stacku (např. vrátný). Univerzum legálních jmen je edge compose — derive-domains.mjs neznámé odmítne; šablony nechávají prázdné."
+    },
+    "knock": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "measure",
+            "live"
+          ],
+          "description": "`measure` nic neotevře, `live` otevírá. Resolver cokoli jiného než `live` čte jako `measure` — enum proto dělá z překlepu chybu, ne tiché měření."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Vrátný (dveře) — vlastnost instance."
+    },
+    "ai": {
+      "type": "object",
+      "properties": {
+        "execution_mode": {
+          "type": "string",
+          "enum": [
+            "local",
+            "hybrid",
+            "cloud"
+          ],
+          "description": "Rezidence dat AI → AISHA_EXECUTION_MODE (derive-domains). `local` = @aisha/llm-dispatch cloudový backend vůbec nezaregistruje (otázka ani data neodejdou mimo lokální modely); `hybrid` = lokální pro jednoduché úrovně, cloud pro složité; `cloud` = dnešní chování platformy. Nedeklarováno = prázdná proměnná a ai-chat compose odmítne start — žádný tichý výklad."
+        },
+        "_note": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "description": "AI — vlastnosti instance (kde smí běžet generování)."
+    },
+    "oauth2": {
+      "type": "object",
+      "properties": {
+        "cookie_domains": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "null = deklaruje operátor (OAUTH2_COOKIE_DOMAINS)."
+        },
+        "whitelist_domains": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "_notes": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "oauth2_cookie_domains_per_server": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "zarizeni": {
+      "type": "object",
+      "description": "Volitelná schopnost „zařízení“ (tablety s hlídačem — device owner kiosku). Cesta k identitě hlídače UVNITŘ dat instance; čte ji CI „Kiosk: balíčky z CI“ (scripts/ci/kiosk-balicky.mjs) a ověřuje týmž pravidlem (scripts/lib/zarizeni-deklarace.mjs). Do databáze ji zapisuje hák dat instance, storage-auth ji čte odtud. Bez klíče vypnuto.",
+      "properties": {
+        "hlidac": {
+          "type": "string",
+          "description": "relativní cesta, např. zarizeni/hlidac.json (tvar: apps/hlidac/hlidac.example.json)"
+        }
+      },
+      "required": [
+        "hlidac"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "Role": {
+      "type": "string",
+      "pattern": "^(frontend|backend|experimental|local|\\$\\{[^}]+\\})$",
+      "description": "Role serveru. Krom tří cloudových rolí i `local` (dev mirror) a odkaz na proměnnou `${VAR}` nebo `${VAR:-default}` — jednouzlový profil tím nechává výběr stroje na instanci, místo aby ho zapekl. Enum by tuhle legální podobu zakázal; naměřeno 2026-08-13, kdy schéma odvozené jen z katalogu neznalo ani `local`, ani `${SINGLE_HOST_SERVER:-backend}`."
+    },
+    "Prose": {
+      "type": [
+        "string",
+        "array"
+      ],
+      "items": {
+        "type": "string"
+      },
+      "description": "Próza pro člověka (`_notes`, `_<klíč>_notes`). Resolver ji nečte; schéma ji připouští jen v tvaru textu, aby se pod podtržítkem nedala schovat konfigurace."
+    }
+  },
+  "patternProperties": {
+    "^_": {
+      "$ref": "#/definitions/Prose"
+    }
+  }
+}

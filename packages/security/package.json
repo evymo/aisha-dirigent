@@ -1,0 +1,85 @@
+{
+  "name": "@aisha/security",
+  "version": "0.4.6",
+  "license": "Elastic-2.0",
+  "description": "OWASP Top 10 hardening primitives shared across all AISHA orchestrator services (Fastify + PostgREST stack). Maps 1:1 to OWASP 2021 categories A01-A10.",
+  "private": false,
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./logger": {
+      "types": "./dist/logger.d.ts",
+      "default": "./dist/logger.js"
+    },
+    "./cors": {
+      "types": "./dist/cors.d.ts",
+      "default": "./dist/cors.js"
+    },
+    "./helmet": {
+      "types": "./dist/helmet.d.ts",
+      "default": "./dist/helmet.js"
+    },
+    "./rate-limit": {
+      "types": "./dist/rateLimit.d.ts",
+      "default": "./dist/rateLimit.js"
+    },
+    "./jwt": {
+      "types": "./dist/jwt.d.ts",
+      "default": "./dist/jwt.js"
+    },
+    "./ssrf": {
+      "types": "./dist/ssrf.d.ts",
+      "default": "./dist/ssrf.js"
+    },
+    "./audit": {
+      "types": "./dist/audit.d.ts",
+      "default": "./dist/audit.js"
+    },
+    "./errors": {
+      "types": "./dist/errors.d.ts",
+      "default": "./dist/errors.js"
+    },
+    "./secrets": {
+      "types": "./dist/secrets.d.ts",
+      "default": "./dist/secrets.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "pretest": "test -d node_modules/fastify || npm install --no-fund --no-audit --prefer-offline",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "type-check": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "fastify": "^4 || ^5"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.0.0",
+    "@fastify/helmet": "^12.0.0",
+    "@fastify/rate-limit": "^10.0.0",
+    "jose": "^6.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "fastify": "^5.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.3"
+  }
+}

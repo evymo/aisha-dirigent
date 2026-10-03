@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "acs.verify.request@1.0",
+  "title": "Verification request",
+  "description": "Asks the independent verifier to compare a final output against the CANONICAL intent — never against intermediate steps (R7/IP-9).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["intent_ref", "output_ref", "trigger"],
+  "properties": {
+    "intent_ref": { "type": "string", "pattern": "^int_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "output_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "properties": {
+        "kind": { "enum": ["message", "document", "run", "artifact"] },
+        "id": { "type": "string", "maxLength": 256 }
+      }
+    },
+    "trigger": { "enum": ["effect", "sampled_read_only", "operator"] },
+    "tot_context": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["winning_thought_id", "depth"],
+      "properties": {
+        "winning_thought_id": { "type": "string", "maxLength": 128 },
+        "depth": { "type": "integer", "minimum": 0, "description": "Tree depth of the winning branch — drift-per-depth metric input (ACS §4.3 R7)." }
+      }
+    }
+  }
+}

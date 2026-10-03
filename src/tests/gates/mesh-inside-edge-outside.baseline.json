@@ -1,0 +1,6 @@
+{
+  "$comment": "Stacks not yet converted to the target shape (inbound only through edge, internally everything on the mesh). Snapshot 2026-07-30. The gate fails on any NEW offender and on stale entries (a stack that became conformant must be removed). Drain with dedicated PRs, in the order the doc gives: core first (most edges point at it), then the gateway, then one stack at a time; public routers come off LAST because until then they are the only working way in. REGENERATE, never hand-edit.",
+  "$comment_univerzum": "2026-08-21: univerzum se ROZŠÍŘILO. Do té doby jím byly stacky s `placement: backend` — jenže placement říká, na kterém STROJI služba běží, ne jestli ji někdo zevnitř oslovuje jménem. Brána tak nikdy neviděla extranet (frontend), ledger ani exec (experimental), a extranet přitom edge volá vnitřním jménem, které bez mesh propadlo wildcardem na cizí stroj (502 po každém přihlášení). Nové kritérium: služba s vnitřní adresou v katalogu (`internal_url` / `internal_endpoints`). Položky, které se tím poprvé ukázaly, NEJSOU nová vada — je to dluh, který měřidlo dosud nevidělo. Přiznaný dluh se splácí, ne schovává; ráčna dál brání RŮSTU.",
+  "stacks_without_mesh": [],
+  "own_public_router": []
+}

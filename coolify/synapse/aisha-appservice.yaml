@@ -1,0 +1,31 @@
+# AISHA Matrix Bot Appservice Registration
+#
+# Registers the AISHA bot (@aisha:${MATRIX_DOMAIN}) as a Matrix appservice.
+# Events matching the namespace are forwarded to the matrix-webhook edge function,
+# which then routes to n8n for AISHA triage.
+#
+# Deploy: copy to /data/appservices/ in Synapse container
+# Reference: homeserver.yaml → app_service_config_files
+
+id: aisha-bot
+url: "${MATRIX_WEBHOOK_URL}"  # Edge function URL (set by Coolify env)
+as_token: "${AISHA_AS_TOKEN}"
+hs_token: "${AISHA_HS_TOKEN}"
+sender_localpart: aisha
+rate_limited: false
+
+namespaces:
+  users:
+    # Envsubst'd at deploy (like url/as_token/hs_token above). Uses MATRIX_DOMAIN
+    # so a fork's bot namespace matches its OWN homeserver, not the id3a.cz
+    # instance. (Dots aren't regex-escaped after substitution, but the homeserver
+    # domain is fixed, so the localpart namespace can't over-match a real user.)
+    - exclusive: true
+      regex: "@aisha:${MATRIX_DOMAIN}"
+  rooms: []
+  aliases: []
+
+# AISHA responds to:
+# - Direct messages to @aisha:${MATRIX_DOMAIN}
+# - @aisha mentions in any room she's invited to
+# - Bridge status events (for monitoring)

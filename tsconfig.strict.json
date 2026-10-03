@@ -1,0 +1,24 @@
+// Stricter typecheck config for the frontend app — enables `noImplicitAny`
+// and `strictNullChecks` on top of `tsconfig.app.json`. NOT used by Vite
+// (that still consumes tsconfig.app.json so the build keeps working);
+// only consumed by `scripts/gen-frontend-typecheck-baseline.mjs` to count
+// remaining strict-mode violations.
+//
+// Why a separate config: the frontend has ~900 legacy implicit-any +
+// nullability sites. Enabling strict directly in tsconfig.app.json would
+// break the build today. The separate config lets us:
+//   - Keep production build green
+//   - Track strict-mode debt as a monotone-decreasing baseline
+//   - Catch any PR that ADDS new strict-mode violations (gate fails)
+//   - Migrate incrementally: each PR that touches a hook / page can fix
+//     a chunk of its strict errors + regenerate the baseline lower
+//
+// Long-term goal: when baseline hits 0, tsconfig.app.json adopts the same
+// strict settings and this file becomes redundant.
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "noImplicitAny": true,
+    "strictNullChecks": true
+  }
+}

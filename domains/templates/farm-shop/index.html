@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n-key="web.farm.title">Maple Hollow Farm — shop &amp; growing guides</title>
+    <meta name="description" data-i18n-key="web.farm.description"
+      content="A small family farm: fresh produce in the shop, and open growing guides to learn from." />
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header" data-section="header">
+      <div class="wrap">
+        <a class="brand" href="/">
+          <span class="brand__mark" aria-hidden="true">🌾</span>
+          <span data-i18n-key="web.farm.brand">Maple Hollow Farm</span>
+        </a>
+        <nav class="nav">
+          <a href="#shop" data-i18n-key="web.farm.nav.shop">Shop</a>
+          <a href="#guides" data-i18n-key="web.farm.nav.guides">Growing guides</a>
+          <a href="#visit" data-i18n-key="web.farm.nav.visit">Visit</a>
+        </nav>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" data-section="hero">
+        <div class="wrap">
+          <h1 data-i18n-key="web.farm.hero.heading">Grown with care, sold the same week</h1>
+          <p data-i18n-key="web.farm.hero.body">
+            We farm a few good acres and sell what we pick. Browse the shop for this week's
+            harvest — or borrow our growing guides and raise it yourself.
+          </p>
+          <a class="btn" href="#shop" data-i18n-key="web.farm.hero.cta">Shop the harvest</a>
+        </div>
+      </section>
+
+      <section class="section" id="shop" data-section="shop">
+        <div class="wrap">
+          <p class="section__eyebrow" data-i18n-key="web.farm.shop.eyebrow">From our fields</p>
+          <h2 class="section__title" data-i18n-key="web.farm.shop.heading">This week in the shop</h2>
+          <!-- LIVE product catalog (instance data). Renders the operator's
+               `products` rows via the product-catalog runtime block; ships EMPTY
+               (the operator stocks their own shop in admin). columns:4 matches
+               the original .products grid (repeat(4,1fr)). -->
+          <div data-runtime-block="product-catalog" data-block-config='{"columns":4}'></div>
+        </div>
+      </section>
+
+      <section class="section" id="guides" data-section="guides">
+        <div class="wrap">
+          <div class="know">
+            <div class="inner">
+              <div>
+                <h2 data-i18n-key="web.farm.know.heading">Grow it yourself — ask our guides</h2>
+                <p data-i18n-key="web.farm.know.body">Twelve seasons of sowing dates, soil notes and what-went-wrong are written down and searchable. Ask in plain language — "when do I start my tomatoes?" — and get an answer drawn straight from our field notes.</p>
+                <a class="btn btn-light" href="#visit" data-i18n-key="web.farm.know.cta">Ask a growing question</a>
+              </div>
+              <div class="know__stat">
+                <span class="know__num" data-i18n-key="web.farm.know.statNum">12</span>
+                <span class="know__label" data-i18n-key="web.farm.know.statLabel">seasons of field notes, searchable</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section visit" id="visit" data-section="visit">
+        <div class="wrap">
+          <h2 class="section__title" data-i18n-key="web.farm.visit.heading">Come see the farm</h2>
+          <p data-i18n-key="web.farm.visit.body">The shop is open Saturday mornings, and we love showing people around. Bring a basket.</p>
+          <a class="btn" href="mailto:hello@example.farm" data-i18n-key="web.farm.visit.button">Plan a visit</a>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer" data-section="footer">
+      <div class="wrap">
+        <span data-i18n-key="web.farm.footer.name">Maple Hollow Farm</span>
+        <span data-i18n-key="web.farm.footer.note">Grown without shortcuts, sold with a handshake.</span>
+      </div>
+    </footer>
+  </body>
+</html>

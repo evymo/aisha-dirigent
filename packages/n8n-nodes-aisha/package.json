@@ -1,0 +1,85 @@
+{
+  "name": "n8n-nodes-aisha",
+  "version": "0.5.13",
+  "description": "AISHA Platform custom n8n community nodes — AISHA gateway RPC, MCP integration, audit, delivery, self-orchestration",
+  "keywords": [
+    "n8n-community-node-package",
+    "n8n",
+    "aisha",
+    "postgrest",
+    "mcp",
+    "orchestration"
+  ],
+  "license": "Elastic-2.0",
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "author": {
+    "name": "AISHA Platform",
+    "email": "dev@evymo.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/evymo/aisha-dirigent.git",
+    "directory": "packages/n8n-nodes-aisha"
+  },
+  "homepage": "https://github.com/evymo/aisha-dirigent/tree/main/packages/n8n-nodes-aisha#readme",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc && node scripts/copy-icons.mjs",
+    "dev": "tsc -w",
+    "lint": "eslint nodes/ credentials/ --ext .ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit -p tsconfig.json",
+    "prepublishOnly": "npm run build",
+    "pack:local": "npm run build && npm pack",
+    "deploy:n8n": "node scripts/deploy-to-n8n.mjs",
+    "deploy:api": "node scripts/deploy-to-n8n.mjs --api",
+    "deploy:publish": "node scripts/deploy-to-n8n.mjs --publish",
+    "postpublish": "curl -sf -X POST https://n8n.aisha.guru/webhook/self-deploy -H 'Content-Type: application/json' -d '{\"source\":\"postpublish\",\"version\":\"'$npm_package_version'\"}' || true"
+  },
+  "files": [
+    "dist",
+    "bootstrap",
+    "workflows",
+    "LICENSE"
+  ],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": [
+      "dist/credentials/AishaPostgrestApi.credentials.js",
+      "dist/credentials/AishaMcpApi.credentials.js",
+      "dist/credentials/AishaNocoDbApi.credentials.js",
+      "dist/credentials/AishaLangfuseApi.credentials.js",
+      "dist/credentials/AishaForgejoApi.credentials.js",
+      "dist/credentials/AishaAppsmithApi.credentials.js"
+    ],
+    "nodes": [
+      "dist/nodes/AishaRpc/AishaRpc.node.js",
+      "dist/nodes/AishaAudit/AishaAudit.node.js",
+      "dist/nodes/AishaStoryManager/AishaStoryManager.node.js",
+      "dist/nodes/AishaModelRouter/AishaModelRouter.node.js",
+      "dist/nodes/AishaLlmRouter/AishaLlmRouter.node.js",
+      "dist/nodes/AishaTrigger/AishaTrigger.node.js",
+      "dist/nodes/AishaNodeFactory/AishaNodeFactory.node.js",
+      "dist/nodes/AishaAdminBridge/AishaAdminBridge.node.js",
+      "dist/nodes/AishaGitHubApp/AishaGitHubApp.node.js"
+    ]
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.46.1",
+    "@typescript-eslint/parser": "^8.46.1",
+    "eslint": "^9.37.0",
+    "n8n-workflow": "~1.120.14",
+    "typescript": "~5.5.0",
+    "vitest": "^3.2.6"
+  },
+  "peerDependencies": {
+    "n8n-workflow": ">=1.60.0"
+  },
+  "overrides": {
+    "form-data": "^4.0.4"
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "version": "1.0.0",
+  "build": 12,
+  "app": {
+    "displayName": "AISHA Dirigent",
+    "bundleId": "cz.id3a.aisha.app",
+    "category": "public.app-category.productivity"
+  },
+  "brand": {
+    "_note": "Store identity for this build. The app is a client-facing white-label product: a client fork edits ONLY this file (and its design-tokens brand file) — no code changes, no fork of the app. slug/scheme must be lowercase-hyphen; xcodeName must equal displayName with every non-alphanumeric removed (Expo derives the iOS workspace/scheme/target that way); backgroundColor should match the design-tokens mobile background.",
+    "slug": "aisha-dirigent",
+    "scheme": "aisha-dirigent",
+    "xcodeName": "AISHADirigent",
+    "shortName": "AISHA",
+    "assistantName": "AISHA",
+    "backgroundColor": "#0E0E10",
+    "gatewayPinned": false,
+    "_shortNameNote": "Short brand token for in-app copy. i18n strings use {{brandFull}} (= app.displayName, e.g. login title) and {{brand}} (= this, inline: 'Consult {{brand}}', '{{brand}} Wallet'). A client reskin sets this to its own short name so no 'AISHA' literal survives in the UI.",
+    "_gatewayPinnedNote": "false = umbrella build: the user may switch instance/gateway at runtime in Settings (default, one app serving many clients). true = dedicated company build: the gateway baked in EXPO_PUBLIC_AISHA_GATEWAY_URL is fixed, the Settings switcher is hidden, and the stored-override path is ignored.",
+    "sentry": {
+      "project": "aisha-dirigent",
+      "organization": "sentry",
+      "url": "https://sentry.id3a.cz"
+    },
+    "defaultSurface": "tabs"
+  },
+  "ios": {
+    "marketingVersion": "1.0",
+    "buildNumber": 12,
+    "deploymentTarget": "15.5"
+  },
+  "android": {
+    "versionCode": 12,
+    "versionName": "1.0.0",
+    "minSdkVersion": 26,
+    "targetSdkVersion": 35
+  },
+  "lastUpdated": "2026-08-05T13:59:17.000Z",
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "build": 12,
+      "date": "2026-08-05",
+      "changes": [
+        "App identity must be explicit: app.config throws when version.json is unreadable or incomplete instead of silently building a mis-identified app",
+        "Firebase config paths are env-overridable (AISHA_FIREBASE_IOS_FILE / AISHA_FIREBASE_ANDROID_FILE) for white-label builds",
+        "Android joins push: googleServicesFile wired for FCM (previously iOS-only)",
+        "Offline meter-reading handover queue (PR #131 companion)"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "build": 11,
+      "date": "2026-07-16",
+      "changes": [
+        "Fix: Keycloak login in release builds — KC authority/realm/client vars now reach the runtime via app.config extra",
+        "Keycloak authority now fails loud when unconfigured instead of silently degrading to a relative URL"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "build": 10,
+      "date": "2026-06-07",
+      "changes": [
+        "Sentry symbolication by design: JS source maps + dSYMs uploaded to self-hosted Sentry on every build"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "build": 9,
+      "date": "2026-06-06",
+      "changes": [
+        "Editorial ember-orange rebrand: new splash screen, app icon and launcher art"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "build": 1,
+      "date": "2026-04-05",
+      "changes": [
+        "Initial scaffold",
+        "Project dashboard",
+        "AISHA chat integration",
+        "Sentry monitoring",
+        "Push notifications"
+      ]
+    }
+  ]
+}

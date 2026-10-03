@@ -1,0 +1,6 @@
+{
+  "$note": "Example demo template — a neighbourhood CAFÉ. The pure e-shop / online-ordering exemplar of the set. The menu is a LIVE product-catalog runtime block (reads the operator's `products` rows) — it ships EMPTY and the operator fills their own menu in admin (instance data, not base data); the surrounding chrome + 'order ahead' panel stay static i18n. Dark theme (the only one) so the gallery ships light + dark. Brand-neutral, fork-freely. Seed with /seed-default { \"source_dir\": \"cafe-shop\" } or AISHA_SEED_DOMAIN=cafe-shop.",
+  "title_key": "web.cafe.title",
+  "description_key": "web.cafe.description",
+  "slug": "index"
+}

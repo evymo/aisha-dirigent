@@ -1,0 +1,36 @@
+{
+  "name": "@aisha/flowboard-core",
+  "version": "0.1.4",
+  "license": "Elastic-2.0",
+  "description": "Engine-agnostic AISHA Flowboard core (ports, registry, graph+validation, engine router, n8n/sandbox compilers, provenance, recipes) shared by the web app and services.",
+  "private": false,
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

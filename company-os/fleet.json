@@ -1,0 +1,170 @@
+{
+  "$schema": "../schemas/company-os-fleet.schema.json",
+  "version": 1,
+  "preset": "one-person-company",
+  "prefix": "os",
+  "owner": {
+    "name": "Evymo",
+    "decision_seat": true
+  },
+  "slot_models": {
+    "spark": "haiku",
+    "ember": "sonnet",
+    "verify": "opus",
+    "default": "inherit"
+  },
+  "defaults": {
+    "slot": "ember",
+    "autonomy_level": "draft",
+    "brain": [
+      "who-i-am.md",
+      "what-i-do.md",
+      "operating-context.md"
+    ]
+  },
+  "agents": [
+    {
+      "slug": "leads",
+      "title": "Leads Agent",
+      "purpose": "Finds leads, buyers, and partnership targets.",
+      "mission": "leads → buyers",
+      "best_for": "Outbound, sponsors, and B2B prospecting.",
+      "tip": "Pull leads by role, industry, company size, and buying intent.",
+      "slot": "ember",
+      "autonomy_level": "draft",
+      "brain": [
+        "weekly-brief.md"
+      ],
+      "outputs": "Ranked lead list with role, industry, company size, buying-intent evidence, and a suggested opening line per lead."
+    },
+    {
+      "slug": "research",
+      "title": "Research Agent",
+      "purpose": "Finds market signals and source-backed research.",
+      "mission": "signals → patterns",
+      "best_for": "Content, product, and positioning research.",
+      "tip": "Ask for patterns, not summaries.",
+      "slot": "verify",
+      "autonomy_level": "advisory",
+      "brain": [],
+      "outputs": "Patterns with named sources and confidence per claim — never unsourced summaries."
+    },
+    {
+      "slug": "docs",
+      "title": "Docs Agent",
+      "purpose": "Organizes docs, SOPs, and knowledge bases.",
+      "mission": "docs → memory",
+      "best_for": "Database, docs, and operating-system memory.",
+      "tip": "Keep all repeatable work inside structured pages.",
+      "slot": "spark",
+      "autonomy_level": "draft",
+      "brain": [
+        "process-files.md"
+      ],
+      "outputs": "Updated or newly structured pages plus an index diff of what moved where."
+    },
+    {
+      "slug": "ads",
+      "title": "Ads Agent",
+      "purpose": "Creates ad concepts and campaign assets.",
+      "mission": "creative → campaigns",
+      "best_for": "Ads, creatives, motion concepts, and visual campaigns.",
+      "tip": "Turn product angles into scroll-stopping creative briefs.",
+      "slot": "ember",
+      "autonomy_level": "draft",
+      "brain": [
+        "style-rules.md"
+      ],
+      "outputs": "Creative briefs: hook, angle, visual direction, copy variants, and the offer each maps to."
+    },
+    {
+      "slug": "content",
+      "title": "Content Agent",
+      "purpose": "Turns ideas into posts, scripts, and visual briefs.",
+      "mission": "ideas → posts",
+      "best_for": "Creators, founders, and media businesses.",
+      "tip": "Feed it style-rules.md before every draft.",
+      "slot": "ember",
+      "autonomy_level": "draft",
+      "brain": [
+        "style-rules.md",
+        "wins-log.md"
+      ],
+      "outputs": "Channel-ready drafts in the operator's voice, each with a one-line rationale and a proof point."
+    },
+    {
+      "slug": "sales",
+      "title": "Sales Agent",
+      "purpose": "Writes outreach, follow-ups, and deal notes.",
+      "mission": "outreach → deals",
+      "best_for": "Sponsors, clients, partnerships, and deal flow.",
+      "tip": "Anchor every reply with one recent proof point.",
+      "slot": "ember",
+      "autonomy_level": "draft",
+      "brain": [
+        "style-rules.md",
+        "wins-log.md"
+      ],
+      "outputs": "Ready-to-send messages plus deal notes: stage, next step, and the proof point used."
+    },
+    {
+      "slug": "product",
+      "title": "Product Agent",
+      "purpose": "Turns customer pain into roadmap items.",
+      "mission": "pain → roadmap",
+      "best_for": "Solo builders shipping tools or digital products.",
+      "tip": "Turn repeated requests into roadmap tickets.",
+      "slot": "verify",
+      "autonomy_level": "draft",
+      "brain": [
+        "process-files.md"
+      ],
+      "outputs": "Roadmap tickets: pain evidence, affected users, proposed scope, and effort guess."
+    },
+    {
+      "slug": "ops",
+      "title": "Ops Agent",
+      "purpose": "Runs workflows, SOPs, and weekly planning.",
+      "mission": "tasks → systems",
+      "best_for": "Removing repetitive founder work.",
+      "tip": "Every repeated task becomes a process file.",
+      "slot": "spark",
+      "autonomy_level": "draft",
+      "brain": [
+        "process-files.md",
+        "weekly-brief.md"
+      ],
+      "outputs": "Updated process files and a weekly plan draft; flags any task done twice without an SOP."
+    },
+    {
+      "slug": "finance",
+      "title": "Finance Agent",
+      "purpose": "Tracks revenue, pricing, and cash decisions.",
+      "mission": "revenue → decisions",
+      "best_for": "Keeping the business honest.",
+      "tip": "Ask what decision changes cash flow this month.",
+      "slot": "verify",
+      "autonomy_level": "advisory",
+      "brain": [
+        "wins-log.md"
+      ],
+      "outputs": "Decision memos: the one decision that changes cash flow this month, options, and numbers behind each."
+    },
+    {
+      "slug": "review",
+      "title": "Review Agent",
+      "purpose": "Checks voice, accuracy, and ship quality.",
+      "mission": "quality → ship/no-ship",
+      "best_for": "Keeping the human in the decision seat.",
+      "tip": "Never publish before the review agent runs the \"anyone test\".",
+      "role": "review",
+      "slot": "verify",
+      "autonomy_level": "advisory",
+      "brain": [
+        "review-prompt.md",
+        "style-rules.md"
+      ],
+      "outputs": "SHIP or FIX FIRST verdict with numbered issues tied to the review-prompt checklist. The human makes the final call."
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "$comment": "Dependency-update policy for scripts/aisha-deps-update.mjs (Forgejo-native replacement of .github/dependabot.yml — Dependabot never ran on the primary forge). Cadence lives in .forgejo/workflows/aisha-deps-update.yml (cron). Semver-major updates are NEVER automated — majors land in bespoke PRs after a manual compat check, mirroring the dependabot ignore rule.",
+  "version": 1,
+  "allowedUpdateTypes": ["minor", "patch"],
+  "groups": {
+    "production": { "dependencyType": "production" },
+    "development": { "dependencyType": "development" }
+  },
+  "maxOpenPrs": 10,
+  "labels": ["dependencies", "security"],
+  "branchPrefix": "deps/",
+  "baseBranch": "main",
+  "internalScopes": ["@aisha", "@evymo"],
+  "$internalScopesComment": "Internal packages version through scripts/aisha-packages-publish.mjs (Verdaccio). The updater never bumps them directly; it REPORTS when a consumer resolves an older published version than the workspace source (the Verdaccio chicken-and-egg from ci.yml npm-audit-services) so the fix is: merge the package bump → publish → re-run updater.",
+  "targets": {
+    "$comment": "Discovered automatically from package-lock.json files (root workspace + standalone lockfile roots). This list only adds EXCLUSIONS.",
+    "excludePathPatterns": [
+      "node_modules/",
+      "trash/",
+      "workbench/vscodium/",
+      "packages/insight"
+    ]
+  },
+  "security": {
+    "auditLevel": "high",
+    "$comment": "npm audit findings at or above auditLevel get their own priority group in the plan (replacement for GitHub's out-of-band security updates) and are listed first in the PR body."
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "widgetName": "{{widgetId}}",
+  "displayName": "Stat Box",
+  "type": "STATBOX_WIDGET",
+  "version": 4,
+  "rightColumn": "{{rightColumn}}",
+  "topRow": "{{topRow}}",
+  "bottomRow": "{{bottomRow}}",
+  "leftColumn": "{{leftColumn}}",
+  "isVisible": true,
+  "label": "{{label}}",
+  "props": {
+    "primaryText": "{{title}}",
+    "primaryTextStyle": {
+      "fontWeight": "bold",
+      "color": "#1a1a1a"
+    },
+    "secondaryText": "{{secondaryText}}",
+    "secondaryTextStyle": {
+      "fontWeight": "normal",
+      "color": "#666"
+    },
+    "value": "{{ {{value_query}}.data || 0 }}",
+    "valueColor": "{{color}}",
+    "iconAlign": "left",
+    "iconName": "{{icon}}",
+    "borderRadius": "8px",
+    "boxShadow": "0px 1px 3px rgba(0,0,0,0.08)"
+  },
+  "isCanvas": false,
+  "tags": ["aisha-ops", "{{section}}"]
+}

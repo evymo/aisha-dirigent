@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1
+# Dockerfile.potok — svc-potok (verification-governed reasoning engine, port 8080)
+#
+# NEW — potok samotný žádný Dockerfile neshipuje (plán §W1). Single-stage,
+# build context = REPO ROOT (Coolify ARG_MAX pattern — viz
+# Dockerfile.svc-source-broker). `.git` never reaches the image
+# (.dockerignore `**/.git` covers the submodule gitlink).
+#
+# Mesh/gateway lane BEZ MLX: packages/potok/requirements-service.txt zatím
+# neexistuje (vzniká ve W2 jako unified pinned deps) — do té doby piny drží
+# tento Dockerfile: množina = requirements-ci.txt minus pytest (CI soubor je
+# záměrně bez pinů; kontejner musí být reprodukovatelný, proto piny zde).
+# POTOK_SERVICE_MLX=0: na Linuxu MLX není (Apple-only) a s "1" by /health
+# spadl na importu demo/mlx_gen — degradace musí být NAHLAS přes mock lane,
+# generation backend registry (aisha_gateway/local_openai/mlx/mock) řeší W2.
+
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/python:3.12-slim-bookworm
+
+# Deps z SoT souboru submodulu (requirements-service.txt = mock/gateway lane,
+# žádné mlx/transformers) — kopie zvlášť kvůli layer-cache před COPY celého stromu.
+WORKDIR /app
+COPY packages/potok/requirements-service.txt /app/requirements-service.txt
+RUN pip install --no-cache-dir -r /app/requirements-service.txt
+
+COPY packages/potok/ /app
+RUN useradd -r -u 10001 potok \
+    && mkdir -p /app/data /app/out \
+    && chown -R potok:potok /app/data /app/out
+USER potok
+
+ENV POTOK_HTTP_HOST=0.0.0.0 \
+    POTOK_HTTP_PORT=8080 \
+    POTOK_SERVICE_MLX=0
+
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD python -c 'import os,sys,urllib.request; r=urllib.request.urlopen("http://127.0.0.1:%s/health" % os.environ.get("POTOK_HTTP_PORT","8080"), timeout=4); sys.exit(0 if r.status==200 else 1)' || exit 1
+
+CMD ["python", "potok_http.py"]

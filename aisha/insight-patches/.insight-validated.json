@@ -1,0 +1,6 @@
+{
+  "_comment": "Attestation that the insight patches were validated to apply cleanly against this (pin, patches) state on a full checkout. The insight-patches gate REQUIRES content (fails if the submodule is absent) whenever current state differs from this. Refresh with `npm run insight:revalidate` after any submodule bump or patch edit.",
+  "pin": "96ec8f25883d1ce5559add3f2ebd3c0b8d79f247",
+  "patches_sha256": "6d65a5764eb0522b7e28e620663a02c7961565c06d4ac77d0fa983747bd451df",
+  "validated_at": "2026-09-29T06:28:34.100Z"
+}

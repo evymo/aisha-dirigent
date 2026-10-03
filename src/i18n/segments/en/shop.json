@@ -1,0 +1,575 @@
+{
+  "orderReview": {
+    "website": "Website",
+    "websitePlaceholder": "https://",
+    "title": "Rate Your Order",
+    "editTitle": "Edit Your Review",
+    "description": "Share your experience with this order",
+    "rating": "Rating",
+    "comment": "Comment (optional)",
+    "commentPlaceholder": "Tell us about your experience...",
+    "ratingRequired": "Please select a rating",
+    "createSuccess": "Thank you for your review!",
+    "updateSuccess": "Review updated successfully",
+    "yourReview": "Your review",
+    "leaveReview": "Leave a review",
+    "availableIn": "Review available in {{days}} days"
+  },
+  "productReviews": {
+    "title": "Customer Reviews",
+    "basedOn": "Based on {{count}} reviews",
+    "basedOn_one": "Based on {{count}} review",
+    "showingLatest": "Showing {{shown}} of {{total}} reviews"
+  },
+  "shop": {
+    "sectionLabel": "Platform",
+    "productsTitle": "Our Platform Tools",
+    "productsSubtitle": "Explore our range of platform tools based on industry best practices. Quality-focused tools to support delivery and reliability.",
+    "cleanIngredients": "Clean Ingredients",
+    "euCompliant": "Meets EU standards",
+    "preorderNotice": "Platform tools are available for pre-order to registered members only. Membership includes access to our project clusters and exclusive tool offerings.",
+    "membersOnly": "Members Only",
+    "partnersOnly": "Partners Only",
+    "learnMore": "Learn More",
+    "viewProduct": "View Tool",
+    "outOfStock": "Out of stock",
+    "noProducts": "No platform tools available yet.",
+    "backToShop": "Back to shop",
+    "productNotFound": "Tool not found.",
+    "addToCart": "Add to Ritual",
+    "aboutProduct": "About this tool",
+    "signInToPurchase": "Sign in to pre-order and manage your cart.",
+    "bridgeTitle": "From the Archive to Today",
+    "bridgeSubtitle": "Our platform tools are developed based on proven practices, reimagined with modern quality and reliability standards.",
+    "methodsStandards": "Read Our Methods & Standards",
+    "membershipCtaTitle": "Interested in Pre-ordering?",
+    "membershipCtaDescription": "Join our membership program to access pre-orders, participate in project clusters, and receive exclusive member benefits.",
+    "becomeMember": "Become a Member",
+    "exploreStudies": "Explore Clusters",
+    "complianceNote": "These platform tools are professional resources and are not intended to replace professional judgment or decision-making. Always evaluate tools in the context of your specific delivery needs.",
+    "originSource": "Source",
+    "originProduction": "Production",
+    "access": {
+      "viewOnly": "View only",
+      "preorder": "Pre-order",
+      "canOrder": "Order",
+      "autoApprove": "Auto-Approve",
+      "signInForAccess": "Sign in to see your access level"
+    },
+    "emptyState": "No products found",
+    "viewDetail": "View detail"
+  },
+  "shopBridge": {
+    "sectionLabel": "From Archive to Today",
+    "title": "How We Translate Proven Practices",
+    "subtitle": "Proven practices inform our modern tools. Here's how we bridge the gap—with integrity, quality, and transparency.",
+    "historicalRecord": "Historical Record",
+    "historicalDescription": "Original engineering practices documented in field-tested archives",
+    "modernStandards": "Modern Standards",
+    "modernDescription": "GMP production, EU compliance, safety testing, clear labeling",
+    "principles": {
+      "noMedicalClaims": {
+        "title": "No Unsupported Claims",
+        "description": "Labeled as food products, not medicines"
+      },
+      "qualitySources": {
+        "title": "Quality Sources",
+        "description": "Organic herbs, controlled animal sources"
+      },
+      "fullTransparency": {
+        "title": "Full Transparency",
+        "description": "Reference links on every tool page"
+      }
+    },
+    "viewProducts": "View Modern Platform Tools",
+    "chooseExplore": "If you choose to explore our modern presentations:"
+  },
+  "subscription": {
+    "authRequired": "Authentication required",
+    "authRequiredDesc": "Please sign in to request a subscription.",
+    "activated": "Subscription activated",
+    "activatedDesc": "Your {{name}} subscription is now active.",
+    "purchaseFailed": "Subscription request failed",
+    "purchaseFailedDesc": "Failed to submit subscription request.",
+    "requested": "Subscription requested",
+    "requestedDesc": "Your request for {{name}} has been submitted and is awaiting approval.",
+    "requestFailed": "Request failed",
+    "requestFailedDesc": "Failed to submit subscription request.",
+    "awaitingApproval": "Awaiting approval",
+    "approved": "Approved - Awaiting payment",
+    "payNow": "Pay Now",
+    "checkoutStarted": "Checkout page opened",
+    "checkoutStartedDesc": "Complete your payment in the new window.",
+    "checkoutFailed": "Failed to start checkout",
+    "portalFailed": "Failed to open subscription management",
+    "checkout": {
+      "selectPaymentType": "Select payment type",
+      "oneTimePayment": "One-time payment",
+      "oneTimeDesc": "Pay the full amount upfront for the entire subscription period.",
+      "recurringPayment": "Recurring payment",
+      "recurringDesc": "Automatically charged at regular intervals.",
+      "recommended": "Recommended",
+      "billingFull": "Billed for the full period",
+      "billingMinimum": "Minimum commitment of {{months}} months",
+      "billingInterval": "Billed every {{months}} months"
+    }
+  },
+  "orders": {
+    "title": "My Orders",
+    "subtitle": "Overview of your orders and their status.",
+    "noOrders": "No orders yet",
+    "noOrdersDescription": "You haven't placed any orders yet. Explore our shop!",
+    "browseShop": "Browse shop",
+    "orderNumber": "Order",
+    "noOrdersDesc": "You haven't placed any orders yet. Explore our shop!",
+    "order": "Order",
+    "product": "Tool",
+    "total": "Total",
+    "status": {
+      "pending": "Pending",
+      "processing": "Processing",
+      "shipped": "Shipped",
+      "delivered": "Delivered",
+      "cancelled": "Cancelled",
+      "refunded": "Refunded"
+    },
+    "paymentMethod": {
+      "card": "Card",
+      "bankTransfer": "Bank Transfer"
+    },
+    "paymentStatus": {
+      "pending": "Pending",
+      "paid": "Paid",
+      "failed": "Failed",
+      "refunded": "Refunded"
+    },
+    "invoice": {
+      "label": "Invoice",
+      "download": "Download Invoice",
+      "printError": "Failed to open invoice"
+    },
+    "bankTransfer": {
+      "awaitingPayment": "Awaiting bank transfer",
+      "variableSymbol": "Variable Symbol",
+      "dueDate": "Due Date",
+      "viewDetails": "View payment details"
+    }
+  },
+  "cart": {
+    "title": "Your Ritual",
+    "signInToView": "Sign in to view your cart",
+    "signInDescription": "Create an account or sign in to add items to your ritual.",
+    "empty": "Your cart is empty",
+    "emptyDescription": "Explore our platform tools and add them to your workflow.",
+    "browseProducts": "Browse Platform Tools",
+    "total": "Total",
+    "proceedToCheckout": "Proceed to Checkout",
+    "shippingCalculated": "Shipping calculated at checkout",
+    "qty": "Qty",
+    "added": "Added to ritual",
+    "addedDescription": "Item has been added to your cart.",
+    "removed": "Removed",
+    "removedDescription": "Item removed from cart."
+  },
+  "checkout": {
+    "title": "Checkout",
+    "cartEmpty": "Your cart is empty",
+    "cartEmptyDescription": "Add some platform tools to your cart before checking out.",
+    "continueShopping": "Continue browsing",
+    "contactInfo": "Contact & Address",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "email": "Email",
+    "phone": "Phone Number",
+    "phonePlaceholder": "+420...",
+    "shippingMethod": "Shipping Method",
+    "selectPickupPoint": "Select Pickup Point",
+    "selectedPickupPoint": "Selected pickup point",
+    "noPickupPoints": "No pickup points available for this country",
+    "deliveryMethod": "Delivery",
+    "shippingAddress": "Shipping Address",
+    "address": "Address",
+    "city": "City",
+    "postalCode": "Postal Code",
+    "country": "Country",
+    "stripeSecure": "Secure payment powered by Stripe. Your card details are encrypted and never stored on our servers.",
+    "proceedToPayment": "Proceed to Payment",
+    "processing": "Processing...",
+    "payment": {
+      "title": "Payment Method",
+      "card": "Credit / Debit Card",
+      "cardDesc": "Pay securely with your card via Stripe.",
+      "bankTransfer": "Bank Transfer",
+      "bankTransferDesc": "Pay by bank transfer using a variable symbol. Order is processed after payment is received.",
+      "bankTransferSecure": "You will receive bank transfer details after placing the order.",
+      "placeOrderBankTransfer": "Place Order"
+    },
+    "bankTransfer": {
+      "orderCreated": "Order Created Successfully",
+      "orderCreatedDesc": "Please complete the bank transfer using the details below to process your order.",
+      "orderRef": "Order Reference:",
+      "paymentDetails": "Bank Transfer Details",
+      "paymentDetailsDesc": "Use the following details to make your payment.",
+      "iban": "IBAN",
+      "bic": "BIC/SWIFT",
+      "variableSymbol": "Variable Symbol",
+      "amount": "Amount",
+      "dueDate": "Due Date",
+      "copied": "Copied",
+      "copiedDesc": "{{field}} copied to clipboard.",
+      "importantTitle": "Important",
+      "importantDesc": "Please use the exact variable symbol when making the transfer. This ensures automatic matching of your payment to your order.",
+      "goToOrders": "View My Orders",
+      "continueShopping": "Continue Shopping",
+      "orderNotFound": "Order Not Found",
+      "orderNotFoundDesc": "The order you are looking for does not exist or you do not have access to it.",
+      "qrCode": {
+        "title": "QR Payment Code",
+        "description": "Scan this QR code with your mobile banking app to fill in payment details automatically.",
+        "scanToPay": "Scan to pay",
+        "ariaLabel": "QR code for bank transfer payment"
+      }
+    },
+    "consents": {
+      "title": "Legal Consents"
+    },
+    "orderSummary": "Order Summary",
+    "subtotal": "Subtotal",
+    "shipping": {
+      "title": "Shipping",
+      "free": "Free",
+      "packetaPickup": "Zásilkovna Pickup Point",
+      "packetaPickupDesc": "Pick up your order at 7,000+ locations across Europe",
+      "packetaHome": "Home Delivery (Zásilkovna)",
+      "packetaHomeDesc": "Delivered to your address within 2-4 business days",
+      "personalPickup": "Personal Pickup",
+      "personalPickupDesc": "Pick up at our Prague office (Karlín)",
+      "pickup": "Pickup Point",
+      "pickupDesc": "Pick up your order at thousands of locations",
+      "zbox": "Z-BOX Parcel Locker",
+      "zboxDesc": "24/7 self-service parcel locker network",
+      "homeDelivery": "Home Delivery",
+      "homeDeliveryDesc": "Delivered to your address by courier",
+      "deliverToSameAddress": "Deliver to the address above",
+      "deliverToDifferentAddress": "Deliver to a different address",
+      "deliveringTo": "Delivering to:",
+      "carrierPickup": "Carrier Pickup Point",
+      "carrierHome": "Courier Home Delivery",
+      "deliveryLocation": "Delivery Location",
+      "postalCodePlaceholder": "e.g. 110 00",
+      "freeShippingEarned": "You have earned free shipping!",
+      "freeShippingRemaining": "Add {{amount}} more for free shipping",
+      "freeShippingProgress": "Free shipping from {{threshold}}",
+      "searchPickupPoint": "Search by name or address...",
+      "searchZBox": "Search Z-BOXes by name or address...",
+      "selectedPoint": "Selected pickup point",
+      "selectedZBox": "Selected Z-BOX",
+      "noPickupPointsFound": "No pickup points found for your search",
+      "noZBoxesFound": "No Z-BOXes found for your search",
+      "noCarriersAvailable": "No carriers available for this country",
+      "selectCarrier": "Select carrier",
+      "maxWeight": "Max {{weight}} kg",
+      "noCod": "Cash on delivery not available",
+      "showingOfTotal": "Showing {{showing}} of {{total}}",
+      "open247": "24/7",
+      "withKeypad": "With keypad",
+      "km": "km"
+    },
+    "validation": {
+      "firstNameRequired": "First name is required",
+      "lastNameRequired": "Last name is required",
+      "emailInvalid": "Invalid email address",
+      "phoneRequired": "Phone number is required",
+      "addressRequired": "Address is required",
+      "cityRequired": "City is required",
+      "postalCodeInvalid": "Invalid postal code format",
+      "countryRequired": "Country is required",
+      "consentsRequired": "Please accept all required consents."
+    },
+    "countries": {
+      "CZ": "Czech Republic",
+      "SK": "Slovakia",
+      "DE": "Germany",
+      "AT": "Austria",
+      "PL": "Poland"
+    },
+    "messages": {
+      "success": "Order placed successfully",
+      "successDesc": "Thank you for your order! We'll send you a confirmation email shortly.",
+      "error": "Checkout failed",
+      "errorDesc": "There was an error processing your order. Please try again.",
+      "validationError": "Validation error",
+      "validationErrorDesc": "Please check the form for errors.",
+      "selectPickupPoint": "Please select a pickup point",
+      "addressRequired": "Please fill in the delivery address",
+      "paymentSuccess": "Payment successful!",
+      "paymentSuccessDesc": "Your order has been confirmed. You'll receive a confirmation email shortly.",
+      "paymentCancelled": "Payment cancelled",
+      "paymentCancelledDesc": "Your payment was cancelled. Your cart items are still saved.",
+      "consentsRequired": "Please accept all required consents."
+    },
+    "voucher": {
+      "title": "Voucher / Discount Code",
+      "placeholder": "Enter code",
+      "apply": "Apply",
+      "remove": "Remove",
+      "applied": "Voucher Applied",
+      "appliedDesc": "Your voucher has been successfully applied to the order.",
+      "invalid": "Invalid Voucher",
+      "invalidDesc": "The code you entered is invalid, expired, or not applicable.",
+      "invalidProduct": "Product Not In Cart",
+      "invalidProductDesc": "This voucher is valid for a product that is not in your cart.",
+      "discount": "Voucher Discount"
+    }
+  },
+  "products": {
+    "viewInShop": "View in Shop",
+    "viewArchive": "View Archive Documents",
+    "exploreShop": "Explore Shop",
+    "joinStudy": "Join the Cluster",
+    "preOrder": "Pre-order",
+    "ctaTitle": "Interested in Platform Tools?",
+    "ctaDescription": "Explore our complete range of platform tools or join our cluster to contribute to ongoing development.",
+    "disclaimer": "This is a dietary product. It is not a medicine and is not intended to diagnose, treat, cure, or prevent any disease. Consult a production professional before use.",
+    "purchaseRequirements": {
+      "qualificationRequired": "You must pass the skill assessment to order platform tools.",
+      "consentRequired": "You must sign the informed consent to order platform tools."
+    },
+    "retisin": {
+      "name": "Demo Product 1 (DEMO-01)",
+      "badge": "Nucleoprotein Immunomodulator",
+      "tagline": "Metabolic accelerator and regenerative support",
+      "description": "From a molecular biology perspective, Retisin targets the fundamental restoration of cellular energetics and immune surveillance. Its primary benefit is the modulation of the organism's 'terrain' – optimizing the environment for regenerative processes. It acts as a strong roborant (strengthening agent), historically proven to increase the organism's overall resistance and suppress fermentative processes (often associated with the Warburg effect in pathological tissues) in favor of oxidative metabolism. It is ideal for states of exhaustion, convalescence after invasive procedures or radiotherapy, and for supporting hematopoiesis.",
+      "imageAlt": "Demo Product 1 30ml drops",
+      "origin": {
+        "title": "Origin and Production",
+        "description": "Deproteinized ethanol extract from bovine tissue with a specific spectrum of low-molecular bioactive substances.",
+        "source": {
+          "title": "Bovine Tissue",
+          "description": "Obtained from certified organic farms with strict quality control."
+        },
+        "production": {
+          "title": "Extraction",
+          "description": "Specific ethanol extraction preserving low-molecular bioactive substances."
+        }
+      },
+      "benefitsTitle": "Key Benefits",
+      "benefits": {
+        "energy": {
+          "title": "Cellular Energy Restoration",
+          "description": "Targets fundamental restoration of cellular energetics and optimization of metabolic processes."
+        },
+        "immunity": {
+          "title": "Immune Surveillance",
+          "description": "Modulates the organism's 'terrain' and optimizes the environment for regenerative processes."
+        },
+        "resistance": {
+          "title": "Increased Resistance",
+          "description": "Historically proven increase in overall organism resistance and suppression of fermentative processes."
+        },
+        "recovery": {
+          "title": "Convalescence",
+          "description": "Ideal for exhaustion, after invasive procedures or radiotherapy, and for supporting hematopoiesis."
+        }
+      },
+      "compositionTitle": "Active Ingredients",
+      "substances": {
+        "nucleotides": "Free nucleotides and nucleosides (AMP, CMP, GMP, IMP, UMP) - essential for DNA/RNA synthesis and energy (ATP)",
+        "peptides": "Bioactive peptides and oligopeptides (defensins, hemocidins) with immunomodulatory function",
+        "aminoAcids": "Spectrum of free amino acids and derivatives (taurine) for neuroendocrine regulation"
+      },
+      "usageTitle": "Usage Instructions",
+      "usage": {
+        "application": {
+          "title": "Application",
+          "description": "Orally. Application under the tongue is recommended for rapid absorption through the mucosa and bypassing liver metabolism (first-pass effect). Form: 30ml drops (solution)."
+        },
+        "distribution": {
+          "title": "Distribution",
+          "description": "Standard productation involves 1–2 ml daily (approx. 20–40 drops), ideally on an empty stomach or away from food to maximize absorption of peptide components."
+        },
+        "chronic": {
+          "title": "Long-term Use",
+          "description": "Suitable for long-term use in cycles (e.g., 3 months use, 1 month break) to maintain receptor sensitivity."
+        }
+      }
+    },
+    "floristen": {
+      "name": "Demo Product 2 (DEMO-02)",
+      "badge": "Phytochemical Anti-inflammatory Agent",
+      "tagline": "Selective extraction for chronic inflammation",
+      "description": "Floristen represents a unique approach to phytotherapy for chronic inflammation. Unlike common St. John's Wort extracts, this tool is designed to eliminate phototoxic components and maximize non-specific anti-inflammatory effects. The mechanism involves inhibiting proliferative inflammatory processes and supporting the resorption of infiltrates (inflammatory foci). Historically proven in chronic gynecological inflammations and conditions resistant to antibiotic treatment, acting as a \"herbal shield\" and supporting tissue vascularization.",
+      "imageAlt": "Demo Product 2 30ml drops",
+      "origin": {
+        "title": "Origin and Production",
+        "description": "Specifically prepared hydroalcoholic extract from Hypericum perforatum (St. John's Wort), focusing on the water-soluble fraction.",
+        "source": {
+          "title": "Hypericum perforatum",
+          "description": "St. John's Wort"
+        },
+        "production": {
+          "title": "Selective Extraction",
+          "description": "Elimination of phototoxic components, maximization of non-specific anti-inflammatory effect."
+        }
+      },
+      "benefitsTitle": "Key Benefits",
+      "benefits": {
+        "antiInflammatory": {
+          "title": "Anti-inflammatory Effect",
+          "description": "Maximized non-specific anti-inflammatory effect, inhibition of proliferative inflammatory processes."
+        },
+        "resorption": {
+          "title": "Resorption Support",
+          "description": "Support for resorption of infiltrates (inflammatory foci)."
+        },
+        "shield": {
+          "title": "Herbal Shield",
+          "description": "Acts as a herbal shield in chronic conditions and supports tissue vascularization."
+        },
+        "safety": {
+          "title": "Safety",
+          "description": "Designed to eliminate phototoxic components common in St. John's Wort extracts."
+        }
+      },
+      "compositionTitle": "Active Ingredients",
+      "substances": {
+        "flavonoids": "Flavonoids (quercetin, rutin, hyperoside, amentoflavone) - strong antioxidant activity, inflammation modulation",
+        "phloroglucinols": "Phloroglucinols (limited, modified hyperforin/adhyperforin) - preserved antimicrobial potential, minimized interactions",
+        "naphthodianthrones": "Naphthodianthrones (limited, minimized hypericin) - reduced photosensitivity risk, preserved antiviral potential"
+      },
+      "usageTitle": "Usage Instructions",
+      "usage": {
+        "application": {
+          "title": "Application",
+          "description": "Orally, mixed in a small amount of water or applied directly. Form: 30ml drops (solution)."
+        },
+        "distribution": {
+          "title": "Distribution",
+          "description": "Standard 20–30 drops 2–3× daily. For chronic conditions, long-term administration (minimum 6–8 weeks) is key for tissue saturation with flavonoids."
+        },
+        "warning": {
+          "title": "Warning",
+          "description": "Although the extract is modified, caution is recommended during sun exposure and consultation with a doctor when taking immunosuppressants or hormonal contraceptives."
+        }
+      }
+    },
+    "lyastin": {
+      "name": "Demo Product 3 (DEMO-03)",
+      "badge": "Lipidomic Regenerator",
+      "tagline": "Vascular protectant and membrane regeneration",
+      "description": "Lyastin targets the integrity of cell membranes and microcirculation. Its main benefit is improving the nutrition (trophics) of ischemic tissues and supporting the regeneration of vascular endothelium. It works by supplying essential building blocks for cell wall repair, acting as a vasodilator and spasmolytic. It is indicated for supporting peripheral circulation, regeneration after vascular events, and conditions associated with tissue degeneration due to hypoxia (lack of oxygen).",
+      "imageAlt": "Demo Product 3 30ml drops",
+      "origin": {
+        "title": "Origin and Production",
+        "description": "Ethanol-ether extract from bovine tissue focusing on the lipid fraction.",
+        "source": {
+          "title": "Bovine Tissue",
+          "description": "Lipid fraction"
+        },
+        "production": {
+          "title": "Extract",
+          "description": "Ethanol-ether extract"
+        }
+      },
+      "benefitsTitle": "Key Benefits",
+      "benefits": {
+        "membrane": {
+          "title": "Membrane Integrity",
+          "description": "Targets cell membrane integrity and supplies building blocks for repair."
+        },
+        "circulation": {
+          "title": "Microcirculation and Trophics",
+          "description": "Improving nutrition of ischemic tissues, supporting vascular endothelium regeneration."
+        },
+        "vasodilation": {
+          "title": "Vasodilation",
+          "description": "Acts as a vasodilator and spasmolytic."
+        },
+        "indications": {
+          "title": "Indications",
+          "description": "Support for peripheral circulation, regeneration after vascular events, conditions associated with hypoxia."
+        }
+      },
+      "compositionTitle": "Active Ingredients",
+      "substances": {
+        "phospholipids": "Phospholipids (phosphatidylcholines, sphingomyelins, phosphoethanolamines) - critical for membrane fluidity and function",
+        "lipoproteins": "Lipoproteins and sterols - support lipid transport and membrane stability",
+        "fattyAcids": "Fatty acids (optimized n-3 and n-6 ratio) - regulation of inflammatory response at membrane level"
+      },
+      "usageTitle": "Usage Instructions",
+      "usage": {
+        "application": {
+          "title": "Application",
+          "description": "Orally. Due to lipid nature, it is advisable to take with food containing fats for better absorption, or directly. Form: 30ml drops (solution)."
+        },
+        "distribution": {
+          "title": "Distribution",
+          "description": "1–2 ml daily (approx. 20–40 drops). For conditions requiring intensive tissue regeneration (e.g., post-traumatic states, bedsores), distribution can be increased short-term."
+        },
+        "synergy": {
+          "title": "Combination",
+          "description": "Historically shows strong synergy with Floristen (for inflammatory and necrotic processes)."
+        }
+      }
+    },
+    "rtnDuo": {
+      "name": "Demo Product 4 (Demo Product 1 + Demo Product 2)",
+      "badge": "Synergistic Immunometabolic Complex",
+      "tagline": "Metabolic stimulation and anti-inflammatory shield",
+      "description": "This combined tool utilizes synergy between metabolic stimulation (Retisin) and anti-inflammatory shield (Floristen). While Retisin supplies 'fuel' and signaling molecules for immune cells (nucleotides, peptides), Floristen modulates the inflammatory environment and reduces oxidative stress. The spray form allows rapid application via oral mucosa, ensuring immediate availability for mucosal immunity (IgA) and systemic circulation. Ideal for acute immune support, at first signs of virosis, or as prevention during stressful periods.",
+      "imageAlt": "Demo Product 4 Spray",
+      "origin": {
+        "title": "Origin and Composition",
+        "description": "Combination of bioactive spectra of both parental tools (Retisin + Floristen) in spray form.",
+        "source": {
+          "title": "Combined Source",
+          "description": "Nucleoprotein fraction from Retisin and flavonoid fraction from Floristen."
+        },
+        "production": {
+          "title": "Synergistic Formulation",
+          "description": "Spray form for maximum bioavailability and immediate mucosal absorption."
+        }
+      },
+      "benefitsTitle": "Key Benefits",
+      "benefits": {
+        "synergy": {
+          "title": "Synergistic Effect",
+          "description": "Combination supports oxygen utilization in tissues and simultaneously suppresses pathological proliferation."
+        },
+        "metabolic": {
+          "title": "Metabolic Support",
+          "description": "Supplies 'fuel' and signaling molecules for immune cells (from Retisin)."
+        },
+        "inflammation": {
+          "title": "Inflammation Modulation",
+          "description": "Modulates inflammatory environment and reduces oxidative stress (from Floristen)."
+        },
+        "absorption": {
+          "title": "Rapid Absorption",
+          "description": "Spray allows rapid application via mucosa, bypassing digestive tract and degradation."
+        }
+      },
+      "compositionTitle": "Active Ingredients",
+      "substances": {
+        "nucleoproteins": "Nucleoprotein fraction (from Retisin) - DNA regeneration, protein synthesis in immune cells",
+        "flavonoids": "Flavonoid fraction (from Floristen) - quercetin and rutin for capillary stabilization and free radical scavenging",
+        "complex": "Synergistic Complex - strong regenerative and defense effect"
+      },
+      "usageTitle": "Usage Instructions",
+      "usage": {
+        "application": {
+          "title": "Application",
+          "description": "Sublingually (under tongue) or on throat mucosa using sprayer. Shake before use. Form: 30ml spray (combined solution)."
+        },
+        "distribution": {
+          "title": "Distribution",
+          "description": "Preventive: 3–5 sprays 2× daily. Acute support: 5 sprays every 3–4 hours during first days of load."
+        },
+        "note": {
+          "title": "Note",
+          "description": "Spray form is designed for maximum compliance and bioavailability, bypassing degradation in digestive tract."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,134 @@
+# =============================================================================
+# 0001-maestro-readiness-probe-context-gate.patch
+# =============================================================================
+# Subject: AISHA Maestro USP integrity gate — runtime CONTEXT_ENABLED check
+#
+# WHY:
+#   Upstream Maestro `/health` endpoint kontroluje pouze CPU/disk/memory
+#   (liveness). Pokud někdo manuálně přepne CONTEXT_ENABLED=false v Coolify
+#   env UI (např. omylem při debugu), Maestro tiše degraduje na single-turn
+#   responses — multi-turn coherence USP (Alexa Prize heritage) je ztracená,
+#   ale healthcheck stále vrací 200. Tento patch přidá readiness probe
+#   `/health/ready`, která vrátí 503 při CONTEXT_ENABLED=false (runtime
+#   čteno přes pydantic settings, žádný hardcoded fallback).
+#
+# Target: aisha/insight@96ec8f25883d1ce5559add3f2ebd3c0b8d79f247
+#
+# Upgrade workflow:
+#   1. Pull new upstream version: cd packages/insight && git pull origin main
+#   2. Update parent submodule pointer: git add packages/insight && git commit
+#   3. Verify patch still applies: scripts/insight-patches-apply.sh --check
+#   4. Pokud konflikt: fix v submodule WD, regenerate patch:
+#        cd packages/insight && git diff > ../../aisha/insight-patches/0001-...patch
+#      Update Target: header above to new commit SHA.
+# =============================================================================
+
+diff --git a/maestro/maestro/api/readiness.py b/maestro/maestro/api/readiness.py
+new file mode 100644
+index 0000000..d589eb1
+--- /dev/null
++++ b/maestro/maestro/api/readiness.py
+@@ -0,0 +1,84 @@
++# -*- coding: utf-8 -*-
++"""
++    maestro.api.readiness
++    ~~~~~~~~~~~~~~~~~~~~~
++
++    Readiness probe with USP integrity gate.
++
++    Distinct from ``/health`` (liveness — process running with healthy
++    CPU/disk/memory). ``/health/ready`` adds Maestro-specific readiness
++    checks that gate traffic on USP correctness.
++
++    Multi-turn dialog coherence (Alquist Insight USP, Alexa Prize heritage)
++    requires ``CONTEXT_ENABLED=True``. If the env var was misconfigured
++    (e.g., manually overridden in Coolify UI), the process keeps running
++    but Maestro silently degrades to single-turn responses — the loss of
++    USP is invisible to liveness probes. The readiness probe surfaces this
++    by returning 503 when CONTEXT_ENABLED is false at runtime.
++
++    Used by ``docker-compose.coolify-integration.yml`` healthcheck so that
++    Coolify marks the container ``unhealthy`` and Traefik routes around it
++    until the operator restores correct configuration.
++"""
++
++from datetime import datetime
++
++from dateutil import tz
++from fastapi import status
++from fastapi.responses import Response
++from fastapi.routing import APIRouter
++from pydantic import BaseModel
++
++from common.api.health import HealthService, cpu_checker, disk_checker, memory_checker
++from common.config import CONFIG
++
++router = APIRouter()
++
++
++class Readiness(BaseModel):
++    results: list[HealthService]
++    status: str
++    timestamp: float
++
++
++def context_enabled_checker() -> HealthService:
++    """Verify Maestro multi-turn USP is active.
++
++    Reads ``CONFIG.CONTEXT_ENABLED`` at runtime (Pydantic settings — single
++    source of truth, no hardcoded fallback). The compose contract sets the
++    env var to ``true`` for the Maestro service; this checker ensures the
++    runtime configuration matches the contract.
++    """
++    enabled = CONFIG.CONTEXT_ENABLED
++    return HealthService(
++        checker=context_enabled_checker.__name__,
++        output=str(enabled),
++        passed=bool(enabled),
++    )
++
++
++@router.get(
++    "/health/ready",
++    response_model=Readiness,
++    status_code=status.HTTP_200_OK,
++    summary="Readiness probe — USP integrity gate",
++)
++def get_readiness(response: Response) -> Readiness:
++    results = [
++        cpu_checker(),
++        disk_checker(),
++        memory_checker(),
++        context_enabled_checker(),
++    ]
++
++    if all(r.passed for r in results):
++        r_status = "success"
++    else:
++        r_status = "failed"
++        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
++
++    return Readiness(
++        results=results,
++        status=r_status,
++        timestamp=datetime.now(tz=tz.UTC).timestamp(),
++    )
+diff --git a/maestro/maestro/api/router.py b/maestro/maestro/api/router.py
+index bf322b0..7973cd5 100644
+--- a/maestro/maestro/api/router.py
++++ b/maestro/maestro/api/router.py
+@@ -9,7 +9,7 @@
+ from fastapi.routing import APIRouter
+ 
+ from common.api import health
+-from maestro.api import analytics, default, dialogue, frontend, nlp, resources
++from maestro.api import analytics, default, dialogue, frontend, nlp, readiness, resources
+ 
+ api_router = APIRouter()
+ api_router.include_router(analytics.router, tags=["analytics"])
+@@ -18,4 +18,5 @@ api_router.include_router(dialogue.router, tags=["dialogue"])
+ api_router.include_router(frontend.router, tags=["frontend"])
+ api_router.include_router(health.router, tags=["default"])
+ api_router.include_router(nlp.router, tags=["nlp"])
++api_router.include_router(readiness.router, tags=["default"])
+ api_router.include_router(resources.router, tags=["resources"])

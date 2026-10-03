@@ -1,0 +1,115 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "description": "Offline mirror of aisha/db/seed/core/27_claude_hook_bindings.sql. Consumed by scripts/ide-adapters/adapter-claude-overlay.mjs and its TS port. Must stay in sync with the SQL seed; gate test src/tests/gates/claude-overlay-drift.gate.test.ts enforces.",
+  "bindings": [
+    {
+      "rule_slug": "rpc-only",
+      "hook_event": "PreToolUse",
+      "matcher": "Edit|Write|MultiEdit",
+      "scanner_kind": "regex",
+      "pattern_regex": "\\.from\\(\\s*[\"'`][^\"'`]{1,60}[\"'`]\\s*\\)\\s*\\.\\s*(select|insert|update|delete|upsert)\\b",
+      "messages": {
+        "cs": "RPC-Only: Přímý .from() dotaz na tabulku — použij rpcUser()/rpcService() z services/svc-ai-chat/src/lib/rpcAdapter.ts.",
+        "en": "RPC-Only: direct .from() table query — use rpcUser()/rpcService() from services/svc-ai-chat/src/lib/rpcAdapter.ts."
+      },
+      "hint": "@aisha Jak nahradím .from().select() správným RPC vzorem?",
+      "cooldown_sec": 45,
+      "severity": "high"
+    },
+    {
+      "rule_slug": "no-console",
+      "hook_event": "PreToolUse",
+      "matcher": "Edit|Write|MultiEdit",
+      "scanner_kind": "regex",
+      "pattern_regex": "console\\.log\\s*\\(",
+      "messages": {
+        "cs": "Hygiena: console.log() není povoleno. Použij safeError() pro error logování.",
+        "en": "Hygiene: console.log() is not permitted. Use safeError() for error logging."
+      },
+      "hint": "@aisha Jak správně logovat chyby?",
+      "cooldown_sec": 45,
+      "severity": "moderate"
+    },
+    {
+      "rule_slug": "no-any",
+      "hook_event": "PreToolUse",
+      "matcher": "Edit|Write|MultiEdit",
+      "scanner_kind": "regex",
+      "pattern_regex": "(\\bas\\s+any\\b|:\\s*any\\b)",
+      "messages": {
+        "cs": "Hygiena: Typ 'any' není povolen. Použij proper typy nebo unknown + type guard.",
+        "en": "Hygiene: Type 'any' is not permitted. Use proper types or unknown + type guard."
+      },
+      "hint": "@aisha Jak nahradím 'any' typ správným type guardem?",
+      "cooldown_sec": 45,
+      "severity": "moderate"
+    },
+    {
+      "rule_slug": "ts-ignore",
+      "hook_event": "PreToolUse",
+      "matcher": "Edit|Write|MultiEdit",
+      "scanner_kind": "regex",
+      "pattern_regex": "@ts-ignore\\b",
+      "messages": {
+        "cs": "Hygiena: @ts-ignore není povolen. Použij @ts-expect-error s vysvětlujícím komentářem.",
+        "en": "Hygiene: @ts-ignore is not permitted. Use @ts-expect-error with explanatory comment."
+      },
+      "hint": "@aisha Jak správně použít @ts-expect-error?",
+      "cooldown_sec": 45,
+      "severity": "moderate"
+    },
+    {
+      "rule_slug": "select-star",
+      "hook_event": "PreToolUse",
+      "matcher": "Edit|Write|MultiEdit",
+      "scanner_kind": "regex",
+      "pattern_regex": "\\.select\\(\\s*[\"'`]\\s*\\*\\s*[\"'`]\\s*\\)",
+      "messages": {
+        "cs": "RPC-Only: .select(\"*\") — vždy vyjmenuj explicitní sloupce, nikoli wildcard.",
+        "en": "RPC-Only: .select(\"*\") — always list explicit columns, never wildcard."
+      },
+      "hint": "@aisha Které sloupce mám vybrat místo *?",
+      "cooldown_sec": 45,
+      "severity": "moderate"
+    },
+    {
+      "rule_slug": "supervisor-relay",
+      "hook_event": "SessionStart",
+      "matcher": "*",
+      "scanner_kind": "relay",
+      "pattern_regex": null,
+      "messages": {
+        "cs": "Supervisor relay: odesílá hook události (session_start/pre_tool/post_tool/stop) na /dirigent/dispatch pro živý monitoring a advisory nudges.",
+        "en": "Supervisor relay: forwards hook events (session_start/pre_tool/post_tool/stop) to /dirigent/dispatch for live monitoring and advisory nudges."
+      },
+      "hint": null,
+      "cooldown_sec": 0,
+      "severity": "low",
+      "config": {
+        "source": "claude-code",
+        "endpoint_path": "/dirigent/dispatch",
+        "timeout_ms": 5000,
+        "events": [
+          { "arg": "session_start", "hook_event": "SessionStart" },
+          { "arg": "pre_tool", "hook_event": "PreToolUse", "matcher": "Edit|Write|MultiEdit|Agent" },
+          { "arg": "post_tool", "hook_event": "PostToolUse", "matcher": "Edit|Write|MultiEdit|Bash|Agent" },
+          { "arg": "stop", "hook_event": "Stop" }
+        ],
+        "phase_map": {
+          "session_start": "session_start",
+          "stop": "stopped",
+          "pre_tool": { "Agent": "planning", "default": "tool_use" },
+          "post_tool": { "default": "reviewing" },
+          "default": "idle"
+        },
+        "tool_derivation": [
+          { "tool": "Agent", "all_of": ["description", "prompt"] },
+          { "tool": "MultiEdit", "all_of": ["edits"] },
+          { "tool": "Bash", "all_of": ["command"] },
+          { "tool": "Edit", "all_of": ["file_path", "new_string"] },
+          { "tool": "Write", "all_of": ["file_path", "content"] }
+        ]
+      }
+    }
+  ]
+}

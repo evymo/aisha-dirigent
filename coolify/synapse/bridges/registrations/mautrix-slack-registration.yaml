@@ -1,0 +1,14 @@
+id: mautrix-slack
+url: http://mautrix-slack:29335
+as_token: ${AISHA_AS_TOKEN}_slack
+hs_token: ${AISHA_HS_TOKEN}_slack
+sender_localpart: slackbot
+rate_limited: false
+namespaces:
+  users:
+    - exclusive: true
+      regex: '@slack_.*'
+  aliases:
+    - exclusive: true
+      regex: '#slack_.*'
+  rooms: []

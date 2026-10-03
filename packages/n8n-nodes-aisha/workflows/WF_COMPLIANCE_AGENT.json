@@ -1,0 +1,533 @@
+{
+  "id": "MGTNBckfKk6j0Brc",
+  "name": "WF_COMPLIANCE_AGENT",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "compliance-agent",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Compliance Agent Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "compliance-agent-wh01"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse incoming request — from GitHub bridge, n8n-trigger, or direct\nconst body = $input.item.json.body || $input.item.json;\n\n// Determine the task type\nconst taskType = body.action || body.task || 'compliance_check';\n\nlet chatInput = '';\nif (taskType === 'pr_check' || body.pull_request) {\n  const pr = body.pull_request || {};\n  chatInput = `Check compliance for PR #${pr.number || body.pr_number} in ${body.repository?.full_name || body.repo || 'unknown'}. ` +\n    `Branch: ${pr.head?.ref || body.branch || 'unknown'}. ` +\n    `Title: ${pr.title || body.title || 'N/A'}. ` +\n    (body.story_id ? `Story ID: ${body.story_id}. ` : '') +\n    `Determine if this PR meets compliance requirements.`;\n} else if (taskType === 'story_check') {\n  chatInput = `Run compliance check for story ${body.story_id}. ` +\n    `Validate that all rules are met and report any violations.`;\n} else {\n  chatInput = body.query || body.message || `Run compliance check: ${JSON.stringify(body)}`;\n}\n\nreturn {\n  json: {\n    chatInput,\n    context: {\n      task_type: taskType,\n      pr_number: body.pr_number || body.pull_request?.number,\n      repo: body.repository?.full_name || body.repo,\n      head_sha: body.pull_request?.head?.sha || body.head_sha,\n      story_id: body.story_id,\n      source: body.source || 'webhook',\n    }\n  }\n};"
+      },
+      "id": "prepare-input",
+      "name": "Parse Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=Jsi **AISHA Compliance Agent** — autonomní subsystém Dirigenta pro enforcement compliance pravidel.\n\n## Role v orchestraci\nJsi subsystém řízený Dirigentem. Dirigent ti deleguje compliance úlohy. Tvůj výstup je strukturovaný SIGNÁL zpět Dirigentovi — on rozhodne o dalších krocích.\n\n## Operační protokol\n\n### Při compliance checku (PR nebo story):\n1. `validate_compliance({ story_id })` — načti celý ruleset\n2. `get_story_context({ story_id })` — získej delivery kontext\n3. Pokud PR: `check_pr_compliance({ story_id, pr_number, ... })` — detailní check\n4. Analyzuj výsledky proti rulesetu\n5. Rozhodni: PASS / FAIL / ESCALATE\n\n### Rozhodovací matice:\n- **PASS**: Všechna pravidla splněna, ruleset existuje a je aktuální\n- **FAIL**: Porušená pravidla → klasifikuj severity (critical/major/minor)\n- **ESCALATE**: >2 opakované faily NEBO security-related porušení\n\n### Při reroute (compliance_reroute):\n1. Přijmi violations z předchozího checku\n2. `create_story_ruleset({ story_id })` — refresh ruleset pokud chybí\n3. Re-check compliance\n4. Pokud stále FAIL → eskaluj\n\n## SIGNÁLNÍ PROTOKOL — Formát odpovědi\n\nVŽDY vrať strukturovanou odpověď v tomto formátu:\n```json\n{\n  \"signal\": \"compliance_result\",\n  \"verdict\": \"pass\" | \"fail\" | \"escalate\",\n  \"severity\": \"low\" | \"medium\" | \"high\" | \"critical\",\n  \"story_id\": \"uuid nebo null\",\n  \"violations\": [\n    { \"rule\": \"název pravidla\", \"severity\": \"critical|major|minor\", \"detail\": \"popis\" }\n  ],\n  \"recommendations\": [\"doporučené akce\"],\n  \"confidence\": 0.0-1.0,\n  \"summary\": \"Stručné shrnutí\",\n  \"requires_human\": false\n}\n```\n\nDirigent tento signál přijme a na základě severity rozhodne:\n- low/medium → autonomní akce\n- high → oznámení + návrh akce\n- critical → eskalace na lidského admina\n\n## Bezpečnostní invarianty\n- NIKDY neautorizuj merge — pouze nastav GitHub Check status\n- NIKDY neprováděj delivery transitions — to je úloha Delivery Agenta\n- Při security-related porušeních VŽDY označ `requires_human: true`\n- VŽDY loguj důvody rozhodnutí",
+          "maxIterations": 6
+        }
+      },
+      "id": "ai-agent",
+      "name": "Compliance Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "routingStrategy": "auto",
+        "modelOverride": "",
+        "options": {
+          "temperature": 0.1,
+          "maxOutputTokens": 4096,
+          "topP": 0.9,
+          "maxRetries": 2
+        }
+      },
+      "type": "n8n-nodes-aisha.aishaLlmRouter",
+      "typeVersion": 1,
+      "position": [
+        500,
+        520
+      ],
+      "id": "llm-router",
+      "name": "LLM Router",
+      "credentials": {
+        "openAiApi": {
+          "id": "__REMAP__",
+          "name": "OpenAi account"
+        },
+        "googlePalmApi": {
+          "id": "__REMAP__",
+          "name": "Google Gemini(PaLM) Api account"
+        },
+        "anthropicApi": {
+          "id": "__REMAP__",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "compliance_reroute",
+        "description": "Trigger compliance reroute workflow when violations are found. Input: { story_id, violations: string[], pr_number, repo, head_sha, attempt }",
+        "workflowId": "=ozS30AZ21Xe5FLvg",
+        "fields": {
+          "values": [
+            {
+              "name": "story_id",
+              "stringValue": "={{ $json.story_id }}"
+            },
+            {
+              "name": "violations",
+              "stringValue": "={{ JSON.stringify($json.violations || []) }}"
+            },
+            {
+              "name": "pr_number",
+              "stringValue": "={{ $json.pr_number }}"
+            },
+            {
+              "name": "attempt",
+              "stringValue": "1"
+            }
+          ]
+        }
+      },
+      "id": "workflow-tool-reroute",
+      "name": "Reroute Workflow Tool",
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2,
+      "position": [
+        680,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process compliance agent output and determine action\nconst agentOutput = $input.item.json;\nconst context = $('Parse Request').item.json.context;\n\nlet result;\ntry {\n  result = typeof agentOutput.output === 'string'\n    ? JSON.parse(agentOutput.output)\n    : agentOutput.output;\n} catch {\n  result = {\n    verdict: 'fail',\n    summary: agentOutput.output || 'Unable to parse compliance result',\n    violations: ['Parse error in agent output'],\n    recommendations: ['Manual review required'],\n    confidence: 0.3\n  };\n}\n\nreturn {\n  json: {\n    success: true,\n    agent: 'compliance',\n    verdict: result.verdict || 'unknown',\n    summary: result.summary,\n    violations: result.violations || [],\n    recommendations: result.recommendations || [],\n    confidence: result.confidence || 0.5,\n    context: {\n      pr_number: context.pr_number,\n      repo: context.repo,\n      story_id: context.story_id,\n      head_sha: context.head_sha,\n    },\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "format-output",
+      "name": "Format Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "conditions": [
+            {
+              "id": "is-pass",
+              "leftValue": "={{ $json.verdict }}",
+              "rightValue": "pass",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "verdict-switch",
+      "name": "Pass or Fail?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Format Result').item.json.context.repo }}/check-runs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"AISHA Compliance Agent\",\n  \"head_sha\": \"{{ $('Format Result').item.json.context.head_sha }}\",\n  \"status\": \"completed\",\n  \"conclusion\": \"success\",\n  \"output\": {\n    \"title\": \"✅ Compliance Passed (AI Agent)\",\n    \"summary\": \"{{ $('Format Result').item.json.summary }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "github-check-pass",
+      "name": "GitHub Check ✅",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        200
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "NI0KGNDrdQLuKsGi",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Format Result').item.json.context.repo }}/check-runs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"AISHA Compliance Agent\",\n  \"head_sha\": \"{{ $('Format Result').item.json.context.head_sha }}\",\n  \"status\": \"completed\",\n  \"conclusion\": \"action_required\",\n  \"output\": {\n    \"title\": \"❌ Compliance Failed (AI Agent)\",\n    \"summary\": \"{{ $('Format Result').item.json.summary }}\\n\\nViolations:\\n{{ $('Format Result').item.json.violations.map(v => '- ' + v).join('\\n') }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "github-check-fail",
+      "name": "GitHub Check ❌",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        400
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "NI0KGNDrdQLuKsGi",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env?.AISHA_POSTGREST_URL || '' }}/rest/v1/rpc/log_n8n_trace_event",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"p_event_type\": \"compliance_check\",\n  \"p_agent_slug\": \"compliance\",\n  \"p_operation\": \"compliance_agent\",\n  \"p_status\": \"{{ $('Format Result').item.json.verdict === 'pass' ? 'ok' : 'error' }}\",\n  \"p_request_summary\": {\n    \"verdict\": \"{{ $('Format Result').item.json.verdict }}\",\n    \"pr_number\": {{ $('Format Result').item.json.context.pr_number || 'null' }},\n    \"violations_count\": {{ $('Format Result').item.json.violations.length }},\n    \"confidence\": {{ $('Format Result').item.json.confidence }}\n  }\n}",
+        "options": {}
+      },
+      "id": "log-trace",
+      "name": "Log Trace Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        520
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Z7oSSowoqk0ZgB8X",
+          "name": "AISHA Supabase (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "name": "validate_compliance",
+        "description": "Quality Governor compliance gate: loads the full ruleset for a story and returns all expert rules with their AI instructions and body. Use this to verify that generated code, documentation, or deliverables conform to the pinned ruleset. Returns structured compliance context.\n\nInput: JSON object. Parameters:\n  - story_id (required): string — UUID of the partner story to check compliance for.\n  - severity_threshold (optional): number — Minimum severity level for rules to include (1=all, 2=important+, 3=critical only). Default: 1.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: validate_compliance\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'validate_compliance', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-validate_compliance",
+      "name": "MCP: validate_compliance",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "name": "check_pr_compliance",
+        "description": "Dirigent PR compliance gate: combines compliance rule checking with code quality assessment. Creates a pr_review session and returns ruleset violations + quality findings for review.\n\nInput: JSON object. Parameters:\n  - story_id (required): string — UUID of the partner story this PR belongs to.\n  - file_paths (required): array — Changed file paths in the PR.\n  - diff_summary (optional): string — Summary of the PR diff/changes.\n  - tech_stack (optional): array — Technology tags.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: check_pr_compliance\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'check_pr_compliance', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-check_pr_compliance",
+      "name": "MCP: check_pr_compliance",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "name": "moderate_flow",
+        "description": "Dirigent moderation: creates a moderation session for a development flow. Returns relevant expert rules, story context, and expertise-level hints. Use this when starting code review, pre-commit check, or general development guidance.\n\nInput: JSON object. Parameters:\n  - session_type (required): string — Type of moderation session.\n  - story_id (optional): string — Optional UUID of the partner story for project context.\n  - tech_stack (optional): array — Technology tags, e.g. ['typescript', 'react', 'supabase'].\n  - file_paths (optional): array — File paths being worked on.\n  - diff_summary (optional): string — Git diff summary or description of changes.\n  - expertise_level (optional): string — Developer expertise level. Default: intermediate.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: moderate_flow\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'moderate_flow', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-moderate_flow",
+      "name": "MCP: moderate_flow",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "name": "evaluate_tests",
+        "description": "Dirigent test strategy: evaluates what tests should exist for a hook or file, identifies gaps, and provides recommendations following AISHA testing patterns (vi.mocked, RPC-only mocks, no fragile toHaveBeenCalledTimes).\n\nInput: JSON object. Parameters:\n  - session_id (required): string — UUID of an active moderation session (from moderate_flow).\n  - hook_name (required): string — Name of the hook or function to evaluate, e.g. 'useMyFeature'.\n  - file_path (required): string — Path to the source file.\n  - test_file_path (optional): string — Path to existing test file, if any.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: evaluate_tests\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'evaluate_tests', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-evaluate_tests",
+      "name": "MCP: evaluate_tests",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "name": "assess_quality",
+        "description": "Dirigent code quality: checks files against AISHA platform standards — RPC-only pattern, i18n compliance, no-any types, no console.log, consistency. Returns findings, refactor candidates, and applicable rules.\n\nInput: JSON object. Parameters:\n  - session_id (required): string — UUID of an active moderation session.\n  - file_paths (required): array — File paths to assess.\n  - check_types (optional): array — Which checks to run. Default: all. Options: consistency, rpc_only, i18n, no_any, no_console.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: assess_quality\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'assess_quality', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-assess_quality",
+      "name": "MCP: assess_quality",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "name": "create_story_ruleset",
+        "description": "Create a deterministic ruleset fingerprint for a story by pinning specific expert rule IDs. Returns the ruleset with SHA-256 fingerprint and version snapshot. Used to lock quality rules before delivery.\n\nInput: JSON object. Parameters:\n  - story_id (required): string — UUID of the partner story\n  - rule_ids (required): array — Array of expert rule UUIDs to pin\n  - context_profile (optional): string — Optional context profile label (e.g. 'web-frontend', 'backend-api')",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: create_story_ruleset\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'create_story_ruleset', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-create_story_ruleset",
+      "name": "MCP: create_story_ruleset",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "name": "get_story_context",
+        "description": "Get the full delivery context for a partner story, including repository details, ruleset fingerprint, build configuration, participants and active expert rules preview.\n\nInput: JSON object. Parameters:\n  - story_id (required): string — UUID of the partner story",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: get_story_context\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || 'https://api.backend.id3a.cz') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst res = await fetch(mcpUrl, {\n  method: 'POST',\n  headers: {\n    'Content-Type': 'application/json',\n    'Authorization': 'Bearer ' + token\n  },\n  body: JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'get_story_context', arguments: args }\n  })\n});\n\nconst data = await res.json();\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-get_story_context",
+      "name": "MCP: get_story_context",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        1100
+      ]
+    }
+  ],
+  "connections": {
+    "Compliance Agent Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Request": {
+      "main": [
+        [
+          {
+            "node": "Compliance Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compliance Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reroute Workflow Tool": {
+      "ai_tool": [
+        [
+          {
+            "node": "Compliance Agent",
+            "type": "ai_tool",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Format Result": {
+      "main": [
+        [
+          {
+            "node": "Pass or Fail?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Trace Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pass or Fail?": {
+      "main": [
+        [
+          {
+            "node": "GitHub Check ✅",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GitHub Check ❌",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: validate_compliance": {
+      "ai_tool": [
+        [
+          {
+            "node": "Compliance Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: check_pr_compliance": {
+      "ai_tool": [
+        [
+          {
+            "node": "Compliance Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: moderate_flow": {
+      "ai_tool": [
+        [
+          {
+            "node": "Compliance Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: evaluate_tests": {
+      "ai_tool": [
+        [
+          {
+            "node": "Compliance Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: assess_quality": {
+      "ai_tool": [
+        [
+          {
+            "node": "Compliance Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: create_story_ruleset": {
+      "ai_tool": [
+        [
+          {
+            "node": "Compliance Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: get_story_context": {
+      "ai_tool": [
+        [
+          {
+            "node": "Compliance Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Router": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Compliance Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

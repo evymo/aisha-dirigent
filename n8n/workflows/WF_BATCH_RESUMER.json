@@ -1,0 +1,472 @@
+{
+  "name": "WF_BATCH_RESUMER",
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "node-trigger",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        280
+      ],
+      "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/get_completed_batches_pending_resume",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"p_limit\": 20}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "node-list-pending",
+      "name": "List Completed Pending Resume",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        420,
+        280
+      ],
+      "onError": "stopWorkflow",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "data",
+        "options": {}
+      },
+      "id": "node-split",
+      "name": "Split Per Batch Job",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        620,
+        280
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "anthropic-route",
+                    "leftValue": "={{ $json.provider }}",
+                    "rightValue": "anthropic",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "anthropic"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "id": "openai-route",
+                    "leftValue": "={{ $json.provider }}",
+                    "rightValue": "openai",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputKey": "openai"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "node-route-provider",
+      "name": "Route By Provider",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        820,
+        280
+      ],
+      "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.result_url }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            },
+            {
+              "name": "anthropic-beta",
+              "value": "message-batches-2024-09-24"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "node-fetch-anthropic",
+      "name": "Fetch Anthropic Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        200
+      ],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.openai.com/v1/files/{{ ($json.result_url || '').replace(/^openai-file:\\/\\//, '') }}/content",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": false,
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "node-fetch-openai",
+      "name": "Fetch OpenAI Result",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        360
+      ],
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize provider-specific batch result (JSONL stream) into a single\n// canonical shape that persist_batch_result_and_resume understands:\n//   { text, tokens_input, tokens_output, raw }\n//\n// AISHA reflection runs use single-request batches today (one generator call\n// per batch), so we extract the first result. Multi-request batch support\n// is a future enhancement (would split per custom_id into multiple ai_runs).\n//\n// Anthropic JSONL line shape (per Message Batches API):\n//   { custom_id, result: { type: 'succeeded'|'errored'|..., message: { content: [{type,text}], usage: {input_tokens,output_tokens} } } }\n//\n// OpenAI JSONL line shape (per Batch API):\n//   { id, custom_id, response: { status_code, body: { choices: [{ message: { content } }], usage: { prompt_tokens, completion_tokens } } } }\n\nconst input = $input.first();\nconst originalJob = $('Split Per Batch Job').first().json;\nconst provider = originalJob.provider;\nconst rawBody = typeof input.json === 'string' ? input.json : (input.json.data ?? JSON.stringify(input.json));\n\nlet text = '';\nlet tokens_input = 0;\nlet tokens_output = 0;\nlet error = null;\n\ntry {\n  const lines = String(rawBody).split('\\n').filter((l) => l.trim().length > 0);\n  if (lines.length === 0) {\n    error = 'empty result body';\n  } else if (provider === 'anthropic') {\n    const first = JSON.parse(lines[0]);\n    const r = first.result || {};\n    if (r.type === 'succeeded') {\n      const msg = r.message || {};\n      const content = msg.content || [];\n      text = content.filter((c) => c.type === 'text').map((c) => c.text).join('\\n');\n      const usage = msg.usage || {};\n      tokens_input = usage.input_tokens || 0;\n      tokens_output = usage.output_tokens || 0;\n    } else {\n      error = `anthropic result type=${r.type}`;\n    }\n  } else if (provider === 'openai') {\n    const first = JSON.parse(lines[0]);\n    const resp = first.response || {};\n    if (resp.status_code >= 200 && resp.status_code < 300) {\n      const body = resp.body || {};\n      const choice = (body.choices || [])[0] || {};\n      text = choice.message?.content || '';\n      const usage = body.usage || {};\n      tokens_input = usage.prompt_tokens || 0;\n      tokens_output = usage.completion_tokens || 0;\n    } else {\n      error = `openai response status=${resp.status_code}`;\n    }\n  } else {\n    error = `unknown provider ${provider}`;\n  }\n} catch (e) {\n  error = `parse error: ${String(e).slice(0, 200)}`;\n}\n\nreturn [\n  {\n    json: {\n      batch_job_id: originalJob.batch_job_id,\n      related_run_id: originalJob.related_run_id,\n      provider,\n      normalized: {\n        text,\n        tokens_input,\n        tokens_output,\n        error,\n        raw_first_line: String(rawBody).split('\\n')[0]?.slice(0, 500) || null,\n      },\n    },\n  },\n];"
+      },
+      "id": "node-normalize",
+      "name": "Normalize Batch Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1240,
+        280
+      ],
+      "onError": "stopWorkflow"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/persist_batch_result_and_resume",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"p_batch_job_id\": \"{{ $json.batch_job_id }}\", \"p_result\": {{ JSON.stringify($json.normalized) }}}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "node-persist",
+      "name": "Persist Result + Flip Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1460,
+        280
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_SVC_AI_CHAT_URL }}/reflect/runs/{{ $('Normalize Batch Result').first().json.related_run_id }}/resume-batch",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "node-resume-orchestrator",
+      "name": "Resume Orchestrator",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        280
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/log_integration_action",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\"p_workflow_name\": \"WF_BATCH_RESUMER\", \"p_action\": \"batch_resumed\", \"p_status\": \"success\", \"p_metadata\": {\"batch_job_id\": \"{{ $('Normalize Batch Result').first().json.batch_job_id }}\", \"related_run_id\": \"{{ $('Normalize Batch Result').first().json.related_run_id }}\", \"provider\": \"{{ $('Normalize Batch Result').first().json.provider }}\"}}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "node-audit",
+      "name": "Audit Integration Action",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1900,
+        280
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "List Completed Pending Resume",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Completed Pending Resume": {
+      "main": [
+        [
+          {
+            "node": "Split Per Batch Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Per Batch Job": {
+      "main": [
+        [
+          {
+            "node": "Route By Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route By Provider": {
+      "main": [
+        [
+          {
+            "node": "Fetch Anthropic Result",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Fetch OpenAI Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Anthropic Result": {
+      "main": [
+        [
+          {
+            "node": "Normalize Batch Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch OpenAI Result": {
+      "main": [
+        [
+          {
+            "node": "Normalize Batch Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Batch Result": {
+      "main": [
+        [
+          {
+            "node": "Persist Result + Flip Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Persist Result + Flip Status": {
+      "main": [
+        [
+          {
+            "node": "Resume Orchestrator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resume Orchestrator": {
+      "main": [
+        [
+          {
+            "node": "Audit Integration Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "pinData": {},
+  "versionId": "",
+  "triggerCount": 0,
+  "tags": [
+    {
+      "name": "autopilot"
+    },
+    {
+      "name": "batch"
+    }
+  ]
+}

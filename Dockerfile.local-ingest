@@ -1,0 +1,76 @@
+# syntax=docker/dockerfile:1
+# Dockerfile.local-ingest — local-ingest (port 8765)
+#
+# Vendored from packages/local-ingest/Dockerfile, adapted for build context =
+# REPO ROOT (Coolify ARG_MAX pattern — viz Dockerfile.svc-source-broker).
+# Every COPY path is therefore prefixed packages/local-ingest/…. `.git` never
+# reaches the image (.dockerignore `**/.git` covers the submodule gitlink).
+#
+# Poznámky k runtime (převzato ze SoT Dockerfile aplikace):
+#  - Linux kontejner = deterministická lane (MLX je Apple-only; engine degraduje
+#    NAHLAS — /api/capabilities to ukáže) + advisory-cpu lane přes llama.cpp
+#    (GGUF na CPU; superset engine Dockerfile.advisory-cpu). Lane je PASIVNÍ,
+#    dokud ji bundle nezapne (models.extractor: backend=llama_cpp +
+#    advisory_fallback=true) a dokud entrypoint neseedne váhy (MODEL_GGUF_URL
+#    + sha pin z bundle; bez env je seed no-op → čistě deterministická jednotka).
+#  - GGML_NATIVE=OFF: build může běžet na build serveru (jiná CPU generace než
+#    runtime node) — nativní SIMD by riskoval SIGILL; baseline x86-64-v2 běží všude.
+#  - OCR: tesseract + čeština (ces) v image.
+#  - Síťový režim je fail-closed: bez AISHA_INGEST_TOKEN + AISHA_INGEST_ALLOWED_HOSTS
+#    server na 0.0.0.0 vůbec nenastartuje.
+
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/python:3.12-slim-bookworm
+
+# libgomp1 = OpenMP runtime pro llama.cpp CPU vlákna; build-essential+cmake = kompilace
+# llama-cpp-python (žádné manylinux kolo pro slim-bookworm negarantováno).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        tesseract-ocr tesseract-ocr-ces curl git \
+        build-essential cmake libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python závislosti = pyproject extras ENGINU, ne druhý (tady už třetí) ručně psaný seznam.
+# ⛔ 2026-09-15 v produkci: ruční seznam neměl openpyxl → 77 z 79 chyb běhu („XLSX extraction
+# needs openpyxl"). Které extras lane potřebují, hlídá `image_extras.py check` — brána
+# local-ingest-obraz-z-extras ho spouští nad tímhle souborem.
+COPY packages/local-ingest/pyproject.toml /tmp/deps/
+COPY packages/local-ingest/scripts/image_extras.py /tmp/deps/scripts/
+RUN python /tmp/deps/scripts/image_extras.py requirements pdf docx xlsx imaging tokenizer \
+        > /tmp/deps/requirements.txt \
+    && pip install --no-cache-dir -r /tmp/deps/requirements.txt
+
+# Advisory zóna (oddělená vrstva → layer-cache): llama.cpp GGUF inference na CPU.
+# Extra `llama` z enginu; GGML_NATIVE=OFF viz hlavička.
+ENV CMAKE_ARGS="-DGGML_NATIVE=OFF" FORCE_CMAKE=1
+RUN python /tmp/deps/scripts/image_extras.py requirements llama > /tmp/deps/llama.txt \
+    && pip install --no-cache-dir -r /tmp/deps/llama.txt \
+    && rm -rf /tmp/deps
+
+WORKDIR /app
+COPY packages/local-ingest/src/ src/
+COPY packages/local-ingest/config/ config/
+COPY packages/local-ingest/impl/ impl/
+# scripts/ = ops nástroje běžící UVNITŘ kontejneru (verify_advisory_cpu, measure_*,
+# fetch_gguf) — parita s engine Dockerfile.advisory-cpu; ověření lane bez obcházky.
+COPY packages/local-ingest/scripts/ scripts/
+COPY packages/local-ingest/docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh \
+    && useradd -r -u 10001 ingest \
+    && mkdir -p /data/input /data/out /bundle /models \
+    && chown -R ingest:ingest /data /bundle /models
+USER ingest
+
+ENV INGEST_CONFIG=/bundle/impl.json \
+    INGEST_INPUT=/data/input \
+    INGEST_OUT=/data/out \
+    INGEST_PORT=8765 \
+    INGEST_WATCH=60 \
+    INGEST_WORKERS=4 \
+    MODEL_GGUF_URL=""
+
+EXPOSE 8765
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD curl -fsS -H "X-Ingest-Token: ${AISHA_INGEST_TOKEN}" \
+        "http://127.0.0.1:${INGEST_PORT}/api/health" || exit 1
+
+ENTRYPOINT ["/entrypoint.sh"]

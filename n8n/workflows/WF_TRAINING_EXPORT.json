@@ -1,0 +1,170 @@
+{
+  "name": "WF_TRAINING_EXPORT",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "training-export",
+        "options": {
+          "responseMode": "lastNode"
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "te-trigger",
+      "name": "Export Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        280,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate and prepare export request.\nconst body = $json.body || {};\nconst datasetId = body.dataset_id;\nconst jobId = body.job_id;\nconst minQuality = body.min_quality || 0.6;\nconst limit = body.limit || 10000;\n\nif (!datasetId) {\n  throw new Error('dataset_id is required');\n}\n\nreturn [{ json: { dataset_id: datasetId, job_id: jobId, min_quality: minQuality, limit } }];"
+      },
+      "id": "te-validate",
+      "name": "Validate Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/fn_export_training_data",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_dataset_id",
+              "value": "={{ $json.dataset_id }}"
+            },
+            {
+              "name": "p_limit",
+              "value": "={{ $json.limit }}"
+            },
+            {
+              "name": "p_min_quality",
+              "value": "={{ $json.min_quality }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 60000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "te-fetch-data",
+      "name": "Fetch Training Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Convert RPC result to JSONL format.\n// Each row has: {example_id, example_type, jsonl_row}\nconst rows = Array.isArray($json) ? $json : [$json];\nconst allRows = rows.flatMap(r => Array.isArray(r) ? r : [r]);\n\nconst sftLines = [];\nconst dpoLines = [];\n\nfor (const row of allRows) {\n  const jsonlRow = row.jsonl_row;\n  if (!jsonlRow) continue;\n  \n  if (row.example_type === 'preference_pair') {\n    dpoLines.push(JSON.stringify(jsonlRow));\n  } else {\n    sftLines.push(JSON.stringify(jsonlRow));\n  }\n}\n\nconst sftContent = sftLines.join('\\n');\nconst dpoContent = dpoLines.join('\\n');\n\nreturn [{\n  json: {\n    dataset_id: $('Validate Request').first().json.dataset_id,\n    job_id: $('Validate Request').first().json.job_id,\n    sft_count: sftLines.length,\n    dpo_count: dpoLines.length,\n    total: sftLines.length + dpoLines.length,\n    sft_jsonl: sftContent,\n    dpo_jsonl: dpoContent\n  }\n}];"
+      },
+      "id": "te-format",
+      "name": "Format JSONL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Return export result as webhook response.\nconst data = $json;\n\nreturn [{\n  json: {\n    success: true,\n    dataset_id: data.dataset_id,\n    job_id: data.job_id,\n    sft_count: data.sft_count,\n    dpo_count: data.dpo_count,\n    total: data.total,\n    sft_jsonl: data.sft_jsonl,\n    dpo_jsonl: data.dpo_jsonl\n  }\n}];"
+      },
+      "id": "te-respond",
+      "name": "Return Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Export Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Request": {
+      "main": [
+        [
+          {
+            "node": "Fetch Training Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Training Data": {
+      "main": [
+        [
+          {
+            "node": "Format JSONL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format JSONL": {
+      "main": [
+        [
+          {
+            "node": "Return Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

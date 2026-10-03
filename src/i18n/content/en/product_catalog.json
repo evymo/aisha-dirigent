@@ -1,0 +1,14 @@
+{
+  "api-gateway.description": "Core API Gateway for routing and transformation",
+  "api-gateway.name": "API Gateway",
+  "auth-module.description": "Module for authentication and authorization",
+  "auth-module.name": "Auth Module",
+  "caching.description": "Effective caching for improved response times",
+  "caching.name": "Caching",
+  "ci-pipeline.description": "CI Pipeline for automated testing and integration",
+  "ci-pipeline.name": "CI Pipeline",
+  "load-balancer.description": "Module for load balancing and performance",
+  "load-balancer.name": "Load Balancer",
+  "monitoring.description": "Monitoring tool for system observability",
+  "monitoring.name": "Monitoring"
+}

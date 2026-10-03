@@ -1,0 +1,127 @@
+{
+  "missionControl": {
+    "pageTitle": "Řízení mise",
+    "pageSubtitle": "Živý přehled o zásobníku AISHA - agenti, nasazení, drift, rollback, příběhy, audit.",
+    "liveAgents": {
+      "title": "Živí agenti",
+      "subtitle": "Běhy AISHA, které se právě provádějí.",
+      "running": "Běh",
+      "starting": "Začínáme..",
+      "empty": "Žádní spuštění agenti.",
+      "cancelled": "Běh zrušen.",
+      "cancelTooltip": "Zrušit běh",
+      "cancelTitle": "Zrušit tento běh?",
+      "cancelConfirm": "Zastavit „{{agent}}“? Tím se běh ukončí a zaznamená do auditního deníku.",
+      "cancelConfirmAction": "Zrušit běh"
+    },
+    "deploy": {
+      "title": "Stav nasazení",
+      "subtitle": "Aktivní modré/zelené sloty na aplikaci.",
+      "empty": "Žádné sledované aplikace.",
+      "lockTooltip": "Probíhá přepínání"
+    },
+    "drift": {
+      "title": "Drift",
+      "subtitle": "Nevyřešené rizikové nálezy ≥ {{minRisk}}."
+    },
+    "rollback": {
+      "title": "Rollback",
+      "subtitle": "Čeká na schválení + nedávná historie vrácení.",
+      "empty": "Žádné nedávné vrácení."
+    },
+    "kanbanMini": {
+      "title": "Příběhy kanban",
+      "subtitle": "{{total}} příběhy napříč životním cyklem.",
+      "open": "Otevřená tabule"
+    },
+    "audit": {
+      "title": "Auditní kanál",
+      "subtitle": "Varování, chyby a kritické události z audit_journal.",
+      "empty": "Žádné zvýšené položky auditu - klidný systém."
+    },
+    "agentSessions": {
+      "title": "Agentní sessions",
+      "subtitle": "Živé pracovní sessions napříč IDE, CLI a spuštěnými agenty.",
+      "active": "Aktivní",
+      "empty": "Žádné aktivní sessions.",
+      "noStory": "Bez story",
+      "aishaSpawned": "AISHA",
+      "collapseAgents": "Sbalit sub-agenty",
+      "expandAgents": "Rozbalit sub-agenty"
+    },
+    "spendApprovals": {
+      "title": "Schválení nákladů",
+      "subtitle": "Úlohy čekající na nákladové rozhodnutí před spuštěním.",
+      "empty": "Nic nečeká na schválení.",
+      "noStory": "Bez story",
+      "approve": "Schválit",
+      "reject": "Zamítnout",
+      "approved": "Náklad schválen.",
+      "rejected": "Náklad zamítnut.",
+      "approveTitle": "Schválit tento náklad?",
+      "approveConfirm": "Povolit spuštění \"{{kind}}\" (odhad ~${{estimate}})? Rozhodnutí je auditováno.",
+      "raiseBudget": "Zároveň navýšit lifetime budget story o ${{estimate}}",
+      "rejectTitle": "Zamítnout tento náklad?",
+      "rejectConfirm": "Zrušit \"{{kind}}\"? Běh se nespustí."
+    },
+    "spendPolicies": {
+      "title": "Nákladové politiky",
+      "subtitle": "Prahy povolit / zeptat se / zamítnout podle typu úlohy. Bez pravidla platí výchozí z katalogu.",
+      "empty": "Žádná vlastní pravidla — platí výchozí z katalogu.",
+      "scopeGlobal": "globální",
+      "allKinds": "všechny typy",
+      "addRule": "Pravidlo",
+      "dialogTitle": "Globální nákladové pravidlo",
+      "dialogSubtitle": "Prahy v USD proti pre-flight odhadu. Prázdné pole = výchozí z katalogu.",
+      "kind": "Typ úlohy (prázdné = všechny typy)",
+      "allowUnder": "Povolit pod",
+      "askOver": "Zeptat se nad",
+      "denyOver": "Zamítnout nad",
+      "saved": "Pravidlo uloženo.",
+      "activated": "Pravidlo aktivováno.",
+      "deactivated": "Pravidlo deaktivováno.",
+      "activate": "Aktivovat pravidlo",
+      "deactivate": "Deaktivovat pravidlo"
+    },
+    "spawnClaude": {
+      "button": "Spustit s Claude",
+      "title": "Spustit běh Claude agenta",
+      "description": "AISHA spustí izolovaného Claude Code agenta na čerstvém worktree pro tento úkol. Běží na tvém předplatném a je živě monitorován níže.",
+      "promptLabel": "Úkol pro agenta",
+      "promptPlaceholder": "Popiš, co má agent udělat…",
+      "cancel": "Zrušit",
+      "submit": "Spustit běh",
+      "spawning": "Spouštím…",
+      "success": "Běh Claude {{id}} zařazen — brzy se objeví níže.",
+      "error": "Běh se nepodařilo spustit: {{msg}}"
+    },
+    "claudeApprovals": {
+      "title": "Schválení CLI běhů",
+      "subtitle": "Agentní CLI běhy čekající na schválení (vysoké riziko).",
+      "empty": "Nic nečeká na schválení.",
+      "approve": "Schválit"
+    },
+    "resolverPolicy": {
+      "cost": "cost-match",
+      "title": "Váhy rozhodnutí",
+      "subtitle": "Jak systém AISHA vyhodnocuje kandidáty při výběru modelu a vykonavatele. Nastavení v reálném čase; bez změny kódu.",
+      "missing": "Chybí globální zásada rozhodování – resolver vyhodí výraznou chybu. Znovu spusťte cold-start / heals.",
+      "bench": "lavička",
+      "local": "místní",
+      "tools": "nástroje",
+      "vision": "vize",
+      "costClass": "nákladová třída",
+      "budget": "rozpočet",
+      "premium": "prémiový",
+      "batch": "dávka",
+      "edit": "Naladit",
+      "saved": "Váhy rozhodnutí byly uloženy.",
+      "dialogTitle": "Nastavit váhy rozhodnutí",
+      "dialogSubtitle": "Globální váhy bodování + mezní hodnoty nákladových tříd. Pokud je pole prázdné, zachová se aktuální hodnota.",
+      "weightsGroup": "Váhy bodování",
+      "costGroup": "Hraniční hodnoty nákladových tříd (USD)",
+      "budgetMax": "rozpočet v rámci",
+      "premiumMax": "příplatek za"
+    }
+  }
+}

@@ -1,0 +1,77 @@
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-fg);
+  line-height: 1.6;
+}
+.wrap { max-width: 1020px; margin: 0 auto; padding: 0 var(--space-lg); }
+
+/* Header */
+.site-header { border-bottom: 1px solid var(--color-border); }
+.site-header .wrap { display: flex; align-items: center; justify-content: space-between; padding-top: var(--space-md); padding-bottom: var(--space-md); }
+.brand { display: flex; align-items: center; gap: var(--space-sm); font-family: var(--font-display); font-weight: 800; font-size: 1.2rem; letter-spacing: 0.02em; color: var(--color-fg); text-decoration: none; }
+.brand__mark { color: var(--color-accent); font-size: 1.3rem; }
+.nav { display: flex; gap: var(--space-lg); }
+.nav a { color: var(--color-fg); text-decoration: none; font-size: 0.95rem; }
+.nav a:hover { color: var(--color-accent-dark); }
+
+/* Hero — dark industrial band */
+.hero { background: var(--color-dark); color: var(--color-dark-fg); }
+.hero .wrap { padding: var(--space-xl) var(--space-lg); }
+.hero h1 { font-family: var(--font-display); font-weight: 800; font-size: 2.7rem; line-height: 1.1; margin: 0 0 var(--space-md); max-width: 18ch; }
+.hero h1 .spark { color: var(--color-accent); }
+.hero p { max-width: 540px; color: #c7ccd4; font-size: 1.15rem; margin: 0 0 var(--space-lg); }
+.hero__cta { display: flex; align-items: center; gap: var(--space-lg); flex-wrap: wrap; }
+.hero__trust { color: #9aa3af; font-size: 0.9rem; }
+
+/* Sections */
+.section { padding: var(--space-xl) 0; border-bottom: 1px solid var(--color-border); }
+.section__eyebrow { color: var(--color-accent-dark); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; margin: 0 0 var(--space-sm); }
+.section__title { font-family: var(--font-display); font-weight: 800; font-size: 1.8rem; margin: 0 0 var(--space-lg); }
+
+/* Services grid */
+.services { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-lg); }
+.svc { padding: var(--space-lg); border: 1px solid var(--color-border); border-top: 3px solid var(--color-accent); border-radius: var(--radius-md); background: var(--color-surface-2); }
+.svc h3 { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; margin: 0 0 var(--space-sm); }
+.svc p { margin: 0; color: var(--color-muted); font-size: 0.95rem; }
+
+/* Field knowledge / FAQ */
+.know { background: var(--color-surface); }
+.faq__intro { color: var(--color-muted); margin: 0 0 var(--space-lg); max-width: 60ch; }
+.faq__item { padding: var(--space-md) 0; border-top: 1px solid var(--color-border); }
+.faq__q { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; margin: 0 0 var(--space-xs); }
+.faq__a { margin: 0; color: var(--color-muted); }
+
+/* Quote form */
+.quote .wrap { max-width: 680px; }
+.quote__body { color: var(--color-muted); margin: 0 0 var(--space-lg); }
+.form { display: grid; gap: var(--space-md); }
+.form input, .form textarea {
+  font: inherit; width: 100%; padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-surface-2); color: var(--color-fg);
+}
+.form textarea { min-height: 110px; resize: vertical; }
+.form__note { color: var(--color-muted); font-size: 0.85rem; margin: 0; }
+
+/* Reviews */
+.reviews { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); margin-top: var(--space-md); }
+.review { padding: var(--space-lg); background: var(--color-surface); border-radius: var(--radius-md); }
+.review__text { margin: 0 0 var(--space-sm); font-size: 1.02rem; }
+.review__author { color: var(--color-muted); font-size: 0.88rem; font-weight: 600; }
+
+.btn { display: inline-block; padding: var(--space-sm) var(--space-lg); background: var(--color-accent); color: #14181f; border: 0; border-radius: var(--radius-sm); text-decoration: none; font: inherit; font-weight: 800; cursor: pointer; }
+.btn:hover { background: var(--color-accent-dark); }
+.btn--block { width: 100%; font-size: 1.05rem; padding: var(--space-md); }
+
+/* Footer */
+.site-footer { background: var(--color-dark); color: #9aa3af; padding: var(--space-lg) 0; font-size: 0.85rem; }
+.site-footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: var(--space-sm); }
+
+@media (max-width: 720px) {
+  .services, .reviews { grid-template-columns: 1fr; }
+  .nav { display: none; }
+  .hero h1 { font-size: 2.1rem; }
+}

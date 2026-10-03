@@ -1,0 +1,9 @@
+# CertificateHasStatus přijímá jen ISSUED|REVOKED|CRL_ISSUANCE_PENDING|EXPIRED|VALID.
+# Kompozitní stav se musí složit přes LazyOR — hodnota mimo whitelist skončí jako
+# configuration_error, což je VÝJIMKA, ne false: negace (!global_…) ji neodchytí a
+# shodí KAŽDÝ přechod, který podmínku používá (viz CHECK_APPROVALS v
+# certificate_revocation_request_v2 — všechny tři cesty ven ji sdílejí).
+class:  Workflow::Condition::LazyOR
+param:
+    condition1: global_is_cert_revoked
+    condition2: global_is_cert_revocation_pending

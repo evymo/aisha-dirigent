@@ -1,0 +1,29 @@
+# Phase 12 WP 2.4 — Alert notification routing.
+#
+# Default: every alert goes to aisha-default contact point (matrix + email).
+# Sub-routes split critical (page on-call) from warning/info (chat only).
+
+apiVersion: 1
+
+policies:
+  - orgId: 1
+    receiver: aisha-default
+    group_by: ['grafana_folder', 'alertname', 'severity']
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+    routes:
+      # Critical: also re-notify every 1h until acknowledged
+      - matchers:
+          - severity = critical
+        receiver: aisha-default
+        repeat_interval: 1h
+        group_wait: 0s
+        continue: true
+
+      # Info: lower frequency, no re-notify
+      - matchers:
+          - severity = info
+        receiver: aisha-default
+        repeat_interval: 24h
+        continue: false

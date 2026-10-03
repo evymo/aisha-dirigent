@@ -1,0 +1,47 @@
+{
+  "_comment": "Source federation snippet — merge into aisha-realm.json once",
+  "_status": "TEMPLATE — not applied automatically. See services/svc-source-broker/docs/SOURCE_FEDERATION.md",
+  "_when_to_merge": "When deploying svc-source-broker /auth/source-login route + frontend Sign in with Source button.",
+
+  "patch_for_clients_array": {
+    "clientId": "svc-source-broker",
+    "name": "Source-api broker microservice",
+    "description": "Service account + Token Exchange permission for federating source JWTs into aisha Keycloak realm.",
+    "enabled": true,
+    "publicClient": false,
+    "serviceAccountsEnabled": true,
+    "directAccessGrantsEnabled": false,
+    "standardFlowEnabled": false,
+    "implicitFlowEnabled": false,
+    "clientAuthenticatorType": "client-secret",
+    "secret": "${SVC_SOURCE_BROKER_CLIENT_SECRET}",
+    "redirectUris": [],
+    "webOrigins": [],
+    "attributes": {
+      "token.exchange.permission.enabled": "true",
+      "token.exchange.allow.subject.token.types": "urn:ietf:params:oauth:token-type:jwt",
+      "token.exchange.audience": "aisha-app",
+      "access.token.lifespan": "300"
+    },
+    "protocolMappers": [
+      {
+        "name": "source-user-id",
+        "protocol": "openid-connect",
+        "protocolMapper": "oidc-usermodel-attribute-mapper",
+        "consentRequired": false,
+        "config": {
+          "user.attribute": "source_user_id",
+          "claim.name": "source_user_id",
+          "jsonType.label": "String",
+          "id.token.claim": "true",
+          "access.token.claim": "true",
+          "userinfo.token.claim": "true"
+        }
+      }
+    ]
+  },
+
+  "patch_for_realm_attributes": {
+    "tokenExchange": "enabled"
+  }
+}

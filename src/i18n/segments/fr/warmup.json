@@ -1,0 +1,61 @@
+{
+  "warmup": {
+    "title": "Préchauffage du stack",
+    "subtitle": "Préparer la base de connaissances de la plateforme dans la story par défaut",
+    "statusDone": "Préchauffage terminé",
+    "stepperAria": "Progression des étapes du préchauffage",
+    "progressLabel": "Étape {{current}} sur {{total}} · {{count}} étape(s) terminée(s)",
+    "stepMarked": {
+      "title": "Étape enregistrée",
+      "description": "L'étape {{step}} a été marquée comme terminée"
+    },
+    "stepMarkedError": "Échec de l'enregistrement de l'étape de préchauffage",
+    "steps": {
+      "welcome": {
+        "title": "Bienvenue",
+        "headline": "Préparons votre stack AISHA",
+        "description": "Cet assistant vous accompagne dans la préparation des connaissances de base de la plateforme dans la story stack-default. Tout ce que vous configurez ici est automatiquement hérité par chaque story ultérieure via l'isolation par story + la récupération des globals.",
+        "defaultPresent": "La story stack-default est présente et prête à recevoir des connaissances.",
+        "defaultMissing": "La story stack-default est manquante — exécutez d'abord le cold-start bootstrap.",
+        "cta": "Compris — continuer"
+      },
+      "kb_upload": {
+        "title": "Téléverser les connaissances",
+        "headline": "Téléversez vos sources de connaissances initiales",
+        "description": "Téléversez et étiquetez les documents, FAQ, règles d'expert et autres sources qui constitueront la base de la plateforme. Ces éléments seront récupérés en tant que globals pour chaque story.",
+        "requirement": "Au moins {{min}} élément de connaissance requis pour continuer",
+        "currentCount": "Actuellement dans stack-default : {{count}} élément(s)",
+        "cta": "Marquer les téléversements terminés"
+      },
+      "rules_setup": {
+        "title": "Vérifier les profils",
+        "headline": "Vérifier les profils de contexte + règles d'expert",
+        "description": "Les profils de contexte déterminent quelles couches de connaissances (KB retrieval, ruleset, graph context, learnings) sont composées dans le prompt LLM et dans quel ordre. Confirmez que les valeurs par défaut conviennent à votre installation.",
+        "body": "Ouvrez la page des profils de contexte pour vérifier ou ajuster les rulesets — ou simplement accusez que les valeurs par défaut conviennent pour le premier passage. Vous pouvez revenir plus tard.",
+        "openProfiles": "Ouvrir les profils de contexte",
+        "acknowledge": "ou acceptez les valeurs par défaut et continuez",
+        "cta": "Confirmer et continuer"
+      },
+      "test_query": {
+        "title": "Requête de test",
+        "headline": "Lancer un chat de test sur la story par défaut",
+        "description": "Vérifiez que la récupération, les citations et le graph trail fonctionnent de bout en bout avant de déclarer le préchauffage terminé.",
+        "body": "Ouvrez la story stack-default, posez une question sur l'un des éléments téléversés, puis vérifiez que la réponse contient les sources + le contexte du graphe.",
+        "checkCitations": "Le panneau des citations sous la réponse liste les chunks utilisés par AISHA",
+        "checkGraph": "Le panneau d'explicabilité affiche le graphe multi-saut vers les concepts découverts",
+        "checkRoute": "Le route plan (dans Admin AI Runs) montre que le chat a touché le profil de contexte attendu",
+        "openStory": "Ouvrir la story par défaut",
+        "cta": "Requête de test vérifiée"
+      },
+      "complete": {
+        "title": "Terminé",
+        "headline": "Préchauffage terminé",
+        "description": "La base de la plateforme est en place. Les nouvelles stories en hériteront via la couche compose_context kb_retrieval globals + graph_context.",
+        "body": "À partir de maintenant l'assistant ne vous redirigera plus. Vous pouvez revenir sur cette page à tout moment pour consulter l'historique d'audit du préchauffage.",
+        "cta": "Marquer le préchauffage terminé",
+        "backToAdmin": "Retour à l'aperçu admin",
+        "lastActivity": "Dernière activité de préchauffage : {{iso}}"
+      }
+    }
+  }
+}

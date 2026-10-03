@@ -1,0 +1,94 @@
+{
+  "applicationName": "Audience: Cohort Manager",
+  "version": 1,
+  "description": "Manage cohorts (source retreats, marketing segments, event audiences). Backed by studies table via cohort_* view aliases.",
+  "dataSources": [
+    { "name": "aisha-postgrest", "type": "PostgresREST", "endpoint": "{{appsmith.env.POSTGREST_URL}}",
+      "headers": { "Authorization": "Bearer {{appsmith.user.jwt}}" } }
+  ],
+  "queries": [
+    {
+      "name": "listCohorts",
+      "method": "GET",
+      "path": "/audience_admin_cohort_overview_v",
+      "queryParams": { "order": "created_at.desc" }
+    },
+    {
+      "name": "createCohortFromFilter",
+      "method": "POST",
+      "path": "/rpc/audience_admin_create_cohort_from_filter",
+      "body": {
+        "p_name": "{{newCohortName.text}}",
+        "p_description": "{{newCohortDescription.text}}",
+        "p_filter": "{{ newCohortTierFilter.selectedOptionValue ? { tier: newCohortTierFilter.selectedOptionValue } : {} }}",
+        "p_cohort_type": "{{newCohortType.selectedOptionValue}}"
+      }
+    },
+    {
+      "name": "registerActor",
+      "method": "POST",
+      "path": "/rpc/audience_cohort_register_actor",
+      "body": {
+        "p_cohort_id": "{{selectedCohort.cohort_id}}",
+        "p_user_id": "{{registerActorInput.text}}",
+        "p_notes": "{{registerNotesInput.text}}"
+      }
+    }
+  ],
+  "widgets": [
+    { "type": "Text", "name": "title", "text": "Cohort Manager", "style": "heading" },
+    {
+      "type": "Table",
+      "name": "cohortList",
+      "dataSource": "{{listCohorts.data}}",
+      "columns": [
+        { "field": "cohort_name", "label": "Name" },
+        { "field": "cohort_type", "label": "Type", "type": "badge" },
+        { "field": "status", "label": "Status" },
+        { "field": "current_registration", "label": "Registered" },
+        { "field": "target_registration", "label": "Target" },
+        { "field": "avg_audience_size", "label": "Avg audience" },
+        { "field": "starts_at", "label": "Starts", "type": "date" },
+        { "field": "ends_at", "label": "Ends", "type": "date" }
+      ],
+      "onRowSelect": "{{store('selectedCohort', row)}}"
+    },
+    {
+      "type": "Drawer",
+      "name": "newCohortDrawer",
+      "trigger": { "type": "Button", "label": "+ New cohort from filter" },
+      "children": [
+        { "type": "InputText", "name": "newCohortName", "label": "Cohort name" },
+        { "type": "Textarea", "name": "newCohortDescription", "label": "Description" },
+        { "type": "Select", "name": "newCohortType", "label": "Type", "options": [
+          { "label": "Marketing segment", "value": "marketing_segment" },
+          { "label": "Event audience", "value": "event_audience" },
+          { "label": "Source retreat", "value": "source_retreat" },
+          { "label": "Course cohort", "value": "course_cohort" }
+        ]},
+        { "type": "Select", "name": "newCohortTierFilter", "label": "Filter by tier (optional)", "options": [
+          { "label": "Any", "value": "" },
+          { "label": "Active", "value": "active" },
+          { "label": "Qualified", "value": "qualified" },
+          { "label": "Partner", "value": "partner" }
+        ]},
+        { "type": "Button", "label": "Create", "onClick": "{{createCohortFromFilter.run()}}" }
+      ]
+    },
+    {
+      "type": "Container",
+      "name": "registerActorPanel",
+      "visible": "{{selectedCohort}}",
+      "children": [
+        { "type": "Text", "text": "Register actor to: {{selectedCohort.cohort_name}}" },
+        { "type": "InputText", "name": "registerActorInput", "label": "Actor user_id" },
+        { "type": "Textarea", "name": "registerNotesInput", "label": "Notes (optional)" },
+        { "type": "Button", "label": "Register", "onClick": "{{registerActor.run()}}" }
+      ]
+    }
+  ],
+  "permissions": {
+    "view": ["admin", "staff", "marketer"],
+    "edit": ["admin", "staff"]
+  }
+}

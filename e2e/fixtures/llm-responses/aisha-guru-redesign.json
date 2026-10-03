@@ -1,0 +1,8 @@
+{
+  "style_band": "editorial_storytelling",
+  "preserved_invariants": {
+    "runtime_block_placeholders": [],
+    "i18n_keys": []
+  },
+  "note": "Mock redesign fixture — used when AISHA_LLM_MOCK=1. The n8n workflow wraps the seed canvas in a single styled div and re-emits the same data-runtime-block + data-i18n-key set verbatim. Visible text ('Dirigent AI agentů', 'Adoptujte AISHu', etc.) is preserved by construction."
+}

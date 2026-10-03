@@ -1,0 +1,6 @@
+{
+  "$note": "Example demo template — a LAW / advisory practice (knowledge-base use-case: answers grounded in the firm's own documents). Brand-neutral, fork-freely. Seed with /seed-default { \"source_dir\": \"legal-advisory\" } or AISHA_SEED_DOMAIN=legal-advisory.",
+  "title_key": "web.legal.title",
+  "description_key": "web.legal.description",
+  "slug": "index"
+}

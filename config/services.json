@@ -1,0 +1,950 @@
+{
+  "$schema": "./services.schema.json",
+  "service_alias_prefix": "aisha",
+  "_service_alias_prefix_comment": [
+    "Prefix síťových aliasů sdílených infrastrukturních kontejnerů (aisha-db,",
+    "aisha-postgrest, aisha-gateway, aisha-keycloak, aisha-redis,",
+    "aisha-shared-redis, aisha-svc-matrix).",
+    "",
+    "Compose ho NEPÍŠE natvrdo — čte ${SERVICE_ALIAS_PREFIX}, které vydává",
+    "derive-domains.mjs. Tady je výchozí hodnota produktu; instance ji přebíjí",
+    "proměnnou AISHA_SERVICE_ALIAS_PREFIX (týž postup jako AISHA_SUBDOMAIN_PREFIX).",
+    "",
+    "Alias je JMÉNO na sdílené síti celého clusteru, tedy nosná věc — na rozdíl",
+    "od container_name, které Coolify stejně přepisuje na <služba>-<uuid>-<n>."
+  ],
+  "_comment": [
+    "AISHA Service Catalog — declarative source of truth.",
+    "",
+    "Replaces hardcoded service-domain mappings in compose files.",
+    "Each service entry declares:",
+    "  - id:          stable abstract name used by @-references in compose",
+    "  - role:        what the service does (auth, rag, db, observability, ...)",
+    "  - tier:        required | important | optional | local-only",
+    "  - subdomain:   short host-prefix used in derived URLs (auth, n8n, ...)",
+    "  - public:      true if also exposed via PUBLIC_TLD (*.aisha.guru)",
+    "  - public_alias: optional override for the PUBLIC_TLD subdomain",
+    "  - public_aliases_env: optional comma-separated env var with additional public aliases",
+    "  - upstream:    where edge-proxy should forward traffic (used in mesh switch)",
+    "  - compose:     path to docker-compose-*.yml file",
+    "  - placement:   default server (overridden per profile)",
+    "  - provision_when_env: opt-in condition — the service (and its derived",
+    "                 domains) exists ONLY when at least one of these env vars",
+    "                 is non-empty. String = one condition; array = any-of,",
+    "                 for services carrying several independent lanes.",
+    "                 AUTHORITATIVE, not a mirror: coolify-story-init.sh READS",
+    "                 this to decide whether to create the Coolify app. It used",
+    "                 to hardcode the same conditions in bash, and the two",
+    "                 copies drifted — svc-source-broker grew a second lane",
+    "                 (li-driver, 2026-07-15) while its gate still named only",
+    "                 the federation one, so the only writer into li_* was",
+    "                 unprovisionable and the stack came up silently short",
+    "                 (found 2026-07-20). One declaration, one consumer.",
+    "                 The domain resolver reads it too, so no hostnames are",
+    "                 emitted for apps a cold-start deliberately does not",
+    "                 create (no permanent coverage FAILs for absent services).",
+    "",
+    "Tiers explained:",
+    "  required    — must be in every cloud profile. KC = identity gate.",
+    "  important   — should be in standard profile. PKI for cert rotation,",
+    "                ragnarok for RAG, n8n for workflows.",
+    "  optional    — opt-in extras (chat platform, admin UIs, etc.)",
+    "  local-only  — never deployed to cloud (vLLM, dev-only services)",
+    "",
+    "Profile overlays in config/profiles/*.json adjust placement, tier",
+    "promotion/demotion, and per-service env without touching this catalog."
+  ],
+  "services": {
+    "admin": {
+      "role": "admin-ui",
+      "tier": "optional",
+      "subdomain": "admin",
+      "public": false,
+      "compose": "docker-compose.coolify-admin.yml",
+      "internal_url": {
+        "service": "appsmith-gateway",
+        "port": 80
+      },
+      "placement": "backend",
+      "depends_on": [
+        "core",
+        "keycloak"
+      ],
+      "extra_subdomains": [
+        "nocodb",
+        "appsmith",
+        "intranet"
+      ],
+      "_comment": "NocoDB + Appsmith + intranet auth. Admin tooling. The `intranet` surface (intranet-auth → all authenticated users, docker-compose.coolify-admin.yml) is governed by the single INTRANET_ENABLED cold-start flag (H1 / W4-03, default in config/domains.env): the SAME token gates the gateway /intranet route (services/gateway/src/config.ts intranetEnabled) AND intranet app provisioning (scripts/provision-intranet.sh), so app-deploy and route move together and the intranet is never half-deployed."
+    },
+    "ai-chat": {
+      "role": "ai-chat",
+      "tier": "optional",
+      "subdomain": "ai-chat",
+      "public": false,
+      "canonical_scope": "internal",
+      "compose": "docker-compose.coolify-ai-chat.yml",
+      "placement": "backend",
+      "depends_on": [
+        "core",
+        "keycloak"
+      ],
+      "internal_url": {
+        "service": "svc-ai-chat",
+        "port": 3011,
+        "env_aliases": [
+          "FLOWBOARD_CALLBACK_BASE_URL"
+        ]
+      },
+      "_comment": "Main AI orchestration service (svc-ai-chat), incl. the Omni /v1 model facade (server.ts v1ChatRoutes: /v1/messages, /v1/chat/completions, /v1/models — the governed full-AISHA pipeline auth→story-bind→admit→CLOW model-select). Sibling stack — core compose is at the ARG_MAX ceiling. INTERNAL-ONLY: no public domain, no Traefik router — the core gateway calls it at http://svc-ai-chat:3011 over the shared coolify network (svc-ai-chat alias). The PUBLIC 'AISHA-as-a-model' face (ask.<public_tld>/v1) is served by @aisha/gateway's STREAMING /v1 proxy (services/gateway/src/routes/v1.ts), which reaches this service at svc-ai-chat:3011/v1/* — svc-ai-chat carries no public router/cert (public TLS terminates upstream). See docs/planning/AISHA_OMNI_GATEWAY.md §3.",
+      "internal_endpoints": [
+        {
+          "subdomain": "ai-chat",
+          "port": 3011,
+          "env_aliases": [
+            "AI_CHAT_SERVICE_URL"
+          ],
+          "service": "svc-ai-chat"
+        },
+        {
+          "subdomain": "aitg-probes",
+          "port": 3041,
+          "env_aliases": [
+            "AITG_PROBES_SERVICE_URL"
+          ],
+          "service": "svc-aitg-probes",
+          "_comment": "AITG conformance probes (services/svc-aitg-probes, port 3041), deployed in this same compose. Bez tohoto záznamu derivace AITG_PROBES_SERVICE_URL nevydá a svc-mcp-knowledge vždy spadne na holý alias."
+        }
+      ]
+    },
+    "clamav": {
+      "role": "av",
+      "tier": "optional",
+      "subdomain": "clamav",
+      "internal_tcp_endpoints": [
+        {
+          "service": "clamav",
+          "port": 3310,
+          "env_aliases": [
+            "CLAMD_HOST"
+          ],
+          "_comment": "clamd mluví vlastním TCP protokolem, ne HTTP — mesh-ingress (Caddy, rozlišuje podle `Host`) ho neměl jak rozvést, takže konzumenti sahali na sdílenou síť `coolify`, kde o jméno soupeří víc nájemníků. U TCP není Host potřeba: sidecar běží v netns agenta, takže (mesh IP, port) je jednoznačné samo."
+        }
+      ],
+      "public": false,
+      "compose": "docker-compose.coolify-clamav.yml",
+      "placement": "backend",
+      "depends_on": [],
+      "_comment": "Shared ClamAV (clamd) antivirus sidecar. Non-HTTP TCP 3310, reachable on the shared coolify network as `clamd`. Flow-through malware scanner for the upload path (storage-auth / svc-web-artifact) BEFORE an object is promoted to a durable bucket or vectorized, and (later) mailserver attachments. clamd.conf with scan limits + AlertEncrypted is baked into the image (bake-not-bind). Verdicts persisted via record_comm_av_scan_audited (fail-closed)."
+    },
+    "core": {
+      "external_connectivity": "ingress",
+      "role": "platform-core",
+      "tier": "required",
+      "subdomain": "api",
+      "public": true,
+      "canonical_scope": "internal",
+      "public_face": {
+        "service": "gateway",
+        "port": 3001,
+        "_comment": "Endpoint, který edge vystavuje veřejně (api/ask). Edge se připojuje na primární mesh jméno služby na tomto portu a Host nese jméno endpointu (core-gateway.<zóna>) — obě souřadnice skládá derivace, nic se tu neopisuje."
+      },
+      "compose": "docker-compose.coolify.yml",
+      "placement": "backend",
+      "depends_on": [],
+      "_comment": "PG17 + PostgREST + aisha-gateway + MinIO + Redis. Foundational data plane. api.backend.id3a.cz canonical (gateway listens here); api.aisha.guru is public alias proxied by edge. Note: pgAdmin admin route db.aisha.guru is a separate concern (admin-only), not modeled here yet.",
+      "internal_endpoints": [
+        {
+          "subdomain": "postgrest",
+          "port": 3000,
+          "env_aliases": [
+            "POSTGREST_URL"
+          ],
+          "service": "postgrest"
+        },
+        {
+          "subdomain": "core-gateway",
+          "port": 3001,
+          "env_aliases": [
+            "AISHA_GATEWAY_URL",
+            "GATEWAY_URL"
+          ],
+          "_comment": "NE 'gateway' — to jméno drží llm-gateway jako primární doménu; dvě služby na jednom jménu = nedeterministické DNS.",
+          "service": "gateway"
+        },
+        {
+          "subdomain": "minio",
+          "port": 9000,
+          "env_aliases": [
+            "MINIO_URL",
+            "MINIO_ENDPOINT",
+            "S3_ENDPOINT"
+          ],
+          "service": "minio"
+        },
+        {
+          "subdomain": "imgproxy",
+          "port": 8080,
+          "env_aliases": [
+            "IMGPROXY_URL"
+          ],
+          "service": "imgproxy"
+        },
+        {
+          "subdomain": "mcp-knowledge",
+          "port": 3017,
+          "env_aliases": [
+            "SVC_MCP_KNOWLEDGE_URL",
+            "MCP_UPSTREAM_URL"
+          ],
+          "service": "svc-mcp-knowledge"
+        },
+        {
+          "subdomain": "web-artifact",
+          "port": 3030,
+          "env_aliases": [
+            "WEB_ARTIFACT_SERVICE_URL"
+          ],
+          "service": "svc-web-artifact"
+        },
+        {
+          "subdomain": "plugin-system",
+          "port": 3029,
+          "env_aliases": [
+            "PLUGIN_SERVICE_URL",
+            "PLUGIN_SYSTEM_URL",
+            "PLUGIN_BROKER_URL"
+          ],
+          "service": "svc-plugin-system"
+        }
+      ]
+    },
+    "domain-services": {
+      "role": "domain-services",
+      "tier": "optional",
+      "subdomain": "domain-services",
+      "public": false,
+      "canonical_scope": "internal",
+      "compose": "docker-compose.coolify-domain-services.yml",
+      "placement": "backend",
+      "depends_on": [
+        "core",
+        "keycloak"
+      ],
+      "_comment": "Domain microservice fleet: svc-stripe/push/blockchain/fio-bank/homeassistant/github-app/health-ai/livekit/communications/packeta + storage-auth. Sibling stack — core compose is at the ARG_MAX/build-block ceiling (its header excludes domain svc-*). INTERNAL-ONLY: no public domain/Traefik router — the core gateway (functions.ts ROUTE_TABLE) calls each cross-stack on the shared coolify network by its default alias (svc-stripe:3010 … storage-auth:3005), no gateway change. Per-integration provider secrets are BYO via Coolify env (several read edge_app_secrets first); services boot fail-quiet without them so an unwired integration is a service 4xx/5xx, not a gateway 502.",
+      "internal_endpoints": [
+        {
+          "subdomain": "storage-auth",
+          "port": 3005,
+          "env_aliases": [
+            "STORAGE_AUTH_URL"
+          ],
+          "service": "storage-auth"
+        },
+        {
+          "subdomain": "push",
+          "port": 3012,
+          "env_aliases": [
+            "PUSH_SERVICE_URL"
+          ],
+          "service": "svc-push"
+        },
+        {
+          "subdomain": "stripe",
+          "port": 3010,
+          "env_aliases": [
+            "STRIPE_SERVICE_URL"
+          ],
+          "service": "svc-stripe"
+        },
+        {
+          "subdomain": "fio-bank",
+          "port": 3014,
+          "env_aliases": [
+            "FIO_SERVICE_URL"
+          ],
+          "service": "svc-fio-bank"
+        },
+        {
+          "subdomain": "homeassistant",
+          "port": 3015,
+          "env_aliases": [
+            "HA_SERVICE_URL"
+          ],
+          "service": "svc-homeassistant"
+        },
+        {
+          "subdomain": "github-app",
+          "port": 3016,
+          "env_aliases": [
+            "GITHUB_SERVICE_URL"
+          ],
+          "service": "svc-github-app"
+        },
+        {
+          "subdomain": "health-ai",
+          "port": 3024,
+          "env_aliases": [
+            "HEALTH_AI_SERVICE_URL"
+          ],
+          "service": "svc-health-ai"
+        },
+        {
+          "subdomain": "livekit",
+          "port": 3025,
+          "env_aliases": [
+            "LIVEKIT_SERVICE_URL"
+          ],
+          "service": "svc-livekit"
+        },
+        {
+          "subdomain": "communications",
+          "port": 3027,
+          "env_aliases": [
+            "COMMS_SERVICE_URL"
+          ],
+          "service": "svc-communications"
+        },
+        {
+          "subdomain": "packeta",
+          "port": 3028,
+          "env_aliases": [
+            "PACKETA_SERVICE_URL"
+          ],
+          "service": "svc-packeta"
+        }
+      ]
+    },
+    "edge": {
+      "external_connectivity": "ingress",
+      "role": "frontend",
+      "tier": "required",
+      "subdomain": "web",
+      "public": true,
+      "public_aliases_env": "AISHA_WEB_PUBLIC_ALIASES",
+      "public_aliases_include_primary": true,
+      "canonical_scope": "public",
+      "compose": "docker-compose.coolify-prebuilt.yml",
+      "placement": "frontend",
+      "depends_on": [],
+      "_comment": "Web SPA + edge-proxy. Public-canonical (no internal-zone presence). Additional public web hostnames are operator data, supplied dynamically via AISHA_WEB_PUBLIC_ALIASES (comma-separated subdomains under PUBLIC_TLD) and resolved by branding_hostname_mapping + EditorPageGate at runtime. The open-code stack never names a production brand/site here."
+    },
+    "exec": {
+      "role": "exec",
+      "tier": "optional",
+      "subdomain": "exec",
+      "public": false,
+      "compose": "docker-compose.coolify-exec.yml",
+      "placement": "experimental",
+      "depends_on": [
+        "core"
+      ],
+      "_comment": "svc-agent-runner with Kata. Sandboxed code execution. Requires Experimental Kata prereq.",
+      "internal_url": {
+        "service": "svc-agent-runner",
+        "port": 3030,
+        "env_aliases": [
+          "AGENT_RUNNER_URL"
+        ]
+      }
+    },
+    "extranet": {
+      "external_connectivity": "ingress",
+      "role": "frontend",
+      "tier": "optional",
+      "subdomain": "extra",
+      "public": true,
+      "canonical_scope": "internal",
+      "compose": "docker-compose.coolify-extranet.yml",
+      "internal_url": {
+        "service": "extranet",
+        "port": 8080,
+        "_comment": "Povrch extranetu na mesh: edge (oauth2-proxy extranet-auth) se k němu připojuje přes mesh jméno, ne přes sdílenou síť. Bez deklarace tu ingress stacku neměl co rozvádět a provisioner mesh DNS neměl čemu vyrobit záznam (naměřeno 2026-08-21: extranet-auth po přihlášení 502, jméno propadlo na wildcard)."
+      },
+      "placement": "frontend",
+      "depends_on": [
+        "core",
+        "keycloak"
+      ],
+      "provision_when_env": "EXTRANET_ENABLED",
+      "_comment": "Customer-facing surface (surface-host SPA). Its OWN container and compose, like every other stack — edge only ROUTES its public host, it does not host it. canonical_scope=internal so the container answers on the internal zone and the public face is the edge route (extra.<PUBLIC_TLD>), the same shape as api/auth. tier=optional + provision_when_env: an instance without an extranet must not fail to deploy. Which shell and which instance overlay it builds are compose build args, so this entry names no instance."
+    },
+    "integration": {
+      "role": "rag",
+      "tier": "important",
+      "subdomain": "integration",
+      "public": false,
+      "compose": "docker-compose.coolify-integration.yml",
+      "placement": "backend",
+      "depends_on": [
+        "core"
+      ],
+      "_comment": "Ragnarok RAG + Elasticsearch + RabbitMQ. Knowledge retrieval backbone.",
+      "internal_url": {
+        "service": "ragnarok",
+        "port": 9696,
+        "env_aliases": [
+          "RAGNAROK_URL"
+        ]
+      },
+      "internal_endpoints": [
+        {
+          "subdomain": "maestro",
+          "port": 8020,
+          "env_aliases": [
+            "MAESTRO_URL"
+          ],
+          "service": "maestro"
+        }
+      ],
+      "internal_tcp_endpoints": [
+        {
+          "service": "rabbitmq",
+          "port": 5672,
+          "env_aliases": [
+            "RABBITMQ_HOST"
+          ],
+          "port_env_aliases": [
+            "RABBITMQ_PORT"
+          ],
+          "_comment": "AMQP je TCP, ne HTTP — mesh-ingress (Caddy, Host) ho nerozvede, rozvádí ho sidecar integration-mesh-tcp. Do 2026-09-17 compose publikoval host port 5673 a RABBITMQ_HOST mířil na `backend.<mesh>` (jméno, které žádný peer nenese): pevný port na sdíleném hostiteli kolidoval s jinou instancí téže platformy a cesta vedla mimo edge."
+        }
+      ]
+    },
+    "keycloak": {
+      "external_connectivity": "ingress",
+      "role": "auth",
+      "tier": "required",
+      "subdomain": "auth",
+      "public": true,
+      "canonical_scope": "internal",
+      "compose": "docker-compose.coolify-keycloak.yml",
+      "placement": "backend",
+      "depends_on": [
+        "core"
+      ],
+      "mesh_bootstrap_dependency": true,
+      "_comment_mesh": "Předpoklad enrollmentu do mesh: management ověřuje každý peer tokenem z tohoto Keycloaku (chicken-and-egg 2026-07-16). Kdyby auth stál jen na mesh, první peer by se neměl kde ověřit. Majitel 2026-08-19: kdo Keycloak potřebuje zevnitř, jde NAPŘÍMO kontejnerovou sítí (KEYCLOAK_INTERNAL_URL); ven jen přes edge jako vše ostatní. Proto není v množině stacků, které mesh-conformance vyžaduje na mesh.",
+      "_comment": "Identity provider. OIDC + Google/Apple IDP brokering. MUST be present — auth is non-negotiable. Canonical hostname is internal (auth.backend.id3a.cz, KC_HOSTNAME) — auth.aisha.guru is public alias proxied by edge-proxy with X-Forwarded-Host so KC issues tokens with the public iss claim. KC_PROXY_HEADERS=xforwarded honors the alias."
+    },
+    "ledger": {
+      "role": "ledger",
+      "tier": "optional",
+      "subdomain": "ledger",
+      "public": false,
+      "compose": "docker-compose.coolify-cosmos.yml",
+      "placement": "experimental",
+      "depends_on": [],
+      "_comment": "Cosmos SDK validator. Internal-only single-validator chain — NOT exposed to the internet (no Traefik, no docker_compose_domains per its compose header). Edge functions reach it via the aisha-network Docker network / ledger.${MESH_TLD} mesh DNS, never a public *.aisha.guru host.",
+      "internal_endpoints": [
+        {
+          "subdomain": "cosmos-rest",
+          "port": 1317,
+          "env_aliases": [
+            "COSMOS_REST_URL"
+          ],
+          "service": "cosmos-node"
+        },
+        {
+          "subdomain": "cosmos-rpc",
+          "port": 26657,
+          "env_aliases": [
+            "COSMOS_RPC_URL"
+          ],
+          "service": "cosmos-node"
+        }
+      ]
+    },
+    "llm-gateway": {
+      "role": "llm-router",
+      "tier": "optional",
+      "subdomain": "gateway",
+      "public": false,
+      "canonical_scope": "internal",
+      "compose": "docker-compose.coolify-llm-gateway.yml",
+      "internal_url": {
+        "service": "llm-gateway",
+        "port": 4000
+      },
+      "placement": "backend",
+      "depends_on": [
+        "core",
+        "keycloak",
+        "observability"
+      ],
+      "capabilities": {
+        "requires_any_of": [
+          {
+            "external_key": "ANTHROPIC_API_KEY"
+          },
+          {
+            "external_key": "OPENAI_API_KEY"
+          },
+          {
+            "external_key": "GOOGLE_AI_API_KEY"
+          },
+          {
+            "local_service": "vllm"
+          },
+          {
+            "local_service": "ollama"
+          }
+        ]
+      },
+      "_comment": "Self-hosted theopenco/llmgateway (AGPLv3). First-class AISHA backend — aisha_resolve_clow_backend may pick backend_kind='llm_gateway' for sync calls when the score (cost + capability fit) wins; svc-ai-chat generator honors state.clow_backend.backend_kind and routes through gateway with AISHA_LLM_GATEWAY_KEY. Three concurrent roles: (1) INTERNAL dev passthrough (container public:false, http://llm-gateway:4000/v1, key AISHA_LLM_GATEWAY_KEY) — NOT the public IDE face; the governed public model napoj is ask.<tld>/v1 + PAT (AISHA_OMNI_GATEWAY.md §0.6); (2) backend sync when resolver selects backend_kind='llm_gateway'; (3) /v1/batches passthrough (Anthropic Message Batches + OpenAI Batch API, 50% off). Routing strategy authoritative in llmRouter.ts + aisha_resolve_clow_backend RPC; audit authoritative in decisionProvenance + audit_journal. Capability-gated: deploys iff at least one upstream provider (Anthropic/OpenAI/Google) or local LLM (vllm/ollama) is available. See docs/architecture/LLM_GATEWAY_DISPATCH_INVARIANTS.md + docs/architecture/CAPABILITY_GATES.md."
+    },
+    "local-ingest": {
+      "external_connectivity": "ingress",
+      "role": "local-ingest",
+      "tier": "optional",
+      "subdomain": "ingest",
+      "public": true,
+      "canonical_scope": "internal",
+      "provision_when_env": "INGEST_BUNDLE_GIT_URL",
+      "compose": "docker-compose.coolify-local-ingest.yml",
+      "placement": "experimental",
+      "depends_on": [],
+      "_comment": "svc-local-ingest — generic offline document/contract ingestion engine (3-gate validator: schema + source-span + confidence). Writes FILES only — never touches the DB; verify-gated export bundles are drained by the source-broker li-driver. Opt-in (tier=optional): coolify-story-init.sh provisions the Coolify app only when INGEST_BUNDLE_GIT_URL is set (the instance data bundle is what makes the generic engine do anything), mirroring the source-broker/SOURCE_API_URL contract. Public admin cockpit at ingest.${PUBLIC_TLD} behind edge+oauth2; the app's own bearer token stays as defense-in-depth. Placement experimental — isolated AI/staging plane, resource caps live in its compose.",
+      "internal_url": {
+        "service": "local-ingest",
+        "port": 8765
+      }
+    },
+    "mesh-router-backend": {
+      "role": "mesh-resolver",
+      "tier": "required",
+      "subdomain": "mesh-router-backend",
+      "public": false,
+      "compose": "docker-compose.coolify-mesh-router-backend.yml",
+      "placement": "backend",
+      "depends_on": [],
+      "_comment": "Mesh resolver TÉTO role serveru. Drží pinovanou adresu MESH_DNS_RESOLVER_IP na síti mesh-dns a předává dotazy do meshe přes vlastního netbird agenta; `dns:` všech kontejnerů na tomtéž stroji míří právě sem. Jedna aplikace na každé placement — ze stejného důvodu jako u netinit: Coolify aplikace běží na JEDNOM serveru, kdežto resolver je zdroj HOSTITELE. ⛔ NAMĚŘENO 2026-09-06: resolver existoval jen ve stacku `edge` (placement frontend), takže na Giahu a Varře adresu .250 NEDRŽEL NIKDO — 48 kontejnerů mířilo `dns:` do prázdna a mesh jména odtud nešla přeložit. Síť mesh-dns si přitom netinit zakládá na každém stroji, takže adresa vypadala platně všude; je to ale pin v host-lokální bridge síti a tutéž podsíť má každý stroj vlastní. Projevilo se to jako `live.` 502: ws-gateway padal na EAI_AGAIN pro jméno sdílené redis. depends_on je PRÁZDNÉ záměrně: resolver musí umět nastartovat DŘÍV než netbird management (jde na něj přes IP z extra_hosts, ne jménem) a zapsání do meshe opakuje donekonečna — jinak by studený start uvázl v kruhu „management čeká na DNS, DNS čeká na management\". Soubor compose je GENEROVANÝ: scripts/gen-mesh-router.mjs."
+    },
+    "mesh-router-experimental": {
+      "role": "mesh-resolver",
+      "tier": "required",
+      "subdomain": "mesh-router-experimental",
+      "public": false,
+      "compose": "docker-compose.coolify-mesh-router-experimental.yml",
+      "placement": "experimental",
+      "depends_on": [],
+      "_comment": "Mesh resolver TÉTO role serveru. Drží pinovanou adresu MESH_DNS_RESOLVER_IP na síti mesh-dns a předává dotazy do meshe přes vlastního netbird agenta; `dns:` všech kontejnerů na tomtéž stroji míří právě sem. Jedna aplikace na každé placement — ze stejného důvodu jako u netinit: Coolify aplikace běží na JEDNOM serveru, kdežto resolver je zdroj HOSTITELE. ⛔ NAMĚŘENO 2026-09-06: resolver existoval jen ve stacku `edge` (placement frontend), takže na Giahu a Varře adresu .250 NEDRŽEL NIKDO — 48 kontejnerů mířilo `dns:` do prázdna a mesh jména odtud nešla přeložit. Síť mesh-dns si přitom netinit zakládá na každém stroji, takže adresa vypadala platně všude; je to ale pin v host-lokální bridge síti a tutéž podsíť má každý stroj vlastní. Projevilo se to jako `live.` 502: ws-gateway padal na EAI_AGAIN pro jméno sdílené redis. depends_on je PRÁZDNÉ záměrně: resolver musí umět nastartovat DŘÍV než netbird management (jde na něj přes IP z extra_hosts, ne jménem) a zapsání do meshe opakuje donekonečna — jinak by studený start uvázl v kruhu „management čeká na DNS, DNS čeká na management\". Soubor compose je GENEROVANÝ: scripts/gen-mesh-router.mjs."
+    },
+    "messaging": {
+      "role": "chat",
+      "tier": "optional",
+      "subdomain": "messaging",
+      "public": false,
+      "compose": "docker-compose.coolify-matrix.yml",
+      "placement": "backend",
+      "depends_on": [
+        "core",
+        "keycloak"
+      ],
+      "extra_subdomains": [
+        "matrix",
+        "element",
+        "call"
+      ],
+      "_comment": "Matrix Synapse + Element + Element Call. Federated chat + voice.",
+      "internal_endpoints": [
+        {
+          "subdomain": "svc-matrix",
+          "port": 3026,
+          "env_aliases": [
+            "SVC_MATRIX_URL"
+          ],
+          "service": "svc-matrix"
+        },
+        {
+          "subdomain": "synapse",
+          "port": 8008,
+          "env_aliases": [
+            "SYNAPSE_ADMIN_URL"
+          ],
+          "service": "synapse"
+        }
+      ]
+    },
+    "model": {
+      "role": "local-model-serving",
+      "tier": "optional",
+      "subdomain": "model",
+      "public": false,
+      "canonical_scope": "internal",
+      "provision_when_env": "CHAT_GGUF_URL",
+      "compose": "docker-compose.coolify-model.yml",
+      "placement": "experimental",
+      "depends_on": [],
+      "_comment": "svc-model — generic OpenAI-compat local model serving (llama.cpp: chat + embeddings). Opt-in (tier=optional, placement experimental): runs only when the instance supplies its model weights via CHAT_GGUF_URL (compose fails loud otherwise). The DNA — which model/lens (MODEL_ALIAS) and the GGUF weights — lives in the instance overlay, never in the stack. Mirrors the local-ingest contract: generic engine, instance supplies the data.",
+      "internal_url": {
+        "service": "svc-model",
+        "port": 8000,
+        "env_aliases": [
+          "SVC_MODEL_URL",
+          "VLLM_GENERATION_URL"
+        ],
+        "base_path": "v1"
+      }
+    },
+    "monitoring": {
+      "role": "monitoring",
+      "tier": "optional",
+      "subdomain": "monitoring",
+      "public": false,
+      "compose": "docker-compose.coolify-monitoring.yml",
+      "placement": "frontend",
+      "depends_on": [],
+      "extra_subdomains": [
+        "logs"
+      ],
+      "_comment": "Dozzle log viewer. Optional ops surface."
+    },
+    "netbird": {
+      "external_connectivity": "ingress",
+      "role": "mesh-control",
+      "tier": "optional",
+      "subdomain": "netbird",
+      "public": true,
+      "canonical_scope": "public",
+      "compose": "docker-compose.coolify-netbird.yml",
+      "mesh_bootstrap_dependency": true,
+      "_comment_mesh": "Řídicí rovina mesh (management/signal/relay): každý agent ji potřebuje, aby se vůbec zapsal. Na mesh stát nemůže z definice — jde k ní napřímo (host port NETBIRD_MESH_PORT přes netbird-internal-tls).",
+      "placement": "backend",
+      "_comment_depends_on": "keycloak JE startovní závislost — DOLOŽENO 2026-08-22 pádem. `netbird-management` si při bootu tahá OIDC konfiguraci z IdP endpointu (management.go:252) a bez ní KONČÍ s exit 1: `OIDC configuration request returned status 503`. ⛔ Krátce jsem ji odsud odstranil na základě NEÚPLNÉHO měření: compose nemá ANI JEDNO aktivní čekání na auth a agenti se enrollují setup klíčem (obojí pravda), jenže ani jedno neměří, co dělá SAMA BINÁRKA při startu. Nedeklarovaná závislost není neexistující závislost — jen nezapsaná. Mesh proto NEMŮŽE vzniknout dřív než auth.",
+      "depends_on": [
+        "keycloak",
+        "pki"
+      ],
+      "_comment": "NetBird mesh control plane. Public-canonical (clients connect from internet). | ⛔ KDE A PROČ (rozhodnuto 2026-08-26). Netbird je řídicí rovina meshe, takže na meshi stát nemůže — peeři na něj musí dosáhnout DŘÍV, než mesh existuje, tedy přes adresu stroje. Z toho plyne jediné tvrdé kritérium: stroj musí mít odvoditelnou LAN adresu (uzel, který má v Coolify jen `host.docker.internal`, tím padá — vzdálený peer z toho adresu nesloží). Zbylé kandidáty rozhoduje `depends_on` výš: keycloak i pki jsou STARTOVNÍ závislosti a pki navíc razí meshový certifikát. Držet je na TÉMŽE stroji znamená, že tahle závislost nepřekročí síť právě v okamžiku, kdy síť ještě neexistuje. Kolizní plocha se stackem souseda je jediná: `netbird-internal-tls` publikuje na hostitele NETBIRD_MESH_PORT (vše ostatní je jen `expose:`), a ten se odděluje per-instance offsetem — doloženo třemi netbird stacky vedle sebe na jednom stroji. NAMĚŘENO: deklarace tu stála 'frontend', kdežto služba běžela u svých závislostí. Nikdo to nevymáhal, takže NETBIRD_MGMT_HOST vycházel na jiný stroj, agenti mířili tam, kde nikdo neposlouchá, a MLČKY se nepřipojili — prázdná mesh, api 502, extranet 404.",
+      "internal_url": {
+        "service": "netbird-management",
+        "port": 443,
+        "env_aliases": [
+          "NB_MANAGEMENT_URL"
+        ]
+      }
+    },
+    "netinit-backend": {
+      "role": "host-networks",
+      "tier": "required",
+      "subdomain": "netinit-backend",
+      "public": false,
+      "compose": "docker-compose.coolify-netinit.yml",
+      "placement": "backend",
+      "depends_on": [],
+      "ephemeral": true,
+      "_comment": "Warmup: zakládá HOSTITELSKÉ sítě instance (${APP_NAME_PREFIX}-shared-net a mesh-DNS) přes docker.sock a skončí. Existuje proto, že síť je zdroj HOSTITELE, ne aplikace: compose ověřuje external sítě PŘED spuštěním prvního kontejneru (změřeno 2026-08-11 — nevznikl ani init kontejner), takže si je stack nemůže založit sám; a kdyby je VLASTNIL, mazal by je při teardownu a shodil nasazení, když na nich visí cizí kontejner. Jedna aplikace na každé placement, protože Coolify aplikace běží na JEDNOM serveru. Cold-start ji nasadí ve vlně 0 a po dokončení rolloutu SMAŽE — root-ekvivalentní přístup k socketu tak není stálý."
+    },
+    "netinit-experimental": {
+      "role": "host-networks",
+      "tier": "required",
+      "subdomain": "netinit-experimental",
+      "public": false,
+      "compose": "docker-compose.coolify-netinit.yml",
+      "placement": "experimental",
+      "depends_on": [],
+      "ephemeral": true,
+      "_comment": "Warmup: zakládá HOSTITELSKÉ sítě instance (${APP_NAME_PREFIX}-shared-net a mesh-DNS) přes docker.sock a skončí. Existuje proto, že síť je zdroj HOSTITELE, ne aplikace: compose ověřuje external sítě PŘED spuštěním prvního kontejneru (změřeno 2026-08-11 — nevznikl ani init kontejner), takže si je stack nemůže založit sám; a kdyby je VLASTNIL, mazal by je při teardownu a shodil nasazení, když na nich visí cizí kontejner. Jedna aplikace na každé placement, protože Coolify aplikace běží na JEDNOM serveru. Cold-start ji nasadí ve vlně 0 a po dokončení rolloutu SMAŽE — root-ekvivalentní přístup k socketu tak není stálý."
+    },
+    "netinit-frontend": {
+      "role": "host-networks",
+      "tier": "required",
+      "subdomain": "netinit-frontend",
+      "public": false,
+      "compose": "docker-compose.coolify-netinit.yml",
+      "placement": "frontend",
+      "depends_on": [],
+      "ephemeral": true,
+      "_comment": "Warmup: zakládá HOSTITELSKÉ sítě instance (${APP_NAME_PREFIX}-shared-net a mesh-DNS) přes docker.sock a skončí. Existuje proto, že síť je zdroj HOSTITELE, ne aplikace: compose ověřuje external sítě PŘED spuštěním prvního kontejneru (změřeno 2026-08-11 — nevznikl ani init kontejner), takže si je stack nemůže založit sám; a kdyby je VLASTNIL, mazal by je při teardownu a shodil nasazení, když na nich visí cizí kontejner. Jedna aplikace na každé placement, protože Coolify aplikace běží na JEDNOM serveru. Cold-start ji nasadí ve vlně 0 a po dokončení rolloutu SMAŽE — root-ekvivalentní přístup k socketu tak není stálý."
+    },
+    "observability": {
+      "role": "observability",
+      "tier": "important",
+      "subdomain": "langfuse",
+      "public": false,
+      "compose": "docker-compose.coolify-langfuse.yml",
+      "internal_url": {
+        "service": "langfuse-gateway",
+        "port": 8080
+      },
+      "placement": "backend",
+      "depends_on": [
+        "core"
+      ],
+      "_comment": "Langfuse — LLM ops. Trace/eval/prompt-mgmt for AI surface."
+    },
+    "openclaw": {
+      "external_connectivity": "ingress",
+      "role": "ai-advisory",
+      "tier": "optional",
+      "subdomain": "companion",
+      "public": true,
+      "canonical_scope": "internal",
+      "compose": "docker-compose.coolify-openclaw.yml",
+      "public_face": {
+        "service": "openclaw-auth",
+        "port": 4180,
+        "_comment": "Veřejná tvář (companion) jde přes oauth2-proxy; `internal_url` openclaw:5210 je pro volání uvnitř mesh."
+      },
+      "placement": "backend",
+      "depends_on": [
+        "core",
+        "keycloak"
+      ],
+      "capabilities": {
+        "requires_all_of": [
+          {
+            "local_service": "llm-gateway"
+          }
+        ]
+      },
+      "_comment": "OpenClaw advisory companion: planner + sandbox + multi-channel notify. NOT a multi-agent executor (n8n stays); NOT a session source-of-truth (chat_conversations stays); NOT MCP replacement (consumer of aisha-knowledge MCP). All AISHA → OpenClaw calls audited via aisha_*_openclaw RPCs. Capability-gated: requires llm-gateway (which is itself provider-gated). Knowledge MCP endpoint is api.backend.id3a.cz (core stack, numbered dependency).",
+      "internal_url": {
+        "service": "openclaw",
+        "port": 5210
+      }
+    },
+    "orchestration": {
+      "external_connectivity": "ingress",
+      "role": "workflow",
+      "tier": "important",
+      "subdomain": "n8n",
+      "public_aliases": [
+        "mcp",
+        "dirigent"
+      ],
+      "public": true,
+      "public_face": {
+        "service": "n8n-auth",
+        "port": 4180,
+        "_comment": "Veřejný provoz (mcp/dirigent) jde VŽDY přes oauth2-proxy před n8n — `internal_url` n8n:5678 je pro služby uvnitř mesh s vlastním tokenem, ne pro edge. Naměřeno 2026-08-21: edge mířil přes DNAT na port 8080 core peeru, kde běží imgproxy → 421."
+      },
+      "compose": "docker-compose.coolify-n8n.yml",
+      "internal_url": {
+        "service": "n8n",
+        "port": 5678
+      },
+      "placement": "backend",
+      "depends_on": [
+        "core",
+        "keycloak"
+      ],
+      "_comment": "n8n workflow engine. Internal n8n.backend.id3a.cz for editor. Public aliases mcp.aisha.guru (MCP clients) and dirigent.aisha.guru (Dirigent orchestration entry-point) — both proxy to the same n8n backend via edge-proxy. Single canonical service, multiple public faces."
+    },
+    "pki": {
+      "role": "key-rotation",
+      "tier": "important",
+      "subdomain": "pki",
+      "public": false,
+      "compose": "docker-compose.coolify-pki.yml",
+      "placement": "backend",
+      "depends_on": [],
+      "extra_subdomains": [
+        "pki-bridge"
+      ],
+      "_comment": "OpenXPKI + pki-bridge. Cert lifecycle (issue/rotate) for internal mesh services + future signing chain.",
+      "internal_endpoints": [
+        {
+          "subdomain": "pki-webui",
+          "port": 80,
+          "env_aliases": [
+            "OPENXPKI_RPC_URL"
+          ],
+          "service": "pki-webui"
+        }
+      ]
+    },
+    "playwright": {
+      "role": "qa-runner",
+      "tier": "optional",
+      "subdomain": "playwright",
+      "public": false,
+      "compose": "docker-compose.coolify-playwright.yml",
+      "placement": "backend",
+      "depends_on": [
+        "core"
+      ],
+      "_comment": "svc-playwright-runner — polling worker, E2E proti deployed env (staging auto + production manual approval-gated). No HTTP listener. Reports v e2e-reports storage bucket."
+    },
+    "potok": {
+      "external_connectivity": "ingress",
+      "role": "flow-runtime",
+      "tier": "optional",
+      "subdomain": "potok",
+      "public": true,
+      "canonical_scope": "internal",
+      "provision_when_env": "POTOK_ENABLED",
+      "compose": "docker-compose.coolify-potok.yml",
+      "placement": "backend",
+      "depends_on": [
+        "core",
+        "keycloak"
+      ],
+      "capabilities": {
+        "requires_all_of": [
+          {
+            "local_service": "ai-chat"
+          }
+        ]
+      },
+      "_comment": "svc-potok — flow-definition runtime (FDL parser → verification gates + hard budgets + append-only provenance ledger → ensemble sampling). Mesh generation backend is the governed Omni /v1 (svc-ai-chat behind the core gateway) — hence the ai-chat capability gate; no in-process training (learn triggers WF_FINE_TUNE_JOB via aishaRpc). Opt-in (tier=optional): coolify-story-init.sh provisions the Coolify app only when POTOK_ENABLED is set. Public admin cockpit at potok.${PUBLIC_TLD} behind edge+oauth2. No DB writes — harvest/provenance persist on the stack volumes.",
+      "internal_url": {
+        "service": "svc-potok",
+        "port": 8080
+      }
+    },
+    "realtime": {
+      "external_connectivity": "ingress",
+      "role": "realtime",
+      "tier": "optional",
+      "subdomain": "live",
+      "public": true,
+      "canonical_scope": "internal",
+      "compose": "docker-compose.coolify-realtime.yml",
+      "public_face": {
+        "service": "ws-gateway",
+        "port": 3002,
+        "_comment": "Veřejná tvář `live` je ws-gateway; realtime nemá `internal_url` (stack vystavuje víc endpointů), takže bez téhle deklarace by edge neměl kam mířit. WebSocket upgrade zvládne Caddy na obou hopech."
+      },
+      "placement": "backend",
+      "depends_on": [
+        "core",
+        "keycloak"
+      ],
+      "_comment": "Realtime fabric (event-worker PG LISTEN→Redis, ws-gateway Redis→WS, svc-ide-context). Sibling stack — restored from the core-trim era. Internal aliases keep the gateway's ws-gateway:3002 proxy target working. Public WS exposed at live.${PUBLIC_TLD}: backend Traefik routes live.${INTERNAL_TLD} → ws-gateway:3002 (n8n-pattern labels), edge-proxy fronts the public host (@live block) — same secure cross-server pattern as auth/api, both proxy hops WS-native.",
+      "internal_endpoints": [
+        {
+          "subdomain": "ws-gateway",
+          "port": 3002,
+          "env_aliases": [
+            "WS_GATEWAY_URL"
+          ],
+          "service": "ws-gateway"
+        },
+        {
+          "subdomain": "event-worker",
+          "port": 3003,
+          "env_aliases": [
+            "EVENT_WORKER_URL"
+          ],
+          "service": "event-worker"
+        }
+      ]
+    },
+    "registry": {
+      "external_connectivity": "egress",
+      "role": "registry",
+      "tier": "important",
+      "subdomain": "cache",
+      "public": true,
+      "canonical_scope": "public",
+      "compose": "docker-compose.coolify-registry.yml",
+      "mesh_bootstrap_dependency": true,
+      "_comment_mesh": "Obrazy tahá Docker daemon HOSTITELE (REGISTRY_PROXY), a ten v mesh není. Cache musí odpovídat na hostitelské síti dřív, než první agent vůbec vznikne — včetně obrazu netbird samotného.",
+      "placement": "frontend",
+      "depends_on": [],
+      "_comment": "Docker Hub pull-through cache. Public-canonical (Docker hub pulls go via public URL)."
+    },
+    "shared-redis": {
+      "role": "cache",
+      "tier": "important",
+      "subdomain": "shared-redis",
+      "internal_tcp_endpoints": [
+        {
+          "service": "shared-redis",
+          "port": 6379,
+          "env_aliases": [
+            "SHARED_REDIS_HOST"
+          ],
+          "_comment": "Sdílená ACL Redis instance (core, langfuse, n8n, admin — každý s vlastním heslem). Redis mluví RESP, ne HTTP, takže ji mesh-ingress (Caddy) nemá jak rozvést; do 2026-08-22 proto konzumenti sahali na sdílenou síť. Tam ale o jméno soupeří víc nájemníků: kdyby na hostiteli existovalo jméno jiné instance, připojili bychom se RYCHLE k CIZÍ cache."
+        }
+      ],
+      "public": false,
+      "canonical_scope": "internal",
+      "compose": "docker-compose.coolify-shared-redis.yml",
+      "placement": "backend",
+      "depends_on": [],
+      "_comment": "V katalogu do 2026-08-22 CHYBĚLA, takže ji verdikt mesh-konformity nevidel — přestože ji `SHARED_REDIS_HOST` oslovuje jménem, což je přesně to kritérium ('sluzba, kterou nekdo uvnitr OSLOVUJE JMENEM, musi byt jmenem dosazitelna'). Mlčení univerza vypadalo jako čisto."
+    },
+    "source-broker": {
+      "role": "federation-broker",
+      "tier": "optional",
+      "subdomain": "broker",
+      "public": false,
+      "canonical_scope": "internal",
+      "provision_when_env": [
+        "SOURCE_API_URL",
+        "LOCAL_INGEST_DROP_DIR"
+      ],
+      "compose": "docker-compose.coolify-source-broker.yml",
+      "internal_url": {
+        "service": "svc-source-broker",
+        "port": 8090,
+        "env_aliases": [
+          "SOURCE_BROKER_URL"
+        ]
+      },
+      "placement": "backend",
+      "depends_on": [
+        "core",
+        "keycloak"
+      ],
+      "_comment": "svc-source-broker — federation RPC: an external source app's users (OTP + mantra) -> gateway /token-exchange -> role=authenticated aisha session. Opt-in (tier=optional): coolify-story-init.sh provisions the Coolify app only when SOURCE_API_URL is set, so non-federated forks never get it.",
+      "_comment_scope": "VNITŘNÍ služba, obě lanes. Broker je v každém toku KLIENT, ne veřejná tvář: SOURCE_FEDERATION.md popisuje token exchange jako 'broker -> keycloak' a KC klienta má publicClient:false; na SOURCE_API_URL volá ven; /token-exchange pro uživatele cizí aplikace vlastní GATEWAY (services/gateway/src/routes/intranet.ts). Sám vystavuje jen /healthz a /sync/{probe,scheduler/status,scheduler/trigger} — operační endpointy za requireAdminOrService, tedy ovládací plocha, která na veřejném TLD nemá co dělat ani s auth. Naměřeno 2026-08-09: žádná trasa brokeru nemá externího volajícího."
+    },
+    "svc-blockchain": {
+      "role": "blockchain-dispatcher",
+      "tier": "optional",
+      "subdomain": "svc-blockchain",
+      "public": false,
+      "canonical_scope": "internal",
+      "compose": "docker-compose.coolify-cosmos.yml",
+      "placement": "experimental",
+      "depends_on": [
+        "core",
+        "ledger"
+      ],
+      "internal_url": {
+        "service": "svc-blockchain",
+        "port": 3013,
+        "env_aliases": [
+          "SVC_BLOCKCHAIN_URL"
+        ]
+      },
+      "_comment": "On-chain dispatcher (svc-blockchain, Node/Fastify port 3013) — the ONLY drainer of the blockchain outbox (retry_pending_blockchain_syncs → RabbitMQ → WF_BLOCKCHAIN_SYNC → /ledger-sync); signs + broadcasts to the cosmos `ledger` node via CosmJS. DISTINCT from the `ledger` role, which is the Cosmos chain NODE (validator), not the dispatcher. Co-located in docker-compose.coolify-cosmos.yml so the dispatcher→node hop (cosmos-node:1317/26657) stays in-stack; it ships within the aisha-ledger Coolify app (already SOFT_DEPLOY) so its failure never halts the deploy cascade. Internal-only, no public host; reached cross-stack at http://svc-blockchain:3013 (SVC_BLOCKCHAIN_URL). On-chain anchoring is gated by LEDGER_ENABLED; the in-DB audit chain is unconditional. Without this entry the topology resolver / coolify provisioner never create the dispatcher and the outbox fills forever (LEDGER-01).",
+      "internal_endpoints": [
+        {
+          "subdomain": "svc-blockchain",
+          "port": 3013,
+          "env_aliases": [
+            "BLOCKCHAIN_SERVICE_URL"
+          ],
+          "service": "svc-blockchain"
+        }
+      ]
+    },
+    "web-render": {
+      "role": "frontend",
+      "tier": "optional",
+      "subdomain": "web-render",
+      "public": false,
+      "compose": "docker-compose.coolify-web-render.yml",
+      "placement": "frontend",
+      "depends_on": [
+        "edge"
+      ],
+      "_comment": "Předgenerování publikovaných stránek do statického HTML (svc-web-render). Výstup a skořápka jsou hostitelské adresáře TÉTO instance (WEB_RENDER_STATIC_HOST_DIR / WEB_RENDER_SHELL_HOST_DIR, generátor je odvozuje z identity) — dřív doslovné /var/lib/aisha/web-{static,shell}, do kterých zapisovaly renderery dvou instancí na jednom stroji (naměřeno 2026-09-23). Kdo je s rendererem sdílí, MUSÍ běžet na témže stroji (placement: frontend) — hostitelský adresář hranici stroje nepřekročí. Vlastní aplikace ZÁMĚRNĚ: jako kontejner uvnitř `edge` (tier: required) by po dosažení limitu restartů shodila `StopApplication` celou veřejnou tvář — web, api, auth i extranet naráz (naměřeno 2026-08-31, dvakrát). Když neběží, nginx nenajde předgenerovaný soubor a spadne na SPA fallback: pomalejší první vykreslení, funkční web."
+    }
+  },
+  "extras": {
+    "vllm": {
+      "tier": "local-only",
+      "_comment": "Local-only LLM runtime. Never deployed to cloud (uses GPUs / specialized hardware on dev machine). Referenced by llm-gateway capabilities.requires_any_of[].local_service — if vllm is in the profile, llm-gateway's provider gate is satisfied even without external API keys."
+    },
+    "ollama": {
+      "tier": "local-only",
+      "_comment": "Local-only LLM runtime via Ollama (CPU-friendly fallback to vllm). Same role as vllm in capabilities.requires_any_of for llm-gateway. No GPU required; quantized models only."
+    }
+  }
+}

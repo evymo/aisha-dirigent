@@ -1,0 +1,41 @@
+{
+  "name": "story-plan-reflect",
+  "display_name": "Story Plan Reflection (partner product)",
+  "description": "Phase 2 product graph for partner story planning. Generator runs with creative_with_dna context profile (Psyché DNA injection), occipitum_creative produces parallel creative branch, critic evaluates brand_voice + compliance + feasibility, convergence threshold 0.80 (creative work tolerates more deviation), interrupt routes to partner-configured channel.",
+  "context": "reflection",
+  "version": 1,
+  "is_active": true,
+  "metadata": {
+    "mode": "creative",
+    "pilot": false,
+    "owner": "partner_facing"
+  },
+  "graph": {
+    "entry": "soulforge_classify",
+    "nodes": [
+      { "id": "soulforge_classify",  "type": "soulforge_classify",  "config": {} },
+      { "id": "soulforge_optimize",  "type": "soulforge_optimize",  "config": { "max_history_chars": 10000 } },
+      { "id": "hippocampus_read",    "type": "hippocampus_read",    "config": { "limit": 5, "min_importance": 3 } },
+      { "id": "generator",           "type": "generator",           "config": { "slot": "semantic", "temperature": 0.5 } },
+      { "id": "occipitum_creative",  "type": "occipitum_creative",  "config": { "slot": "semantic", "temperature": 0.85, "profile": "maxQuality" } },
+      { "id": "critic",              "type": "critic",              "config": { "rules": ["brand_voice","compliance","feasibility"], "slot": "verify", "threshold": 0.80 } },
+      { "id": "convergence_gate",    "type": "convergence_gate",    "config": { "min_score": 0.80, "max_iterations": 3 } },
+      { "id": "corrector",           "type": "corrector",           "config": { "slot": "semantic" } },
+      { "id": "interrupt",           "type": "interrupt",           "config": { "channel": "in_app", "approver": "partner", "reason": "partner_review" } },
+      { "id": "hippocampus_write",   "type": "hippocampus_write",   "config": { "importance": "critic_score" } }
+    ],
+    "edges": [
+      { "from": "soulforge_classify", "to": "soulforge_optimize" },
+      { "from": "soulforge_optimize", "to": "hippocampus_read" },
+      { "from": "hippocampus_read",   "to": "generator" },
+      { "from": "generator",          "to": "occipitum_creative" },
+      { "from": "occipitum_creative", "to": "critic" },
+      { "from": "critic",             "to": "convergence_gate" },
+      { "from": "convergence_gate",   "to": "corrector",        "condition": "convergence_result == 'retry'" },
+      { "from": "convergence_gate",   "to": "interrupt",        "condition": "convergence_result == 'pass'" },
+      { "from": "convergence_gate",   "to": "hippocampus_write","condition": "convergence_result == 'exhausted'" },
+      { "from": "corrector",          "to": "generator" },
+      { "from": "interrupt",          "to": "hippocampus_write","condition": "approved == true" }
+    ]
+  }
+}

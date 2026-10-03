@@ -1,0 +1,1704 @@
+{
+  "partners": {
+    "sectionLabel": "Zusammenarbeit",
+    "title": "Partner & Mitwirkende",
+    "subtitle": "Das Evymo-Archiv ist ein lebendiges Projekt. Wir begrüßen die Zusammenarbeit mit Entwicklern, Organisationen und Einzelpersonen, die unser Engagement für Transparenz und Open Source teilen.",
+    "certifiedProvider": "Zertifizierter Gesundheitsdienstleister",
+    "certifiedPartner": "Zertifizierter Partner",
+    "categories": {
+      "academic": {
+        "title": "Akademische Institutionen",
+        "description": "Universitäten und Forschungszentren mit Interesse an Archivmaterialien für historische, technologische oder Plattformgeschichtsforschung.",
+        "examples": [
+          "Programme zur Technologiegeschichte",
+          "Plattformgeschichtsforschung",
+          "Zentral- und Osteuropastudien"
+        ]
+      },
+      "research": {
+        "title": "Forschungsorganisationen",
+        "description": "Unabhängige Forscher und Organisationen, die die Geschichte der Plattform-Governance, Orchestrierung oder frühen KI-Entwicklung studieren.",
+        "examples": [
+          "Technologiehistoriker",
+          "Plattformstudien-Wissenschaftler",
+          "Dokumentarfilmer"
+        ]
+      },
+      "cultural": {
+        "title": "Kulturelle Institutionen",
+        "description": "Museen, Archive und kulturelle Organisationen, die möglicherweise Ausstellungen oder öffentliche Programme präsentieren oder daran mitwirken möchten.",
+        "examples": [
+          "Technologiemuseen",
+          "Nationale Archive",
+          "Historische Gesellschaften"
+        ]
+      },
+      "community": {
+        "title": "Gemeinschaftsbeiträge",
+        "description": "Einzelpersonen mit persönlicher Verbindung zur Evymo-Geschichte — ehemalige Mitwirkende, Mitglieder, Community-Mitglieder — die Materialien oder Geschichten teilen möchten.",
+        "examples": [
+          "Familienarchive",
+          "Persönliche Fotografien",
+          "Mündliche Geschichten"
+        ]
+      }
+    },
+    "howWeWork": {
+      "title": "Wie wir zusammenarbeiten",
+      "subtitle": "Unser Ansatz zur Zusammenarbeit priorisiert gegenseitigen Nutzen und gemeinsame Standards.",
+      "openAccess": {
+        "title": "Offene Forschungszugänglichkeit",
+        "description": "Alle Archivmaterialien sind frei zugänglich. Forscher können sie für akademische Zwecke mit entsprechender Zitation nutzen. Kein Zugangsschutz, keine Gebühren für Bildungsnutzung."
+      },
+      "contributions": {
+        "title": "Materialbeiträge",
+        "description": "Wenn Sie Dokumente, Screenshots oder andere Materialien zur Evymo-Geschichte haben, begrüßen wir Beiträge. Alle Mitwirkenden werden genannt, und Originale können nach der Digitalisierung zurückgegeben werden."
+      },
+      "oralHistory": {
+        "title": "Programm zur mündlichen Geschichte",
+        "description": "Wir sammeln mündliche Berichte von Personen mit direkter Kenntnis des Evymo-Betriebs, der Entwicklung oder der Plattformdienste."
+      }
+    },
+    "currentCollaborators": "Aktuelle Mitwirkende",
+    "currentCollaboratorsSubtitle": "Organisationen und Einzelpersonen, die zum Archivprojekt beigetragen haben.",
+    "partnerLogo": "Partnerlogo",
+    "getInTouch": {
+      "title": "Nehmen Sie Kontakt auf",
+      "subtitle": "Egal, ob Sie ein Forscher sind, der Zugang sucht, eine Institution, die an einer Zusammenarbeit interessiert ist, oder jemand, der Materialien beisteuern möchte, wir würden uns freuen, von Ihnen zu hören."
+    },
+    "searchPlaceholder": "Partner suchen...",
+    "allCities": "Alle Städte",
+    "noPartners": "Keine Partner gefunden",
+    "becomeFirst": "Seien Sie der Erste, der unserem Netzwerk zertifizierter Partner beitritt.",
+    "inPerson": "Persönlich",
+    "bookAppointment": "Termin buchen",
+    "viewProfile": "Profil ansehen",
+    "signInToViewDetails": "Anmelden, um Details anzuzeigen",
+    "signInForMore": {
+      "title": "Möchten Sie mehr sehen?",
+      "description": "Melden Sie sich an, um alle Partner, deren vollständige Profile, Dienstleistungen und Buchungsmöglichkeiten anzuzeigen.",
+      "descriptionWithCount": "Melden Sie sich an, um alle {{count}} Partner, deren vollständige Profile, Dienstleistungen und Buchungsmöglichkeiten anzuzeigen."
+    },
+    "badges": {
+      "provider": "Gesundheitsdienstleister",
+      "partner": "Zertifizierter Partner"
+    },
+    "becomePartner": {
+      "title": "Partner werden",
+      "description": "Treten Sie unserem Netzwerk zertifizierter Praktiker und Gildenmitglieder bei. Lassen Sie sich in Plattformprotokollen schulen.",
+      "button": "Zertifizieren lassen"
+    },
+    "booking": {
+      "title": "Buchen Sie bei {{name}}",
+      "selectDate": "Wählen Sie ein Datum für Ihren Termin.",
+      "selectTime": "Wählen Sie einen verfügbaren Zeitrahmen.",
+      "enterDetails": "Geben Sie die Termindetails ein.",
+      "noTimes": "Keine verfügbaren Zeiten an diesem Datum.",
+      "appointmentType": "Terminart",
+      "service": "Dienstleistung",
+      "selectService": "Wählen Sie eine Dienstleistung...",
+      "notes": "Notizen (optional)",
+      "notesPlaceholder": "Zusätzliche Informationen...",
+      "confirm": "Buchung bestätigen",
+      "confirmed": "Buchung bestätigt",
+      "thankYou": "Danke!",
+      "confirmationSent": "Ihre Terminanforderung wurde gesendet.",
+      "success": "Termin gebucht",
+      "successDesc": "Ihre Terminanforderung wurde eingereicht.",
+      "error": "Fehler beim Buchen des Termins. Bitte versuchen Sie es erneut.",
+      "shareTrackingData": "Teilen Sie meine Gesundheitsdaten mit diesem Partner",
+      "shareTrackingDataDesc": "Erlauben Sie dem Partner, Ihr Gesundheitsprofil und Ihre Dokumente für eine bessere Beratung einzusehen.",
+      "confirmPassword": "Bestätigen Sie Ihre Identität",
+      "confirmPasswordDesc": "Geben Sie Ihr Passwort ein, um auf Ihre Gesundheitsdaten zuzugreifen und sie zu teilen.",
+      "unlockTrackingData": "Gesundheitsdaten freischalten",
+      "healthDataUnlocked": "Zugriff auf Gesundheitsdaten aktiviert",
+      "unlockSecureFirst": "Bitte schalten Sie zuerst den Zugriff auf die Gesundheitsdaten frei, indem Sie Ihr Passwort eingeben.",
+      "unlockPhiFirst": "Bitte aktivieren Sie zunächst den sicheren Modus, um Gesundheitsdaten auszutauschen."
+    },
+    "online": "Online"
+  },
+  "partnerCertification": {
+    "noQuestionsAvailable": "Keine Fragen verfügbar. Bitte kontaktieren Sie den Support.",
+    "results": {
+      "passed": "Herzlichen Glückwunsch!",
+      "notPassed": "Test nicht bestanden",
+      "passedDesc": "Sie haben {{score}}% erreicht und sind jetzt ein zertifizierter Partner.",
+      "notPassedDesc": "Sie haben {{score}}% erreicht. Sie benötigen mindestens {{required}}%, um zu bestehen.",
+      "correctAnswers": "{{correct}} von {{total}} richtigen Antworten",
+      "viewDirectory": "Partnerverzeichnis anzeigen",
+      "goToPortal": "Zum Portal gehen",
+      "tryAgain": "Erneut versuchen"
+    },
+    "title": "Partnerzertifizierung",
+    "subtitle": "Werden Sie zertifizierter Evymo-Partner und bieten Sie Mitgliedern Dienste an",
+    "loginRequired": "Bitte melden Sie sich an, um auf die Partnerzertifizierung zuzugreifen.",
+    "qualificationRequired": {
+      "title": "Bewertung erforderlich",
+      "description": "Schließen Sie den Bewertungstest ab, bevor Sie den Zertifizierungstest beginnen.",
+      "goToQualification": "Zum Bewertungstest"
+    },
+    "steps": {
+      "type": "Partnertyp",
+      "profile": "Profil",
+      "test": "Zertifizierungstest"
+    },
+    "intro": {
+      "title": "Partnerzertifizierungsprogramm",
+      "description": "Schließen Sie diese Zertifizierung ab, um dem Evymo-Partnernetzwerk beizutreten.",
+      "alreadyCertified": "Sie sind bereits ein zertifizierter Partner.",
+      "selectType": "Wählen Sie Ihren Partnertyp:",
+      "whatYouGet": "Was Sie als zertifizierter Partner erhalten:",
+      "benefit1": "Im Partnerverzeichnis aufgeführt",
+      "benefit2": "Möglichkeit, Terminbuchungen von Mitgliedern zu erhalten",
+      "benefit3": "Zugang zu Partnerressourcen und Schulungen",
+      "benefit4": "Offizielles Evymo-Partnerzertifizierungsabzeichen",
+      "startButton": "Zertifizierung starten"
+    },
+    "alreadyCertified": {
+      "title": "Sie sind zertifiziert",
+      "description": "Sie haben die Partnerzertifizierung erfolgreich abgeschlossen.",
+      "certified": "Zertifizierter Partner",
+      "score": "Ihr Ergebnis: {{score}}%",
+      "completedAt": "Abgeschlossen am {{date}}",
+      "goToDashboard": "Zum Partner-Dashboard gehen",
+      "viewNetwork": "Partnernetzwerk anzeigen"
+    },
+    "types": {
+      "individual": {
+        "title": "Einzelner Partner",
+        "description": "Einzelpersonen mit Interesse an Plattformprotokollen",
+        "badge": "Zertifizierter Partner"
+      },
+      "provider": {
+        "title": "Gesundheitsdienstleister",
+        "description": "Lizenzierte Fachkräfte und Organisationen",
+        "badge": "Zertifizierter Anbieter"
+      }
+    },
+    "profile": {
+      "title": "Partnerprofil",
+      "subtitle": "Diese Informationen werden im Partnerverzeichnis angezeigt.",
+      "displayName": "Anzeigename",
+      "displayNamePlaceholder": "Ihr Name oder Pseudonym",
+      "businessName": "Firmen-/Organisationsname",
+      "businessNamePlaceholder": "Name Ihrer Organisation oder Firma",
+      "city": "Stadt",
+      "cityPlaceholder": "z.B. Prag",
+      "country": "Land",
+      "email": "Kontakt-E-Mail",
+      "phone": "Telefon",
+      "phonePlaceholder": "+420...",
+      "description": "Über Sie",
+      "descriptionPlaceholder": "Beschreiben Sie kurz Ihren Hintergrund und Ihre Dienstleistungen...",
+      "services": "Angebotene Dienstleistungen",
+      "continueToTest": "Weiter zum Test"
+    },
+    "services": {
+      "consultation": "Beratung",
+      "diagnostics": "Analyse",
+      "therapy": "Implementierung",
+      "education": "Bildung",
+      "screening": "Vorauswahl",
+      "coaching": "Coaching",
+      "assessment": "Bewertung",
+      "training": "Ausbildung",
+      "nutrition": "Ernährung",
+      "fitness": "Fitness",
+      "wellness": "Überwachung",
+      "lifestyle": "Lebensstil",
+      "medical": "Technisch"
+    },
+    "test": {
+      "question": "Frage",
+      "toPass": "zu bestehen",
+      "submit": "Test einreichen"
+    },
+    "messages": {
+      "fillRequired": "Bitte füllen Sie alle erforderlichen Felder aus.",
+      "congratulations": "Herzlichen Glückwunsch!",
+      "certificationPassed": "Sie sind jetzt ein zertifizierter Evymo-Partner.",
+      "submitError": "Einreichen der Zertifizierung fehlgeschlagen. Bitte versuchen Sie es erneut."
+    }
+  },
+  "partnerDashboard": {
+    "title": "Partner-Dashboard",
+    "subtitle": "Verwalten Sie Ihre Termine und Verfügbarkeiten",
+    "templates": "Vorlagen",
+    "statusUpdated": "Terminstatus aktualisiert",
+    "statusUpdateFailed": "Aktualisierung des Terminstatus fehlgeschlagen",
+    "stats": {
+      "pending": "Ausstehend",
+      "upcoming": "Bevorstehend",
+      "completed": "Abgeschlossen",
+      "total": "Insgesamt",
+      "studies": "Cluster",
+      "users": "Mitglieder",
+      "alerts": "Benachrichtigungen"
+    },
+    "tabs": {
+      "overview": "Übersicht",
+      "studies": "Cluster",
+      "alerts": "Benachrichtigungen",
+      "calendar": "Kalender",
+      "pending": "Ausstehend",
+      "upcoming": "Bevorstehend",
+      "availability": "Verfügbarkeit",
+      "invitations": "Einladungen",
+      "profile": "Mein Profil",
+      "mentoring": "Mentoring",
+      "earnings": "Ergebnis",
+      "pricing": "Preisgestaltung"
+    },
+    "overview": {
+      "studiesTitle": "Meine Cluster",
+      "studiesDesc": "Cluster, in denen Sie Berater sind",
+      "noStudies": "Sie sind noch keinen Clustern zugewiesen",
+      "users": "Mitglieder",
+      "viewAll": "Alle anzeigen",
+      "alertsTitle": "Aktuelle Aktivitäten",
+      "alertsDesc": "Neue Daten von Ihren Mitglieder",
+      "noAlerts": "Keine aktuellen Aktivitäten",
+      "upcomingTitle": "Bevorstehende Termine"
+    },
+    "studies": {
+      "title": "Berater-Cluster",
+      "description": "Cluster, in denen Sie als Berater registriert sind",
+      "none": "Sie haben sich noch bei keinen Clustern als Berater beworben",
+      "browse": "Cluster durchsuchen",
+      "assignedUsers": "zugewiesene Mitglieder"
+    },
+    "alertsTab": {
+      "title": "Userenbenachrichtigungen",
+      "description": "Aktuelle Check-ins und Testergebnisse Ihrer Mitglieder",
+      "none": "Keine neuen Benachrichtigungen - alles auf dem neuesten Stand!"
+    },
+    "availability": {
+      "title": "Arbeitszeiten",
+      "description": "Legen Sie Ihre verfügbaren Zeitfenster für Termine fest",
+      "inPerson": "Persönlich",
+      "addSlot": "Zeitfenster hinzufügen",
+      "newSlot": "Neues Zeitfenster",
+      "day": "Tag",
+      "startTime": "Startzeit",
+      "endTime": "Endzeit",
+      "type": "Typ",
+      "noSlots": "Keine Verfügbarkeit festgelegt",
+      "added": "Zeitfenster hinzugefügt",
+      "removed": "Zeitfenster entfernt",
+      "bookingSettings": {
+        "title": "Buchungseinstellungen",
+        "description": "Dauer und Puffer zwischen Terminen konfigurieren",
+        "slotDuration": "Slotdauer",
+        "slotDurationDescription": "Dauer jedes buchbaren Zeitfensters (Minuten)",
+        "bufferTime": "Pufferzeit",
+        "bufferTimeDescription": "Mindestabstand zwischen Ende eines Termins und Beginn des nächsten (Minuten)",
+        "minutes": "Min",
+        "saved": "Buchungseinstellungen gespeichert",
+        "errors": {
+          "saveFailed": "Buchungseinstellungen konnten nicht gespeichert werden",
+          "loadFailed": "Buchungseinstellungen konnten nicht geladen werden"
+        }
+      },
+      "errors": {
+        "addFailed": "Hinzufügen des Zeitfensters fehlgeschlagen",
+        "removeFailed": "Entfernen des Zeitfensters fehlgeschlagen",
+        "updateFailed": "Aktualisierung des Zeitfensters fehlgeschlagen"
+      },
+      "online": "Online"
+    },
+    "profile": {
+      "title": "Partnerprofil",
+      "description": "Ihre öffentlichen Partnerinformationen",
+      "edit": "Profil bearbeiten",
+      "displayName": "Anzeigename",
+      "businessName": "Firmenname",
+      "location": "Standort",
+      "email": "E-Mail",
+      "phone": "Telefon",
+      "visibility": "Sichtbarkeit",
+      "visible": "Öffentlich",
+      "hidden": "Versteckt",
+      "about": "Über",
+      "services": "Dienstleistungen",
+      "certificationScore": "Zertifizierungspunktzahl",
+      "certificationLevel": "Zertifizierungsstufe",
+      "certifiedOn": "Zertifiziert am"
+    },
+    "calendar": {
+      "title": "Datum auswählen",
+      "selectDate": "Klicken Sie auf ein Datum, um Termine anzuzeigen",
+      "appointments": "Termine",
+      "noAppointments": "An diesem Tag keine Termine"
+    },
+    "pending": {
+      "title": "Ausstehende Anfragen",
+      "description": "Terminanforderungen warten auf Ihre Bestätigung",
+      "none": "Keine ausstehenden Terminanforderungen"
+    },
+    "upcoming": {
+      "title": "Bevorstehende Termine",
+      "description": "Ihre bestätigten bevorstehenden Termine",
+      "none": "Keine bevorstehenden Termine"
+    },
+    "appointmentType": {
+      "online": "Online-Beratung",
+      "inPerson": "Persönlicher Besuch"
+    },
+    "service": "Dienstleistung",
+    "status": {
+      "pending": "Ausstehend",
+      "confirmed": "Bestätigt",
+      "completed": "Abgeschlossen",
+      "cancelled": "Storniert",
+      "no_show": "Keine Vorstellung",
+      "rescheduled": "Umgeplant"
+    },
+    "actions": {
+      "confirm": "Bestätigen",
+      "cancel": "Stornieren",
+      "complete": "Als abgeschlossen markieren"
+    },
+    "notes": {
+      "show": "Notizen anzeigen",
+      "hide": "Notizen ausblenden",
+      "none": "Keine Notizen",
+      "loadFailed": "Fehler beim Laden der Notizen"
+    },
+    "member": "Mitglied",
+    "viewUsers": "Mitglieder anzeigen",
+    "mentoring": {
+      "certificationRequired": {
+        "title": "Mentoring ist nur für zertifizierte Partner verfügbar.",
+        "description": "Schließen Sie den Zertifizierungskurs ab, um auf Mentoring- und Klienten-Zuweisungsfunktionen zuzugreifen.",
+        "cta": "Zertifizierung starten →"
+      }
+    },
+    "unclaimedUsers": {
+      "title": "Benutzer ohne Mentor",
+      "titleWithCount": "Benutzer ohne Mentor ({{count}})",
+      "description": "Neue Benutzer warten auf die Zuweisung eines Mentors",
+      "descriptionLong": "Diese Benutzer haben das Onboarding abgeschlossen und warten darauf, einem zertifizierten Mentor zugewiesen zu werden",
+      "loading": "Lädt...",
+      "empty": {
+        "title": "Keine Benutzer ohne zugewiesenen Mentor",
+        "description": "Derzeit gibt es keine Benutzer ohne zugewiesenen Mentor. Großartige Arbeit! 🎉"
+      },
+      "buttons": {
+        "claim": "Weisen Sie mich zu",
+        "claiming": "Zuweisung..."
+      },
+      "wellbeing": {
+        "overallFeeling": "Allgemeines Gefühl",
+        "energy": "Energie"
+      },
+      "sections": {
+        "concern": "Was sie beschäftigt:",
+        "goal": "Ihr Ziel:"
+      },
+      "badges": {
+        "years": "Jahre alt",
+        "communication": "Kommunikation",
+        "prefersMale": "Bevorzugt männlich",
+        "prefersFemale": "Bevorzugt weiblich",
+        "communicationFrequent": "Häufig",
+        "communicationModerate": "Moderat",
+        "communicationMinimal": "Minimal"
+      },
+      "toasts": {
+        "fetchFailed": {
+          "title": "Ladefehler",
+          "description": "Fehler beim Laden der Benutzer ohne Mentor"
+        },
+        "claimSuccess": {
+          "title": "Benutzer zugewiesen! 🎉",
+          "description": "{{email}} ist jetzt in Ihrem Team. Planen Sie einen Einführungsgespräch mit ihnen.",
+          "charts": {
+            "checkIns": "Check-ins"
+          }
+        },
+        "claimFailed": {
+          "title": "Zuweisung fehlgeschlagen",
+          "description": "Der Benutzer hat möglicherweise bereits einen Mentor oder Sie haben keine Berechtigung."
+        }
+      }
+    },
+    "myClients": {
+      "title": "Meine Klienten",
+      "count": "Meine Klienten ({{count}})",
+      "description": "Benutzer, die Sie betreuen",
+      "descriptionShort": "Benutzer, die Sie als Mentor zugewiesen haben",
+      "loading": "Lädt...",
+      "loadingDetails": "Lädt...",
+      "loadError": "Ladefehler",
+      "noClients": "Sie haben noch keine zugewiesenen Klienten. Weisen Sie jemanden aus dem Abschnitt \"Benutzer ohne Mentor\" oben zu.",
+      "assignedAgo": "Zugewiesen vor {{time}}",
+      "relinquishReason": "Partner hat freiwillig den Zugriff aufgegeben",
+      "toasts": {
+        "fetchFailed": {
+          "title": "Ladefehler",
+          "description": "Fehler beim Laden Ihrer Klienten"
+        },
+        "detailsFetchFailed": {
+          "title": "Details Ladefehler",
+          "description": "Fehler beim Laden der Klientendetails"
+        },
+        "requestSent": {
+          "title": "Anfrage gesendet",
+          "description": "{{email}} erhält eine Benachrichtigung zur Anfrage der Datenfreigabe."
+        },
+        "requestFailed": {
+          "title": "Fehler beim Senden der Anfrage",
+          "description": "Bitte versuchen Sie es erneut."
+        },
+        "accessRelinquished": {
+          "title": "Zugriff beendet",
+          "description": "Sie haben den Zugriff auf die Gesundheitsdaten von {{email}} aufgegeben."
+        },
+        "relinquishFailed": {
+          "title": "Zugriffsbeendigungsfehler",
+          "description": "Bitte versuchen Sie es erneut."
+        }
+      },
+      "consent": {
+        "label": "Zustimmung:",
+        "requestMessage": "Ich möchte Zugriff auf Ihre Gesundheitsdaten haben, um Ihnen besser helfen zu können.",
+        "noConsent": {
+          "title": "Klient hat die Datenfreigabe nicht genehmigt.",
+          "description": "Um auf detaillierte Gesundheitsinformationen zuzugreifen, müssen Sie die Zustimmung zur Datenfreigabe anfordern."
+        },
+        "waitingForResponse": "Warten auf Benutzerantwort"
+      },
+      "buttons": {
+        "requestConsent": "Zustimmung anfordern",
+        "renewConsent": "Zustimmung erneuern",
+        "requestAgain": "Erneut anfordern",
+        "relinquishAccess": "Zugriff aufgeben",
+        "cancel": "Abbrechen",
+        "confirmRelinquish": "Ja, Zugriff aufgeben",
+        "requesting": "Senden...",
+        "relinquishing": "Beenden...",
+        "details": "Einzelheiten"
+      },
+      "status": {
+        "completed": "Abgeschlossen",
+        "afterCall": "Nach dem Anruf",
+        "callScheduled": "Anruf geplant",
+        "waitingForCall": "Warten auf Anruf"
+      },
+      "consentStatus": {
+        "granted": "Gewährt",
+        "pending": "Genehmigung ausstehend",
+        "expired": "Abgelaufen",
+        "revoked": "Widerrufen",
+        "none": "Nicht gewährt"
+      },
+      "dialog": {
+        "clientDetail": {
+          "title": "Klientendetails"
+        },
+        "wellbeing": {
+          "overallFeeling": "Allgemeines Gefühl",
+          "energy": "Energie",
+          "mentalWellbeing": "Mentale Gesundheit",
+          "sleep": "Schlaf"
+        },
+        "sections": {
+          "concerns": "Was sie beschäftigt:",
+          "secondaryConcerns": "Zusätzliche Anliegen:",
+          "mainGoal": "Hauptziel:",
+          "chronicCondition": "Chronische Erkrankung:",
+          "preferences": "Präferenzen:",
+          "concern": "Anliegen:",
+          "goal": "Ziel:"
+        },
+        "preferences": {
+          "years": "Jahre",
+          "communication": {
+            "frequent": "Häufig",
+            "moderate": "Moderat",
+            "label": "Kommunikation",
+            "minimal": "Minimal"
+          },
+          "goalLabel": "Ziel:"
+        },
+        "relinquishAccess": {
+          "title": "Zugriff auf Gesundheitsdaten aufgeben?",
+          "description": "Sie sind dabei, Ihren Zugriff auf die Gesundheitsdaten von <strong>{{email}}</strong> zu beenden.",
+          "consequences": "Diese Aktion:",
+          "bullet1": "Beendet sofort Ihren Zugriff auf deren Gesundheitsinformationen",
+          "bullet2": "Der Benutzer wird über die Beendigung des Zugriffs informiert",
+          "bullet3": "Sie müssen eine neue Zustimmung anfordern, wenn Sie den Zugriff wiederherstellen möchten"
+        }
+      }
+    },
+    "invitations": {
+      "title": "Meine Einladungen",
+      "subtitle": "Verwalten Sie Einladungen für neue Mitglieder",
+      "info": "Erstellen Sie Einladungen für neue Mitglieder. Jedes eingeladene Mitglied wird automatisch Ihnen als Mentor zugewiesen.",
+      "createDesc": "Erstellen Sie eine Einladung für ein neues Mitglied",
+      "empty": "Sie haben noch keine Einladungen",
+      "emptyDesc": "Erstellen Sie Ihre erste Einladung und beginnen Sie, neue Mitglieder einzuladen",
+      "total": "Gesamtanzahl der Einladungen",
+      "active": "Aktiv",
+      "used": "Verwendet",
+      "prefillTitle": "Profil vorausgefüllt (optional)",
+      "internalNotes": "Interne Notizen",
+      "notesPlaceholder": "Notizen über den Kontakt...",
+      "notesHint": "Nur Sie können diese Notizen sehen",
+      "hasPrefill": "Profil vorausgefüllt"
+    }
+  },
+  "partnerUsers": {
+    "title": "Meine Mitglieder",
+    "subtitle": "Gesundheitsdaten für Ihre zugewiesenen Mitglieder anzeigen und verwalten",
+    "backToDashboard": "Zurück zum Dashboard",
+    "privacyNotice": {
+      "title": "Userenprivatsphäre geschützt",
+      "description": "Sie können nur detaillierte Gesundheitsdaten für Mitglieder einsehen, die Ihnen ausdrücklich Zugriff gewährt haben. Alle anderen Userendaten werden nur als anonymisierte aggregierte Statistiken angezeigt."
+    },
+    "searchPlaceholder": "Suche nach Name, E-Mail, Schwerpunkt...",
+    "filterByStudy": "Nach Cluster filtern",
+    "filterByStatus": "Nach Status filtern",
+    "allStudies": "Alle Cluster",
+    "allStatuses": "Alle Status",
+    "stats": {
+      "total": "Gesamtzahl der Mitglieder",
+      "consented": "Mit Zugriff",
+      "anonymous": "Anonym",
+      "active": "Aktiv",
+      "completed": "Abgeschlossen",
+      "filtered": "Anzeigen"
+    },
+    "status": {
+      "enrolled": "Eingeschrieben",
+      "active": "Aktiv",
+      "completed": "Abgeschlossen",
+      "withdrawn": "Zurückgezogen",
+      "screening": "Vorauswahl"
+    },
+    "noUsers": {
+      "title": "Keine Mitglieder zugewiesen",
+      "description": "Sie haben noch keine zugewiesenen Mitglieder. Mitglieder erscheinen hier, wenn sie in Clustern eingeschrieben sind."
+    },
+    "noResults": {
+      "title": "Keine Mitglieder gefunden",
+      "description": "Versuchen Sie, Ihre Such- oder Filterkriterien anzupassen."
+    },
+    "list": {
+      "title": "Mitglieder",
+      "count": "Mitglied(en)"
+    },
+    "unknownUser": "Unbekannter Mitglied",
+    "selectUser": "Wählen Sie einen Mitglieder aus, um dessen Gesundheitsdaten anzuzeigen",
+    "dob": "Geburtsdatum",
+    "diagnosis": "Schwerpunkt",
+    "enrolled": "Eingeschrieben",
+    "tabs": {
+      "consented": "Mitglieder mit Zugriff",
+      "cohort": "Kohortenstatistiken",
+      "longevity": "Zuverlässigkeitswerte",
+      "labs": "Labore",
+      "dosing": "Dosierung",
+      "forms": "Formulare",
+      "consents": "Zustimmungen",
+      "checkIns": "Check-ins"
+    },
+    "noConsentedUsers": {
+      "title": "Kein Datenzugriff gewährt",
+      "description": "Keiner Ihrer zugewiesenen Mitglieder hat Ihnen bisher Zugriff auf seine detaillierten Gesundheitsdaten gewährt. Sie können jedoch anonymisierte Kohortenstatistiken im Tab 'Kohortenstatistiken' einsehen."
+    },
+    "noData": "Keine Gesundheitsdaten verfügbar",
+    "noCheckIns": "Keine Gesundheits-Check-ins aufgezeichnet",
+    "noLabs": "Keine Testergebnisse aufgezeichnet",
+    "noDosing": "Keine Dosierungsprotokolle aufgezeichnet",
+    "noQuestionnaires": "Keine Fragebogenantworten aufgezeichnet",
+    "noConsents": "Keine Zustimmungen aufgezeichnet",
+    "chart": {
+      "title": "Gesundheitstrends (Letzte 30 Tage)"
+    },
+    "labChart": {
+      "title": "Testtrends"
+    },
+    "avgPain": "Durchschnittlicher Schmerz",
+    "avgEnergy": "Durchschnittliche Energie",
+    "avgMood": "Durchschnittliche Stimmung",
+    "avgSleep": "Durchschnittlicher Schlaf",
+    "completed": "Abgeschlossen",
+    "granted": "Gewährt",
+    "denied": "Verweigert",
+    "cohort": {
+      "anonymousNotice": {
+        "title": "Anonymisierte Daten",
+        "description": "Diese Ansicht zeigt aggregierte Statistiken über alle Mitglieder in Ihren Clustern. Die Daten einzelner Mitglieder werden nicht angezeigt. {{count}} von {{total}} Mitgliedern haben keinen detaillierten Zugriff gewährt."
+      },
+      "noStudies": {
+        "title": "Keine Cluster",
+        "description": "Sie sind noch keinen Clustern zugewiesen."
+      },
+      "aggregateStatistics": "Aggregierte Statistiken für diese Cluster-Kohorte",
+      "totalParticipants": "Gesamtteilnehmer",
+      "activeParticipants": "Aktiv",
+      "completedParticipants": "Abgeschlossen",
+      "averageTrackingMetrics": "Durchschnittliche Gesundheitskennzahlen",
+      "pain": "Schmerz",
+      "energy": "Energie",
+      "mood": "Stimmung",
+      "sleepQuality": "Schlafqualität",
+      "sleepHours": "Schlafstunden",
+      "averageLabValues": "Durchschnittliche Testwerte",
+      "activityCounts": "Aktivitätszählungen",
+      "totalLabResults": "Testergebnisse",
+      "totalDosingLogs": "Dosierungsprotokolle",
+      "noData": "Für diesen Cluster sind noch keine Daten verfügbar.",
+      "noTrendData": "Keine Trenddaten verfügbar",
+      "trackingTrends": "Gesundheitstrends (Letzte 12 Wochen)",
+      "labTrends": "Testtrends (Letzte 12 Monate)",
+      "weeklyAverages": "Wöchentliche Durchschnitte über alle Kohorten-Teilnehmer",
+      "monthlyAverages": "Monatliche Durchschnitte über alle Kohorten-Teilnehmer",
+      "totalCheckIns": "Check-ins"
+    },
+    "biomarkers": {
+      "crp": "CRP (mg/L)",
+      "glucose": "Glukose (mg/dL)",
+      "vitaminD": "Vitamin D (ng/ml)"
+    },
+    "labels": {
+      "pain": "Schmerz",
+      "energy": "Energie",
+      "mood": "Stimmung",
+      "sleep": "Schlaf",
+      "crp": "CRP",
+      "glucose": "Glukose",
+      "vitD": "Vitamin D"
+    }
+  },
+  "partnerProfile": {
+    "notFound": "Partner nicht gefunden",
+    "notFoundDescription": "Dieses Partnerprofil konnte nicht gefunden werden oder ist nicht mehr verfügbar.",
+    "reviews": "Bewertungen",
+    "about": "Über",
+    "notesForVisitors": "Hinweise für Besucher",
+    "services": "Dienstleistungen",
+    "availability": "Verfügbarkeit",
+    "availabilityDescription": "Reguläre Arbeitszeiten, in denen Termine gebucht werden können",
+    "noAvailability": "Keine Verfügbarkeit festgelegt",
+    "acceptsOnline": "Akzeptiert Online-Konsultationen",
+    "acceptsInPerson": "Akzeptiert persönliche Besuche",
+    "reviewsTitle": "Bewertungen",
+    "reviewsCount": "{{count}} Bewertungen",
+    "noReviewsYet": "Noch keine Bewertungen",
+    "certification": "Zertifizierung",
+    "testScore": "Testergebnis",
+    "certifiedSince": "Zertifiziert seit",
+    "certifiedProvider": "Zertifizierter Gesundheitsdienstleister",
+    "certifiedPartner": "Zertifizierter Partner",
+    "contact": "Kontakt",
+    "visitWebsite": "Website besuchen",
+    "bookAppointment": "Termin buchen",
+    "languages": "Kommunikationssprachen"
+  },
+  "partnerProfileEdit": {
+    "title": "Öffentliches Profil bearbeiten",
+    "subtitle": "Passen Sie an, wie Ihr Profil für Besucher angezeigt wird",
+    "saveSuccess": "Profil erfolgreich gespeichert",
+    "saveError": "Profil konnte nicht gespeichert werden",
+    "visibility": {
+      "title": "Profil Sichtbarkeit",
+      "description": "Steuern Sie, ob Ihr Profil im Partnerverzeichnis sichtbar ist",
+      "label": "Im Partnerverzeichnis anzeigen",
+      "hint": "Wenn aktiviert, wird Ihr Profil für alle Besucher sichtbar sein"
+    },
+    "basicInfo": {
+      "title": "Grundinformationen",
+      "displayName": "Anzeigename",
+      "businessName": "Name des Unternehmens",
+      "businessNameHint": "Optional - Name Ihrer Organisation oder Praxis",
+      "description": "Über Sie",
+      "descriptionHint": "Beschreiben Sie Ihre Erfahrungen, Spezialisierungen und Ansätze",
+      "notesForVisitors": "Hinweise für Besucher",
+      "notesForVisitorsHint": "Besondere Anweisungen, Parkinformationen oder alles, was Besucher wissen sollten"
+    },
+    "location": {
+      "title": "Standort",
+      "city": "Stadt",
+      "country": "Land",
+      "address": "Vollständige Adresse",
+      "addressHint": "Wird Besuchern für persönliche Termine angezeigt"
+    },
+    "contact": {
+      "title": "Kontaktinformationen",
+      "email": "E-Mail",
+      "phone": "Telefon",
+      "websitePlaceholder": "https://",
+      "website": "Website"
+    },
+    "services": {
+      "title": "Angebotene Dienstleistungen",
+      "description": "Wählen Sie die Dienstleistungen aus, die Sie anbieten"
+    },
+    "appointments": {
+      "title": "Terminarten",
+      "description": "Welche Arten von Terminen akzeptieren Sie?",
+      "online": "Online-Termine",
+      "inPerson": "Persönliche Termine"
+    },
+    "languages": {
+      "title": "Kommunikationssprachen",
+      "description": "Sprachen, in denen Sie mit Kunden kommunizieren",
+      "czech": "Tschechisch",
+      "english": "Englisch",
+      "german": "Deutsch",
+      "russian": "Russisch",
+      "slovak": "Slowakisch",
+      "polish": "Polnisch",
+      "french": "Französisch",
+      "spanish": "Spanisch",
+      "italian": "Italienisch",
+      "chinese": "Chinesisch",
+      "japanese": "Japanisch",
+      "korean": "Koreanisch",
+      "vietnamese": "Vietnamesisch",
+      "other": "Andere",
+      "cs": "Cs",
+      "en": "En",
+      "de": "De",
+      "sk": "Sk",
+      "pl": "Pl",
+      "hu": "Hu",
+      "ru": "Ru",
+      "uk": "Uk",
+      "fr": "P",
+      "es": "Es",
+      "it": "Es",
+      "pt": "Punkt"
+    }
+  },
+  "consultantDashboard": {
+    "title": "Userendashboard",
+    "subtitle": "Gesundheitsdaten für Ihre zugewiesenen Mitglieder anzeigen",
+    "backToPartner": "Zurück zum Partnerdashboard",
+    "stats": {
+      "totalUsers": "Gesamtanzahl der Mitglieder",
+      "activeUsers": "Aktive Mitglieder",
+      "completedUsers": "Abgeschlossen"
+    },
+    "noUsers": {
+      "title": "Keine Mitglieder zugewiesen",
+      "description": "Keine zugewiesenen Mitglieder. Mitglieder erscheinen nach Einschreibung in Cluster."
+    },
+    "userList": {
+      "title": "Mitglieder",
+      "description": "Wählen Sie einen Mitglieder aus, um seine Gesundheitsdaten anzuzeigen"
+    },
+    "unknownUser": "Unbekannter Mitglied",
+    "selectUser": "Wählen Sie einen Mitglieder aus, um seine Gesundheitsdaten anzuzeigen",
+    "dob": "Geburtsdatum",
+    "diagnosis": "Schwerpunkt",
+    "enrolled": "Eingeschrieben",
+    "tabs": {
+      "users": "Mitglieder",
+      "labs": "Labore",
+      "dosing": "Dosierung",
+      "questionnaires": "Formulare",
+      "consents": "Einwilligungen",
+      "checkIns": "Check-ins"
+    },
+    "avgPain": "Durchschnittlicher Schmerz",
+    "avgEnergy": "Durchschnittliche Energie",
+    "avgMood": "Durchschnittliche Stimmung",
+    "avgSleep": "Durchschnittlicher Schlaf",
+    "noCheckIns": "Keine Gesundheits-Check-ins aufgezeichnet",
+    "noLabResults": "Keine Testergebnisse aufgezeichnet",
+    "noDosingLogs": "Keine Dosierungsprotokolle aufgezeichnet",
+    "noQuestionnaires": "Keine Fragebogenantworten",
+    "noConsents": "Keine Einwilligungsaufzeichnungen",
+    "noData": "Keine Gesundheitsdaten verfügbar",
+    "questionnaireCompleted": "Fragebogen abgeschlossen",
+    "granted": "Genehmigt",
+    "denied": "Abgelehnt",
+    "chart": {
+      "title": "Gesundheitstrends (Letzte 30 Tage)",
+      "pain": "Schmerz",
+      "energy": "Energie",
+      "sleep": "Schlaf",
+      "mood": "Stimmung",
+      "noData": "Nicht genügend Daten, um das Diagramm anzuzeigen"
+    },
+    "labChart": {
+      "title": "Leistungstrends (Plattformprotokoll)",
+      "noData": "Keine Testergebnisse anzuzeigen",
+      "inflammation": "Entzündung",
+      "metabolic": "Stoffwechsel",
+      "lipids": "Lipide",
+      "vitamins": "Vitamine",
+      "liver": "Leber",
+      "immune": "Immunsystem",
+      "advanced": "Fortgeschritten",
+      "inflammationTitle": "Entzündungsmarker",
+      "inflammationDesc": "CRP & ESR - Schlüsselindikatoren für Qualitätsprotokoll",
+      "metabolicTitle": "Stoffwechselpanel",
+      "metabolicDesc": "Glukose & HbA1c - Schlüsselindikatoren für Plattformprotokoll",
+      "lipidsTitle": "Lipidprofil",
+      "lipidsDesc": "Cholesterinpanel - Schlüsselindikatoren für Optimierungsprotokoll",
+      "vitaminsTitle": "Vitaminstatus",
+      "vitaminsDesc": "Vitamin D & B12 - Basis-Zuverlässigkeitsmarker",
+      "liverTitle": "Leberfunktion",
+      "liverDesc": "AST & ALT - Systemgesundheitsüberwachung",
+      "immuneTitle": "Immunsystempanel",
+      "immuneDesc": "NK-Zellen & Lymphozyten - Schlüsselindikatoren für Qualitätsprotokoll",
+      "advancedTitle": "Erweiterte Zuverlässigkeitsmarker",
+      "advancedDesc": "NAD/NADH-Verhältnis & Omega-3 - Tiefe Personalisierungsmarker"
+    },
+    "biomarkers": {
+      "crp": "CRP",
+      "glucose": "Glukose",
+      "chol": "Chol",
+      "hdl": "HDL",
+      "ldl": "LDL",
+      "ast": "AST",
+      "vitD": "Vitamin D",
+      "hba1c": "HbA1c"
+    }
+  },
+  "storyloop": {
+    "days": "{{count}} Tage",
+    "days_one": "{{count}} Tag",
+    "unknownUser": "Unbekannter Mitglied",
+    "newStory": {
+      "title": "Neue Story",
+      "description": "Erstellen Sie einen neuen Fall für Ihren Mitglieder",
+      "memberDescription": "Neuen StoryLoop-Fall innerhalb Ihres aktiven Clusters erstellen",
+      "user": "Mitglied",
+      "selectUser": "Mitglied auswählen",
+      "noUsers": "Keine Mitglieder mit Einwilligung",
+      "study": "Cluster",
+      "selectStudy": "Cluster auswählen",
+      "noEligibleStudies": "Keine aktiven oder eingeschriebenen Cluster verfügbar",
+      "storyTitle": "Titel (optional)",
+      "titlePlaceholder": "Z.B. Erstgespräch",
+      "titleHint": "Ein kurzer Titel zur Identifikation dieses Falls",
+      "create": "Story erstellen",
+      "error": "Fehler",
+      "errorDescription": "Story konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
+      "success": "Story erstellt",
+      "successDescription": "Neuer Fall wurde erfolgreich erstellt"
+    },
+    "addEntry": {
+      "title": "Eintrag hinzufügen",
+      "description": "Eintrag zur Zeitleiste eines Mitglieds hinzufügen",
+      "selectMember": "Mitglied auswählen",
+      "selectStory": "Fall auswählen",
+      "noActiveStories": "Keine aktiven Fälle für dieses Mitglied",
+      "selectEntryType": "Eintragstyp",
+      "content": "Notiz (optional)",
+      "contentPlaceholder": "Zusätzliche Notiz...",
+      "submit": "Eintrag hinzufügen",
+      "success": "Eintrag hinzugefügt",
+      "successDescription": "Eintrag wurde zur Zeitleiste hinzugefügt",
+      "error": "Fehler",
+      "errorDescription": "Eintrag konnte nicht hinzugefügt werden. Bitte erneut versuchen.",
+      "entryTypes": {
+        "note": "Notiz",
+        "meeting_request": "Terminanfrage",
+        "questionnaire_request": "Fragebogen",
+        "consent_request": "Einwilligungsanfrage",
+        "lab_order": "Testbestellung",
+        "distribution_adjustment": "Dosisanpassung",
+        "email": "E-Mail"
+      }
+    },
+    "newDiscussion": {
+      "title": "Neue Diskussion",
+      "description": "Neues Diskussionsthema erstellen",
+      "topicTitle": "Thementitel",
+      "topicTitlePlaceholder": "Z.B. Best Practices für Productierungsprotokolle",
+      "summary": "Zusammenfassung (optional)",
+      "summaryPlaceholder": "Kurze Beschreibung des Themas...",
+      "firstPost": "Eröffnungsbeitrag",
+      "firstPostPlaceholder": "Eröffnungsbeitrag verfassen...",
+      "visibility": "Sichtbarkeit",
+      "visibilityPublic": "Öffentlich",
+      "visibilityMembers": "Nur für Mitglieder",
+      "create": "Thema erstellen",
+      "success": "Diskussion erstellt",
+      "successDescription": "Neues Diskussionsthema wurde erstellt",
+      "error": "Fehler",
+      "errorDescription": "Diskussion konnte nicht erstellt werden. Bitte erneut versuchen."
+    },
+    "star": "Stern",
+    "composerPlaceholder": "Schreiben Sie eine Notiz oder Nachricht...",
+    "memberComposerPlaceholder": "Notiz zur Timeline hinzufügen...",
+    "blocks": {
+      "meetingRequestDesc": "Termin mit Mitglied vereinbaren",
+      "questionnaireRequestDesc": "Bitten Sie das Mitglied, einen Fragebogen auszufüllen.",
+      "meetingRequest": "Besprechungsanfrage",
+      "questionnaireRequest": "Fragebogenanforderung",
+      "consentRequest": "Einwilligungsanfrage",
+      "consentRequestDesc": "Mitglied um Zustimmung bitten",
+      "labOrderDesc": "Bewertungstests bestellen",
+      "distributionAdjustment": "Dosierungsanpassung",
+      "distributionAdjustmentDesc": "Plattformdienst-Verteilung ändern",
+      "labOrder": "Testbestellung",
+      "bloodMatrixAnalysis": "Leistungsmatrix-Analyse",
+      "bloodMatrixAnalysisDesc": "3x3-Leistungsmatrix aufzeichnen und Bericht erstellen",
+      "email": "E-Mail senden",
+      "emailDesc": "E-Mail an das Mitglied verfassen und senden",
+      "productLog": "Product protokollieren",
+      "productLogDesc": "Producteinnahme erfassen",
+      "healthLog": "Gesundheitszustand protokollieren",
+      "trackingLogDesc": "Problemschwere aufzeichnen"
+    },
+    "meetingType": {
+      "onboarding": "Onboarding",
+      "consultation": "Beratung",
+      "check_in": "Einchecken",
+      "urgent": "Dringend",
+      "other": "Sonstiges",
+      "initial": "Ursprüngliche",
+      "follow_up": "Weiterverfolgung",
+      "assessment": "Bewertung",
+      "closing": "Schließen"
+    },
+    "meetingStatus": {
+      "pending": "Bestätigung steht noch aus",
+      "accepted": "Bestätigt",
+      "declined": "Abgelehnt",
+      "rescheduled": "Verschoben",
+      "completed": "Abgeschlossen",
+      "scheduled": "Geplant",
+      "cancelled": "Abgesagt",
+      "no_show": "Keine Vorstellung"
+    },
+    "location": {
+      "video": "Videoanruf",
+      "phone": "Telefon",
+      "in_person": "Persönlich",
+      "online": "Online"
+    },
+    "meetingNotesPlaceholder": "Optionale Notizen für das Treffen...",
+    "questionnaireStatus": {
+      "started": "In Bearbeitung",
+      "pending": "Ausstehend",
+      "completed": "Abgeschlossen",
+      "expired": "Abgelaufen",
+      "in_progress": "In Arbeit",
+      "skipped": "Übersprungen"
+    },
+    "questionnaireRequestContent": "Fragebogenanforderung: {{name}}",
+    "consentStatus": {
+      "pending": "Unterschrift steht noch aus",
+      "signed": "Unterzeichnet",
+      "declined": "Abgelehnt",
+      "expired": "Abgelaufen",
+      "granted": "Gewährt",
+      "revoked": "Widerrufen"
+    },
+    "consentRequestContent": "Antrag auf Zustimmung: {{name}}",
+    "labStatus": {
+      "ordered": "Bestellt",
+      "scheduled": "Geplant",
+      "completed": "Abgeschlossen",
+      "results_ready": "Ergebnisse verfügbar",
+      "reviewed": "Überprüft",
+      "pending": "Anhängig",
+      "cancelled": "Abgesagt"
+    },
+    "newDose": "Neu",
+    "user": {
+      "context": "Userenkontakt",
+      "recentCheckIns": "Letzte Check-ins",
+      "sharedDocuments": "Gemeinsam genutzte Dokumente",
+      "timeline": "Zeitachse"
+    },
+    "aisha": {
+      "name": "Aisha",
+      "placeholder": "Geben Sie Ihre Frage ein...",
+      "contextInfo": "Aisha hat Zugriff auf Userenkontext",
+      "startConversation": "Beginnen Sie eine Unterhaltung oder nutzen Sie die Schnellaktionen oben.",
+      "contextDescription": "Aisha hat Zugriff auf den Fallverlauf, Gesundheitschecks und freigegebene Dokumente (sofern die Zustimmung erteilt wurde).",
+      "title": "Beraten Sie sich mit Aisha.",
+      "recommend": "Schritte vorschlagen",
+      "analyze": "Trends analysieren",
+      "excludeHealth": "Gesundheitsdaten ausschließen",
+      "generating": "Antwort wird generiert...",
+      "comingSoon": "KI-Beratung in Kürze verfügbar.",
+      "errorGenerating": "Antwort konnte nicht generiert werden.",
+      "clearHistory": "Verlauf löschen",
+      "consult": "Konsultieren",
+      "recap": "Zusammenfassung",
+      "translate": "Übersetzen",
+      "thinkingChat": "Denke nach…",
+      "thinkingRecap": "Fasse Timeline zusammen…",
+      "thinkingTranslate": "Übersetze…",
+      "thinkingRecommend": "Bereite Empfehlungen vor…",
+      "thinkingAnalyze": "Analysiere Gesundheitsdaten…"
+    },
+    "entry": {
+      "note": "Hinweis",
+      "healthEvent": "Gesundheitsveranstaltung",
+      "health_event": "Gesundheitsveranstaltung",
+      "action": "Aktion",
+      "system": "System",
+      "request": "Anfrage",
+      "message": "Nachricht",
+      "aiRecap": "AI-Zusammenfassung",
+      "ai_recap": "AI-Zusammenfassung",
+      "document": "Dokument",
+      "appointment": "Termin",
+      "translation": "Übersetzung",
+      "meeting_request": "Anfrage für Termin",
+      "questionnaire_request": "Fragebogen-Anfrage",
+      "consent_request": "Einwilligungsanfrage",
+      "lab_order": "Testbestellung",
+      "distribution_adjustment": "Dosisanpassung",
+      "title": "Titel",
+      "content": "Inhalt",
+      "status": "Status",
+      "blood_matrix_analysis": "Leistungsmatrix-Analyse",
+      "email": "E-Mail",
+      "health_snapshot": "Gesundheitsübersicht",
+      "product_info": "Produktinformation"
+    },
+    "reprice": {
+      "title": "Preisanpassung",
+      "awaiting": "Warten auf Bestätigung",
+      "confirmed": "Bestätigt",
+      "rejected": "Abgelehnt",
+      "confirmButton": "Bestätigen",
+      "rejectButton": "Ablehnen",
+      "confirmedToast": "Preisanpassung bestätigt",
+      "rejectedToast": "Preisanpassung abgelehnt"
+    },
+    "blockActions": {
+      "meetingAccepted": "Termin akzeptiert",
+      "meetingDeclined": "Termin abgelehnt",
+      "meetingRescheduled": "Termin zur Verschiebung markiert",
+      "reminderSent": "Erinnerung gesendet",
+      "consentResent": "Einwilligungsanfrage erneut gesendet",
+      "actionFailed": "Aktion fehlgeschlagen. Bitte erneut versuchen.",
+      "viewingResults": "Ergebnisse werden geöffnet…",
+      "viewingConsent": "Einwilligung wird geöffnet…",
+      "viewingLabResults": "Testergebnisse werden geöffnet…"
+    },
+    "sentAt": "Gesendet am",
+    "emailRecipient": "Empfänger",
+    "emailRecipientType": {
+      "user": "Mitglied",
+      "partner": "Partner",
+      "system": "System"
+    },
+    "emailStatus": {
+      "draft": "Entwurf",
+      "sent": "Gesendet",
+      "delivered": "Zugestellt",
+      "failed": "Fehlgeschlagen"
+    },
+    "reminders": {
+      "setReminder": "Erinnerung einstellen",
+      "upcoming": "Erinnerungen",
+      "complete": "Vollständig",
+      "overdue": "Überfällig"
+    },
+    "email": {
+      "to": "An",
+      "toPlaceholder": "empfaenger@beispiel.de",
+      "subject": "Betreff",
+      "subjectPlaceholder": "E-Mail-Betreff...",
+      "body": "Nachricht",
+      "bodyPlaceholder": "Ihre Nachricht verfassen...",
+      "send": "E-Mail senden"
+    },
+    "memberCard": {
+      "sharedWith": "Geteilt mit",
+      "healthData": "Gesundheitsdaten",
+      "labResults": "Testergebnisse",
+      "studyRegistration": "Cluster-Registrierung",
+      "fullAccessDesc": "Sie haben Zugriff auf alle freigegebenen Daten.",
+      "limitedAccessDesc": "Sie haben Zugriff auf einige Datenkategorien.",
+      "anonymizedDesc": "Sie sehen nur anonymisierte aggregierte Daten.",
+      "noAccessDesc": "Sie haben keinen Zugriff auf Daten.",
+      "anonymizedOnly": "Anonymisiertes Mitglied",
+      "fullAccess": "Voller Zugriff",
+      "limitedAccess": "Eingeschränkter Zugang",
+      "anonymizedAccess": "Anonymisierte Daten",
+      "accessLevel": "Zugriffsebene",
+      "consentGranted": "Zustimmung erteilt",
+      "consentPending": "Zustimmung steht noch aus",
+      "consentRevoked": "Einwilligung widerrufen",
+      "consentExpired": "Einwilligung abgelaufen",
+      "consentNeverAsked": "Zustimmung nicht erforderlich",
+      "memberSince": "Mitglied seit",
+      "lastActivity": "Letzte Aktivität",
+      "requestAccess": "Zugang beantragen",
+      "labresults": "Testergebnisse",
+      "dosinglogs": "Dosierungsprotokolle",
+      "studydata": "Cluster-Daten",
+      "noAccess": "Kein Zugang",
+      "healthcheckins": "Check-ins",
+      "checkIns": "Check-ins",
+      "documents": "Dokumente",
+      "assessments": "Beurteilungen",
+      "status": "Status",
+      "consent": {
+        "pending": "Anhängig",
+        "granted": "Gewährt",
+        "revoked": "Widerrufen"
+      },
+      "access": "Zugang"
+    },
+    "trackingPanel": {
+      "title": "Gesundheitsdaten",
+      "last7Days": "Letzte 7 Tage",
+      "pain": "Schmerz",
+      "energy": "Energie",
+      "mood": "Stimmung",
+      "sleep": "Schlaf",
+      "avgPain": "Durchschn. Schmerz",
+      "avgEnergy": "Durchschn. Energie",
+      "avgMood": "Durchschn. Stimmung",
+      "avgSleep": "Durchschn. Schlaf",
+      "dayStreak": "Serie: {{count}} Tage",
+      "dayStreak_one": "Serie: {{count}} Tag",
+      "lastCheckIn": "Letzter Check-in",
+      "tookMeds": "Medikamente genommen",
+      "wearablesData": "Wearables",
+      "steps": "Schritte",
+      "bpm": "BPM",
+      "activeMin": "Aktive Min",
+      "noData": "Noch keine Gesundheitsdaten verfügbar",
+      "noCheckIns": "Keine Check-ins aufgezeichnet",
+      "noMeds": "Keine Serviceprotokolle",
+      "noSymptoms": "Keine Problemprotokolle aufgezeichnet",
+      "unknownSymptom": "Unbekanntes Problem",
+      "symptomSeverity": "Schweregrad",
+      "symptomOngoing": "Andauernd",
+      "symptomDurationHours": "{{count}} Std.",
+      "symptomDurationHours_one": "{{count}} Std.",
+      "symptomDurationDays": "{{count}} T.",
+      "symptomDurationDays_one": "{{count}} T.",
+      "doseCount": "{{count}}× Dosen",
+      "doseCount_one": "{{count}}× Dosis",
+      "unknownProduct": "Unbekannter Plattformdienst",
+      "noWearables": "Keine Wearables-Daten",
+      "noConsent": "Kein Datenzugriff",
+      "noConsentDesc": "Dieser Mitglied hat Ihnen keinen Zugriff auf seine Gesundheitsdaten gewährt.",
+      "relative": {
+        "today": "Heute",
+        "yesterday": "Gestern"
+      },
+      "tabs": {
+        "overview": "Übersicht",
+        "checkIns": "Check-ins",
+        "symptoms": "Probleme",
+        "meds": "Dienstleistungen",
+        "wearables": "Wearables"
+      }
+    },
+    "trackingSummary": {
+      "label": "Status",
+      "improving": "Verbesserung",
+      "stable": "Stabil",
+      "declining": "Verschlechterung"
+    },
+    "description": "Partner-Arbeitsbereich für das Userenfallmanagement",
+    "tokenRewardTooltip": "Für den Abschluss dieser Aufgabe erhalten Sie {{amount}} Token.",
+    "dueDateHint": "Optional. Mitglieder erhalten vor dem Fälligkeitsdatum eine Erinnerung.",
+    "requireSignatureHint": "Das Mitglied muss die Einwilligung digital unterzeichnen.",
+    "inProgress": "In Bearbeitung",
+    "search": "Fälle suchen...",
+    "selectStory": "Wählen Sie einen Fall aus der Liste aus.",
+    "markRead": "Als gelesen markieren",
+    "addAction": "Aktion hinzufügen",
+    "entryAdded": "Eintrag hinzugefügt",
+    "composerHint": "Strg+Eingabetaste zum Senden",
+    "loadPreview": "Vorschau laden",
+    "previewNotAvailable": "Vorschau nicht verfügbar",
+    "imageLoadFailed": "Bild konnte nicht geladen werden",
+    "documentLinkCopied": "Dokumentlink in die Zwischenablage kopiert",
+    "insertBlock": "Block einfügen",
+    "blockAdded": "Block hinzugefügt",
+    "proposedTimes": "Vorgeschlagene Zeiten",
+    "proposedTimesLabel": "Vorgeschlagene Zeiten",
+    "meetingTypeLabel": "Meeting-Typ",
+    "selectLocation": "Standort auswählen",
+    "addProposedTime": "Zeitfenster hinzufügen",
+    "createMeetingRequest": "Anfrage erstellen",
+    "meetingRequestContent": "Besprechungsanfrage",
+    "questionnaireLoadError": "Fehler beim Laden des Fragebogens",
+    "noQuestionnairesAvailable": "Keine Fragebögen verfügbar",
+    "noStudySelected": "Kein Cluster ausgewählt",
+    "viewResults": "Ergebnisse anzeigen",
+    "responseDetail": {
+      "title": "Antwortdetail",
+      "description": "Detaillierte Ansicht der Fragebogenantwort",
+      "score": "Punktzahl",
+      "answers": "Antworten",
+      "noAnswers": "Keine Antworten erfasst",
+      "loadError": "Antwortdetail konnte nicht geladen werden",
+      "questionnaireVersion": "Fragebogen v{{version}}",
+      "responseVersion": "Antwort v{{version}}"
+    },
+    "consentDetail": {
+      "title": "Einwilligungsdetail",
+      "description": "Detaillierte Ansicht des Einwilligungsdatensatzes",
+      "loadError": "Einwilligungsdetail konnte nicht geladen werden",
+      "consentType": "Einwilligungsart",
+      "study": "Cluster",
+      "version": "Version {{version}}",
+      "statusGranted": "Erteilt",
+      "statusRevoked": "Widerrufen",
+      "statusPending": "Ausstehend",
+      "grantedAt": "Erteilt am",
+      "revokedAt": "Widerrufen am",
+      "createdAt": "Erstellt am",
+      "viewDocument": "Dokument anzeigen",
+      "types": {
+        "data_processing": "Datenverarbeitung",
+        "observation": "Beobachtung",
+        "operational_trial": "Klinische Studie",
+        "wearables": "Wearable-Daten",
+        "marketing": "Marketing",
+        "informed_consent": "Einverständniserklärung"
+      }
+    },
+    "labResultDetail": {
+      "title": "Testergebnis-Details",
+      "description": "Detailansicht des Testergebnisses",
+      "loadError": "Fehler beim Laden des Testergebnis-Details",
+      "unknownTestType": "Unbekannter Test",
+      "labName": "Quelle",
+      "testDate": "Testdatum",
+      "resultDate": "Ergebnisdatum",
+      "statusPending": "Ausstehend",
+      "statusCompleted": "Abgeschlossen",
+      "statusReviewed": "Überprüft",
+      "biomarkers": "Biomarker",
+      "biomarkerName": "Name",
+      "biomarkerValue": "Wert",
+      "biomarkerUnit": "Einheit",
+      "notes": "Anmerkungen",
+      "reviewedBy": "Überprüft von {{name}}",
+      "viewDocument": "Dokument anzeigen",
+      "biomarkerLabels": {
+        "alt": "ALT",
+        "ast": "AST",
+        "cd4_count": "CD4-Zellen",
+        "cd8_count": "CD8-Zellen",
+        "cholesterol_total": "Gesamtcholesterin",
+        "creatinine": "Kreatinin",
+        "crp": "CRP",
+        "esr": "BSG",
+        "glucose": "Glukose",
+        "hba1c": "HbA1c",
+        "hdl": "HDL",
+        "hemoglobin": "Hämoglobin",
+        "il_4": "IL-4",
+        "il_6": "IL-6",
+        "insulin": "Insulin",
+        "ldl": "LDL",
+        "nad_nadh_ratio": "NAD/NADH-Verhältnis",
+        "nk_cells": "NK-Zellen",
+        "omega3_index": "Omega-3-Index",
+        "platelets": "Thrombozyten",
+        "rbc": "Erythrozyten",
+        "tnf_alpha": "TNF-alpha",
+        "triglycerides": "Triglyceride",
+        "urea": "Harnstoff",
+        "vitamin_b12": "Vitamin B12",
+        "vitamin_d": "Vitamin D",
+        "wbc": "Leukozyten"
+      }
+    },
+    "sendReminder": "Erinnerung senden",
+    "selectQuestionnaire": "Fragebogen auswählen",
+    "sendQuestionnaire": "Fragebogen senden",
+    "requiresSignature": "Unterschrift erforderlich",
+    "noSignatureRequired": "Keine Unterschrift erforderlich",
+    "consentDeclined": "Die Zustimmung wurde abgelehnt.",
+    "viewConsent": "Einwilligung anzeigen",
+    "consentLabel": "Art der Einwilligung",
+    "selectConsent": "Einwilligungsart auswählen",
+    "requireSignature": "Unterschrift erforderlich",
+    "sendConsentRequest": "Anfrage senden",
+    "labPreset": {
+      "custom": "Benutzerdefinierte Auswahl",
+      "respiratory_baseline": "Qualitätsbasis (CBC, hs-CRP, ESR, Ferritin)",
+      "respiratory_extension": "Qualitätserweiterung (Fibrinogen, SAA)",
+      "respiratory_immunity": "Resilienzkarte (CD3/CD4/CD8, Lymphozytenpanel)",
+      "respiratory_metabolic": "Leistungsreserve (HbA1c, Cystatin C, Homocystein)",
+      "respiratory_endocrine": "Systemcheck (TSH, f-T4)"
+    },
+    "orderedTests": "Bestellte Tests",
+    "selectLabTest": "Test aus dem Katalog auswählen",
+    "addTest": "Test hinzufügen",
+    "selectedTests": "Ausgewählte Tests",
+    "noTestsSelected": "Noch keine Tests ausgewählt",
+    "scheduledFor": "Geplant für",
+    "viewLabResults": "Ergebnisse anzeigen",
+    "distributionAdjustment": "Dosierungsanpassung",
+    "effectiveFrom": "Gültig ab",
+    "title": "StoryLoop",
+    "all": "Alle",
+    "active": "Aktiv",
+    "inbox": "Posteingang",
+    "scheduled": "Geplant",
+    "starred": "Mit Sternchen versehen",
+    "archived": "Archiviert",
+    "trash": "Dick",
+    "labels": "Etiketten",
+    "noStories": "Keine Fälle",
+    "archive": "Archiv",
+    "restore": "Wiederherstellen",
+    "delete": "Löschen",
+    "moveTo": "Umzug nach",
+    "addNote": "Notiz hinzufügen",
+    "internalNote": "Intern",
+    "internal": "Intern",
+    "addBlock": "Block",
+    "acceptMeeting": "Akzeptieren",
+    "declineMeeting": "Rückgang",
+    "rescheduleMeeting": "Neu terminieren",
+    "locationLabel": "Standort",
+    "notesLabel": "Anmerkungen",
+    "dueDate": "Zwei Termine",
+    "dueDateLabel": "Zwei Termine",
+    "overdue": "Überfällig",
+    "completedAt": "Abgeschlossen",
+    "questionnaireLabel": "Fragebogen",
+    "signedAt": "Unterzeichnet",
+    "resendRequest": "Erneut senden",
+    "labOrder": "Testbestellung",
+    "distributionChange": "Änderung",
+    "previousDose": "Zurück",
+    "status": "Status",
+    "bloodMatrix": {
+      "title": "Leistungsmatrix 3x3-Analyse",
+      "content": "Leistungsmatrix-Analyse",
+      "sourceLabel": "Quelle der Analyse",
+      "source": {
+        "manual": "Manuelle Auswertung",
+        "ai_photo": "AI aus Beispielfoto",
+        "hybrid": "Hybrid (AI + manuell)"
+      },
+      "sampleDate": "Datum der Probe",
+      "squares": {
+        "1": {
+          "title": "Rouleaux (Erythrozytenstapel)"
+        },
+        "2": {
+          "title": "Bakterielle Belastung"
+        },
+        "3": {
+          "title": "Pilze / Kristalle"
+        },
+        "4": {
+          "title": "Fibrin / Leberbelastung"
+        },
+        "5": {
+          "title": "Erythrozyten-Abweichungen"
+        },
+        "6": {
+          "title": "Protozoen / atypische Formen"
+        },
+        "7": {
+          "title": "Erythrozyten-Cluster"
+        },
+        "8": {
+          "title": "Reserve / Artefakte"
+        },
+        "9": {
+          "title": "Parasiten/Eier"
+        }
+      },
+      "notePlaceholder": "Beobachtungsnotiz",
+      "noNote": "Keine Notiz",
+      "summaryNote": "Anmerkung des Therapeuten",
+      "summaryPlaceholder": "Gesamtzusammenhang und Empfehlungen...",
+      "nextCheck": "Nächste Prüfung",
+      "aiSummary": "AI-Zusammenfassung",
+      "aiSummaryPlaceholder": "Optionale AI-Dolmetschung für den Abschlussbericht",
+      "weightedScore": "Gewichtete Punktzahl",
+      "severity": {
+        "low": "Geringer Schweregrad: Flüssigkeitszufuhr und Basisversorgung",
+        "moderate": "Mäßiger Schweregrad: Darm und mikrobielles Gleichgewicht hinzufügen",
+        "elevated": "Erhöhter Schweregrad: strukturierte Entgiftung und engmaschige Nachsorge",
+        "high": "Hohe Schwere: vollständiges Phasenprotokoll und Experten-Follow-up"
+      },
+      "recommendedDuration": "Empfohlene Dauer: {{min}}-{{max}} Tage",
+      "parasiteSignal": "Hochgradiges Protozoen-/Parasitensignal erkannt – überwachen Sie die weitere Entwicklung und erwägen Sie eine Differentialdiagnostik.",
+      "protocolTitle": "Empfohlene Protokollschritte",
+      "protocol": {
+        "hydration": "Flüssigkeitszufuhr und Elektrolyte",
+        "gut_support": "Darmbarriere und Unterstützung der Verdauung",
+        "microbial_balance": "Ausgleich von Mikroben und Parasiten",
+        "liver_detox": "Unterstützung und Ausscheidung der Leber",
+        "membrane_rebuild": "Membran- und Mikronährstoffaufbau"
+      },
+      "productsTitle": "Empfohlene generische Produkte",
+      "noProductRecommendation": "Keine Ergänzungsempfehlung für aktuelle Erkenntnisse",
+      "products": {
+        "hydration_electrolytes": "Elektrolyte + Mineralstoffzufuhr",
+        "omega3": "Omega-3 (EPA/DHA)",
+        "phosphatidylcholine": "Phosphatidylcholin / Lecithin",
+        "probiotic": "Probiotikum mit mehreren Stämmen",
+        "digestive_enzymes": "Verdauungsenzyme",
+        "berberine_oregano": "Berberin / Oregano zur Unterstützung der antimikrobiellen Wirkung",
+        "liver_support": "Leberunterstützender Komplex (z. B. Silymarin/Artischocke)",
+        "nac": "N-Acetylcystein (NAC)",
+        "magnesium": "Magnesium (Glycinat/Citrat)",
+        "vitamin_d3_k2": "Vitamin D3 + K2",
+        "zinc_selenium": "Zink + Selen",
+        "fiber_prebiotic": "Ballaststoffe und präbiotische Unterstützung",
+        "antiparasitic_botanicals": "Pflanzliche Antiparasitika-Mischung"
+      },
+      "priority": {
+        "core": "Kern",
+        "support": "Unterstützung",
+        "optional": "Optional"
+      },
+      "reasonFromSquare": "von {{square}}",
+      "presetLoaded": "Probe AI-Matrix geladen",
+      "loadPreset": "Muster AI-Befund laden",
+      "reset": "Matrix zurücksetzen",
+      "report": {
+        "preview": "Vorschau des Berichts",
+        "title": "ANALYSEBERICHT"
+      },
+      "reportCopied": "Bericht in die Zwischenablage kopiert",
+      "copyReport": "Bericht kopieren",
+      "aiPromptTitle": "KI-Aufforderung zur endgültigen Interpretation",
+      "aiPromptCopied": "AI-Eingabeaufforderung kopiert",
+      "copyAiPrompt": "AI-Eingabeaufforderung kopieren",
+      "notes": {
+        "mild_bacterial_load": "leichte bakterielle Belastung",
+        "mycotic_biofilm": "mykotischer Biofilm",
+        "active_fibrin": "aktives Fibrin",
+        "echinocyte_pattern": "echinocyten-Muster",
+        "protozoa_activity": "protozoen-Aktivität",
+        "mild_aggregation": "leichte Aggregation",
+        "helminth_egg_signal": "mögliches Signal für Helmintheneier"
+      }
+    },
+    "discussions": {
+      "title": "Diskussionen",
+      "selectThread": "Select a discussion thread",
+      "topicInfo": "Informationen zum Thema",
+      "posts": "Discussion",
+      "beFirstToPost": "Seien Sie der Erste, der postet...",
+      "postAdded": "Beitrag hinzugefügt",
+      "postError": "Beitrag kann nicht hinzugefügt werden",
+      "composerPlaceholder": "Eine Antwort schreiben...",
+      "postsCount": "{{count}} Beiträge",
+      "postsCount_one": "{{count}} Beitrag"
+    },
+    "threadModes": {
+      "stories": "Mitglieder-Threads",
+      "discussions": "Wissens-Threads"
+    },
+    "bookmarks": {
+      "title": "Lesezeichen",
+      "empty": "Noch keine Lesezeichen",
+      "open": "Gespeicherten Beitrag öffnen",
+      "add": "Lesezeichen hinzufügen",
+      "remove": "Lesezeichen entfernen"
+    },
+    "hideHeader": "Kopfzeile ausblenden",
+    "showHeader": "Kopfzeile anzeigen",
+    "participants": {
+      "title": "Teilnehmer",
+      "addParticipant": "Teilnehmer hinzufügen",
+      "addParticipantDescription": "Laden Sie einen zertifizierten Partner ein, an dieser Geschichte mitzuarbeiten",
+      "removeParticipant": "Teilnehmer entfernen",
+      "removeConfirmTitle": "Teilnehmer entfernen?",
+      "removeConfirmDesc": "Dieser Teilnehmer wird den Zugang zu dieser Geschichte verlieren",
+      "leaveStory": "Geschichte verlassen",
+      "leaveConfirmTitle": "Geschichte verlassen?",
+      "leaveConfirmDesc": "Sie werden den Zugang zu dieser Geschichte verlieren",
+      "searchPartner": "Suche nach zertifizierten Partnern...",
+      "noParticipants": "Keine zusätzlichen Teilnehmer",
+      "owner": "Eigentümer",
+      "shared": "Gemeinsame",
+      "sharedWith": "Geteilt mit {{count}} Teilnehmern",
+      "sharedWith_one": "Geteilt mit {{count}} Teilnehmer",
+      "inviteSent": "Einladung verschickt",
+      "inviteSentDescription": "Der Partner wurde zur Zusammenarbeit eingeladen",
+      "participantRemoved": "Teilnehmer entfernt",
+      "participantRemovedDescription": "Der Teilnehmer wurde aus dieser Geschichte entfernt",
+      "leftStory": "Linke Geschichte",
+      "leftStoryDescription": "Sie haben diese Geschichte verlassen",
+      "error": "Fehler",
+      "addError": "Teilnehmer kann nicht hinzugefügt werden",
+      "removeError": "Teilnehmer konnte nicht entfernt werden",
+      "notCertified": "Nur zertifizierte Partner können eingeladen werden",
+      "alreadyParticipant": "Dieser Benutzer ist bereits ein Teilnehmer",
+      "cannotRemoveLastOwner": "Kann den letzten Besitzer nicht entfernen",
+      "role": {
+        "partner": "Eigentümer",
+        "member": "Mitglied",
+        "guild_expert": "Gildenexperte",
+        "aisha": "AISHA"
+      },
+      "certificationLevel": {
+        "certified_partner": "Zertifizierter Partner",
+        "certified_provider": "Zertifizierter Spezialist"
+      }
+    }
+  },
+  "partnerTemplates": {
+    "description": "Erstellen Sie Vorlagen, um die Kommunikation mit Mitgliedern zu automatisieren.",
+    "deleteConfirmDesc": "Diese Aktion kann nicht rückgängig gemacht werden. Die Vorlage wird dauerhaft gelöscht.",
+    "emptyHint": "Erstellen Sie Ihre erste Vorlage, um die Arbeitsabläufe Ihrer Mitglieder zu optimieren.",
+    "title": "StoryLoop-Vorlagen",
+    "create": "Vorlage erstellen",
+    "edit": "Vorlage bearbeiten",
+    "delete": "Vorlage löschen",
+    "empty": "Noch keine Vorlagen",
+    "saved": "Vorlage gespeichert",
+    "noDescription": "Keine Beschreibung",
+    "deleteConfirmTitle": "Vorlage löschen?",
+    "updated": "Aktualisiert"
+  },
+  "delivery": {
+    "panel": {
+      "title": "Lieferkontext",
+      "noContext": "Kein Lieferkontext fur diese Story verfugbar",
+      "riskProfile": "Risiko",
+      "rulesCount": "{{count}} Regeln angeheftet",
+      "rulesCount_one": "{{count}} Regel angeheftet",
+      "pinnedRules": "Angeheftete Regeln",
+      "participants": "{{count}} Teilnehmende",
+      "participants_one": "{{count}} Teilnehmender",
+      "manageRuleset": "Ruleset verwalten",
+      "preview": {
+        "title": "Projektvorschau",
+        "summary": "Zusammenfassung",
+        "summaryPlaceholder": "Kurze Projektzusammenfassung",
+        "goals": "Ziele",
+        "constraints": "Einschränkungen",
+        "successCriteria": "Erfolgskriterien",
+        "listPlaceholder": "Ein Element pro Zeile",
+        "save": "Entwurf speichern",
+        "publish": "Veröffentlichen",
+        "saveSuccess": "Projektvorschau gespeichert",
+        "publishSuccess": "Projektvorschau veröffentlicht",
+        "saveError": "Projektvorschau konnte nicht gespeichert werden"
+      }
+    },
+    "status": {
+      "analyzing": "Analyse",
+      "matched": "Zugeordnet",
+      "scaffolding": "Gerüstbau",
+      "ready": "Bereit",
+      "in_progress": "In Bearbeitung",
+      "blocked": "Blockiert",
+      "qa": "QS",
+      "delivering": "Auslieferung",
+      "delivered": "Ausgeliefert",
+      "archived": "Archiviert",
+      "maintenance": "Wartung"
+    },
+    "ruleset": {
+      "title": "Story-Ruleset verwalten",
+      "description": "Wahle Expertenregeln aus, die an diese Story angeheftet werden sollen. Aus den ausgewahlten Regeln wird ein deterministischer Fingerabdruck berechnet.",
+      "searchPlaceholder": "Regeln nach Titel, Kategorie oder Tag durchsuchen...",
+      "noRules": "Keine veroffentlichten Regeln verfugbar",
+      "selectedCount": "{{count}} Regeln ausgewahlt",
+      "selectedCount_one": "{{count}} Regel ausgewahlt",
+      "save": "Regeln anheften",
+      "saveSuccess": "Ruleset erfolgreich erstellt",
+      "saveError": "Ruleset konnte nicht erstellt werden"
+    },
+    "earnings": {
+      "title": "Ergebnis",
+      "subtitle": "Verfolgen Sie Ihre Einnahmen und Auszahlungen",
+      "totalEarned": "Insgesamt verdient",
+      "totalPending": "Anhängig",
+      "grossRevenue": "Bruttoeinnahmen",
+      "totalProjects": "Projekte",
+      "period": {
+        "month": "Diesen Monat",
+        "quarter": "Dieses Quartal",
+        "year": "Dieses Jahr",
+        "all": "Alle Zeiten"
+      },
+      "noEarnings": "Noch keine Einnahmen",
+      "noEarningsDescription": "Vollständige Konsultationen, um mit dem Verdienst zu beginnen",
+      "table": {
+        "title": "Ertragsgeschichte",
+        "date": "Datum",
+        "project": "Projekt",
+        "type": "Typ",
+        "gross": "Brutto",
+        "net": "Ihre Aufteilung",
+        "yourSplit": "Ihre Aufteilung",
+        "splitPct": "Anteil %",
+        "status": "Status",
+        "noData": "Keine Einnahmen für diesen Zeitraum",
+        "page": "Seite {{page}}"
+      },
+      "type": {
+        "consultation": "Konsultation",
+        "project": "Projekt",
+        "maintenance": "Wartung"
+      },
+      "status": {
+        "pending": "Anhängig",
+        "completed": "Abgeschlossen",
+        "processing": "Verarbeitung",
+        "settled": "Abgewickelt",
+        "failed": "Gescheitert",
+        "refunded": "Erstattet"
+      }
+    },
+    "pricing": {
+      "title": "Einstellungen zur Preisgestaltung",
+      "description": "Legen Sie Ihren Stundensatz und Ihre Buchungseinstellungen fest",
+      "subtitle": "Legen Sie Ihren Stundensatz und Ihre Buchungseinstellungen fest",
+      "hourlyRate": "Stundensatz (CZK)",
+      "minBlock": "Mindestblock (Stunden)",
+      "maxConcurrent": "Maximal gleichzeitige Projekte",
+      "instantBooking": "Sofortige Buchung aktivieren",
+      "instantBookingDescription": "Kunden können ohne Ihre manuelle Bestätigung buchen",
+      "instantBookingHelp": "Kunden können ohne Ihre manuelle Bestätigung buchen",
+      "active": "Annahme von Buchungen",
+      "save": "Preise speichern",
+      "saved": "Preisgestaltung aktualisiert",
+      "saveSuccess": "Preisgestaltung aktualisiert",
+      "saveError": "Preisaktualisierung fehlgeschlagen"
+    }
+  },
+  "design": {
+    "interview": {
+      "trigger": "Design-DNA",
+      "title": "Design-DNA-Interview",
+      "description": "Lassen Sie Occipitum Ihre visuelle Identität in einem kurzen Gespräch verstehen.",
+      "welcomeQuestion": "Lassen Sie uns beginnen. Schließen Sie für einen Moment die Augen - wenn Ihre Marke ein Ort wäre, wie würde es sich anfühlen, durch ihn zu gehen?",
+      "q2": "Wenn jemand Ihre Website zum ersten Mal besucht, welche Emotionen sollten bleiben, nachdem er sie verlassen hat?",
+      "q3": "Stellen Sie sich den Schreibtisch Ihres idealen Kunden vor. Welche Gegenstände befinden sich darauf? Welche Farben umgeben sie?",
+      "q4": "Wenn Ihre Dienstleistungen ein Musikstück wären, welches Genre und welches Tempo würden sie haben?",
+      "q5": "Denken Sie an eine Website, die Sie insgeheim bewundern - keinen Konkurrenten, sondern etwas Unerwartetes. Was zieht Sie an?",
+      "q6": "Welches visuelle Klischee in Ihrer Branche lässt Sie am meisten erschaudern?",
+      "q7": "Ihre Marke hat einen Rhythmus - ist es das scharfe Stakkato einer Schreibmaschine oder die fließenden Kurven einer handgeschriebenen Schrift?",
+      "q8": "Nennen Sie drei Wörter, die niemals auf Ihrer Website erscheinen sollten. Warum?",
+      "analyzing": "Ich danke Ihnen. Ich bin gerade dabei, Ihre Antworten in ein Design-DNA-Profil zu verweben...",
+      "complete": "Ihre Design-DNA ist erfasst worden. Occipitum kann nun Vorschläge für Leinwände erstellen, die Ihre Identität widerspiegeln.",
+      "error": "Bei der Analyse ist ein Fehler aufgetreten. Bitte versuchen Sie es erneut.",
+      "placeholder": "Geben Sie Ihre Antwort ein...",
+      "processing": "Bearbeitung Ihrer Antwort...",
+      "progress": "{{current}} von {{total}} Fragen"
+    },
+    "occipitum": {
+      "trigger": "Occipitum",
+      "description": "Generieren Sie einen innovativen Entwurf auf der Grundlage Ihrer Design-DNA. Jede Generation verwendet einen einzigartigen Kreativitätskern für frische, nicht stereotype Ergebnisse.",
+      "generate": "Entwurf generieren",
+      "generating": "Occipitum stellt sich Ihre Leinwand vor...",
+      "proposal": "Neu",
+      "proposalReady": "Canvas-Vorschlag fertig",
+      "proposalApplied": "Angewandter Designvorschlag",
+      "proposalAppliedDescription": "Ein neuer Occipitum-Designvorschlag wurde in Ihre Leinwand geladen.",
+      "accept": "Bewerbung",
+      "reject": "Ablegen",
+      "variant": "Variante ausprobieren"
+    }
+  }
+}

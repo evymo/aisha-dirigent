@@ -1,0 +1,19 @@
+appId: ${APP_ID}
+---
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: tab-home
+    timeout: 30000
+- tapOn:
+    id: header-settings-btn
+- extendedWaitUntil:
+    visible:
+      id: settings-screen
+    timeout: 15000
+- tapOn:
+    id: settings-logout-btn
+- extendedWaitUntil:
+    visible:
+      id: auth-login-screen
+    timeout: 30000

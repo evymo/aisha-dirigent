@@ -1,0 +1,18 @@
+{
+  "downtime.description": "Pannes imprevues et indisponibilite des services",
+  "downtime.name": "Temps d'arret",
+  "integration-errors.description": "Erreurs, echecs ou timeouts dans les integrations",
+  "integration-errors.name": "Erreurs d'integration",
+  "latency.description": "Temps de reponse eleves et performances systeme degradees",
+  "latency.name": "Latence",
+  "memory-leak.description": "Croissance progressive de la memoire et problemes de synchronisation",
+  "memory-leak.name": "Fuite memoire",
+  "mood-changes.description": "Tempetes d'alertes, faux positifs ou bruit de monitoring",
+  "mood-changes.name": "Alertes instables",
+  "sleep-issues.description": "Erreurs de timeout et deconnexions inactives",
+  "sleep-issues.name": "Problèmes de timeout",
+  "slow-queries.description": "Goulots d'etranglement de base de donnees et problemes d'optimisation",
+  "slow-queries.name": "Requetes lentes",
+  "ui-glitches.description": "Bugs visuels, problemes de rendu et de mise en page",
+  "ui-glitches.name": "Bugs d'interface"
+}

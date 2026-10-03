@@ -1,0 +1,23 @@
+# Ignore build outputs
+vscodium/
+vscode/
+artifacts/
+*.tar.gz
+*.deb
+*.rpm
+*.AppImage
+*.dmg
+*.zip
+*.exe
+*.msi
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node
+node_modules/
+
+# Temp
+*.bak
+*.tmp

@@ -1,0 +1,32 @@
+{
+  "kanban": {
+    "pageTitle": "Příběhy kanban",
+    "pageSubtitle": "Přetažením příběhu přes sloupce změníte jeho stav kanbanu. Pravidla přechodu + administrátorské brány jsou vynucovány na straně serveru.",
+    "moving": "Dojemný příběh..",
+    "lane": {
+      "stack": "Stack",
+      "userStories": "Uživatelské příběhy"
+    },
+    "column": {
+      "empty": "Žádné příběhy"
+    },
+    "card": {
+      "priorityTooltip": "Priorita",
+      "agentTooltip": "Aktuální / nejnovější agent",
+      "branchTooltip": "Výchozí větev",
+      "runningLive": "Nyní běží",
+      "costTooltip": "Náklady na AI dosud",
+      "liveSessionTooltip": "Živá {{source}} session — {{phase}}"
+    },
+    "budget": {
+      "setTooltip": "Nastavit rozpočet AI",
+      "setShort": "Rozpočet",
+      "dialogTitle": "Nastavit rozpočet AI",
+      "dialogDescription": "Celkový strop útrat za AI pro „{{title}}“. Ponechte prázdné pro zrušení limitu.",
+      "costLimitLabel": "Limit nákladů (USD)",
+      "costLimitPlaceholder": "např. 5.00",
+      "invalid": "Zadejte nezápornou částku.",
+      "saved": "Rozpočet aktualizován."
+    }
+  }
+}

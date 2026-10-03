@@ -1,0 +1,91 @@
+{
+  "name": "WF_DIRIGENT_AGENT_WATCHDOG",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "watchdog-schedule",
+      "name": "Every 5 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "fn_detect_agent_runaway",
+        "rpcParams": "={{ JSON.stringify({ p_max_runtime_minutes: parseInt($env.AGENT_WATCHDOG_MAX_RUNTIME_MIN || '15', 10), p_max_tokens: $env.AGENT_WATCHDOG_MAX_TOKENS ? parseInt($env.AGENT_WATCHDOG_MAX_TOKENS, 10) : null, p_max_cost_usd: $env.AGENT_WATCHDOG_MAX_COST_USD ? parseFloat($env.AGENT_WATCHDOG_MAX_COST_USD) : null }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 8000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "detect-runaway",
+      "name": "Detect Runaway Agents",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// fn_detect_agent_runaway returns the number of nudges queued. Surface it so\n// runs are observable; the nudges themselves drain to agents on their next hook.\nconst created = Number($json?.[0] ?? $json ?? 0) || 0;\nreturn [{ json: { nudges_created: created, checked_at: new Date().toISOString() } }];"
+      },
+      "id": "summarize",
+      "name": "Summarize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Every 5 min": {
+      "main": [
+        [
+          {
+            "node": "Detect Runaway Agents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detect Runaway Agents": {
+      "main": [
+        [
+          {
+            "node": "Summarize",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

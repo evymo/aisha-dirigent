@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "acs.event.db_change@1.0",
+  "title": "Database change event",
+  "description": "Row-change notification. Carries ONLY references — the row itself is read from the store (pass-by-reference on the transport layer; also respects the 8 kB pg_notify limit).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["op", "row_ref", "occurred_at"],
+  "properties": {
+    "op": { "enum": ["INSERT", "UPDATE", "DELETE"] },
+    "row_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "table", "pk"],
+      "properties": {
+        "schema": { "type": "string", "pattern": "^[a-z0-9_]+$", "maxLength": 64 },
+        "table": { "type": "string", "pattern": "^[a-z0-9_]+$", "maxLength": 64 },
+        "pk": { "type": "string", "maxLength": 256 }
+      }
+    },
+    "occurred_at": { "type": "string", "format": "date-time" }
+  }
+}

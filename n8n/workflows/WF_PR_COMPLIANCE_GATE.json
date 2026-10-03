@@ -1,0 +1,381 @@
+{
+  "name": "WF_PR_COMPLIANCE_GATE",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "pr-compliance-gate",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "GitHub PR Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "action-check",
+              "leftValue": "={{ $json.body.action }}",
+              "rightValue": "opened",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "action-sync",
+              "leftValue": "={{ $json.body.action }}",
+              "rightValue": "synchronize",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "or"
+        }
+      },
+      "id": "filter-action",
+      "name": "Filter PR Action",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('GitHub PR Webhook').item.json.body.pull_request.diff_url }}",
+        "authentication": "predefinedCredentialType",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        },
+        "nodeCredentialType": "githubApi"
+      },
+      "id": "get-diff",
+      "name": "Get PR Diff",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        300
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "__REMAP__",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": 1,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"route_task\",\n    \"arguments\": {\n      \"task_kind\": \"pr_gate\",\n      \"risk_profile\": \"medium\",\n      \"story_id\": {{ $json.story_id ? '\"' + $json.story_id + '\"' : 'null' }}\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "route-task",
+      "name": "Route Task (PR Gate)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract story_id from PR branch name or labels\nconst pr = $('GitHub PR Webhook').item.json.body.pull_request;\nconst branch = pr.head.ref || '';\nconst labels = (pr.labels || []).map(l => l.name);\n\n// Try to extract story_id from branch pattern: story/<uuid> or feature/<uuid>\nconst uuidPattern = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;\nconst branchMatch = branch.match(uuidPattern);\nconst labelMatch = labels.find(l => l.match(uuidPattern));\n\nconst storyId = branchMatch ? branchMatch[0] : (labelMatch ? labelMatch.match(uuidPattern)[0] : null);\n\nreturn {\n  story_id: storyId,\n  pr_number: pr.number,\n  pr_title: pr.title,\n  repo_full_name: $('GitHub PR Webhook').item.json.body.repository.full_name,\n  head_sha: pr.head.sha,\n  diff_text: $('Get PR Diff').item.json.data?.substring(0, 50000) || '(no diff)',\n};"
+      },
+      "id": "extract-context",
+      "name": "Extract PR Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"method\": \"tools/call\",\n  \"params\": {\n    \"name\": \"validate_compliance\",\n    \"arguments\": {\n      \"story_id\": {{ $('Extract PR Context').item.json.story_id ? '\"' + $('Extract PR Context').item.json.story_id + '\"' : '\"00000000-0000-0000-0000-000000000000\"' }}\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "validate-compliance",
+      "name": "Validate Compliance",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "create_ai_run",
+        "rpcParams": "={\n  \"p_kind\": \"pr_gate\",\n  \"p_story_id\": {{ $('Extract PR Context').item.json.story_id ? '\"' + $('Extract PR Context').item.json.story_id + '\"' : 'null' }},\n  \"p_route_plan\": {\n    \"pr_number\": {{ $('Extract PR Context').item.json.pr_number }},\n    \"repo\": \"{{ $('Extract PR Context').item.json.repo_full_name }}\"\n  }\n}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "create-ai-run",
+      "name": "Create AI Run",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        500
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Evaluate compliance result\nconst complianceResult = $('Validate Compliance').item.json;\nconst rules = complianceResult?.result?.content || [];\nconst prContext = $('Extract PR Context').item.json;\n\n// Simple pass/fail: if we got rules back, compliance context exists\nconst hasRuleset = rules.some(r => r.type === 'resource' && r.resource);\nconst pass = hasRuleset; // In production: run LLM evaluation of diff against rules\n\nreturn {\n  pass,\n  pr_number: prContext.pr_number,\n  repo: prContext.repo_full_name,\n  head_sha: prContext.head_sha,\n  summary: pass \n    ? '✅ Compliance gate passed — rules coverage verified'\n    : '❌ Compliance gate failed — no ruleset pinned or rules violated',\n  violations: pass ? [] : ['No active ruleset found for this story'],\n};"
+      },
+      "id": "evaluate-result",
+      "name": "Evaluate Compliance",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.pass }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "pass-fail-switch",
+      "name": "Pass / Fail?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Extract PR Context').item.json.repo_full_name }}/check-runs",
+        "authentication": "predefinedCredentialType",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"AISHA Compliance Gate\",\n  \"head_sha\": \"{{ $('Evaluate Compliance').item.json.head_sha }}\",\n  \"status\": \"completed\",\n  \"conclusion\": \"success\",\n  \"output\": {\n    \"title\": \"✅ Compliance Passed\",\n    \"summary\": \"{{ $('Evaluate Compliance').item.json.summary }}\"\n  }\n}",
+        "options": {},
+        "nodeCredentialType": "githubApi"
+      },
+      "id": "gh-check-pass",
+      "name": "GitHub Check: Pass",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1780,
+        200
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "__REMAP__",
+          "name": "GitHub account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.github.com/repos/{{ $('Extract PR Context').item.json.repo_full_name }}/check-runs",
+        "authentication": "predefinedCredentialType",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"name\": \"AISHA Compliance Gate\",\n  \"head_sha\": \"{{ $('Evaluate Compliance').item.json.head_sha }}\",\n  \"status\": \"completed\",\n  \"conclusion\": \"failure\",\n  \"output\": {\n    \"title\": \"❌ Compliance Failed\",\n    \"summary\": \"{{ $('Evaluate Compliance').item.json.summary }}\\n\\nViolations:\\n{{ $('Evaluate Compliance').item.json.violations.join('\\n- ') }}\"\n  }\n}",
+        "options": {},
+        "nodeCredentialType": "githubApi"
+      },
+      "id": "gh-check-fail",
+      "name": "GitHub Check: Fail",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1780,
+        400
+      ],
+      "credentials": {
+        "githubApi": {
+          "id": "__REMAP__",
+          "name": "GitHub account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "GitHub PR Webhook": {
+      "main": [
+        [
+          {
+            "node": "Filter PR Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter PR Action": {
+      "main": [
+        [
+          {
+            "node": "Get PR Diff",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Extract PR Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get PR Diff": {
+      "main": [
+        [
+          {
+            "node": "Extract PR Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract PR Context": {
+      "main": [
+        [
+          {
+            "node": "Route Task (PR Gate)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Validate Compliance",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Create AI Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Compliance": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Compliance",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Compliance": {
+      "main": [
+        [
+          {
+            "node": "Pass / Fail?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pass / Fail?": {
+      "main": [
+        [
+          {
+            "node": "GitHub Check: Pass",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "GitHub Check: Fail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "_comment": "E2E test workspace settings — keep VS Code deterministic. Disables welcome page (steals focus), workspace trust prompt (blocks keystrokes), and update checks.",
+  "workbench.startupEditor": "none",
+  "security.workspace.trust.enabled": false,
+  "security.workspace.trust.startupPrompt": "never",
+  "security.workspace.trust.banner": "never",
+  "update.mode": "none",
+  "telemetry.telemetryLevel": "off",
+  "extensions.autoCheckUpdates": false,
+  "extensions.autoUpdate": false,
+  "files.exclude": {
+    "**/.vscode": false
+  }
+}

@@ -1,0 +1,215 @@
+ARG REGISTRY_PROXY=
+# ⛔ 26.0.8, NE 26.0.7. Naměřeno 2026-09-06 na produkci <fork>: 26.0.7 padá při
+# importu realmu, který obsahuje klienta se `serviceAccountsEnabled: true` —
+# a takoví jsou tři (netbird-backend, aisha-pki-issuer, aisha-user-admin).
+#
+#   java.lang.IllegalArgumentException: Session not bound to a realm
+#     at InfinispanOrganizationProvider.getRealm
+#     at Organizations.isReadOnlyOrganizationMember
+#     at UserCacheSession.findServiceAccount
+#     at RealmManager.setupClientServiceAccountsAndAuthorizationOnImport
+#
+# Padá v provideru Organizations, přestože ta funkce ani není zapnutá
+# (KC_FEATURES=token-exchange,admin-fine-grained-authz). Není to vada našeho
+# realmu: servisní účty jsou běžná funkce a bez nich se netbird nepřihlásí.
+#
+# Doloženo bisekcí na živém stroji (stejné env, stejný vyrenderovaný realm):
+#   bez importu                       → 26.0.7 nastartuje
+#   náš realm                         → 26.0.7 padá
+#   bez deklarovaných service-account-* uživatelů → 26.0.7 PADÁ DÁL
+#   bez serviceAccountsEnabled        → 26.0.7 nastartuje (18.6 s)
+#   TÝŽ realm, 26.0.8                 → NASTARTUJE (12.2 s)
+#
+# Cena té vady: 3409 restartů v smyčce od 2026-09-05, tedy auth NIKDY neběžel.
+# Nic na portu 80 → Traefik „no available server" → 503 na auth.<tld> →
+# discovery nemá kam → CORE_MESH_IP prázdné → edge stojí. Celý řetěz, který
+# vypadal jako pět různých vad, měl na konci tuhle jednu.
+FROM quay.io/keycloak/keycloak:26.0.8 AS builder
+
+ENV KC_DB=postgres
+ENV KC_HEALTH_ENABLED=true
+ENV KC_METRICS_ENABLED=true
+ENV KC_FEATURES=token-exchange,admin-fine-grained-authz
+ENV KC_LEGACY_OBSERVABILITY_INTERFACE=true
+
+# Apple Sign In identity provider (not shipped with core Keycloak).
+# Without this SPI the realm import fails with:
+#   "Invalid identity provider id [apple]"
+# Version 1.14.0 is the last release built against Keycloak 26.0.x.
+# See /memories/repo/keycloak-gotrue-identity-linking.md
+ADD --chown=keycloak:keycloak --chmod=0644 \
+  https://github.com/klausbetz/apple-identity-provider-keycloak/releases/download/1.14.0/apple-identity-provider-1.14.0.jar \
+  /opt/keycloak/providers/apple-identity-provider.jar
+RUN test -s /opt/keycloak/providers/apple-identity-provider.jar
+
+# Pre-build to register providers (faster, deterministic startup).
+RUN /opt/keycloak/bin/kc.sh build
+
+# busybox stage — gives us a single statically-linked binary we can drop
+# into the keycloak runtime to satisfy `wget`-based healthchecks (UBI-9-micro
+# base has neither curl nor wget and no package manager).
+FROM ${REGISTRY_PROXY}library/busybox:1.37.0-musl AS busybox
+
+# ── Instanční overlay tématu ─────────────────────────────────────────────────
+# Jak vypadá přihlašovací stránka a e-maily JEDNÉ instance není vlastnost
+# platformy. Táž dráha jako `SURFACE_OVERLAY_GIT_URL` u povrchu,
+# `BUNDLE_GIT_URL` u ingestu a `instance-data-hook.sh` u SQL: co je instanční,
+# přichází z instančního repa.
+#
+# Klonuje se v ODDĚLENÉM stage schválně — runtime obraz Keycloaku je UBI-9-micro
+# a nemá `git` ani správce balíčků (proto do něj repo vkládá busybox). Do
+# běhového obrazu tak jde jen výsledek, ne nástroje ani `.git`.
+#
+# FORGEJO_TOKEN chodí přes BuildKit secret, NE přes build ARG.
+#
+# Dřív tu stálo, že token je bezpečný, protože se spotřebuje jen v tomhle stage
+# a běhový stage ho nedeklaruje. U běžného `docker build` by to platilo. Pod
+# Coolify NE: `modify_dockerfiles_for_compose()` vkládá `ARG <KEY>` za KAŽDÝ
+# `FROM` — tedy i za ten běhový — čímž deklaraci znovu zavede a hodnota se
+# zapíše do metadat. Naměřeno 2026-08-15 na sesterském svc-web-artifactu:
+# FORGEJO_TOKEN v `docker history` KONEČNÉHO obrazu, přesně tam, kde podle
+# tehdejšího komentáře být nemohl. Obrana postavená na tvaru Dockerfilu neobstojí,
+# když ten tvar někdo za běhu přepisuje.
+#
+# `--mount=type=secret` je nezrušitelný: obsah žije jen po dobu jedné instrukce
+# v tmpfs a do žádné vrstvy ani do historie se nezapisuje. Ověřeno měřením —
+# přes build ARG 2 výskyty hodnoty v metadatech, přes secret 0.
+#
+# Podmínka: proměnná NESMÍ být v Coolify označená jako build-time, jinak ji
+# Coolify pošle jako `--build-arg` navíc a únik se vrátí. Compose ji předává
+# přes `secrets:` (viz docker-compose.coolify-keycloak.yml), což čte `.env`
+# a build-time příznak nepotřebuje.
+FROM ${REGISTRY_PROXY}library/alpine:3.20 AS theme-overlay
+ARG KC_THEME_OVERLAY_GIT_URL=
+ARG KC_THEME_OVERLAY_REF=
+ARG KC_THEME_OVERLAY_PATH=keycloak/themes
+# ⛔ CACHEBUST — bez něj se overlay NASADÍ JEDNOU A UŽ NIKDY.
+# BuildKit kešuje vrstvu podle textu příkazu, a ten se mezi nasazeními nemění:
+# `git clone` se pak vůbec nespustí a v obrazu zůstane obsah instančního repa
+# ze dne prvního buildu. Naměřeno 2026-08-02 při vlastním testu — přepsané téma
+# se do obrazu nedostalo a build hlásil úspěch. Je to táž třída jako
+# „deploy přijat, ale neproveden": zelené, a přesto beze změny.
+# Nasazení sem MUSÍ poslat hodnotu, která se mění (commit SHA instančního repa
+# nebo časové razítko); brána keycloak-theme-overlay hlídá, že se ARG používá.
+ARG KC_THEME_OVERLAY_CACHEBUST=
+# Fail-closed: URL zadaná a klon/podadresář chybí = build PADNE. Tiché sesunutí
+# na platformní vzhled by vyrobilo přihlašovací stránku s cizí značkou, a to se
+# pozná až očima — tedy hůř než spadlý build.
+# Do logu jde md5 otisk obsahu: jediný způsob, jak z hotového buildu poznat, CO
+# se do obrazu opravdu dostalo — zakešovaný běh vypadá jinak stejně jako čerstvý.
+# (Komentáře patří SEM, ne dovnitř `RUN`: `#` uvnitř pokračovacího řádku je
+#  footgun, který spolehlivě splete každý čtecí nástroj i člověka.)
+RUN --mount=type=secret,id=forgejo_token,required=false \
+    mkdir -p /themes && \
+    if [ -z "$KC_THEME_OVERLAY_GIT_URL" ]; then \
+      echo "[theme-overlay] přeskočeno (KC_THEME_OVERLAY_GIT_URL nenastaveno) — platformní téma"; \
+    else \
+      [ -n "$KC_THEME_OVERLAY_CACHEBUST" ] || { \
+        echo "[theme-overlay] CHYBA: KC_THEME_OVERLAY_GIT_URL je zadané, ale KC_THEME_OVERLAY_CACHEBUST prázdné." >&2; \
+        echo "[theme-overlay]        BuildKit by klon zakešoval a nasadil téma z PRVNÍHO buildu — tiše." >&2; \
+        echo "[theme-overlay]        Pošli commit SHA instančního repa nebo časové razítko." >&2; exit 1; }; \
+      apk add --no-cache git >/dev/null || { echo "[theme-overlay] CHYBA: git se nenainstaloval" >&2; exit 1; }; \
+      URL="$KC_THEME_OVERLAY_GIT_URL"; \
+      FORGEJO_TOKEN="$(cat /run/secrets/forgejo_token 2>/dev/null || true)"; \
+      case "$URL" in *@*) : ;; *) [ -n "$FORGEJO_TOKEN" ] && URL="https://${FORGEJO_TOKEN}@${URL#https://}" ;; esac; \
+      git clone --quiet --depth 1 ${KC_THEME_OVERLAY_REF:+--branch "$KC_THEME_OVERLAY_REF"} "$URL" /tmp/overlay \
+        || { echo "[theme-overlay] CHYBA: klon instančního repa selhal" >&2; exit 1; }; \
+      [ -d "/tmp/overlay/${KC_THEME_OVERLAY_PATH}" ] \
+        || { echo "[theme-overlay] CHYBA: ${KC_THEME_OVERLAY_PATH} v instančním repu není" >&2; exit 1; }; \
+      cp -RL "/tmp/overlay/${KC_THEME_OVERLAY_PATH}/." /themes/ \
+        || { echo "[theme-overlay] CHYBA: kopie selhala — visící symlink v tématu?" >&2; exit 1; }; \
+      rm -rf /tmp/overlay; \
+      echo "[theme-overlay] cachebust=${KC_THEME_OVERLAY_CACHEBUST:-<NENASTAVENO — hrozí zastaralý overlay>}"; \
+      echo "[theme-overlay] témata z instance: $(ls /themes | tr '\n' ' ')"; \
+      find /themes -type f | sort | xargs cat 2>/dev/null | md5sum \
+        | sed 's/^/[theme-overlay] otisk obsahu: /'; \
+    fi
+
+# ── CSS extranetového SDK ────────────────────────────────────────────────────
+# `@aisha/extranet-sdk-ui` NENÍ workspace tohohle repa — je to publikovaný balík
+# z registru, závislost `apps/workbench-shell`. Dřív se jeho CSS kopírovalo
+# z `packages/extranet-sdk-ui/`, tedy z adresáře, který v gitu má NULA souborů;
+# na disku vývojáře leží jen jako výsledek `npm install` a `.dockerignore` navíc
+# vyřazuje `node_modules/`. Build proto padal na neexistující cestě.
+#
+# Verzi, adresu i otisk určuje `package-lock.json` — nic se tu nepíše ručně,
+# takže se to nemůže rozejít s tím, co instaluje zbytek repa. Podrobnosti
+# i důvody, proč ne kopie v repu a ne `npm ci`, nese hlavička toho skriptu.
+FROM ${REGISTRY_PROXY}library/node:22-alpine AS esdk-css
+WORKDIR /esdk
+COPY package-lock.json ./
+COPY scripts/build/fetch-locked-package.mjs ./
+RUN node fetch-locked-package.mjs --bez-externich-importu \
+      @aisha/extranet-sdk-ui /esdk/out styles.css adapter.css tokens.css
+
+FROM quay.io/keycloak/keycloak:26.0.8
+
+ENV KC_DB=postgres
+ENV KC_HEALTH_ENABLED=true
+ENV KC_METRICS_ENABLED=true
+ENV KC_FEATURES=token-exchange,admin-fine-grained-authz
+ENV KC_LEGACY_OBSERVABILITY_INTERFACE=true
+
+COPY --from=builder /opt/keycloak/ /opt/keycloak/
+
+# Drop in busybox for `wget` (used by the docker healthcheck against
+# /health/ready). Also exposes /bin/sh, sed, cat, etc. — useful for
+# any post-start script that needs more than what UBI-9-micro provides.
+USER root
+COPY --from=busybox /bin/busybox /bin/busybox
+RUN /bin/busybox --install -s /bin && /bin/busybox --install -s /sbin || true
+USER 1000
+
+# Bake the realm import file as a TEMPLATE — it carries __PLATFORM_ADMIN_*__
+# placeholders, so NO personal/account identity lives in git. The render
+# entrypoint (below) substitutes the admin identity from env into
+# /opt/keycloak/data/import/ on boot, then first boot loads it.
+COPY keycloak/aisha-realm.json /opt/keycloak/aisha-realm.template.json
+COPY --chmod=0755 keycloak/render-realm-and-start.sh /opt/keycloak/render-realm-and-start.sh
+# Smír deklarace klientů. `--import-realm` běží jen na prázdný realm, takže
+# každá pozdější změna šablony by se ke KONZUMENTOVI nedostala — soubor by
+# tvrdil jedno a běžící realm držel druhé. Reconciler tu mezeru zavírá zevnitř
+# stacku (kcadm z tohoto image), aniž by kdokoli musel na Keycloak zvenčí.
+COPY --chmod=0755 keycloak/reconcile-realm-clients.sh /opt/keycloak/reconcile-realm-clients.sh
+
+# AISHA branded login theme. chown to the runtime user (1000) — the entrypoint
+# substitutes __SUPPORT_EMAIL__ into the email template at container start, and
+# a root-owned theme dir made that sed fail (crash-looping Keycloak on boot).
+COPY --chown=1000:0 keycloak/themes/aisha /opt/keycloak/themes/aisha
+
+# Designový jazyk do zdrojů tématu — aby přihlašovací stránka mohla mluvit TÝMŽ
+# jazykem jako povrchy, a ne cizím (Z7: 0 ze 116 tokenů na přihlášení).
+# Vezou se HOTOVÉ soubory z balíků, ne kopie: `@aisha/design-language` nese
+# páteř (škála mezer, rádiusů, časů, funkční barvy), `extranet-sdk-ui` k ní
+# adaptér krátkých jmen (--s4 → --space-4) a CSS primitivy (.es-card/.es-inp/
+# .es-btn) pro HOLÉ HTML — přesně to, co umí FreeMarker šablona.
+# ⛔ Soubory SDK jdou do VLASTNÍHO podadresáře `css/esdk/`, ne vedle ostatních.
+# Naměřeno 2026-08-18 skutečným buildem: `styles.css` má `@import "tokens.css"`,
+# tedy relativní odkaz na TŘETÍ soubor. Kdyby ležel v `css/`, srazil by se
+# s `css/tokens.css`, což je jméno REZERVOVANÉ PRO INSTANCI (viz brand.css) —
+# jedna z těch dvou značek by tiše zmizela podle pořadí kopírování. Vlastní
+# adresář dá relativnímu importu vyjít a kolizi vyloučí konstrukcí.
+# Overlay instance pak dodává jen HODNOTY tokenů, žádné vlastní CSS škály.
+COPY --chown=1000:0 packages/design-language/src/styles.css \
+  /opt/keycloak/themes/aisha/login/resources/css/design-language.css
+COPY --from=esdk-css --chown=1000:0 /esdk/out/styles.css /esdk/out/adapter.css /esdk/out/tokens.css \
+  /opt/keycloak/themes/aisha/login/resources/css/esdk/
+
+# Instanční overlay PŘES platformní téma — pořadí je nosné: co instance nedodá,
+# zůstane platformní, takže overlay smí být částečný (jen CSS, jen logo).
+# Obrácené pořadí by overlay tiše zahodilo. Prázdný stage = žádná změna.
+# `--chown` je povinný ze stejného důvodu jako o řádek výš: entrypoint zapisuje
+# __SUPPORT_EMAIL__ DO SOUBORŮ tématu a root-vlastněný adresář KC crash-loopnul.
+COPY --from=theme-overlay --chown=1000:0 /themes/ /opt/keycloak/themes/
+
+# Post-start realm configuration script (branding for master + aisha)
+COPY keycloak/configure-realms.sh /opt/keycloak/configure-realms.sh
+COPY --chmod=0755 keycloak/mint-apple-secret.py /opt/keycloak/mint-apple-secret.py
+COPY --chmod=0755 keycloak/sanitize-keycloak-seed.py /opt/keycloak/sanitize-keycloak-seed.py
+
+# Local-only E2E provisioning script; invoked explicitly by the Playwright wrapper.
+COPY keycloak/provision-e2e.sh /opt/keycloak/provision-e2e.sh
+
+# Render the platform-admin identity from env into the realm import file, then
+# hand off to kc.sh (compose `command` args flow through as "$@").
+ENTRYPOINT ["/opt/keycloak/render-realm-and-start.sh"]

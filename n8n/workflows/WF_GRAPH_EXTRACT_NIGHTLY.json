@@ -1,0 +1,182 @@
+{
+  "name": "WF_GRAPH_EXTRACT_NIGHTLY",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 3,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "graph-extract-cron",
+      "name": "Daily Schedule (03:30 UTC)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const now = new Date();\nconst batchId = (typeof crypto !== 'undefined' && crypto.randomUUID)\n  ? crypto.randomUUID()\n  : `${now.toISOString().replace(/[:.]/g, '-')}-${Math.random().toString(36).slice(2, 10)}`;\nreturn [{\n  json: {\n    batch_id: batchId,\n    started_at: now.toISOString(),\n    batch_size: Number($env.RAG_GRAPH_EXTRACT_BATCH_SIZE) || 20,\n    max_age_hours: Number($env.RAG_GRAPH_EXTRACT_MAX_AGE_HOURS) || 168\n  }\n}];"
+      },
+      "id": "graph-extract-prepare",
+      "name": "Prepare Batch ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SVC_MCP_KNOWLEDGE_URL || 'http://svc-mcp-knowledge:3017' }}/graph/extract/run",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ batch_id: $json.batch_id, batch_size: $json.batch_size, max_age_hours: $json.max_age_hours }) }}",
+        "options": {
+          "timeout": 1800000
+        }
+      },
+      "id": "graph-extract-run",
+      "name": "Run Graph Extract Batch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        690,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const result = $('Run Graph Extract Batch').first()?.json ?? {};\nconst prep = $('Prepare Batch ID').first()?.json ?? {};\nconst now = new Date().toISOString();\n\nconst summary = {\n  timestamp: now,\n  workflow: 'WF_GRAPH_EXTRACT_NIGHTLY',\n  batch_id: result.batch_id || prep.batch_id,\n  judge_model: result.judge_model,\n  candidates: result.candidates ?? 0,\n  processed: result.processed ?? 0,\n  failed: result.failed ?? 0,\n  nodes_added: result.nodes_added ?? 0,\n  edges_added: result.edges_added ?? 0,\n  edges_skipped: result.edges_skipped ?? 0,\n  duration_ms: result.duration_ms ?? 0,\n  failures_sample: (result.failures || []).slice(0, 5)\n};\n\nconst total = summary.processed + summary.failed;\nif (total === 0) {\n  summary.severity = 'info';\n  summary.message = 'Graph extract queue is caught up — no candidates.';\n} else if (summary.failed > 0 && summary.failed >= total * 0.2) {\n  summary.severity = 'warn';\n  summary.message = `Graph extract batch had ${summary.failed}/${total} failures.`;\n} else {\n  summary.severity = 'info';\n  summary.message = `Graph extract batch ok: ${summary.processed}/${summary.candidates} runs, ${summary.nodes_added} nodes + ${summary.edges_added} edges added (${summary.edges_skipped} edges skipped).`;\n}\n\nreturn [{ json: summary }];"
+      },
+      "id": "graph-extract-log",
+      "name": "Log Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        910,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.POSTGREST_URL || 'http://postgrest:3000' }}/rpc/log_integration_action",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "params=single-object"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_action: 'graph.extract_nightly_completed', p_metadata: { batch_id: $json.batch_id, judge_model: $json.judge_model, candidates: $json.candidates, processed: $json.processed, failed: $json.failed, nodes_added: $json.nodes_added, edges_added: $json.edges_added, edges_skipped: $json.edges_skipped, duration_ms: $json.duration_ms, severity: $json.severity, message: $json.message } }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "graph-extract-audit",
+      "name": "Audit Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1130,
+        300
+      ],
+      "continueOnFail": true,
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Daily Schedule (03:30 UTC)": {
+      "main": [
+        [
+          {
+            "node": "Prepare Batch ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Batch ID": {
+      "main": [
+        [
+          {
+            "node": "Run Graph Extract Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Graph Extract Batch": {
+      "main": [
+        [
+          {
+            "node": "Log Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Results": {
+      "main": [
+        [
+          {
+            "node": "Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

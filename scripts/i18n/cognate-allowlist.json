@@ -1,0 +1,153 @@
+{
+  "_note": [
+    "Klíče, u nichž je shoda s angličtinou SPRÁVNÁ odpověď, ne nepřeloženost.",
+    "Čte `scripts/i18n/content-parity-check.mjs`. Každá položka MUSÍ nést `reason`,",
+    "který napsal člověk. Osiřelá položka (už není shodná s en, nebo klíč zmizel)",
+    "bránu ZČERVENÁ — seznam se tím čistí sám a nemůže tiše růst.",
+    "",
+    "⛔ Tohle NENÍ baseline současného stavu. Do seznamu patří jen to, co je",
+    "shodné z VĚCNÉHO důvodu (kognát, kód, vlastní jméno, identifikátor ikony).",
+    "Cokoli, co jen nikdo nepřeložil, se překládá — nezapisuje sem.",
+    "",
+    "`namespace` a `locales` jsou volitelné. Bez `locales` platí položka pro",
+    "všechny jazyky."
+  ],
+  "triagedNamespaces": [
+    "extranet"
+  ],
+  "_triagedNote": [
+    "Namespace uvedený zde má shody s angličtinou PROJITÉ člověkem, takže",
+    "`untranslated-copy` je tam CHYBA (blokuje). Neuvedený namespace shody jen",
+    "HLÁSÍ — heuristika bez revize nesmí blokovat cizí doménu, ale ani mlčet.",
+    "Seznam smí jen růst; ubrat namespace znamená vzdát se už získané jistoty."
+  ],
+  "entries": [
+    {
+      "key": "app.units.usd",
+      "namespace": "extranet",
+      "reason": "Měnový kód podle ISO 4217 — ve všech jazycích 'USD'."
+    },
+    {
+      "key": "app.cols.ok",
+      "namespace": "extranet",
+      "reason": "'OK' je mezinárodní zkratka, používá se ve všech cílových jazycích beze změny."
+    },
+    {
+      "key": "app.cols.p50",
+      "namespace": "extranet",
+      "locales": [
+        "cs",
+        "de",
+        "fr"
+      ],
+      "reason": "Percentil latence — technická jednotka. ru/th si lokalizují 'ms', cs/de/fr ne."
+    },
+    {
+      "key": "app.cols.p95",
+      "namespace": "extranet",
+      "locales": [
+        "cs",
+        "de",
+        "fr"
+      ],
+      "reason": "Percentil latence — technická jednotka. ru/th si lokalizují 'ms', cs/de/fr ne."
+    },
+    {
+      "key": "app.cols.status",
+      "namespace": "extranet",
+      "locales": [
+        "de"
+      ],
+      "reason": "Kognát: německy 'Status'. cs/fr/ru/th mají vlastní slovo."
+    },
+    {
+      "key": "app.wb.col.status",
+      "namespace": "extranet",
+      "locales": [
+        "de"
+      ],
+      "reason": "Kognát: německy 'Status'. cs/fr/ru/th mají vlastní slovo."
+    },
+    {
+      "key": "app.nav.groups.finance",
+      "namespace": "extranet",
+      "locales": [
+        "cs",
+        "fr"
+      ],
+      "reason": "Kognát: 'Finance' je i české i francouzské slovo. de 'Finanzen', ru 'Финансы', th vlastní."
+    },
+    {
+      "key": "app.nav.groups.sprava",
+      "namespace": "extranet",
+      "locales": [
+        "fr"
+      ],
+      "reason": "Kognát: francouzsky 'Administration'. cs 'Správa', de 'Verwaltung'."
+    },
+    {
+      "key": "app.nav.sections",
+      "namespace": "extranet",
+      "locales": [
+        "fr"
+      ],
+      "reason": "Kognát: francouzsky 'Sections'."
+    },
+    {
+      "key": "app.provenance.source",
+      "namespace": "extranet",
+      "locales": [
+        "fr"
+      ],
+      "reason": "Kognát: francouzsky 'Source'."
+    },
+    {
+      "key": "app.twins.field.source",
+      "namespace": "extranet",
+      "locales": [
+        "fr"
+      ],
+      "reason": "Kognát: francouzsky 'Source'."
+    },
+    {
+      "key": "app.wb.field.clause",
+      "namespace": "extranet",
+      "locales": [
+        "fr"
+      ],
+      "reason": "Kognát: francouzsky 'Clause'."
+    },
+    {
+      "key": "app.wb.field.documents",
+      "namespace": "extranet",
+      "locales": [
+        "fr"
+      ],
+      "reason": "Kognát: francouzsky 'Documents'."
+    },
+    {
+      "key": "app.mc.model",
+      "namespace": "extranet",
+      "locales": [
+        "cs"
+      ],
+      "reason": "Kognát: česky 'Model'. de 'Modell', fr 'Modèle', ru 'Модель', th vlastní."
+    },
+    {
+      "key": "app.mc.tokens",
+      "namespace": "extranet",
+      "locales": [
+        "de"
+      ],
+      "reason": "Kognát: německy 'Tokens' (zavedený termín pro jednotky LLM). fr 'Jetons', cs 'Tokeny'."
+    },
+    {
+      "key": "app.mc.src",
+      "namespace": "extranet",
+      "locales": [
+        "fr"
+      ],
+      "reason": "Kognát: francouzsky 'SOURCE'. Verzálky jsou záměr — je to štítek provenience."
+    }
+  ]
+}

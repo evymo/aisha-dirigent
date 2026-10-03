@@ -1,0 +1,6 @@
+{
+  "$comment": "Stacky, které se z repa STAVÍ, ale žádná CI úloha je nenasazuje. Mapa compose→appka se tu ZÁMĚRNĚ NEOPAKUJE: deklaruje ji coolify/manifests/aisha.manifest. Seznam smí jen UBÝVAT. ⭐ SPLACENO 2026-09-16: CI nasazuje řízeně detektorem (scripts/aisha-changed-apps.mjs → deploy_apps) a po vlnách z aisha-redeploy.mjs --print-waves (úlohy deploy-koren a deploy-stacky, scripts/ci/nasad-podle-vln.sh). Rozhodnutí majitele: nic ručně, trezor mimo CI; změnu kontraktu proměnných dorovná cold-start --skip-create.",
+  "mimo_manifest": [],
+  "$comment_mimo_manifest": "Prázdné — dluh SPLACEN 2026-08-10: livekit doplněn do manifestu i do WAVES (vlna 2, self-contained). Seznam smí jen ubývat; brána padne i na stale záznamu.",
+  "bez_deploy_ulohy": []
+}

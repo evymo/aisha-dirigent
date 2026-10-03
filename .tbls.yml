@@ -1,0 +1,81 @@
+# .tbls.yml — AISHA schema documentation config (tbls, https://github.com/k1LoW/tbls)
+#
+# The "DB architect" VISUALIZATION layer. Generated docs live in docs/db/ and are
+# committed, so the ER diagram diffs in PRs (a new/removed relationship shows up as a
+# diff). Companion to the FK-relationship-gap GATE (scripts/db/check-fk-relationship-gaps.mjs):
+#   • the gate ENFORCES — fails cold-start on a NEW unenforced *_id relationship;
+#   • this config VISUALIZES — the ER shows only real (enforced) FKs, so a missing
+#     "vazba" is a visibly absent line.
+#
+# Run:  AISHA_DB_URL=postgres://… npm run db:schema:docs
+#   Point AISHA_DB_URL at a throwaway / cold-start DB that has the full schema applied
+#   (e.g. `AISHA_TYPEGEN_KEEP=1 npm run db:types:refresh:throwaway` leaves one up).
+#   The generator runs tbls via the k1low/tbls Docker image, sourced through your
+#   registry mirror (REGISTRY_PROXY, same as the infra/* Dockerfiles) — never Docker
+#   Hub directly when REGISTRY_PROXY is set; override fully with AISHA_TBLS_IMAGE.
+
+dsn: ${AISHA_DB_URL}
+docPath: docs/db/tbls   # full per-table site (gitignored); committed ER is docs/db/RELATIONSHIPS.md
+
+er:
+  format: mermaid   # text → diffable, GitHub-rendered, no graphviz/dot dependency
+  comment: true
+
+format:
+  adjust: true
+  sortTablesByName: true
+
+# Relationship / doc-hygiene lint. The unenforced-FK class is owned by the GATE
+# (check-fk-relationship-gaps.mjs) with its own allowlist, so we deliberately DON'T
+# double-report it here (unrelatedColumns: off). tbls lint covers the complementary
+# hygiene rules only.
+lint:
+  duplicateRelations:
+    enabled: true
+  unrelatedColumns:
+    enabled: false   # owned by the FK-gap gate
+  requireTableComment:
+    enabled: false   # 338 auto-extracted tables; comments not yet curated
+  requireColumnComment:
+    enabled: false
+  columnCount:
+    enabled: false
+
+# >>> generated viewpoints — produced by `npm run db:schema:docs` (2026-06-02) from the live FK
+# >>> graph; do not hand-edit below this sentinel, re-run the generator instead.
+viewpoints:
+  - name: stories
+    desc: "Story domain — partner_stories, its direct FK children, and every story_*-named table. (32 tables, generated 2026-06-02)"
+    tables:
+      - agent_knowledge_bindings
+      - collaboration_preferences
+      - consultation_bookings
+      - graph_nodes
+      - knowledge_attribution
+      - knowledge_items
+      - maintenance_contracts
+      - partner_stories
+      - playwright_runs
+      - project_revenue
+      - rag_eval_golden
+      - rule_quality_feedback
+      - sla_tracking
+      - specialist_ratings
+      - story_ai_sessions
+      - story_bundles
+      - story_contexts
+      - story_entries
+      - story_environments
+      - story_goal_state
+      - story_instances
+      - story_labels
+      - story_links
+      - story_matrix_rooms
+      - story_participants
+      - story_reminders
+      - story_rulesets
+      - story_sync_operations
+      - story_sync_policies
+      - voice_rooms
+      - web_artifact_jobs
+      - web_pages

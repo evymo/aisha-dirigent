@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "acs.effect.propose@1.0",
+  "title": "Effect proposal (readback, phase 1)",
+  "description": "Before any side-effectful tool executes, the executor states its structured interpretation of what it is about to do (R5/IP-8). The proposal is compared MACHINE-wise against intent constraints; prose plays no role in the decision.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["effect_id", "tool_name", "effect_class", "intent_ref", "proposal"],
+  "properties": {
+    "effect_id": { "type": "string", "pattern": "^eff_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "tool_name": { "type": "string", "maxLength": 128 },
+    "effect_class": { "enum": ["write", "delete", "payment", "deploy", "external_call", "unclassified"], "description": "unclassified is legal to STATE but deny-fast to EXECUTE — new tools must be classified before they may act." },
+    "intent_ref": { "type": "string", "pattern": "^int_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "proposal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["target", "action", "params_sha256"],
+      "properties": {
+        "target": { "type": "string", "maxLength": 512, "description": "Machine identifier of the affected entity (table row, URL host, file path…)." },
+        "action": { "type": "string", "pattern": "^[a-z0-9_]+$", "maxLength": 64 },
+        "params_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$", "description": "Hash of the exact parameters that will execute — confirm binds to THIS hash." },
+        "summary": { "type": "string", "maxLength": 1000, "description": "Human-readable only; never machine-interpreted." }
+      }
+    }
+  }
+}

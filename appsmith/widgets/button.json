@@ -1,0 +1,32 @@
+{
+  "widgetName": "{{widgetId}}",
+  "displayName": "Button",
+  "type": "BUTTON_WIDGET",
+  "version": 1,
+  "rightColumn": "{{rightColumn}}",
+  "topRow": "{{topRow}}",
+  "bottomRow": "{{bottomRow}}",
+  "leftColumn": "{{leftColumn}}",
+  "isVisible": true,
+  "isVisibleDynamic": "{{ appsmith.user.roles?.includes('{{role_required}}') }}",
+  "label": "{{label}}",
+  "props": {
+    "text": "{{label}}",
+    "buttonVariant": "{{variant}}",
+    "buttonColor": "{{button_color}}",
+    "iconName": "{{icon}}",
+    "iconAlign": "left",
+    "isDisabled": false,
+    "shouldFitContent": false,
+    "borderRadius": "8px",
+    "onClick": "{{ confirm('{{confirm_message}}') && {{action_query_name}}.run() }}",
+    "displayName": "Button",
+    "tooltip": "{{tooltip}}"
+  },
+  "isCanvas": false,
+  "tags": ["aisha-ops", "actions", "admin-only"],
+  "_security": {
+    "role_required": "{{role_required}}",
+    "double_check": "Server-side validation MUST occur in webhook handler — UI hide is convenience only"
+  }
+}

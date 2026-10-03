@@ -1,0 +1,38 @@
+{
+  "name": "@aisha/acs-contracts",
+  "version": "1.0.0",
+  "license": "Elastic-2.0",
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "description": "Agent Communication Standard — contract registry source of truth. JSON Schema (2020-12) documents for the ACS envelope and every message type, plus typed exports. Schemas are the canonical, versioned, diffable artefacts (docs/AGENT_COMMUNICATION_STANDARD.md R4); the DB registry (acs_message_schemas) is seeded from these files.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit",
+    "build": "tsc",
+    "pretest": "test -d node_modules || npm install --no-fund --no-audit --prefer-offline"
+  },
+  "files": [
+    "dist",
+    "src",
+    "schemas"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.3"
+  }
+}

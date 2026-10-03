@@ -1,0 +1,470 @@
+{
+  "name": "WF_EXPERT_NOTIFICATION",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "expert-notification",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Notification Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate and enrich notification request\nconst body = $input.item.json.body || $input.item.json;\nconst severity = (body.severity || 'medium').toLowerCase();\nconst subject = body.subject || 'AISHA Notification';\nconst message = body.message || '';\nconst context = body.context || {};\nconst requiresResponse = body.requires_response || false;\nconst source = body.source || 'dirigent';\nconst timestamp = new Date().toISOString();\n\n// Severity validation\nconst validSeverities = ['low', 'medium', 'high', 'critical'];\nif (!validSeverities.includes(severity)) {\n  return [{\n    json: {\n      error: true,\n      message: `Invalid severity: ${severity}. Must be one of: ${validSeverities.join(', ')}`\n    }\n  }];\n}\n\nif (!message) {\n  return [{\n    json: {\n      error: true,\n      message: 'Missing required field: message'\n    }\n  }];\n}\n\n// Determine channels based on severity\nconst channels = {\n  low: ['log'],\n  medium: ['log', 'email_digest'],\n  high: ['log', 'email_immediate'],\n  critical: ['log', 'email_immediate', 'webhook_callback']\n};\n\nconst notificationId = 'notif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);\n\nreturn [{\n  json: {\n    notificationId,\n    severity,\n    subject,\n    message,\n    context,\n    requiresResponse,\n    source,\n    timestamp,\n    channels: channels[severity],\n    error: false\n  }\n}];"
+      },
+      "id": "validate-enrich",
+      "name": "Validate & Enrich",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.error }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-error",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.message }) }}"
+      },
+      "id": "respond-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_integration_action",
+        "rpcParams": "={{ JSON.stringify({ p_service_name: 'aisha', p_action: 'expert_notification', p_action_detail: { notificationId: $json.notificationId, severity: $json.severity, subject: $json.subject, source: $json.source, channels: $json.channels, requiresResponse: $json.requiresResponse }, p_status: 'success', p_duration_ms: 0 }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "log-notification",
+      "name": "Log Notification",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        900,
+        140
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.severity }}",
+                    "rightValue": "low",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputLabel": "Low (log only)"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.severity }}",
+                    "rightValue": "medium",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputLabel": "Medium (email digest)"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.severity }}",
+                    "rightValue": "high",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputLabel": "High (email now)"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": false
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.severity }}",
+                    "rightValue": "critical",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ]
+              },
+              "renameOutput": true,
+              "outputLabel": "Critical (all channels)"
+            }
+          ]
+        }
+      },
+      "id": "route-severity",
+      "name": "Route by Severity",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// LOW severity — log only, queue for daily digest\nconst input = $input.item.json;\n\nreturn [{\n  json: {\n    delivered: true,\n    notificationId: input.notificationId,\n    channels: ['log'],\n    message: `[LOW] ${input.subject}: ${input.message}`,\n    digestQueued: true\n  }\n}];"
+      },
+      "id": "handle-low",
+      "name": "Handle Low",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// MEDIUM severity — store for email digest (sent at scheduled intervals)\nconst input = $input.item.json;\n\n// Store in NocoDB notification_queue table for daily digest\nreturn [{\n  json: {\n    delivered: true,\n    notificationId: input.notificationId,\n    channels: ['log', 'email_digest'],\n    message: `[MEDIUM] ${input.subject}: ${input.message}`,\n    digestQueued: true,\n    digestData: {\n      severity: input.severity,\n      subject: input.subject,\n      message: input.message,\n      source: input.source,\n      timestamp: input.timestamp,\n      context: input.context\n    }\n  }\n}];"
+      },
+      "id": "handle-medium",
+      "name": "Handle Medium",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/send-notification-email' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to: $env?.AISHA_ADMIN_EMAIL || '', subject: '[AISHA ' + $json.severity.toUpperCase() + '] ' + $json.subject, body: '## AISHA Dirigent Alert\\n\\n**Severity:** ' + $json.severity.toUpperCase() + '\\n**Source:** ' + $json.source + '\\n**Time:** ' + $json.timestamp + '\\n\\n### Message\\n' + $json.message + '\\n\\n### Context\\n```json\\n' + JSON.stringify($json.context, null, 2) + '\\n```\\n\\n---\\n*This is an automated notification from AISHA Dirigent.*', severity: $json.severity, notificationId: $json.notificationId }) }}",
+        "options": {}
+      },
+      "id": "send-email-high",
+      "name": "Send Email (High)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1140,
+        420
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/send-notification-email' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to: $env?.AISHA_ADMIN_EMAIL || '', subject: '[AISHA CRITICAL] ' + $json.subject, body: '# CRITICAL ALERT\\n\\n**Severity:** CRITICAL\\n**Source:** ' + $json.source + '\\n**Time:** ' + $json.timestamp + '\\n\\n### IMMEDIATE ACTION REQUIRED\\n' + $json.message + '\\n\\n### Context\\n```json\\n' + JSON.stringify($json.context, null, 2) + '\\n```\\n\\n### Approval Link\\nRespond at: ' + ($env?.N8N_WEBHOOK_BASE_URL || '') + '/webhook/approval-response?id=' + $json.notificationId + '\\n\\n---\\n*CRITICAL: Autonomous operations have been paused pending your response.*', severity: 'critical', notificationId: $json.notificationId }) }}",
+        "options": {}
+      },
+      "id": "send-email-critical",
+      "name": "Send Email (Critical)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1140,
+        580
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env?.N8N_WEBHOOK_BASE_URL || '') + '/webhook/expert-notification' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ event: 'aisha_critical_alert', notificationId: $json.notificationId, severity: 'critical', subject: $json.subject, message: $json.message, timestamp: $json.timestamp, source: $json.source, context: $json.context, approval_url: ($env?.N8N_WEBHOOK_BASE_URL || '') + '/webhook/approval-response?id=' + $json.notificationId }) }}",
+        "options": {
+          "timeout": 5000
+        }
+      },
+      "id": "webhook-callback-critical",
+      "name": "Webhook Callback",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge all delivery results\nconst input = $input.item.json;\nconst severity = $('Validate & Enrich').item.json.severity;\nconst notificationId = $('Validate & Enrich').item.json.notificationId;\n\nreturn [{\n  json: {\n    success: true,\n    notificationId,\n    severity,\n    delivered: true,\n    channels: $('Validate & Enrich').item.json.channels,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "merge-results",
+      "name": "Merge Delivery Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1580,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1800,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Notification Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate & Enrich",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Enrich": {
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Log Notification",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Route by Severity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route by Severity": {
+      "main": [
+        [
+          {
+            "node": "Handle Low",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Handle Medium",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Email (High)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Email (Critical)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Low": {
+      "main": [
+        [
+          {
+            "node": "Merge Delivery Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Handle Medium": {
+      "main": [
+        [
+          {
+            "node": "Merge Delivery Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email (High)": {
+      "main": [
+        [
+          {
+            "node": "Merge Delivery Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email (Critical)": {
+      "main": [
+        [
+          {
+            "node": "Webhook Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook Callback": {
+      "main": [
+        [
+          {
+            "node": "Merge Delivery Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Delivery Results": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

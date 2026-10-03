@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AISHA Setup Cockpit</title>
+  <link rel="icon" type="image/svg+xml" href="aisha-mark.svg">
+  <link rel="stylesheet" href="fonts/nunito-sans/fonts.css">
+  <link rel="stylesheet" href="aisha-tokens.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header / top bar -->
+    <header id="header">
+      <div class="logo">
+        <!-- New AISHA wordmark: orange −23° skewed dot + Nunito-Black "AISHA" -->
+        <span class="dot"></span>
+        <span class="wordmark">
+          <b>AISHA</b>
+          <small>.guru · setup</small>
+        </span>
+      </div>
+      <div id="connection-badge" class="badge badge-ok">Local</div>
+    </header>
+
+    <!-- Progress — thin orange segment bars, one per step -->
+    <nav id="progress">
+      <ol id="step-list"></ol>
+    </nav>
+
+    <!-- Step container -->
+    <main id="step-container"></main>
+
+    <!-- Footer -->
+    <footer id="footer">
+      <button id="btn-prev" class="btn btn-secondary" disabled>← Zpět</button>
+      <div id="step-counter"></div>
+      <button id="btn-next" class="btn btn-primary">Pokračovat →</button>
+    </footer>
+  </div>
+
+  <!-- Terminal overlay for script output -->
+  <div id="terminal-overlay" class="hidden">
+    <div id="terminal-panel">
+      <div id="terminal-header">
+        <span id="terminal-title">Běží…</span>
+        <button id="terminal-close" class="btn btn-small">✕</button>
+      </div>
+      <pre id="terminal-output"></pre>
+    </div>
+  </div>
+
+  <script src="cockpit.js" type="module"></script>
+</body>
+</html>

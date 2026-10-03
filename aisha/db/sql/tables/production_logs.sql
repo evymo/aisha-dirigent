@@ -1,0 +1,47 @@
+-- Table: production_logs
+-- RLS: ENABLED
+
+CREATE TABLE IF NOT EXISTS production_logs (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  batch_id uuid NOT NULL,
+  log_type text NOT NULL,
+  message text ,
+  logged_by uuid,
+  metadata jsonb,
+  created_at timestamptz DEFAULT now(),
+  workflow_step_id uuid,
+  log_category text,
+  title text,
+  description text,
+  input_volume numeric,
+  input_concentration numeric,
+  input_unit text,
+  output_volume numeric,
+  output_concentration numeric,
+  output_unit text,
+  loss_volume numeric,
+  loss_percentage numeric,
+  waste_volume numeric,
+  material_lot text,
+  source_container text,
+  target_container text,
+  temperature numeric,
+  humidity numeric,
+  sensor_data jsonb,
+  automation_source text,
+  device_id text,
+  performed_by uuid,
+  performed_at timestamptz,
+  verified_by uuid,
+  verified_at timestamptz,
+  photos jsonb,
+  documents jsonb,
+  notes text,
+  blockchain_tx_hash text,
+  payload_hash text,
+  PRIMARY KEY (id),
+  CONSTRAINT production_logs_batch_id_fkey FOREIGN KEY (batch_id) REFERENCES production_batches(id) ON DELETE CASCADE,
+  CONSTRAINT production_logs_logged_by_fkey FOREIGN KEY (logged_by) REFERENCES aisha_auth.users(id)
+);
+
+ALTER TABLE production_logs ENABLE ROW LEVEL SECURITY;

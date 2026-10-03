@@ -1,0 +1,134 @@
+{
+  "id": "nWsoE21smOV1RaKr",
+  "name": "WF_MCP_BRIDGE",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "tool_name",
+              "type": "string"
+            },
+            {
+              "name": "arguments",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "trigger",
+      "name": "Workflow Trigger",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse MCP tool call from AI agent\n// Input: { tool_name: string, arguments: object } or JSON string\nconst raw = $input.item.json;\n\nlet toolName, args;\ntry {\n  // Handle various input formats from toolWorkflow\n  let data = raw;\n  \n  // If input is a string, parse it\n  if (typeof raw === 'string') {\n    data = JSON.parse(raw);\n  }\n  \n  // Try direct fields first\n  toolName = data.tool_name || data.toolName || data.name;\n  args = data.arguments || data.args || data.params || {};\n  \n  // If no tool_name found, check nested 'query' field (toolWorkflow sends query)\n  if (!toolName && data.query) {\n    const q = typeof data.query === 'string' ? JSON.parse(data.query) : data.query;\n    toolName = q.tool_name || q.toolName || q.name;\n    args = q.arguments || q.args || q.params || {};\n  }\n  \n  // If arguments is still a string, try parsing it\n  if (typeof args === 'string') {\n    try { args = JSON.parse(args); } catch { args = { query: args }; }\n  }\n} catch (e) {\n  return {\n    json: {\n      error: true,\n      message: 'Invalid input. Expected JSON with tool_name and arguments. Error: ' + e.message,\n      raw: JSON.stringify(raw).substring(0, 500)\n    }\n  };\n}\n\nif (!toolName) {\n  return {\n    json: {\n      error: true,\n      message: 'Missing tool_name. Available tools: search_knowledge, get_expert_rule, get_expertise_areas, match_experts, get_agent_knowledge, get_project_context, search_knowledge_v2, get_knowledge_item, get_knowledge_stats, get_story_context, create_story_ruleset, generate_copilot_instructions, route_task, compose_context, validate_compliance, moderate_flow, evaluate_tests, assess_quality, suggest_next_step, estimate_effort, check_pr_compliance, transition_delivery_status, get_delivery_timeline, get_allowed_transitions, manage_story_environment, get_story_environments',\n      raw: JSON.stringify(raw).substring(0, 500)\n    }\n  };\n}\n\n// Build JSON-RPC 2.0 payload\nconst rpcPayload = {\n  jsonrpc: '2.0',\n  id: Date.now(),\n  method: 'tools/call',\n  params: {\n    name: toolName,\n    arguments: args\n  }\n};\n\nreturn {\n  json: {\n    toolName,\n    args,\n    rpcBody: JSON.stringify(rpcPayload)\n  }\n};"
+      },
+      "id": "parse-input",
+      "name": "Parse MCP Call",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env?.AISHA_POSTGREST_URL || '' }}/functions/v1/mcp-knowledge-server",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "string",
+        "body": "={{ $json.rpcBody }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "mcp-request",
+      "name": "Call MCP Server",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "aisha-mcp",
+          "name": "AISHA MCP OAuth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format MCP JSON-RPC response for AI agent consumption\nconst response = $input.item.json;\nconst toolName = $('Parse MCP Call').item.json.toolName;\n\n// Handle error in Parse stage\nif ($('Parse MCP Call').item.json.error) {\n  return { json: { response: $('Parse MCP Call').item.json.message } };\n}\n\n// Handle HTTP/network errors\nif (!response || typeof response !== 'object') {\n  return { json: { response: 'MCP server returned invalid response: ' + JSON.stringify(response).substring(0, 500) } };\n}\n\n// Handle JSON-RPC error\nif (response.error) {\n  const errMsg = typeof response.error === 'object' \n    ? (response.error.message || JSON.stringify(response.error))\n    : String(response.error);\n  return { json: { response: `MCP Error calling ${toolName}: ${errMsg}` } };\n}\n\n// Extract content from successful result\nconst result = response.result;\nif (result && Array.isArray(result.content)) {\n  const text = result.content\n    .map(c => {\n      if (c.type === 'text') return c.text;\n      return JSON.stringify(c);\n    })\n    .join('\\n');\n  return { json: { response: text } };\n}\n\n// Fallback: stringify the result\nreturn { json: { response: JSON.stringify(result || response) } };"
+      },
+      "id": "format-response",
+      "name": "Format Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Workflow Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse MCP Call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse MCP Call": {
+      "main": [
+        [
+          {
+            "node": "Call MCP Server",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Call MCP Server": {
+      "main": [
+        [
+          {
+            "node": "Format Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

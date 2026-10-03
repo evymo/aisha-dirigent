@@ -1,0 +1,70 @@
+{
+  "meta": {
+    "captured_at": "2026-05-19T22:48:47.193Z",
+    "baseline_date": "2026-05-20",
+    "trace_sample_size": 1000,
+    "sources": {
+      "langfuse": "http://langfuse-server:3000",
+      "prometheus": "http://prometheus:9090"
+    }
+  },
+  "kpis": {
+    "ttft_p95_ms": null,
+    "total_latency_p95_ms": null,
+    "postgres_rpc_p95_ms": null,
+    "embedding_p95_ms": null,
+    "retrieval_p95_ms": null,
+    "cache_hit_ratio_pct": null,
+    "llm_tokens_per_second": null,
+    "service_count": null,
+    "aitg_gate_pass_ratio": null,
+    "rag_faithfulness_evidence_strict": null,
+    "data_egress_llm_pct": null,
+    "critical_cves_open": null
+  },
+  "langfuse": {
+    "queryable": false,
+    "traces_sampled": 0,
+    "notes": [
+      "LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY not set; skipping Langfuse capture."
+    ]
+  },
+  "prometheus": {
+    "queryable": false,
+    "queries": {},
+    "notes": [
+      "http_p95_ms: fetch failed",
+      "rpc_p95_ms: fetch failed",
+      "rps_top: fetch failed",
+      "pg_conn_count: fetch failed",
+      "pg_top_queries: fetch failed",
+      "pg_cache_hit_ratio: fetch failed"
+    ]
+  },
+  "workspaces": {
+    "note": "Service count derived from filesystem scan of services/svc-*/Dockerfile presence — informational.",
+    "deployed_services": 20,
+    "detected": [
+      "event-worker",
+      "gateway",
+      "storage-auth",
+      "svc-ai-chat",
+      "svc-blockchain",
+      "svc-communications",
+      "svc-fio-bank",
+      "svc-github-app",
+      "svc-health-ai",
+      "svc-homeassistant",
+      "svc-livekit",
+      "svc-matrix",
+      "svc-mcp-knowledge",
+      "svc-packeta",
+      "svc-pki-bridge",
+      "svc-plugin-system",
+      "svc-push",
+      "svc-stripe",
+      "svc-web-artifact",
+      "ws-gateway"
+    ]
+  }
+}

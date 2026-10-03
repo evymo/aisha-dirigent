@@ -1,0 +1,55 @@
+/* Electrician / solo trade — example template tokens. Brand-neutral, fork-freely.
+ * Industrial: charcoal slate + electric amber + white. Confident, safety-forward.
+ * A dark hero band over a light page — distinct from the café's all-dark theme.
+ *
+ * Authored on :root so it matches the GrapesJS editor; PageRenderer maps :root →
+ * .gjs-page-content, so these cascade to BOTH the static chrome (via the --color-*
+ * aliases) AND the live contact-form runtime block (shadcn hsl(var(--token))).
+ * The shadcn set MUST be bare-HSL triplets ("H S% L%"). */
+:root {
+  /* shadcn token set — consumed by the runtime React blocks (light, charcoal+amber). */
+  --background: 0 0% 100%;
+  --foreground: 218 22% 10%;
+  --card: 0 0% 100%;
+  --card-foreground: 218 22% 10%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 218 22% 10%;
+  --muted: 220 16% 96%;
+  --muted-foreground: 214 12% 40%;
+  --primary: 221 39% 11%;          /* charcoal slate #111827 */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 16% 96%;
+  --secondary-foreground: 218 22% 10%;
+  --accent: 37 91% 55%;            /* electric amber #f5a524 */
+  --accent-foreground: 218 22% 10%;
+  --border: 214 14% 90%;
+  --input: 214 14% 90%;
+  --ring: 221 39% 11%;
+
+  /* template's own semantic names, ALIASED to the shadcn set → one palette. */
+  --color-bg: hsl(var(--background));
+  --color-fg: hsl(var(--foreground));
+  --color-muted: hsl(var(--muted-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-dark: hsl(0 0% 0%);        /* #000000 — no shadcn slot */
+  --color-primary-fg: hsl(var(--primary-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-dark: hsl(36 84% 46%);      /* #d98a13 — no shadcn slot */
+  --color-border: hsl(var(--border));
+  --color-surface: hsl(var(--muted));
+  --color-surface-2: hsl(var(--card));
+  --color-dark: hsl(var(--foreground));
+  --color-dark-fg: hsl(var(--muted));
+
+  --font-display: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 2rem;
+  --space-xl: 4rem;
+
+  --radius-sm: 4px;
+  --radius-md: 10px;
+}

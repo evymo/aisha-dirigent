@@ -1,0 +1,68 @@
+{
+  "applicationName": "Audience: Tier Funnel",
+  "version": 1,
+  "description": "Registered → Active → Qualified → Partner pipeline KPIs + growth trends.",
+  "dataSources": [
+    { "name": "aisha-postgrest", "type": "PostgresREST", "endpoint": "{{appsmith.env.POSTGREST_URL}}",
+      "headers": { "Authorization": "Bearer {{appsmith.user.jwt}}" } }
+  ],
+  "queries": [
+    {
+      "name": "loadFunnel",
+      "method": "GET",
+      "path": "/audience_admin_tier_funnel_v"
+    },
+    {
+      "name": "loadMetrics",
+      "method": "POST",
+      "path": "/rpc/audience_admin_get_funnel_metrics",
+      "body": {
+        "p_date_from": "{{dateRangeFrom.value}}",
+        "p_date_to": "{{dateRangeTo.value}}"
+      }
+    }
+  ],
+  "widgets": [
+    { "type": "Text", "name": "title", "text": "Tier Funnel", "style": "heading" },
+    {
+      "type": "Container",
+      "name": "dateRange",
+      "children": [
+        { "type": "DatePicker", "name": "dateRangeFrom", "label": "From",
+          "defaultValue": "{{moment().subtract(90, 'days').format()}}" },
+        { "type": "DatePicker", "name": "dateRangeTo", "label": "To",
+          "defaultValue": "{{moment().format()}}" },
+        { "type": "Button", "name": "applyRange", "label": "Apply", "onClick": "{{loadMetrics.run()}}" }
+      ]
+    },
+    {
+      "type": "StatGroup",
+      "name": "tierCards",
+      "cards": [
+        { "label": "Registered", "value": "{{loadFunnel.data.find(r => r.member_tier === 'registered')?.actor_count ?? 0}}", "color": "gray" },
+        { "label": "Active", "value": "{{loadFunnel.data.find(r => r.member_tier === 'active')?.actor_count ?? 0}}", "color": "blue" },
+        { "label": "Qualified", "value": "{{loadFunnel.data.find(r => r.member_tier === 'qualified')?.actor_count ?? 0}}", "color": "purple" },
+        { "label": "Partner", "value": "{{loadFunnel.data.find(r => r.member_tier === 'partner')?.actor_count ?? 0}}", "color": "gold" }
+      ]
+    },
+    {
+      "type": "Chart",
+      "name": "tierBreakdown",
+      "chartType": "horizontal_bar",
+      "dataSource": "{{loadFunnel.data}}",
+      "x": "actor_count",
+      "y": "member_tier",
+      "series": ["actor_count", "active_30d", "with_audience"]
+    },
+    {
+      "type": "Card",
+      "name": "headlineMetrics",
+      "title": "Period summary",
+      "content": "{{JSON.stringify(loadMetrics.data, null, 2)}}"
+    }
+  ],
+  "permissions": {
+    "view": ["admin", "staff"],
+    "edit": ["admin"]
+  }
+}

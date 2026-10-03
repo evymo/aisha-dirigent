@@ -1,0 +1,539 @@
+{
+  "id": "ApprovalGate001",
+  "name": "WF_APPROVAL_GATE",
+  "active": true,
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "approval-gate",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "request-webhook",
+      "name": "Approval Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "approval-gate-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Create approval request with risk evaluation and explainability metadata\nconst crypto = require('crypto');\nconst webhook = $('Approval Request').item.json;\nconst body = webhook.body || webhook;\nconst riskEval = $input.item.json; // output of Evaluate Risk node\n\nconst actionDescription = body.action_description || '';\nconst severity = (body.severity || 'high').toLowerCase();\nconst context = body.context || {};\nconst timeoutHours = body.timeout_hours || 4;\nconst source = body.source || 'dirigent';\nconst agentSlug = body.agent_slug || source;\nconst category = body.category || 'function';\nconst requestReasoning = body.decision_reasoning || '';\n\nif (!actionDescription) {\n  return [{ json: { error: true, message: 'Missing required field: action_description' } }];\n}\n\n// Signed-link secret — fail loud rather than ever emit an UNSIGNED approval link.\nconst linkSecret = ($env && $env.APPROVAL_LINK_HMAC_SECRET) || '';\nif (!linkSecret) {\n  return [{ json: { error: true, message: 'APPROVAL_LINK_HMAC_SECRET is not configured — refusing to issue an unsigned approval link' } }];\n}\n\n// Ground-truth risk from DB fn_evaluate_proposal_risk (independent of caller-declared severity)\nconst computedRisk = (riskEval && !riskEval.error && riskEval.data)\n  ? String(riskEval.data).toLowerCase()\n  : severity;\n\n// Context hash for audit correlation and deduplication\nconst contextStr = actionDescription + '|' + agentSlug + '|' + category + '|' + JSON.stringify(context);\nlet h = 0;\nfor (let i = 0; i < contextStr.length; i++) { h = ((h << 5) - h) + contextStr.charCodeAt(i); h |= 0; }\nconst contextHash = Math.abs(h).toString(16).padStart(8, '0');\n\n// Criteria evaluation for explainability\nconst criteriaMet = [];\nconst criteriaFailed = [];\n\nif (computedRisk === severity) criteriaMet.push('risk_severity_consistent');\nelse criteriaFailed.push('risk_mismatch:declared=' + severity + ',computed=' + computedRisk);\n\nif (requestReasoning) criteriaMet.push('decision_reasoning_provided');\nelse criteriaFailed.push('decision_reasoning_missing');\n\nif (Object.keys(context).length > 0) criteriaMet.push('context_provided');\nelse criteriaFailed.push('context_empty');\n\nif (['critical', 'high'].includes(computedRisk)) criteriaMet.push('high_risk_gate_required');\n\nconst approvalId = 'approval_' + Date.now() + '_' + Math.random().toString(36).substr(2, 8);\nconst createdAt = new Date();\nconst expiresAt = new Date(createdAt.getTime() + timeoutHours * 60 * 60 * 1000);\nconst expiresIso = expiresAt.toISOString();\nconst baseUrl = $env && $env.N8N_URL ? $env.N8N_URL : '';\n\n// SIGNED LINK: HMAC(id|decision|expires) binds the response URL, so a guessed or\n// forged approval-response link cannot be replayed. Each link's signature covers\n// the ORIGINAL decision baked into that link.\nfunction signLink(decision) {\n  return crypto.createHmac('sha256', linkSecret).update(approvalId + '|' + decision + '|' + expiresIso).digest('hex');\n}\nconst approveSig = signLink('approved');\nconst rejectSig = signLink('rejected');\nconst respBase = baseUrl + '/webhook/approval-response?id=' + approvalId + '&expires=' + encodeURIComponent(expiresIso);\n\nreturn [{\n  json: {\n    error: false,\n    approvalId,\n    actionDescription,\n    severity,\n    computedRisk,\n    riskScore: computedRisk,\n    context,\n    source,\n    agentSlug,\n    category,\n    timeoutHours,\n    createdAt: createdAt.toISOString(),\n    expiresAt: expiresIso,\n    status: 'pending',\n    contextHash,\n    criteriaMet,\n    criteriaFailed,\n    decisionReasoning: requestReasoning,\n    approvalUrl: baseUrl + '/webhook/approval-response',\n    approveLink: respBase + '&decision=approved&sig=' + approveSig,\n    rejectLink: respBase + '&decision=rejected&sig=' + rejectSig\n  }\n}];"
+      },
+      "id": "create-approval",
+      "name": "Create Approval Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.error }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-error",
+      "name": "Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, error: $json.message }) }}"
+      },
+      "id": "respond-error",
+      "name": "Respond Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        450
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env?.AISHA_POSTGREST_URL || '' }}/rest/v1/rpc/log_integration_action",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_service_name: 'aisha', p_action: 'approval_request_created', p_action_detail: { approvalId: $json.approvalId, actionDescription: $json.actionDescription, severity: $json.severity, source: $json.source, expiresAt: $json.expiresAt, timeoutHours: $json.timeoutHours }, p_status: 'pending', p_duration_ms: 0 }) }}"
+      },
+      "id": "log-approval-request",
+      "name": "Log Approval Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        100
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Z7oSSowoqk0ZgB8X",
+          "name": "AISHA Supabase (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env?.N8N_URL || '' }}/webhook/expert-notification",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ severity: $json.severity, subject: 'Approval Required: ' + $json.actionDescription, message: 'AISHA requests your approval for the following action:\\n\\n**Action:** ' + $json.actionDescription + '\\n**Severity:** ' + $json.severity.toUpperCase() + '\\n**Source:** ' + $json.source + '\\n**Expires:** ' + $json.expiresAt + '\\n\\n**Approve:** ' + $json.approveLink + '\\n**Reject:** ' + $json.rejectLink + '\\n\\nIf no response within ' + $json.timeoutHours + ' hours, this will be auto-escalated to CRITICAL.', context: $json.context, requires_response: true, source: 'approval_gate' }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "notify-expert",
+      "name": "Notify Expert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Store approval request in NocoDB for tracking\n// Also return the approval details for the caller\nconst input = $('Create Approval Request').item.json;\n\nreturn [{\n  json: {\n    success: true,\n    approvalId: input.approvalId,\n    status: 'pending',\n    actionDescription: input.actionDescription,\n    severity: input.severity,\n    expiresAt: input.expiresAt,\n    approveLink: input.approveLink,\n    rejectLink: input.rejectLink,\n    message: `Approval request created. Expert has been notified. Timeout: ${input.timeoutHours}h.`\n  }\n}];"
+      },
+      "id": "prepare-response",
+      "name": "Prepare Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "respond-success",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "=GET",
+        "path": "approval-response",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "response-webhook",
+      "name": "Approval Response",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        600
+      ],
+      "webhookId": "approval-response-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process approval response from expert — verify the SIGNED link, then apply expiry.\nconst crypto = require('crypto');\nconst query = $input.item.json.query || {};\nconst approvalId = query.id || '';\nconst originalDecision = (query.decision || '').toLowerCase();\nlet decision = originalDecision;\nconst comment = query.comment || '';\nconst sig = query.sig || '';\n\n// Normalise the expiry to its DECODED form so the HMAC input equals the value\n// that was signed (expiresIso), regardless of whether the webhook layer already\n// URL-decoded the query param. decodeURIComponent is a no-op on an already\n// decoded ISO string (no % left), and undoes %3A→: when it was not decoded.\nconst expiresRaw = query.expires || '';\nlet expiresAtStr = expiresRaw;\ntry { expiresAtStr = decodeURIComponent(expiresRaw); } catch (e) { expiresAtStr = expiresRaw; }\n\nconst errPage = (msg) => ({ error: true, message: msg, html: '<html><body><h2>Invalid Request</h2><p>' + msg + '</p></body></html>' });\n\nif (!approvalId || !decision) {\n  return [{ json: errPage('Missing required params: id, decision (approved/rejected)') }];\n}\n\n// SIGNED LINK: verify HMAC(id|decision|expires) with a constant-time compare, so\n// a guessed / forged / param-tampered approval-response URL is rejected. The\n// signature covers the ORIGINAL link decision (before any expiry override).\nconst linkSecret = ($env && $env.APPROVAL_LINK_HMAC_SECRET) || '';\nif (!linkSecret) {\n  return [{ json: errPage('APPROVAL_LINK_HMAC_SECRET is not configured') }];\n}\nconst expected = crypto.createHmac('sha256', linkSecret).update(approvalId + '|' + originalDecision + '|' + expiresAtStr).digest('hex');\nlet signatureValid = false;\ntry {\n  const a = Buffer.from(sig, 'hex');\n  const b = Buffer.from(expected, 'hex');\n  signatureValid = a.length === b.length && crypto.timingSafeEqual(a, b);\n} catch (e) { signatureValid = false; }\nif (!signatureValid) {\n  return [{ json: errPage('Invalid or missing approval-link signature') }];\n}\n\n// Expiry check — only AFTER the link is proven authentic (expiresAtStr already decoded).\nif (expiresAtStr) {\n  try {\n    const expiresAt = new Date(expiresAtStr);\n    if (!isNaN(expiresAt.getTime()) && new Date() > expiresAt) { decision = 'expired'; }\n  } catch (e) { /* ignore malformed expiry */ }\n}\n\nif (!['approved', 'rejected', 'expired'].includes(decision)) {\n  return [{ json: errPage('Invalid decision: ' + decision + \". Must be 'approved' or 'rejected'.\") }];\n}\n\nconst isExpired = decision === 'expired';\nconst respondedBy = isExpired ? 'system_timeout' : 'expert';\n\nreturn [{\n  json: {\n    error: false,\n    approvalId,\n    decision,\n    comment,\n    respondedAt: new Date().toISOString(),\n    respondedBy,\n    decisionReasoning: comment || (isExpired ? 'Approval request timeout exceeded - auto-escalated to CRITICAL' : ''),\n    criteriaMet: isExpired ? [] : ['human_decision_recorded', 'signed_link_verified'],\n    criteriaFailed: isExpired ? ['approval_timeout'] : [],\n    isExpired\n  }\n}];"
+      },
+      "id": "process-response",
+      "name": "Process Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.error }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-response-error",
+      "name": "Valid Response?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}"
+      },
+      "id": "respond-response-error",
+      "name": "Respond Response Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        900,
+        750
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env?.AISHA_POSTGREST_URL || '' }}/rest/v1/rpc/log_integration_action",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_service_name: 'aisha', p_action: 'approval_response_received', p_action_detail: { approvalId: $json.approvalId, decision: $json.decision, comment: $json.comment, respondedBy: $json.respondedBy, respondedAt: $json.respondedAt }, p_status: $json.decision === 'approved' ? 'success' : 'rejected', p_duration_ms: 0 }) }}"
+      },
+      "id": "log-response",
+      "name": "Log Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        540
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Z7oSSowoqk0ZgB8X",
+          "name": "AISHA Supabase (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env?.N8N_URL || '' }}/webhook/dirigent-agent",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: 'approval_response', approval_id: $json.approvalId, decision: $json.decision, comment: $json.comment, responded_at: $json.respondedAt, source: 'approval_gate' }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "notify-dirigent",
+      "name": "Notify Dirigent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        540
+      ],
+      "notes": "Sends approval decision back to Dirigent agent for action"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate human-friendly response page\nconst decision = $('Process Response').item.json.decision;\nconst approvalId = $('Process Response').item.json.approvalId;\nconst emoji = decision === 'approved' ? '✅' : '❌';\nconst title = decision === 'approved' ? 'Approved' : 'Rejected';\nconst color = decision === 'approved' ? '#22c55e' : '#ef4444';\n\nreturn [{\n  json: {\n    html: `<html><head><style>body{font-family:system-ui;max-width:600px;margin:60px auto;text-align:center;background:#f8fafc;color:#1e293b}h1{color:${color};font-size:3em}p{font-size:1.2em;color:#64748b}.id{font-family:monospace;color:#94a3b8;font-size:0.9em}</style></head><body><h1>${emoji} ${title}</h1><p>Your decision has been recorded and forwarded to AISHA Dirigent.</p><p class='id'>Approval ID: ${approvalId}</p></body></html>`\n  }\n}];"
+      },
+      "id": "generate-response-page",
+      "name": "Response Page",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1340,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.html }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "text/html"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond-html",
+      "name": "Respond HTML",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1560,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "fn_create_approval_request",
+        "rpcParams": "={{ JSON.stringify({ p_approval_id: $json.approvalId, p_action_description: $json.actionDescription, p_severity: $json.severity, p_computed_risk: $json.computedRisk, p_agent_slug: $json.agentSlug, p_category: $json.category, p_source: $json.source, p_context: $json.context, p_context_hash: $json.contextHash, p_expires_at: $json.expiresAt, p_status: 'pending' }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "persist-approval",
+      "name": "Persist Approval",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1136,
+        -80
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "fn_resolve_approval_request",
+        "rpcParams": "={{ JSON.stringify({ p_approval_id: $json.approvalId, p_decision: $json.decision, p_responded_by: $json.respondedBy, p_comment: $json.comment, p_responded_at: $json.respondedAt }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "resolve-approval",
+      "name": "Resolve Approval",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        912,
+        720
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "fn_anchor_decision",
+        "rpcParams": "={{ JSON.stringify({ p_decision_type: 'improvement_proposals', p_reference: $json.approvalId, p_payload: { decision: $json.decision, responded_by: $json.respondedBy, responded_at: $json.respondedAt } }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "anchor-approval-decision",
+      "name": "Anchor Decision",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        720
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Approval Request": {
+      "main": [
+        [
+          {
+            "node": "Create Approval Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Approval Request": {
+      "main": [
+        [
+          {
+            "node": "Valid?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid?": {
+      "main": [
+        [
+          {
+            "node": "Log Approval Request",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify Expert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Persist Approval",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Expert": {
+      "main": [
+        [
+          {
+            "node": "Prepare Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Response": {
+      "main": [
+        [
+          {
+            "node": "Respond Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Approval Response": {
+      "main": [
+        [
+          {
+            "node": "Process Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Process Response": {
+      "main": [
+        [
+          {
+            "node": "Valid Response?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valid Response?": {
+      "main": [
+        [
+          {
+            "node": "Log Response",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Resolve Approval",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Anchor Decision",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond Response Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log Response": {
+      "main": [
+        [
+          {
+            "node": "Notify Dirigent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Dirigent": {
+      "main": [
+        [
+          {
+            "node": "Response Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Response Page": {
+      "main": [
+        [
+          {
+            "node": "Respond HTML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

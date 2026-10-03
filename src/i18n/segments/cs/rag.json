@@ -1,0 +1,74 @@
+{
+  "rag": {
+    "baseline": {
+      "title": "Kvalita retrievalu (posledních 7 dní)",
+      "subtitle": "Noční RAG eval proti kurátorovanému zlatému Q/A setu",
+      "faithfulness": "Věrnost",
+      "faithfulnessHint": "Jak moc je odpověď podložená retrievovaným kontextem",
+      "answerRelevancy": "Relevance odpovědi",
+      "answerRelevancyHint": "Jak přímo odpověď odpovídá na otázku",
+      "contextPrecision": "Přesnost kontextu",
+      "contextPrecisionHint": "Podíl retrievovaných úryvků, které byly relevantní",
+      "contextRecall": "Pokrytí kontextu",
+      "contextRecallHint": "Podíl potřebných informací, které byly retrievovány",
+      "compositeScore": "Souhrnné skóre",
+      "evalRuns": "Eval běhy",
+      "p90": "p90",
+      "p50": "p50",
+      "noData": "Zatím žádná eval data — spusť nejdřív noční batch",
+      "periodLabel": "Období",
+      "period24h": "Posledních 24 hodin",
+      "period7d": "Posledních 7 dní",
+      "period30d": "Posledních 30 dní",
+      "embeddingModel": "Model vkládání",
+      "llmModel": "LLM",
+      "allProfiles": "Všechny profily"
+    },
+    "chip": {
+      "high": "Vysoká věrnost",
+      "medium": "Střední věrnost",
+      "low": "Nízká věrnost — ověřte odpověď před použitím",
+      "noData": "Nevyhodnoceno",
+      "tooltip": "Věrnost {{score}} · {{count}} citací"
+    },
+    "citations": {
+      "panelTitle": "Použité zdroje",
+      "empty": "K této odpovědi nejsou citace",
+      "toggleShow": "Zobrazit zdroje",
+      "toggleHide": "Skrýt zdroje",
+      "openItem": "Otevřít zdroj",
+      "weight": "Váha {{value}}"
+    },
+    "feedback": {
+      "thumbsUp": "Odpověď byla správná",
+      "thumbsDown": "Odpověď nesedí",
+      "reasonPlaceholder": "Volitelně: co bylo špatně?",
+      "submit": "Odeslat zpětnou vazbu",
+      "saved": "Děkujeme, zpětná vazba byla zaznamenána"
+    },
+    "quarantine": {
+      "title": "Karanténa znalostních položek",
+      "subtitle": "Položky označené skenerem bezpečnosti při ingestaci",
+      "queueTitle": "Označené a karanténované položky",
+      "queueDescription": "Tyto položky jsou skryté před retrievalem, dokud nedojde k obnovení",
+      "empty": "Žádné označené nebo karanténované položky",
+      "score": "Skóre bezpečnosti",
+      "reason": "Důvod",
+      "reinstate": "Obnovit",
+      "reinstateReasonPlaceholder": "Proč je tato položka bezpečná? (audit)",
+      "reasonRequired": "Důvod obnovení je povinný",
+      "confirmReinstate": "Obnovit položku",
+      "reinstated": "Položka obnovena",
+      "reinstatedDescription": "Položka je opět viditelná pro retrieval",
+      "reinstateError": "Obnovení položky se nezdařilo"
+    },
+    "explainability": {
+      "panelTitle": "Jak tato odpověď navazuje",
+      "empty": "Bez grafového kontextu — z citovaných zdrojů zatím nebyly odvozené žádné koncepty ani související běhy",
+      "depthLabel": "{{depth}} skok(y)",
+      "confidenceLabel": "Důvěra {{pct}} %",
+      "viaSeeds": "přes {{labels}}{{extra}}",
+      "moreSeeds": " a dalších {{n}}"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "acs.effect.decision@1.0",
+  "title": "Effect decision (readback, phase 2)",
+  "description": "Machine verdict over an effect proposal. Execution may proceed only on decision=confirm AND matching params hash (R5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["effect_id", "decision", "decided_by", "params_sha256"],
+  "properties": {
+    "effect_id": { "type": "string", "pattern": "^eff_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "decision": { "enum": ["confirm", "abort"] },
+    "decided_by": { "enum": ["constraint_check", "acl", "operator", "budget_gate"] },
+    "params_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "reason_code": { "type": ["string", "null"], "pattern": "^[a-z0-9_]+$", "maxLength": 64 }
+  }
+}

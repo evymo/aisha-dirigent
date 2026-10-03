@@ -1,0 +1,15 @@
+.vscode/**
+.vscode-test/**
+src/**
+node_modules/**
+esbuild.config.js
+tsconfig.json
+vitest.config.ts
+__tests__/**
+extensions/**
+**/*.ts
+.gitignore
+.npmrc
+security_and_test_analysis.md
+!dist/extension.js
+**/*.map

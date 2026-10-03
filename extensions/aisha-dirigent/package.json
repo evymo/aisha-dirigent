@@ -1,0 +1,601 @@
+{
+  "name": "aisha-dirigent",
+  "displayName": "%ext.displayName%",
+  "description": "%ext.description%",
+  "version": "0.7.0",
+  "publisher": "evymo",
+  "license": "Elastic-2.0",
+  "l10n": "./l10n",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/evymo/aisha-dirigent"
+  },
+  "icon": "resources/icon.png",
+  "engines": {
+    "vscode": "^1.99.0"
+  },
+  "extensionKind": [
+    "workspace",
+    "ui"
+  ],
+  "categories": [
+    "AI",
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onChatParticipant:aisha.dirigent"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "aisha.dirigent",
+        "name": "aisha",
+        "fullName": "AISHA Dirigent",
+        "description": "%chatParticipant.description%",
+        "isSticky": false,
+        "commands": [
+          {
+            "name": "test",
+            "description": "%cmd.test%"
+          },
+          {
+            "name": "quality",
+            "description": "%cmd.quality%"
+          },
+          {
+            "name": "compliance",
+            "description": "%cmd.compliance%"
+          },
+          {
+            "name": "estimate",
+            "description": "%cmd.estimate%"
+          },
+          {
+            "name": "next",
+            "description": "%cmd.next%"
+          },
+          {
+            "name": "instructions",
+            "description": "%cmd.instructions%"
+          },
+          {
+            "name": "dirigent",
+            "description": "%cmd.dirigent%"
+          },
+          {
+            "name": "route",
+            "description": "%cmd.route%"
+          },
+          {
+            "name": "models",
+            "description": "%cmd.models%"
+          },
+          {
+            "name": "eval",
+            "description": "%cmd.eval%"
+          },
+          {
+            "name": "proposals",
+            "description": "%cmd.proposals%"
+          },
+          {
+            "name": "health",
+            "description": "%cmd.health%"
+          },
+          {
+            "name": "onboard",
+            "description": "%cmd.onboard%"
+          },
+          {
+            "name": "connect-repo",
+            "description": "%cmd.connectRepo%"
+          },
+          {
+            "name": "story",
+            "description": "%cmd.story%"
+          },
+          {
+            "name": "local",
+            "description": "%cmd.local%"
+          }
+        ]
+      }
+    ],
+    "configuration": {
+      "title": "AISHA Dirigent",
+      "properties": {
+        "aisha.dirigent.mcpUrl": {
+          "type": "string",
+          "default": "",
+          "description": "%config.mcpUrl%"
+        },
+        "aisha.dirigent.expertiseLevel": {
+          "type": "string",
+          "default": "intermediate",
+          "enum": [
+            "beginner",
+            "intermediate",
+            "advanced",
+            "expert"
+          ],
+          "description": "%config.expertiseLevel%"
+        },
+        "aisha.dirigent.storyId": {
+          "type": "string",
+          "default": "",
+          "description": "%config.storyId%"
+        },
+        "aisha.dirigent.n8nTriggerUrl": {
+          "type": "string",
+          "default": "",
+          "description": "%config.n8nTriggerUrl%"
+        },
+        "aisha.dirigent.supabaseUrl": {
+          "type": "string",
+          "default": "",
+          "description": "%config.supabaseUrl%"
+        },
+        "aisha.dirigent.bootstrapUrl": {
+          "type": "string",
+          "default": "",
+          "description": "%config.bootstrapUrl%"
+        },
+        "aisha.dirigent.keycloakUrl": {
+          "type": "string",
+          "default": "",
+          "description": "%config.keycloakUrl%"
+        },
+        "aisha.dirigent.webUrl": {
+          "type": "string",
+          "default": "",
+          "description": "%config.webUrl%"
+        },
+        "aisha.dirigent.orchestrationUrl": {
+          "type": "string",
+          "default": "",
+          "description": "%config.orchestrationUrl%"
+        },
+        "aisha.dirigent.cloudTLD": {
+          "type": "string",
+          "default": "",
+          "description": "Public top-level domain for your AISHA deployment (e.g. aisha.guru). Used to derive companion service URLs from the API URL."
+        },
+        "aisha.dirigent.internalTLD": {
+          "type": "string",
+          "default": "",
+          "description": "Internal top-level domain for your AISHA deployment (e.g. id3a.cz). Used to identify internal-tier service URLs."
+        },
+        "aisha.dirigent.anonKey": {
+          "type": "string",
+          "default": "",
+          "description": "%config.anonKey%"
+        },
+        "aisha.dirigent.dashboardUrl": {
+          "type": "string",
+          "default": "http://localhost:8090",
+          "description": "%config.dashboardUrl%"
+        },
+        "aisha.dirigent.edgeFirst": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.edgeFirst%"
+        },
+        "aisha.dirigent.workbenchDrainer": {
+          "type": "boolean",
+          "default": false,
+          "description": "If enabled, this editor drains the AISHA workbench execution queue — claiming clows the platform routed to the 'workbench' runtime and running them on your local model (Ollama/vLLM/Docker Desktop). Off by default; only claims work when a local model is discovered and you are signed in."
+        },
+        "aisha.dirigent.autoRegenerate.enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "If enabled, Dirigent may auto-regenerate IDE instruction files (CLAUDE.md, .cursorrules, copilot-instructions.md, …) in response to events listed in 'triggers'. Off by default — manual command (`AISHA: Sync IDE instructions`) always works regardless of this setting."
+        },
+        "aisha.dirigent.autoRegenerate.triggers": {
+          "type": "array",
+          "default": [
+            "manual"
+          ],
+          "items": {
+            "type": "string",
+            "enum": [
+              "manual",
+              "story-change",
+              "story-create",
+              "rules-updated",
+              "auto-flow"
+            ]
+          },
+          "description": "Which events may trigger automatic regeneration. 'manual' is always allowed. Other triggers fire only when 'autoRegenerate.enabled' is true."
+        },
+        "aisha.dirigent.shareWorkspaceContext": {
+          "type": "boolean",
+          "default": false,
+          "description": "If enabled, Dirigent includes the active editor selection, recent commit messages, and diff summary when calling the MCP backend. Off by default to keep potentially sensitive snippets local. File paths and tech-stack tags are always shared (needed for routing)."
+        },
+        "aisha.welcome.headline": {
+          "type": "string",
+          "default": "",
+          "description": "Custom headline for the AISHA welcome screen (marketplace override)."
+        },
+        "aisha.welcome.subtitle": {
+          "type": "string",
+          "default": "",
+          "description": "Custom subtitle for the AISHA welcome screen (marketplace override)."
+        },
+        "aisha.welcome.dashboardUrl": {
+          "type": "string",
+          "default": "",
+          "description": "URL for embedded dashboard in welcome flow (Appsmith, NocoDB, custom)."
+        },
+        "aisha.welcome.dashboardTitle": {
+          "type": "string",
+          "default": "Dashboard",
+          "description": "Title for the embedded dashboard panel."
+        },
+        "aisha.welcome.accentColor": {
+          "type": "string",
+          "default": "",
+          "description": "Override accent color for the welcome flow (CSS hex value)."
+        },
+        "aisha.welcome.quickActions": {
+          "type": "array",
+          "default": [],
+          "description": "Custom quick actions on the ready screen [{label, command, icon}].",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "command": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "label",
+              "command"
+            ]
+          }
+        },
+        "aisha.dirigent.languageOverride": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "en",
+            "cs",
+            "de",
+            "fr",
+            "ru",
+            "th"
+          ],
+          "description": "%config.languageOverride%"
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "aisha.dirigent.setStory",
+        "title": "%cmd.setStory%"
+      },
+      {
+        "command": "aisha.dirigent.clearSession",
+        "title": "%cmd.clearSession%"
+      },
+      {
+        "command": "aisha.dirigent.syncInstructions",
+        "title": "%cmd.syncInstructions%"
+      },
+      {
+        "command": "aisha.dirigent.setExpertise",
+        "title": "%cmd.setExpertise%"
+      },
+      {
+        "command": "aisha.dirigent.refreshModels",
+        "title": "%cmd.refreshModels%"
+      },
+      {
+        "command": "aisha.dirigent.login",
+        "title": "%cmd.login%"
+      },
+      {
+        "command": "aisha.dirigent.loginWithPkce",
+        "title": "%cmd.loginWithPkce%"
+      },
+      {
+        "command": "aisha.dirigent.loginWithAishaId",
+        "title": "%cmd.loginWithAishaId%"
+      },
+      {
+        "command": "aisha.dirigent.logout",
+        "title": "%cmd.logout%"
+      },
+      {
+        "command": "aisha.dirigent.switchBackend",
+        "title": "%cmd.switchBackend%"
+      },
+      {
+        "command": "aisha.dirigent.connect",
+        "title": "%cmd.connect%"
+      },
+      {
+        "command": "aisha.dirigent.signup",
+        "title": "%cmd.signup%"
+      },
+      {
+        "command": "aisha.dirigent.openDashboard",
+        "title": "%cmd.openDashboard%"
+      },
+      {
+        "command": "aisha.dirigent.openSetup",
+        "title": "AISHA: Setup Panel"
+      },
+      {
+        "command": "aisha.dirigent.selectLlmPreset",
+        "title": "AISHA: Select LLM Preset"
+      },
+      {
+        "command": "aisha.dirigent.discoverModels",
+        "title": "AISHA: Discover Local Models"
+      },
+      {
+        "command": "aisha.dirigent.switchAdminModel",
+        "title": "AISHA: Switch Active AI Model (admin)"
+      },
+      {
+        "command": "aisha.dirigent.connectRepo",
+        "title": "%cmd.connectRepoTitle%"
+      },
+      {
+        "command": "aisha.dirigent.openStoryChat",
+        "title": "%cmd.openStoryChat%"
+      },
+      {
+        "command": "aisha.dirigent.openStoryPanel",
+        "title": "%cmd.openStoryPanel%"
+      },
+      {
+        "command": "aisha.dirigent.scanEnvironment",
+        "title": "AISHA: Scan Environment"
+      },
+      {
+        "command": "aisha.dirigent.showQuestionnaire",
+        "title": "AISHA: Profile Questionnaire"
+      },
+      {
+        "command": "aisha.dirigent.openWalkthrough",
+        "title": "AISHA: Welcome Guide"
+      },
+      {
+        "command": "aisha.dirigent.selectLanguage",
+        "title": "%cmd.selectLanguage%"
+      },
+      {
+        "command": "aisha.dirigent.refreshAgentActivity",
+        "title": "%cmd.refreshAgentActivity%",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "aisha.dirigent.approveSpend",
+        "title": "%cmd.approveSpend%"
+      },
+      {
+        "command": "aisha.dirigent.rejectSpend",
+        "title": "%cmd.rejectSpend%"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "aisha-dirigent",
+          "title": "AISHA Dirigent",
+          "icon": "resources/icon.svg"
+        }
+      ],
+      "secondarySidebar": [
+        {
+          "id": "aisha-story-chat",
+          "title": "AISHA Story",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "aisha-dirigent": [
+        {
+          "id": "aisha.dirigent.settings",
+          "name": "%view.settings%"
+        },
+        {
+          "id": "aisha.dirigent.session",
+          "name": "%view.session%"
+        },
+        {
+          "id": "aisha.dirigent.decisions",
+          "name": "%view.decisions%"
+        },
+        {
+          "id": "aisha.dirigent.models",
+          "name": "%view.models%"
+        },
+        {
+          "id": "aisha.dirigent.resources",
+          "name": "%view.resources%"
+        },
+        {
+          "id": "aisha.dirigent.agentActivity",
+          "name": "%view.agentActivity%"
+        },
+        {
+          "id": "aisha.dirigent.dashboard",
+          "name": "%view.dashboard%"
+        }
+      ],
+      "aisha-story-chat": [
+        {
+          "type": "webview",
+          "id": "aisha.dirigent.storyPanel",
+          "name": "%view.storyPanel%"
+        },
+        {
+          "type": "webview",
+          "id": "aisha.dirigent.storyChat",
+          "name": "%view.storyChat%"
+        }
+      ]
+    },
+    "walkthroughs": [
+      {
+        "id": "aishaWelcome",
+        "title": "%walkthrough.title%",
+        "description": "%walkthrough.description%",
+        "steps": [
+          {
+            "id": "welcome",
+            "title": "%walkthrough.step.welcome.title%",
+            "description": "%walkthrough.step.welcome.description%",
+            "media": {
+              "svg": "media/walkthrough/welcome.svg"
+            },
+            "completionEvents": [
+              "onStepSelected"
+            ]
+          },
+          {
+            "id": "detectEnv",
+            "title": "%walkthrough.step.detectEnv.title%",
+            "description": "%walkthrough.step.detectEnv.description%\n\n[$(search) Spustit detekci](command:aisha.dirigent.scanEnvironment)",
+            "media": {
+              "svg": "media/walkthrough/detect-env.svg"
+            },
+            "completionEvents": [
+              "onContext:aisha.warmup.scanned"
+            ]
+          },
+          {
+            "id": "connectBackend",
+            "title": "%walkthrough.step.connectBackend.title%",
+            "description": "%walkthrough.step.connectBackend.description%\n\n[$(plug) Připojit backend](command:aisha.dirigent.connect)",
+            "media": {
+              "svg": "media/walkthrough/connect-backend.svg"
+            },
+            "completionEvents": [
+              "onContext:aisha.warmup.hasBackend"
+            ]
+          },
+          {
+            "id": "signIn",
+            "title": "%walkthrough.step.signIn.title%",
+            "description": "%walkthrough.step.signIn.description%\n\n[$(sign-in) Přihlásit se](command:aisha.dirigent.login)\n\n[$(add) Vytvořit účet](command:aisha.dirigent.signup)",
+            "media": {
+              "svg": "media/walkthrough/sign-in.svg"
+            },
+            "completionEvents": [
+              "onContext:aisha.isAuthenticated"
+            ]
+          },
+          {
+            "id": "questionnaire",
+            "title": "%walkthrough.step.questionnaire.title%",
+            "description": "%walkthrough.step.questionnaire.description%\n\n[$(account) Vyplnit dotazník](command:aisha.dirigent.showQuestionnaire)",
+            "media": {
+              "svg": "media/walkthrough/questionnaire.svg"
+            },
+            "completionEvents": [
+              "onContext:aisha.questionnaire.completed"
+            ]
+          },
+          {
+            "id": "aiSetup",
+            "title": "%walkthrough.step.aiSetup.title%",
+            "description": "%walkthrough.step.aiSetup.description%\n\n[$(hubot) Najít AI modely](command:aisha.dirigent.discoverModels)",
+            "media": {
+              "svg": "media/walkthrough/ai-setup.svg"
+            },
+            "completionEvents": [
+              "onContext:aisha.warmup.hasAiModel"
+            ]
+          },
+          {
+            "id": "selectStory",
+            "title": "%walkthrough.step.selectStory.title%",
+            "description": "%walkthrough.step.selectStory.description%\n\n[$(bookmark) Vybrat story](command:aisha.dirigent.setStory)",
+            "media": {
+              "svg": "media/walkthrough/select-story.svg"
+            },
+            "completionEvents": [
+              "onCommand:aisha.dirigent.setStory"
+            ]
+          },
+          {
+            "id": "ready",
+            "title": "%walkthrough.step.ready.title%",
+            "description": "%walkthrough.step.ready.description%\n\n[$(comment-discussion) Otevřít Chat](command:workbench.action.chat.open)\n\n[$(dashboard) Otevřít Dashboard](command:aisha.dirigent.openDashboard)",
+            "media": {
+              "svg": "media/walkthrough/ready.svg"
+            },
+            "completionEvents": [
+              "onStepSelected"
+            ]
+          }
+        ]
+      }
+    ],
+    "configurationDefaults": {
+      "workbench.startupEditor": "welcomePage"
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "aisha.dirigent.refreshAgentActivity",
+          "when": "view == aisha.dirigent.agentActivity",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "aisha.dirigent.approveSpend",
+          "when": "view == aisha.dirigent.agentActivity && viewItem == aisha.spendApproval",
+          "group": "inline"
+        },
+        {
+          "command": "aisha.dirigent.rejectSpend",
+          "when": "view == aisha.dirigent.agentActivity && viewItem == aisha.spendApproval",
+          "group": "inline"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "build:deps": "npm run ensure:deps --prefix ../../packages/local-signals && npm run build --prefix ../../packages/local-signals",
+    "precompile": "npm run build:deps",
+    "compile": "node esbuild.config.js",
+    "prewatch": "npm run build:deps",
+    "watch": "node esbuild.config.js --watch",
+    "lint": "eslint src --ext ts",
+    "pretest": "npm run build:deps",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "pretype-check": "npm run build:deps",
+    "type-check": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@aisha/api-core": "file:../../packages/api-core",
+    "@aisha/local-signals": "file:../../packages/local-signals",
+    "@aisha/workbench-core": "file:../../packages/workbench-core",
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.99.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vscode/vsce": "^2.32.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.4"
+  }
+}

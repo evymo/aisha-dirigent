@@ -1,0 +1,32 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify.netseg.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+services:
+  svc-plugin-system:
+    networks:
+      - internal
+      - aisha-backend-net
+    labels:
+      - "traefik.docker.network=coolify"
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - "node -e \"require('http').get('http://127.0.0.1:3029/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\" || exit 1"
+      interval: 15s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+
+networks:
+  internal:
+    external: true
+    name: ${APP_NAME_PREFIX:?identita instance}-shared-net
+  aisha-frontend-net:
+    external: true
+    name: ${NETSEG_FRONTEND_NET:?generate-secrets}
+  aisha-backend-net:
+    external: true
+    name: ${NETSEG_BACKEND_NET:?generate-secrets}
+  aisha-data-net:
+    external: true
+    name: ${NETSEG_DATA_NET:?generate-secrets}

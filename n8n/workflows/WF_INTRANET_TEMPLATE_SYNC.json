@@ -1,0 +1,208 @@
+{
+  "name": "WF_INTRANET_TEMPLATE_SYNC",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24,
+              "triggerAtHour": 3
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Daily 03:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        220,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "intranet-template-sync",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Manual Sync Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Template sync: check repo for updated templates, re-import if changed\nconst input = $input.first().json;\nconst isWebhook = !!input.body || !!input.params;\nconst force = isWebhook && (input.query?.force === 'true' || input.body?.force === true);\nreturn [{\n  json: {\n    triggered_by: isWebhook ? 'manual_webhook' : 'cron_daily',\n    force,\n    started_at: new Date().toISOString(),\n  },\n}];"
+      },
+      "id": "init-context",
+      "name": "Init Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "command": "={{ 'bash /workspace/scripts/provision-intranet.sh --check' }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "check-status",
+      "name": "Check Intranet Status",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        660,
+        340
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = $input.first().json;\nconst exitCode = output.exitCode;\nconst stdout = output.stdout || '';\n\nif (exitCode !== 0) {\n  return [{ json: { status: 'error', message: 'Intranet check failed', stdout } }];\n}\n\nreturn [{ json: { status: 'ok', message: 'Intranet workspace verified', stdout } }];"
+      },
+      "id": "evaluate-status",
+      "name": "Evaluate Status",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "rpc",
+        "rpcName": "list_integration_services",
+        "rpcParams": "={{ JSON.stringify({ p_service_type: 'intranet' }) }}",
+        "onError": "continueRegularOutput"
+      },
+      "id": "check-registration",
+      "name": "Check Service Registration",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        340
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, status: $('Evaluate Status').first().json.status }) }}"
+      },
+      "id": "respond-result",
+      "name": "Respond Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        340
+      ]
+    }
+  ],
+  "connections": {
+    "Daily 03:00": {
+      "main": [
+        [
+          {
+            "node": "Init Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Sync Webhook": {
+      "main": [
+        [
+          {
+            "node": "Init Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Init Context": {
+      "main": [
+        [
+          {
+            "node": "Check Intranet Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Intranet Status": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Status": {
+      "main": [
+        [
+          {
+            "node": "Check Service Registration",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Service Registration": {
+      "main": [
+        [
+          {
+            "node": "Respond Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "intranet"
+    },
+    {
+      "name": "story-intra"
+    }
+  ]
+}

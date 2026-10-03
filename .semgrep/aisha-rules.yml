@@ -1,0 +1,128 @@
+###############################################################################
+# AISHA orchestrator — local Semgrep rules.
+#
+# AUTO-GENERATED from public.aisha_static_defense_rules table.
+# DO NOT EDIT MANUALLY — regenerate via `npm run gen:static-defense`.
+#
+# To add or modify a rule:
+#   1. INSERT/UPDATE in aisha_static_defense_rules via Appsmith UI OR
+#      RPC propose_static_defense_rule / publish_static_defense_rule
+#   2. Run `npm run gen:static-defense` locally (needs DB) OR add a new
+#      seed-style migration touching aisha_static_defense_rules
+#   3. Commit the regenerated YAML. The .aisha/ payload cache stays LOCAL
+#      (gitignored) — CI regenerates from the seed migration via --from-seed.
+#
+# Rule severity convention:
+#   ERROR   — blocks the workflow (matches OWASP A-category violations)
+#   WARNING — surfaces but doesn't block (style/maintainability)
+#   INFO    — informational, for trend tracking
+###############################################################################
+
+
+rules:
+
+  # A09 — aisha-console-in-service-runtime
+  - id: aisha-console-in-service-runtime
+    pattern-either:
+      - pattern: "console.log(...)"
+      - pattern: "console.error(...)"
+      - pattern: "console.warn(...)"
+      - pattern: "console.info(...)"
+      - pattern: "console.debug(...)"
+    paths:
+      include:
+        - "services/"
+      exclude:
+        - "services/*/src/__tests__/**"
+        - "services/*/src/**/*.test.ts"
+        - "services/*/scripts/**"
+    message: |
+      OWASP A09: console.* call in service runtime. Use createSafeLogger() from @aisha/security so log redaction + audit linking apply.
+    severity: ERROR
+    languages: [typescript]
+
+  # A03 — aisha-fastify-route-without-zod
+  - id: aisha-fastify-route-without-zod
+    pattern-either:
+      - pattern: "$APP.post($PATH, async ($REQ, $REPLY) => { ... $REQ.body ... })"
+      - pattern: "$APP.put($PATH, async ($REQ, $REPLY) => { ... $REQ.body ... })"
+      - pattern: "$APP.patch($PATH, async ($REQ, $REPLY) => { ... $REQ.body ... })"
+    paths:
+      include:
+        - "services/"
+      exclude:
+        - "services/*/src/__tests__/**"
+        - "services/*/src/**/*.test.ts"
+    message: |
+      OWASP A03: Fastify route reads req.body without validateBody()/Zod. Use validateBody(zodSchema, req.body) from @aisha/security to enforce schema before any downstream use.
+    severity: ERROR
+    languages: [typescript]
+
+  # A02 — aisha-hardcoded-secret-fallback
+  - id: aisha-hardcoded-secret-fallback
+    pattern-either:
+      - pattern: "process.env.$KEY ?? \"changeme\""
+      - pattern: "process.env.$KEY ?? \"password\""
+      - pattern: "process.env.$KEY ?? \"secret\""
+      - pattern: "process.env.$KEY ?? \"default-secret\""
+      - pattern: "process.env.$KEY || \"changeme\""
+      - pattern: "process.env.$KEY || \"password\""
+      - pattern: "process.env.$KEY || \"secret\""
+    message: |
+      OWASP A02: weak secret fallback detected. If the env var is missing, the service should refuse to start (loud-fail) rather than silently using a guessable default.
+    severity: ERROR
+    languages: [typescript]
+
+  # A07 — aisha-inline-jose-jwt-verify
+  - id: aisha-inline-jose-jwt-verify
+    pattern-either:
+      - pattern: "jwtVerify($TOKEN, ...)"
+    paths:
+      include:
+        - "services/"
+      exclude:
+        - "services/*/src/__tests__/**"
+        - "services/*/src/**/*.test.ts"
+        - "packages/security/src/jwt.ts"
+    message: |
+      OWASP A07: inline jose.jwtVerify() detected. JWT verification belongs in @aisha/security/jwt where JWKS caching, audience checking, MFA policy and session-age policy are enforced uniformly.
+    severity: ERROR
+    languages: [typescript]
+
+  # A10 — aisha-raw-fetch-outside-ssrf-guard
+  - id: aisha-raw-fetch-outside-ssrf-guard
+    pattern-either:
+      - pattern: "fetch($URL, ...)"
+      - pattern: "await fetch($URL, ...)"
+    paths:
+      include:
+        - "services/"
+      exclude:
+        - "services/*/src/__tests__/**"
+        - "services/*/src/**/*.test.ts"
+        - "packages/security/src/ssrf.ts"
+    message: |
+      OWASP A10 (SSRF): raw fetch() call detected outside @aisha/security/ssrf. Use createSsrfGuard().safeFetch() to enforce host allowlist + scheme restriction.
+    severity: ERROR
+    languages: [typescript]
+
+  # AITG-APP-01 — aitg-llm-import-without-guard
+  - id: aitg-llm-import-without-guard
+    pattern-either:
+      - pattern: "import { ... } from 'openai'"
+      - pattern: "import { ... } from '@anthropic-ai/sdk'"
+      - pattern: "import { ... } from '@google/generative-ai'"
+      - pattern: "import { ... } from 'cohere-ai'"
+    paths:
+      include:
+        - "services/"
+        - "packages/"
+      exclude:
+        - "services/*/src/__tests__/**"
+        - "services/*/src/**/*.test.ts"
+        - "packages/aitg/src/__tests__/**"
+        - "packages/security/src/__tests__/**"
+    message: |
+      AITG-APP-01: file imports an LLM provider SDK but does not import withAitgGuard from @aisha/aitg. Every LLM call site MUST wrap calls in withAitgGuard so the runtime classifiers record outcomes to aitg_runs.
+    severity: ERROR
+    languages: [typescript]

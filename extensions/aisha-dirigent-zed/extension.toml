@@ -1,0 +1,10 @@
+id = "aisha-dirigent"
+name = "AISHA Dirigent"
+description = "AISHA ZEDBENCH orchestration for Zed Agent Panel via MCP"
+version = "0.1.1"
+schema_version = 1
+authors = ["AISHA"]
+repository = "https://github.com/aisha/evymo-ai-orchestrator"
+
+[context_servers.aisha-knowledge]
+name = "AISHA Knowledge"

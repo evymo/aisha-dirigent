@@ -1,0 +1,37 @@
+{
+  "default_server_config": {
+    "m.homeserver": {
+      "base_url": "https://${MATRIX_DOMAIN}",
+      "server_name": "${MATRIX_DOMAIN}"
+    },
+    "m.identity_server": {
+      "base_url": ""
+    }
+  },
+  "disable_custom_urls": true,
+  "disable_guests": true,
+  "disable_login_language_selector": false,
+  "disable_3pid_login": true,
+  "brand": "Evymo",
+  "default_country_code": "CZ",
+  "show_labs_settings": false,
+  "default_theme": "light",
+  "room_directory": {
+    "servers": ["${MATRIX_DOMAIN}"]
+  },
+  "element_call": {
+    "url": "https://${ELEMENT_CALL_DOMAIN}",
+    "use_exclusively": true,
+    "participant_limit": 50
+  },
+  "features": {
+    "feature_group_calls": true,
+    "feature_video_rooms": true,
+    "feature_element_call_video_rooms": true
+  },
+  "setting_defaults": {
+    "breadcrumbs": true,
+    "MessageComposerInput.isRichTextEnabled": false
+  },
+  "map_style_url": null
+}

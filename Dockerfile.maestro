@@ -1,0 +1,128 @@
+# Dockerfile.maestro — AISHA-adapted Maestro dialog management service (Alquist Insight)
+#
+# Build context: . (repo root) — Coolify requires root context for all services
+# Exposes: 8020 (FastAPI/Uvicorn)
+#
+# Maestro je dialog management vrstvou Alquist Insight stacku, která řídí
+# multi-turn coherence (Alexa Prize USP). V AISHA stacku slouží jako LLM provider
+# adapter v `services/svc-ai-chat` orchestraci — Tao/Psyche/Hippocampus/governance
+# vrstvy se aplikují na úrovni svc-ai-chat, NE uvnitř Maestra.
+#
+# Multi-stage:
+#   1. patcher — aplikuje aisha/insight-patches/*.patch na pinný submodule
+#                (vendoring-with-patches pattern; viz scripts/insight-patches-apply.sh)
+#   2. runtime — finální image, COPY z patched source
+
+# ── Stage 1: patcher ────────────────────────────────────────────────────────
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/python:3.11-slim-bookworm AS patcher
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends git ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /src
+
+# Submodule source (pinný commit) + AISHA patches.
+COPY packages/insight/ ./insight/
+COPY aisha/insight-patches/ ./patches/
+
+# `git apply` vyžaduje git repo kontext. Submodule po COPY má `.git` jako gitlink
+# soubor (`gitdir: ../../.git/modules/packages/insight`), který v build kontextu
+# ukazuje na neexistující path → git operace selhajou s "not a git repository".
+# `**/.git` rule v .dockerignore zamezí copy gitlinku, ale defensive `rm -rf .git`
+# tu ponecháme pro případ že někdo .dockerignore omylem upraví.
+#
+# Idempotentní apply (matches scripts/insight-patches-apply.sh) — Docker COPY
+# inheritne developer's locally-applied state pokud někdo spustil applier mimo
+# --reset. Reverse-check detekuje already-applied patche, jinak forward apply.
+# Build je tak deterministicky reproducible bez ohledu na local WD state.
+#
+# `--initial-branch=patches` je explicit pro git ≥2.28 (Bookworm má 2.39).
+RUN cd insight \
+    && rm -rf .git \
+    && git init -q --initial-branch=patches \
+    && git config user.email "dockerfile@aisha.local" \
+    && git config user.name  "AISHA Dockerfile patcher" \
+    && git add -A \
+    && git commit -q -m "vendor: snapshot (incl. any developer-applied patches)" \
+    && for patch in /src/patches/*.patch; do \
+         [ -f "$patch" ] || continue; \
+         name=$(basename "$patch"); \
+         awk '/^diff --git/{found=1} found' "$patch" > /tmp/raw.patch; \
+         if git apply --reverse --check < /tmp/raw.patch >/dev/null 2>&1; then \
+           echo "[patcher] $name — already applied (skip)"; \
+         elif git apply --check < /tmp/raw.patch >/dev/null 2>&1; then \
+           git apply < /tmp/raw.patch; \
+           echo "[patcher] $name — applied"; \
+         else \
+           echo "[patcher] $name — does NOT apply (upstream drift?)" >&2; \
+           exit 1; \
+         fi; \
+       done
+
+
+# ── Stage 2: runtime ────────────────────────────────────────────────────────
+FROM ${REGISTRY_PROXY}library/python:3.11-slim-bookworm
+
+WORKDIR /root
+
+RUN pip install --disable-pip-version-check --no-cache-dir pipenv setuptools wheel \
+    && apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Patched submodule source z patcher stage. `common` package je shared dep.
+COPY --from=patcher /src/insight/common common
+COPY --from=patcher /src/insight/maestro/Pipfile /src/insight/maestro/Pipfile.lock maestro/
+RUN cd maestro && pipenv install --deploy --system
+
+ENV USER=app
+ENV USER_HOME=/home/$USER
+RUN groupadd -g 999 $USER \
+    && useradd -r -u 999 -g $USER $USER \
+    && mkdir -p $USER_HOME \
+    && chown $USER:$USER -R $USER_HOME
+
+USER $USER
+WORKDIR $USER_HOME
+
+ENV PYTHONPATH=$USER_HOME:$USER_HOME/maestro
+
+COPY --from=patcher --chown=999:999 /src/insight/common ./common
+COPY --from=patcher --chown=999:999 /src/insight/maestro ./maestro
+COPY --from=patcher --chown=999:999 /src/insight/maestro/run.py ./run.py
+COPY --from=patcher --chmod=755 --chown=999:999 /src/insight/maestro/start.sh ./start.sh
+
+# ─────────────────────────────────────────────────────────────────────────────
+# AISHA opt-out z GitLab frontend fetch
+# ─────────────────────────────────────────────────────────────────────────────
+# Upstream Alquist Insight `fetch_client()` v packages/insight/maestro/maestro/
+# utils/frontend.py při startu stahuje Admin Console + Interactor static buildy
+# z https://gitlab.com/api/v4/projects/60777891/packages/generic/... Vyžaduje
+# PACKAGE_REGISTRY_TOKEN s read scope (gldt-...). Public token v config.env je
+# expirovaný / restricted, takže fetch failne s 401 → Maestro startup crash.
+#
+# AISHA nepoužívá Alquist UI (frontend volá Maestra POUZE přes svc-ai-chat
+# /story-consult orchestraci s plným brain wiringem — viz INSIGHT_INTEGRATION.md).
+# Místo dependence na external GitLab registry tu pre-vytvoříme prázdné
+# index.html placeholdery — fetch_client() má skip logic: pokud index.html už
+# existuje, fetch se neprovádí (frontend.py:49-51).
+#
+# Toto je **vědomý opt-out**, ne workaround. Pokud někdo někdy bude chtít plný
+# Alquist UI: smaže placeholdery + nastaví PACKAGE_REGISTRY_TOKEN s valid auth.
+USER root
+RUN mkdir -p ./maestro/frontend/admin/dist ./maestro/frontend/interactor/dist \
+    && touch ./maestro/frontend/admin/dist/index.html \
+       ./maestro/frontend/interactor/dist/index.html \
+    && chown -R 999:999 ./maestro/frontend
+USER $USER
+
+# /health/ready gate-uje USP integritu (CONTEXT_ENABLED runtime check) — patch
+# 0001-maestro-readiness-probe-context-gate přidá readiness.py + router include.
+# Při bare-image runu (bez compose override) je to defaultní healthcheck.
+# Compose runtime přebírá se sjednoceným start_period 30s s ES (viz integration compose).
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD curl -fsS http://localhost:8020/health/ready || exit 1
+
+EXPOSE 8020
+CMD ["./start.sh"]

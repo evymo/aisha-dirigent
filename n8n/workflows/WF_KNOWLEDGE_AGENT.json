@@ -1,0 +1,398 @@
+{
+  "name": "WF_KNOWLEDGE_AGENT",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "knowledge-agent",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Knowledge Agent Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=Jsi **AISHA Knowledge Expert** — autonomní subsystém Dirigenta pro znalostní bázi Guild of Experts.\n\n## Role v orchestraci\nJsi subsystém řízený Dirigentem. Dirigent ti deleguje knowledge úlohy. Tvůj výstup je strukturovaný SIGNÁL zpět Dirigentovi.\n\n## Operační protokol\n\n### Při knowledge searchi:\n1. Rozpoznej typ dotazu: full-text vs. sémantický\n2. Pro přesné dotazy → `search_knowledge` (full-text)\n3. Pro konceptuální dotazy → `search_knowledge_v2` (sémantické vektory)\n4. Cituj konkrétní rules s ID a názvem\n5. Pokud nic nenalezeno → signalizuj knowledge gap\n\n### Při expert matchingu:\n1. `get_expertise_areas` — zjisti dostupné oblasti\n2. `match_experts({ ... })` s relevantním domain/tech kontextem\n3. Vrať seřazený seznam expertů s relevance score\n\n### Při context assembly:\n1. `get_project_context({ project_description, expertise_areas, context_tags })`\n2. Vrať strukturovaný kontext pro použití Dirigentem nebo dalšími agenty\n\n### Při knowledge gap detekci:\nPokud dotaz nemá relevantní výsledky (0 results nebo nízká relevance):\n→ Signalizuj Dirigentovi `signal: 'knowledge_gap'` s topic a kontextem\n→ Dirigent rozhodne zda vytvořit knowledge request\n\n## SIGNÁLNÍ PROTOKOL — Formát odpovědi\n\nVŽDY vrať strukturovanou odpověď:\n```json\n{\n  \"signal\": \"knowledge_result\",\n  \"action\": \"search\" | \"match\" | \"context\" | \"stats\",\n  \"results_count\": 0,\n  \"has_knowledge_gap\": false,\n  \"gap_topic\": null,\n  \"results\": [\n    { \"rule_id\": \"uuid\", \"title\": \"název\", \"relevance\": 0.95, \"summary\": \"...\" }\n  ],\n  \"experts_matched\": [],\n  \"summary\": \"Stručné shrnutí\"\n}\n```\n\nDirigent tento signál přijme a rozhodne:\n- `has_knowledge_gap: true` → Dirigent vytvoří knowledge request\n- Nízký `results_count` → Dirigent zkusí alternativní přístup\n\n## Pravidla\n- VŽDY vyhledej v KB PŘED odpovědí — nikdy nehádej\n- Cituj rules s ID\n- Pokud nenajdeš → řekni to upřímně + signalizuj gap\n- NIKDY nevracej sensitive data — pouze pravidla, doporučení, metadata\n- Odpovídej v jazyce dotazu (čeština / angličtina)",
+          "maxIterations": 8
+        }
+      },
+      "id": "ai-agent",
+      "name": "Knowledge Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "routingStrategy": "auto",
+        "modelOverride": "",
+        "options": {
+          "temperature": 0.3,
+          "maxOutputTokens": 4096,
+          "topP": 0.9,
+          "maxRetries": 2
+        }
+      },
+      "id": "llm-router",
+      "name": "LLM Router",
+      "type": "n8n-nodes-aisha.aishaLlmRouter",
+      "typeVersion": 1,
+      "position": [
+        480,
+        500
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "__REMAP__",
+          "name": "Google Gemini(PaLM) Api account"
+        },
+        "openAiApi": {
+          "id": "__REMAP__",
+          "name": "OpenAi account"
+        },
+        "anthropicApi": {
+          "id": "__REMAP__",
+          "name": "Anthropic account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.body?.session_id || $json.headers?.['x-session-id'] || 'default' }}",
+        "contextWindowLength": 10
+      },
+      "id": "memory",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        660,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare input for AI Agent from webhook body\nconst body = $input.item.json.body || {};\nconst query = body.query || body.message || body.text || '';\n\nif (!query) {\n  return { json: { error: 'Missing query parameter in request body' } };\n}\n\nreturn {\n  json: {\n    chatInput: query,\n    session_id: body.session_id || 'webhook-' + Date.now(),\n    metadata: {\n      source: 'webhook',\n      timestamp: new Date().toISOString(),\n      user_id: body.user_id || null,\n    }\n  }\n};"
+      },
+      "id": "prepare-input",
+      "name": "Prepare Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format the agent response for API consumers\nconst agentOutput = $input.item.json;\n\nreturn {\n  json: {\n    success: true,\n    response: agentOutput.output || agentOutput.text || agentOutput,\n    agent: 'knowledge',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "format-output",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "name": "search_knowledge",
+        "description": "Search the AISHA Guild of Experts knowledge base. Supports text search, category filtering, expertise area filtering, and AI context tag matching. Returns ranked results.\n\nInput: JSON object. Parameters:\n  - query (optional): string — Text to search for in rule titles, summaries, body, and AI instructions.\n  - category (optional): string — Filter by rule category.\n  - expertise_area (optional): string — Filter by expertise area slug (e.g., 'frontend', 'backend', 'ai', 'security').\n  - context_tags (optional): array — AI context tags to match against (e.g., ['react', 'typescript', 'testing']). Rules with overlapping \n  - include_ai_instructions (optional): boolean — Whether to include AI-specific instructions in results. Default: true.\n  - limit (optional): number — Maximum number of results (1–50). Default: 20.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: search_knowledge\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n  jsonrpc: '2.0',\n  id: Date.now(),\n  method: 'tools/call',\n  params: { name: 'search_knowledge', arguments: args }\n});\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error (search_knowledge): ' + (e.message || String(e));\n}\n\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-search_knowledge",
+      "name": "MCP: search_knowledge",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        860,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "name": "search_knowledge_v2",
+        "description": "Semantic search across the knowledge graph using vector embeddings, text matching, and tag filtering. Returns chunk-level results with similarity scores. Uses OpenAI embeddings for query vectorization. Falls back to text+tag search if embedding generation fails.\n\nInput: JSON object. Parameters:\n  - query (optional): string — Natural language search query. Will be vectorized for semantic matching.\n  - item_types (optional): array — Filter by knowledge item types: expert_rule, engineering_doc, domain_doc, playbook, case_study.\n  - category (optional): string — Filter by category (e.g., 'security', 'architecture').\n  - expertise_area (optional): string — Filter by expertise area slug.\n  - context_tags (optional): array — Tags to boost matching results.\n  - include_ai_instructions (optional): boolean — Include AI instructions in results. Default: true.\n  - limit (optional): number — Maximum results (1-50). Default: 20.\n  - similarity_threshold (optional): number — Minimum cosine similarity (0-1). Default: 0.3.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: search_knowledge_v2\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n  jsonrpc: '2.0',\n  id: Date.now(),\n  method: 'tools/call',\n  params: { name: 'search_knowledge_v2', arguments: args }\n});\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error (search_knowledge_v2): ' + (e.message || String(e));\n}\n\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-search_knowledge_v2",
+      "name": "MCP: search_knowledge_v2",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        860,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "name": "get_expert_rule",
+        "description": "Get the full content of an expert rule by slug, including body markdown, AI instructions, documents, and metadata.\n\nInput: JSON object. Parameters:\n  - slug (required): string — The unique slug of the expert rule.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: get_expert_rule\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n  jsonrpc: '2.0',\n  id: Date.now(),\n  method: 'tools/call',\n  params: { name: 'get_expert_rule', arguments: args }\n});\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error (get_expert_rule): ' + (e.message || String(e));\n}\n\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-get_expert_rule",
+      "name": "MCP: get_expert_rule",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        860,
+        700
+      ]
+    },
+    {
+      "parameters": {
+        "name": "get_expertise_areas",
+        "description": "List all Guild of Experts expertise areas with rule and expert counts. Use this to discover what knowledge domains are available.\n\nInput: empty JSON object {} or no input needed.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: get_expertise_areas\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n  jsonrpc: '2.0',\n  id: Date.now(),\n  method: 'tools/call',\n  params: { name: 'get_expertise_areas', arguments: args }\n});\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error (get_expertise_areas): ' + (e.message || String(e));\n}\n\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-get_expertise_areas",
+      "name": "MCP: get_expertise_areas",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        860,
+        800
+      ]
+    },
+    {
+      "parameters": {
+        "name": "match_experts",
+        "description": "Find Guild of Experts members matching specific expertise and context. Use for project staffing, consultation matching, or finding domain specialists.\n\nInput: JSON object. Parameters:\n  - expertise_area (optional): string — Expertise area slug to filter by.\n  - context_tags (optional): array — AI context tags describing the project needs. Experts with matching published rules score higher.\n  - min_proficiency (optional): number — Minimum proficiency level (1-5). Default: 1.\n  - limit (optional): number — Maximum number of experts (1-20). Default: 10.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: match_experts\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n  jsonrpc: '2.0',\n  id: Date.now(),\n  method: 'tools/call',\n  params: { name: 'match_experts', arguments: args }\n});\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error (match_experts): ' + (e.message || String(e));\n}\n\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-match_experts",
+      "name": "MCP: match_experts",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        860,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "name": "get_agent_knowledge",
+        "description": "Get all expert rules bound to a specific agent configuration. Returns rules with their binding type (instructions, knowledge_source, guardrail, reference) and priority ordering.\n\nInput: JSON object. Parameters:\n  - agent_slug (required): string — The slug of the agent configuration.\n  - binding_type (optional): string — Filter by binding type.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: get_agent_knowledge\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n  jsonrpc: '2.0',\n  id: Date.now(),\n  method: 'tools/call',\n  params: { name: 'get_agent_knowledge', arguments: args }\n});\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error (get_agent_knowledge): ' + (e.message || String(e));\n}\n\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-get_agent_knowledge",
+      "name": "MCP: get_agent_knowledge",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        860,
+        1000
+      ]
+    },
+    {
+      "parameters": {
+        "name": "get_knowledge_item",
+        "description": "Get a complete knowledge item by source slug or ID, including body content, AI instructions, chunks, and active bindings.\n\nInput: JSON object. Parameters:\n  - slug (optional): string — Source slug of the knowledge item.\n  - id (optional): string — UUID of the knowledge item. Use slug or id, not both.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: get_knowledge_item\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n  jsonrpc: '2.0',\n  id: Date.now(),\n  method: 'tools/call',\n  params: { name: 'get_knowledge_item', arguments: args }\n});\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error (get_knowledge_item): ' + (e.message || String(e));\n}\n\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-get_knowledge_item",
+      "name": "MCP: get_knowledge_item",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        860,
+        1100
+      ]
+    },
+    {
+      "parameters": {
+        "name": "get_knowledge_stats",
+        "description": "Get statistics about the knowledge graph: total items, chunks, embeddings, coverage by type and category.\n\nInput: empty JSON object {} or no input needed.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: get_knowledge_stats\n// Auto-generated by deploy-individual-tools.mjs\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n  jsonrpc: '2.0',\n  id: Date.now(),\n  method: 'tools/call',\n  params: { name: 'get_knowledge_stats', arguments: args }\n});\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error (get_knowledge_stats): ' + (e.message || String(e));\n}\n\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-get_knowledge_stats",
+      "name": "MCP: get_knowledge_stats",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        860,
+        1200
+      ]
+    }
+  ],
+  "connections": {
+    "Knowledge Agent Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Input": {
+      "main": [
+        [
+          {
+            "node": "Knowledge Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Knowledge Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Knowledge Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: search_knowledge": {
+      "ai_tool": [
+        [
+          {
+            "node": "Knowledge Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: search_knowledge_v2": {
+      "ai_tool": [
+        [
+          {
+            "node": "Knowledge Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: get_expert_rule": {
+      "ai_tool": [
+        [
+          {
+            "node": "Knowledge Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: get_expertise_areas": {
+      "ai_tool": [
+        [
+          {
+            "node": "Knowledge Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: match_experts": {
+      "ai_tool": [
+        [
+          {
+            "node": "Knowledge Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: get_agent_knowledge": {
+      "ai_tool": [
+        [
+          {
+            "node": "Knowledge Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: get_knowledge_item": {
+      "ai_tool": [
+        [
+          {
+            "node": "Knowledge Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: get_knowledge_stats": {
+      "ai_tool": [
+        [
+          {
+            "node": "Knowledge Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Router": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Knowledge Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

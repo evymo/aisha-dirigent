@@ -1,0 +1,57 @@
+/* Construction / site supervision (building inspector) — example template tokens.
+ * Brand-neutral, fork-freely. Engineering palette: steel-blueprint blue + concrete
+ * grey + a thin safety-orange accent. Sober and precise — a credentialed,
+ * document-backed professional service. Distinct from the electrician's
+ * charcoal+amber and the legal navy+gold.
+ *
+ * Authored on :root so it matches the GrapesJS editor; PageRenderer maps :root →
+ * .gjs-page-content, so these cascade to BOTH the static chrome (via the --color-*
+ * aliases) AND the live contact-form runtime block (shadcn hsl(var(--token))).
+ * The shadcn set MUST be bare-HSL triplets ("H S% L%"). */
+:root {
+  /* shadcn token set — consumed by the runtime React blocks (light, steel-blue+orange). */
+  --background: 210 29% 97%;
+  --foreground: 210 31% 15%;
+  --card: 0 0% 100%;
+  --card-foreground: 210 31% 15%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 210 31% 15%;
+  --muted: 206 26% 95%;
+  --muted-foreground: 211 13% 42%;
+  --primary: 201 52% 31%;          /* steel-blueprint blue #265b78 */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 206 26% 95%;
+  --secondary-foreground: 210 31% 15%;
+  --accent: 24 73% 55%;            /* safety orange #e07b39 */
+  --accent-foreground: 0 0% 100%;
+  --border: 208 21% 88%;
+  --input: 208 21% 88%;
+  --ring: 201 52% 31%;
+
+  /* template's own semantic names, ALIASED to the shadcn set → one palette. */
+  --color-bg: hsl(var(--background));
+  --color-fg: hsl(var(--foreground));
+  --color-muted: hsl(var(--muted-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-dark: hsl(202 52% 23%);    /* #1c4359 — no shadcn slot */
+  --color-primary-fg: hsl(var(--primary-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-border: hsl(var(--border));
+  --color-surface: hsl(var(--card));
+  --color-surface-2: hsl(var(--muted));
+  --color-dark: hsl(var(--foreground));
+  --color-dark-fg: hsl(207 30% 93%);         /* #e7edf2 — no shadcn slot */
+
+  --font-display: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-body: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', Menlo, monospace;
+
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 2rem;
+  --space-xl: 4rem;
+
+  --radius-sm: 4px;
+  --radius-md: 10px;
+}

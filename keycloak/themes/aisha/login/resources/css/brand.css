@@ -1,0 +1,16 @@
+/*
+ * HODNOTY INSTANCE — poslední vrstva jazyka.
+ *
+ * Tady je schválně PRÁZDNÁ: platforma nesmí nést značku žádného zákazníka.
+ * Bez instančního overlaye se stránka vykreslí ve výchozích hodnotách
+ * designového jazyka (design-language.css) — čitelně a bez cizí značky.
+ *
+ * Instanční overlay tenhle soubor PŘEPÍŠE svým. Co do něj patří:
+ *   - `@import url("tokens.css");` — hodnoty značky instance (ideálně symlink
+ *     na tentýž soubor, ze kterého žije extranet i mobilní povrch),
+ *   - nanejvýš pár vlastních deklarací, když značka potřebuje víc než tokeny.
+ *
+ * Co do něj NEPATŘÍ: rozvržení (login.css), primitivy (esdk.css) ani texty
+ * (message bundle). Nová instance se obléká přepsáním HODNOT, ne kopií
+ * stránky — proto v běžném případě stačí `--primary` a `--primary-ink`.
+ */

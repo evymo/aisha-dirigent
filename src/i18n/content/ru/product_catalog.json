@@ -1,0 +1,14 @@
+{
+  "api-gateway.description": "Основной API Gateway для маршрутизации и трансформации",
+  "api-gateway.name": "API Gateway",
+  "auth-module.description": "Модуль для аутентификации и авторизации",
+  "auth-module.name": "Auth Module",
+  "caching.description": "Эффективное кеширование для улучшения времени отклика",
+  "caching.name": "Кэширование",
+  "ci-pipeline.description": "CI Pipeline для автоматического тестирования и интеграции",
+  "ci-pipeline.name": "CI Pipeline",
+  "load-balancer.description": "Модуль для балансировки нагрузки и производительности",
+  "load-balancer.name": "Load Balancer",
+  "monitoring.description": "Инструмент для мониторинга и наблюдаемости",
+  "monitoring.name": "Мониторинг"
+}

@@ -1,0 +1,220 @@
+{
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "meta": {
+    "designPattern": "event-driven-propagation",
+    "philosophy": "Listens for expert_rule changes via webhook (triggered by pg_notify or Supabase webhook). Propagates changes: fetches instruction payload, generates ALL IDE instruction files (copilot, agents, claude, cursorrules, windsurfrules, aisha-agent, codex-skill), commits to Forgejo, notifies MCP clients, logs to Langfuse.",
+    "selfDesignHint": "Aisha: This workflow closes the loop between DB rule edits and ALL downstream IDE consumers. It ensures every IDE instruction file stays in sync with expert_rules via the adapter registry pattern."
+  },
+  "connections": {
+    "Rule Change Webhook": {
+      "main": [
+        [
+          {
+            "node": "Parse Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Payload": {
+      "main": [
+        [
+          {
+            "node": "Fetch Instruction Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Instruction Payload": {
+      "main": [
+        [
+          {
+            "node": "Generate All IDE Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate All IDE Files": {
+      "main": [
+        [
+          {
+            "node": "Commit to Forgejo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Commit to Forgejo": {
+      "main": [
+        [
+          {
+            "node": "Log to Langfuse",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify MCP Clients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "id": "rp-webhook-001",
+      "name": "Rule Change Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "rule-propagation",
+      "parameters": {
+        "authentication": "headerAuth",
+        "path": "rule-propagation",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      }
+    },
+    {
+      "id": "rp-parse-002",
+      "name": "Parse Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Parse the incoming pg_notify / webhook payload\nconst body = $input.first().json.body || $input.first().json;\n\nconst ruleId = body.rule_id || body.record?.id || 'unknown';\nconst ruleSlug = body.rule_slug || body.record?.slug || 'unknown';\nconst operation = body.operation || body.type || 'UPDATE';\nconst rulesetIds = body.affected_rulesets || [];\nconst newFingerprint = body.new_fingerprint || null;\nconst storyId = body.story_id || null;\n\nreturn [{\n  json: {\n    ruleId,\n    ruleSlug,\n    operation,\n    rulesetIds,\n    newFingerprint,\n    storyId,\n    receivedAt: new Date().toISOString()\n  }\n}];"
+      }
+    },
+    {
+      "id": "rp-fetch-003",
+      "name": "Fetch Instruction Payload",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ],
+      "parameters": {
+        "functionName": "get_instruction_payload",
+        "rpcParams": "={{ JSON.stringify({ p_story_id: $json.storyId || null }) }}",
+        "useSingleOutput": true,
+        "onError": "continueRegularOutput"
+      },
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "supabase-cred",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "rp-regen-004",
+      "name": "Generate All IDE Files",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "jsCode": "// Generate ALL IDE instruction files from the instruction payload.\n// This mirrors the adapter pattern from scripts/ide-adapters/registry.mjs\n// Each adapter produces content for its specific IDE format.\n\nconst payload = $input.first().json;\nconst rules = payload.rules || [];\nconst story = payload.story || {};\nconst ruleset = payload.ruleset || {};\nconst generatedAt = new Date().toISOString();\n\n// --- Shared helpers ---\nconst AUTO_GEN_MARKER = 'Auto-generated from AISHA Expert Overlay ruleset.';\n\nfunction autoGenHeader(title, fingerprint) {\n  let h = `# ${title}\\n\\n> ${AUTO_GEN_MARKER}\\n> **Do not edit manually** — regenerate via \\`npm run gen:ide\\`.\\n`;\n  if (fingerprint) h += `> Fingerprint: \\`${fingerprint}\\`\\n`;\n  h += `> Generated: ${generatedAt}\\n\\n`;\n  return h;\n}\n\nfunction groupByCategory(rules) {\n  const map = {};\n  for (const r of rules) {\n    const cat = r.category || 'other';\n    if (!map[cat]) map[cat] = [];\n    map[cat].push(r);\n  }\n  return map;\n}\n\nfunction categoryLabel(cat) {\n  return cat.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');\n}\n\nfunction getRuleContent(rule) {\n  if (rule.ai_instructions?.trim()) return rule.ai_instructions.trim();\n  if (rule.summary?.trim()) return rule.summary.trim();\n  return '';\n}\n\nfunction renderRules(rules) {\n  const grouped = groupByCategory(rules);\n  const sections = [];\n  for (const [cat, catRules] of Object.entries(grouped)) {\n    const blocks = catRules.map(r => {\n      const c = getRuleContent(r);\n      return c ? `#### ${r.title}\\n\\n${c}` : '';\n    }).filter(Boolean);\n    if (blocks.length) sections.push(`### ${categoryLabel(cat)}\\n\\n${blocks.join('\\n\\n')}`);\n  }\n  return sections.join('\\n\\n');\n}\n\nfunction metaFooter(adapterId, outputPath) {\n  return '\\n' + JSON.stringify({\n    story_id: story.id || null,\n    output_path: outputPath,\n    adapter: adapterId,\n    fingerprint: ruleset.fingerprint || null,\n    generated_at: generatedAt\n  }, null, 2) + '\\n';\n}\n\nconst fp = ruleset.fingerprint || null;\n\n// --- Adapters ---\nconst files = {};\n\n// 1. copilot-instructions.md\nlet copilot = autoGenHeader('Copilot Instructions — AISHA Platform', fp);\ncopilot += '## \\u26A0\\uFE0F Expert Rules\\n\\n' + renderRules(rules) + '\\n\\n';\ncopilot += '## \\uD83D\\uDCCB PR Checklist\\n\\n';\ncopilot += '- [ ] All expert rules followed\\n- [ ] `npm run test` — passing\\n- [ ] `npm run build` — successful\\n- [ ] `npm run lint` — no errors\\n- [ ] No hardcoded text in JSX (use i18n)\\n- [ ] No `any` types\\n- [ ] No `console.log` in production code\\n';\ncopilot += metaFooter('copilot', '.github/copilot-instructions.md');\nfiles['.github/copilot-instructions.md'] = copilot;\n\n// 2. AGENTS.md (concise rules for Codex/OpenAI agents)\nlet agents = autoGenHeader('AGENTS.md — Pokyny pro AI asistenty a v\\u00FDvoj\\u00E1\\u0159e', fp);\nagents += renderRules(rules) + '\\n';\nagents += metaFooter('agents', 'AGENTS.md');\nfiles['AGENTS.md'] = agents;\n\n// 3. CLAUDE.md\nlet claude = autoGenHeader('CLAUDE.md — AISHA Platform', fp);\nclaude += renderRules(rules) + '\\n';\nclaude += metaFooter('claude', 'CLAUDE.md');\nfiles['CLAUDE.md'] = claude;\n\n// 4. .cursorrules\nlet cursor = autoGenHeader('Cursor Rules — AISHA Platform', fp);\ncursor += renderRules(rules) + '\\n';\ncursor += metaFooter('cursorrules', '.cursorrules');\nfiles['.cursorrules'] = cursor;\n\n// 5. .windsurfrules\nlet windsurf = autoGenHeader('Windsurf Rules — AISHA Platform', fp);\nwindsurf += renderRules(rules) + '\\n';\nwindsurf += metaFooter('windsurfrules', '.windsurfrules');\nfiles['.windsurfrules'] = windsurf;\n\n// 6. AISHA.agent.md\nlet aisha = '---\\ndescription: \"AISHA Dirigent \\u2014 proaktivn\\u00ED orchestr\\u00E1tor a evalu\\u00E1tor v\\u00FDvoje Aisha platformy.\"\\n---\\n\\n';\naisha += autoGenHeader('AISHA Dirigent \\u2014 Agent Definition', fp);\naisha += 'Jsi **AISHA Dirigent**, autonomn\\u00ED orchestra\\u010Dn\\u00ED AI agent platformy Aisha.\\n\\n';\nconst lawRule = rules.find(r => r.slug === 'aisha-development-laws' || (r.title || '').includes('Development Laws'));\nif (lawRule) aisha += getRuleContent(lawRule) + '\\n\\n';\naisha += metaFooter('aisha-agent', '.github/agents/AISHA.agent.md');\nfiles['.github/agents/AISHA.agent.md'] = aisha;\n\n// 7. codex SKILL.md\nlet skill = '---\\nname: aisha-dirigent-autopilot\\ndescription: Hybrid Aisha/Codex autopilot for the Aisha platform.\\n---\\n\\n';\nskill += autoGenHeader('AISHA Dirigent Autopilot', fp);\nskill += '## Core rules\\n\\n- Treat `AGENTS.md` as the policy source.\\n- Prefer Aisha for planning, routing, and compliance.\\n- Fall back to local CLI when MCP unavailable.\\n\\n';\nskill += metaFooter('codex-skill', 'codex/skills/aisha-dirigent-autopilot/SKILL.md');\nfiles['codex/skills/aisha-dirigent-autopilot/SKILL.md'] = skill;\n\nconst fileList = Object.keys(files);\n\nreturn [{\n  json: {\n    ruleId: $('Parse Payload').first().json.ruleId,\n    ruleSlug: $('Parse Payload').first().json.ruleSlug,\n    operation: $('Parse Payload').first().json.operation,\n    ruleCount: rules.length,\n    adapterCount: fileList.length,\n    generatedFiles: fileList,\n    files,\n    generatedAt,\n    fingerprint: fp\n  }\n}];"
+      }
+    },
+    {
+      "id": "rp-commit-007",
+      "name": "Commit to Forgejo",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1120,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.FORGEJO_URL || 'https://git.id3a.cz' }}/api/v1/repos/{{ $env.FORGEJO_OWNER || 'aisha' }}/{{ $env.FORGEJO_REPO || 'aisha-ai-orchestrator' }}/contents",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ message: `chore(ide): auto-regenerate IDE instruction files [skip ci]\\n\\nRule: ${$json.ruleSlug} (${$json.operation})\\nAdapters: ${$json.adapterCount}\\nFingerprint: ${$json.fingerprint || 'n/a'}`, files: Object.entries($json.files).map(([path, content]) => ({ operation: 'update', path, content: Buffer.from(content).toString('base64'), encoding: 'base64' })) }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "forgejo-token",
+          "name": "Forgejo API Token"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "rp-langfuse-005",
+      "name": "Log to Langfuse",
+      "type": "n8n-nodes-aisha.aishaAdminBridge",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        200
+      ],
+      "parameters": {
+        "service": "langfuse",
+        "operation": "create_trace",
+        "traceName": "rule_propagation",
+        "traceInput": "={{ JSON.stringify({ ruleId: $json.ruleId, ruleSlug: $json.ruleSlug, operation: $json.operation }) }}",
+        "traceOutput": "={{ JSON.stringify({ ruleCount: $json.ruleCount, adapterCount: $json.adapterCount, generatedFiles: $json.generatedFiles, generatedAt: $json.generatedAt }) }}",
+        "traceTags": "rule-propagation,multi-ide,automated"
+      },
+      "credentials": {
+        "aishaLangfuseApi": {
+          "id": "langfuse-cred",
+          "name": "AISHA Langfuse"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "rp-notify-006",
+      "name": "Notify MCP Clients",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1360,
+        420
+      ],
+      "parameters": {
+        "jsCode": "// Emit notification for connected MCP clients and VS Code extensions\nconst notification = {\n  type: 'rule_propagation_complete',\n  ruleId: $json.ruleId,\n  ruleSlug: $json.ruleSlug,\n  operation: $json.operation,\n  ruleCount: $json.ruleCount,\n  adapterCount: $json.adapterCount,\n  generatedFiles: $json.generatedFiles,\n  generatedAt: $json.generatedAt,\n  fingerprint: $json.fingerprint,\n  message: `Expert rule '${$json.ruleSlug}' ${$json.operation.toLowerCase()}d — ${$json.ruleCount} rules regenerated into ${$json.adapterCount} IDE files`\n};\n\nreturn [{ json: notification }];"
+      }
+    }
+  ],
+  "active": true,
+  "name": "WF_RULE_PROPAGATION"
+}

@@ -1,0 +1,323 @@
+{
+  "$comment": "ROHATKA třídy „služba čte proměnnou, její blok v docker-compose.coolify*.yml ji neuvádí“ — do kontejneru se tedy nedostane (compose je jediná cesta). Seznam DLUHU po službách: smí jen ubývat; nová čtená proměnná bez řádku v compose = ČERVENÁ; co compose doplní nebo kód přestane číst, musí zmizet i odtud. `bez_bloku` = služby, jejichž blok compose nenašlo (měřidlo bez dosahu) — také jen ubývá.",
+  "$proc": "Naměřeno 2026-09-29: 273 proměnných v 29 službách (měřidlo počítá i pomocníky čtoucí process.env[parametr], komentáře ne). Spouštěč: riq kolo 11 — gateway bez KNOCK_UPSTREAM (ohlášení tabletů vždy 403). Klasifikace dluhu gatewaye je v popisu PR.",
+  "sluzby": {
+    "event-worker": [
+      "ACS_TRUSTED_KEYS"
+    ],
+    "gateway": [
+      "AISHA_ANON_KEY",
+      "APPLE_APP_ATTEST_KEY_ID",
+      "APP_CONFIG_AISHA_URL",
+      "APP_CONFIG_ASK_URL",
+      "APP_CONFIG_KEYCLOAK_URL",
+      "APP_CONFIG_MATRIX_HOMESERVER_URL",
+      "APP_CONFIG_MATRIX_SERVICE_URL",
+      "APP_CONFIG_MCP_URL",
+      "APP_CONFIG_N8N_TRIGGER_URL",
+      "APP_CONFIG_ORCHESTRATION_URL",
+      "APP_CONFIG_REDIRECT_URL",
+      "APP_CONFIG_WEB_URL",
+      "AUTH_DOMAIN_PUBLIC",
+      "CLOUD_LLM_API_KEY",
+      "CLOUD_LLM_MODEL",
+      "CLOUD_LLM_URL",
+      "COOLIFY_TOKEN",
+      "COOLIFY_URL",
+      "CORS_ORIGINS",
+      "DEPLOY_KNOWN_HOSTS",
+      "EVENT_WORKER_URL",
+      "GATEWAY_HOST",
+      "GATEWAY_PORT",
+      "INTRANET_ENABLED",
+      "INTRANET_OIDC_CLIENT",
+      "KC_INTRANET_ALLOWED_CLIENTS",
+      "KEYCLOAK_DOMAIN",
+      "KEYCLOAK_DOMAIN_PUBLIC",
+      "LOCAL_LLM_URL",
+      "LOG_LEVEL",
+      "MCP_UPSTREAM_URL",
+      "PLAY_INTEGRITY_API_KEY",
+      "PLAY_INTEGRITY_PACKAGE_NAME",
+      "POSTGREST_SERVICE_TOKEN",
+      "RESEND_FROM_DOMAIN",
+      "RESEND_FROM_NAME",
+      "SENTRY_AUTH_TOKEN",
+      "SENTRY_ORG",
+      "SENTRY_PROJECT",
+      "SOURCE_BROKER_URL",
+      "SPA_DOOR_FORWARD_URL",
+      "SPA_PINHOLE_TTL",
+      "SSRF_HOST_ALLOWLIST",
+      "STORAGE_PUBLIC_URL",
+      "VITE_AISHA_BACKEND_ANON_KEY",
+      "VITE_AISHA_GATEWAY_KEY",
+      "WS_GATEWAY_URL"
+    ],
+    "storage-auth": [
+      "ALLOWED_ORIGINS",
+      "CLAMD_TIMEOUT_MS",
+      "CORS_ORIGINS",
+      "DOWNLOAD_URL_TTL",
+      "MAX_APK_MB",
+      "SSRF_HOST_ALLOWLIST",
+      "UPLOADS_QUARANTINE_BUCKET",
+      "UPLOAD_URL_TTL"
+    ],
+    "svc-agent-runner": [
+      "AGENT_IMAGE_ALLOWLIST",
+      "AGENT_RUNNER_CONFIG_TTL_MS",
+      "AISHA_GATEWAY_URL",
+      "AISHA_MCP_TOKEN",
+      "CLAUDE_POLL_GRACE_SECONDS",
+      "CLAUDE_POLL_INTERVAL_MS",
+      "HOSTNAME",
+      "RATE_LIMIT_ENABLED",
+      "SSRF_HOST_ALLOWLIST",
+      "SVC_AGENT_RUNNER_PORT"
+    ],
+    "svc-ai-chat": [
+      "ACS_EFFECT_TOOLS",
+      "ACS_MODE",
+      "ADAPTIVE_CONTEXT_BUDGET",
+      "AISHA_BUDGET_ENFORCEMENT",
+      "AISHA_DECISION_JOURNAL_ALLOW_UNPERSISTED",
+      "AISHA_LLM_GATEWAY_KEY",
+      "AISHA_LLM_GATEWAY_URL",
+      "AISHA_MODEL_PRICING",
+      "AISHA_SLOT_MODELS",
+      "AISHA_WORKBENCH_POLL_TIMEOUT_MS",
+      "AI_RUNTIME_CONFIG_JSON",
+      "AI_RUNTIME_CONFIG_TTL_MS",
+      "ALLOWED_ORIGINS",
+      "DYNAMIC_TOOL_SELECTION",
+      "INSIGHT_MAESTRO_PROVIDER",
+      "LANGGRAPH_DEFAULT_AGENT_SLUG",
+      "LANGGRAPH_ENABLE_COSMOS",
+      "LANGGRAPH_ENABLE_SOULFORGE",
+      "LANGGRAPH_ENABLE_WORKBENCH",
+      "LANGGRAPH_MAX_ITERATIONS",
+      "LANGGRAPH_MAX_NODE_TIMEOUT_MS",
+      "LANGGRAPH_NODE_TIMEOUT_MS",
+      "MAESTRO_API_KEY",
+      "MCP_SERVICE_URL",
+      "MODEL_LOCAL_COMPLEX",
+      "MODEL_LOCAL_DEEP",
+      "MODEL_LOCAL_GREETING",
+      "MODEL_LOCAL_MODERATE",
+      "MODEL_LOCAL_SIMPLE",
+      "MODEL_TIER_COMPLEX",
+      "MODEL_TIER_DEEP",
+      "MODEL_TIER_GREETING",
+      "MODEL_TIER_MODERATE",
+      "MODEL_TIER_SIMPLE",
+      "N8N_WEBHOOK_URL",
+      "OMNI_ADMIT_BUDGET_MS",
+      "OMNI_DEFAULT_MAX_OUTPUT_TOKENS",
+      "OMNI_DISPATCH_BUDGET_MS_HIGH",
+      "OMNI_DISPATCH_BUDGET_MS_INTERACTIVE",
+      "OMNI_REQUEST_MAX_TOKENS_DEFAULT",
+      "OMNI_SENSITIVITY_REGISTRY_TTL_MS",
+      "OPENCLAW_TIMEOUT_MS",
+      "POSTGREST_JWT_SECRET",
+      "RAGNAROK_API_KEY",
+      "RESIDENCY_CLOUD_FORBIDDEN_MIN_SENSITIVITY",
+      "STABLE_PREFIX_CACHE",
+      "SVC_BLOCKCHAIN_SERVICE_TOKEN",
+      "SVC_BLOCKCHAIN_URL",
+      "UNTRUSTED_WRAPPER_ENABLED"
+    ],
+    "svc-aisha-kronos-shim": [
+      "CORS_ALLOWLIST",
+      "INSIGHT_SESSION_AGENT_SLUG",
+      "RATE_LIMIT_ENABLED",
+      "SSRF_HOST_ALLOWLIST"
+    ],
+    "svc-blockchain": [
+      "CIRCUIT_BREAKER_TIMEOUT_MS"
+    ],
+    "svc-communications": [
+      "MESSAGEBIRD_API_KEY",
+      "MESSAGEBIRD_ORIGINATOR",
+      "OTP_LENGTH",
+      "OTP_MAX_ATTEMPTS",
+      "OTP_TTL_MINUTES",
+      "SMS_PROVIDER",
+      "SSRF_HOST_ALLOWLIST",
+      "TWILIO_ACCOUNT_SID",
+      "TWILIO_AUTH_TOKEN",
+      "TWILIO_FROM_NUMBER",
+      "VONAGE_API_KEY",
+      "VONAGE_API_SECRET",
+      "VONAGE_FROM_NUMBER"
+    ],
+    "svc-fio-bank": [
+      "FIO_BANK_API_TOKEN",
+      "SSRF_HOST_ALLOWLIST"
+    ],
+    "svc-github-app": [
+      "GITHUB_APP_ID",
+      "GITHUB_APP_PRIVATE_KEY",
+      "GITHUB_WEBHOOK_SECRET",
+      "N8N_WEBHOOK_URL",
+      "SSRF_HOST_ALLOWLIST",
+      "TOKEN_CACHE_TTL_MS"
+    ],
+    "svc-health-ai": [
+      "AISHA_LLM_GATEWAY_KEY",
+      "AISHA_LLM_GATEWAY_URL",
+      "HEALTH_AI_LLM_MODE",
+      "HEALTH_AI_MODEL",
+      "OPENAI_API_KEY",
+      "OPENAI_API_URL",
+      "SSRF_HOST_ALLOWLIST"
+    ],
+    "svc-homeassistant": [
+      "SSRF_HOST_ALLOWLIST"
+    ],
+    "svc-ide-context": [
+      "AISHA_TEMPLATES_DIR",
+      "IDE_CONTEXT_MAX_ACTIVE_RUNS",
+      "IDE_CONTEXT_MAX_APPROVALS",
+      "IDE_CONTEXT_MAX_AUDIT",
+      "IDE_CONTEXT_MAX_DEPLOY",
+      "IDE_CONTEXT_MAX_STORIES",
+      "IDE_CONTEXT_REFRESH_SEC",
+      "PORT",
+      "POSTGREST_JWT_SECRET"
+    ],
+    "svc-knock": [
+      "SPA_BIND",
+      "SPA_OPERATORS_FILE",
+      "SPA_OPERATORS_REFRESH_SEC",
+      "SPA_OTP_DIGITS",
+      "SPA_OTP_STEP",
+      "SPA_RECENT_OK_SEC"
+    ],
+    "svc-livekit": [
+      "LIVEKIT_API_KEY",
+      "LIVEKIT_API_SECRET",
+      "LIVEKIT_HOST",
+      "RECORDING_S3_ACCESS_KEY",
+      "RECORDING_S3_BUCKET",
+      "RECORDING_S3_REGION",
+      "RECORDING_S3_SECRET_KEY",
+      "SSRF_HOST_ALLOWLIST"
+    ],
+    "svc-matrix": [
+      "AUTH_PUBLIC_URL",
+      "RATE_LIMIT_ENABLED",
+      "SSRF_HOST_ALLOWLIST"
+    ],
+    "svc-mcp-knowledge": [
+      "CORS_ALLOWLIST",
+      "INSIGHT_DEFAULT_LANG",
+      "INSIGHT_DEFAULT_PROJECT_ID",
+      "KC_ALLOWED_CLIENTS",
+      "LOG_LEVEL",
+      "MAESTRO_API_KEY",
+      "MAESTRO_URL",
+      "OPENAI_API_BASE_URL",
+      "POSTGREST_JWT_SECRET",
+      "RAG_JUDGE_API_KEY",
+      "RAG_JUDGE_BASE_URL",
+      "RAG_PREFIX_ENABLED",
+      "RATE_LIMIT_ENABLED",
+      "SSRF_HOST_ALLOWLIST",
+      "TRANSLATE_MODEL",
+      "VLLM_API_KEY",
+      "VLLM_GENERATION_URL"
+    ],
+    "svc-money": [
+      "VPN_LEASE_TTL_MS"
+    ],
+    "svc-openclaw": [
+      "HOST",
+      "LOG_LEVEL",
+      "NOTIFY_TIMEOUT_MS",
+      "OPENCLAW_CORS_ALLOWLIST",
+      "OPENCLAW_OUTBOUND_HOSTS",
+      "OPENCLAW_RATE_LIMIT_MAX",
+      "PLANNER_MODEL",
+      "PLANNER_TIMEOUT_MS",
+      "PORT"
+    ],
+    "svc-packeta": [
+      "DEFAULT_SHIPPING_COST_CZK",
+      "FREE_SHIPPING_THRESHOLD",
+      "PACKETA_API_KEY",
+      "PACKETA_API_URL",
+      "PACKETA_BRANCH_FEED_TTL",
+      "PACKETA_CARRIER_FEED_TTL",
+      "PACKETA_XML_API_URL",
+      "SSRF_HOST_ALLOWLIST"
+    ],
+    "svc-pki-bridge": [
+      "CORS_ALLOWLIST",
+      "KEYCLOAK_PUBLIC_URL",
+      "MESH_TLD",
+      "RATE_LIMIT_ENABLED",
+      "SSRF_HOST_ALLOWLIST",
+      "SVC_PKI_BRIDGE_PORT"
+    ],
+    "svc-playwright-runner": [
+      "AISHA_PLAYWRIGHT_CONFIG",
+      "AISHA_PLAYWRIGHT_REPORT_BASE"
+    ],
+    "svc-plugin-system": [
+      "AGENT_RUNNER_IMAGE",
+      "AISHA_GATEWAY_URL",
+      "AI_GENERATE_URL",
+      "CORS_ALLOWLIST",
+      "GATEWAY_URL",
+      "LOG_LEVEL",
+      "PLUGIN_TIMEOUT_MS",
+      "POSTGREST_SERVICE_TOKEN",
+      "PUSH_SERVICE_URL",
+      "RATE_LIMIT_ENABLED",
+      "SSRF_HOST_ALLOWLIST",
+      "SVC_PLUGIN_SYSTEM_PORT"
+    ],
+    "svc-push": [
+      "SSRF_HOST_ALLOWLIST"
+    ],
+    "svc-source-broker": [
+      "AISHA_GATEWAY_INTRANET_KEY",
+      "AISHA_JWT_EXP_SEC",
+      "AISHA_MEMBER_ROLE",
+      "BROKER_DEV_ALLOW_UNAUTHED_SYNC",
+      "FEDERATION_MAINTENANCE_INTERVAL_MS",
+      "FEDERATION_VAULT_KEY_ID",
+      "LI_RENT_CLAIM_CHECK_PARAMS",
+      "RATE_LIMIT_ENABLED",
+      "SOURCE_ADAPTER_PLUGINS",
+      "SOURCE_JWT_CACHE_TTL_MS",
+      "SOURCE_SERVICE_EMAIL",
+      "SOURCE_SERVICE_PASSWORD",
+      "SOURCE_SYNC_INTERVAL_MS"
+    ],
+    "svc-stripe": [
+      "DEFAULT_ORIGIN",
+      "SSRF_HOST_ALLOWLIST",
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET"
+    ],
+    "svc-web-artifact": [
+      "AISHA_SEED_ON_BOOT",
+      "CORS_ALLOWLIST",
+      "POSTGREST_SERVICE_TOKEN",
+      "PUBLIC_TLD"
+    ],
+    "svc-web-render": [
+      "WEB_RENDER_CORS_ALLOWLIST",
+      "WEB_RENDER_HOSTNAME",
+      "WEB_RENDER_POLL_MS",
+      "WEB_RENDER_RATE_LIMIT"
+    ],
+    "ws-gateway": [
+      "WS_HEARTBEAT_INTERVAL_MS",
+      "WS_MAX_TOPICS"
+    ]
+  },
+  "bez_bloku": []
+}

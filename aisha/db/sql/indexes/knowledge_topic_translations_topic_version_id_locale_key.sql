@@ -1,0 +1,3 @@
+-- Index: knowledge_topic_translations_topic_version_id_locale_key
+
+CREATE UNIQUE INDEX knowledge_topic_translations_topic_version_id_locale_key ON public.knowledge_topic_translations USING btree (topic_version_id, locale);

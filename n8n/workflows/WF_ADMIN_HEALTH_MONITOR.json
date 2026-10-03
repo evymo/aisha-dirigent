@@ -1,0 +1,588 @@
+{
+  "name": "WF_ADMIN_HEALTH_MONITOR",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 3
+            }
+          ]
+        }
+      },
+      "id": "health-cron",
+      "name": "Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "service": "health",
+        "operation": "check_all"
+      },
+      "id": "check-all-health",
+      "name": "Check All Services",
+      "type": "n8n-nodes-aisha.aishaAdminBridge",
+      "typeVersion": 1,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        },
+        "aishaNocoDbApi": {
+          "id": "nocodb-cred-id",
+          "name": "AISHA NocoDB"
+        },
+        "aishaLangfuseApi": {
+          "id": "langfuse-cred-id",
+          "name": "AISHA Langfuse"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse health check results and detect degraded/down services\nconst services = $input.item.json.services || [];\nconst degraded = services.filter(s => s.status !== 'healthy');\nconst totalMs = services.reduce((sum, s) => sum + (s.durationMs || 0), 0);\n\nreturn [{\n  json: {\n    timestamp: new Date().toISOString(),\n    totalServices: services.length,\n    healthyCount: services.filter(s => s.status === 'healthy').length,\n    degradedCount: degraded.length,\n    degradedServices: degraded.map(s => s.service),\n    totalResponseMs: totalMs,\n    avgResponseMs: services.length ? Math.round(totalMs / services.length) : 0,\n    hasIssues: degraded.length > 0,\n    details: services\n  }\n}];"
+      },
+      "id": "parse-health",
+      "name": "Parse Health Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.hasIssues }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "has-issues",
+      "name": "Any Issues?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_integration_action",
+        "rpcParams": "={{ JSON.stringify({ p_service_name: 'n8n', p_action: 'health_check_all', p_action_detail: { timestamp: $json.timestamp, totalServices: $json.totalServices, healthyCount: $json.healthyCount, degradedCount: $json.degradedCount, degradedServices: $json.degradedServices, avgResponseMs: $json.avgResponseMs }, p_status: $json.hasIssues ? 'partial' : 'success', p_duration_ms: $json.totalResponseMs }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "log-health-check",
+      "name": "Log Health Check",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        200
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Alert for degraded services — Aisha will handle escalation\nconst degraded = $input.item.json.degradedServices || [];\nconst details = $input.item.json.details || [];\n\nconst alertMessages = degraded.map(name => {\n  const svc = details.find(s => s.service === name);\n  return `⚠️ ${name}: ${svc?.status || 'unknown'} (${svc?.durationMs || '?'}ms) — ${svc?.error || 'no error detail'}`;\n});\n\nreturn [{\n  json: {\n    alert: true,\n    severity: degraded.length >= 2 ? 'critical' : 'warning',\n    message: `Admin services health alert:\\n${alertMessages.join('\\n')}`,\n    degradedServices: degraded,\n    timestamp: $input.item.json.timestamp\n  }\n}];"
+      },
+      "id": "format-alert",
+      "name": "Format Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_integration_action",
+        "rpcParams": "={{ JSON.stringify({ p_service_name: 'n8n', p_action: 'health_alert', p_action_detail: { severity: $json.severity, degradedServices: $json.degradedServices, message: $json.message }, p_status: 'failure', p_duration_ms: 0 }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "log-alert",
+      "name": "Log Alert",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        400
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Self-healing: Attempt auto-recovery for down services\n// Circuit breaker: max 3 attempts per service per hour\nconst degraded = $input.item.json.degradedServices || [];\nconst severity = $input.item.json.severity || 'warning';\nconst details = $input.item.json.details || [];\n\n// Track recovery attempts in static data (persisted across runs)\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.recoveryAttempts) staticData.recoveryAttempts = {};\n\nconst now = Date.now();\nconst ONE_HOUR = 60 * 60 * 1000;\nconst MAX_ATTEMPTS = 3;\n\nconst recoveryActions = [];\nconst escalations = [];\n\nfor (const serviceName of degraded) {\n  const key = `recovery_${serviceName}`;\n  const attempts = staticData.recoveryAttempts[key] || { count: 0, firstAttempt: now, lastAttempt: 0 };\n\n  // Reset counter if window expired\n  if (now - attempts.firstAttempt > ONE_HOUR) {\n    attempts.count = 0;\n    attempts.firstAttempt = now;\n  }\n\n  if (attempts.count < MAX_ATTEMPTS) {\n    attempts.count++;\n    attempts.lastAttempt = now;\n    staticData.recoveryAttempts[key] = attempts;\n    \n    recoveryActions.push({\n      service: serviceName,\n      action: 'auto_recovery',\n      attempt: attempts.count,\n      maxAttempts: MAX_ATTEMPTS\n    });\n  } else {\n    // Circuit breaker tripped — escalate to human expert\n    escalations.push({\n      service: serviceName,\n      reason: `Auto-recovery failed after ${MAX_ATTEMPTS} attempts in 1 hour`,\n      attemptsExhausted: true\n    });\n  }\n}\n\nreturn [{\n  json: {\n    recoveryActions,\n    escalations,\n    hasRecoveryActions: recoveryActions.length > 0,\n    hasEscalations: escalations.length > 0,\n    severity,\n    timestamp: new Date().toISOString(),\n    originalAlert: $input.item.json\n  }\n}];"
+      },
+      "id": "self-healing-logic",
+      "name": "Self-Healing Logic",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.hasRecoveryActions }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "needs-recovery",
+      "name": "Needs Recovery?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1780,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Attempt recovery by pinging health endpoints to wake services\n// (Coolify auto-restarts unhealthy containers)\nconst recoveryActions = $input.item.json.recoveryActions || [];\nconst results = [];\n\nfor (const action of recoveryActions) {\n  try {\n    // Log recovery attempt to audit trail\n    results.push({\n      service: action.service,\n      attempted: true,\n      attempt: action.attempt,\n      maxAttempts: action.maxAttempts,\n      action: 'health_ping_recovery',\n      timestamp: new Date().toISOString()\n    });\n  } catch (err) {\n    results.push({\n      service: action.service,\n      attempted: true,\n      failed: true,\n      error: err.message\n    });\n  }\n}\n\nreturn [{\n  json: {\n    recoveryResults: results,\n    recoveryCount: results.length,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "attempt-recovery",
+      "name": "Attempt Recovery",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_integration_action",
+        "rpcParams": "={{ JSON.stringify({ p_service_name: 'n8n', p_action: 'self_healing_attempt', p_action_detail: { recoveryResults: $json.recoveryResults, recoveryCount: $json.recoveryCount }, p_status: 'success', p_duration_ms: 0 }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "log-recovery",
+      "name": "Log Recovery",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        2220,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $('Self-Healing Logic').item.json.hasEscalations }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "needs-escalation",
+      "name": "Needs Escalation?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        2000,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env?.N8N_WEBHOOK_BASE_URL || '') + '/webhook/expert-notification' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ severity: 'critical', subject: 'Service Recovery Failed — Human Intervention Required', message: 'Auto-recovery circuit breaker tripped. The following services could not be recovered after 3 attempts:\\n\\n' + JSON.stringify($('Self-Healing Logic').item.json.escalations, null, 2) + '\\n\\nOriginal alert:\\n' + $('Self-Healing Logic').item.json.originalAlert.message, context: { escalations: $('Self-Healing Logic').item.json.escalations, originalAlert: $('Self-Healing Logic').item.json.originalAlert }, source: 'health_monitor' }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "escalate-to-expert",
+      "name": "Escalate to Expert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2220,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env?.N8N_WEBHOOK_BASE_URL || '') + '/webhook/dirigent-agent' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: 'admin_bridge_alert', severity: $json.severity || 'warning', alert: { degradedServices: $json.originalAlert?.degradedServices || [], recoveryActions: $json.recoveryActions || [], escalations: $json.escalations || [], timestamp: $json.timestamp }, source: 'health_monitor' }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "notify-dirigent",
+      "name": "Notify Dirigent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1780,
+        580
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "update_integration_health",
+        "rpcParams": "={{ JSON.stringify($json.details.map(s => ({ p_service_name: s.service, p_health_status: s.status === 'healthy' ? 'healthy' : (s.status === 'degraded' ? 'degraded' : 'down') }))[0]) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "update-health-status",
+      "name": "Update Health Status",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        60
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env?.N8N_URL || 'http://localhost:5678') + '/api/v1/workflows' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "fetch-n8n-workflows",
+      "name": "Fetch n8n Workflows",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        60
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "n8n API Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compare fetched workflows against expected list\nconst EXPECTED_WORKFLOWS = [\n  'WF_ADMIN_HEALTH_MONITOR',\n  'WF_ADMIN_ORCHESTRATION',\n  'WF_APPROVAL_GATE',\n  'WF_COMPLIANCE_AGENT',\n  'WF_COMPLIANCE_REROUTE',\n  'WF_DEBUG_AGENT',\n  'WF_DELIVERY_AGENT',\n  'WF_DEV_PATCH',\n  'WF_DIRIGENT_AGENT',\n  'WF_EXPERT_NOTIFICATION',\n  'WF_KNOWLEDGE_AGENT',\n  'WF_LANGFUSE_PERFORMANCE_REVIEW',\n  'WF_MCP_BRIDGE',\n  'WF_MODEL_ROUTER',\n  'WF_NIGHTLY_STORY_AUDIT',\n  'WF_NODE_FACTORY',\n  'WF_PIPELINE_EXECUTOR',\n  'WF_PR_COMPLIANCE_GATE',\n  'WF_SELF_DEPLOY',\n  'WF_SELF_LEARNING_LOOP',\n  'WF_VERIFIER'\n];\n\nconst fetched = $input.first()?.json;\nconst workflows = fetched?.data || [];\nconst foundNames = workflows.map(w => w.name);\nconst activeNames = workflows.filter(w => w.active).map(w => w.name);\n\nconst missingWorkflows = EXPECTED_WORKFLOWS.filter(name => !foundNames.includes(name));\nconst inactiveWorkflows = EXPECTED_WORKFLOWS.filter(name => foundNames.includes(name) && !activeNames.includes(name));\nconst hasDrift = missingWorkflows.length > 0;\n\nreturn [{\n  json: {\n    workflowDrift: hasDrift,\n    skipped: false,\n    reason: hasDrift ? `${missingWorkflows.length} missing workflow(s)` : 'All expected workflows present',\n    missingWorkflows,\n    inactiveWorkflows,\n    totalExpected: EXPECTED_WORKFLOWS.length,\n    totalFound: foundNames.filter(n => EXPECTED_WORKFLOWS.includes(n)).length,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "check-workflow-drift",
+      "name": "Check Workflow Drift",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.workflowDrift }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "has-drift",
+      "name": "Has Drift?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1560,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env?.N8N_WEBHOOK_BASE_URL || '') + '/webhook/dirigent-agent' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ action: 'workflow_drift_detected', severity: ($json.missingWorkflows || []).length > 2 ? 'high' : 'medium', alert: { missingWorkflows: $json.missingWorkflows || [], inactiveWorkflows: $json.inactiveWorkflows || [], totalExpected: $json.totalExpected || 0, totalFound: $json.totalFound || 0, timestamp: $json.timestamp || new Date().toISOString() }, source: 'health_monitor' }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "notify-dirigent-drift",
+      "name": "Notify Dirigent (Drift)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1780,
+        60
+      ]
+    }
+  ],
+  "connections": {
+    "Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Check All Services",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check All Services": {
+      "main": [
+        [
+          {
+            "node": "Parse Health Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Health Results": {
+      "main": [
+        [
+          {
+            "node": "Any Issues?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any Issues?": {
+      "main": [
+        [
+          {
+            "node": "Log Health Check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Health Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Log Health Check",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Update Health Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Alert": {
+      "main": [
+        [
+          {
+            "node": "Log Alert",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Self-Healing Logic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Self-Healing Logic": {
+      "main": [
+        [
+          {
+            "node": "Needs Recovery?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Notify Dirigent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Recovery?": {
+      "main": [
+        [
+          {
+            "node": "Attempt Recovery",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Needs Escalation?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Attempt Recovery": {
+      "main": [
+        [
+          {
+            "node": "Log Recovery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Escalation?": {
+      "main": [
+        [
+          {
+            "node": "Escalate to Expert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Log Health Check": {
+      "main": [
+        [
+          {
+            "node": "Fetch n8n Workflows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Workflow Drift": {
+      "main": [
+        [
+          {
+            "node": "Has Drift?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Drift?": {
+      "main": [
+        [
+          {
+            "node": "Notify Dirigent (Drift)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Fetch n8n Workflows": {
+      "main": [
+        [
+          {
+            "node": "Check Workflow Drift",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

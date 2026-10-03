@@ -1,0 +1,179 @@
+{
+  "_note": "Translation values for every data-i18n-key this template references. Consumed by `npm --prefix services/svc-web-artifact run export-web-seed` → emitted as `translations` rows. EN + CS authored by hand; de/fr/ru/th filled by `node scripts/i18n/translate-template-i18n.mjs domains/templates/cafe-shop` (DeepL + context review). Prices, the stat number and the brand wordmark are hand-set in all 6 locales so the filler leaves them untouched.",
+  "web.cafe.title": {
+    "en": "The Copper Cup — coffee, order ahead",
+    "cs": "The Copper Cup — káva, objednejte předem",
+    "de": "The Copper Cup – Kaffee, bitte im Voraus bestellen",
+    "fr": "The Copper Cup — café, commande à l'avance",
+    "ru": "The Copper Cup — кофе, заказывайте заранее",
+    "th": "The Copper Cup — กาแฟ สั่งล่วงหน้า"
+  },
+  "web.cafe.description": {
+    "en": "A neighbourhood coffee house. See the menu and order ahead — ready when you arrive.",
+    "cs": "Lokální kavárna. Prohlédněte si menu a objednejte předem — bude hotovo, až dorazíte.",
+    "de": "Ein Café in der Nachbarschaft. Schauen Sie sich die Speisekarte an und bestellen Sie im Voraus – Ihr Essen steht bereit, wenn Sie kommen.",
+    "fr": "Un café de quartier. Consultez le menu et passez votre commande à l'avance : tout sera prêt à votre arrivée.",
+    "ru": "Кофейня по соседству. Ознакомьтесь с меню и сделайте заказ заранее — все будет готово к вашему приходу.",
+    "th": "ร้านกาแฟในละแวกใกล้เคียง ดูเมนูและสั่งล่วงหน้า — พร้อมเสิร์ฟเมื่อคุณมาถึง"
+  },
+  "web.cafe.brand": {
+    "en": "The Copper Cup",
+    "cs": "The Copper Cup",
+    "de": "The Copper Cup",
+    "fr": "The Copper Cup",
+    "ru": "The Copper Cup",
+    "th": "The Copper Cup"
+  },
+  "web.cafe.nav.menu": {
+    "en": "Menu",
+    "cs": "Menu",
+    "de": "Menü",
+    "fr": "Menu",
+    "ru": "Меню",
+    "th": "เมนู"
+  },
+  "web.cafe.nav.order": {
+    "en": "Order ahead",
+    "cs": "Objednat předem",
+    "de": "Im Voraus bestellen",
+    "fr": "Commander à l'avance",
+    "ru": "Закажите заранее",
+    "th": "สั่งล่วงหน้า"
+  },
+  "web.cafe.nav.visit": {
+    "en": "Visit",
+    "cs": "Návštěva",
+    "de": "Besuchen",
+    "fr": "Visitez",
+    "ru": "Посетите",
+    "th": "เยี่ยมชม"
+  },
+  "web.cafe.hero.heading": {
+    "en": "Coffee, slow and proper",
+    "cs": "Káva, pomalu a poctivě",
+    "de": "Kaffee, langsam und richtig",
+    "fr": "Un café, pris le temps qu'il faut",
+    "ru": "Кофе: не спеша и как положено",
+    "th": "กาแฟ ช้า ๆ และถูกต้อง"
+  },
+  "web.cafe.hero.body": {
+    "en": "Small-batch beans, pulled with patience. Browse the menu, order from your phone, and we'll have it on the bar by the time you walk in.",
+    "cs": "Zrna v malých dávkách, připravená s trpělivostí. Projděte si menu, objednejte z telefonu a my ji budeme mít na baru, než vejdete.",
+    "de": "Kaffee aus kleinen Röstchargen, mit viel Geduld zubereitet. Schauen Sie sich die Karte an, bestellen Sie über Ihr Smartphone, und wir stellen Ihren Kaffee an die Theke, noch bevor Sie hereinkommen.",
+    "fr": "Des grains torréfiés en petites quantités, préparés avec patience. Parcourez le menu, passez votre commande depuis votre téléphone, et votre boisson vous attendra au comptoir dès votre arrivée.",
+    "ru": "Кофе, приготовленный небольшими партиями с особой тщательностью. Просмотрите меню, сделайте заказ через телефон, и к моменту вашего прихода ваш заказ уже будет готов у барной стойки.",
+    "th": "เมล็ดกาแฟคั่วสดในปริมาณจำกัด คัดสรรอย่างพิถีพิถัน ดึงรสชาติด้วยความอดทน เลือกเมนูได้ตามใจสั่งผ่านมือถือ แล้วเราจะเตรียมไว้ให้คุณที่บาร์ก่อนที่คุณจะเดินเข้ามา"
+  },
+  "web.cafe.hero.cta": {
+    "en": "Order ahead",
+    "cs": "Objednat předem",
+    "de": "Im Voraus bestellen",
+    "fr": "Commander à l'avance",
+    "ru": "Закажите заранее",
+    "th": "สั่งล่วงหน้า"
+  },
+  "web.cafe.menu.eyebrow": {
+    "en": "On the bar",
+    "cs": "Na baru",
+    "de": "An der Bar",
+    "fr": "Au bar",
+    "ru": "На барной стойке",
+    "th": "บนบาร์"
+  },
+  "web.cafe.menu.heading": {
+    "en": "The menu",
+    "cs": "Menu",
+    "de": "Das Menü",
+    "fr": "Le menu",
+    "ru": "Меню",
+    "th": "เมนู"
+  },
+  "web.cafe.order.heading": {
+    "en": "Order ahead, skip the queue",
+    "cs": "Objednejte předem, vyhněte se frontě",
+    "de": "Bestellen Sie im Voraus und umgehen Sie die Warteschlange",
+    "fr": "Commandez à l'avance, évitez la file d'attente",
+    "ru": "Закажите заранее, чтобы не стоять в очереди",
+    "th": "สั่งล่วงหน้า ไม่ต้องต่อแถว"
+  },
+  "web.cafe.order.body": {
+    "en": "Build your order online and pay in a tap. We start it when you're a few minutes away, so it's fresh on the bar the moment you arrive — no waiting in line.",
+    "cs": "Sestavte si objednávku online a zaplaťte jedním klepnutím. Spustíme ji, když budete pár minut od nás, takže bude čerstvá na baru ve chvíli, kdy dorazíte — žádné čekání ve frontě.",
+    "de": "Stellen Sie Ihre Bestellung online zusammen und bezahlen Sie mit einem Fingertipp. Wir bereiten sie zu, sobald Sie nur noch wenige Minuten entfernt sind, sodass sie bei Ihrer Ankunft frisch auf der Theke steht – ganz ohne Wartezeit.",
+    "fr": "Composez votre commande en ligne et payez en un clic. Nous la préparons dès que vous êtes à quelques minutes de là, pour qu'elle soit toute fraîche sur le comptoir dès votre arrivée — pas besoin de faire la queue.",
+    "ru": "Сформируйте заказ онлайн и оплатите одним касанием. Мы начнем его приготовление, когда вы будете уже в нескольких минутах от нас, чтобы напиток был свежим на стойке к моменту вашего прихода — без необходимости стоять в очереди.",
+    "th": "สร้างคำสั่งซื้อของคุณออนไลน์และชำระเงินด้วยการแตะเพียงครั้งเดียว เราจะเริ่มทำเมื่อคุณอยู่ห่างออกไปเพียงไม่กี่นาที เพื่อให้ทุกอย่างสดใหม่บนบาร์ทันทีที่คุณมาถึง — ไม่ต้องรอคิว"
+  },
+  "web.cafe.order.cta": {
+    "en": "Start an order",
+    "cs": "Začít objednávku",
+    "de": "Bestellung aufgeben",
+    "fr": "Passer une commande",
+    "ru": "Оформить заказ",
+    "th": "เริ่มการสั่งซื้อ"
+  },
+  "web.cafe.order.statNum": {
+    "en": "5 min",
+    "cs": "5 min",
+    "de": "5 min",
+    "fr": "5 min",
+    "ru": "5 мин",
+    "th": "5 นาที"
+  },
+  "web.cafe.order.statLabel": {
+    "en": "saved on a typical morning run",
+    "cs": "ušetřených při ranní zastávce",
+    "de": "gespart beim morgendlichen Kaffeestopp",
+    "fr": "économisé sur le café du matin",
+    "ru": "сэкономлено на утреннем кофе",
+    "th": "ประหยัดได้ในการแวะซื้อกาแฟยามเช้า"
+  },
+  "web.cafe.visit.heading": {
+    "en": "Find us",
+    "cs": "Najdete nás",
+    "de": "So finden Sie uns",
+    "fr": "Où nous trouver",
+    "ru": "Найдите нас",
+    "th": "ค้นหาเรา"
+  },
+  "web.cafe.visit.body": {
+    "en": "On the corner of Linden and 4th, with the green awning. Dogs and laptops welcome.",
+    "cs": "Na rohu Linden a 4. ulice, se zelenou markýzou. Psi i notebooky vítáni.",
+    "de": "An der Ecke Linden und 4th, mit der grünen Markise. Hunde und Laptops sind willkommen.",
+    "fr": "Au coin de la rue Linden et de la 4e, avec l'auvent vert. Chiens et ordinateurs portables bienvenus.",
+    "ru": "На углу улиц Линден и 4-й, под зеленым навесом. Приглашаем с собаками и ноутбуками.",
+    "th": "ที่มุมถนนลินเดนและถนนที่ 4 มีกันสาดสีเขียว ยินดีต้อนรับสุนัขและแล็ปท็อป"
+  },
+  "web.cafe.visit.hours": {
+    "en": "Mon–Fri 7am–6pm · Sat–Sun 8am–4pm",
+    "cs": "Po–Pá 7–18 · So–Ne 8–16",
+    "de": "Mo–Fr 7–18 Uhr · Sa–So 8–16 Uhr",
+    "fr": "Lun–Ven 7h–18h · Sam–Dim 8h–16h",
+    "ru": "Пн–Пт 7:00–18:00 · Сб–Вс 8:00–16:00",
+    "th": "จันทร์–ศุกร์ 7:00 น.–18:00 น. · เสาร์–อาทิตย์ 8:00 น.–16:00 น."
+  },
+  "web.cafe.visit.button": {
+    "en": "Get directions",
+    "cs": "Zobrazit trasu",
+    "de": "Wegbeschreibung abrufen",
+    "fr": "Obtenir l'itinéraire",
+    "ru": "Получить маршрут",
+    "th": "รับเส้นทาง"
+  },
+  "web.cafe.footer.name": {
+    "en": "The Copper Cup",
+    "cs": "The Copper Cup",
+    "de": "The Copper Cup",
+    "fr": "The Copper Cup",
+    "ru": "The Copper Cup",
+    "th": "The Copper Cup"
+  },
+  "web.cafe.footer.note": {
+    "en": "Roasted nearby, served with no rush.",
+    "cs": "Praženo poblíž, podáváno bez spěchu.",
+    "de": "Frisch geröstet aus der Nachbarschaft, in aller Ruhe serviert.",
+    "fr": "Torréfié à proximité, servi sans précipitation.",
+    "ru": "Обжарено прямо здесь, подается без спешки.",
+    "th": "คั่วสดใหม่ใกล้ๆ เสิร์ฟโดยไม่รีบร้อน"
+  }
+}

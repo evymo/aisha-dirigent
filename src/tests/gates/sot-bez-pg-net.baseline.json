@@ -1,0 +1,15 @@
+{
+  "$comment": "ROHATKA volání pg_net (`net.http_*`) v SoT. pg_net v obrazu DB NENÍ (naměřeno 2026-09-26: žádné schéma `net`), takže každé takové volání je mrtvá větev, která vypadá jako doručení. Tohle NENÍ seznam „povoleno“ — je to DLUH, který smí jen ubývat: nový výskyt = ČERVENÁ, a co ze SoT zmizelo, musí zmizet i odtud (rohatka je oboustranná). Převod = zápis do outboxu `ai_proactive_runs`, doručí executor v event-workeru; kde na doručení nic nečeká, větev smazat. ⛔ Žádný guard `to_regprocedure`/`to_regnamespace` v tělech — z mrtvé větve by udělal tichý průchod.",
+  "$proc": "Rozhodnutí Aisha Guru 2026-09-26. Baseline 10 funkcí; v F3a (2026-09-28) odešel dispečer fn_dispatch_proactive_triggers (most do n8n nikdy nic nedoručil, doručuje executor z outboxu).",
+  "soubory": [
+    "functions/fn_notify_ai_feedback_ready.sql",
+    "functions/fn_notify_knowledge_change.sql",
+    "functions/fn_notify_rule_change.sql",
+    "functions/fn_queue_blockchain_sync.sql",
+    "functions/fn_queue_embedding_generation.sql",
+    "functions/fn_sync_keycloak_roles.sql",
+    "functions/handle_auth_send_email.sql",
+    "functions/publish_agent.sql",
+    "functions/publish_expert_rule.sql"
+  ]
+}

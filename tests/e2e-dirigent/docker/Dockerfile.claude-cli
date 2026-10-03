@@ -1,0 +1,38 @@
+# Container that runs the .claude/* overlay against a mounted workspace.
+#
+# Build context: tests/e2e-dirigent/
+#
+# Why this exists: we don't need to install the real `claude-code` CLI to
+# verify the overlay's behavior. The overlay's contract is:
+#   - PreToolUse hook receives CLAUDE_HOOK_TOOL_INPUT env JSON
+#   - Hook prints advisory on stderr if pattern matches
+#   - Hook exits 0 (advisory-only)
+#   - Relay hook (.claude/hooks/aisha-supervisor-relay.mjs) POSTs to
+#     $AISHA_GATEWAY_URL/dirigent/dispatch
+#
+# So this image just needs: bash, node>=18 (for relay), the .claude
+# overlay (mounted from workspace), and the test specs (mounted at runtime).
+
+# Per-fork pull-through cache host — defaults to evymo's value. Forks
+# override at build time via `--build-arg REGISTRY_DOMAIN=...` (or compose
+# `args:` block) to route through their own cache.
+ARG REGISTRY_DOMAIN=cache.aisha.guru
+FROM ${REGISTRY_DOMAIN}/library/node:22-alpine
+
+# Bash is required by .claude/hooks/*.sh; alpine ships ash by default
+# Python3 is required by _aisha-advise-lib.sh (JSON parsing of CLAUDE_HOOK_TOOL_INPUT)
+RUN apk add --no-cache bash grep coreutils python3
+
+WORKDIR /workspace
+
+# Pre-create cooldown tmp dir (hooks write to /tmp/aisha-advise-*)
+RUN mkdir -p /tmp/aisha-advise && chmod 777 /tmp/aisha-advise
+
+ENV AISHA_GATEWAY_URL=http://mock-backend:3030 \
+    AISHA_MCP_TOKEN=test-token-e2e \
+    SHELL=/bin/bash
+
+# Long-running container so specs can `docker exec` into it
+HEALTHCHECK --interval=10s --timeout=3s CMD true
+
+CMD ["tail", "-f", "/dev/null"]

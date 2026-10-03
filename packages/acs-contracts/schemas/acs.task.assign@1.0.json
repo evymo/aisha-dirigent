@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "acs.task.assign@1.0",
+  "title": "Task assignment",
+  "description": "Delegates a unit of work. All content travels by reference (R3): the receiver reads the canonical intent and input artefacts from the store — never a paraphrase.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["task_kind", "intent_ref", "input_refs", "priority"],
+  "properties": {
+    "task_kind": { "type": "string", "pattern": "^[a-z0-9_.-]+$", "maxLength": 64, "description": "Closed vocabulary maintained in ai_task_kind_registry." },
+    "intent_ref": { "type": "string", "pattern": "^int_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "input_refs": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "id"],
+        "properties": {
+          "kind": { "enum": ["intent", "message", "document", "kb_chunk", "run", "effect"] },
+          "id": { "type": "string", "maxLength": 256 }
+        }
+      }
+    },
+    "priority": { "enum": ["p0", "p1", "p2", "p3"] },
+    "constraints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "deadline": { "type": "string", "format": "date-time" },
+        "max_tokens": { "type": "integer", "minimum": 1 },
+        "budget_units": { "type": "number", "minimum": 0 },
+        "allowed_tools": { "type": "array", "items": { "type": "string", "maxLength": 128 }, "maxItems": 128 }
+      }
+    }
+  }
+}

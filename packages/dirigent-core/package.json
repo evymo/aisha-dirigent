@@ -1,0 +1,13 @@
+{
+  "name": "@aisha/dirigent-core",
+  "version": "0.1.0",
+  "license": "Elastic-2.0",
+  "description": "Editor-neutral AISHA Dirigent contracts for IDE clients, sidecars, and ZEDBENCH.",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.mjs",
+  "exports": {
+    ".": "./src/index.mjs"
+  },
+  "sideEffects": false
+}

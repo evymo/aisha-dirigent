@@ -1,0 +1,101 @@
+# syntax=docker/dockerfile:1
+# Dockerfile.svc-aisha-kronos-shim — Kronos-compatible adapter pro Maestra (port 9625).
+#
+# "Soft" shim: Maestru poskytuje Kronos API, ale uvnitř proxuje na AISHA
+# RPC + Ragnarok (žádný Mongo, žádný MinIO, žádný Azure). Detail: viz
+# services/svc-aisha-kronos-shim/src/server.ts hlavička.
+#
+# Workspace-aware build with SELECTIVE COPY for better layer caching.
+# Build context = REPO ROOT (set in docker-compose.coolify-integration.yml).
+#
+# Dep chain: @aisha/security → @aisha/svc-aisha-kronos-shim
+#
+# Previous form (single-service npm install) failed in CI with:
+#   npm error 404 Not Found - GET https://registry.npmjs.org/@aisha%2fsecurity
+# because `@aisha/security` is a workspace symlink, not a published npm
+# package. Workspace-aware npm ci resolves it correctly.
+
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/node:22-alpine AS build
+WORKDIR /app
+
+# ─── 1. Workspace skeleton (manifests only) ──────────────────────────────
+COPY package.json package-lock.json ./
+COPY packages/aisha-ide-bridge/package.json packages/aisha-ide-bridge/
+COPY packages/aitg/package.json packages/aitg/
+COPY packages/cache-redis/package.json packages/cache-redis/
+COPY packages/local-signals/package.json packages/local-signals/
+COPY packages/observability/package.json packages/observability/
+COPY packages/postgrest-client/package.json packages/postgrest-client/
+COPY packages/security/package.json packages/security/
+COPY packages/workbench-core/package.json packages/workbench-core/
+COPY services/event-worker/package.json services/event-worker/
+COPY services/gateway/package.json services/gateway/
+COPY services/storage-auth/package.json services/storage-auth/
+COPY services/svc-agent-runner/package.json services/svc-agent-runner/
+COPY services/svc-ai-chat/package.json services/svc-ai-chat/
+COPY services/svc-aisha-kronos-shim/package.json services/svc-aisha-kronos-shim/
+COPY services/svc-aitg-probes/package.json services/svc-aitg-probes/
+COPY services/svc-blockchain/package.json services/svc-blockchain/
+COPY services/svc-communications/package.json services/svc-communications/
+COPY services/svc-fio-bank/package.json services/svc-fio-bank/
+COPY services/svc-health-ai/package.json services/svc-health-ai/
+COPY services/svc-homeassistant/package.json services/svc-homeassistant/
+COPY services/svc-livekit/package.json services/svc-livekit/
+COPY services/svc-matrix/package.json services/svc-matrix/
+COPY services/svc-mcp-knowledge/package.json services/svc-mcp-knowledge/
+COPY services/svc-packeta/package.json services/svc-packeta/
+COPY services/svc-pki-bridge/package.json services/svc-pki-bridge/
+COPY services/svc-playwright-runner/package.json services/svc-playwright-runner/
+COPY services/svc-plugin-system/package.json services/svc-plugin-system/
+COPY services/svc-push/package.json services/svc-push/
+COPY services/svc-web-artifact/package.json services/svc-web-artifact/
+COPY services/ws-gateway/package.json services/ws-gateway/
+
+# ─── 2. Install (workspace-aware, resolves @aisha/* via symlinks) ────────
+RUN npm ci --workspace=@aisha/svc-aisha-kronos-shim --include-workspace-root --include=dev --ignore-scripts
+
+# ─── 3. Source COPY — only the dep chain ─────────────────────────────────
+COPY packages/security packages/security
+COPY packages/postgrest-client packages/postgrest-client
+COPY services/svc-aisha-kronos-shim services/svc-aisha-kronos-shim
+
+# ─── 4. Build + prune ────────────────────────────────────────────────────
+RUN npm run build --workspace=@aisha/security && \
+    npm run build --workspace=@aisha/postgrest-client && \
+    npm run build --workspace=@aisha/svc-aisha-kronos-shim
+RUN npm prune --workspace=@aisha/svc-aisha-kronos-shim --omit=dev
+# Guarantee the service's own node_modules dir exists so the runtime COPY below
+# never fails — and carries any dep npm nested HERE instead of hoisting to root.
+RUN mkdir -p services/svc-aisha-kronos-shim/node_modules
+
+# ─── Runtime image ───────────────────────────────────────────────────────
+FROM ${REGISTRY_PROXY}library/node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/packages/security/package.json packages/security/package.json
+COPY --from=build /app/packages/security/dist packages/security/dist
+COPY --from=build /app/packages/postgrest-client/package.json packages/postgrest-client/package.json
+COPY --from=build /app/packages/postgrest-client/dist packages/postgrest-client/dist
+COPY --from=build /app/services/svc-aisha-kronos-shim/package.json services/svc-aisha-kronos-shim/package.json
+COPY --from=build /app/services/svc-aisha-kronos-shim/dist services/svc-aisha-kronos-shim/dist
+# Nested (non-hoisted) deps live under the service's own node_modules — copy
+# them too, else Node can't resolve them at runtime (ERR_MODULE_NOT_FOUND).
+COPY --from=build /app/services/svc-aisha-kronos-shim/node_modules services/svc-aisha-kronos-shim/node_modules
+WORKDIR /app/services/svc-aisha-kronos-shim
+
+# Alpine wget se default řeší přes IPv6 ::1 dříve než IPv4 — Fastify listenuje
+# jen IPv4 0.0.0.0:9625, takže explicit 127.0.0.1 je nutný.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -qO- http://127.0.0.1:9625/health >/dev/null 2>&1 || exit 1
+
+EXPOSE 9625
+# Mesh routu staví entrypoint v compose JAKO ROOT a práva hned zahodí přes
+# `exec su-exec node …` (vzor: gateway, brána mesh-lane-miri-jmenem-ne-hopem).
+# ⛔ NAMĚŘENO 2026-09-16 na guru: s `USER node` v obrazu služba routu postavit
+# nemohla, mesh jméno se přeložilo a NESPOJILO — svc-ai-chat vypršel na PostgREST,
+# MCP, lokálním modelu, companion i integration, a nic to nehlásilo jako chybu.
+RUN apk add --no-cache su-exec iproute2
+CMD ["node", "dist/server.js"]

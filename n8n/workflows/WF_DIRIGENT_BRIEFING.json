@@ -1,0 +1,228 @@
+{
+  "name": "WF_DIRIGENT_BRIEFING",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "dirigent/briefing",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "briefing-trigger",
+      "name": "Briefing Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SessionStart playbook — produce a markdown brief for the agent.\n// Input contract (from services/svc-ai-chat/src/routes/dirigent-supervisor.ts):\n//   { event, story_id, session_id, tool_input, tool_output, user_prompt, transcript_excerpt }\n// Output contract (per README-dirigent-supervisor.md):\n//   { advisory: string, decision: 'allow', reason?: string }\nconst body = $input.first().json.body || $input.first().json;\nconst storyId = body.story_id || null;\nconst sessionId = body.session_id || null;\nif (body.event !== 'session_start') {\n  throw new Error(`WF_DIRIGENT_BRIEFING expects event=session_start, got ${body.event}`);\n}\nreturn [{\n  json: {\n    story_id: storyId,\n    session_id: sessionId,\n    has_story: !!storyId,\n    started_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "mcp_get_story_context",
+        "rpcParams": "={{ JSON.stringify({ p_story_id: $json.story_id }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 5000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "fetch-story-context",
+      "name": "Fetch Story Context",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        680,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "evaluate_story_self",
+        "rpcParams": "={{ JSON.stringify({ p_story_id: $('Validate Input').first().json.story_id }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 5000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "fetch-self-eval",
+      "name": "Fetch Self-Eval Verdict",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        790,
+        480
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compose the briefing markdown.\n// Empty story → short hint; otherwise structured brief with title, ruleset,\n// top 3 rules (when KB call adds them), acceptance criteria checklist.\nconst input = $('Validate Input').first().json;\nconst rpc = $('Fetch Story Context').first().json;\nconst v = $('Fetch Self-Eval Verdict').first().json;\nconst verdict = (v && typeof v.score !== 'undefined') ? v : null;\nconst story = (rpc && rpc.success !== false) ? rpc : null;\n\nlet advisory = '';\nif (!input.has_story) {\n  advisory = '📋 AISHA Dirigent: No active story. Set .aisha/story.json with the current story_id to receive briefings, intent advisories and goal evaluation on Stop.';\n} else if (!story) {\n  advisory = `📋 AISHA Dirigent: Story ${input.story_id.slice(0,8)} context not retrievable. Briefing skipped this turn; will retry next SessionStart.`;\n} else {\n  const title = story.title || 'Untitled story';\n  const status = story.delivery_status || 'unknown';\n  const fp = story.ruleset_fingerprint || story.ruleset?.fingerprint || 'no ruleset';\n  const ac = Array.isArray(story.acceptance_criteria) ? story.acceptance_criteria : [];\n  const acLines = ac.length ? ac.map(c => `- [ ] ${typeof c === 'string' ? c : (c.text || JSON.stringify(c))}`).join('\\n') : '- (no acceptance criteria set)';\n  advisory = `📋 **${title}** — status: \\`${status}\\`\\n\\n_Ruleset fingerprint:_ \\`${fp}\\`\\n\\n**Acceptance criteria**:\\n${acLines}`;\n}\nif (verdict) {\n  const fc = Array.isArray(verdict.findings) ? verdict.findings.length : 0;\n  advisory += '\\n\\n_Self-eval:_ ' + (verdict.level || 'n/a') + ' (score ' + (verdict.score != null ? verdict.score : '?') + '/100)' + (fc ? ', ' + fc + ' open finding(s)' : '');\n}\nreturn [{\n  json: {\n    advisory,\n    decision: 'allow',\n    _audit: { event: 'session_start', story_id: input.story_id, session_id: input.session_id }\n  }\n}];"
+      },
+      "id": "compose-brief",
+      "name": "Compose Brief",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_integration_action",
+        "rpcParams": "={{ JSON.stringify({ p_action_key: 'dirigent.briefing.completed', p_integration: 'wf_dirigent_briefing', p_payload: $json._audit }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 3000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "audit-log",
+      "name": "Audit Log",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        300
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ advisory: $('Compose Brief').first().json.advisory, decision: $('Compose Brief').first().json.decision }) }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Briefing Trigger": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Fetch Story Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Story Context": {
+      "main": [
+        [
+          {
+            "node": "Fetch Self-Eval Verdict",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose Brief": {
+      "main": [
+        [
+          {
+            "node": "Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit Log": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Self-Eval Verdict": {
+      "main": [
+        [
+          {
+            "node": "Compose Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

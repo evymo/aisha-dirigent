@@ -1,0 +1,38 @@
+# Dockerfile.n8n-nodes — balíček n8n-nodes-aisha sestavený z TOHOTO commitu
+#
+# NAMĚŘENO 2026-09-17 (guru): n8n 1.79.0 neznal ani jeden typ `aisha*`
+# (393 typů pověření, žádný aisha), `~/.n8n/nodes` v kontejneru neexistoval.
+# Balíček do n8n nedoručovalo nic automaticky — jen ruční `npm run aisha:nodes:*`.
+# Důsledek: provision-credentials skončil na první položce (typ aishaPostgrestApi
+# n8n nezná) a nevzniklo žádné pověření.
+#
+# Kam balíček patří, určuje loader n8n 1.79.0 (load-nodes-and-credentials.js):
+# balíčky `n8n-nodes-*` s předponou balíčku (`n8n-nodes-aisha.aishaRpc`, jak je
+# čtou workflowy) načítá JEN z `<nodesDownloadDir>/node_modules`, tj.
+# `/home/node/.n8n/nodes/node_modules` — a to leží ve svazku n8n-data, takže
+# vrstva obrazu n8n by byla svazkem překrytá. N8N_CUSTOM_EXTENSIONS načítá
+# CustomDirectoryLoaderem s předponou `CUSTOM.` — pro workflowy špatné jméno.
+# Proto init kontejner: obraz nese sestavený balíček, init ho před startem n8n
+# zapíše do svazku (infra/n8n/doruc-uzly-aisha.sh).
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/node:22-alpine AS build
+WORKDIR /pkg
+COPY packages/n8n-nodes-aisha/package.json packages/n8n-nodes-aisha/package-lock.json ./
+RUN npm ci --ignore-scripts --no-audit --no-fund
+COPY packages/n8n-nodes-aisha/tsconfig.json ./
+COPY packages/n8n-nodes-aisha/credentials/ ./credentials/
+COPY packages/n8n-nodes-aisha/nodes/ ./nodes/
+COPY packages/n8n-nodes-aisha/scripts/copy-icons.mjs ./scripts/copy-icons.mjs
+RUN npm run build
+
+FROM ${REGISTRY_PROXY}library/alpine:3.20
+# jq: skript doručení čte manifest balíčku (jméno, verze, slíbené soubory).
+RUN apk add --no-cache jq
+# Jen to, co loader čte: package.json (manifest `n8n.nodes`/`n8n.credentials`)
+# a dist. Balíček nemá runtime závislosti; n8n-workflow a @langchain/* řeší
+# n8n přes NODE_PATH, který si při startu nastaví sám.
+COPY --from=build /pkg/package.json /opt/n8n-nodes-aisha/package.json
+COPY --from=build /pkg/dist/ /opt/n8n-nodes-aisha/dist/
+COPY infra/n8n/doruc-uzly-aisha.sh /usr/local/bin/doruc-uzly-aisha.sh
+RUN chmod +x /usr/local/bin/doruc-uzly-aisha.sh
+CMD ["/usr/local/bin/doruc-uzly-aisha.sh", "/opt/n8n-nodes-aisha", "/data"]

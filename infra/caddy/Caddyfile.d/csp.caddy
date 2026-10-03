@@ -1,0 +1,55 @@
+# Phase 12 WP 4.7 — Content-Security-Policy snippet (nonce-based).
+#
+# IMPORT pattern: in any Caddyfile site block:
+#   import csp-report-only   # Step 1 — collect violations
+#   import csp-enforce       # Step 2 — flip to enforcing
+#
+# Two-step rollout (per WP 4.7 spec):
+#   Step 1 (week 1): `csp-report-only` snippet — Content-Security-Policy-Report-Only
+#                    header collects violations to /csp-report endpoint without
+#                    blocking. Operator reviews violations + fixes offending code.
+#   Step 2 (week 2): `csp-enforce` snippet — flip to enforcing Content-Security-Policy
+#                    header once 0 violations for 3 consecutive days.
+#
+# Nonce injection: Caddy's `{http.request.uuid}` placeholder provides a
+# per-request unique value. Vite's `vite-plugin-csp-nonce` (if added) or
+# server-side HTML template engine substitutes `{{nonce}}` placeholders
+# in <script nonce="..."> and <style nonce="...">.
+#
+# Without nonce-substitution at HTML render: inline scripts blocked.
+# That's the GOAL — forces all inline code to be either:
+#   - Externalized to a separate .js file (preferred for CSP-strict)
+#   - Marked with nonce="{{nonce}}" placeholder Caddy substitutes
+#
+# CSP policy rationale per directive:
+#   default-src 'self'   → block all cross-origin loads by default
+#   script-src           → only same-origin + nonce-tagged inline allowed
+#                          (NO 'unsafe-inline', NO 'unsafe-eval')
+#   style-src            → 'unsafe-inline' is a transition compromise for
+#                          tailwind utilities + Radix; revisit when migrated
+#                          to all-external CSS (WP 4.7b TBD)
+#   img-src              → 'self' + data: (avatars/icons) + https: (Sentry)
+#   connect-src          → 'self' + wss: (WebSocket) + *.${PUBLIC_TLD} subdomains
+#   frame-ancestors      → none (modern X-Frame-Options=DENY equivalent)
+#   base-uri             → 'self' (prevents <base> tag injection)
+#   form-action          → 'self' (prevents form redirect to attacker domain)
+#   report-uri           → /csp-report → Sentry CSP-report endpoint
+
+# Step 1: Report-Only mode (use during initial rollout)
+(csp-report-only) {
+  header Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self' 'nonce-{http.request.uuid}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' wss: https://*.{$PUBLIC_TLD} https://*.{$INTERNAL_TLD}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; report-uri /csp-report"
+}
+
+# Step 2: Enforcing mode (flip after 7-day soak with 0 violations)
+(csp-enforce) {
+  header Content-Security-Policy "default-src 'self'; script-src 'self' 'nonce-{http.request.uuid}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' wss: https://*.{$PUBLIC_TLD} https://*.{$INTERNAL_TLD}; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; report-uri /csp-report"
+}
+
+# Companion: CSP-report endpoint forwards browser violation reports to
+# Sentry. Mount as a separate site block in the Caddyfile:
+#
+#   /csp-report {
+#     reverse_proxy https://sentry.io/api/0/csp-report/{SENTRY_PROJECT_ID}/?sentry_key={SENTRY_PUBLIC_KEY}
+#   }
+#
+# Operator wires SENTRY_PROJECT_ID + SENTRY_PUBLIC_KEY in Coolify env.

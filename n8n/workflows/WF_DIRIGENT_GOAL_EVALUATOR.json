@@ -1,0 +1,109 @@
+{
+  "name": "WF_DIRIGENT_GOAL_EVALUATOR",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "dirigent/goal_evaluator",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "goal-trigger",
+      "name": "Goal Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Stop playbook ⭐ CRITICAL — only playbook allowed to return decision != 'allow'.\n// Loads story_goal_state, scores transcript vs acceptance_criteria, decides:\n//   - all met       → allow (✅ Goal reached)\n//   - some missing  → block (force loop continuation with expert observation)\n//   - loop cap hit  → ask (escalate to manual review)\n//\n// MVP: only loop-cap guard is enforced; criterion evaluation is a stub that\n// reports criteria as 'pending evaluation' (LLM-based scoring lands in next\n// iteration with mid-tier model + low temperature).\nconst body = $input.first().json.body || $input.first().json;\nif (body.event !== 'stop') {\n  throw new Error(`WF_DIRIGENT_GOAL_EVALUATOR expects event=stop, got ${body.event}`);\n}\nreturn [{\n  json: {\n    story_id: body.story_id || null,\n    session_id: body.session_id || null,\n    transcript_excerpt: String(body.transcript_excerpt || '').slice(0, 4000),\n    has_story: !!body.story_id\n  }\n}];"
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "mcp_get_story_context",
+        "rpcParams": "={{ JSON.stringify({ p_story_id: $json.story_id }) }}",
+        "authMode": "service_role",
+        "options": { "timeout": 5000, "auditTrail": false },
+        "onError": "continueRegularOutput"
+      },
+      "id": "fetch-story",
+      "name": "Fetch Story Context",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "credentials": {
+        "aishaPostgrestApi": { "id": "__REMAP__", "name": "AISHA PostgREST" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Goal evaluation. MVP semantics (no LLM yet):\n//   - no story_id            → allow with hint to set story\n//   - loop_iterations >= max  → ask\n//   - acceptance_criteria empty → allow (nothing to evaluate)\n//   - otherwise               → block with expert observation that\n//     criteria need explicit verification this turn\n//\n// Once LLM scoring lands, replace the placeholder block-text with per-\n// criterion met/partial/missing with evidence quotes.\nconst input = $('Validate Input').first().json;\nconst story = $input.first().json;\nconst now = new Date().toISOString();\n\nif (!input.has_story) {\n  return [{\n    json: {\n      advisory: '📋 AISHA Dirigent: no active story — Stop allowed without evaluation.',\n      decision: 'allow',\n      _audit: { event: 'stop', story_id: null, session_id: input.session_id, branch: 'no_story', now }\n    }\n  }];\n}\n\nconst gs = (story && story.success !== false) ? (story.goal_state || story) : null;\nconst loopIter = Number(gs?.loop_iterations ?? 0);\nconst loopMax = Number(gs?.loop_max ?? 12);\nconst ac = Array.isArray(gs?.acceptance_criteria) ? gs.acceptance_criteria : [];\n\nif (loopIter >= loopMax) {\n  return [{\n    json: {\n      advisory: '🛑 AISHA Goal Evaluator: autonomous loop reached cap.',\n      decision: 'ask',\n      reason: `Story autonomous loop reached cap (${loopMax} iterations). Please review manually before continuing.`,\n      _audit: { event: 'stop', story_id: input.story_id, session_id: input.session_id, branch: 'loop_cap', loop_iter: loopIter, loop_max: loopMax, now }\n    }\n  }];\n}\n\nif (ac.length === 0) {\n  return [{\n    json: {\n      advisory: '✅ AISHA Goal Evaluator: no acceptance criteria set — Stop allowed.',\n      decision: 'allow',\n      _audit: { event: 'stop', story_id: input.story_id, session_id: input.session_id, branch: 'no_criteria', now }\n    }\n  }];\n}\n\n// MVP block path — explicit criteria need verification this turn.\n// Once LLM scoring lands, this becomes per-criterion met/partial/missing.\nconst criteriaList = ac.map((c, i) => `  ${i+1}. ${typeof c === 'string' ? c : (c.text || JSON.stringify(c))}`).join('\\n');\nreturn [{\n  json: {\n    advisory: '🔍 AISHA Goal Evaluator: kritéria potřebují ověření.',\n    decision: 'block',\n    reason: `Story má ${ac.length} acceptance criteria. Před Stop ověř, že každé je splněno, nebo přidej milestone log s důkazem:\\n${criteriaList}\\n\\nIterace ${loopIter+1}/${loopMax}. Toto není pokyn — popřemýšlej a pokračuj.`,\n    _audit: { event: 'stop', story_id: input.story_id, session_id: input.session_id, branch: 'criteria_pending', loop_iter: loopIter+1, criteria_count: ac.length, now }\n  }\n}];"
+      },
+      "id": "evaluate-goal",
+      "name": "Evaluate Goal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_integration_action",
+        "rpcParams": "={{ JSON.stringify({ p_action_key: 'dirigent.goal_evaluator.completed', p_integration: 'wf_dirigent_goal_evaluator', p_payload: $json._audit }) }}",
+        "authMode": "service_role",
+        "options": { "timeout": 3000, "auditTrail": false },
+        "onError": "continueRegularOutput"
+      },
+      "id": "audit-log",
+      "name": "Audit Log",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [1120, 300],
+      "credentials": {
+        "aishaPostgrestApi": { "id": "__REMAP__", "name": "AISHA PostgREST" }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ advisory: $('Evaluate Goal').first().json.advisory, decision: $('Evaluate Goal').first().json.decision, reason: $('Evaluate Goal').first().json.reason }) }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Goal Trigger": { "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]] },
+    "Validate Input": { "main": [[{ "node": "Fetch Story Context", "type": "main", "index": 0 }]] },
+    "Fetch Story Context": { "main": [[{ "node": "Evaluate Goal", "type": "main", "index": 0 }]] },
+    "Evaluate Goal": { "main": [[{ "node": "Audit Log", "type": "main", "index": 0 }]] },
+    "Audit Log": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

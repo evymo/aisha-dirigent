@@ -1,0 +1,201 @@
+{
+  "name": "WF_DRIFT_OBSERVER",
+  "meta": {
+    "purpose": "Event-driven drift detection — porovnává live Coolify state s git manifestem, autonomně rozhoduje o remediaci. Drift = source of truth pro AISHA o tom, co se v stacku reálně děje vs. co je deklarované.",
+    "trigger": "Event-driven: webhook /webhook/drift-now (manual + sub-workflow calls)",
+    "design_doc": "docs/deploy/AUTONOMOUS_DEPLOY_FLOW.md",
+    "event_sources": [
+      "Manual: POST /webhook/drift-now { reason: 'manual' }",
+      "Post-deploy: WF_BLUE_GREEN_ORCHESTRATOR after promote → POST /webhook/drift-now { reason: 'post-bg-promote', app: X }",
+      "Post-incident: WF_SENTRY_OBSERVER on high severity → POST /webhook/drift-now { reason: 'sentry-incident', app: X }",
+      "Post-cold-start: aisha-cold-start.sh step 7 → POST /webhook/drift-now { reason: 'post-cold-start' }",
+      "Post-changed-apps: aisha-changed-apps + redeploy → POST /webhook/drift-now { reason: 'post-redeploy' }"
+    ],
+    "remediation_decisions": [
+      "compose_drift → auto-fix via Coolify PATCH (auto, reverzibilní)",
+      "missing apps → trigger story-init creation (auto, reverzibilní)",
+      "orphaned apps → operator alert (manual confirm, security concern)",
+      "server_drift → operator alert (manual, destruktivní migration)"
+    ],
+    "rate_limit": "First node parse-trigger debounces — pokud last execution byl <60s ago a reason=='post-bg-promote', skip (avoid burst při wave deploys)."
+  },
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "drift-now",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "wh-drift",
+      "name": "Drift trigger webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [200, 325]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse trigger payload + light debounce.\n// Caller posts { reason, app?, story?, force? } — reason je free-form tag.\n// Debounce: pokud reason patří do 'post-bg-promote' a není force=true, soft\n// rate-limit (caller responsible for spacing). Real persistence vyžaduje\n// state store (n8n static data), zde stub.\nconst body = $input.first().json.body || $input.first().json;\nconst reason = body.reason || 'unspecified';\nconst app = body.app || null;\nconst story = body.story || null;\nconst force = body.force === true;\n\nreturn { json: {\n  reason,\n  app,\n  story,\n  force,\n  ts: new Date().toISOString(),\n  // Forward all original fields pro downstream handlers\n  trigger_source: body,\n}};"
+      },
+      "id": "parse-trigger",
+      "name": "Parse trigger event",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [400, 325]
+    },
+    {
+      "parameters": {
+        "url": "{{ $env.AGENT_RUNNER_URL }}/exec",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipe\": \"system/coolify-drift-check\",\n  \"args\": [\"--json\"],\n  \"isolation\": \"runc\",\n  \"timeout_s\": 30\n}",
+        "options": {
+          "timeout": 60000,
+          "response": { "response": { "neverError": true, "responseFormat": "json", "fullResponse": true } }
+        }
+      },
+      "id": "run-drift-check",
+      "name": "Run drift check (svc-agent-runner)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 325]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse drift report from svc-agent-runner exec output.\n// Recipe `system/coolify-drift-check` runs `node scripts/coolify-drift-check.mjs --json`\n// and returns stdout JSON in body.output.\nconst body = $input.first().json.body || $input.first().json;\nconst raw = body.output || body.stdout || '{}';\nlet drift;\ntry {\n  drift = typeof raw === 'string' ? JSON.parse(raw) : raw;\n} catch (e) {\n  return { json: { error: 'failed to parse drift JSON', raw: String(raw).slice(0, 200) } };\n}\n\n// Extract counts\nconst counts = {\n  orphaned: (drift.orphaned || []).length,\n  missing: (drift.missing || []).length,\n  composeDrift: (drift.composeDrift || []).length,\n  serverDrift: (drift.serverDrift || []).length,\n};\nconst total = counts.orphaned + counts.missing + counts.composeDrift + counts.serverDrift;\n\n// Severity classification\nlet severity = 'clean';\nif (counts.orphaned > 0) severity = 'security_concern';\nelse if (counts.serverDrift > 0) severity = 'critical';\nelse if (counts.missing > 0) severity = 'high';\nelse if (counts.composeDrift > 0) severity = 'medium';\n\n// Carry forward trigger context\nconst triggerCtx = $('parse-trigger').first().json;\nreturn { json: { drift, counts, total, severity, ts: new Date().toISOString(), trigger: triggerCtx } };"
+      },
+      "id": "parse-drift",
+      "name": "Parse + classify drift",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 325]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "outputKey": "auto_fix", "conditions": { "conditions": [{ "leftValue": "={{ $json.severity }}", "rightValue": "medium", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } },
+            { "outputKey": "trigger_create", "conditions": { "conditions": [{ "leftValue": "={{ $json.severity }}", "rightValue": "high", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } },
+            { "outputKey": "alert_security", "conditions": { "conditions": [{ "leftValue": "={{ $json.severity }}", "rightValue": "security_concern", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } },
+            { "outputKey": "alert_critical", "conditions": { "conditions": [{ "leftValue": "={{ $json.severity }}", "rightValue": "critical", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } }
+          ]
+        },
+        "fallbackOutput": "extra",
+        "options": {}
+      },
+      "id": "route",
+      "name": "Route by severity",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [1150, 325]
+    },
+    {
+      "parameters": {
+        "url": "{{ $env.AGENT_RUNNER_URL }}/exec",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipe\": \"system/coolify-drift-check\",\n  \"args\": [\"--fix-compose\"],\n  \"isolation\": \"runc\",\n  \"timeout_s\": 60\n}",
+        "options": {
+          "timeout": 120000,
+          "response": { "response": { "neverError": true, "responseFormat": "json", "fullResponse": true } }
+        }
+      },
+      "id": "auto-fix-compose",
+      "name": "Auto-fix compose drift",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 100]
+    },
+    {
+      "parameters": {
+        "url": "{{ $env.AGENT_RUNNER_URL }}/exec",
+        "method": "POST",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"recipe\": \"system/coolify-story-init\",\n  \"args\": [\"--manifest\", \"coolify/manifests/aisha.manifest\"],\n  \"isolation\": \"runc\",\n  \"timeout_s\": 300\n}",
+        "options": {
+          "timeout": 360000,
+          "response": { "response": { "neverError": true, "responseFormat": "json", "fullResponse": true } }
+        }
+      },
+      "id": "trigger-create-missing",
+      "name": "Re-create missing apps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1400, 250]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Security concern: orphaned apps in Coolify (manuálně přidané, nejsou v gitu).\n// MAY indicate compromise — escalate to operator, NEVER auto-delete.\nconst d = $input.first().json;\nreturn { json: {\n  action_taken: 'security_alert',\n  channel: '#aisha-security',\n  severity: 'high',\n  triggered_by: d.trigger?.reason || 'unspecified',\n  message: `${d.counts.orphaned} orphaned Coolify app(s) detected — manuálně přidané, nejsou v gitu manifestu`,\n  apps: (d.drift.orphaned || []).map(a => a.name),\n  recommendation: 'Audit each app — pokud legitimní, přidat do aisha.manifest. Pokud ne, smazat přes Coolify UI.',\n}};"
+      },
+      "id": "alert-security",
+      "name": "Security alert (orphans)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Critical: server drift (app na špatném serveru). Manual ops needed (server\n// migration v Coolify je destruktivní). Alert operator.\nconst d = $input.first().json;\nreturn { json: {\n  action_taken: 'critical_alert',\n  channel: '#aisha-deploy-alerts',\n  severity: 'critical',\n  triggered_by: d.trigger?.reason || 'unspecified',\n  message: `${d.counts.serverDrift} app(s) on wrong server — vyžaduje manual migration`,\n  drifts: d.drift.serverDrift,\n}};"
+      },
+      "id": "alert-critical",
+      "name": "Critical alert (server drift)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 550]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Clean / extra (no drift) — log only.\nconst d = $input.first().json;\nreturn { json: {\n  action_taken: 'log_only',\n  total: d.total,\n  severity: d.severity,\n  triggered_by: d.trigger?.reason || 'unspecified'\n}};"
+      },
+      "id": "log-clean",
+      "name": "Log clean state",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 700]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($input.first().json) }}"
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1650, 325]
+    }
+  ],
+  "connections": {
+    "Drift trigger webhook": { "main": [[{ "node": "Parse trigger event", "type": "main", "index": 0 }]] },
+    "Parse trigger event": { "main": [[{ "node": "Run drift check (svc-agent-runner)", "type": "main", "index": 0 }]] },
+    "Run drift check (svc-agent-runner)": { "main": [[{ "node": "Parse + classify drift", "type": "main", "index": 0 }]] },
+    "Parse + classify drift": { "main": [[{ "node": "Route by severity", "type": "main", "index": 0 }]] },
+    "Route by severity": {
+      "main": [
+        [{ "node": "Auto-fix compose drift", "type": "main", "index": 0 }],
+        [{ "node": "Re-create missing apps", "type": "main", "index": 0 }],
+        [{ "node": "Security alert (orphans)", "type": "main", "index": 0 }],
+        [{ "node": "Critical alert (server drift)", "type": "main", "index": 0 }],
+        [{ "node": "Log clean state", "type": "main", "index": 0 }]
+      ]
+    },
+    "Auto-fix compose drift":     { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] },
+    "Re-create missing apps":     { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] },
+    "Security alert (orphans)":   { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] },
+    "Critical alert (server drift)": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] },
+    "Log clean state":            { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": ["aisha", "drift", "self-driving", "event-driven"]
+}

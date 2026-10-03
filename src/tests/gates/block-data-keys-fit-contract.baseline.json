@@ -1,0 +1,16 @@
+{
+  "_": [
+    "ROHATKA, NE VÝJIMKA. Tenhle seznam je DLUH, ne povolení.",
+    "Brána selže na čemkoli, co v něm NENÍ — a selže i tehdy, když v něm zůstane",
+    "něco, co už je opravené. Seznam tedy může jen SMRŠŤOVAT; kdo sem přidá řádek,",
+    "musí napsat proč a čím to skončí.",
+    "",
+    "HISTORIE: 2026-08-08 tu byly get_doc_expiry_review_block a",
+    "get_twin_ref_review_block (review_queue jen s {items}, bez entity_kind",
+    "a actions). Opraveno 2026-07-28 až 08-01 (ee8871534 „the last two blocks the",
+    "client was throwing away“, 3ede3b62e, e14492d89) — a rohatka to ohlásila až",
+    "2026-09-03, protože brána běžela bez AISHA_INSTANCE_CONFIG_DIR a overlay",
+    "tiše přeskakovala. Vyškrtnuto 2026-09-03; seznam je prázdný a má zůstat."
+  ],
+  "znamy_dluh": []
+}

@@ -1,0 +1,254 @@
+{
+  "$comment": "Spend Governance & Agent Activity — operator analytics page for the AISHA Ops Appsmith app. Reads the SAME audited RPCs the web Mission Control panes use (list_active_agent_sessions, list_pending_spend_approvals, kanban_stories_view, get_ai_agent_metrics_timeseries) so the workbench dashboard, the web app and the Dirigent IDE view all show one consistent picture of 'what runs and what it costs'. Approve/reject go through approve_task_spend_audited / reject_task_spend_audited (audit_journal-logged, admin-only enforced server-side).",
+  "pageName": "Spend Governance",
+  "pageSlug": "spend-governance",
+  "isHidden": false,
+  "isDefault": false,
+  "navigation": {
+    "icon": "dollar-sign",
+    "label": "Spend & Agents",
+    "section": "AI Ops"
+  },
+  "queries": [
+    {
+      "name": "activeAgentSessions",
+      "datasource": "AISHA Postgres REST",
+      "actionConfiguration": {
+        "httpMethod": "POST",
+        "path": "/rpc/list_active_agent_sessions",
+        "body": "{ \"p_limit\": 50 }"
+      },
+      "executeOnLoad": true,
+      "confirmBeforeExecute": false
+    },
+    {
+      "name": "pendingApprovals",
+      "datasource": "AISHA Postgres REST",
+      "actionConfiguration": {
+        "httpMethod": "POST",
+        "path": "/rpc/list_pending_spend_approvals",
+        "body": "{ \"p_limit\": 50 }"
+      },
+      "executeOnLoad": true,
+      "confirmBeforeExecute": false
+    },
+    {
+      "name": "storySpend",
+      "datasource": "AISHA Postgres REST",
+      "actionConfiguration": {
+        "httpMethod": "POST",
+        "path": "/rpc/kanban_stories_view",
+        "body": "{}"
+      },
+      "executeOnLoad": true,
+      "confirmBeforeExecute": false
+    },
+    {
+      "name": "costTimeseries",
+      "datasource": "AISHA Postgres REST",
+      "actionConfiguration": {
+        "httpMethod": "POST",
+        "path": "/rpc/get_ai_agent_metrics_timeseries",
+        "body": "{ \"p_hours_back\": 168 }"
+      },
+      "executeOnLoad": true,
+      "confirmBeforeExecute": false
+    },
+    {
+      "name": "approveSpend",
+      "datasource": "AISHA Postgres REST",
+      "actionConfiguration": {
+        "httpMethod": "POST",
+        "path": "/rpc/approve_task_spend_audited",
+        "body": "{{ { p_run_id: pendingApprovalsTable.selectedRow.run_id, p_raise_budget_usd: pendingApprovalsTable.selectedRow.estimate_usd || null } }}"
+      },
+      "executeOnLoad": false,
+      "confirmBeforeExecute": true,
+      "onSuccess": ["pendingApprovals.run()", "activeAgentSessions.run()"]
+    },
+    {
+      "name": "rejectSpend",
+      "datasource": "AISHA Postgres REST",
+      "actionConfiguration": {
+        "httpMethod": "POST",
+        "path": "/rpc/reject_task_spend_audited",
+        "body": "{{ { p_run_id: pendingApprovalsTable.selectedRow.run_id, p_reason: 'rejected via workbench' } }}"
+      },
+      "executeOnLoad": false,
+      "confirmBeforeExecute": true,
+      "onSuccess": ["pendingApprovals.run()"]
+    }
+  ],
+  "widgets": [
+    {
+      "type": "TextWidget",
+      "name": "pageTitle",
+      "props": {
+        "text": "## Spend Governance & Agent Activity",
+        "fontSize": "HEADING1"
+      },
+      "position": { "row": 0, "col": 0, "rowSpan": 2, "colSpan": 64 }
+    },
+    {
+      "type": "StatBoxWidget",
+      "name": "activeSessionsStat",
+      "props": {
+        "label": "Active agent sessions",
+        "value": "{{ activeAgentSessions.data?.length ?? 0 }}",
+        "icon": "pulse",
+        "color": "#2563eb"
+      },
+      "position": { "row": 2, "col": 0, "rowSpan": 3, "colSpan": 16 }
+    },
+    {
+      "type": "StatBoxWidget",
+      "name": "pendingApprovalsStat",
+      "props": {
+        "label": "Pending spend approvals",
+        "value": "{{ pendingApprovals.data?.length ?? 0 }}",
+        "icon": "warning",
+        "color": "{{ (pendingApprovals.data?.length ?? 0) > 0 ? '#dc2626' : '#16a34a' }}"
+      },
+      "position": { "row": 2, "col": 16, "rowSpan": 3, "colSpan": 16 }
+    },
+    {
+      "type": "StatBoxWidget",
+      "name": "totalSpendStat",
+      "props": {
+        "label": "AI spend to date (USD)",
+        "value": "{{ '$' + (storySpend.data?.reduce((a, s) => a + (Number(s.cost_to_date_usd) || 0), 0) ?? 0).toFixed(2) }}",
+        "icon": "dollar-sign",
+        "color": "#0e7490"
+      },
+      "position": { "row": 2, "col": 32, "rowSpan": 3, "colSpan": 16 }
+    },
+    {
+      "type": "StatBoxWidget",
+      "name": "tokens24hStat",
+      "props": {
+        "label": "Tokens (window)",
+        "value": "{{ (costTimeseries.data?.reduce((a, r) => a + (Number(r.total_tokens) || 0), 0) ?? 0).toLocaleString() }}",
+        "icon": "database",
+        "color": "#7c3aed"
+      },
+      "position": { "row": 2, "col": 48, "rowSpan": 3, "colSpan": 16 }
+    },
+    {
+      "type": "TextWidget",
+      "name": "approvalsHeading",
+      "props": { "text": "### Pending spend approvals", "fontSize": "HEADING2" },
+      "position": { "row": 5, "col": 0, "rowSpan": 1, "colSpan": 64 }
+    },
+    {
+      "type": "TableWidget",
+      "name": "pendingApprovalsTable",
+      "props": {
+        "tableData": "{{ pendingApprovals.data }}",
+        "primaryColumnKey": "run_id",
+        "columns": [
+          { "key": "kind", "label": "Task kind", "width": 160 },
+          { "key": "story_title", "label": "Story", "width": 220 },
+          { "key": "estimate_usd", "label": "Est. USD", "width": 100 },
+          { "key": "decision_reason", "label": "Reason", "width": 240 }
+        ]
+      },
+      "position": { "row": 6, "col": 0, "rowSpan": 12, "colSpan": 50 }
+    },
+    {
+      "type": "ButtonWidget",
+      "name": "approveButton",
+      "props": {
+        "label": "Approve",
+        "role_required": "admin",
+        "buttonColor": "#16a34a",
+        "onClick": "{{ approveSpend.run() }}",
+        "disabledWhen": "{{ !pendingApprovalsTable.selectedRow.run_id }}"
+      },
+      "position": { "row": 6, "col": 50, "rowSpan": 2, "colSpan": 14 }
+    },
+    {
+      "type": "ButtonWidget",
+      "name": "rejectButton",
+      "props": {
+        "label": "Reject",
+        "role_required": "admin",
+        "buttonColor": "#dc2626",
+        "onClick": "{{ rejectSpend.run() }}",
+        "disabledWhen": "{{ !pendingApprovalsTable.selectedRow.run_id }}"
+      },
+      "position": { "row": 8, "col": 50, "rowSpan": 2, "colSpan": 14 }
+    },
+    {
+      "type": "TextWidget",
+      "name": "sessionsHeading",
+      "props": { "text": "### Live agent sessions", "fontSize": "HEADING2" },
+      "position": { "row": 18, "col": 0, "rowSpan": 1, "colSpan": 64 }
+    },
+    {
+      "type": "TableWidget",
+      "name": "agentSessionsTable",
+      "props": {
+        "tableData": "{{ activeAgentSessions.data }}",
+        "primaryColumnKey": "session_id",
+        "columns": [
+          { "key": "source", "label": "Source", "width": 120 },
+          { "key": "story_title", "label": "Story", "width": 220 },
+          { "key": "current_phase", "label": "Phase", "width": 110 },
+          { "key": "last_tool", "label": "Last tool", "width": 140 },
+          { "key": "tokens_input", "label": "Tok in", "width": 90 },
+          { "key": "tokens_output", "label": "Tok out", "width": 90 },
+          { "key": "cost_usd", "label": "Cost USD", "width": 100 }
+        ]
+      },
+      "position": { "row": 19, "col": 0, "rowSpan": 12, "colSpan": 64 }
+    },
+    {
+      "type": "TextWidget",
+      "name": "spendByStoryHeading",
+      "props": { "text": "### Spend by story", "fontSize": "HEADING2" },
+      "position": { "row": 31, "col": 0, "rowSpan": 1, "colSpan": 64 }
+    },
+    {
+      "type": "TableWidget",
+      "name": "storySpendTable",
+      "props": {
+        "tableData": "{{ storySpend.data }}",
+        "primaryColumnKey": "story_id",
+        "columns": [
+          { "key": "title", "label": "Story", "width": 260 },
+          { "key": "cost_to_date_usd", "label": "Spend USD", "width": 120 },
+          { "key": "tokens_to_date", "label": "Tokens", "width": 120 },
+          {
+            "key": "budget_state",
+            "label": "Budget",
+            "width": 120,
+            "cellBackgroundColor": "{{ currentRow.budget_state === 'stopped' ? '#fee2e2' : currentRow.budget_state === 'approaching' ? '#fef3c7' : '#dcfce7' }}"
+          }
+        ]
+      },
+      "position": { "row": 32, "col": 0, "rowSpan": 12, "colSpan": 64 }
+    },
+    {
+      "type": "TextWidget",
+      "name": "costOverTimeHeading",
+      "props": { "text": "### Cost / tokens over time (per agent, hourly)", "fontSize": "HEADING2" },
+      "position": { "row": 44, "col": 0, "rowSpan": 1, "colSpan": 64 }
+    },
+    {
+      "type": "TableWidget",
+      "name": "costTimeseriesTable",
+      "props": {
+        "tableData": "{{ costTimeseries.data }}",
+        "primaryColumnKey": "hour",
+        "columns": [
+          { "key": "hour", "label": "Hour", "width": 180 },
+          { "key": "agent_slug", "label": "Agent", "width": 180 },
+          { "key": "total_cost_usd", "label": "Cost USD", "width": 120 },
+          { "key": "total_tokens", "label": "Tokens", "width": 120 },
+          { "key": "errors", "label": "Errors", "width": 90 }
+        ]
+      },
+      "position": { "row": 45, "col": 0, "rowSpan": 12, "colSpan": 64 }
+    }
+  ]
+}

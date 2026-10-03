@@ -1,0 +1,14 @@
+id: mautrix-discord
+url: http://mautrix-discord:29334
+as_token: ${AISHA_AS_TOKEN}_discord
+hs_token: ${AISHA_HS_TOKEN}_discord
+sender_localpart: discordbot
+rate_limited: false
+namespaces:
+  users:
+    - exclusive: true
+      regex: '@discord_.*'
+  aliases:
+    - exclusive: true
+      regex: '#discord_.*'
+  rooms: []

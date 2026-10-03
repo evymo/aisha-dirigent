@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "acs.verify.result@1.0",
+  "title": "Verification result",
+  "description": "Verifier verdict. insufficient_evidence is a first-class outcome — a verdict may only be issued over complete evidence (ACS_AUDIT_FINDINGS: truncated-evidence rule).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["intent_ref", "verdict", "drift_score"],
+  "properties": {
+    "intent_ref": { "type": "string", "pattern": "^int_[0-9A-HJKMNP-TV-Z]{26}$" },
+    "verdict": { "enum": ["pass", "fail", "insufficient_evidence"] },
+    "drift_score": { "type": "number", "minimum": 0, "maximum": 1, "description": "0 = output matches intent exactly; 1 = unrelated." },
+    "findings": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "severity"],
+        "properties": {
+          "code": { "type": "string", "pattern": "^[a-z0-9_]+$", "maxLength": 64 },
+          "severity": { "enum": ["info", "warning", "violation"] },
+          "detail": { "type": "string", "maxLength": 2000 }
+        }
+      }
+    }
+  }
+}

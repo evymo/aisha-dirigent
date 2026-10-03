@@ -1,0 +1,159 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "tags": ["aisha", "llm", "cost", "budget"],
+  "templating": {
+    "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "type": "datasource",
+        "query": "prometheus",
+        "hide": 2
+      },
+      {
+        "name": "provider",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(aisha_llm_calls_total, provider)",
+        "includeAll": true,
+        "multi": true,
+        "refresh": 2
+      }
+    ]
+  },
+  "time": { "from": "now-24h", "to": "now" },
+  "title": "AISHA LLM Cost",
+  "uid": "aisha-llm-cost",
+  "version": 2,
+  "panels": [
+    {
+      "title": "Total LLM calls (24h)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        { "expr": "sum(increase(aisha_llm_calls_total{provider=~\"$provider\"}[24h]))" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } }
+    },
+    {
+      "title": "Error rate (24h, all providers)",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "expr": "100 * sum(increase(aisha_llm_calls_total{status=\"error\",provider=~\"$provider\"}[24h])) / sum(increase(aisha_llm_calls_total{provider=~\"$provider\"}[24h]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "title": "Active providers",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        { "expr": "count(group by (provider) (aisha_llm_calls_total))" }
+      ]
+    },
+    {
+      "title": "Active models",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        { "expr": "count(group by (model) (aisha_llm_calls_total))" }
+      ]
+    },
+    {
+      "title": "LLM calls per provider (24h)",
+      "type": "piechart",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "expr": "sum by (provider) (increase(aisha_llm_calls_total{provider=~\"$provider\"}[24h]))",
+          "legendFormat": "{{provider}}"
+        }
+      ],
+      "options": {
+        "legend": { "displayMode": "table", "values": ["value", "percent"] }
+      }
+    },
+    {
+      "title": "Error rate per provider over time",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "expr": "100 * sum by (provider) (rate(aisha_llm_calls_total{status=\"error\",provider=~\"$provider\"}[5m])) / sum by (provider) (rate(aisha_llm_calls_total{provider=~\"$provider\"}[5m]))",
+          "legendFormat": "{{provider}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percent" } }
+    },
+    {
+      "title": "Calls/sec per model",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum by (model) (rate(aisha_llm_calls_total{provider=~\"$provider\"}[5m]))",
+          "legendFormat": "{{model}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "title": "Calls per status (ok / error / timeout)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(aisha_llm_calls_total{provider=~\"$provider\"}[5m]))",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "title": "LLM call latency p95 (proxy via aisha_rpc_duration_ms)",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le, rpc) (rate(aisha_rpc_duration_ms_bucket{rpc=~\".*llm.*|.*completion.*|.*chat.*\"}[5m])))",
+          "legendFormat": "{{rpc}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ms" } }
+    },
+    {
+      "title": "Cost breakdown — canonical view in Langfuse",
+      "type": "text",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 28 },
+      "options": {
+        "mode": "markdown",
+        "content": "## Where to find what\n\n| Metric | Where | Why |\n|---|---|---|\n| **Per-call cost (USD)** | [Langfuse UI](https://langfuse.backend.id3a.cz) → Generations | Langfuse joins token counts × model price; cardinality (per chat turn) too high for Prometheus |\n| **Daily cost per tenant** | Langfuse UI → Costs → group by `user_id` | Tenant-level rollup needs prompt + response context; Langfuse already has it |\n| **Daily cost per story** | Langfuse UI → Costs → filter `metadata.storyId` | Story-level rollup driven by Langfuse trace metadata |\n| **Call counts + error rate** | **This dashboard** ↑ | Low-cardinality Prometheus counter `aisha_llm_calls_total{provider,model,status}` |\n| **Latency p95 / RPS** | **This dashboard** ↑ | Per-route histogram via `aisha_request_duration_ms` |\n| **Budget alerts** | Grafana alert rules (see `provisioning/alerting/llm-cost.yaml`) | Trigger when daily call count exceeds threshold or error rate spikes |\n\n## Alert thresholds (configured via `grafana/provisioning/alerting/llm-cost.yaml`)\n\n- Error rate >5% for 10 min → page on-call\n- Total calls/sec >2× weekly baseline → warning\n- Single provider failure rate >25% for 5 min → page on-call\n\n## How to investigate a cost spike\n\n1. Spot the spike in this dashboard's per-model time series.\n2. Click through to Langfuse UI for the affected window.\n3. Group by `user_id` or `metadata.storyId` to find the source.\n4. If runaway tenant: check `llm_quota` table (WP 2.3, pending) for rate limit status.\n5. If runaway prompt: open the Langfuse trace and review the prompt + response."
+      }
+    }
+  ]
+}

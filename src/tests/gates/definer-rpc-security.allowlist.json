@@ -1,0 +1,10 @@
+{
+  "_comment": "Allowlist for scripts/db/check-definer-rpc-security.mjs (DB_SECURITY_INVARIANTS.md Follow-up). That check runs against the cold-start catalog (verify-cold-start-apply.sh step 5/5) and FLAGS any SECURITY DEFINER function that is EXECUTE-able by PUBLIC/anon, is not a trigger, has no auth check, AND is not defined in aisha/db/sql/functions/ (access.mjs's blind spot). Identity-keyed, not a count: a NEW such function is a NEW name = a hard fail. To clear a flag: add an auth check, move the function into sql/functions/, or add it here WITH a reason. Keep this list MINIMAL — every entry is a function access.mjs cannot see and a human vouched is safe.",
+  "_generated_at": "2026-05-31T00:00:00Z",
+  "allowlist": [
+    {
+      "name": "is_story_partner",
+      "reason": "STABLE SECURITY DEFINER RLS helper added by 20260530130000_fix_story_participants_rls_recursion to break the Postgres 42P17 self-reference recursion on story_participants/call_participants policies. It reads only participant membership; EXECUTE must be open so RLS evaluation works for every role. Read-only, no DML, takes the caller's own context — not an anon-callable data RPC. Defined in a migration (not sql/functions/) because it is policy infrastructure, not an application RPC."
+    }
+  ]
+}

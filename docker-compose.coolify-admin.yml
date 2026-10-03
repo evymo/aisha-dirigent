@@ -1,0 +1,561 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify-admin.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+services:
+  nocodb:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    image: ${IMAGE_NOCODB}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-nocodb
+    restart: unless-stopped
+    environment:
+      - NC_DB=pg://${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-db:5432?u=nocodb_app&p=${NOCODB_DB_PASSWORD}&d=postgres
+      - NC_AUTH_JWT_SECRET=${NOCODB_JWT_SECRET}
+      - NC_PUBLIC_URL=https://${NOCODB_DOMAIN}
+      - NC_DISABLE_TELE=true
+      - NC_ADMIN_EMAIL=${NOCODB_ADMIN_EMAIL}
+      - NC_ADMIN_PASSWORD=${NOCODB_ADMIN_PASSWORD}
+      - NC_INVITE_ONLY_SIGNUP=true
+    volumes:
+      - nocodb-data:/usr/app/data
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider --tries=1 --timeout=3 http://127.0.0.1:8080/api/v1/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 180s
+    networks:
+      coolify:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-nocodb
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-nocodb
+      mesh-dns:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-nocodb
+    labels:
+      - "coolify.managed=true"
+      - "traefik.docker.network=coolify"
+      - "traefik.enable=true"
+  nocodb-auth:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1-alpine
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-nocodb-auth
+    restart: unless-stopped
+    extra_hosts:
+      - "${KEYCLOAK_DOMAIN_PUBLIC}:host-gateway"
+      - "${KEYCLOAK_EXTRA_HOST_ALIAS:?vydává derive-domains; bez něj by extra_hosts nesl duplicitu nebo prázdné jméno}:host-gateway"
+    environment:
+      OAUTH2_PROXY_PROVIDER: keycloak-oidc
+      OAUTH2_PROXY_CLIENT_ID: ${OIDC_CLIENT_PREFIX:-}nocodb-proxy
+      OAUTH2_PROXY_CLIENT_SECRET: ${NOCODB_OIDC_SECRET}
+      OAUTH2_PROXY_OIDC_ISSUER_URL: https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}
+      OAUTH2_PROXY_SKIP_OIDC_DISCOVERY: "true"
+      OAUTH2_PROXY_LOGIN_URL: https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth
+      OAUTH2_PROXY_REDEEM_URL: https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token
+      OAUTH2_PROXY_OIDC_JWKS_URL: https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs
+      OAUTH2_PROXY_PROFILE_URL: https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/userinfo
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_UPSTREAMS: http://${APP_NAME_PREFIX:?identita instance}-nocodb:8080
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_PROXY_COOKIE_SECRET}
+      OAUTH2_PROXY_COOKIE_SECURE: "true"
+      OAUTH2_PROXY_COOKIE_NAME: _aisha_nocodb_proxy
+      OAUTH2_PROXY_COOKIE_DOMAINS: ${OAUTH2_COOKIE_DOMAINS}
+      OAUTH2_PROXY_COOKIE_SAMESITE: lax
+      OAUTH2_PROXY_REDIRECT_URL: https://${NOCODB_DOMAIN}/oauth2/callback
+      OAUTH2_PROXY_ALLOWED_GROUPS: admin,staff
+      OAUTH2_PROXY_OIDC_GROUPS_CLAIM: roles
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
+      OAUTH2_PROXY_PASS_USER_HEADERS: "true"
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_SILENCE_PING_LOGGING: "true"
+      OAUTH2_PROXY_SKIP_AUTH_ROUTES: "^/api/v1/health$,^/\\.well-known/.*"
+    expose:
+      - "4180"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:4180/ping || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      nocodb:
+        condition: service_healthy
+    networks:
+      - internal
+      - mesh-dns
+    labels:
+      - "coolify.managed=true"
+      - "traefik.docker.network=coolify"
+  appsmith-auth:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1-alpine
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-appsmith-auth
+    restart: unless-stopped
+    extra_hosts:
+      - "${KEYCLOAK_DOMAIN_PUBLIC}:host-gateway"
+      - "${KEYCLOAK_EXTRA_HOST_ALIAS:?vydává derive-domains; bez něj by extra_hosts nesl duplicitu nebo prázdné jméno}:host-gateway"
+    environment:
+      OAUTH2_PROXY_PROVIDER: keycloak-oidc
+      OAUTH2_PROXY_CLIENT_ID: ${OIDC_CLIENT_PREFIX:-}appsmith-proxy
+      OAUTH2_PROXY_CLIENT_SECRET: ${APPSMITH_OIDC_SECRET}
+      OAUTH2_PROXY_OIDC_ISSUER_URL: https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}
+      OAUTH2_PROXY_SKIP_OIDC_DISCOVERY: "true"
+      OAUTH2_PROXY_LOGIN_URL: https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth
+      OAUTH2_PROXY_REDEEM_URL: https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token
+      OAUTH2_PROXY_OIDC_JWKS_URL: https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs
+      OAUTH2_PROXY_PROFILE_URL: https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/userinfo
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_UPSTREAMS: http://${APP_NAME_PREFIX:?identita instance}-appsmith-gateway:80
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_PROXY_COOKIE_SECRET}
+      OAUTH2_PROXY_COOKIE_SECURE: "true"
+      OAUTH2_PROXY_COOKIE_NAME: _aisha_appsmith_proxy
+      OAUTH2_PROXY_COOKIE_DOMAINS: ${OAUTH2_COOKIE_DOMAINS}
+      OAUTH2_PROXY_COOKIE_SAMESITE: lax
+      OAUTH2_PROXY_REDIRECT_URL: https://${APPSMITH_DOMAIN}/oauth2/callback
+      OAUTH2_PROXY_ALLOWED_GROUPS: admin,staff
+      OAUTH2_PROXY_OIDC_GROUPS_CLAIM: roles
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
+      OAUTH2_PROXY_PASS_USER_HEADERS: "true"
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_SILENCE_PING_LOGGING: "true"
+      OAUTH2_PROXY_SKIP_AUTH_ROUTES: "^/api/v1/health$,^/app/,^/\\.well-known/.*"
+    expose:
+      - "4180"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:4180/ping || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      appsmith-gateway:
+        condition: service_healthy
+    networks:
+      - internal
+      - coolify
+      - mesh-dns
+    labels:
+      - "coolify.managed=true"
+      - "traefik.docker.network=coolify"
+      - "traefik.enable=true"
+  appsmith-gateway:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    image: ${REGISTRY_PROXY}library/caddy:2-alpine
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-appsmith-gateway
+    restart: unless-stopped
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        { echo ":80 {"
+        echo "  # Local liveness probe — always 200 regardless of Appsmith state."
+        echo "  handle /__gateway_health {"
+        echo "    respond \"ok\" 200"
+        echo "  }"
+        echo "  @root path /"
+        echo "  redir @root /app/storyloop-dashboard-1-69cdf9824c99c02ecad13a0e/page-69cdf9824c99c02ecad13a10 temporary"
+        echo "  @login path /user/login*"
+        echo "  redir @login /app/storyloop-dashboard-1-69cdf9824c99c02ecad13a0e/page-69cdf9824c99c02ecad13a10 temporary"
+        echo "  @signup path /user/signup*"
+        echo "  redir @signup /app/storyloop-dashboard-1-69cdf9824c99c02ecad13a0e/page-69cdf9824c99c02ecad13a10 temporary"
+        echo "  reverse_proxy ${APP_NAME_PREFIX:?identita instance}-appsmith:80"
+        echo "}"
+        } > /etc/caddy/Caddyfile
+        caddy run --config /etc/caddy/Caddyfile
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:80/__gateway_health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    depends_on:
+      appsmith:
+        condition: service_healthy
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-appsmith-gateway
+      mesh-dns:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-appsmith-gateway
+  appsmith:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    image: ${IMAGE_APPSMITH}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-appsmith
+    restart: unless-stopped
+    environment:
+      - APPSMITH_ENCRYPTION_PASSWORD=${APPSMITH_ENCRYPTION_PASSWORD}
+      - APPSMITH_ENCRYPTION_SALT=${APPSMITH_ENCRYPTION_SALT}
+      - APPSMITH_DISABLE_TELEMETRY=true
+      - APPSMITH_ADMIN_EMAILS=${APPSMITH_ADMIN_EMAIL}
+      - APPSMITH_SIGNUP_DISABLED=true
+    volumes:
+      - appsmith-data:/appsmith-stacks
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s --max-time 5 -o /dev/null http://localhost:80/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 300s
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-appsmith
+      mesh-dns:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-appsmith
+  intranet-auth:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.7.1-alpine
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-intranet-auth
+    restart: unless-stopped
+    extra_hosts:
+      - "${KEYCLOAK_DOMAIN_PUBLIC}:host-gateway"
+      - "${KEYCLOAK_EXTRA_HOST_ALIAS:?vydává derive-domains; bez něj by extra_hosts nesl duplicitu nebo prázdné jméno}:host-gateway"
+    environment:
+      OAUTH2_PROXY_PROVIDER: keycloak-oidc
+      OAUTH2_PROXY_CLIENT_ID: ${OIDC_CLIENT_PREFIX:-}appsmith-intranet-proxy
+      OAUTH2_PROXY_CLIENT_SECRET: ${APPSMITH_INTRANET_OIDC_SECRET}
+      OAUTH2_PROXY_OIDC_ISSUER_URL: https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}
+      OAUTH2_PROXY_SKIP_OIDC_DISCOVERY: "true"
+      OAUTH2_PROXY_LOGIN_URL: https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth
+      OAUTH2_PROXY_REDEEM_URL: https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token
+      OAUTH2_PROXY_OIDC_JWKS_URL: https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/certs
+      OAUTH2_PROXY_PROFILE_URL: https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/userinfo
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4180
+      OAUTH2_PROXY_UPSTREAMS: http://${APP_NAME_PREFIX:?identita instance}-intranet-gateway:80
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_PROXY_COOKIE_SECRET}
+      OAUTH2_PROXY_COOKIE_SECURE: "true"
+      OAUTH2_PROXY_COOKIE_NAME: _aisha_intranet_proxy
+      OAUTH2_PROXY_COOKIE_DOMAINS: ${OAUTH2_COOKIE_DOMAINS}
+      OAUTH2_PROXY_COOKIE_SAMESITE: lax
+      OAUTH2_PROXY_REDIRECT_URL: https://${INTRANET_DOMAIN}/oauth2/callback
+      OAUTH2_PROXY_ALLOWED_GROUPS: admin,staff,practitioner,member,evaluator,partner,consultant,production_operator,production_supervisor,quality_manager,researcher
+      OAUTH2_PROXY_OIDC_GROUPS_CLAIM: roles
+      OAUTH2_PROXY_SKIP_PROVIDER_BUTTON: "true"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "true"
+      OAUTH2_PROXY_PASS_USER_HEADERS: "true"
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_SILENCE_PING_LOGGING: "true"
+      OAUTH2_PROXY_SKIP_AUTH_ROUTES: "^/api/v1/health$,^/app/,^/\\.well-known/.*"
+    expose:
+      - "4180"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:4180/ping || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      intranet-gateway:
+        condition: service_healthy
+    networks:
+      - internal
+      - coolify
+      - mesh-dns
+    labels:
+      - "coolify.managed=true"
+      - "traefik.docker.network=coolify"
+      - "traefik.enable=true"
+  intranet-gateway:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    image: ${REGISTRY_PROXY}library/caddy:2-alpine
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-intranet-gateway
+    restart: unless-stopped
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        { echo ":80 {"
+        echo "  # Local liveness probe — always 200 regardless of Appsmith state."
+        echo "  handle /__gateway_health {"
+        echo "    respond \"ok\" 200"
+        echo "  }"
+        echo "  @root path /"
+        echo "  redir @root /applications temporary"
+        echo "  @login path /user/login*"
+        echo "  redir @login /applications temporary"
+        echo "  @signup path /user/signup*"
+        echo "  redir @signup /applications temporary"
+        echo "  reverse_proxy ${APP_NAME_PREFIX:?identita instance}-appsmith:80"
+        echo "}"
+        } > /etc/caddy/Caddyfile
+        caddy run --config /etc/caddy/Caddyfile
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:80/__gateway_health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    depends_on:
+      appsmith:
+        condition: service_healthy
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-intranet-gateway
+      mesh-dns:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-intranet-gateway
+  appsmith-provision:
+    build:
+      context: .
+      dockerfile: Dockerfile.appsmith-provision
+      args:
+        REGISTRY_PROXY: ${REGISTRY_PROXY:-}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-appsmith-provision
+    restart: "no"
+    depends_on:
+      appsmith:
+        condition: service_healthy
+    environment:
+      APPSMITH_URL: http://${APP_NAME_PREFIX:?identita instance}-appsmith:80
+      APPSMITH_ADMIN_EMAIL: ${APPSMITH_ADMIN_EMAIL}
+      APPSMITH_ADMIN_PASSWORD: ${APPSMITH_ADMIN_PASSWORD}
+      INTRANET_ENABLED: "true"
+      INTRANET_API_KEY: ${INTRANET_API_KEY:?required — shared secret for the gateway /intranet routes}
+      AISHA_API_URL: http://${APP_NAME_PREFIX:?identita instance — jméno na sdílené síti ji MUSÍ nést}-gateway:3001
+      AISHA_POSTGREST_ANON_KEY: ${ANON_KEY:?required for the intranet public-data datasource}
+      INTRANET_PROXY_URL: https://${INTRANET_DOMAIN}/intranet
+      INTERNAL_TLD: ${INTERNAL_TLD}
+    networks:
+      - internal
+    healthcheck:
+      disable: true
+
+  pki-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.pki-init
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-admin--pki-init
+    restart: "no"
+    environment:
+      PKI_BRIDGE_URL: ${PKI_BRIDGE_URL:-}
+      # Odvozuje cold-start z manifestu (pki nasazeno ⇒ true); bez PKI se vypíná
+      # POŽADAVEK, ne jen adresa — výklad: docs/compose-notes/docker-compose.coolify.yml.md
+      PKI_BUNDLE_REQUIRED: ${PKI_BUNDLE_REQUIRED:?odvozuje cold-start z manifestu; bez něj pki-init trvá na bundlu i bez PKI}
+    command: ["/usr/local/bin/assemble-ca-bundle.sh"]
+    volumes:
+      - pki-certs:/certs/pki
+    healthcheck:
+      disable: true
+    networks:
+      - internal
+
+  netbird-agent:
+    # Mesh komponenta — bez meshe nemá co dělat. Profil "mesh" zapíná
+    # coolify-deploy-init.sh podle MESH_ENABLED; hlídá brána mesh-profil-drzi.
+    profiles: ["mesh"]
+    image: ${IMAGE_NETBIRD}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-admin--netbird
+    cap_add:
+      - NET_ADMIN
+      - SYS_RESOURCE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    depends_on:
+      pki-init:
+        condition: service_completed_successfully
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        if [ -z "$${NB_SETUP_KEY:-}" ]; then
+          echo "[netbird-agent] NB_SETUP_KEY empty for hostname=$${NB_HOSTNAME:-<unset>}"
+          echo "[netbird-agent] State: PENDING_BOOTSTRAP — awaiting netbird-bootstrap.sh + redeploy."
+          trap 'echo "[netbird-agent] received TERM — exiting idle"; exit 0' TERM INT
+          while :; do sleep 3600 & wait "$$!" || true; done
+        fi
+        if ! command -v netbird >/dev/null 2>&1; then
+          echo "[netbird-agent] FATAL: netbird binary not in PATH" >&2
+          exit 127
+        fi
+        echo "[netbird-agent] Bridge mode — own netns, no host daemon conflict."
+        echo "[netbird-agent] DNS proxy disabled — admin receives inbound mesh only."
+        # ⛔ NETBIRD 0.70 NEPÍŠE config.json (naměřeno 2026-09-06). Stav drží
+        # `default.json` + `active_profile.json`; podmínka na legacy cestu proto
+        # neplatila NIKDE — změřeno na 6 z 6 agentů včetně cizího nájemníka.
+        # Následek: agent se při KAŽDÉM startu zapsal jako NOVÝ peer, dostal
+        # novou mesh IP, a DNS záznam osiřel. Edge pak volal na starou adresu
+        # („dial 100.112.246.17:3002: no route to host") → live.<tld> 502.
+        # Je to ta příčina, proč se „mesh DNS se neprovisionuje samo" vracelo
+        # dokola: nešlo o provisioning, ale o ztrátu identity při restartu.
+        # Legacy cesta zůstává kvůli starším agentům — stačí KTERÝKOLI stavový
+        # soubor; teprve když není žádný, je zápis do meshe opravdu první.
+        CONFIG_FILE="$${NB_CONFIG_FILE:-/etc/netbird/config.json}"
+        if [ "$${NB_FORCE_REENROLL:-0}" = "1" ]; then
+          echo "[netbird-agent] NB_FORCE_REENROLL=1 — wiping local NetBird state before enrollment."
+          rm -rf /etc/netbird/* 2>/dev/null || true
+        fi
+        for _nb_stav in "$$CONFIG_FILE" /etc/netbird/default.json /var/lib/netbird/default.json; do
+          if [ -s "$$_nb_stav" ]; then CONFIG_FILE="$$_nb_stav"; break; fi
+        done
+        if [ -s "$$CONFIG_FILE" ]; then
+          echo "[netbird-agent] Existing config found at $$CONFIG_FILE — reconnecting without setup key."
+          set -- --foreground-mode --disable-dns --management-url "$${NB_MANAGEMENT_URL}" --hostname "$${NB_HOSTNAME}"
+        else
+          echo "[netbird-agent] No existing config — enrolling as $${NB_HOSTNAME} via $${NB_MANAGEMENT_URL}."
+          set -- --foreground-mode --disable-dns --management-url "$${NB_MANAGEMENT_URL}" --setup-key "$${NB_SETUP_KEY}" --hostname "$${NB_HOSTNAME}"
+        fi
+        trap 'echo "[netbird-agent] received TERM — exiting"; exit 0' TERM INT
+        while :; do
+          netbird up "$$@" || true
+          echo "[netbird-agent] netbird up exited — retry in 15s; container stays UP (never trips Coolify restart-limit)."
+          sleep 15 & wait "$$!" || true
+        done
+    extra_hosts:
+      - "${NETBIRD_MESH_HOST}:${NETBIRD_MGMT_HOST:-host-gateway}"
+    volumes:
+      - netbird-admin-data-v3:/etc/netbird
+      - netbird-admin-data-v3:/var/lib/netbird
+      - pki-certs:/certs/pki:ro
+    environment:
+      NB_SETUP_KEY: ${NETBIRD_STACK_KEY_BACKEND}
+      NB_MANAGEMENT_URL: https://${NETBIRD_MESH_HOST}:${NETBIRD_MESH_PORT:-33073}
+      NB_SSL_TRUST_BUNDLE: /certs/pki/aisha-ca-bundle.pem
+      SSL_CERT_FILE: /certs/pki/aisha-ca-bundle.pem
+      NB_HOSTNAME: backend-admin
+      NB_FORCE_REENROLL: ${NB_FORCE_REENROLL:-0}
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -z \"$$NB_SETUP_KEY\" ]; then exit 0; fi; ip -o addr show wt0 2>/dev/null | grep -qE 'inet 100\\.'"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 8
+    restart: unless-stopped
+    networks:
+      - internal
+      - mesh-dns
+
+  admin-mesh-ingress:
+    # Mesh komponenta — bez meshe nemá co dělat. Profil "mesh" zapíná
+    # coolify-deploy-init.sh podle MESH_ENABLED; hlídá brána mesh-profil-drzi.
+    profiles: ["mesh"]
+    image: ${IMAGE_CADDY}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-model--mesh-ingress
+    restart: unless-stopped
+    network_mode: "service:netbird-agent"
+    depends_on:
+      netbird-agent:
+        condition: service_started
+    environment:
+      ADMIN_MESH_INGRESS_ROUTES: ${ADMIN_MESH_INGRESS_ROUTES:-}
+      # TÝŽ seznam, jaký dostává gateway — jeden zdroj (`lib/derive-subnets.mjs`).
+      # Bez něj Caddy `x-forwarded-for` přepíše a klientská adresa se ztratí.
+      GATEWAY_TRUSTED_PROXIES: ${GATEWAY_TRUSTED_PROXIES:-}
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        if [ -z "$${ADMIN_MESH_INGRESS_ROUTES:-}" ]; then
+          echo "[mesh-ingress] ADMIN_MESH_INGRESS_ROUTES prázdné — derivace nic nevydala nebo se nedoručila."
+          echo "[mesh-ingress] Naslouchám jen na health, aby bylo VIDĚT, že tabulka chybí."
+          # ⛔ STAV BEZ TABULKY MUSÍ BÝT VIDĚT SONDĚ (naměřeno 2026-09-03).
+          # Záložní Caddyfile poslouchal na :8000, ale healthcheck sonduje :80 —
+          # port této služby. Sonda tedy dostala „connection refused" místo
+          # navrženého 503 „bez směrovací tabulky", a diagnóza vedla k „zavřený
+          # port" místo ke skutečné příčině. Neshoda byla v 15 z 16 stacků;
+          # jediný, kde porty seděly, byl `model`, jehož vlastní port JE 8000 —
+          # vzor se trefil sám sebou a vada byla ze zdroje neviditelná.
+          printf ':80 {\n  handle /__mesh_health {\n    respond "no-routes" 503\n  }\n  handle {\n    respond "mesh-ingress bez směrovací tabulky" 503\n  }\n}\n' > /etc/caddy/Caddyfile
+        else
+          : > /etc/caddy/Caddyfile
+          # ⛔ NAMĚŘENO 2026-08-31: brána viděla `x-forwarded-for` s JEDINÝM
+          # prvkem — adresou svého souseda (mesh-router edge). To je podpis
+          # NAHRAZENÍ, ne řetězu: Caddy bez `trusted_proxies` příchozí hlavičce
+          # nedůvěřuje a přepíše ji tím, kdo se právě připojil. Každý náš skok
+          # tak řetěz zahodil a klientská adresa se ke dveřím NEDOSTALA —
+          # `enforce` by zamkl i majitele.
+          #
+          # Hodnota se NEOPISUJE: je to TÝŽ seznam, jaký dostává gateway
+          # (`lib/derive-subnets.mjs` → GATEWAY_TRUSTED_PROXIES). Dva tvary
+          # (čárky pro env, mezery pro Caddy), jeden zdroj — kdyby si je každý
+          # skládal sám, chůze zprava by v každém prvku končila jinde.
+          if [ -n "$${GATEWAY_TRUSTED_PROXIES:-}" ]; then
+            printf '{\n  servers {\n    trusted_proxies static %s\n  }\n}\n\n' \
+              "$$(echo "$${GATEWAY_TRUSTED_PROXIES}" | tr ',' ' ')" >> /etc/caddy/Caddyfile
+          else
+            # Nedoručený seznam se NEDOSAZUJE. Bez něj Caddy řetěz přepíše —
+            # to je vada, ale TICHÁ; tady se aspoň řekne nahlas.
+            echo "[mesh-ingress] GATEWAY_TRUSTED_PROXIES nedoručen — x-forwarded-for bude PŘEPSÁN, klientská adresa se ztratí"
+          fi
+          PORTS=$$(echo "$${ADMIN_MESH_INGRESS_ROUTES}" | tr ';' '\n' | cut -d'|' -f1 | sort -un)
+          for P in $$PORTS; do
+            printf ':%s {\n  handle /__mesh_health {\n    respond "ok" 200\n  }\n' "$$P" >> /etc/caddy/Caddyfile
+            echo "$${ADMIN_MESH_INGRESS_ROUTES}" | tr ';' '\n' | while IFS='|' read -r RP RH RT; do
+              [ "$$RP" = "$$P" ] || continue
+              M=$$(echo "$$RH" | cut -d, -f1 | cut -d. -f1 | tr '-' '_')
+              HOSTS=$$(echo "$$RH" | tr ',' ' ')
+              printf '  @%s host %s\n  handle @%s {\n    reverse_proxy http://%s\n  }\n' "$$M" "$$HOSTS" "$$M" "$$RT" >> /etc/caddy/Caddyfile
+            done
+            printf '  handle {\n    respond "mesh-ingress: Host nepatri na tento port" 421\n  }\n}\n' >> /etc/caddy/Caddyfile
+          done
+          echo "[mesh-ingress] tabulka: $$(echo "$${ADMIN_MESH_INGRESS_ROUTES}" | tr ';' '\n' | wc -l) tras na $$(echo "$$PORTS" | wc -w) portech"
+        fi
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/__mesh_health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  pki-certs:
+    name: ${APP_NAME_PREFIX:?}_admin-pki-certs
+  netbird-admin-data-v3:
+    name: ${APP_NAME_PREFIX:?}_netbird-admin-data
+  nocodb-data:
+    name: ${APP_NAME_PREFIX:?}_nocodb-data
+  appsmith-data:
+    name: ${APP_NAME_PREFIX:?}_appsmith-data-v3
+networks:
+  internal:
+    external: true
+    name: ${APP_NAME_PREFIX:?identita instance}-shared-net
+  coolify:
+    external: true
+    name: coolify
+  mesh-dns:
+    external: true
+    name: ${MESH_DNS_NETWORK:?vydává generate-secrets}

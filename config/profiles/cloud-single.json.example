@@ -1,0 +1,44 @@
+{
+  "$schema": "../profiles.schema.json",
+  "id": "cloud-single",
+  "app_name_prefix": "aisha",
+  "description": "Single-server Coolify deployment. All services on one host. Public *.aisha.example.com, internal services reach each other via Docker network (no mesh needed). All domains here are generic placeholders — replace them with your own TLDs (or set PUBLIC_TLD/INTERNAL_TLD/MESH_TLD in your operator env).",
+  "domain": {
+    "public_tld": "aisha.example.com",
+    "internal_tld": "internal.example.com",
+    "internal_pattern": "{subdomain}.{server}.{internal_tld}",
+    "public_pattern": "{subdomain}.{public_tld}",
+    "mesh_tld": "mesh.example.net",
+    "mesh_pattern": "{subdomain}.{mesh_tld}"
+  },
+  "servers": ["${SINGLE_HOST_SERVER:-backend}"],
+  "service_overrides": {
+    "core":           { "placement": "${SINGLE_HOST_SERVER:-backend}" },
+    "keycloak":       { "placement": "${SINGLE_HOST_SERVER:-backend}" },
+    "pki":            { "placement": "${SINGLE_HOST_SERVER:-backend}" },
+    "integration":    { "placement": "${SINGLE_HOST_SERVER:-backend}" },
+    "orchestration":  { "placement": "${SINGLE_HOST_SERVER:-backend}" },
+    "observability":  { "placement": "${SINGLE_HOST_SERVER:-backend}" },
+    "admin":          { "placement": "${SINGLE_HOST_SERVER:-backend}" },
+    "messaging":      { "placement": "${SINGLE_HOST_SERVER:-backend}" },
+    "edge":           { "placement": "${SINGLE_HOST_SERVER:-backend}" },
+    "registry":       { "placement": "${SINGLE_HOST_SERVER:-backend}" },
+    "monitoring":     { "placement": "${SINGLE_HOST_SERVER:-backend}" },
+    "llm-gateway":    { "placement": "${SINGLE_HOST_SERVER:-backend}", "legacy_env_var": "LLM_GATEWAY" },
+    "openclaw":       { "placement": "${SINGLE_HOST_SERVER:-backend}", "legacy_env_var": "OPENCLAW" },
+    "local-ingest":   { "placement": "${SINGLE_HOST_SERVER:-backend}" },
+    "potok":          { "placement": "${SINGLE_HOST_SERVER:-backend}" }
+  },
+  "tier_filter": ["required", "important"],
+  "exclude": ["netbird", "ledger", "exec"],
+  "mesh_default": false,
+  "oauth2": {
+    "cookie_domains": ".${SINGLE_HOST_SERVER:-backend}.internal.example.com,.aisha.example.com",
+    "whitelist_domains": ".aisha.example.com,.${SINGLE_HOST_SERVER:-backend}.internal.example.com"
+  },
+  "_notes": "netbird excluded — single-server has no mesh need; cross-stack Docker DNS works. ledger/exec dropped — Experimental-specific. tier_filter excludes optional by default; opt-in via include[].",
+  "ai": {
+    "execution_mode": "cloud",
+    "_note": "Rezidence dat AI (local | hybrid | cloud). Šablona drží dnešní chování platformy; instance s modelem uvnitř meshe deklaruje local."
+  }
+}

@@ -1,0 +1,41 @@
+# Phase 12 WP 0.2 — Custom postgres_exporter queries.
+# Surfaces pg_stat_statements as Prometheus time-series (per query hash).
+# Read-only — depends on `postgres_exporter` PG role + grants from cold-start.
+
+pg_stat_statements:
+  query: |
+    SELECT
+      pg_get_userbyid(userid) AS user,
+      datname AS database,
+      LEFT(query, 80) AS query,
+      calls,
+      total_exec_time / 1000 AS total_time_seconds,
+      mean_exec_time / 1000 AS mean_time_seconds,
+      rows
+    FROM pg_stat_statements pss
+    JOIN pg_database pd ON pd.oid = pss.dbid
+    WHERE calls > 100
+    ORDER BY total_exec_time DESC
+    LIMIT 50
+  metrics:
+    - user:
+        usage: LABEL
+        description: User that ran the query
+    - database:
+        usage: LABEL
+        description: Database
+    - query:
+        usage: LABEL
+        description: First 80 chars of normalized query
+    - calls:
+        usage: COUNTER
+        description: Total call count
+    - total_time_seconds:
+        usage: COUNTER
+        description: Total execution time across all calls
+    - mean_time_seconds:
+        usage: GAUGE
+        description: Mean execution time
+    - rows:
+        usage: COUNTER
+        description: Total rows returned

@@ -1,0 +1,14 @@
+id: mautrix-whatsapp
+url: http://mautrix-whatsapp:29318
+as_token: ${AISHA_AS_TOKEN}_whatsapp
+hs_token: ${AISHA_HS_TOKEN}_whatsapp
+sender_localpart: whatsappbot
+rate_limited: false
+namespaces:
+  users:
+    - exclusive: true
+      regex: '@whatsapp_.*'
+  aliases:
+    - exclusive: true
+      regex: '#whatsapp_.*'
+  rooms: []

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="stav_neni_spravce">Tahle aplikace tablet nespravuje. Nastavte tablet z QR kódu (tovární reset, pak šestkrát ťuknout na uvítací obrazovku).</string>
+    <string name="servis_nadpis">Servisní režim — kiosk je vypnutý</string>
+    <string name="aplikace_verze">Aplikace %1$s: %2$s</string>
+    <string name="aplikace_chybi">Aplikace %1$s není nainstalovaná.</string>
+    <string name="chybi_pin">Chybí PIN technika — kiosk nejde zamknout. Nastavte tablet znovu z QR kódu s PINem.</string>
+    <string name="okno_info">Noční okno pro aktualizace: %1$s (jen při nabíjení)</string>
+    <string name="okno_odmitnuto">✗ Noční okno z QR odmítnuto (%1$s) — platí %2$s. Vyrobte nový QR s oknem v rozsahu 00:00–23:59.</string>
+    <string name="wifi">Wi-Fi</string>
+    <string name="nastaveni">Nastavení</string>
+    <string name="spustit_kiosk">Spustit kiosk</string>
+    <string name="uvolnit">Uvolnit tablet</string>
+    <string name="uvolnit_potvrzeni">Uvolnit tablet? Kiosk skončí a tahle aplikace přestane tablet spravovat. Znovu ho převzít půjde jen po továrním resetu z QR kódu.</string>
+    <string name="spoustim_za">Spouštím %1$s za %2$d s</string>
+    <string name="servis_napoveda">Servis: %1$d× klepněte na nadpis nebo na tento text a zadejte PIN technika.</string>
+    <string name="okno_aktualizace">Probíhá noční aktualizace. Aplikace se znovu spustí v %1$s.</string>
+    <string name="spustit_hned">Spustit hned</string>
+    <string name="pin_nadpis">PIN technika</string>
+    <string name="pin_spatne">Špatný PIN.</string>
+    <string name="pin_zamceno">Příliš mnoho pokusů. Zkuste to znovu za %1$d min.</string>
+    <string name="zamek_nejde_ukoncit">Zámek nejde ukončit: %1$s</string>
+    <string name="roz_nacitam">Načítám seznam appek…</string>
+    <string name="roz_bez_vybavy">Kiosk Admin nezná adresu platformy (QR nenesl výbavu).</string>
+    <string name="roz_seznam_chyba">Seznam appek nejde načíst: %1$s</string>
+    <string name="roz_zadna">Platforma nenabízí žádnou appku.</string>
+    <string name="roz_neuplna">Položka seznamu appek je neúplná.</string>
+    <string name="roz_aktualni">%1$s: verze %2$d je aktuální.</string>
+    <string name="roz_stahuji">%1$s: staženo %2$d z %3$d MB</string>
+    <string name="roz_selhalo">%1$s: %2$s</string>
+    <string name="roz_otisk">%1$s: otisk nesedí — balíček zahozen.</string>
+    <string name="roz_odeslano">%1$s: předáno Androidu k instalaci…</string>
+    <string name="roz_nainstalovano">%1$s: nainstalováno.</string>
+    <string name="roz_ceka_potvrzeni">%1$s: Android chce potvrdit instalaci.</string>
+    <string name="roz_instalace_chyba">%1$s: instalace SELHALA (stav %2$d): %3$s</string>
+    <string name="roz_chyba">Rozdávání spadlo: %1$s</string>
+    <string name="roz_hlidac_aktualizovan">Kiosk Admin aktualizován na %1$s (%2$d).</string>
+    <string name="roz_sebe_odlozeno">Kiosk Admin se aktualizuje příště — ještě se instaluje: %1$s</string>
+    <string name="diag_hlidac">Kiosk Admin: %1$s (%2$d)</string>
+    <string name="diag_nabidka">Platforma nabízí: %1$s</string>
+    <string name="diag_nabidka_nic">Platforma nabízí: zatím nenačteno</string>
+    <string name="diag_api">Platforma: %1$s</string>
+    <string name="diag_api_chybi">Platforma: neznámá (QR nenesl výbavu)</string>
+    <string name="diag_zarizeni">Android %1$s · %2$s · %3$s</string>
+    <string name="diag_posledni">Poslední krok: %1$s</string>
+    <string name="diag_posledni_nic">Poslední krok: zatím nic</string>
+    <string name="aktualizovat_ted">Aktualizovat teď</string>
+    <string name="aktualizuji">Aktualizuji…</string>
+    <string name="kroky_nastaveni_prime">1. Nechte tablet na Wi-Fi.
+2. Appky se nainstalují samy — průběh je vidět výše. Když se nic neděje, klepněte na Aktualizovat teď.
+3. Spusťte kiosk.</string>
+    <string name="diag_webview">WebView: %1$s</string>
+    <string name="diag_webview_chybi">WebView: žádné — přihlášení nepůjde</string>
+</resources>

@@ -1,0 +1,376 @@
+{
+  "builder": {
+    "panels": {
+      "blocks": "Bibliothèque de blocs",
+      "properties": "Propriétés",
+      "activity": "Activité des agents"
+    },
+    "blocks": {
+      "install-grid": {
+        "title": "Grille d'installation",
+        "description": "Grille de cartes de canaux d'installation et de téléchargement"
+      },
+      "modes": {
+        "title": "Cartes de modes",
+        "description": "Quatre cartes de modes numérotées avec étiquettes et puces"
+      },
+      "cost-pillars": {
+        "title": "Piliers de valeur",
+        "description": "Trois piliers avec statistiques mises en avant"
+      },
+      "hero": {
+        "title": "Section héro",
+        "description": "Bannière pleine largeur avec titre et CTA"
+      },
+      "features": {
+        "title": "Grille de fonctionnalités",
+        "description": "Grille de cartes avec icônes"
+      },
+      "pricing": {
+        "title": "Tableau des prix",
+        "description": "Plans tarifaires comparatifs"
+      },
+      "cta": {
+        "title": "Appel à l'action",
+        "description": "Section d'action mise en avant"
+      },
+      "testimonials": {
+        "title": "Témoignages",
+        "description": "Carrousel d'avis clients"
+      },
+      "faq": {
+        "title": "FAQ",
+        "description": "Accordéon de questions fréquentes"
+      },
+      "footer": {
+        "title": "Pied de page",
+        "description": "Pied de page avec liens et informations"
+      },
+      "contact": {
+        "title": "Formulaire de contact",
+        "description": "Formulaire de collecte de demandes"
+      },
+      "trust-bar": {
+        "title": "Barre de confiance",
+        "description": "Bande d'icônes de domaines"
+      },
+      "pillars": {
+        "title": "Piliers",
+        "description": "Trois cartes de proposition de valeur"
+      },
+      "how-it-works": {
+        "title": "Comment ça marche",
+        "description": "Flux de processus étape par étape"
+      },
+      "about": {
+        "title": "À propos",
+        "description": "Valeurs et mission de l'entreprise"
+      },
+      "specialist-guild": {
+        "title": "Guilde des spécialistes",
+        "description": "Niveaux d'adhésion des spécialistes"
+      },
+      "hiring": {
+        "title": "Recrutement",
+        "description": "Cartes de postes ouverts"
+      },
+      "stats-counter": {
+        "title": "Compteur de statistiques",
+        "description": "Statistiques numériques animées"
+      },
+      "project-configurator": {
+        "title": "Configurateur de projet",
+        "description": "Sélecteur interactif d'options de projet"
+      },
+      "meeting": {
+        "title": "Bloc réunion",
+        "description": "Planifier et gérer des réunions"
+      },
+      "questionnaire": {
+        "title": "Questionnaire",
+        "description": "Bloc de sondage ou formulaire dynamique"
+      },
+      "consent": {
+        "title": "Bloc de consentement",
+        "description": "Partage de données et consentement"
+      },
+      "action": {
+        "title": "Bloc d'action",
+        "description": "Demande d'action utilisateur comme télécharger ou planifier"
+      },
+      "info": {
+        "title": "Bloc d'information",
+        "description": "Contenu informatif statique"
+      },
+      "hero-slides": {
+        "title": "Diapositives de héros",
+        "description": "Carrousel dynamique avec diapositives de héros depuis le backend"
+      },
+      "news-list": {
+        "title": "Liste de nouvelles",
+        "description": "Publication d'articles d'actualité à partir du backend"
+      },
+      "contact-form": {
+        "title": "Formulaire de contact",
+        "description": "Formulaire de contact interactif avec validation"
+      },
+      "archive-preview": {
+        "title": "Aperçu des archives",
+        "description": "Archiver la liste des documents à partir du backend"
+      },
+      "knowledge-preview": {
+        "title": "Thèmes de connaissance",
+        "description": "Liste des sujets de la base de connaissances à partir du backend"
+      },
+      "faq-accordion": {
+        "title": "FAQ Accordéon",
+        "description": "Foire aux questions avec catégories rabattables"
+      },
+      "timeline": {
+        "title": "Chronologie",
+        "description": "Ligne de temps verticale avec événements et jalons"
+      },
+      "data-table": {
+        "title": "Tableau des données",
+        "description": "Tableau avec colonnes et lignes pour les données structurées"
+      },
+      "ordered-list": {
+        "title": "Liste ordonnée",
+        "description": "Etapes numérotées avec titres et descriptions"
+      },
+      "product-catalog": {
+        "title": "Catalogue des produits",
+        "description": "Grille de produits de la boutique avec prix et badges"
+      },
+      "news-browser": {
+        "title": "Navigateur de nouvelles",
+        "description": "Liste complète des articles de presse avec cartes"
+      },
+      "knowledge-browser": {
+        "title": "Navigateur de connaissances",
+        "description": "Thèmes de connaissance avec filtre de recherche et de visibilité"
+      },
+      "archive-browser": {
+        "title": "Navigateur d'archives",
+        "description": "Archivage complet avec filtrage sur 4 axes"
+      },
+      "studies-browser": {
+        "title": "Studies Browser",
+        "description": "Studies listing with tab filtering and funding progress"
+      },
+      "guild-directory": {
+        "title": "Annuaire des guildes",
+        "description": "Place de marché spécialisée avec filtres et pagination"
+      },
+      "process-loop": {
+        "title": "Boucle de processus",
+        "description": "Un cycle continu d'étapes numérotées"
+      },
+      "layer-stack": {
+        "title": "Empilement de couches",
+        "description": "Des couches superposées, chacune s'appuyant sur celle du dessous"
+      },
+      "signal-cards": {
+        "title": "Cartes d'indicateurs",
+        "description": "Une rangée de cartes d'indicateurs"
+      },
+      "announcement-bar": {
+        "title": "Barre d'annonces",
+        "description": "Une bannière étroite sur toute la largeur contenant un lien"
+      },
+      "aisha-pruvodce": {
+        "title": "Guide AISHA",
+        "description": "Guide IA de 13 diapositives pour la première consultation + quiz en cinq questions (présentation interactive)"
+      },
+      "discussion-thread": {
+        "title": "Discussion",
+        "description": "Messages des utilisateurs en fil de discussion sous ce nœud de contenu"
+      }
+    },
+    "traits": {
+      "variant": "Variante",
+      "bgColor": "Couleur de fond",
+      "bgGradient": "Fond dégradé",
+      "sectionPadding": "Remplissage de la section",
+      "cssClass": "Classe CSS",
+      "colorScheme": "Palette de couleurs"
+    },
+    "traitGroups": {
+      "template": "Modèle",
+      "config": "Configuration",
+      "layout": "Disposition",
+      "other": "Autre"
+    },
+    "categories": {
+      "web": "Blocs web",
+      "workflow": "Blocs workflow"
+    },
+    "actions": {
+      "save": "Enregistrer le canvas",
+      "publish": "Publier",
+      "preview": "Aperçu",
+      "addBlock": "Ajouter un bloc",
+      "removeBlock": "Supprimer le bloc",
+      "undo": "Annuler",
+      "redo": "Rétablir"
+    },
+    "status": {
+      "saving": "Enregistrement...",
+      "saved": "Toutes les modifications enregistrées",
+      "error": "Échec de l'enregistrement",
+      "loading": "Chargement du canvas...",
+      "translationsDenied": "Enregistré, mais pas les textes — leur écriture requiert le rôle admin ou staff. Vos modifications restent uniquement dans ce canevas."
+    },
+    "agents": {
+      "blockAdded": "{{agent}} a ajouté {{block}}",
+      "propertyChanged": "{{agent}} a modifié {{property}} sur {{block}}",
+      "blockRemoved": "{{agent}} a supprimé {{block}}",
+      "approved": "{{agent}} a approuvé {{block}}",
+      "rejected": "{{agent}} a rejeté {{block}}",
+      "occipitumProposal": "{{agent}} a proposé un nouveau modèle de toile"
+    },
+    "variants": {
+      "default": "Par défaut",
+      "hero": {
+        "splitLeft": "Divisé à gauche",
+        "minimal": "Minime"
+      },
+      "trust-bar": {
+        "statBar": "Barre de statistiques"
+      },
+      "pillars": {
+        "borderList": "Liste encadrée"
+      },
+      "how-it-works": {
+        "timelineSteps": "Étapes chronologiques"
+      },
+      "about": {
+        "proseCentered": "Texte centré"
+      },
+      "specialist-guild": {
+        "horizontalBar": "Barre horizontale"
+      },
+      "hiring": {
+        "listRows": "Lignes de liste"
+      },
+      "stats-counter": {
+        "cardGrid": "Grille de cartes"
+      },
+      "features": {
+        "textRows": "Lignes de texte"
+      },
+      "pricing": {
+        "horizontalCompare": "Comparaison horizontale"
+      },
+      "cta": {
+        "splitMedia": "Média divisé"
+      },
+      "testimonials": {
+        "cardGrid": "Grille de cartes"
+      },
+      "faq": {
+        "twoColumn": "Deux colonnes"
+      },
+      "footer": {
+        "stacked": "Empilé"
+      },
+      "contact": {
+        "splitInfo": "Info divisée"
+      },
+      "project-configurator": {
+        "stepWizard": "Assistant par étapes"
+      },
+      "timeline": {
+        "horizontal": "Horizontal"
+      },
+      "data-table": {
+        "stripedCompact": "Rayé compact"
+      },
+      "ordered-list": {
+        "cardSteps": "Étapes en cartes"
+      }
+    },
+    "empty": {
+      "title": "Pas encore de canvas",
+      "description": "Glissez des blocs depuis la bibliothèque pour commencer"
+    },
+    "sidebar": {
+      "blocks": "Blocs",
+      "styles": "Styles",
+      "traits": "Paramètres",
+      "layers": "Calques",
+      "i18n": "Traductions",
+      "selectElement": "Sélectionnez un élément pour modifier ses propriétés",
+      "emptyCanvas": "Le canevas est vide"
+    },
+    "i18n": {
+      "injectTranslations": "Aperçu des traductions",
+      "noKeys": "Aucun élément traduisible sur le canevas",
+      "keysFound": "{{count}} clés traduisibles"
+    },
+    "devices": {
+      "desktop": "Bureau",
+      "tablet": "Tablette",
+      "mobile": "Mobile"
+    },
+    "pageSettings": {
+      "background": "Historique de la page",
+      "backgroundPlaceholder": "par exemple #fafafa ou linear-gradient(...)",
+      "className": "Page CSS Class",
+      "classNamePlaceholder": "par exemple, la page d'atterrissage",
+      "styleJson": "Style de page JSON",
+      "styleJsonPlaceholder": "par exemple, {\"maxWidth\" : \"1200px\"}",
+      "invalidJson": "Page Style JSON doit être un objet JSON valide"
+    },
+    "schemes": {
+      "default": "Par défaut",
+      "warmSunset": "Coucher de soleil chaud",
+      "coolOcean": "Océan frais",
+      "forestGreen": "Vert forêt",
+      "darkElegant": "Sombre élégant",
+      "softLavender": "Lavande douce",
+      "neutralSlate": "Ardoise neutre"
+    },
+    "runtime": {
+      "limit": "Limite d'éléments",
+      "columns": "Colonnes",
+      "autoplay": "Lecture automatique",
+      "interval": "Intervalle (ms)",
+      "skipHref": "Cible du lien « Passer » (URL)",
+      "showFilters": "Afficher les filtres",
+      "tag": "Épingler au tag",
+      "nodeType": {
+        "label": "Type de nœud",
+        "news_article": "Article d'actualité",
+        "web_page": "Page web"
+      },
+      "nodeId": "ID du nœud"
+    },
+    "versions": {
+      "title": "Historique des versions",
+      "restore": "Restaurer",
+      "restored": "Version restaurée",
+      "restoredDesc": "La page a été restaurée à partir de la version sélectionnée.",
+      "restoreError": "Impossible de restaurer la version.",
+      "none": "Aucune version pour le moment"
+    },
+    "templates": {
+      "title": "Modèles de page",
+      "saveAs": "Enregistrer comme modèle",
+      "namePlaceholder": "Nom du modèle...",
+      "saved": "Modèle enregistré",
+      "savedDesc": "Page actuelle enregistrée comme modèle réutilisable.",
+      "saveError": "Impossible d'enregistrer le modèle.",
+      "apply": "Appliquer",
+      "applied": "Modèle appliqué",
+      "appliedDesc": "Le modèle a été appliqué à cette page.",
+      "applyError": "Impossible d'appliquer le modèle.",
+      "none": "Aucun modèle disponible"
+    },
+    "assets": {
+      "invalidType": "Type de fichier non pris en charge",
+      "tooLarge": "Fichier trop volumineux (max 20 Mo)",
+      "uploadFailed": "Échec du téléversement de l’asset"
+    }
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "$note": "VZOR identity hlídače. Skutečný soubor patří do dat instance (<fork>-instance-data), ne sem. Build ho bere z HLIDAC_INSTANCE.",
+  "applicationId": "com.example.hlidac",
+  "label": "Example Guard",
+  "versionCode": 1,
+  "versionName": "1.0.0",
+  "kiosk": {
+    "package": "com.example.kiosk",
+    "grantPermissions": [
+      "android.permission.CAMERA",
+      "android.permission.ACCESS_FINE_LOCATION",
+      "android.permission.ACCESS_COARSE_LOCATION",
+      "android.permission.POST_NOTIFICATIONS"
+    ]
+  },
+  "provisioning": {
+    "timeZone": "Europe/Prague",
+    "locale": "cs_CZ"
+  },
+  "signing": {
+    "certSha256": null
+  },
+  "apk": {
+    "$note": "Otisk balíčku, který platforma rozdává tabletům. ⛔ BINÁRKA TADY NEBYDLÍ — je to artefakt a patří do úložiště (bucket `zarizeni`), kam ji nahraje administrace. Tenhle otisk je závazný: nahrání s jiným otiskem služba ODMÍTNE a při startu nahlásí, když v úložišti leží něco jiného. Samé nuly = nevyplněno.",
+    "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "appky": [
+    {
+      "$note": "Appky, které hlídač rozdává a aktualizuje MIMO Obchod Play. Instaluje se jen když je `versionCode` VYŠŠÍ než na zařízení. Binárka opět jen v úložišti.",
+      "balicek": "com.example.kiosk",
+      "versionCode": 1,
+      "versionName": "1.0.0",
+      "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "vybava": {
+    "$note": "Co hlídač rozdá appce řízenou konfigurací. Bez toho appka neví, KAM se připojit — a APK z Obchodu Play samo o sobě neumí zaťukat.",
+    "apiUrl": "https://api.example.cz",
+    "knock": {
+      "$note": "Buď všechny čtyři, nebo žádná. Není to tajemství: kdo je zná, ještě neumí zaťukat.",
+      "host": "edge.example.cz",
+      "port": 62201,
+      "kid": "example",
+      "scope": "ridic"
+    }
+  }
+}

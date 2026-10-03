@@ -1,0 +1,86 @@
+# =============================================================================
+# Dockerfile.plugin-publish-init — jednorázový krok: pluginy do katalogu
+# =============================================================================
+# Build context = REPO ROOT (docker-compose.coolify.yml), jako ostatní init obrazy.
+#
+# ⭐ ŽÁDNÉ `npm ci`. Ověřeno čtením importů: `build.mjs` i `publish.mjs` sahají
+# VÝHRADNĚ na vestavěné moduly node — bundlují přes `node:vm`, S3 podepisují
+# vlastní implementací přes globální `fetch`, a publish spouští build přes
+# `process.execPath`. Nic z npm. Instalovat závislosti by tedy jen přidalo
+# minuty buildu a plochu k rozbití; workspaces (`packages/*`, `services/*`,
+# `apps/*`) by navíc vynutily kopírovat celé repo kvůli krokům, které se
+# nepoužijí.
+#
+# ⛔ PROČ VLASTNÍ OBRAZ, a ne krok v Dockerfile.svc-plugin-system
+# Runtime obraz té služby veze JEN `services/svc-plugin-system/{package.json,
+# dist,node_modules}`; `scripts/plugins/` ani `plugins/` v něm nejsou. Publikace
+# je navíc jednorázový ČIN při nasazení, ne schopnost služby.
+# ⛔ FROM JDE PŘES ${REGISTRY_PROXY}, ne přímo z Docker Hubu. Brána
+# `dockerfile-cache-prefix` to vymáhá: přímý pull obchází registry cache
+# instance, takže build závisí na dostupnosti Hubu a na jeho rate limitu —
+# a v cold startu, kde se staví desítky obrazů, to je rozdíl mezi „projde"
+# a „projde někdy".
+FROM ${REGISTRY_PROXY}library/node:22-alpine
+
+# curl kvůli ROPC tokenu — alpine ho v základu nemá.
+RUN apk add --no-cache curl
+
+WORKDIR /app
+
+# Jen to, co skripty skutečně čtou. `dist/` je v .dockerignore, což je správně:
+# artefakty se stavějí UVNITŘ obrazu, nekopírují se z hostitele (hermetické).
+# Kořenový `package.json` + lockfile monorepa jsou tu jen jako ZDROJ ČÍSEL pro
+# izolovanou instalaci níž — do /app nepatří (skripty publikace je nečtou).
+COPY package.json package-lock.json /opt/monorepo/
+COPY scripts/lib/zavislosti-z-lockfile.mjs scripts/lib/cli-entry.mjs /opt/monorepo/nastroj/
+# Manifesty pluginů nesou PŘESNÉ verze jejich závislostí — build je balí, takže
+# musí být nainstalované dřív, než se staví. Proto pluginy už tady.
+COPY plugins ./plugins
+
+# ⛔ `build.mjs` POTŘEBUJE `esbuild` — komentář výš tvrdil opak.
+#
+# NAMĚŘENO 2026-09-06: init kontejner skončil `Exited (1)` s
+# `ERR_MODULE_NOT_FOUND: Cannot find package 'esbuild'`, takže se nezabalil
+# ANI JEDEN plugin a `plugin_catalog` zůstal na nule. Připisovalo se to
+# oprávněním (heal #40, 2026-09-02: „zdroje zapnuté přes dvě hodiny a nepřibyl
+# ani JEDEN řádek"); oprávnění se opravila a katalog byl prázdný dál.
+#
+# ⭐ PROČ TO ČTENÍ MINULO: importy `build.mjs` opravdu jsou jen `node:*` —
+# až na řádek 107, kde je `await import("esbuild")` UVNITŘ funkce. Dynamický
+# import nestojí na začátku řádku, takže ho pohled po `^import` nevidí.
+# Čtení není spuštění.
+#
+# ⭐ VERZE MÁ JEDEN DOMOV. Rozsah nástroje se čte z kořenového `package.json`,
+# rozřešená verze z `package-lock.json`, verze závislostí pluginů z jejich
+# manifestů — nic z toho se sem neopisuje. Chybí-li deklarace nebo nesedí-li
+# manifest s lockfilem, build padne TADY a hlasitě, ne až za běhu v produkci.
+# ⛔ DVA nástroje, ne jeden. `publish.mjs` má na ř. 113 `await import("minio")` —
+# táž třída, jen o krok dál v dráze: bez něj by balení prošlo a teprve NAHRÁNÍ
+# do úložiště spadlo. Našla to brána `plugin-publish-image-ma-zavislosti`, ne
+# čtení; sám jsem hledal jen `esbuild`.
+#
+# ⛔ HERMETICKY, NE `npm install` NAD MONOREPEM. NAMĚŘENO 2026-09-23 (<fork>-core,
+# nasazení pc2i6yts…): dřívější `npm install --no-save esbuild@V` běžel v adresáři
+# s KOŘENOVÝM `package.json` monorepa BEZ lockfile, takže npm znovu resolvoval
+# CELÝ strom na nejnovější verze v rozsazích — a trefil se do okamžiku, kdy
+# Sentry vydával 10.75.3 (vyšel 14:06:21Z, build padl 14:06:24Z):
+#     npm error notarget No matching version found for @sentry/core@10.75.3.
+# Lockfile přitom držel 10.55.0. Compose je jeden celek, takže tenhle init obraz
+# zablokoval nasazení CELÉHO jádra. Teď `zavislosti-z-lockfile.mjs` složí z lockfile
+# uzavřenou podmnožinu (nástroje + závislosti pluginů a jejich strom) a `npm ci`
+# ji nainstaluje s kontrolou integrity: 34 balíků, ~25 MB, nic se neresolvuje.
+# ⚠️ Závislosti pluginů sem patří nutně: dřív je do node_modules dostal jen celý
+# strom monorepa — NÁHODOU. Bez nich by `tcars-fleet` a `webdispecink-fleet`
+# (fast-xml-parser) tiše vypadly z katalogu.
+RUN node /opt/monorepo/nastroj/zavislosti-z-lockfile.mjs /opt/monorepo /app/plugins /app esbuild minio \
+ && npm ci --no-audit --no-fund \
+ && rm -rf /root/.npm
+COPY scripts/plugins ./scripts/plugins
+COPY infra/plugins/publish-plugins.sh /usr/local/bin/publish-plugins.sh
+
+RUN chmod +x /usr/local/bin/publish-plugins.sh \
+ && mkdir -p /app/dist/plugins \
+ && chown -R node:node /app
+
+# ⭐ Neprivilegovaně: krok jen čte repo, staví do /app/dist a mluví po síti.
+USER node

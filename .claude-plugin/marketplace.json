@@ -1,0 +1,39 @@
+{
+  "name": "evymo",
+  "owner": {
+    "name": "evymo",
+    "url": "https://github.com/evymo"
+  },
+  "metadata": {
+    "description": "AISHA plugins for Claude Code — governance, seed/merge tracking, model routing, and project artifact composition via the Dirigent MCP server.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "aisha-delegation",
+      "source": "./extensions/aisha-delegation-claude",
+      "description": "AISHA tiered delegation kit — work-package contracts (zadání), tier policy (Fable/Opus = A, Sonnet 5 = B, Haiku = C), advisory hooks (tier-escalation, zadani-scope, contract-change) and /delegate, /zadani-new, /zadani-verify commands.",
+      "author": {
+        "name": "evymo",
+        "url": "https://github.com/evymo"
+      },
+      "homepage": "https://github.com/evymo/aisha-dirigent",
+      "license": "Elastic-2.0",
+      "category": "devtools",
+      "keywords": ["aisha", "delegation", "tiering", "work-package", "governance"]
+    },
+    {
+      "name": "aisha-dirigent",
+      "source": "./extensions/aisha-dirigent-claude",
+      "description": "AISHA Dirigent for Claude — governance rules, seed/merge tracking, model routing, health, local-LLM cost/usage, local-stack bring-up, and backend-parameterized composition of .claude/* artifacts, exposed as MCP tools.",
+      "author": {
+        "name": "evymo",
+        "url": "https://github.com/evymo"
+      },
+      "homepage": "https://github.com/evymo/aisha-dirigent",
+      "license": "Elastic-2.0",
+      "category": "devtools",
+      "keywords": ["aisha", "dirigent", "governance", "mcp", "rules", "routing"]
+    }
+  ]
+}

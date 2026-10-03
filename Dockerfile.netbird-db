@@ -1,0 +1,12 @@
+# Dockerfile.netbird-db — Postgres for NetBird state, wrapped with the GENERIC
+# credential-reconcile entrypoint so a rotated NETBIRD_DB_PASSWORD is re-applied
+# to an existing volume on every start (else netbird-management is stranded on
+# the old password → mesh down; incident 2026-07-05). The entrypoint is instance-
+# agnostic (env-driven, never references the container name), so any fork/tenant
+# reuses the same script. See infra/db-reconcile/postgres-reconcile-entrypoint.sh.
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/postgres:17-alpine
+COPY infra/db-reconcile/postgres-reconcile-entrypoint.sh /usr/local/bin/postgres-reconcile-entrypoint.sh
+RUN chmod +x /usr/local/bin/postgres-reconcile-entrypoint.sh
+ENTRYPOINT ["/usr/local/bin/postgres-reconcile-entrypoint.sh"]
+CMD ["postgres"]

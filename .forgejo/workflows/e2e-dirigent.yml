@@ -1,0 +1,185 @@
+# =============================================================================
+# AISHA Dirigent Supervisor — Pure-Node E2E (Forgejo Actions)
+# =============================================================================
+# Verifies the supervisor's CLI surface (mock backend + bash hooks + Node
+# relay) without Docker — the only runner currently registered at the
+# Forgejo instance level (aisha-runner, labels: ubuntu-latest,
+# ubuntu-22.04, self-hosted) is not DinD-enabled.
+#
+# What this CI job covers:
+#   - Mock backend boots (tsx mock-backend/server.ts) + 3 endpoints respond
+#   - All 7 .claude/hooks/aisha-advise-*.sh fire on positive samples,
+#     stay silent on clean code, cooldown gate works
+#   - .claude/hooks/aisha-supervisor-relay.mjs POSTs to mock backend,
+#     prints additionalContext on stdout, exits 0 (fail-open contract)
+#   - Drift gate: workspace-fixture/.claude == repo .claude (regen safety)
+#
+# What this CI job does NOT cover (Docker-only, local-dev verification):
+#   - VS Code extension activation in code-server (requires docker compose)
+#   - Playwright DOM specs (Chromium driving code-server iframe)
+#   Both verified locally via `npm run test:e2e:dirigent` from contributor's
+#   workstation before merging. Coverage of the same behaviors at the unit
+#   level: extensions/aisha-dirigent/__tests__/rules-engine.test.ts (21
+#   tests on cache + matcher), gate tests on adapter output drift.
+#
+# Conventions: unprefixed actions/X@v4 (Forgejo's registered action
+# source), NODE_VERSION 22 (matches ci.yml).
+# =============================================================================
+
+name: e2e-dirigent
+
+on:
+  push:
+    branches:
+      - main
+      - "claude/**"
+    paths:
+      - "extensions/aisha-dirigent/**"
+      - ".claude/**"
+      - "scripts/ide-adapters/**"
+      - "services/svc-ai-chat/src/routes/dirigent-supervisor.ts"
+      - "tests/e2e-dirigent/**"
+      - ".forgejo/workflows/e2e-dirigent.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "extensions/aisha-dirigent/**"
+      - ".claude/**"
+      - "scripts/ide-adapters/**"
+      - "services/svc-ai-chat/src/routes/dirigent-supervisor.ts"
+      - "tests/e2e-dirigent/**"
+      - ".forgejo/workflows/e2e-dirigent.yml"
+
+concurrency:
+  group: e2e-dirigent-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref_name != 'main' }}
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  supervisor-cli-e2e:
+    name: Supervisor CLI e2e (hooks + relay + mock backend)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: ${{ vars.VERDACCIO_URL }}
+
+      - name: Diagnostics — env probe
+        run: |
+          set +e
+          echo "=== Tooling versions ==="
+          node --version
+          npm --version
+          which bash
+          bash --version | head -1
+          which python3
+          python3 --version
+          echo "=== Workspace ==="
+          pwd
+          ls -la
+          echo "=== Disk ==="
+          df -h | head -5
+
+      - name: Install e2e suite deps (mock-backend only)
+        working-directory: tests/e2e-dirigent
+        run: |
+          # Standalone install — only the runtime deps we need (fastify + tsx).
+          # The full e2e package.json devDeps include playwright + node-pty
+          # which are not needed for the CLI tier and would slow CI.
+          npm install --no-audit --no-fund --no-package-lock \
+            fastify@^4.28.1 tsx@^4.22.0
+
+      - name: Start mock backend (background)
+        working-directory: tests/e2e-dirigent
+        run: |
+          npx tsx mock-backend/server.ts > /tmp/mock-backend.log 2>&1 &
+          echo $! > /tmp/mock-backend.pid
+          # Wait for /health to respond
+          for i in $(seq 1 30); do
+            if curl -sf http://127.0.0.1:3030/health >/dev/null 2>&1; then
+              echo "mock backend ready after ${i}s"
+              curl -s http://127.0.0.1:3030/health
+              echo ""
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "mock backend failed to become ready"
+          cat /tmp/mock-backend.log
+          exit 1
+
+      - name: Smoke — mock backend serves the 5 default bindings
+        run: |
+          set -e
+          slugs=$(curl -sf -X POST http://127.0.0.1:3030/rpc/mcp_get_claude_hook_bindings \
+                    -H "Content-Type: application/json" -d '{}' \
+                    | python3 -c 'import json,sys; print(" ".join(sorted(b["rule_slug"] for b in json.load(sys.stdin))))')
+          expected="no-any no-console rpc-only select-star ts-ignore"
+          if [ "$slugs" != "$expected" ]; then
+            echo "FAIL: expected '$expected', got '$slugs'"
+            exit 1
+          fi
+          echo "PASS: 5 bindings serve correctly"
+
+      - name: Run CLI hook + relay specs (local mode, against running mock)
+        working-directory: tests/e2e-dirigent
+        env:
+          MOCK_BACKEND_URL: http://127.0.0.1:3030
+        run: |
+          # ⛔ `--test-concurrency=1` NENÍ zpomalení pro jistotu, je to oprava.
+          # Naměřeno 2026-08-09 (běh 662, první spuštění téhle lane na forku):
+          # 10/12 prošlo, padly dva testy —
+          #   not ok 6  aisha-advise-ts-ignore.sh fires on @ts-ignore  → prázdný stdout
+          #   not ok 8  relay forwards SessionStart …                  → prázdný stdout
+          # Test 8 je PRVNÍ test svého souboru a jediný, co v něm padl; testy 9–12
+          # nad toutéž mechanikou prošly. To není vada relaye, to je závod.
+          #
+          # Oba spec soubory sdílejí DVĚ globální věci: jeden mock backend na
+          # 127.0.0.1:3030 a jeden jmenný prostor `/tmp/aisha-advise-*`. Přitom
+          # `claude-relay-injects` volá `resetMockBackend()` PŘED KAŽDÝM testem a
+          # `claude-hook-fires` maže cooldowny taktéž. `node --test` ale soubory
+          # pouští SOUBĚŽNĚ, takže reset jednoho smaže stav, který si druhý právě
+          # nastavil — a advisory dorazí prázdné.
+          #
+          # Lokálně sada projde 12/12; na runneru padá. Měřidlo tedy měří stroj a
+          # časování, ne kód — táž třída jako zelená deploy úloha, která nic
+          # nenasadila. Dokud sdílený backend nebude per-soubor, musí být běh
+          # sériový. (Poctivá varianta téhož: dát každému souboru vlastní port a
+          # vlastní CLAUDE_SESSION_ID; to je větší zásah do harness.mjs.)
+          #
+          # node --test exits non-zero on any spec failure
+          node --test --test-concurrency=1 \
+            cli/claude-hook-fires.spec.mjs cli/claude-relay-injects.spec.mjs
+
+      - name: Collect mock backend log on failure
+        if: failure()
+        run: |
+          echo "=== mock-backend.log ==="
+          cat /tmp/mock-backend.log || echo "(no log file)"
+          echo ""
+          echo "=== process state ==="
+          if [ -f /tmp/mock-backend.pid ]; then
+            PID=$(cat /tmp/mock-backend.pid)
+            if kill -0 "$PID" 2>/dev/null; then
+              echo "mock-backend still running (pid $PID)"
+            else
+              echo "mock-backend crashed (pid $PID no longer alive)"
+            fi
+          fi
+
+      - name: Stop mock backend
+        if: always()
+        run: |
+          if [ -f /tmp/mock-backend.pid ]; then
+            kill $(cat /tmp/mock-backend.pid) 2>/dev/null || true
+            rm -f /tmp/mock-backend.pid
+          fi

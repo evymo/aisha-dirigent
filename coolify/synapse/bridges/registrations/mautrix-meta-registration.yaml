@@ -1,0 +1,14 @@
+id: mautrix-meta
+url: http://mautrix-meta:29319
+as_token: ${AISHA_AS_TOKEN}_meta
+hs_token: ${AISHA_HS_TOKEN}_meta
+sender_localpart: metabot
+rate_limited: false
+namespaces:
+  users:
+    - exclusive: true
+      regex: '@meta_.*'
+  aliases:
+    - exclusive: true
+      regex: '#meta_.*'
+  rooms: []

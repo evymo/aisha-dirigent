@@ -1,0 +1,369 @@
+{
+  "name": "Story Intra",
+  "exportedApplication": {
+    "name": "Story Intra",
+    "isPublic": false,
+    "color": "#4F46E5",
+    "icon": "home",
+    "slug": "story-intra",
+    "pages": [
+      {
+        "name": "Home",
+        "slug": "home",
+        "isDefault": true,
+        "layouts": [
+          {
+            "dsl": {
+              "widgetName": "MainContainer",
+              "type": "CANVAS_WIDGET",
+              "children": [
+                {
+                  "widgetName": "Header",
+                  "type": "TEXT_WIDGET",
+                  "text": "Story Intra",
+                  "fontSize": "HEADING1",
+                  "textAlign": "LEFT",
+                  "topRow": 0,
+                  "leftColumn": 0,
+                  "rightColumn": 24,
+                  "bottomRow": 4
+                },
+                {
+                  "widgetName": "WelcomeText",
+                  "type": "TEXT_WIDGET",
+                  "text": "Your workspace for stories, knowledge, and apps",
+                  "fontSize": "PARAGRAPH",
+                  "topRow": 4,
+                  "leftColumn": 0,
+                  "rightColumn": 24,
+                  "bottomRow": 6
+                },
+                {
+                  "widgetName": "MyStories",
+                  "type": "TABLE_WIDGET_V2",
+                  "tableData": "{{get_my_stories.data}}",
+                  "primaryColumns": {
+                    "title": { "columnType": "text", "label": "Story" },
+                    "status": { "columnType": "text", "label": "Status" },
+                    "updated_at": { "columnType": "date", "label": "Updated" }
+                  },
+                  "topRow": 8,
+                  "leftColumn": 0,
+                  "rightColumn": 16,
+                  "bottomRow": 28
+                },
+                {
+                  "widgetName": "QuickActions",
+                  "type": "CONTAINER_WIDGET",
+                  "topRow": 8,
+                  "leftColumn": 16,
+                  "rightColumn": 24,
+                  "bottomRow": 28,
+                  "children": [
+                    {
+                      "widgetName": "KBSearchBtn",
+                      "type": "BUTTON_WIDGET",
+                      "text": "Search Knowledge",
+                      "onClick": "{{navigateTo('Knowledge')}}",
+                      "topRow": 0,
+                      "leftColumn": 0,
+                      "rightColumn": 24,
+                      "bottomRow": 4
+                    },
+                    {
+                      "widgetName": "ChatBtn",
+                      "type": "BUTTON_WIDGET",
+                      "text": "Team Chat",
+                      "onClick": "{{navigateTo('Chat')}}",
+                      "topRow": 5,
+                      "leftColumn": 0,
+                      "rightColumn": 24,
+                      "bottomRow": 9
+                    },
+                    {
+                      "widgetName": "NewAppBtn",
+                      "type": "BUTTON_WIDGET",
+                      "text": "Create App",
+                      "onClick": "{{navigateTo('/applications')}}",
+                      "topRow": 10,
+                      "leftColumn": 0,
+                      "rightColumn": 24,
+                      "bottomRow": 14
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "name": "Knowledge",
+        "slug": "knowledge",
+        "layouts": [
+          {
+            "dsl": {
+              "widgetName": "MainContainer",
+              "type": "CANVAS_WIDGET",
+              "children": [
+                {
+                  "widgetName": "KBHeader",
+                  "type": "TEXT_WIDGET",
+                  "text": "Knowledge Base",
+                  "fontSize": "HEADING1",
+                  "topRow": 0,
+                  "leftColumn": 0,
+                  "rightColumn": 24,
+                  "bottomRow": 4
+                },
+                {
+                  "widgetName": "SearchInput",
+                  "type": "INPUT_WIDGET_V2",
+                  "label": "Search knowledge...",
+                  "inputType": "TEXT",
+                  "topRow": 4,
+                  "leftColumn": 0,
+                  "rightColumn": 20,
+                  "bottomRow": 8
+                },
+                {
+                  "widgetName": "SearchBtn",
+                  "type": "BUTTON_WIDGET",
+                  "text": "Search",
+                  "onClick": "{{search_knowledge.run()}}",
+                  "topRow": 4,
+                  "leftColumn": 20,
+                  "rightColumn": 24,
+                  "bottomRow": 8
+                },
+                {
+                  "widgetName": "ResultsTable",
+                  "type": "TABLE_WIDGET_V2",
+                  "tableData": "{{search_knowledge.data?.results || []}}",
+                  "primaryColumns": {
+                    "title": { "columnType": "text", "label": "Title" },
+                    "category": { "columnType": "text", "label": "Category" },
+                    "score": { "columnType": "number", "label": "Relevance" },
+                    "summary": { "columnType": "text", "label": "Summary" }
+                  },
+                  "topRow": 10,
+                  "leftColumn": 0,
+                  "rightColumn": 24,
+                  "bottomRow": 40
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "name": "Chat",
+        "slug": "chat",
+        "layouts": [
+          {
+            "dsl": {
+              "widgetName": "MainContainer",
+              "type": "CANVAS_WIDGET",
+              "children": [
+                {
+                  "widgetName": "ChatHeader",
+                  "type": "TEXT_WIDGET",
+                  "text": "Team Chat",
+                  "fontSize": "HEADING1",
+                  "topRow": 0,
+                  "leftColumn": 0,
+                  "rightColumn": 24,
+                  "bottomRow": 4
+                },
+                {
+                  "widgetName": "ChannelList",
+                  "type": "LIST_WIDGET_V2",
+                  "listData": "{{get_channels.data || []}}",
+                  "topRow": 4,
+                  "leftColumn": 0,
+                  "rightColumn": 6,
+                  "bottomRow": 40
+                },
+                {
+                  "widgetName": "MessageList",
+                  "type": "LIST_WIDGET_V2",
+                  "listData": "{{get_messages.data || []}}",
+                  "topRow": 4,
+                  "leftColumn": 6,
+                  "rightColumn": 24,
+                  "bottomRow": 36
+                },
+                {
+                  "widgetName": "MessageInput",
+                  "type": "INPUT_WIDGET_V2",
+                  "label": "",
+                  "placeholderText": "Type a message...",
+                  "inputType": "TEXT",
+                  "topRow": 36,
+                  "leftColumn": 6,
+                  "rightColumn": 21,
+                  "bottomRow": 40
+                },
+                {
+                  "widgetName": "SendBtn",
+                  "type": "BUTTON_WIDGET",
+                  "text": "Send",
+                  "onClick": "{{send_message.run().then(() => get_messages.run())}}",
+                  "topRow": 36,
+                  "leftColumn": 21,
+                  "rightColumn": 24,
+                  "bottomRow": 40
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "name": "My Apps",
+        "slug": "my-apps",
+        "layouts": [
+          {
+            "dsl": {
+              "widgetName": "MainContainer",
+              "type": "CANVAS_WIDGET",
+              "children": [
+                {
+                  "widgetName": "AppsHeader",
+                  "type": "TEXT_WIDGET",
+                  "text": "My Applications",
+                  "fontSize": "HEADING1",
+                  "topRow": 0,
+                  "leftColumn": 0,
+                  "rightColumn": 24,
+                  "bottomRow": 4
+                },
+                {
+                  "widgetName": "AppsDescription",
+                  "type": "TEXT_WIDGET",
+                  "text": "Build custom applications using the AISHA backend. Connect to the Knowledge Base, PostgREST RPCs, n8n workflows, and more.",
+                  "fontSize": "PARAGRAPH",
+                  "topRow": 4,
+                  "leftColumn": 0,
+                  "rightColumn": 24,
+                  "bottomRow": 7
+                },
+                {
+                  "widgetName": "CreateAppBtn",
+                  "type": "BUTTON_WIDGET",
+                  "text": "Create New Application",
+                  "onClick": "{{navigateTo('/applications')}}",
+                  "buttonStyle": "PRIMARY",
+                  "topRow": 8,
+                  "leftColumn": 0,
+                  "rightColumn": 8,
+                  "bottomRow": 12
+                },
+                {
+                  "widgetName": "TemplatesInfo",
+                  "type": "TEXT_WIDGET",
+                  "text": "Available datasources: AISHA Intranet API (user-scoped RPCs), AISHA Knowledge (MCP tools), AISHA Public Data (PostgREST read-only)",
+                  "fontSize": "PARAGRAPH",
+                  "topRow": 14,
+                  "leftColumn": 0,
+                  "rightColumn": 24,
+                  "bottomRow": 18
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "datasources": [
+      {
+        "name": "AISHA Intranet API",
+        "_comment": "S2: routed through the intranet oauth2-proxy ({{INTRANET_PROXY_URL}} → gateway /intranet). The proxy injects X-Auth-Request-Access-Token (the caller's verified Keycloak token) which the gateway uses as the SOLE identity. X-Intranet-Api-Key is kept only as a coarse defense-in-depth pre-filter. The old X-Appsmith-User-Email identity header is removed — the gateway no longer trusts it.",
+        "pluginId": "restapi-plugin",
+        "datasourceConfiguration": {
+          "url": "{{INTRANET_PROXY_URL}}",
+          "headers": [
+            { "key": "X-Intranet-Api-Key", "value": "{{INTRANET_API_KEY}}" },
+            { "key": "Content-Type", "value": "application/json" }
+          ]
+        }
+      },
+      {
+        "name": "AISHA Knowledge",
+        "_comment": "S2: same intranet oauth2-proxy path as AISHA Intranet API; identity comes from the injected X-Auth-Request-Access-Token, not a user-supplied header.",
+        "pluginId": "restapi-plugin",
+        "datasourceConfiguration": {
+          "url": "{{INTRANET_PROXY_URL}}/mcp",
+          "headers": [
+            { "key": "X-Intranet-Api-Key", "value": "{{INTRANET_API_KEY}}" },
+            { "key": "Content-Type", "value": "application/json" }
+          ]
+        }
+      },
+      {
+        "name": "AISHA Public Data",
+        "pluginId": "restapi-plugin",
+        "datasourceConfiguration": {
+          "url": "{{GATEWAY_URL}}/rest/v1",
+          "headers": [
+            { "key": "apikey", "value": "{{ANON_KEY}}" },
+            { "key": "Authorization", "value": "Bearer {{ANON_KEY}}" },
+            { "key": "Content-Type", "value": "application/json" }
+          ]
+        }
+      }
+    ],
+    "queries": [
+      {
+        "name": "get_my_stories",
+        "datasource": "AISHA Intranet API",
+        "actionConfiguration": {
+          "httpMethod": "POST",
+          "path": "/rpc/get_my_stories",
+          "headers": [],
+          "body": "{}"
+        }
+      },
+      {
+        "name": "search_knowledge",
+        "datasource": "AISHA Knowledge",
+        "actionConfiguration": {
+          "httpMethod": "POST",
+          "path": "",
+          "headers": [],
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"search_knowledge_v2\",\"arguments\":{\"query\":\"{{SearchInput.text}}\",\"limit\":20}}}"
+        }
+      },
+      {
+        "name": "get_channels",
+        "datasource": "AISHA Intranet API",
+        "actionConfiguration": {
+          "httpMethod": "POST",
+          "path": "/rpc/get_intranet_channels",
+          "headers": [],
+          "body": "{}"
+        }
+      },
+      {
+        "name": "get_messages",
+        "datasource": "AISHA Intranet API",
+        "actionConfiguration": {
+          "httpMethod": "POST",
+          "path": "/rpc/get_intranet_messages",
+          "headers": [],
+          "body": "{\"p_channel_slug\":\"{{ChannelList.selectedItem?.slug || 'general'}}\",\"p_limit\":50}"
+        }
+      },
+      {
+        "name": "send_message",
+        "datasource": "AISHA Intranet API",
+        "actionConfiguration": {
+          "httpMethod": "POST",
+          "path": "/rpc/send_intranet_message",
+          "headers": [],
+          "body": "{\"p_channel_slug\":\"{{ChannelList.selectedItem?.slug || 'general'}}\",\"p_content\":\"{{MessageInput.text}}\"}"
+        }
+      }
+    ]
+  }
+}

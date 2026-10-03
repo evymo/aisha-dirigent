@@ -1,0 +1,31 @@
+# ── Cross-platform line endings (Mac / Linux / Windows) ──────────────────────
+# Repo stores LF; git normalizes on checkout. Without this, Windows checkouts get
+# CRLF, which breaks bash scripts + husky hooks and creates noisy cross-OS diffs.
+# NOTE: adding this file sets the policy going forward. A one-time
+# `git add --renormalize .` in a dedicated commit normalizes existing files.
+* text=auto eol=lf
+
+# Scripts + hooks MUST stay LF (CRLF makes them un-executable).
+*.sh        text eol=lf
+*.bash      text eol=lf
+*.mjs       text eol=lf
+*.cjs       text eol=lf
+.husky/*    text eol=lf
+
+# Windows-native helpers stay CRLF.
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+
+# Binary — never normalize / diff as text.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.pdf   binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.eot   binary
+*.lockb binary

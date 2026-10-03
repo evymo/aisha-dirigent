@@ -1,0 +1,44 @@
+# =============================================================================
+# mautrix-meta Bridge Configuration — Evymo Production
+# =============================================================================
+# Covers both Facebook Messenger and Instagram DMs.
+# Docs: https://docs.mau.fi/bridges/go/meta/
+# =============================================================================
+
+homeserver:
+  address: http://synapse:8008
+  domain: ${MATRIX_DOMAIN}
+
+appservice:
+  address: http://mautrix-meta:29319
+  hostname: 0.0.0.0
+  port: 29319
+  database:
+    type: postgres
+    uri: postgres://synapse_user:${SYNAPSE_DB_PASSWORD}@${APP_NAME_PREFIX}-db:5432/synapse_bridge_meta?sslmode=disable
+  id: meta
+  as_token: ${AISHA_AS_TOKEN}_meta
+  hs_token: ${AISHA_HS_TOKEN}_meta
+  bot:
+    username: metabot
+    displayname: Meta Bridge Bot
+
+meta:
+  mode: facebook
+  ig_e2ee: false
+
+bridge:
+  permissions:
+    "*": relay
+    "${MATRIX_DOMAIN}": user
+    "@admin:${MATRIX_DOMAIN}": admin
+  relay:
+    enabled: true
+  command_prefix: "!meta"
+  double_puppet_allow_discovery: true
+
+logging:
+  min_level: warn
+  writers:
+    - type: stdout
+      format: json

@@ -1,0 +1,15 @@
+#!/bin/sh
+# post-checkout — self-heal husky's wrapper dir (.husky/_) in fresh worktrees.
+#
+# `git worktree add` fires this hook (found via the PRIMARY checkout's
+# core.hooksPath) with the working directory set to the BRAND-NEW worktree,
+# before any node_modules is linked. We use that one chance to copy husky's
+# wrapper into the new tree so pre-commit / pre-push actually run there — see
+# scripts/ensure-worktree-hooks.sh for the why. It also runs on ordinary branch
+# checkouts; that path is a cheap no-op (the script exits at once when .husky/_
+# is already present).
+#
+# Skip husky entirely (husky's own contract):  HUSKY=0 git ...
+root=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+[ -n "$root" ] || exit 0
+sh "$root/scripts/ensure-worktree-hooks.sh" || true

@@ -1,0 +1,326 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify-observability.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+x-v2-common: &v2-common
+  restart: unless-stopped
+
+services:
+  pki-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.pki-init
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-obs-pki-init
+    restart: "no"
+    environment:
+      PKI_BRIDGE_URL: ${PKI_BRIDGE_URL:-}
+      # Odvozuje cold-start z manifestu (pki nasazeno ⇒ true); bez PKI se vypíná
+      # POŽADAVEK, ne jen adresa — výklad: docs/compose-notes/docker-compose.coolify.yml.md
+      PKI_BUNDLE_REQUIRED: ${PKI_BUNDLE_REQUIRED:?odvozuje cold-start z manifestu; bez něj pki-init trvá na bundlu i bez PKI}
+    command: ["/usr/local/bin/assemble-ca-bundle.sh"]
+    volumes:
+      - pki-certs:/certs/pki
+    healthcheck:
+      disable: true
+    networks:
+      - internal
+
+  obs-config-init:
+    build:
+      context: .
+      dockerfile_inline: |
+        FROM ${REGISTRY_PROXY}library/alpine:3.20
+        COPY coolify/observability /src
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-obs-config-init
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        cp /src/loki/loki-config.yaml                     /loki/loki-config.yaml
+        cp /src/prometheus/prometheus.yml                 /prometheus/prometheus.yml
+        cp /src/prometheus/postgres-exporter-queries.yaml /pg-exporter/queries.yaml
+        chmod 0644 /loki/*.yaml /prometheus/*.yml /pg-exporter/*.yaml
+        # Loki runs as uid:gid 10001:10001 and writes its WAL to /loki/wal
+        # (named volume `loki-wal`). On fresh-volume create Docker defaults
+        # the mountpoint to root:root → "open /loki/wal/00000000: permission
+        # denied" restart loop. Chown here so loki can write on first start.
+        # Idempotent: re-runs cost <1ms when ownership already matches.
+        chown -R 10001:10001 /loki-wal
+        ls -la /loki /prometheus /pg-exporter /loki-wal
+        echo "[obs-config-init] staged 3 config files into 3 named volumes + chowned loki-wal"
+    volumes:
+      - obs-loki-config:/loki
+      - obs-prometheus-config:/prometheus
+      - obs-pg-exporter-config:/pg-exporter
+      - loki-wal:/loki-wal
+    healthcheck:
+      disable: true
+    networks:
+      - internal
+
+  loki:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    <<: *v2-common
+    image: ${IMAGE_LOKI}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-loki
+    user: "10001:10001"  # loki user inside the image
+    command:
+      - -config.file=/etc/loki/loki-config.yaml
+      - -config.expand-env=true
+    environment:
+      MINIO_ENDPOINT: ${APP_NAME_PREFIX:?identita instance}-minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - obs-loki-config:/etc/loki:ro
+      - loki-wal:/loki/wal
+    depends_on:
+      obs-config-init:
+        condition: service_completed_successfully
+    expose:
+      - "3100"
+    networks:
+      - internal
+      - mesh-dns
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3100/metrics || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+  prometheus:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    <<: *v2-common
+    image: ${IMAGE_PROMETHEUS}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-prometheus
+    user: "65534:65534"  # nobody
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle  # POST /-/reload for hot config swap
+    volumes:
+      - obs-prometheus-config:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      obs-config-init:
+        condition: service_completed_successfully
+    expose:
+      - "9090"
+    networks:
+      - internal
+      - mesh-dns
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  node-exporter:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    <<: *v2-common
+    image: ${IMAGE_NODE_EXPORTER}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-node-exporter
+    pid: host
+    command:
+      - --path.procfs=/host/proc
+      - --path.sysfs=/host/sys
+      - --path.rootfs=/host/root
+      - --collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/host/root:ro,rslave
+    expose:
+      - "9100"
+    networks:
+      - internal
+      - mesh-dns
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:9100/metrics || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  cadvisor:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    <<: *v2-common
+    image: ${IMAGE_CADVISOR}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-cadvisor
+    privileged: true  # required for /sys/fs/cgroup access on some hosts
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    expose:
+      - "8080"
+    networks:
+      - internal
+      - mesh-dns
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:8080/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  postgres-exporter:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    <<: *v2-common
+    image: ${IMAGE_POSTGRES_EXPORTER}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-postgres-exporter
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres_exporter:${POSTGRES_EXPORTER_PASSWORD}@${APP_NAME_PREFIX:?identita instance}-db:5432/postgres?sslmode=disable"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "false"
+      PG_EXPORTER_EXTEND_QUERY_PATH: /etc/postgres-exporter/queries.yaml
+    volumes:
+      - obs-pg-exporter-config:/etc/postgres-exporter:ro
+    depends_on:
+      obs-config-init:
+        condition: service_completed_successfully
+    expose:
+      - "9187"
+    networks:
+      - internal
+      - mesh-dns
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:9187/metrics || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  grafana:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    <<: *v2-common
+    image: ${IMAGE_GRAFANA}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_AUTH_PROXY_ENABLED: "true"
+      GF_AUTH_PROXY_HEADER_NAME: X-Forwarded-User
+      GF_AUTH_PROXY_HEADER_PROPERTY: username
+      GF_AUTH_PROXY_AUTO_SIGN_UP: "true"
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"  # admin/admin fallback if proxy fails
+      RUNBOOK_BASE_URL: ${RUNBOOK_BASE_URL:-}
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    expose:
+      - "3000"
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-grafana
+      mesh-dns:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-grafana
+    depends_on:
+      loki:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  grafana-auth:
+    dns:
+      - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
+    dns_search:
+      - ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
+    <<: *v2-common
+    image: ${IMAGE_OAUTH2_PROXY}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-grafana-auth
+    environment:
+      OAUTH2_PROXY_HTTP_ADDRESS: 0.0.0.0:4181
+      OAUTH2_PROXY_REVERSE_PROXY: "true"
+      OAUTH2_PROXY_PROVIDER: keycloak-oidc
+      OAUTH2_PROXY_PROVIDER_DISPLAY_NAME: AISHA Keycloak
+      OAUTH2_PROXY_OIDC_ISSUER_URL: https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}
+      OAUTH2_PROXY_PROVIDER_CA_FILES: /certs/pki/aisha-ca-bundle.pem
+      OAUTH2_PROXY_CLIENT_ID: ${OIDC_CLIENT_PREFIX:-}studio-proxy
+      OAUTH2_PROXY_CLIENT_SECRET: ${STUDIO_OIDC_SECRET}
+      OAUTH2_PROXY_COOKIE_SECRET: ${STUDIO_COOKIE_SECRET}
+      OAUTH2_PROXY_COOKIE_DOMAINS: ".${GRAFANA_DOMAIN}"
+      OAUTH2_PROXY_WHITELIST_DOMAINS: "${GRAFANA_DOMAIN}"
+      OAUTH2_PROXY_REDIRECT_URL: "https://${GRAFANA_DOMAIN}/oauth2/callback"
+      OAUTH2_PROXY_UPSTREAMS: "http://${APP_NAME_PREFIX:?identita instance}-grafana:3000"
+      OAUTH2_PROXY_PASS_AUTHORIZATION_HEADER: "true"
+      OAUTH2_PROXY_PASS_USER_HEADERS: "true"
+      OAUTH2_PROXY_SET_AUTHORIZATION_HEADER: "true"
+      OAUTH2_PROXY_SCOPE: "openid email profile"
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_ALLOWED_GROUPS: studio_access
+      OAUTH2_PROXY_OIDC_GROUPS_CLAIM: roles
+      OAUTH2_PROXY_INSECURE_OIDC_ALLOW_UNVERIFIED_EMAIL: "true"
+    volumes:
+      - pki-certs:/certs/pki:ro  # AISHA CA bundle for OIDC issuer TLS verify
+    expose:
+      - "4181"
+    networks:
+      - internal
+      - coolify
+      - mesh-dns
+    depends_on:
+      grafana:
+        condition: service_healthy
+      pki-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:4181/ping || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  loki-wal:
+  prometheus-data:
+  grafana-data:
+  obs-loki-config:
+  obs-prometheus-config:
+  obs-pg-exporter-config:
+  pki-certs:
+
+networks:
+  internal:
+    external: true
+    name: ${APP_NAME_PREFIX:?identita instance}-shared-net
+  coolify:
+    external: true
+    name: coolify
+  mesh-dns:
+    external: true
+    name: ${MESH_DNS_NETWORK:?vydává generate-secrets}

@@ -1,0 +1,44 @@
+# Phase 12 WP 4.4 — AISHA security headers (Caddy snippet).
+#
+# IMPORT pattern: in any Caddyfile site block:
+#   import security-headers
+#
+# Adds:
+#   - HSTS preload (2 years, includeSubDomains, preload)
+#   - X-Frame-Options: DENY (no embedding by default; per-site override
+#     can use `frame-ancestors` CSP for nuanced policy)
+#   - X-Content-Type-Options: nosniff (MIME sniffing protection)
+#   - Referrer-Policy: strict-origin-when-cross-origin (privacy)
+#   - Permissions-Policy: geolocation/camera/microphone/etc. denied by default
+#
+# CSP (Content-Security-Policy) is NOT here — set per-site since each
+# surface has different inline-script needs. WP 4.7 (Sentry + CSP) ships
+# the nonce-based CSP variant separately.
+#
+# HSTS preload submission: after deploy, add domains to https://hstspreload.org/
+# (one-time per apex domain — `${PUBLIC_TLD}`, `${INTERNAL_TLD}`).
+(security-headers) {
+  # HSTS — 2 years, includeSubDomains, preload-eligible
+  header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+
+  # Browser legacy embedding gate. CSP frame-ancestors is the modern
+  # replacement; both are belt-and-braces.
+  header X-Frame-Options "DENY"
+
+  # Suppress MIME sniffing.
+  header X-Content-Type-Options "nosniff"
+
+  # Privacy: send origin (not path/query) on cross-origin nav.
+  header Referrer-Policy "strict-origin-when-cross-origin"
+
+  # Browser feature gates. Disable surfaces the workbench doesn't use.
+  # Add explicit allowlist entries if a future feature needs e.g. mic.
+  header Permissions-Policy "geolocation=(), camera=(), microphone=(), payment=(), usb=()"
+
+  # Belt-and-braces: deny embedding via legacy header for older browsers.
+  header X-Permitted-Cross-Domain-Policies "none"
+
+  # COOP — cross-origin isolation (paves the way for SharedArrayBuffer
+  # uses in future, e.g. WASM workloads). Safe default.
+  header Cross-Origin-Opener-Policy "same-origin"
+}

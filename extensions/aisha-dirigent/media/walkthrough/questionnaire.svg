@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="280" viewBox="0 0 400 280">
+  <defs>
+    <linearGradient id="qBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0E0E10"/>
+      <stop offset="100%" stop-color="#1C1C21"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="280" rx="12" fill="url(#qBg)"/>
+
+  <!-- Title -->
+  <text x="200" y="30" text-anchor="middle" fill="#E55A10" font-family="system-ui" font-size="13" font-weight="600">Řekněte nám o sobě</text>
+  <text x="200" y="48" text-anchor="middle" fill="#6E6E73" font-family="system-ui" font-size="9">AISHA přizpůsobí prostředí vašim potřebám</text>
+
+  <!-- Form card -->
+  <rect x="50" y="62" width="300" height="190" rx="10" fill="#1C1C21" stroke="#2A2A30" stroke-width="1"/>
+
+  <!-- Role selector -->
+  <text x="70" y="86" fill="#9A9A9E" font-family="system-ui" font-size="9" font-weight="500">Jaká je vaše role?</text>
+  <g transform="translate(70, 92)">
+    <rect width="64" height="24" rx="5" fill="#FF6A1A" opacity="0.15" stroke="#FF6A1A" stroke-width="1"/>
+    <text x="32" y="16" text-anchor="middle" fill="#FF6A1A" font-family="system-ui" font-size="9" font-weight="600">Vývojář</text>
+  </g>
+  <g transform="translate(142, 92)">
+    <rect width="64" height="24" rx="5" fill="transparent" stroke="#4A4A50" stroke-width="1"/>
+    <text x="32" y="16" text-anchor="middle" fill="#9A9A9E" font-family="system-ui" font-size="9">Designér</text>
+  </g>
+  <g transform="translate(214, 92)">
+    <rect width="64" height="24" rx="5" fill="transparent" stroke="#4A4A50" stroke-width="1"/>
+    <text x="32" y="16" text-anchor="middle" fill="#9A9A9E" font-family="system-ui" font-size="9">Manager</text>
+  </g>
+
+  <!-- Experience -->
+  <text x="70" y="140" fill="#9A9A9E" font-family="system-ui" font-size="9" font-weight="500">Zkušenost s AI nástroji?</text>
+  <g transform="translate(70, 146)">
+    <rect width="80" height="24" rx="5" fill="transparent" stroke="#4A4A50" stroke-width="1"/>
+    <text x="40" y="16" text-anchor="middle" fill="#9A9A9E" font-family="system-ui" font-size="9">Začátečník</text>
+  </g>
+  <g transform="translate(158, 146)">
+    <rect width="80" height="24" rx="5" fill="#E55A10" opacity="0.15" stroke="#E55A10" stroke-width="1"/>
+    <text x="40" y="16" text-anchor="middle" fill="#E55A10" font-family="system-ui" font-size="9" font-weight="600">Pokročilý</text>
+  </g>
+
+  <!-- Interest tags -->
+  <text x="70" y="194" fill="#9A9A9E" font-family="system-ui" font-size="9" font-weight="500">Co vás zajímá?</text>
+  <g transform="translate(70, 200)">
+    <rect width="56" height="20" rx="10" fill="#4ade80" opacity="0.15" stroke="#4ade80" stroke-width="1"/>
+    <text x="28" y="14" text-anchor="middle" fill="#4ade80" font-family="system-ui" font-size="8">AI Chat</text>
+  </g>
+  <g transform="translate(134, 200)">
+    <rect width="70" height="20" rx="10" fill="#60a5fa" opacity="0.15" stroke="#60a5fa" stroke-width="1"/>
+    <text x="35" y="14" text-anchor="middle" fill="#60a5fa" font-family="system-ui" font-size="8">Code Review</text>
+  </g>
+  <g transform="translate(212, 200)">
+    <rect width="56" height="20" rx="10" fill="transparent" stroke="#4A4A50" stroke-width="1"/>
+    <text x="28" y="14" text-anchor="middle" fill="#9A9A9E" font-family="system-ui" font-size="8">Deploy</text>
+  </g>
+
+  <!-- CTA button -->
+  <rect x="120" y="232" width="160" height="30" rx="6" fill="#FF6A1A"/>
+  <text x="200" y="251" text-anchor="middle" fill="#fff" font-family="system-ui" font-size="11" font-weight="600">Pokračovat →</text>
+
+  <!-- Skip link -->
+  <text x="200" y="268" text-anchor="middle" fill="#6E6E73" font-family="system-ui" font-size="8">Přeskočit — můžete nastavit kdykoli później</text>
+</svg>

@@ -1,0 +1,78 @@
+{
+  "name": "WF_PLAYWRIGHT_RUN",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "playwright-run",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Playwright Run Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate input. Body shape:\n//   { trigger_kind: 'staging_auto' | 'production_manual' | 'scheduled',\n//     target_env: string,\n//     target_base_url: string | 'auto',     // 'auto' requires app_name\n//     app_name?: string,                    // coolify_app_slots.app_name; when set, RPC derives URL + captures active_slot\n//     story_id?: uuid,                      // when set, RPC emits qa_playwright_* story_entries\n//     suite?: string, deploy_ref?: string, metadata?: object }\nconst body = $input.first().json.body ?? $input.first().json;\nconst valid = ['staging_auto', 'production_manual', 'scheduled'];\nif (!valid.includes(body.trigger_kind)) {\n  throw new Error(`trigger_kind must be one of: ${valid.join(', ')}`);\n}\nif (!body.target_env) throw new Error('target_env required');\nconst url = body.target_base_url;\nif (!url) throw new Error('target_base_url required (or \"auto\" with app_name)');\nif (url !== 'auto' && !/^https?:\\/\\//.test(url)) {\n  throw new Error('target_base_url must be http(s)://... or \"auto\"');\n}\nif (url === 'auto' && !body.app_name) {\n  throw new Error('target_base_url=\"auto\" requires app_name');\n}\nreturn [{ json: {\n  trigger_kind: body.trigger_kind,\n  target_env: body.target_env,\n  target_base_url: url,\n  app_name: body.app_name ?? null,\n  story_id: body.story_id ?? null,\n  suite: body.suite ?? 'all',\n  deploy_ref: body.deploy_ref ?? null,\n  metadata: body.metadata ?? {}\n} }];"
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Enqueue via start_playwright_run RPC (service_role).\n// When app_name is passed, the RPC consults resolve_deployed_url() to\n// derive target_base_url from the live B/G slot and capture active_slot;\n// when story_id is passed, the RPC emits qa_playwright_requested into the\n// storyloop timeline.\nconst gw = $env.AISHA_GATEWAY_URL;\nconst tok = $env.AISHA_SERVICE_KEY;\nconst input = $input.first().json;\nconst res = await fetch(`${gw}/rest/v1/rpc/start_playwright_run`, {\n  method: 'POST',\n  headers: { 'content-type': 'application/json', apikey: tok, authorization: `Bearer ${tok}` },\n  body: JSON.stringify({\n    p_trigger_kind: input.trigger_kind,\n    p_target_env: input.target_env,\n    p_target_base_url: input.target_base_url,\n    p_suite: input.suite,\n    p_deploy_ref: input.deploy_ref,\n    p_metadata: input.metadata,\n    p_story_id: input.story_id,\n    p_app_name: input.app_name\n  })\n});\nif (!res.ok) {\n  const text = await res.text();\n  throw new Error(`start_playwright_run failed: ${res.status} ${text}`);\n}\nconst run_id = (await res.json()).toString().replace(/\"/g, '');\nconst approval = input.trigger_kind === 'production_manual';\nreturn [{ json: { run_id, trigger_kind: input.trigger_kind, target_env: input.target_env, target_base_url: input.target_base_url, app_name: input.app_name, story_id: input.story_id, suite: input.suite, deploy_ref: input.deploy_ref, approval_required: approval } }];"
+      },
+      "id": "start-rpc",
+      "name": "Start Playwright Run (RPC)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Audit + return. Approval gate is enforced inside svc-playwright-runner\n// via get_next_playwright_run (which skips approval_required rows that\n// have no approved_at). Production_manual runs sit queued until the\n// admin calls approve_playwright_run RPC.\nconst gw = $env.AISHA_GATEWAY_URL;\nconst tok = $env.AISHA_SERVICE_KEY;\nconst i = $input.first().json;\nawait fetch(`${gw}/rest/v1/rpc/log_integration_action`, {\n  method: 'POST',\n  headers: { 'content-type': 'application/json', apikey: tok, authorization: `Bearer ${tok}` },\n  body: JSON.stringify({\n    p_integration: 'n8n',\n    p_action_key: 'playwright.enqueued',\n    p_payload: { run_id: i.run_id, trigger_kind: i.trigger_kind, target_env: i.target_env, target_base_url: i.target_base_url, app_name: i.app_name, story_id: i.story_id, suite: i.suite, deploy_ref: i.deploy_ref, approval_required: i.approval_required },\n    p_tags: ['stack', 'qa', 'playwright', i.trigger_kind]\n  })\n});\nreturn [{ json: { ok: true, run_id: i.run_id, approval_required: i.approval_required, message: i.approval_required ? 'Queued; awaiting admin approval (call approve_playwright_run RPC).' : 'Queued; runner will pick up within the poll interval.' } }];"
+      },
+      "id": "audit-and-return",
+      "name": "Audit + Respond",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}"
+      },
+      "id": "respond",
+      "name": "Respond to Caller",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Playwright Run Webhook": { "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]] },
+    "Validate Input": { "main": [[{ "node": "Start Playwright Run (RPC)", "type": "main", "index": 0 }]] },
+    "Start Playwright Run (RPC)": { "main": [[{ "node": "Audit + Respond", "type": "main", "index": 0 }]] },
+    "Audit + Respond": { "main": [[{ "node": "Respond to Caller", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "tags": [
+    { "name": "stack" },
+    { "name": "qa" },
+    { "name": "playwright" }
+  ]
+}

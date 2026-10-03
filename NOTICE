@@ -1,0 +1,55 @@
+AISHA Platform
+Copyright 2026 Evymo s.r.o. and AISHA Platform contributors
+
+This product includes software developed at Evymo s.r.o.
+(https://evymo.com).
+
+Licensed under the Elastic License 2.0 (ELv2). See LICENSE for details.
+
+The hosted AISHA service (internal models, evaluation and routing) is a
+separate proprietary service operated by Evymo s.r.o. and is not licensed
+under ELv2. AISHA, Evymo and Dirigent are trade names of Evymo s.r.o.;
+no trademark rights are granted by the source license.
+
+================================================================================
+Third-party software included in this distribution
+================================================================================
+
+This project incorporates components from the projects listed below.
+
+  React (MIT)             https://reactjs.org
+  Vite (MIT)              https://vitejs.dev
+  TypeScript (Apache-2.0) https://www.typescriptlang.org
+  Tailwind CSS (MIT)      https://tailwindcss.com
+  shadcn/ui (MIT)         https://ui.shadcn.com
+  PostgreSQL (PostgreSQL) https://www.postgresql.org
+  PostgREST (MIT)         https://postgrest.org
+  Keycloak (Apache-2.0)   https://www.keycloak.org
+  n8n (Sustainable Use)   https://n8n.io
+  Fastify (MIT)           https://fastify.dev
+  Zod (MIT)               https://zod.dev
+  TanStack Query (MIT)    https://tanstack.com/query
+  Vitest (MIT)            https://vitest.dev
+  Playwright (Apache-2.0) https://playwright.dev
+  Elasticsearch (SSPL)    https://www.elastic.co
+  Langfuse (MIT)          https://langfuse.com
+  GrapesJS (BSD-3-Clause) https://grapesjs.com
+  Sentry (FSL/Apache-2.0) https://sentry.io
+  Redis (BSD-3-Clause)    https://redis.io
+  Docker (Apache-2.0)     https://www.docker.com
+  Coolify (Apache-2.0)    https://coolify.io
+  NetBird (BSD-3-Clause)  https://netbird.io
+  OpenXPKI (Apache-2.0)   https://www.openxpki.org
+
+Bundled fonts (self-hosted webfonts)
+
+  Nunito Sans (OFL-1.1)   https://github.com/Fonthausen/NunitoSans
+                          Copyright 2016 The Nunito Sans Project Authors.
+                          Brand typeface. Full SIL Open Font License 1.1 text
+                          ships next to the woff2 files as OFL.txt in each
+                          fonts/nunito-sans/ directory (public, keycloak, workbench).
+
+The full list of dependencies (with their licenses) can be regenerated from
+package.json + package-lock.json using:
+
+  npx license-checker --production --summary

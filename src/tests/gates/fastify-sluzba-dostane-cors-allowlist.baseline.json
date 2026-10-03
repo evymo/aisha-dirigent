@@ -1,0 +1,22 @@
+{
+  "dluh": 17,
+  "sluzby": [
+    "storage-auth",
+    "svc-aisha-kronos-shim",
+    "svc-communications",
+    "svc-fio-bank",
+    "svc-github-app",
+    "svc-health-ai",
+    "svc-homeassistant",
+    "svc-livekit",
+    "svc-mcp-knowledge",
+    "svc-money",
+    "svc-openclaw",
+    "svc-packeta",
+    "svc-pki-bridge",
+    "svc-plugin-system",
+    "svc-push",
+    "svc-stripe",
+    "svc-web-artifact"
+  ]
+}

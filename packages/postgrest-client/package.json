@@ -1,0 +1,40 @@
+{
+  "name": "@aisha/postgrest-client",
+  "version": "0.1.2",
+  "license": "Elastic-2.0",
+  "description": "The ONE PostgREST RPC call contract shared by every AISHA orchestrator service. Replaces the divergent hand-rolled services/*/src/postgrest.ts copies (SVC-01 / D11) with a single canonical client: rpcService / rpcUser / rpcUserClaims + table helpers, preserving each service's auth / timeout semantics via options.",
+  "private": false,
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "jose": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.3"
+  }
+}

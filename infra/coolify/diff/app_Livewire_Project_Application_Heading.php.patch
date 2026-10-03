@@ -1,0 +1,11 @@
+--- stock/app_Livewire_Project_Application_Heading.php	2026-09-05 14:32:30
++++ live/app_Livewire_Project_Application_Heading.php	2026-09-05 14:32:32
+@@ -105,7 +105,7 @@
+ 
+                 return;
+             }
+-            if (data_get($this->application, 'settings.is_build_server_enabled') && str($this->application->docker_registry_image_name)->isEmpty()) {
++            if (data_get($this->application, 'settings.is_build_server_enabled') && $this->application->build_pack !== 'dockercompose' && str($this->application->docker_registry_image_name)->isEmpty()) {
+                 $this->dispatch('error', 'Failed to deploy.', 'To use a build server, you must first set a Docker image.<br>More information here: <a target="_blank" class="underline" href="https://coolify.io/docs/knowledge-base/server/build-server">documentation</a>');
+ 
+                 return;

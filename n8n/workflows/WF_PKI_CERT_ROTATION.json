@@ -1,0 +1,448 @@
+{
+  "name": "WF_PKI_CERT_ROTATION",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "triggerAtHour": 6
+            }
+          ]
+        }
+      },
+      "id": "cron-daily",
+      "name": "Daily 06:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://pki-server:8080/rpc/v1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "{\n  \"service\": \"Certificate\",\n  \"method\": \"search\",\n  \"params\": {\n    \"status\": \"ISSUED\",\n    \"valid_to\": \"{{ $now.plus(30, 'days').toISO() }}\",\n    \"pki_realm\": \"{{ $json.realm ?? 'identity-plane' }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "check-expiry",
+      "name": "Check Certs Expiring ≤30d",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.result.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "has-expiring",
+      "name": "Any expiring?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        540,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract cert metadata for rotation\nconst certs = $json.result || [];\nreturn certs.map(cert => ({\n  identifier: cert.identifier,\n  subject: cert.subject,\n  notafter: cert.notafter,\n  pki_realm: cert.pki_realm,\n  // Map OpenXPKI realm → compose service names to restart\n  services: {\n    'identity-plane':  ['aisha-auth', 'aisha-studio-auth', 'aisha-keycloak'],\n    'data-plane':      ['aisha-db', 'aisha-elasticsearch'],\n    'orchestration-plane': ['aisha-n8n', 'aisha-langfuse']\n  }[cert.pki_realm] || []\n}));"
+      },
+      "id": "map-services",
+      "name": "Map Certs → Services",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://pki-server:8080/rpc/v1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "{\n  \"service\": \"Workflow\",\n  \"method\": \"create_workflow_instance\",\n  \"params\": {\n    \"workflow\": \"certificate_signing_request_v2\",\n    \"params\": {\n      \"cert_profile\": \"tls_server\",\n      \"cert_subject_style\": \"00_service_style\",\n      \"renewal_cert_identifier\": \"{{ $json.identifier }}\"\n    }\n  }\n}",
+        "options": {}
+      },
+      "id": "renew-cert",
+      "name": "Renew via OpenXPKI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        980,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Determine host path where cert files are stored\nconst realm = $json.pki_realm;\nconst identifier = $json.identifier;\nconst certPaths = {\n  'identity-plane':       '/opt/aisha/config/pki/identity',\n  'data-plane':           '/opt/aisha/config/pki/data',\n  'orchestration-plane':  '/opt/aisha/config/pki/orchestration'\n};\nreturn [{\n  ...($json),\n  cert_path: `${certPaths[realm]}/${identifier.replace(/[^a-zA-Z0-9_-]/g,'_')}.pem`,\n  newWorkflowId: $input.item.json.result?.workflow_id\n}];"
+      },
+      "id": "build-paths",
+      "name": "Build File Paths",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://pki-server:8080/rpc/v1",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "{\n  \"service\": \"Certificate\",\n  \"method\": \"get_cert\",\n  \"params\": {\n    \"identifier\": \"{{ $json.newCertIdentifier }}\",\n    \"format\": \"PEM\"\n  }\n}",
+        "options": {}
+      },
+      "id": "fetch-new-cert",
+      "name": "Fetch New PEM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1420,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.cert_path }}",
+        "dataPropertyName": "={{ $json.result }}",
+        "options": {}
+      },
+      "id": "write-cert-file",
+      "name": "Write PEM to Volume",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1,
+      "position": [
+        1640,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build docker restart commands for affected services\nconst services = $json.services || [];\nconst SAFE_SVC = /^aisha-[a-z0-9][a-z0-9-]{0,62}$/;\nfor (const s of services) { if (!SAFE_SVC.test(s)) { throw new Error('Refusing docker restart: unsafe service name ' + JSON.stringify(s)); } }\nreturn services.map(svc => ({\n  service: svc,\n  command: `docker restart ${svc}`\n}));"
+      },
+      "id": "build-restart-cmds",
+      "name": "Build Restart Cmds",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1860,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "command": "docker restart {{ $json.service }}"
+      },
+      "id": "rolling-restart",
+      "name": "Rolling docker restart",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        220
+      ],
+      "notes": "Requires n8n container has Docker socket access:\n  volumes:\n    - /var/run/docker.sock:/var/run/docker.sock"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate rotation results\nconst restartOutput = $input.all();\nconst failed = restartOutput.filter(i => i.json.exitCode !== 0);\nreturn [{\n  rotated_at: new Date().toISOString(),\n  total_restarts: restartOutput.length,\n  failures: failed.length,\n  details: restartOutput.map(i => ({ service: i.json.service, ok: i.json.exitCode === 0 }))\n}];"
+      },
+      "id": "summarize",
+      "name": "Summarize",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2300,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_WEBHOOK_URL }}/pki/rotation-complete",
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "notify-aisha",
+      "name": "Notify AISHA",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2520,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// No certs expiring — log and stop\nreturn [{ status: 'ok', message: 'No certs expiring within 30 days', checked_at: new Date().toISOString() }];"
+      },
+      "id": "all-ok",
+      "name": "All certs OK",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Fingerprint the PKI cert rotation for the immutable ledger (OPANCHOR).\nconst crypto = require('crypto');\nlet restart = {};\ntry { restart = $json || {}; } catch (e) { restart = {}; }\nlet certs = {};\ntry { certs = $('Map Certs → Services').item.json || {}; } catch (e) { certs = {}; }\nconst payload = { event: 'pki_rotation', certs, restart_result: restart, at: new Date().toISOString() };\nconst payload_hash = crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');\nconst reference_id = String(certs.cert_id || certs.certificate_id || '');\nreturn [{ json: { event_type: 'pki_rotation', reference_table: 'pki_certificates', reference_id, payload, payload_hash } }];"
+      },
+      "id": "build-pki-anchor",
+      "name": "Build Rotation Anchor",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        120
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "edge_blockchain_audit",
+        "rpcParams": "={{ JSON.stringify({ p_action: 'insert_record', p_payload: { event_type: $json.event_type, reference_table: $json.reference_table, reference_id: $json.reference_id, payload: $json.payload, payload_hash: $json.payload_hash } }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "anchor-pki-rotation",
+      "name": "Anchor Rotation",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        120
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Daily 06:00": {
+      "main": [
+        [
+          {
+            "node": "Check Certs Expiring ≤30d",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Certs Expiring ≤30d": {
+      "main": [
+        [
+          {
+            "node": "Any expiring?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any expiring?": {
+      "main": [
+        [
+          {
+            "node": "Map Certs → Services",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "All certs OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Map Certs → Services": {
+      "main": [
+        [
+          {
+            "node": "Renew via OpenXPKI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Renew via OpenXPKI": {
+      "main": [
+        [
+          {
+            "node": "Build File Paths",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build File Paths": {
+      "main": [
+        [
+          {
+            "node": "Fetch New PEM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch New PEM": {
+      "main": [
+        [
+          {
+            "node": "Write PEM to Volume",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write PEM to Volume": {
+      "main": [
+        [
+          {
+            "node": "Build Restart Cmds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Restart Cmds": {
+      "main": [
+        [
+          {
+            "node": "Rolling docker restart",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rolling docker restart": {
+      "main": [
+        [
+          {
+            "node": "Summarize",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Rotation Anchor",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize": {
+      "main": [
+        [
+          {
+            "node": "Notify AISHA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Rotation Anchor": {
+      "main": [
+        [
+          {
+            "node": "Anchor Rotation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "description": "Automated PKI certificate rotation. Checks OpenXPKI daily for certs expiring within 30 days, renews them, writes new PEM files to mounted volumes, then does rolling docker restart (one service at a time). Requires n8n to have /var/run/docker.sock mounted.",
+    "tags": [
+      "pki",
+      "security",
+      "automation",
+      "certificate-rotation"
+    ]
+  }
+}

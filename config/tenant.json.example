@@ -1,0 +1,9 @@
+{
+  "$note": "TEMPLATE. Copy to config/tenant.json (gitignored) on operator / CI hosts that hold the real tenant roster. It carries the EXACT tenant identifiers (names, sub-domains, external project domains) that the leak-detection gates use for belt-and-suspenders exact-name scanning of shipped public artifacts. It must NEVER be committed to the public repo — a committed denylist of real customers would itself disclose exactly who the tenants are. In the public repo and in forks this file is absent, and the gates fall back to STRUCTURAL detection (Keycloak client allowlist, seed compile-profile, email/domain shape) which needs no tenant names. See src/tests/gates/lib/tenant-leak-detect.ts. Values below are fictional placeholders.",
+  "sentinels": [
+    "acme-corp",
+    "globex",
+    "example-tenant",
+    "acme.example.com"
+  ]
+}

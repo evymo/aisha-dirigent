@@ -1,0 +1,19 @@
+{
+  "name": "aisha-delegation",
+  "description": "AISHA tiered delegation kit — work-package contracts (zadání), tier policy (Fable/Opus = A, Sonnet = B, Haiku = C), advisory hooks for tier escalation + scope + contract changes, and /delegate, /zadani-new, /zadani-verify commands.",
+  "version": "0.1.0",
+  "author": {
+    "name": "evymo",
+    "url": "https://github.com/evymo"
+  },
+  "homepage": "https://github.com/evymo/aisha-dirigent",
+  "repository": "https://github.com/evymo/aisha-dirigent",
+  "license": "Elastic-2.0",
+  "keywords": [
+    "aisha",
+    "delegation",
+    "tiering",
+    "work-package",
+    "governance"
+  ]
+}

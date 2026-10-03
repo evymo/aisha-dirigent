@@ -1,0 +1,160 @@
+{
+  "name": "WF_DIRIGENT_CLI_SPAWNER",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "dirigent/cli_spawner",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "spawn-trigger",
+      "name": "Spawn Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build the svc-agent-runner POST /runs body for a Claude CLI task.\n// All values come from the trigger payload / env — no hardcoded image/URL.\nconst input = $input.first().json;\nconst body = input.body || input;\nconst storyId = body.story_id || null;\nconst prompt = String(body.prompt || '').trim();\nif (!prompt) throw new Error('cli_spawner: payload.prompt is required');\nconst branch = body.branch || (storyId ? `aisha/story-${storyId}` : `aisha/cli-run-${Date.now()}`);\n// Image is intentionally omitted — the runner defaults it from AGENT_CLAUDE_IMAGE\n// (config.agentClaudeImage), keeping the workflow image-agnostic.\nconst runRequest = {\n  kind: 'claude_cli_task',\n  source: 'dirigent:cli_spawner',\n  source_ref: branch,\n  payload: {\n    story_id: storyId,\n    prompt,\n    base_ref: body.base_ref || 'HEAD',\n    branch,\n    auth_mode: body.auth_mode || 'auto',\n    context_profile: body.context_profile || 'default'\n  }\n};\nif (body.image) runRequest.image = body.image;\nreturn [{ json: { runRequest } }];"
+      },
+      "id": "build-request",
+      "name": "Build Run Request",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.AGENT_RUNNER_URL || '').replace(/\\/$/, '') }}/runs",
+        "sendHeaders": false,
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.runRequest) }}",
+        "options": {
+          "timeout": 3600000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "post-runner",
+      "name": "POST Agent Runner",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "write_audit_journal",
+        "rpcParams": "={{ JSON.stringify({ p_action: 'agent_run.cli_spawned', p_metadata: { run_id: $json.run_id || null, status: $json.status || null, source: 'dirigent:cli_spawner' } }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 5000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "audit-log",
+      "name": "Audit Log",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        900,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ run_id: $json.run_id || null, status: $json.status || 'submitted' }) }}",
+        "options": {}
+      },
+      "id": "respond",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        1120,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Spawn Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Run Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Run Request": {
+      "main": [
+        [
+          {
+            "node": "POST Agent Runner",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST Agent Runner": {
+      "main": [
+        [
+          {
+            "node": "Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit Log": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

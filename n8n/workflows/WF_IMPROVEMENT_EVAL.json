@@ -1,0 +1,387 @@
+{
+  "name": "WF_IMPROVEMENT_EVAL",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "improvement-eval",
+        "options": {
+          "responseMode": "lastNode"
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "ie-trigger",
+      "name": "Eval Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        280,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 24,
+        "unit": "hours"
+      },
+      "id": "ie-wait",
+      "name": "Wait 24h",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        500,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/fn_get_agent_performance_snapshot",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_agent_slug",
+              "value": "={{ $json.body.agent_slug }}"
+            },
+            {
+              "name": "p_hours_window",
+              "value": "24"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "ie-collect-metrics",
+      "name": "Collect Post-Change Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compare pre-change baseline vs post-change metrics.\n// Decide if the change is kept, rolled back, or cannot be judged yet.\n//\n// null = NOT MEASURED, never zero (ONE_WORLD_MODEL Z3). fn_get_agent_performance_snapshot\n// returns avg_overall = null when no evaluation of this agent finished in the window.\n// Before 2026-09-28 this node read `avg_overall || 0`, so an unmeasured window looked\n// like \"quality dropped to 0\" → regression → rollback of a good change (K-01).\n// Now: no measurement on either side → verdict 'inconclusive' → neither rollback\n// nor a \"maintained\" success memory; the outcome is logged as inconclusive.\n\nconst proposal = $('Eval Trigger').first().json.body;\nconst postMetrics = $json;\n\nconst num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : (v === null || v === undefined || v === '' ? null : (Number.isFinite(Number(v)) ? Number(v) : null)));\n\n// Pre-change baseline from proposal metadata\nconst baseline = proposal.baseline_metrics || {};\nconst baselineScore = num(baseline.avg_overall);\nconst postScore = num(postMetrics?.avg_overall);\nconst baselineErrorRate = num(baseline.error_rate);\nconst postErrorRate = num(postMetrics?.error_rate);\n\nconst regressionThreshold = -0.05; // 5% regression triggers rollback\n\nconst scoreMeasured = baselineScore !== null && postScore !== null;\nconst scoreDelta = scoreMeasured ? postScore - baselineScore : null;\nconst isRegression = scoreMeasured && baselineScore > 0 && scoreDelta < regressionThreshold;\n\nconst errorMeasured = baselineErrorRate !== null && postErrorRate !== null;\nconst errorSpike = errorMeasured && postErrorRate > baselineErrorRate * 1.5 && postErrorRate > 0.05;\n\nconst shouldRollback = isRegression || errorSpike;\nconst verdict = shouldRollback ? 'regression' : ((scoreMeasured || errorMeasured) ? 'maintained' : 'inconclusive');\n\nreturn [{\n  json: {\n    proposal_id: proposal.proposal_id,\n    agent_slug: proposal.agent_slug,\n    pre_version: proposal.config_version_before,\n    post_version: proposal.config_version_after,\n    baseline_score: baselineScore,\n    post_score: postScore,\n    score_delta: scoreDelta === null ? null : Math.round(scoreDelta * 10000) / 10000,\n    error_spike: errorSpike,\n    should_rollback: shouldRollback,\n    verdict,\n    reason: verdict === 'regression'\n      ? (isRegression ? `Score regression: ${scoreDelta.toFixed(4)}` : `Error rate spike: ${baselineErrorRate} → ${postErrorRate}`)\n      : verdict === 'maintained'\n        ? 'Change maintained — no regression detected'\n        : 'Inconclusive — no quality or error-rate measurement on both sides of the change'\n  }\n}];"
+      },
+      "id": "ie-evaluate",
+      "name": "Evaluate Change Impact",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        940,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true
+          },
+          "conditions": [
+            {
+              "id": "condition-rollback",
+              "leftValue": "={{ $json.should_rollback }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "ie-decision",
+      "name": "Regression?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/fn_rollback_agent_model",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_agent_slug",
+              "value": "={{ $('Evaluate Change Impact').first().json.agent_slug }}"
+            },
+            {
+              "name": "p_proposal_id",
+              "value": "={{ $('Evaluate Change Impact').first().json.proposal_id }}"
+            },
+            {
+              "name": "p_reason",
+              "value": "={{ $('Evaluate Change Impact').first().json.reason }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "ie-rollback",
+      "name": "Rollback Config",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1380,
+        200
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true
+          },
+          "conditions": [
+            {
+              "id": "condition-measured",
+              "leftValue": "={{ $json.verdict }}",
+              "rightValue": "maintained",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      },
+      "id": "ie-measured",
+      "name": "Measured Maintained?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1380,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/rest/v1/rpc/fn_store_agent_memory",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "p_agent_slug",
+              "value": "dirigent"
+            },
+            {
+              "name": "p_content",
+              "value": "=Improvement {{ $('Evaluate Change Impact').first().json.proposal_id }} maintained. Score delta: {{ $('Evaluate Change Impact').first().json.score_delta }}. No regression detected after 24h observation."
+            },
+            {
+              "name": "p_importance",
+              "value": "6"
+            },
+            {
+              "name": "p_memory_type",
+              "value": "fact"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 10000
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "ie-record-success",
+      "name": "Record Success Memory",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1600,
+        420
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Final summary for logging.\nconst eval_result = $('Evaluate Change Impact').first().json;\nconst outcomeByVerdict = { regression: 'rolled_back', maintained: 'maintained', inconclusive: 'inconclusive' };\n\nreturn [{\n  json: {\n    workflow: 'WF_IMPROVEMENT_EVAL',\n    proposal_id: eval_result.proposal_id,\n    outcome: outcomeByVerdict[eval_result.verdict] ?? 'inconclusive',\n    score_delta: eval_result.score_delta,\n    reason: eval_result.reason,\n    completed_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "ie-log",
+      "name": "Log Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1820,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Eval Trigger": {
+      "main": [
+        [
+          {
+            "node": "Wait 24h",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 24h": {
+      "main": [
+        [
+          {
+            "node": "Collect Post-Change Metrics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Post-Change Metrics": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Change Impact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Change Impact": {
+      "main": [
+        [
+          {
+            "node": "Regression?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Regression?": {
+      "main": [
+        [
+          {
+            "node": "Rollback Config",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Measured Maintained?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rollback Config": {
+      "main": [
+        [
+          {
+            "node": "Log Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Success Memory": {
+      "main": [
+        [
+          {
+            "node": "Log Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Measured Maintained?": {
+      "main": [
+        [
+          {
+            "node": "Record Success Memory",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Log Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

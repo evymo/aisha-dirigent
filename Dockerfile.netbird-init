@@ -1,0 +1,7 @@
+# Dockerfile.netbird-init — Init container for NetBird management.json
+# Bakes management.json template + envsubst from repo into image.
+# Avoids Coolify bind-mount trap (file bind on remote may resolve to dir).
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/alpine:3.20
+RUN apk add --no-cache gettext
+COPY coolify/netbird-management.json.template /staging/management.json.template

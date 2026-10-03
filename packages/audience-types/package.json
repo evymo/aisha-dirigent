@@ -1,0 +1,52 @@
+{
+  "name": "@aisha/audience-types",
+  "version": "0.4.0",
+  "license": "Elastic-2.0",
+  "description": "Universal audience module — TypeScript domain types, IDataSource contract, tier derivation, scope rules. Shared between svc-source-broker, future broker services, and Appsmith bindings.",
+  "private": false,
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./member-tier": {
+      "types": "./dist/member-tier.d.ts",
+      "default": "./dist/member-tier.js"
+    },
+    "./aggregation": {
+      "types": "./dist/aggregation.d.ts",
+      "default": "./dist/aggregation.js"
+    },
+    "./IDataSource": {
+      "types": "./dist/IDataSource.d.ts",
+      "default": "./dist/IDataSource.js"
+    },
+    "./entities": {
+      "types": "./dist/audience-entities.d.ts",
+      "default": "./dist/audience-entities.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.4"
+  }
+}

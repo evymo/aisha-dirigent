@@ -1,0 +1,286 @@
+{
+  "name": "WF_RAGNAROK_AGENT",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "httpMethod": "POST",
+        "path": "ragnarok-agent",
+        "options": {},
+        "responseMode": "lastNode"
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "webhook-trigger",
+      "name": "Ragnarok Agent Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare input for Ragnarok RAG Agent from webhook body\nconst body = $input.item.json.body || {};\nconst query = body.query || body.message || body.text || '';\nconst kbIds = body.kb_ids || [];\nconst projectId = body.project_id || 'aisha';\nconst lang = body.lang || 'cs-CZ';\n\nif (!query) {\n  return { json: { error: 'Missing query parameter in request body' } };\n}\n\nreturn {\n  json: {\n    chatInput: query,\n    session_id: body.session_id || 'ragnarok-' + Date.now(),\n    kb_ids: kbIds,\n    project_id: projectId,\n    lang: lang,\n    metadata: {\n      source: 'webhook',\n      agent: 'ragnarok',\n      timestamp: new Date().toISOString(),\n      user_id: body.user_id || null,\n    }\n  }\n};"
+      },
+      "id": "prepare-input",
+      "name": "Prepare Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=Jsi **AISHA Ragnarok Agent** — specializovaný RAG agent pro vyhledávání v dokumentové znalostní bázi.\n\n## Role\nZpracováváš dotazy nad nahranými dokumenty (PDF, DOCX, TXT) pomocí Ragnarok RAG enginu s Elasticsearch hybrid search (BM25 + KNN vektory + reranking).\n\n## Operační protokol\n\n### Při document search:\n1. Analyzuj dotaz a vyber vhodnou strategii:\n   - Pro dotazy na konkrétní dokumenty → `search_ragnarok` s kb_ids filtrem\n   - Pro obecné dotazy → `search_ragnarok` bez filtrů (prohledá celou KB)\n   - Pro konceptuální/rule dotazy → `search_knowledge_v2` (pgvector)\n2. Vždy cituj zdroj dokumentu a relevantní chunk\n3. Pokud Ragnarok nenajde výsledky, zkus search_knowledge_v2 jako fallback\n\n### Dual KB strategie:\n- **search_ragnarok**: Elasticsearch, vhodné pro nahrané dokumenty, PDF/DOCX chunky\n- **search_knowledge_v2**: pgvector, vhodné pro pravidla, expert rules, knowledge items\n\n### SIGNÁLNÍ PROTOKOL — Formát odpovědi\n\nVŽDY vrať strukturovanou odpověď:\n```json\n{\n  \"signal\": \"ragnarok_result\",\n  \"action\": \"document_search\",\n  \"sources\": [\n    { \"kb_id\": \"...\", \"chunk\": \"...\", \"relevance\": 0.95 }\n  ],\n  \"answer\": \"Odpověď na základě nalezených dokumentů\",\n  \"fallback_used\": false,\n  \"summary\": \"Stručné shrnutí\"\n}\n```\n\n## Pravidla\n- VŽDY vyhledej v KB PŘED odpovědí — nikdy nehádej\n- Cituj zdroje s KB ID a relevantním textem\n- Pokud nic nenajdeš → řekni to upřímně\n- NIKDY nevracej sensitive data\n- Odpovídej v jazyce dotazu (čeština / angličtina)",
+          "maxIterations": 6
+        }
+      },
+      "id": "ai-agent",
+      "name": "Ragnarok RAG Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "routingStrategy": "auto",
+        "modelOverride": "",
+        "options": {
+          "temperature": 0.3,
+          "maxOutputTokens": 4096,
+          "topP": 0.9,
+          "maxRetries": 2
+        }
+      },
+      "id": "llm-router",
+      "name": "LLM Router",
+      "type": "n8n-nodes-aisha.aishaLlmRouter",
+      "typeVersion": 1,
+      "position": [
+        480,
+        500
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "__REMAP__",
+          "name": "OpenAi account"
+        },
+        "googlePalmApi": {
+          "id": "__REMAP__",
+          "name": "Google Gemini(PaLM) Api account"
+        },
+        "anthropicApi": {
+          "id": "__REMAP__",
+          "name": "Anthropic account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $json.body?.session_id || $json.headers?.['x-session-id'] || 'default' }}",
+        "contextWindowLength": 10,
+        "inputKey": "chatInput"
+      },
+      "id": "memory",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        660,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "name": "search_ragnarok",
+        "description": "Search the Ragnarok RAG knowledge base using hybrid retrieval (BM25 + KNN vector search + optional reranking). Useful for document-level retrieval from uploaded PDFs, DOCX, and other files.\n\nInput: JSON object. Parameters:\n  - query (required): string — Natural language search query.\n  - project_id (optional): string — Ragnarok project ID. Default: 'aisha'.\n  - kb_ids (optional): array — Filter to specific knowledge base IDs.\n  - lang (optional): string — Query language (e.g., 'cs-CZ', 'en-US'). Default: 'cs-CZ'.\n  - return_matched_chunks (optional): boolean — Include matched text chunks. Default: true.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: search_ragnarok\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'search_ragnarok', arguments: args }\n  });\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error: ' + (e.message || String(e));\n}\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-search_ragnarok",
+      "name": "MCP: search_ragnarok",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        860,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "name": "search_knowledge_v2",
+        "description": "Semantic search across the AISHA knowledge graph using vector embeddings (pgvector). Fallback for when Ragnarok doesn't have relevant documents. Searches expert rules, engineering docs, playbooks.\n\nInput: JSON object. Parameters:\n  - query (required): string — Natural language search query.\n  - item_types (optional): array — Filter by type: expert_rule, engineering_doc, domain_doc, playbook, case_study.\n  - category (optional): string — Filter by category.\n  - limit (optional): number — Max results (1-50). Default: 20.",
+        "language": "javaScript",
+        "jsCode": "// MCP Tool: search_knowledge_v2\nconst query = $input.item.json.query || $input.item.json || '';\nlet args;\ntry {\n  args = typeof query === 'string' ? JSON.parse(query) : query;\n} catch {\n  args = typeof query === 'string' && query.length > 0 ? { query } : {};\n}\n\nconst mcpUrl = ($env?.AISHA_POSTGREST_URL || '') + '/functions/v1/mcp-knowledge-server';\nconst token = $env?.AISHA_ACCESS_TOKEN || $env?.AISHA_KEYCLOAK_ACCESS_TOKEN || '';\n\nconst rpcBody = JSON.stringify({\n    jsonrpc: '2.0',\n    id: Date.now(),\n    method: 'tools/call',\n    params: { name: 'search_knowledge_v2', arguments: args }\n  });\n\nlet data;\ntry {\n  if (typeof fetch === 'function') {\n    const res = await fetch(mcpUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },\n      body: rpcBody\n    });\n    data = await res.json();\n  } else {\n    const https = require('https');\n    const url = new URL(mcpUrl);\n    data = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'Authorization': 'Bearer ' + token,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON response: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return 'MCP Tool Error: ' + (e.message || String(e));\n}\nif (data.error) return 'MCP Error: ' + (data.error.message || JSON.stringify(data.error));\nif (data.result?.content) {\n  return data.result.content.map(c => c.type === 'text' ? c.text : JSON.stringify(c)).join('\\n');\n}\nreturn JSON.stringify(data.result || data);"
+      },
+      "id": "tool-search_knowledge_v2",
+      "name": "MCP: search_knowledge_v2",
+      "type": "@n8n/n8n-nodes-langchain.toolCode",
+      "typeVersion": 1.2,
+      "position": [
+        860,
+        600
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Format the agent response for API consumers\nconst agentOutput = $input.item.json;\n\nreturn {\n  json: {\n    success: true,\n    response: agentOutput.output || agentOutput.text || agentOutput,\n    agent: 'ragnarok',\n    timestamp: new Date().toISOString()\n  }\n};"
+      },
+      "id": "format-output",
+      "name": "Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL }}/functions/v1/n8n-trigger",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"type\": \"ai_trace\",\n  \"payload\": {\n    \"event_type\": \"ragnarok_agent_run\",\n    \"agent\": \"ragnarok\",\n    \"query\": \"{{ $('Prepare Input').item.json.chatInput }}\",\n    \"response_preview\": \"{{ JSON.stringify($json.response).substring(0, 500) }}\",\n    \"session_id\": \"{{ $('Prepare Input').item.json.session_id }}\",\n    \"timestamp\": \"{{ $json.timestamp }}\"\n  }\n}",
+        "options": {
+          "timeout": 5000,
+          "ignore": true
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth"
+      },
+      "id": "log-trace",
+      "name": "Log Trace",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1080,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Ragnarok Agent Webhook": {
+      "main": [
+        [
+          {
+            "node": "Prepare Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Input": {
+      "main": [
+        [
+          {
+            "node": "Ragnarok RAG Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ragnarok RAG Agent": {
+      "main": [
+        [
+          {
+            "node": "Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "Ragnarok RAG Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: search_ragnarok": {
+      "ai_tool": [
+        [
+          {
+            "node": "Ragnarok RAG Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MCP: search_knowledge_v2": {
+      "ai_tool": [
+        [
+          {
+            "node": "Ragnarok RAG Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Response": {
+      "main": [
+        [
+          {
+            "node": "Log Trace",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM Router": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Ragnarok RAG Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

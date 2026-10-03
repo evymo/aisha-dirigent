@@ -1,0 +1,1129 @@
+{
+  "web": {
+    "about": {
+      "title": "",
+      "intro": "",
+      "story": "",
+      "structure": "",
+      "values": {
+        "title": ""
+      },
+      "value1": {
+        "title": "",
+        "desc": ""
+      },
+      "value2": {
+        "title": "",
+        "desc": ""
+      },
+      "value3": {
+        "title": "",
+        "desc": ""
+      }
+    },
+    "cfg": {
+      "badge": "",
+      "title": "",
+      "subtitle": "",
+      "uc": {
+        "custom": {
+          "desc": "",
+          "name": ""
+        },
+        "client-app": {
+          "name": "",
+          "desc": "",
+          "old": "",
+          "new": ""
+        },
+        "construction": {
+          "name": "",
+          "desc": "",
+          "old": "",
+          "new": ""
+        },
+        "manufacturing": {
+          "name": "",
+          "desc": "",
+          "old": "",
+          "new": ""
+        },
+        "analysis": {
+          "name": "",
+          "desc": "",
+          "old": "",
+          "new": ""
+        }
+      },
+      "custom": {
+        "hasTeam": "",
+        "noTeam": "",
+        "teamSize": "",
+        "hourlyRate": "",
+        "projectMonths": "",
+        "months": "",
+        "people": "",
+        "perHour": "",
+        "traditional": "",
+        "withEvymo": "",
+        "roleCount": "",
+        "roles": "",
+        "roleHint": "",
+        "tierLabel": "",
+        "tierStandard": "",
+        "tierPremium": "",
+        "volumeDiscount": "",
+        "onTokens": ""
+      },
+      "old": {
+        "label": ""
+      },
+      "new": {
+        "label": ""
+      },
+      "agents": {
+        "label": "",
+        "suffix": ""
+      },
+      "conductor": {
+        "label": "",
+        "onetime": "",
+        "rate": "",
+        "days": "",
+        "breakdown": ""
+      },
+      "included": {
+        "title": "",
+        "monitoring": "",
+        "escalation": "",
+        "updates": "",
+        "kb": ""
+      },
+      "scale": {
+        "title": "",
+        "desc": "",
+        "conservative": "",
+        "middle": "",
+        "creative": "",
+        "capacity": "",
+        "insight": {
+          "cons": {
+            "title": "",
+            "desc": ""
+          },
+          "mid": {
+            "title": "",
+            "desc": ""
+          },
+          "crea": {
+            "title": "",
+            "desc": ""
+          }
+        },
+        "training": ""
+      },
+      "result": {
+        "traditionalTitle": "",
+        "traditionalDesc": "",
+        "withEvymoTitle": "",
+        "withEvymoDesc": "",
+        "principle": "",
+        "saving": "",
+        "onetime": "",
+        "onboarding": ""
+      },
+      "ops": {
+        "title": "",
+        "operation": "",
+        "from": "",
+        "month": "",
+        "inc": {
+          "monitoring": "",
+          "escalation": "",
+          "updates": ""
+        }
+      },
+      "premium": {
+        "title": "",
+        "desc": ""
+      },
+      "tagline": "",
+      "disclaimer": "",
+      "guild": {
+        "title": "",
+        "subtitle": "",
+        "projectSplit": "",
+        "maintenanceSplit": "",
+        "specialist": "",
+        "knowledge": "",
+        "platform": "",
+        "blockRate": "",
+        "cta": "",
+        "ctaHint": ""
+      }
+    },
+    "configurator": {
+      "title": "",
+      "result": {
+        "daily": {
+          "ai": ""
+        }
+      },
+      "agents": {
+        "suffix": ""
+      }
+    },
+    "contact": {
+      "name": {
+        "label": "Name",
+        "placeholder": "Ihr Name"
+      },
+      "email": {
+        "label": "E-Mail",
+        "placeholder": "you@example.com"
+      },
+      "contact": {
+        "label": "E-Mail oder Telefon",
+        "placeholder": "E-Mail-Adresse oder Telefonnummer"
+      },
+      "type": {
+        "label": "Grund für die Kontaktaufnahme",
+        "collaboration": "Zusammenarbeit",
+        "partnership": "Partnerschaft",
+        "general": "Allgemeine Anfrage",
+        "urgent": "Dringende Angelegenheit"
+      },
+      "message": {
+        "label": "Nachricht",
+        "placeholder": "Sagen Sie uns, wie wir Ihnen helfen können"
+      },
+      "success": "Vielen Dank – wir melden uns in Kürze bei Ihnen.",
+      "error": {
+        "name": "Bitte geben Sie Ihren Namen ein.",
+        "email": "Bitte geben Sie eine gültige E-Mail-Adresse ein.",
+        "message": "Bitte geben Sie eine Nachricht ein.",
+        "contact": "Bitte geben Sie eine E-Mail-Adresse oder eine Telefonnummer ein."
+      }
+    },
+    "cta": {
+      "title": "Kontaktieren Sie uns",
+      "subtitle": "Lassen Sie uns ins Gespräch kommen",
+      "button": "Nachricht senden"
+    },
+    "faq": {
+      "title": "",
+      "subtitle": ""
+    },
+    "features": {
+      "title": ""
+    },
+    "footer": {
+      "company": "",
+      "part_of": "",
+      "rights": "",
+      "ico": "",
+      "dic": "",
+      "court": "",
+      "vat": "",
+      "bank": ""
+    },
+    "guild": {
+      "badge": "",
+      "title": "",
+      "subtitle": "",
+      "from": "",
+      "perBlock": "",
+      "optionalLayer": "",
+      "cta": "",
+      "feat": {
+        "browse": {
+          "title": "",
+          "desc": ""
+        },
+        "rated": {
+          "title": "",
+          "desc": ""
+        },
+        "instant": {
+          "title": "",
+          "desc": ""
+        },
+        "block": {
+          "title": "",
+          "desc": ""
+        }
+      }
+    },
+    "hero": {
+      "badge": "",
+      "title": "",
+      "subtitle": "",
+      "description": "",
+      "cta": {
+        "contact": "",
+        "more": ""
+      }
+    },
+    "hiring": {
+      "badge": "",
+      "title": "",
+      "subtitle": "",
+      "role": {
+        "fullstack": {
+          "title": "",
+          "desc": ""
+        },
+        "conductor": {
+          "title": "",
+          "desc": ""
+        },
+        "expert": {
+          "title": "",
+          "desc": ""
+        }
+      },
+      "perk": {
+        "remote": "",
+        "flexible": "",
+        "internet": ""
+      },
+      "cta": ""
+    },
+    "how": {
+      "title": "",
+      "step1": {
+        "title": "",
+        "desc": ""
+      },
+      "step2": {
+        "title": "",
+        "desc": ""
+      },
+      "step3": {
+        "title": "",
+        "desc": ""
+      },
+      "step4": {
+        "title": "",
+        "desc": ""
+      }
+    },
+    "maintenance": {
+      "title": "",
+      "subtitle": "",
+      "self": {
+        "title": "",
+        "desc": "",
+        "price": ""
+      },
+      "flat": {
+        "title": "",
+        "desc": "",
+        "price": ""
+      },
+      "managed": {
+        "title": "",
+        "desc": "",
+        "price": ""
+      },
+      "hosting": {
+        "title": "",
+        "subtitle": "",
+        "own": {
+          "desc": ""
+        },
+        "cloud": {
+          "desc": ""
+        },
+        "aisha": {
+          "desc": ""
+        },
+        "vps": {
+          "desc": ""
+        }
+      }
+    },
+    "manifesto": {
+      "hook": {
+        "line1": "",
+        "line2": "",
+        "punchline": ""
+      },
+      "transform": {
+        "title": "",
+        "p1": "",
+        "p2": "",
+        "p3": "",
+        "philosophy": "",
+        "signature": ""
+      }
+    },
+    "nav": {
+      "home": "",
+      "solution": "",
+      "guild": "",
+      "references": "",
+      "about": "",
+      "partners": "",
+      "partnerProgram": "",
+      "careers": "",
+      "contact": "",
+      "findExpert": ""
+    },
+    "news": {
+      "title": "",
+      "subtitle": ""
+    },
+    "notfound": {
+      "text": "",
+      "back": ""
+    },
+    "partners": {
+      "title": "",
+      "subtitle": "",
+      "model": {
+        "title": "",
+        "desc": "",
+        "benefit1": "",
+        "benefit2": "",
+        "benefit3": "",
+        "benefit4": ""
+      },
+      "onboarding": {
+        "title": "",
+        "step1": {
+          "title": "",
+          "desc": ""
+        },
+        "step2": {
+          "title": "",
+          "desc": ""
+        },
+        "step3": {
+          "title": "",
+          "desc": ""
+        },
+        "step4": {
+          "title": "",
+          "desc": ""
+        }
+      },
+      "faq": {
+        "title": "",
+        "q1": "",
+        "a1": "",
+        "q2": "",
+        "a2": "",
+        "q3": "",
+        "a3": "",
+        "q4": "",
+        "a4": "",
+        "q5": "",
+        "a5": "",
+        "q6": "",
+        "a6": "",
+        "q7": "",
+        "a7": "",
+        "q8": "",
+        "a8": ""
+      },
+      "cta": {
+        "text": "",
+        "title": "",
+        "subtitle": "",
+        "button": ""
+      }
+    },
+    "pillars": {
+      "1": {
+        "title": "",
+        "desc": ""
+      },
+      "2": {
+        "title": "",
+        "desc": ""
+      },
+      "3": {
+        "title": "",
+        "desc": ""
+      },
+      "title": ""
+    },
+    "protocol": {
+      "title": "",
+      "subtitle": "",
+      "feature1": {
+        "title": "",
+        "desc": ""
+      },
+      "feature2": {
+        "title": "",
+        "desc": ""
+      },
+      "feature3": {
+        "title": "",
+        "desc": ""
+      }
+    },
+    "ref": {
+      "1": {
+        "title": "",
+        "industry": "",
+        "desc": "",
+        "impact": "",
+        "tags": ""
+      },
+      "2": {
+        "title": "",
+        "industry": "",
+        "desc": "",
+        "impact": "",
+        "tags": ""
+      },
+      "3": {
+        "title": "",
+        "industry": "",
+        "desc": "",
+        "impact": "",
+        "tags": ""
+      },
+      "4": {
+        "title": "",
+        "industry": "",
+        "desc": "",
+        "impact": "",
+        "tags": ""
+      },
+      "5": {
+        "title": "",
+        "industry": "",
+        "desc": "",
+        "impact": "",
+        "tags": ""
+      },
+      "6": {
+        "title": "",
+        "industry": "",
+        "desc": "",
+        "impact": "",
+        "tags": ""
+      }
+    },
+    "references": {
+      "title": "",
+      "subtitle": "",
+      "different": {
+        "badge": "",
+        "title": "",
+        "subtitle": "",
+        "point1": "",
+        "point2": "",
+        "point3": "",
+        "point4": ""
+      }
+    },
+    "research": {
+      "subtitle": "",
+      "timeline": {
+        "title": ""
+      },
+      "year": {
+        "2020": "",
+        "2024": "",
+        "2026": ""
+      }
+    },
+    "rules": {
+      "title": "",
+      "subtitle": "",
+      "center": "",
+      "actor": {
+        "client": {
+          "desc": ""
+        },
+        "analyst": {
+          "desc": ""
+        },
+        "agents": {
+          "desc": ""
+        }
+      },
+      "rule": {
+        "arch": "",
+        "code": "",
+        "test": "",
+        "deploy": ""
+      }
+    },
+    "solution": {
+      "hero": {
+        "badge": "",
+        "title": "",
+        "subtitle": "",
+        "manifesto": ""
+      },
+      "roles": {
+        "title": "",
+        "subtitle": "",
+        "humanBadge": "",
+        "orchestrates": "",
+        "agentBadge": ""
+      },
+      "role": {
+        "analyst": {
+          "title": "",
+          "subtitle": "",
+          "desc": "",
+          "cost": ""
+        },
+        "frontend": {
+          "title": "",
+          "subtitle": "",
+          "desc": ""
+        },
+        "backend": {
+          "title": "",
+          "subtitle": "",
+          "desc": ""
+        },
+        "qa": {
+          "title": "",
+          "subtitle": "",
+          "desc": ""
+        },
+        "devops": {
+          "title": "",
+          "subtitle": "",
+          "desc": ""
+        },
+        "ai": {
+          "cost": ""
+        }
+      },
+      "selfcorrect": {
+        "title": "",
+        "subtitle": "",
+        "step1": "",
+        "step2": "",
+        "step3": "",
+        "step4": "",
+        "loop": ""
+      },
+      "kb": {
+        "label": "",
+        "title": "",
+        "subtitle": "",
+        "contribute": {
+          "title": "",
+          "desc": "",
+          "dirigent": "",
+          "consultant": "",
+          "client": ""
+        },
+        "core": {
+          "title": "",
+          "desc": "",
+          "rules": "",
+          "patterns": "",
+          "domain": "",
+          "feedback": ""
+        },
+        "benefit": {
+          "title": "",
+          "desc": "",
+          "agents": "",
+          "experts": "",
+          "clients": ""
+        },
+        "callout": ""
+      },
+      "cost": {
+        "title": "",
+        "subtitle": "",
+        "traditional": {
+          "title": "",
+          "pm": {
+            "label": "",
+            "cost": ""
+          },
+          "fe": {
+            "label": "",
+            "cost": ""
+          },
+          "be": {
+            "label": "",
+            "cost": ""
+          },
+          "qa": {
+            "label": "",
+            "cost": ""
+          },
+          "devops": {
+            "label": "",
+            "cost": ""
+          },
+          "total": ""
+        },
+        "agentic": {
+          "title": "",
+          "analyst": {
+            "label": "",
+            "cost": ""
+          },
+          "agents": {
+            "label": "",
+            "cost": ""
+          },
+          "total": "",
+          "note": ""
+        },
+        "saving": {
+          "badge": "",
+          "desc": ""
+        }
+      },
+      "paradigm": {
+        "title": "",
+        "desc": "",
+        "point1": "",
+        "point2": "",
+        "point3": "",
+        "point4": "",
+        "point5": "",
+        "cta": ""
+      },
+      "workflow": {
+        "title": "",
+        "step1": {
+          "title": "",
+          "desc": ""
+        },
+        "step2": {
+          "title": "",
+          "desc": ""
+        },
+        "step3": {
+          "title": "",
+          "desc": ""
+        },
+        "step4": {
+          "title": "",
+          "desc": ""
+        }
+      }
+    },
+    "story": {
+      "badge": "",
+      "title": "",
+      "subtitle": "",
+      "vision": {
+        "title": "",
+        "text": ""
+      },
+      "timeline": {
+        "title": ""
+      },
+      "milestone": {
+        "2020": {
+          "title": "",
+          "desc": ""
+        },
+        "2023": {
+          "title": "",
+          "desc": ""
+        },
+        "2026": {
+          "title": "",
+          "desc": ""
+        }
+      }
+    },
+    "track": {
+      "title": "",
+      "subtitle": "",
+      "m1": {
+        "year": "",
+        "title": "",
+        "desc": ""
+      },
+      "m2": {
+        "year": "",
+        "title": "",
+        "desc": ""
+      },
+      "m3": {
+        "year": "",
+        "title": "",
+        "desc": ""
+      },
+      "m4": {
+        "year": "",
+        "title": "",
+        "desc": ""
+      },
+      "m5": {
+        "year": "",
+        "title": "",
+        "desc": ""
+      },
+      "m6": {
+        "year": "",
+        "title": "",
+        "desc": ""
+      }
+    },
+    "trends": {
+      "title": "",
+      "subtitle": "",
+      "bottom": "",
+      "case1": {
+        "badge": "",
+        "scope": "",
+        "detail": "",
+        "period": "",
+        "periodLabel": "",
+        "traditional": "",
+        "traditionalLabel": "",
+        "files": "",
+        "filesLabel": "",
+        "loc": "",
+        "locLabel": "",
+        "tests": "",
+        "testsLabel": "",
+        "commits": "",
+        "commitsLabel": "",
+        "acceleration": "",
+        "accelerationLabel": "",
+        "saving": "",
+        "savingLabel": "",
+        "costSaved": "",
+        "costSavedLabel": "",
+        "highlights": ""
+      },
+      "moreComingSoon": ""
+    },
+    "trust": {
+      "title": "",
+      "domain": {
+        "audit": "",
+        "automotive": "",
+        "hosting": "",
+        "biotech": "",
+        "distribution": "",
+        "legal": ""
+      }
+    },
+    "whitepaper": {
+      "badge": "",
+      "subtitle": ""
+    },
+    "default": {
+      "title": "",
+      "description": "",
+      "welcome": {
+        "heading": "",
+        "body": ""
+      },
+      "what": {
+        "heading": "",
+        "body": ""
+      },
+      "cta": {
+        "heading": "",
+        "button": ""
+      }
+    }
+  },
+  "stats": {
+    "1": {
+      "value": "",
+      "label": ""
+    },
+    "2": {
+      "value": "",
+      "label": ""
+    },
+    "3": {
+      "value": "",
+      "label": ""
+    },
+    "4": {
+      "value": "",
+      "label": ""
+    }
+  },
+  "features": {
+    "1": {
+      "title": "",
+      "desc": ""
+    },
+    "2": {
+      "title": "",
+      "desc": ""
+    },
+    "3": {
+      "title": "",
+      "desc": ""
+    }
+  },
+  "pricing": {
+    "title": "",
+    "starter": {
+      "title": "",
+      "price": "",
+      "desc": ""
+    },
+    "pro": {
+      "title": "",
+      "price": "",
+      "desc": ""
+    },
+    "enterprise": {
+      "title": "",
+      "price": "",
+      "desc": ""
+    }
+  },
+  "testimonials": {
+    "1": {
+      "quote": "",
+      "author": ""
+    },
+    "title": ""
+  },
+  "faq": {
+    "1": {
+      "question": "",
+      "answer": ""
+    },
+    "2": {
+      "question": "",
+      "answer": ""
+    },
+    "3": {
+      "question": "",
+      "answer": ""
+    }
+  },
+  "footer": {
+    "copyright": "",
+    "privacy": "",
+    "terms": "",
+    "contact": ""
+  },
+  "cfg": {
+    "adoption": {
+      "title": "",
+      "desc": ""
+    },
+    "workshop": {
+      "title": "",
+      "desc": ""
+    },
+    "adaptation": {
+      "title": "",
+      "desc": ""
+    }
+  },
+  "timeline": {
+    "1": {
+      "year": "",
+      "title": "",
+      "desc": ""
+    },
+    "2": {
+      "year": "",
+      "title": "",
+      "desc": ""
+    },
+    "3": {
+      "year": "",
+      "title": "",
+      "desc": ""
+    },
+    "title": ""
+  },
+  "table": {
+    "title": "",
+    "col": {
+      "a": "",
+      "b": "",
+      "c": ""
+    },
+    "r1": {
+      "a": "",
+      "b": "",
+      "c": ""
+    },
+    "r2": {
+      "a": "",
+      "b": "",
+      "c": ""
+    },
+    "r3": {
+      "a": "",
+      "b": "",
+      "c": ""
+    }
+  },
+  "steps": {
+    "1": {
+      "title": "",
+      "desc": ""
+    },
+    "2": {
+      "title": "",
+      "desc": ""
+    },
+    "3": {
+      "title": "",
+      "desc": ""
+    },
+    "title": ""
+  },
+  "pruvodce": {
+    "aria": {
+      "deck": "AISHA-Leitfaden – Präsentation mit Quiz",
+      "nav": "Navigation im Leitfaden",
+      "prev": "Zurück",
+      "next": "Weiter",
+      "answered": "{{answered}} von {{total}} Fragen beantwortet"
+    },
+    "quiz": {
+      "counter": "Frage {{num}} / {{total}}",
+      "next": "Weiter",
+      "evaluate": "Bewerten"
+    },
+    "s0": {
+      "eyebrow": "Kurzanleitung · 5 Minuten",
+      "heading": "Ist KI das, was man versehentlich bei <br/>Google</br/> eintippt?",
+      "body": "Vielleicht ist AISHA für dich noch etwas zu früh. Aber wenn du neugierig bist, lass uns gemeinsam einen Blick darauf werfen – was KI eigentlich ist, warum sie keine Zauberei ist und warum AISHA dir das Entscheiden erleichtert. Am Ende gibt es einen Test mit fünf Fragen, damit du sehen kannst, wo du stehst.",
+      "cta_go": "Los geht’s",
+      "cta_skip": "Lasst mich durch, ich bin Profi"
+    },
+    "s1": {
+      "eyebrow": "01 · Was KI eigentlich ist",
+      "heading": "KI ist ein <accent>genialer</accent><br/>Esel.",
+      "body": "Es kann über alles Mögliche nachdenken – Wort für Wort errät es, was du als Nächstes sagen würdest. Aber es bleibt völlig <strong>dumm</strong>, bis du ihm sagst, wo es steht, wohin es geht und was es dort liefern soll. Ohne Kontext gibt es nur lautes Geschrei von sich.",
+      "lbl_dumb": "Dummer Esel",
+      "arrow": "+ KONTEXT →",
+      "lbl_genius": "Genie",
+      "caption": "Halluzination = ein Esel, den niemand gefragt hat, wohin er unterwegs ist."
+    },
+    "s2": {
+      "eyebrow": "02 · Es gibt nicht die eine KI",
+      "heading": "Es gibt <accent>Dutzende</accent>.<br/>Jedes hat seine eigenen Stärken.",
+      "body": "OpenAI, Anthropic, Google, Meta, xAI, Mistral... Jeder Anbieter bringt <strong>ganze Modellfamilien</strong> auf den Markt. Einige schreiben brillant, andere programmieren, wieder andere führen Gespräche, und manche erkennen Bilder. Sie unterscheiden sich in Geschwindigkeit, Preis und ihren Anwendungsbereichen.",
+      "tag_universal": "allgemein · Argumentation",
+      "tag_code": "Code · langer Kontext",
+      "tag_fast": "schnell · günstig · Vision",
+      "tag_local": "lokal · kostenlos",
+      "caption": "Du musst sie nicht alle einzeln kennen. AISHA kennt sie.",
+      "line_openai": "GPT-4o · GPT-5 · o3-mini",
+      "line_anthropic": "Opus · Sonnet · Haiku",
+      "line_google": "Gemini 2.5 Flash · Pro",
+      "line_local": "Llama · Qwen · Gemma"
+    },
+    "s3": {
+      "eyebrow": "03 · Gleiche Frage, unterschiedliche Antworten",
+      "heading": "<accent>Der Kontext</accent> ist alles.",
+      "body": "Im richtigen Kontext erhält dieselbe Frage eine ganz andere Antwort. Ohne Ihre Dokumente, Regeln und Ihren Verlauf gibt AISHA nur allgemeine Vermutungen ab. Mit diesen Informationen spricht sie <strong>für Sie</strong>. Das nennt man eine <em>Wissensdatenbank</em> – Ihre private Wissensbasis, auf die AISHA zurückgreift.",
+      "lbl_without": "Ohne Kontext",
+      "answer_without": "„Im Allgemeinen wird empfohlen, …“",
+      "lbl_with": "Mit Ihrer Wissensdatenbank",
+      "answer_with": "„Dein Projekt nutzt X, also mach Y und vermeide Z.“",
+      "caption": "Ihre Dokumente verlassen das Haus nicht. Sie helfen AISHA lediglich dabei, Sie besser zu verstehen."
+    },
+    "s4": {
+      "eyebrow": "04 · Die Arbeit lässt sich aufteilen",
+      "heading": "Nicht für alles braucht man<br/>das <accent>teuerste</accent> Modell.",
+      "body": "Ein teures Modell für alles = eine teure Rechnung. AISHA weiß, wann ein lokales Qwen ausreicht, wann ein kleines Flash genügt und wann Opus oder GPT-5 zum Einsatz kommen müssen. <strong>Die Stapelverarbeitung</strong> bietet bei OpenAI und Anthropic einen Rabatt von 50 % – senden Sie ihr die Anfragen, die nicht sofort beantwortet werden müssen.",
+      "row_greeting": "Gruß",
+      "row_routine": "Routine",
+      "row_analysis": "Analyse",
+      "row_deep": "Konzentriertes Arbeiten",
+      "tier_local": "Lokal",
+      "caption": "Fünf Stufen. AISHA wählt aus. Du zahlst den Mindestbetrag."
+    },
+    "s5": {
+      "eyebrow": "05 · Wofür es gut ist",
+      "heading": "Es geht nicht nur um <accent>Chat</accent>.",
+      "body": "Programmieren ist nur einer von vielen Bereichen. Hier sind ein paar Ideen – such dir etwas aus. AISHA hilft dir dabei, eine Wissensdatenbank und Expertenregeln für jeden dieser Bereiche aufzubauen.",
+      "uc1_name": "Werbetext",
+      "uc1_desc": "Texte im Stil Ihrer Marke – aus dem Studio, dem Blog und dem Online-Shop.",
+      "uc2_name": "Codeüberprüfung",
+      "uc2_desc": "Die Regeln deines Teams, keine allgemeinen Ratschläge aus dem Internet.",
+      "uc3_name": "Kundenservice",
+      "uc3_desc": "Erste Antwortreihe, Weiterleitung an einen menschlichen Spezialisten.",
+      "uc4_name": "Rechtsrecherche",
+      "uc4_desc": "Rechtsprechung, ähnliche Fälle und Klauseln finden.",
+      "uc5_name": "Klinische Forschung",
+      "uc5_desc": "Protokolle, Prüfpfad, datengestützte Empfehlungen.",
+      "uc6_name": "Finanzen und Rechnungswesen",
+      "uc6_desc": "Kategorisierung, Rechnungsprüfung, Exporte.",
+      "uc7_name": "Personalwesen & Einarbeitung",
+      "uc7_desc": "Ein Leitfaden für neue Mitarbeiter: Durchsuchen Sie die Unternehmensrichtlinien.",
+      "uc8_name": "Datenanalyse",
+      "uc8_desc": "Fragen zu CSV-Dateien, Dashboards und Unternehmensdaten."
+    },
+    "s6": {
+      "eyebrow": "Kleiner Test · 5 Fragen",
+      "heading": "Wenn du <accent>80 %</accent> oder mehr erreichst<br/>, ist AISHA genau das Richtige für dich.",
+      "body": "Das ist keine Prüfung. Nur eine kurze Überprüfung, ob wir auf derselben Wellenlänge sind. Wenn es nicht ganz passt, gehen wir den Leitfaden noch einmal durch und machen dann weiter. Das ist keine Schande.",
+      "cta_start": "Test starten"
+    },
+    "q1": {
+      "question": "Was braucht KI am meisten, um eine gute Antwort zu geben?",
+      "a": "Viel Energie",
+      "b": "Kontext – wissen, wer fragt, worum es geht und warum",
+      "c": "Glück",
+      "d": "Das Internet",
+      "hint": "Ohne Kontext ist es einfach nur <strong>Schreien</strong> – siehe das Eselbild."
+    },
+    "q2": {
+      "question": "Warum gibt es so viele verschiedene Modelle (GPT, Claude, Gemini, Qwen…)?",
+      "a": "Wettbewerb – einer von ihnen gewinnt",
+      "b": "Mehr Parameter bedeuten eine bessere Leistung",
+      "c": "Jedes hat andere Stärken, Preise und Geschwindigkeiten – jedes eignet sich für etwas anderes",
+      "d": "Um die Nutzer zu verwirren",
+      "hint": "Flash ist schnell und günstig, Opus ist teuer und clever, Qwen läuft auf deiner GPU für <strong>null</strong>."
+    },
+    "q3": {
+      "question": "Was ist eine „Wissensdatenbank“?",
+      "a": "Eine Art Modell",
+      "b": "Ihre privaten Dokumente, Regeln und Ihr Verlauf, auf die die KI zurückgreift",
+      "c": "Eine Datenbank in der Cloud des Anbieters",
+      "d": "Ein Antwort-Cache",
+      "hint": "Ihr Unternehmen, Ihr Projekt, Ihre E-Mails, Ihre Verträge – alles, was die Antwort für Sie <strong></strong> Sinn ergibt, und nicht für irgendjemanden."
+    },
+    "q4": {
+      "question": "Was versteht man bei OpenAI und Anthropic unter „Batch“-Verarbeitung?",
+      "a": "Massenabfragen mit verzögerter Antwort – mit 50 % Rabatt",
+      "b": "Eine besondere Art von Modell",
+      "c": "Eine regelmäßige Sicherung der Abfragen",
+      "d": "Die tschechische Übersetzung von „Agent“",
+      "hint": "Senden Sie tausend Anfragen und erhalten Sie die Antworten innerhalb von 24 Stunden zum halben Preis. AISHA verschiebt alles, was keine sofortige Antwort erfordert, selbstständig in die Batch-Warteschlange <strong></strong>."
+    },
+    "q5": {
+      "question": "Was passiert normalerweise, wenn der KI kein Kontext zur Verfügung steht?",
+      "a": "Nichts, da steht „Ich weiß es nicht“",
+      "b": "Es fängt an, sich Dinge frei auszudenken – es halluziniert",
+      "c": "Es schaltet sich aus",
+      "d": "Es ruft den Anbieter auf",
+      "hint": "Ein Modell kennt die Grenzen seines eigenen Wissens nicht. Es stellt Vermutungen an. Deshalb sind die <strong>Wissensdatenbank</strong> und der <strong>Kontext</strong> so wichtig – sie halten den Esel auf Kurs."
+    },
+    "result": {
+      "eyebrow": "Ergebnis",
+      "ready_title": "Du bist bereit.",
+      "ready_body": "Sie haben alles, was Sie brauchen, damit AISHA für Sie arbeitet und nicht gegen Sie. Wir zeigen Ihnen, was das Programm alles kann.",
+      "soon_title": "Fast.",
+      "soon_body": "Ein paar Dinge stimmen noch nicht ganz, aber du bist schon fast am Ziel. Geh die Anleitung noch einmal durch oder geh direkt zur Plattform – dort findest du weitere Details.",
+      "again_title": "Vielleicht noch nicht.",
+      "again_body": "Und das ist völlig in Ordnung. KI ist eine neue Sprache, an die man sich erst gewöhnen muss. Wir empfehlen, die Anleitung noch einmal durchzugehen – danach werden Ihnen die darin erwähnten Punkte intuitiv erscheinen. Oder Sie können sich einfach auf der Website umsehen.",
+      "cta_platform": "Zur AISHA-Plattform",
+      "cta_restart": "Führe es noch einmal aus",
+      "cta_anyway_soon": "Trotzdem weiterblättern",
+      "cta_anyway": "Lass mich trotzdem rein"
+    }
+  }
+}

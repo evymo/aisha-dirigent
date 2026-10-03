@@ -1,0 +1,4 @@
+class:  Workflow::Condition::LazyOR
+param:
+    condition1: global_has_duplicate_key_certificate
+    condition2: global_has_duplicate_key_workflow

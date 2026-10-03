@@ -1,0 +1,103 @@
+{
+  "id": "tcars-fleet",
+  "version": "0.3.1",
+  "name": "T-cars Fleet",
+  "description": "Reads vehicles, people, groups and the journey log from the T-cars SOAP WebService v2 and promotes them onto the raw signal lane. Optional by construction: a deployment without a T-cars contract simply does not install it.",
+  "author": "Evymo",
+  "kind": "data_source",
+  "trust_tier": "internal",
+  "source_spec": {
+    "source_slug": "tcars-fleet",
+    "namespace": "telematics/tcars",
+    "adapter_entry": "plugins/tcars-fleet/src/index.ts",
+    "default_config": {
+      "codebookSyncCron": "0 3 * * *",
+      "rideSyncCron": "20 5-20 * * *",
+      "rideBackfillDays": 30,
+      "rideOverlapHours": 2,
+      "rideReconcileOverlapHours": 48,
+      "rideReconcileEveryHours": 20,
+      "projectionWindowMin": 180,
+      "ridePauseMs": 200,
+      "rideCallBudget": 0
+    }
+  },
+  "capabilities": [
+    "cron.sync_codebooks",
+    "cron.sync_rides"
+  ],
+  "config_schema": {
+    "type": "object",
+    "required": ["cisloSmlouvy", "jmeno", "heslo"],
+    "properties": {
+      "apiUrl": {
+        "type": "string",
+        "default": "https://webservice.t-cars.cz/v2/index.php",
+        "description": "SOAP WebService v2 endpoint (rpc/ENCODED). The WSDL lives at the same URL with ?wsdl."
+      },
+      "cisloSmlouvy": {
+        "type": "string",
+        "secret": true,
+        "description": "Contract number — the first field of the tLoginData struct; also the deploy gate for this connector."
+      },
+      "jmeno": { "type": "string", "secret": true, "description": "Login name (tLoginData.jmeno)." },
+      "heslo": { "type": "string", "secret": true, "description": "Login secret (tLoginData.heslo)." },
+      "codebookSyncCron": {
+        "type": "string",
+        "default": "0 3 * * *",
+        "description": "Vehicles/people/groups are reference data, not a stream: daily is enough."
+      },
+      "rideSyncCron": {
+        "type": "string",
+        "default": "20 5-20 * * *",
+        "description": "The journey log is queried per vehicle, so cost scales with fleet size: hourly during the working day, not at night. Nothing is lost overnight — the next window starts at the stored cursor."
+      },
+      "rideOverlapHours": {
+        "type": "number",
+        "default": 2,
+        "description": "Every tick re-reads this many hours before the cursor, so a ride still open at the previous tick is stored complete. Costs rows, not vendor calls."
+      },
+      "rideReconcileOverlapHours": {
+        "type": "number",
+        "default": 48,
+        "description": "Once a day the window reaches this far back, to pick up rides the vendor edited after the fact (private/business, corrected distance)."
+      },
+      "rideReconcileEveryHours": {
+        "type": "number",
+        "default": 20,
+        "description": "How often the long overlap runs; with the default schedule that is the first tick of the day."
+      },
+      "projectionWindowMin": {
+        "type": "number",
+        "default": 180,
+        "description": "Rides touched by sync within this many minutes are re-offered to the twin projection, which writes only the ones that actually changed."
+      },
+      "rideBackfillDays": {
+        "type": "number",
+        "default": 30,
+        "description": "Window used on the FIRST run only; afterwards the stored cursor decides, so history is never re-read."
+      },
+      "ridePauseMs": {
+        "type": "number",
+        "default": 200,
+        "description": "Pause between per-vehicle journey-log calls. Courtesy toward the vendor's production system, not our own throttling."
+      },
+      "rideCallBudget": {
+        "type": "number",
+        "default": 0,
+        "description": "Hard ceiling on vendor calls per tick (0 = none). A grown fleet or a misread cursor must not turn one tick into hundreds of requests; when the ceiling stops a run the cursor is held back, so the window is retried rather than skipped."
+      }
+    }
+  },
+  "lifecycle": {
+    "backend_entry": "src/index.ts",
+    "load_strategy": "hot"
+  },
+  "sandbox": {
+    "timeout_ms": 30000,
+    "network_allowlist": ["webservice.t-cars.cz"],
+    "max_memory_mb": 64,
+    "rpc_allowlist": ["tc_project_rides", "tc_propose_identity", "tc_upsert_drivers_audited", "tc_upsert_groups_audited", "tc_upsert_rides_audited", "tc_upsert_vehicles_audited"]
+  },
+  "dependencies": { "fast-xml-parser": "5.7.3" }
+}

@@ -1,0 +1,11 @@
+-- RLS pro agent_knowledge_source_secrets.
+--
+-- ⛔ ZÁMĚRNĚ BEZ JEDINÉ POLICY. Zapnutá RLS bez povolujícího pravidla znamená,
+-- že přes PostgREST se k řádkům NEDOSTANE NIKDO — ani admin. Přístup má jen
+-- SECURITY DEFINER funkce, která běží jako vlastník a RLS obchází.
+--
+-- Kdyby tu byla „admin může SELECT", vznikla by cesta, kterou lze šifrotext
+-- vytáhnout ven; a šifrotext je pořád tajemství, jen hůř čitelné. Kdo potřebuje
+-- vědět, CO je nastavené, ptá se `get_data_source_secret_status` — ta vrací
+-- jména klíčů a příznak, ne hodnoty.
+ALTER TABLE public.agent_knowledge_source_secrets ENABLE ROW LEVEL SECURITY;

@@ -1,0 +1,109 @@
+{
+  "id": "avp-portal",
+  "version": "0.3.0",
+  "name": "AVP portal (Kupson)",
+  "description": "Reads the card and tank codebook, fuel dispensing, tank refills and daily tank levels from the Kupson AVP portal REST API and writes them onto the GENERIC raw lane of the stack (source_catalog_rows via audience_sync_source_catalog) — the core knows nothing about AVP, so installing it is data, not DDL. Codebook = snapshot, fuelings and tank events = series. It derives nothing and creates NO twins: every version of a fueling is stored with its own flags (parent_id, hidden, removed); which one counts, and which twin it belongs to, is decided one layer up through CONFIRMED identity bindings. Only the CONFIG (endpoint, database, credentials, schedule) is administrable. See README.md for the ways this API departs from its vendor documentation.",
+  "author": "Evymo",
+  "kind": "data_source",
+  "trust_tier": "internal",
+  "source_spec": {
+    "source_slug": "avp-portal",
+    "namespace": "fuel/avp-portal",
+    "adapter_entry": "plugins/avp-portal/src/index.ts",
+    "default_config": {
+      "fleetSyncCron": "0 3 * * *",
+      "fuelingSyncCron": "*/15 * * * *",
+      "tankSyncCron": "20 3 * * *",
+      "backfillDays": 7,
+      "pageSize": 2000,
+      "requestTimeoutMs": 20000,
+      "projectionWindowMin": 180
+    }
+  },
+  "capabilities": [
+    "cron.sync_fleet",
+    "cron.sync_fuelings",
+    "cron.sync_tanks"
+  ],
+  "config_schema": {
+    "type": "object",
+    "required": [
+      "baseUrl",
+      "database",
+      "username",
+      "password"
+    ],
+    "properties": {
+      "baseUrl": {
+        "type": "string",
+        "description": "Instance URL, https://<instance>.avp-portal.cz. The test environment described by the vendor (testavpportal.kupson.cz) issues tokens that do not work here."
+      },
+      "database": {
+        "type": "string",
+        "description": "Instance name in the path /api/{database}/… (the subdomain). NOT the `ownership` value from the signin response — that one returns 403 'Database is disabled'. Since the database is resolved before authorization, a 403 almost always means this field is wrong, not that the account lacks a right."
+      },
+      "username": {
+        "type": "string",
+        "secret": true,
+        "description": "API user for POST /api/signin."
+      },
+      "password": {
+        "type": "string",
+        "secret": true,
+        "description": "Password for that user."
+      },
+      "fleetSyncCron": {
+        "type": "string",
+        "default": "0 3 * * *",
+        "description": "How often to refresh the card + tank codebook (changes rarely)."
+      },
+      "fuelingSyncCron": {
+        "type": "string",
+        "default": "*/15 * * * *",
+        "description": "How often to pull new fuelings onto the raw lane. Incremental via serverSyncTime (write time, behind reality), cursor = latest write seen."
+      },
+      "tankSyncCron": {
+        "type": "string",
+        "default": "20 3 * * *",
+        "description": "How often to pull tank refills + daily levels (cursor overlaps 48 h — late writes are not skipped)."
+      },
+      "backfillDays": {
+        "type": "number",
+        "default": 7,
+        "description": "On the first run (no cursor yet), how many days back to load."
+      },
+      "requestTimeoutMs": {
+        "type": "number",
+        "default": 20000,
+        "description": "Per-request timeout (must fit inside the sandbox run timeout). Unbounded queries return whole tables, so every list here pages with a limit."
+      },
+      "pageSize": {
+        "type": "number",
+        "default": 2000,
+        "description": "Rows per page when paging through a resource. Paging uses `offset` with `sort=id`; `skip` is silently ignored and `page` means something else."
+      },
+      "projectionWindowMin": {
+        "type": "number",
+        "default": 180,
+        "description": "Fuelings touched by sync within this many minutes (and the parents of new corrections) are re-offered to the twin projection, which writes only what actually changed."
+      }
+    }
+  },
+  "lifecycle": {
+    "backend_entry": "src/index.ts",
+    "load_strategy": "hot"
+  },
+  "sandbox": {
+    "timeout_ms": 30000,
+    "network_allowlist": [
+      "*.avp-portal.cz"
+    ],
+    "max_memory_mb": 128,
+    "rpc_allowlist": [
+      "audience_sync_source_catalog",
+      "avp_project_fuelings",
+      "avp_propose_identity"
+    ]
+  },
+  "dependencies": {}
+}

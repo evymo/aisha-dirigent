@@ -1,0 +1,58 @@
+{
+  "description": "Rename Study → Cluster (reference config from 2026-04 rebrand)",
+  "notes": [
+    "Czech: 'studie' is feminine, 'cluster' is masculine inanimate.",
+    "Czech declension: cluster(nom/acc), clusteru(gen/dat/loc), clusterem(inst), clustery(nom.pl/acc.pl), clusterů(gen.pl), clusterům(dat.pl), clusterech(loc.pl)",
+    "Language-specific rules run BEFORE global rules (higher priority).",
+    "Use /regex/flags syntax for regex patterns, plain text otherwise."
+  ],
+  "rules": {
+    "*": [
+      { "from": "Study", "to": "Cluster" },
+      { "from": "study", "to": "cluster" },
+      { "from": "Studies", "to": "Clusters" },
+      { "from": "studies", "to": "clusters" }
+    ],
+    "cs": [
+      { "from": "ve clusterůch", "to": "v clusterech", "note": "fix wrong loc.pl (studie→*clusterůch is wrong)" },
+      { "from": "Ve clusterůch", "to": "V clusterech", "note": "uppercase variant" },
+      { "from": "clusterymi", "to": "clustery", "note": "fix wrong inst.pl" },
+
+      { "from": "Klinická clustery", "to": "Klinický cluster", "note": "fem.adj → masc.adj (singular)" },
+      { "from": "Zaslepená clustery", "to": "Zaslepený cluster", "note": "fem.adj → masc.adj" },
+      { "from": "Neznámá clustery", "to": "Neznámý cluster", "note": "fem.adj → masc.adj" },
+      { "from": "Propojená clustery", "to": "Propojené clustery", "note": "fem.adj → masc.adj (plural)" },
+      { "from": "Nastavte novou výzkumnou clusteru", "to": "Nastavte nový výzkumný cluster", "note": "fem.adj+acc → masc" },
+
+      { "from": "Clustery úspěšně vytvořena", "to": "Cluster úspěšně vytvořen", "note": "fem.participle → masc" },
+      { "from": "Clustery úspěšně aktualizována", "to": "Cluster úspěšně aktualizován", "note": "fem.participle → masc" },
+
+      { "from": "Vytvořit clusteru", "to": "Vytvořit cluster", "note": "acc not gen after vytvořit" },
+      { "from": "Upravit clusteru", "to": "Upravit cluster", "note": "acc not gen after upravit" },
+      { "from": "Vyberte clusteru", "to": "Vyberte cluster", "note": "acc not gen after vyberte" },
+      { "from": "aktualizovat clusteru", "to": "aktualizovat cluster", "note": "acc not gen" },
+
+      { "from": "Kód clustery", "to": "Kód clusteru", "note": "gen.sg after noun" },
+      { "from": "Název clustery", "to": "Název clusteru", "note": "gen.sg after noun" },
+      { "from": "Typ clustery", "to": "Typ clusteru", "note": "gen.sg after noun" },
+      { "from": "Den clustery", "to": "Den clusteru", "note": "gen.sg after noun" },
+      { "from": "Ramena clustery", "to": "Ramena clusteru", "note": "gen.sg after noun" },
+      { "from": "Konzultanti clustery", "to": "Konzultanti clusteru", "note": "gen.sg after noun" },
+      { "from": "nastavení clustery", "to": "nastavení clusteru", "note": "gen.sg after noun" },
+      { "from": "Přehled clustery", "to": "Přehled clusteru", "note": "gen.sg after noun" },
+      { "from": "Chybí kód clustery", "to": "Chybí kód clusteru", "note": "gen chain" },
+
+      { "from": "do clustery", "to": "do clusteru", "note": "gen after preposition do" },
+      { "from": "podle clustery", "to": "podle clusteru", "note": "gen after preposition podle" },
+      { "from": "ze clustery", "to": "z clusteru", "note": "gen after preposition z/ze" },
+
+      { "from": "tuto clusteru", "to": "tento cluster", "note": "fem.dem → masc.dem" },
+      { "from": "danou clusteru", "to": "daný cluster", "note": "fem.adj → masc.adj" },
+      { "from": "jejích cílů", "to": "jeho cílů", "note": "fem.poss → masc.poss" },
+
+      { "from": "v jakékoli clusteru", "to": "v jakémkoli clusteru", "note": "fem.pron → masc.pron" },
+
+      { "from": "/Registrace do observační cluster(?!u)/", "to": "Registrace do observačního clusteru", "note": "fem.adj+gen → masc.adj+gen" }
+    ]
+  }
+}

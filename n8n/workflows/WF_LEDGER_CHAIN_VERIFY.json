@@ -1,0 +1,168 @@
+{
+  "name": "WF_LEDGER_CHAIN_VERIFY",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "every-6h",
+      "name": "Every 6 hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "fn_verify_audit_chain",
+        "rpcParams": "={{ JSON.stringify({ p_limit: null }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 60000
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "verify-chain",
+      "name": "Verify Audit Chain",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        464,
+        304
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.ok }}",
+              "value2": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "chain-ok",
+      "name": "Chain OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        688,
+        304
+      ]
+    },
+    {
+      "parameters": {
+        "category": "custom",
+        "functionName": "log_integration_action",
+        "rpcParams": "={{ JSON.stringify({ p_service_name: 'aisha', p_action: 'ledger_chain_verified', p_action_detail: { rows_total: $json.rows_total, rows_verified: $json.rows_verified, head_hash: $json.head_hash }, p_status: 'success', p_duration_ms: 0 }) }}",
+        "authMode": "service_role",
+        "options": {
+          "timeout": 10000,
+          "auditTrail": false
+        },
+        "onError": "continueRegularOutput"
+      },
+      "id": "log-ok",
+      "name": "Log Verified",
+      "type": "n8n-nodes-aisha.aishaRpc",
+      "typeVersion": 1,
+      "position": [
+        912,
+        208
+      ],
+      "credentials": {
+        "aishaPostgrestApi": {
+          "id": "__REMAP__",
+          "name": "AISHA PostgREST"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env?.N8N_URL || '' }}/webhook/expert-notification",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ severity: 'critical', subject: 'LEDGER TAMPER DETECTED — audit chain verification failed', message: 'fn_verify_audit_chain reported a broken link in the immutable ledger.\\n\\n**Rows verified:** ' + ($json.rows_verified || 0) + ' / ' + ($json.rows_total || 0) + '\\n**Head hash:** ' + ($json.head_hash || 'n/a') + '\\n**First broken:** ' + JSON.stringify($json.first_broken || {}) + '\\n\\nThis is a Tier-1 security event: the append-only hash chain no longer verifies. Investigate immediately.', requires_response: true, source: 'ledger_chain_verify' }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "alert-tamper",
+      "name": "Alert Tamper",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        912,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Every 6 hours": {
+      "main": [
+        [
+          {
+            "node": "Verify Audit Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Audit Chain": {
+      "main": [
+        [
+          {
+            "node": "Chain OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chain OK?": {
+      "main": [
+        [
+          {
+            "node": "Log Verified",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Alert Tamper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

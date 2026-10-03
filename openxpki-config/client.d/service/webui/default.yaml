@@ -1,0 +1,22 @@
+global:
+    # Let user pick realm on login (multi-realm support)
+    session_timeout: 3600
+    scripturl: /openxpki/
+    locale_directory: /usr/share/locale
+    default_language: en_US
+
+# Allow realm selection — OpenXPKI shows dropdown
+# when multiple realms are configured in config.d/system/realms.yaml
+
+logger:
+    level: INFO
+
+auth:
+    stack: _System
+    handler:
+        Anonymous:
+            type: Anonymous
+            label: Anonymous
+
+output:
+    headers: all

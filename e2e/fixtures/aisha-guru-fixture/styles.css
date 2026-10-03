@@ -1,0 +1,16 @@
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+.hero { padding: var(--space-lg); }
+.cta {
+  display: inline-block;
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  background: var(--color-primary);
+  color: #fff;
+  text-decoration: none;
+}
+.faq details { margin-bottom: var(--space-md); }

@@ -1,0 +1,353 @@
+{
+  "name": "WF_SELF_LEARNING_LOOP",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "path": "self-learning",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Webhook Auth"
+        }
+      },
+      "id": "sl-trigger",
+      "name": "Improvement Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Create improvement proposal via Supabase RPC\nconst input = $input.first().json.body;\n\nconst supabaseUrl = $env.AISHA_POSTGREST_URL || 'http://127.0.0.1:57421';\nconst supabaseKey = $env.AISHA_POSTGREST_SERVICE_KEY;\n\nconst rpcUrl = `${supabaseUrl}/rest/v1/rpc/fn_create_improvement_proposal`;\nconst rpcBody = JSON.stringify({\n  p_agent_slug: input.agent_slug,\n  p_title: input.title,\n  p_description: input.description,\n  p_category: input.category || 'general',\n  p_metadata: input.metadata || {}\n});\n\nlet result;\ntry {\n  if (typeof fetch === 'function') {\n    const response = await fetch(rpcUrl, {\n      method: 'POST',\n      headers: { 'Content-Type': 'application/json', 'apikey': supabaseKey, 'Authorization': `Bearer ${supabaseKey}` },\n      body: rpcBody\n    });\n    result = await response.json();\n  } else {\n    const https = require('https');\n    const url = new URL(rpcUrl);\n    result = await new Promise((resolve, reject) => {\n      const req = https.request({\n        hostname: url.hostname,\n        port: url.port || 443,\n        path: url.pathname,\n        method: 'POST',\n        headers: {\n          'Content-Type': 'application/json',\n          'apikey': supabaseKey,\n          'Authorization': `Bearer ${supabaseKey}`,\n          'Content-Length': Buffer.byteLength(rpcBody)\n        }\n      }, res => {\n        let body = '';\n        res.on('data', c => body += c);\n        res.on('end', () => {\n          try { resolve(JSON.parse(body)); }\n          catch { reject(new Error('Invalid JSON: ' + body.substring(0, 200))); }\n        });\n      });\n      req.on('error', reject);\n      req.write(rpcBody);\n      req.end();\n    });\n  }\n} catch (e) {\n  return [{ json: { ...input, proposal: { error: e.message } } }];\n}\n\nreturn [{ json: { ...input, proposal: result } }];"
+      },
+      "id": "sl-evaluate",
+      "name": "Evaluate Proposal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        470,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "auto-approve-check",
+              "leftValue": "={{ $json.proposal.status }}",
+              "rightValue": "auto_approved",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "sl-risk-router",
+      "name": "Risk Router",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        690,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "service": "forgejo",
+        "operation": "create_branch",
+        "repoOwner": "aisha",
+        "repoName": "aisha-ai-orchestrator",
+        "branchName": "=aisha/{{ $json.proposal.proposal_id.substring(0, 8) }}-{{ $json.category || 'improvement' }}",
+        "fromBranch": "main"
+      },
+      "id": "sl-create-branch",
+      "name": "Create Branch",
+      "type": "n8n-nodes-aisha.aishaAdminBridge",
+      "typeVersion": 1,
+      "position": [
+        910,
+        200
+      ],
+      "credentials": {
+        "aishaForgejoApi": {
+          "id": "forgejo-1",
+          "name": "Forgejo API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "workflowId": "WF_DEV_PATCH",
+        "options": {}
+      },
+      "id": "sl-implement",
+      "name": "Implement Change",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1,
+      "position": [
+        1130,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "compliance-check",
+              "leftValue": "={{ $json.proposal.risk_level }}",
+              "rightValue": "critical",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "sl-compliance",
+      "name": "Compliance Gate",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1350,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "service": "forgejo",
+        "operation": "create_pr",
+        "repoOwner": "aisha",
+        "repoName": "aisha-ai-orchestrator",
+        "prTitle": "=[Aisha] {{ $json.proposal.agent }}: {{ $json.title }}",
+        "prBody": "=## Autonomous Improvement Proposal\n\n**Agent:** {{ $json.proposal.agent }}\n**Risk:** {{ $json.proposal.risk_level }}\n**Category:** {{ $json.category || 'general' }}\n**Proposal ID:** {{ $json.proposal.proposal_id }}\n**Run ID:** {{ $json.proposal.run_id }}\n\n### Description\n{{ $json.description }}\n\n---\n_Auto-generated by Aisha Self-Learning Loop_",
+        "headBranch": "=aisha/{{ $json.proposal.proposal_id.substring(0, 8) }}-{{ $json.category || 'improvement' }}",
+        "baseBranch": "main"
+      },
+      "id": "sl-create-pr",
+      "name": "Create PR",
+      "type": "n8n-nodes-aisha.aishaAdminBridge",
+      "typeVersion": 1,
+      "position": [
+        1570,
+        150
+      ],
+      "credentials": {
+        "aishaForgejoApi": {
+          "id": "forgejo-1",
+          "name": "Forgejo API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "service": "forgejo",
+        "operation": "delete_branch",
+        "repoOwner": "aisha",
+        "repoName": "aisha-ai-orchestrator",
+        "branchName": "=aisha/{{ $json.proposal.proposal_id.substring(0, 8) }}-{{ $json.category || 'improvement' }}"
+      },
+      "id": "sl-rollback",
+      "name": "Rollback Branch",
+      "type": "n8n-nodes-aisha.aishaAdminBridge",
+      "typeVersion": 1,
+      "position": [
+        1570,
+        300
+      ],
+      "credentials": {
+        "aishaForgejoApi": {
+          "id": "forgejo-1",
+          "name": "Forgejo API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Non-auto-approved proposals are queued for human review.\n// Update proposal status and notify via appropriate channel.\nconst proposal = $json.proposal;\n\nreturn [{\n  json: {\n    action: 'queued_for_review',\n    proposal_id: proposal.proposal_id,\n    risk_level: proposal.risk_level,\n    agent: proposal.agent,\n    message: `Proposal ${proposal.proposal_id} queued for human review (risk: ${proposal.risk_level})`\n  }\n}];"
+      },
+      "id": "sl-queue-review",
+      "name": "Queue For Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        910,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "service": "langfuse",
+        "operation": "create_event",
+        "traceId": "={{ $json.proposal?.run_id || $json.run_id || 'self-learning-' + Date.now() }}",
+        "eventName": "self_learning_loop",
+        "eventInput": "={{ JSON.stringify($json) }}",
+        "eventOutput": "={{ JSON.stringify({ status: $json.action || 'completed', proposal_id: $json.proposal?.proposal_id }) }}"
+      },
+      "id": "sl-log-langfuse",
+      "name": "Log to Langfuse",
+      "type": "n8n-nodes-aisha.aishaAdminBridge",
+      "typeVersion": 1,
+      "position": [
+        1790,
+        300
+      ],
+      "credentials": {
+        "aishaLangfuseApi": {
+          "id": "langfuse-1",
+          "name": "Langfuse API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Improvement Trigger": {
+      "main": [
+        [
+          {
+            "node": "Evaluate Proposal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evaluate Proposal": {
+      "main": [
+        [
+          {
+            "node": "Risk Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Risk Router": {
+      "main": [
+        [
+          {
+            "node": "Create Branch",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Queue For Review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Branch": {
+      "main": [
+        [
+          {
+            "node": "Implement Change",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Implement Change": {
+      "main": [
+        [
+          {
+            "node": "Compliance Gate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compliance Gate": {
+      "main": [
+        [
+          {
+            "node": "Create PR",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Rollback Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create PR": {
+      "main": [
+        [
+          {
+            "node": "Log to Langfuse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Queue For Review": {
+      "main": [
+        [
+          {
+            "node": "Log to Langfuse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rollback Branch": {
+      "main": [
+        [
+          {
+            "node": "Log to Langfuse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "timezone": "Europe/Prague",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}

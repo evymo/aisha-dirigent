@@ -1,0 +1,84 @@
+{
+  "name": "WF_EMBEDDING_V1_BACKFILL",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/10 0-5,20-23 * * *"
+            }
+          ]
+        }
+      },
+      "id": "v1-backfill-cron",
+      "name": "Mimo špičku každých 10 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.AISHA_POSTGREST_URL || 'http://127.0.0.1:57421' }}/functions/v1/backfill-knowledge-embeddings-v1",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": false,
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "batch_size",
+              "value": "200"
+            },
+            {
+              "name": "max_ms",
+              "value": "540000"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "v1-backfill-call",
+      "name": "Dopočet vektorů živé identity (v1)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        470,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "AISHA Gateway (Service Role)"
+        }
+      },
+      "notes": "Platformní dopočet vektorů ŽIVÉ identity (svc-model, týž runtime jako dotazy) pro chunky bez nich — staré ST/MLX i chybějící. Mimo špičku (20–06), sekvenčně, ustoupí při souběhu s dotazy. Postup = pokrytí vektory ve stavu zdroje (broker), ne historie tohoto WF.",
+      "notesInFlow": true
+    }
+  ],
+  "connections": {
+    "Mimo špičku každých 10 min": {
+      "main": [
+        [
+          {
+            "node": "Dopočet vektorů živé identity (v1)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}
