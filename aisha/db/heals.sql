@@ -11741,3 +11741,12 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/functions/edge_bank_transactions.sql
 
 NOTIFY pgrst, 'reload schema';
+
+-- ⛔ STREAK TRIGGER SHAZOVAL CHECK-IN BEZ PŘIHLÁŠENÉHO (2026-10-04).
+-- trigger_update_streak_on_health_checkin hlídal `auth.uid() IS NULL → RAISE`, takže
+-- každý INSERT do health_check_ins mimo uživatelskou relaci (služba, import, obnova)
+-- spadl i s check-inem. Trigger funkce přímo volat nejde; stráž pryč, grant pro
+-- authenticated taky (nepotřebuje ho). update_user_streak (DEFINER, p_user_id od
+-- volajícího) má v SoT REVOKE z authenticated, ale bez \ir by na běžící DB nedoletěl.
+\ir sql/functions/update_user_streak.sql
+\ir sql/functions/trigger_update_streak_on_health_checkin.sql
