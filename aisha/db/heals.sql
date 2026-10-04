@@ -11774,3 +11774,22 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/views/audience_admin_twin_relations_v.sql
 
 NOTIFY pgrst, 'reload schema';
+
+-- ⛔ POHLEDY S PRÁVY VLASTNÍKA ČITELNÉ BEZ PŘIHLÁŠENÍ (2026-10-04, naměřeno katalogem čisté DB).
+-- Osm pohledů mělo GRANT SELECT pro anon (+ DML pro authenticated) a čte se mimo RLS
+-- podkladu: úpravy dávkování členů s poznámkou konzultanta a e-mailem autorizujícího,
+-- zdravotní a laboratorní souhrny kohort studií (malé kohorty = reidentifikace), tržby
+-- zásilek, šarže a expedice. Klient je přímo nečte (studie přes DEFINER *_secure RPC),
+-- takže zůstává jen service_role. Totéž u ai_agent_metrics_hourly: přímý SELECT obcházel
+-- stráž is_admin_or_staff() v get_ai_agent_metrics. Grant soubory dosud v heals nebyly.
+\ir sql/grants/distribution_adjustments_overview.sql
+\ir sql/grants/study_cohort_lab_trends.sql
+\ir sql/grants/study_cohort_statistics.sql
+\ir sql/grants/study_cohort_trends.sql
+\ir sql/grants/batch_inventory_overview.sql
+\ir sql/grants/distribution_overview.sql
+\ir sql/grants/expedition_overview.sql
+\ir sql/grants/shipment_statistics.sql
+\ir sql/materialized_views/ai_agent_metrics_hourly.sql
+
+NOTIFY pgrst, 'reload schema';

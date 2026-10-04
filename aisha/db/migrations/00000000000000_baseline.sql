@@ -174802,7 +174802,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_agent_metrics_hourly_pk
   ON ai_agent_metrics_hourly (hour, agent_slug, event_type);
 
 -- Grants
-GRANT SELECT ON ai_agent_metrics_hourly TO authenticated;
+-- ⛔ Jen služba (nález 2026-10-04): čtecí RPC get_ai_agent_metrics(_timeseries)
+-- jsou DEFINER se stráží is_admin_or_staff(); přímý SELECT pro authenticated
+-- ji obcházel a vydával náklady a latence agentů komukoli přihlášenému.
+REVOKE ALL ON public.ai_agent_metrics_hourly FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.ai_agent_metrics_hourly TO service_role;
 
 
 -- =============================================================================
@@ -205389,10 +205393,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ba
 -- -----------------------------------------------------------------------------
 
 -- Grants: batch_inventory_overview
-
-GRANT SELECT ON public.batch_inventory_overview TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.batch_inventory_overview TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.batch_inventory_overview TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (stav šarží a zásob) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.batch_inventory_overview FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.batch_inventory_overview TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -205711,10 +205719,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.di
 -- -----------------------------------------------------------------------------
 
 -- Grants: distribution_adjustments_overview
-
-GRANT SELECT ON public.distribution_adjustments_overview TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_adjustments_overview TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_adjustments_overview TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (úpravy dávkování členů (member_token, poznámka konzultanta, e-mail autorizujícího)) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.distribution_adjustments_overview FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.distribution_adjustments_overview TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -205766,10 +205778,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.di
 -- -----------------------------------------------------------------------------
 
 -- Grants: distribution_overview
-
-GRANT SELECT ON public.distribution_overview TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_overview TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_overview TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (plán distribuce (počty členů a balení)) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.distribution_overview FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.distribution_overview TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -205871,10 +205887,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ex
 -- -----------------------------------------------------------------------------
 
 -- Grants: expedition_overview
-
-GRANT SELECT ON public.expedition_overview TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expedition_overview TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expedition_overview TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (expediční kalendář studií) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.expedition_overview FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.expedition_overview TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -208114,10 +208134,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.sh
 -- -----------------------------------------------------------------------------
 
 -- Grants: shipment_statistics
-
-GRANT SELECT ON public.shipment_statistics TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.shipment_statistics TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.shipment_statistics TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (tržby, slevy a tokeny zásilek) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.shipment_statistics FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.shipment_statistics TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -208372,10 +208396,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- -----------------------------------------------------------------------------
 
 -- Grants: study_cohort_lab_trends
-
-GRANT SELECT ON public.study_cohort_lab_trends TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_cohort_lab_trends TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_cohort_lab_trends TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (měsíční průměry laboratorních výsledků kohort studií) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.study_cohort_lab_trends FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.study_cohort_lab_trends TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -208383,10 +208411,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- -----------------------------------------------------------------------------
 
 -- Grants: study_cohort_statistics
-
-GRANT SELECT ON public.study_cohort_statistics TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_cohort_statistics TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_cohort_statistics TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (souhrny zdraví a laboratoří kohort studií) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.study_cohort_statistics FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.study_cohort_statistics TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -208394,10 +208426,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- -----------------------------------------------------------------------------
 
 -- Grants: study_cohort_trends
-
-GRANT SELECT ON public.study_cohort_trends TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_cohort_trends TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_cohort_trends TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (týdenní průměry bolesti, energie, nálady a spánku kohort) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.study_cohort_trends FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.study_cohort_trends TO service_role;
 
 
 -- -----------------------------------------------------------------------------
