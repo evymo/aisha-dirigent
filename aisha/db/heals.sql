@@ -11711,3 +11711,14 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/views/audience_admin_twin_timeline_v.sql
 
 NOTIFY pgrst, 'reload schema';
+
+-- ⛔ edge_mobile_notifications BEZ STRÁŽE (2026-10-04, bezpečnostní nález z revize SQL).
+-- SECURITY DEFINER + GRANT authenticated; stráž měla jen admin akce. Přihlášený si
+-- přímým /rpc/ četl FCM tokeny cizích zařízení, posílal in-app notifikace s odkazem
+-- komukoli (phishing), vynuloval push tokeny všem uživatelům naráz a četl cizí
+-- preference. Teď vše kromě get_campaign_notification_deliveries_admin (admin UI,
+-- is_admin_or_staff) jen služba — svc-push i gateway volají service tokenem.
+-- Soubor dosud v heals nebyl.
+\ir sql/functions/edge_mobile_notifications.sql
+
+NOTIFY pgrst, 'reload schema';

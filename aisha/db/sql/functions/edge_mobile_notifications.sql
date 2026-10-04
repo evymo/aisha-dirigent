@@ -14,6 +14,20 @@ DECLARE
   v_id uuid;
   v_user_id uuid;
 BEGIN
+  -- ⛔ SECURITY DEFINER vypíná RLS, takže nárok musí vymáhat tělo. Do 2026-10-04
+  -- tu stráž měla jen admin akce a funkce má GRANT pro `authenticated` (admin UI
+  -- čte doručení kampaně). Kdokoli přihlášený si tak přímým
+  -- /rpc/edge_mobile_notifications mohl přečíst FCM tokeny cizích zařízení
+  -- (get_mobile_sessions → push komukoli mimo platformu), poslat in-app
+  -- notifikaci s odkazem libovolnému účtu (insert_notifications_bulk → phishing),
+  -- vynulovat tokeny VŠEM (null_mobile_session_token bez user_id) a číst
+  -- preference cizích účtů. Všechno kromě admin čtení doručení je práce služby
+  -- (svc-push, gateway — volají service tokenem).
+  IF p_action IS DISTINCT FROM 'get_campaign_notification_deliveries_admin'
+     AND NOT public.is_service_role() THEN
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+  END IF;
+
   IF p_action = 'get_mobile_sessions' THEN
     RETURN jsonb_build_object(
       'rows',

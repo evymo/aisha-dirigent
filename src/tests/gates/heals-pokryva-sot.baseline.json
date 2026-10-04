@@ -267,7 +267,6 @@
     "sql/functions/edge_app_versions.sql",
     "sql/functions/edge_blockchain_audit.sql",
     "sql/functions/edge_database_dump_table.sql",
-    "sql/functions/edge_mobile_notifications.sql",
     "sql/functions/edge_orders.sql",
     "sql/functions/edge_payment_sessions.sql",
     "sql/functions/edge_profiles.sql",

@@ -113,7 +113,6 @@ export const KNOWN_NO_AUTH_FUNCTIONS = [
   'edge_app_secrets',
   'edge_blockchain_audit',
   'edge_database_dump_table',
-  'edge_mobile_notifications',
   'edge_payment_sessions',
   'edge_public_partners_directory',
   'edge_sms_otp',

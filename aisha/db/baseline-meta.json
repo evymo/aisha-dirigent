@@ -2,7 +2,7 @@
   "$schema": "./baseline-meta.schema.json",
   "description": "Tracks baseline + seed version state. Updated by db:init:generate / refreshdb.sh. Do NOT edit manually.",
   "baseline": {
-    "refreshed_at": "2026-10-04T18:59:11.725Z",
+    "refreshed_at": "2026-10-04T19:03:23.255Z",
     "source": "aisha/db/sql/",
     "output": "aisha/db/migrations/00000000000000_baseline.sql",
     "file_count": 5301,
