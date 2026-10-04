@@ -11731,3 +11731,13 @@ NOTIFY pgrst, 'reload schema';
 -- spadl celý (Stripe webhook, ruční párování bankovní platby). Naměřeno DB testem při
 -- opravě edge_bank_transactions. Soubor dosud v heals nebyl.
 \ir sql/functions/handle_order_payment_completed.sql
+
+-- ⛔ edge_bank_transactions: ČTYŘI AKCE, KTERÉ KLIENTI VOLALI A SQL NEZNALO (2026-10-04).
+-- svc-fio-bank volá auto_match_by_vs (po prvním pohybu s VS spadla celá synchronizace
+-- na „Unsupported action"), admin UI get_all / get_awaiting_orders / dismiss_transaction
+-- (stránka párování plateb ukazovala chybu). Doplněno v SoT; auto-párování zaplatí jen
+-- při přesné shodě částky, jinak amount_mismatch pro admina. Funkce už je výš \ir —
+-- přehraje se znovu, aby chronologie ukazovala, kdy akce přibyly.
+\ir sql/functions/edge_bank_transactions.sql
+
+NOTIFY pgrst, 'reload schema';

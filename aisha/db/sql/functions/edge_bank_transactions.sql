@@ -1,4 +1,8 @@
 -- edge_bank_transactions: Edge-safe bank transaction operations (insert, match, list)
+--   služba (svc-fio-bank): insert_transaction, auto_match_by_vs
+--   admin/staff (AdminBankReconciliation): get_unmatched, get_all, get_awaiting_orders,
+--                                          match_to_order, dismiss_transaction
+--   vlastník objednávky: get_order_bank_transfer
 CREATE OR REPLACE FUNCTION public.edge_bank_transactions(
   p_action text,
   p_payload jsonb DEFAULT '{}'::jsonb
@@ -13,6 +17,10 @@ DECLARE
   v_rows jsonb;
   v_tx_id text;
   v_order_id uuid;
+  v_expected numeric;
+  v_order_currency text;
+  v_tx_uuid uuid;
+  v_limit int;
 BEGIN
   -- ⛔ SECURITY DEFINER vypíná RLS, takže nárok musí vymáhat tělo. Do 2026-10-04
   -- tu žádná stráž nebyla a funkce má GRANT pro `authenticated` (admin UI ji volá
@@ -21,10 +29,10 @@ BEGIN
   -- platbu (insert_transaction) a přečíst účty a jména plátců (get_unmatched).
   -- Zápis pohybů z banky dělá jen služba (svc-fio-bank); párování a frontu
   -- nespárovaných admin/staff. get_order_bank_transfer stráží vlastníka níž.
-  IF p_action = 'insert_transaction' AND NOT public.is_service_role() THEN
+  IF p_action IN ('insert_transaction', 'auto_match_by_vs') AND NOT public.is_service_role() THEN
     RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
   END IF;
-  IF p_action IN ('match_to_order', 'get_unmatched')
+  IF p_action IN ('match_to_order', 'get_unmatched', 'get_all', 'get_awaiting_orders', 'dismiss_transaction')
      AND NOT (public.is_service_role() OR public.is_admin_or_staff()) THEN
     RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
   END IF;
@@ -68,6 +76,7 @@ BEGIN
     UPDATE public.bank_transactions
     SET matched_order_id = v_order_id,
         match_status = 'matched',
+        match_type = 'manual',
         match_notes = NULLIF(p_payload ->> 'notes', '')
     WHERE id = (p_payload ->> 'transaction_id')::uuid;
 
@@ -103,6 +112,129 @@ BEGIN
     WHERE bt.match_status IN ('unmatched', 'amount_mismatch');
 
     RETURN jsonb_build_object('rows', v_rows);
+  END IF;
+
+  -- ⛔ DO 2026-10-04 NÁSLEDUJÍCÍ ČTYŘI AKCE NEEXISTOVALY, ačkoli je volali
+  -- klienti: svc-fio-bank `auto_match_by_vs` (po prvním pohybu s VS spadla celá
+  -- synchronizace na „Unsupported action") a admin UI `get_all`,
+  -- `get_awaiting_orders`, `dismiss_transaction` (stránka párování ukazovala
+  -- chybu místo dat). Tvar odpovědí odpovídá Zod schématům v
+  -- src/hooks/useBankReconciliation.ts a očekávání svc-fio-bank.
+
+  -- AUTO-MATCH právě vloženého pohybu na objednávku podle variabilního symbolu.
+  -- Zaplaceno jen při PŘESNÉ shodě částky (a měny, je-li známá) — přeplatek
+  -- i nedoplatek jde adminovi jako amount_mismatch, nic se nedomýšlí.
+  IF p_action = 'auto_match_by_vs' THEN
+    SELECT o.id, COALESCE(o.bank_transfer_amount, o.total), o.currency
+      INTO v_order_id, v_expected, v_order_currency
+    FROM public.orders o
+    WHERE o.variable_symbol = NULLIF(p_payload ->> 'variable_symbol', '')
+      AND o.payment_status = 'awaiting_transfer'
+    ORDER BY o.created_at DESC
+    LIMIT 1;
+
+    IF v_order_id IS NULL THEN
+      RETURN jsonb_build_object('matched', false, 'reason', 'no_order');
+    END IF;
+
+    SELECT bt.id INTO v_tx_uuid
+    FROM public.bank_transactions bt
+    WHERE bt.variable_symbol = NULLIF(p_payload ->> 'variable_symbol', '')
+      AND bt.match_status = 'unmatched'
+    ORDER BY bt.created_at DESC
+    LIMIT 1;
+
+    IF v_tx_uuid IS NULL THEN
+      RETURN jsonb_build_object('matched', false, 'reason', 'no_transaction');
+    END IF;
+
+    IF (p_payload ->> 'amount')::numeric IS DISTINCT FROM v_expected
+       OR (NULLIF(p_payload ->> 'currency', '') IS NOT NULL AND v_order_currency IS NOT NULL
+           AND upper(p_payload ->> 'currency') <> upper(v_order_currency)) THEN
+      UPDATE public.bank_transactions
+      SET match_status = 'amount_mismatch',
+          matched_order_id = v_order_id,
+          match_type = 'auto_vs',
+          match_notes = format('Očekáváno %s %s', v_expected, COALESCE(v_order_currency, ''))
+      WHERE id = v_tx_uuid;
+      RETURN jsonb_build_object('matched', false, 'reason', 'amount_mismatch', 'order_id', v_order_id);
+    END IF;
+
+    UPDATE public.bank_transactions
+    SET matched_order_id = v_order_id,
+        match_status = 'matched',
+        match_type = 'auto_vs'
+    WHERE id = v_tx_uuid;
+
+    UPDATE public.orders
+    SET payment_status = 'paid',
+        status = 'paid',
+        updated_at = now()
+    WHERE id = v_order_id
+      AND payment_status = 'awaiting_transfer';
+
+    RETURN jsonb_build_object('matched', true, 'order_id', v_order_id);
+  END IF;
+
+  -- LIST all transactions (admin), newest first
+  IF p_action = 'get_all' THEN
+    v_limit := LEAST(GREATEST(COALESCE(NULLIF(p_payload ->> 'limit', '')::int, 500), 1), 2000);
+    SELECT COALESCE(jsonb_agg(
+      jsonb_build_object(
+        'id', t.id,
+        'fio_transaction_id', t.fio_transaction_id,
+        'amount', t.amount,
+        'currency', COALESCE(t.currency, public.commerce_base_currency()),
+        'variable_symbol', t.variable_symbol,
+        'sender_account', t.sender_account,
+        'sender_name', t.sender_name,
+        'transaction_date', t.transaction_date,
+        'message', t.message,
+        'match_status', t.match_status,
+        'match_type', t.match_type,
+        'match_notes', t.match_notes,
+        'matched_order_id', t.matched_order_id,
+        'created_at', t.created_at
+      ) ORDER BY t.transaction_date DESC NULLS LAST, t.created_at DESC
+    ), '[]'::jsonb) INTO v_rows
+    FROM (
+      SELECT bt.*
+      FROM public.bank_transactions bt
+      ORDER BY bt.transaction_date DESC NULLS LAST, bt.created_at DESC
+      LIMIT v_limit
+    ) t;
+
+    RETURN jsonb_build_object('rows', v_rows);
+  END IF;
+
+  -- LIST orders awaiting a bank transfer (admin, manual matching)
+  IF p_action = 'get_awaiting_orders' THEN
+    SELECT COALESCE(jsonb_agg(
+      jsonb_build_object(
+        'id', o.id,
+        'total', o.total,
+        'currency', COALESCE(o.currency, public.commerce_base_currency()),
+        'variable_symbol', o.variable_symbol,
+        'bank_transfer_amount', o.bank_transfer_amount,
+        'bank_transfer_due_date', o.bank_transfer_due_date,
+        'created_at', o.created_at
+      ) ORDER BY o.created_at DESC
+    ), '[]'::jsonb) INTO v_rows
+    FROM public.orders o
+    WHERE o.payment_status = 'awaiting_transfer';
+
+    RETURN jsonb_build_object('rows', v_rows);
+  END IF;
+
+  -- DISMISS (ignore) a transaction that is not a payment for any order (admin)
+  IF p_action = 'dismiss_transaction' THEN
+    UPDATE public.bank_transactions
+    SET match_status = 'dismissed',
+        match_notes = NULLIF(p_payload ->> 'notes', '')
+    WHERE id = (p_payload ->> 'transaction_id')::uuid
+      AND match_status IN ('unmatched', 'amount_mismatch');
+
+    RETURN jsonb_build_object('ok', FOUND);
   END IF;
 
   -- GET bank transfer details for an order (member view)

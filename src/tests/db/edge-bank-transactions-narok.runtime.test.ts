@@ -25,6 +25,9 @@ const OBJ_ADMIN = randomUUID();
 const OBJ_CIZI = randomUUID();
 const TX_CLEN = randomUUID();
 const TX_ADMIN = randomUUID();
+const TX_ZAHOD = randomUUID();
+const OBJ_AUTO = randomUUID();
+const OBJ_NEDOPLATEK = randomUUID();
 
 const volani = (akce: string, payload: object) =>
   `SELECT public.edge_bank_transactions('${akce}', '${JSON.stringify(payload)}'::jsonb)::text`;
@@ -44,10 +47,13 @@ describe.skipIf(!isPgReachable())("edge_bank_transactions: nárok podle akce", (
     fixtura(`INSERT INTO public.orders (id, user_id, total, payment_method, payment_status, status, variable_symbol) VALUES
                ('${OBJ_CLENA}', '${CLEN}',  990, 'bank_transfer', 'awaiting_transfer', 'pending', 'vs-clen-${RUN}'),
                ('${OBJ_ADMIN}', '${CLEN}',  990, 'bank_transfer', 'awaiting_transfer', 'pending', 'vs-admin-${RUN}'),
-               ('${OBJ_CIZI}',  '${CIZI}',  990, 'bank_transfer', 'awaiting_transfer', 'pending', 'vs-cizi-${RUN}')`);
+               ('${OBJ_CIZI}',  '${CIZI}',  990, 'bank_transfer', 'awaiting_transfer', 'pending', 'vs-cizi-${RUN}'),
+               ('${OBJ_AUTO}',  '${CIZI}',  500, 'bank_transfer', 'awaiting_transfer', 'pending', 'vs-auto-${RUN}'),
+               ('${OBJ_NEDOPLATEK}', '${CIZI}', 700, 'bank_transfer', 'awaiting_transfer', 'pending', 'vs-nedo-${RUN}')`);
     fixtura(`INSERT INTO public.bank_transactions (id, fio_transaction_id, amount, sender_account, sender_name, match_status) VALUES
                ('${TX_CLEN}',  'fio-clen-${RUN}',  990, '123456789/0100', 'Platce ${RUN}', 'unmatched'),
-               ('${TX_ADMIN}', 'fio-admin-${RUN}', 990, '987654321/0300', 'Platce ${RUN}', 'unmatched')`);
+               ('${TX_ADMIN}', 'fio-admin-${RUN}', 990, '987654321/0300', 'Platce ${RUN}', 'unmatched'),
+               ('${TX_ZAHOD}', 'fio-zahod-${RUN}', 5,   '111111111/0800', 'Omyl ${RUN}',   'unmatched')`);
   });
 
   it("⛔ člen si NEspáruje platbu na vlastní objednávku (zaplaceno zdarma)", () => {
@@ -84,6 +90,49 @@ describe.skipIf(!isPgReachable())("edge_bank_transactions: nárok podle akce", (
 
     expect(jako(SLUZBA, volani("insert_transaction", pohyb(`fio-sluzba-${RUN}`)))).toContain('"ok": true');
     expect(pocet()).toBe("1");
+  });
+
+  // ⛔ Do 2026-10-04 tyhle akce v SQL vůbec nebyly, ačkoli je volá admin UI
+  // (useBankReconciliation) a svc-fio-bank — padaly na „Unsupported action".
+  it("admin čte všechny pohyby a objednávky čekající na převod; člen ne", () => {
+    const vse = jako(prihlaseny(ADMIN), volani("get_all", {}));
+    expect(vse).toContain(`fio-zahod-${RUN}`);
+    expect(vse).toContain('"match_type"');
+    expect(jako(prihlaseny(ADMIN), volani("get_awaiting_orders", {}))).toContain(`vs-clen-${RUN}`);
+
+    expect(zkus(prihlaseny(CLEN), volani("get_all", {}))).toMatch(/Access denied/);
+    expect(zkus(prihlaseny(CLEN), volani("get_awaiting_orders", {}))).toMatch(/Access denied/);
+  });
+
+  it("admin zahodí omylový pohyb; člen ne", () => {
+    const zahod = volani("dismiss_transaction", { transaction_id: TX_ZAHOD, notes: "omyl" });
+    const stav = () => fixtura(`SELECT match_status FROM public.bank_transactions WHERE id = '${TX_ZAHOD}'`);
+
+    expect(zkus(prihlaseny(CLEN), zahod)).toMatch(/Access denied/);
+    expect(stav()).toBe("unmatched");
+
+    expect(jako(prihlaseny(ADMIN), zahod)).toBe('{"ok": true}');
+    expect(stav()).toBe("dismissed");
+  });
+
+  it("auto-párování podle VS: jen služba; přesná částka zaplatí, nedoplatek jde adminovi", () => {
+    const vloz = (vs: string, castka: number) =>
+      jako(SLUZBA, volani("insert_transaction", { fio_transaction_id: `fio-${vs}`, amount: String(castka), variable_symbol: vs }));
+    const paruj = (vs: string, castka: number) => volani("auto_match_by_vs", { variable_symbol: vs, amount: castka });
+
+    vloz(`vs-auto-${RUN}`, 500);
+    expect(zkus(prihlaseny(CLEN), paruj(`vs-auto-${RUN}`, 500))).toMatch(/Access denied/);
+    expect(zkus(prihlaseny(ADMIN), paruj(`vs-auto-${RUN}`, 500))).toMatch(/Access denied/);
+    expect(stavObjednavky(OBJ_AUTO)).toBe("awaiting_transfer/pending");
+
+    expect(jako(SLUZBA, paruj(`vs-auto-${RUN}`, 500))).toContain('"matched": true');
+    expect(stavObjednavky(OBJ_AUTO)).toBe("paid/paid");
+
+    vloz(`vs-nedo-${RUN}`, 600);
+    expect(jako(SLUZBA, paruj(`vs-nedo-${RUN}`, 600))).toContain('"reason": "amount_mismatch"');
+    expect(stavObjednavky(OBJ_NEDOPLATEK), "nedoplatek objednávku zaplatil").toBe("awaiting_transfer/pending");
+    expect(fixtura(`SELECT match_status FROM public.bank_transactions WHERE fio_transaction_id = 'fio-vs-nedo-${RUN}'`))
+      .toBe("amount_mismatch");
   });
 
   it("detail převodu k objednávce: vlastník ano, cizí člen nic", () => {
