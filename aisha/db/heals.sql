@@ -11719,6 +11719,8 @@ NOTIFY pgrst, 'reload schema';
 -- preference. Teď vše kromě get_campaign_notification_deliveries_admin (admin UI,
 -- is_admin_or_staff) jen služba — svc-push i gateway volají service tokenem.
 -- Soubor dosud v heals nebyl.
+-- + insert_notifications_bulk padal pro VŠECHNY (WITH … INSERT v poddotazu) — in-app
+--   notifikace kampaní a připomínek nevznikaly; opraveno v témže souboru.
 \ir sql/functions/edge_mobile_notifications.sql
 
 NOTIFY pgrst, 'reload schema';

@@ -78971,6 +78971,7 @@ SET search_path TO 'public'
 AS $function$
 DECLARE
   v_id uuid;
+  v_inserted bigint;
   v_user_id uuid;
 BEGIN
   -- ⛔ SECURITY DEFINER vypíná RLS, takže nárok musí vymáhat tělo. Do 2026-10-04
@@ -79080,42 +79081,44 @@ BEGIN
   END IF;
 
   IF p_action = 'insert_notifications_bulk' THEN
-    RETURN jsonb_build_object(
-      'inserted',
-      (
-        WITH input_rows AS (
-          SELECT
-            COALESCE(NULLIF(row ->> 'link', ''), NULL) AS link,
-            NULLIF(row ->> 'message', '') AS message,
-            COALESCE(row -> 'metadata', '{}'::jsonb) AS metadata,
-            COALESCE(NULLIF(row ->> 'title', ''), 'Notification') AS title,
-            COALESCE(NULLIF(row ->> 'type', ''), 'campaign') AS type,
-            NULLIF(row ->> 'user_id', '')::uuid AS user_id
-          FROM jsonb_array_elements(COALESCE(p_payload -> 'rows', '[]'::jsonb)) AS t(row)
-        ),
-        inserted AS (
-          INSERT INTO public.notifications (
-            link,
-            message,
-            metadata,
-            title,
-            type,
-            user_id
-          )
-          SELECT
-            i.link,
-            i.message,
-            i.metadata,
-            i.title,
-            i.type,
-            i.user_id
-          FROM input_rows i
-          WHERE i.user_id IS NOT NULL
-          RETURNING 1
-        )
-        SELECT count(*) FROM inserted
+    -- ⛔ WITH s INSERT MUSÍ BÝT NA NEJVYŠŠÍ ÚROVNI. Do 2026-10-04 tu byl jako
+    -- poddotaz uvnitř jsonb_build_object(...) a Postgres ho odmítal při KAŽDÉM
+    -- volání („WITH clause containing a data-modifying statement must be at
+    -- the top level") — in-app notifikace kampaní a připomínek dotazníků
+    -- nevznikla ani jedna, svc-push jen zalogoval chybu.
+    WITH input_rows AS (
+      SELECT
+        NULLIF(row ->> 'link', '') AS link,
+        NULLIF(row ->> 'message', '') AS message,
+        COALESCE(row -> 'metadata', '{}'::jsonb) AS metadata,
+        COALESCE(NULLIF(row ->> 'title', ''), 'Notification') AS title,
+        COALESCE(NULLIF(row ->> 'type', ''), 'campaign') AS type,
+        NULLIF(row ->> 'user_id', '')::uuid AS user_id
+      FROM jsonb_array_elements(COALESCE(p_payload -> 'rows', '[]'::jsonb)) AS t(row)
+    ),
+    inserted AS (
+      INSERT INTO public.notifications (
+        link,
+        message,
+        metadata,
+        title,
+        type,
+        user_id
       )
-    );
+      SELECT
+        i.link,
+        i.message,
+        i.metadata,
+        i.title,
+        i.type,
+        i.user_id
+      FROM input_rows i
+      WHERE i.user_id IS NOT NULL
+      RETURNING 1
+    )
+    SELECT count(*) INTO v_inserted FROM inserted;
+
+    RETURN jsonb_build_object('inserted', v_inserted);
   END IF;
 
   IF p_action = 'get_existing_questionnaire_reminder_keys' THEN

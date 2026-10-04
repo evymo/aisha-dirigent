@@ -58,6 +58,11 @@ describe.skipIf(!isPgReachable())("edge_mobile_notifications: nárok podle akce"
 
     expect(zkus(prihlaseny(UTOCNIK), posli)).toMatch(/Access denied/);
     expect(pocet()).toBe("0");
+
+    // Kontrolní vzorek: služba (svc-push kampaně) notifikaci vloží. Do 2026-10-04
+    // akce padala pro všechny na „WITH … INSERT musí být na nejvyšší úrovni".
+    expect(jako(SLUZBA, posli)).toBe('{"inserted": 1}');
+    expect(pocet()).toBe("1");
   });
 
   it("⛔ přihlášený NEvynuluje push tokeny všem", () => {
