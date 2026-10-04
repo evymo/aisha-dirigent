@@ -1,7 +1,13 @@
 -- View: public.v_health_weekly_summary
 -- Description: Weekly health metrics summary per user.
-
-CREATE OR REPLACE VIEW public.v_health_weekly_summary AS
+--
+-- ⛔ security_invoker JE POVINNÝ (nález 2026-10-04). Bez něj se pohled čte
+-- právy VLASTNÍKA, tedy MIMO RLS tabulky health_check_ins — a s GRANT SELECT
+-- pro anon/authenticated vydával zdravotní souhrny (tep, bolest, nálada,
+-- spánek) VŠECH uživatelů komukoli, i bez účtu. S security_invoker platí
+-- policies podkladu: člen vidí své, konzultant souhlasem sdílené, admin vše.
+CREATE OR REPLACE VIEW public.v_health_weekly_summary
+WITH (security_invoker = true) AS
 SELECT
   user_id,
   date_trunc('week', check_in_date)::date AS week_start,

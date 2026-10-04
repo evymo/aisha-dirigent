@@ -11677,3 +11677,16 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/functions/edge_bank_transactions.sql
 
 NOTIFY pgrst, 'reload schema';
+
+-- ⛔ v_health_weekly/monthly_summary: ZDRAVOTNÍ DATA BEZ PŘIHLÁŠENÍ (2026-10-04, nález z revize SQL).
+-- Pohledy bez security_invoker se čtou právy vlastníka, tedy MIMO RLS health_check_ins,
+-- a měly GRANT SELECT pro anon (+ plné DML pro authenticated): souhrny tepu, bolesti,
+-- nálady a spánku všech uživatelů četl kdokoli přes /rest/v1/v_health_*. Teď
+-- security_invoker = true (platí policies podkladu) a jen SELECT pro přihlášené
+-- a službu. Oba páry souborů dosud v heals nebyly — na běžící DB by oprava nedotekla.
+\ir sql/views/v_health_weekly_summary.sql
+\ir sql/views/v_health_monthly_summary.sql
+\ir sql/grants/v_health_weekly_summary.sql
+\ir sql/grants/v_health_monthly_summary.sql
+
+NOTIFY pgrst, 'reload schema';

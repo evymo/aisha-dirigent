@@ -1866,8 +1866,6 @@
     "sql/grants/user_shipment_preferences.sql",
     "sql/grants/user_ui_preferences.sql",
     "sql/grants/user_wallets.sql",
-    "sql/grants/v_health_monthly_summary.sql",
-    "sql/grants/v_health_weekly_summary.sql",
     "sql/grants/variable_symbol_sequences.sql",
     "sql/grants/vial_assignments.sql",
     "sql/grants/wearable_analysis_files.sql",
@@ -2195,9 +2193,7 @@
     "sql/views/shipment_statistics.sql",
     "sql/views/study_cohort_lab_trends.sql",
     "sql/views/study_cohort_statistics.sql",
-    "sql/views/study_cohort_trends.sql",
-    "sql/views/v_health_monthly_summary.sql",
-    "sql/views/v_health_weekly_summary.sql"
+    "sql/views/study_cohort_trends.sql"
   ],
   "duplicate_policy_pairs": [
     "ai_budget :: admin_read_all_budget",

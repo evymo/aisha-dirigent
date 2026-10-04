@@ -21513,8 +21513,14 @@ ORDER BY se.study_id, week_start;
 
 -- View: public.v_health_monthly_summary
 -- Description: Monthly health metrics summary per user.
-
-CREATE OR REPLACE VIEW public.v_health_monthly_summary AS
+--
+-- ⛔ security_invoker JE POVINNÝ (nález 2026-10-04). Bez něj se pohled čte
+-- právy VLASTNÍKA, tedy MIMO RLS tabulky health_check_ins — a s GRANT SELECT
+-- pro anon/authenticated vydával zdravotní souhrny (tep, bolest, nálada,
+-- spánek) VŠECH uživatelů komukoli, i bez účtu. S security_invoker platí
+-- policies podkladu: člen vidí své, konzultant souhlasem sdílené, admin vše.
+CREATE OR REPLACE VIEW public.v_health_monthly_summary
+WITH (security_invoker = true) AS
 SELECT
   user_id,
   date_trunc('month', check_in_date)::date AS month_start,
@@ -21539,8 +21545,14 @@ GROUP BY user_id, date_trunc('month', check_in_date)::date;
 
 -- View: public.v_health_weekly_summary
 -- Description: Weekly health metrics summary per user.
-
-CREATE OR REPLACE VIEW public.v_health_weekly_summary AS
+--
+-- ⛔ security_invoker JE POVINNÝ (nález 2026-10-04). Bez něj se pohled čte
+-- právy VLASTNÍKA, tedy MIMO RLS tabulky health_check_ins — a s GRANT SELECT
+-- pro anon/authenticated vydával zdravotní souhrny (tep, bolest, nálada,
+-- spánek) VŠECH uživatelů komukoli, i bez účtu. S security_invoker platí
+-- policies podkladu: člen vidí své, konzultant souhlasem sdílené, admin vše.
+CREATE OR REPLACE VIEW public.v_health_weekly_summary
+WITH (security_invoker = true) AS
 SELECT
   user_id,
   date_trunc('week', check_in_date)::date AS week_start,
@@ -208698,10 +208710,13 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.us
 -- -----------------------------------------------------------------------------
 
 -- Grants: v_health_monthly_summary
-
-GRANT SELECT ON public.v_health_monthly_summary TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_health_monthly_summary TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_health_monthly_summary TO service_role;
+--
+-- Jen čtení, jen přihlášeným a službě. Dřív SELECT pro anon a plné DML pro
+-- authenticated — nad pohledem s právy vlastníka to byl únik zdravotních dat
+-- bez přihlášení. REVOKE ALL napřed: na běžící DB žijí i granty z ALTER DEFAULT
+-- PRIVILEGES, které samotný GRANT nezruší.
+REVOKE ALL ON public.v_health_monthly_summary FROM PUBLIC, anon, authenticated, service_role;
+GRANT SELECT ON public.v_health_monthly_summary TO authenticated, service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -208709,10 +208724,13 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_
 -- -----------------------------------------------------------------------------
 
 -- Grants: v_health_weekly_summary
-
-GRANT SELECT ON public.v_health_weekly_summary TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_health_weekly_summary TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_health_weekly_summary TO service_role;
+--
+-- Jen čtení, jen přihlášeným a službě. Dřív SELECT pro anon a plné DML pro
+-- authenticated — nad pohledem s právy vlastníka to byl únik zdravotních dat
+-- bez přihlášení. REVOKE ALL napřed: na běžící DB žijí i granty z ALTER DEFAULT
+-- PRIVILEGES, které samotný GRANT nezruší.
+REVOKE ALL ON public.v_health_weekly_summary FROM PUBLIC, anon, authenticated, service_role;
+GRANT SELECT ON public.v_health_weekly_summary TO authenticated, service_role;
 
 
 -- -----------------------------------------------------------------------------
