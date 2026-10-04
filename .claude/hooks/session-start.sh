@@ -1,27 +1,16 @@
 #!/usr/bin/env bash
 # SessionStart — připraví cloudovou session Claude Code jako vývojářskou stanici:
-# nainstaluje závislosti a sestaví vše, co README uvádí v „Getting started"
-# (npm install → build:packages → web build), plus VS Code rozšíření.
+# submodul extranet SDK, závislosti (root + workspaces, VS Code rozšíření,
+# mobilní aplikace) a buildy z „Getting started" (build:packages → web build).
 #
 # Běží JEN v cloudu (CLAUDE_CODE_REMOTE=true); lokálně je no-op.
 # Synchronní: session naběhne až po doběhnutí, takže testy a linter jsou hned
 # k dispozici. Idempotentní: instalace je no-op nad hotovým stromem a buildy se
 # přeskočí, pokud se od posledního běhu nezměnil HEAD ani pracovní strom.
 #
-# ⛔ PROČ --replace-registry-host=always
-# package-lock.json nese u ~315 balíků `resolved` na zrcadlo npm.id3a.cz, které
-# cloudová proxy nepustí (403). Volba přepíše hostitele na nakonfigurovaný
-# registr (npmjs.org; pro @aisha/* VERDACCIO_URL z .npmrc) — obsah ověřuje
-# `integrity` z locku, takže jde o tytéž tarbally.
-#
-# ⛔ PROČ SE MŮŽE VYNECHAT apps/workbench-shell
-# Závisí na @aisha/extranet-sdk-ui, který je publikovaný JEN na privátním
-# zrcadle (na npmjs 404). Workspace se zahrne, jakmile je SDK k dispozici:
-#   · leží v packages/extranet-sdk-ui/ (stane se z něj workspace), nebo
-#   · je nastavený VERDACCIO_URL (+ VERDACCIO_TOKEN) a registr balík vydá.
-# Jinak se SDK připojí symlinkem ze sousedního klonu evymo/aisha-extranet-sdk
-# (../aisha-extranet-sdk/packages/ui), je-li v session — root tsc, testy a brány
-# ho pak vidí; workbench-shell zůstává mimo instalaci (lock chce verzi z registru).
+# Žádný vlastní registr: @aisha/* jsou workspaces ze zdroje (extranet SDK ze
+# submodulu packages/extranet-sdk), cizí balíky jdou z registry.npmjs.org podle
+# lockfilu. Hlídá brána npmrc-registr-musi-mit-adresu.
 #
 # Volby (env): AISHA_SESSION_SKIP_BUILD=1 — jen instalace, bez buildů.
 #
@@ -39,16 +28,8 @@ LOG=/tmp/aisha-session-start.log
 SUMMARY=()
 FAILED=0
 
-# Nenastavená proměnná by v .npmrc zůstala doslova jako "${VERDACCIO_TOKEN}".
-export VERDACCIO_TOKEN="${VERDACCIO_TOKEN:-}"
-export npm_config_replace_registry_host=always
 export npm_config_audit=false
 export npm_config_fund=false
-
-# Platí i pro další `npm install` během session.
-if [ -n "${CLAUDE_ENV_FILE:-}" ]; then
-  echo 'export npm_config_replace_registry_host=always' >> "$CLAUDE_ENV_FILE"
-fi
 
 # run_step <popis> <příkaz…> — výstup do logu, do souhrnu jen výsledek a čas.
 run_step() {
@@ -67,51 +48,34 @@ run_step() {
   return 1
 }
 
-# ── Výběr workspaces ─────────────────────────────────────────────────────────
-sdk_available() {
-  [ -f packages/extranet-sdk-ui/package.json ] && return 0
-  [ -n "${VERDACCIO_URL:-}" ] || return 1
-  npm view @aisha/extranet-sdk-ui version --registry "$VERDACCIO_URL" >/dev/null 2>&1
+# ── Extranet SDK (submodul, zdroj workspaces @aisha/extranet-sdk-*) ──────────
+# Klonuje se přes GitHub proxy session — repo evymo/aisha-extranet-sdk musí být
+# v session připojené. Session s více repy ho má i jako sousední klon; ten
+# poslouží, když proxy klon odmítne (připnutý commit musí v klonu být).
+init_sdk() {
+  [ -f packages/extranet-sdk/package.json ] && return 0
+  git submodule update --init packages/extranet-sdk && return 0
+  local sourozenec
+  sourozenec="$(dirname "$PWD")/aisha-extranet-sdk"
+  [ -d "$sourozenec/.git" ] || return 1
+  git -c protocol.file.allow=always -c "submodule.packages/extranet-sdk.url=$sourozenec" \
+    submodule update --init packages/extranet-sdk
 }
 
-WORKSPACE_ARGS=()
-if sdk_available; then
-  SUMMARY+=("• workspaces: všechny (extranet SDK dostupné)")
-else
-  while IFS= read -r ws; do
-    WORKSPACE_ARGS+=("--workspace=$ws")
-  done < <(node -e '
-    const fs = require("fs"), path = require("path");
-    for (const glob of require("./package.json").workspaces) {
-      const base = glob.replace(/\/\*$/, "");
-      for (const dir of fs.readdirSync(base)) {
-        const ws = path.join(base, dir);
-        if (ws !== "apps/workbench-shell" && fs.existsSync(path.join(ws, "package.json"))) console.log(ws);
-      }
-    }')
-  WORKSPACE_ARGS+=("--include-workspace-root")
-  SUMMARY+=("• workspaces: bez apps/workbench-shell (chybí @aisha/extranet-sdk-ui)")
-fi
+INSTALL_OK=1
+run_step "submodul packages/extranet-sdk" init_sdk || INSTALL_OK=0
 
 # ── Instalace ────────────────────────────────────────────────────────────────
 # `--no-save`: lockfile ani package.json se nepřepisují (strom zůstane čistý).
-INSTALL_OK=1
-run_step "npm install (root + workspaces)" \
-  npm install --no-save ${WORKSPACE_ARGS[@]+"${WORKSPACE_ARGS[@]}"} || INSTALL_OK=0
+if [ "$INSTALL_OK" = 1 ]; then
+  run_step "npm install (root + workspaces)" npm install --no-save || INSTALL_OK=0
+fi
 
-# Rozšíření má vlastní lockfile a není workspace.
+# Rozšíření a mobilní aplikace mají vlastní lockfile a nejsou workspaces.
 if [ "$INSTALL_OK" = 1 ]; then
   run_step "npm install (extensions/aisha-dirigent)" \
     npm install --no-save --prefix extensions/aisha-dirigent || true
-fi
-
-# Extranet SDK ze sousedního klonu — jen když ho nenainstaloval registr.
-# Po každém `npm install` znovu: reify by symlink jako cizí balík odklidil.
-SDK_SIBLING="$(dirname "$PWD")/aisha-extranet-sdk/packages/ui"
-if [ "$INSTALL_OK" = 1 ] && [ ${#WORKSPACE_ARGS[@]} -gt 0 ] && [ -f "$SDK_SIBLING/package.json" ]; then
-  rm -rf node_modules/@aisha/extranet-sdk-ui
-  ln -s "$SDK_SIBLING" node_modules/@aisha/extranet-sdk-ui
-  SUMMARY+=("• @aisha/extranet-sdk-ui → $SDK_SIBLING (v$(node -p "require('$SDK_SIBLING/package.json').version"))")
+  run_step "npm install (mobile-app)" npm install --no-save --prefix mobile-app || true
 fi
 
 # ── Buildy ───────────────────────────────────────────────────────────────────

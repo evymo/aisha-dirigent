@@ -15,31 +15,27 @@
 #
 # Co připraví (vše idempotentní; chybějící repo se přeskočí):
 #   1. bezpečnostní skenery: gitleaks (Go proxy), semgrep (PyPI)
-#   2. aisha-orchestrator: npm závislosti + buildy (= .claude/hooks/session-start.sh),
+#   2. aisha-orchestrator: submodul SDK, npm závislosti + buildy (= .claude/hooks/session-start.sh),
 #      pak throwaway Postgres image pro `npm run test:db`
 #   3. Python repa insight, potok, aisha-local-ingest: venv v /opt/venvs/<repo>
 #
-# Repa hledá v /home/user/<repo>, kam je cloudová session klonuje. Session pro
-# celý projekt: evymo/aisha-orchestrator + aisha-extranet-sdk (SDK se připojí
-# symlinkem, privátní zrcadlo pak není potřeba) + insight + potok + aisha-local-ingest.
+# Repa hledá v /home/user/<repo>, kam je cloudová session klonuje. Připojit do
+# prostředí/session: evymo/aisha-orchestrator, aisha-extranet-sdk (zdroj
+# submodulu packages/extranet-sdk — bez připojení ho GitHub proxy nenaklonuje),
+# insight, potok, aisha-local-ingest.
+#
+# Žádný vlastní npm ani Forgejo: @aisha/* se staví ze zdroje (workspaces,
+# SDK ze submodulu), cizí balíky z registry.npmjs.org podle lockfilů.
 #
 # ── Nastavení prostředí, ke kterému skript patří ─────────────────────────────
 # Network access: Custom, zaškrtnout „Also include default list of common
 # package managers", Allowed domains:
 #     deb.debian.org         # apt v buildu infra/postgres (DB testy)
 #     apt.postgresql.org     # pgaudit/pgtap v buildu infra/postgres
-#   volitelně:
-#     npm.id3a.cz            # privátní npm zrcadlo (SDK z registru místo z klonu)
-#     api.backend.id3a.cz    # MCP server aisha-knowledge (.mcp.json)
 # Environment variables:
-#     VERDACCIO_TOKEN=
-#     npm_config_replace_registry_host=always
 #     REGISTRY_PROXY=mirror.gcr.io/   # Docker Hub přes Google mirror (anonymní pull = 429)
 #     BASH_DEFAULT_TIMEOUT_MS=600000
 #     BASH_MAX_TIMEOUT_MS=1800000
-#   s povoleným npm.id3a.cz navíc: VERDACCIO_URL=https://npm.id3a.cz/
-# Token k zrcadlu (je-li potřeba) NE do proměnných — ty vidí každý uživatel
-# prostředí. Patří do „API credentials" pro host npm.id3a.cz.
 # =============================================================================
 set -uo pipefail
 # Bez -e záměrně: jeden selhaný krok nesmí zastavit ostatní ani start session.
@@ -78,8 +74,8 @@ orchestrator() {
   if [ -f "$hook" ]; then
     CLAUDE_CODE_REMOTE=true CLAUDE_PROJECT_DIR="$repo" CLAUDE_ENV_FILE=/dev/null bash "$hook"
   else
-    (cd "$repo" && export VERDACCIO_TOKEN="${VERDACCIO_TOKEN:-}" \
-      && npm install --no-save --no-audit --no-fund --replace-registry-host=always \
+    (cd "$repo" && git submodule update --init packages/extranet-sdk \
+      && npm install --no-save --no-audit --no-fund \
       && npm run build:packages && npm run build)
   fi
   # Throwaway DB image (tag nese otisk infra/postgres → staví se jen při změně).
