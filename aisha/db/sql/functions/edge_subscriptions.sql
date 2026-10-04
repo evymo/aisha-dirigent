@@ -18,6 +18,20 @@ DECLARE
   v_stripe_subscription_id text;
   v_user_id uuid;
 BEGIN
+  -- ⛔ SECURITY DEFINER vypíná RLS, takže nárok musí vymáhat tělo. Do 2026-10-04
+  -- tu žádná stráž nebyla a funkce má GRANT pro `authenticated` (svc-stripe čte
+  -- předplatné uživatelským tokenem): kdokoli přihlášený si přímým
+  -- /rpc/edge_subscriptions mohl přepnout VLASTNÍ předplatné na 'active' bez
+  -- platby (update_subscription), založit si ho (create_member_subscription),
+  -- přepsat Stripe ceny balíčku (update_package_stripe) a číst předplatné cizích
+  -- účtů (get_user_subscriptions s cizím user_id).
+  -- Zápisy dělá jen služba (svc-stripe po ověření u Stripe / z webhooku); číst
+  -- předplatné smí vlastník, služba a správa. Katalog balíčků zůstává čitelný.
+  IF p_action IN ('create_member_subscription', 'update_package_stripe', 'update_subscription')
+     AND NOT public.is_service_role() THEN
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+  END IF;
+
   IF p_action = 'create_member_subscription' THEN
     INSERT INTO public.member_subscriptions (
       amount_paid,
@@ -86,6 +100,10 @@ BEGIN
     v_user_id := NULLIF(p_payload ->> 'user_id', '')::uuid;
     IF v_user_id IS NULL THEN
       RAISE EXCEPTION 'Missing user_id';
+    END IF;
+    IF v_user_id IS DISTINCT FROM auth.uid()
+       AND NOT (public.is_service_role() OR public.is_admin_or_staff()) THEN
+      RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
     END IF;
 
     v_statuses := COALESCE(

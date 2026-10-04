@@ -11690,3 +11690,13 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/grants/v_health_monthly_summary.sql
 
 NOTIFY pgrst, 'reload schema';
+
+-- ⛔ edge_subscriptions BEZ STRÁŽE (2026-10-04, bezpečnostní nález z revize SQL).
+-- SECURITY DEFINER + GRANT authenticated bez kontroly role: přihlášený si přímým
+-- /rpc/ přepnul vlastní předplatné na 'active' bez platby (update_subscription),
+-- zakládal předplatné, přepisoval Stripe ceny balíčků a četl předplatné cizích
+-- účtů. Zápisy teď jen služba (svc-stripe aktivaci po ověření u Stripe zapisuje
+-- service tokenem), čtení vlastník/služba/správa. Soubor dosud v heals nebyl.
+\ir sql/functions/edge_subscriptions.sql
+
+NOTIFY pgrst, 'reload schema';

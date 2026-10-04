@@ -118,7 +118,6 @@ export const KNOWN_NO_AUTH_FUNCTIONS = [
   'edge_public_partners_directory',
   'edge_sms_otp',
   'edge_stripe_disputes',
-  'edge_subscriptions',
   'log_ai_trace_event',
   'log_n8n_trace_event',
   'route_task',

@@ -275,7 +275,6 @@
     "sql/functions/edge_sms_otp.sql",
     "sql/functions/edge_story_ai.sql",
     "sql/functions/edge_stripe_disputes.sql",
-    "sql/functions/edge_subscriptions.sql",
     "sql/functions/enforce_rate_limit.sql",
     "sql/functions/enqueue_notification_campaign_send_admin.sql",
     "sql/functions/enqueue_workbench_request.sql",
