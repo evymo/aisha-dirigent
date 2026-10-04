@@ -11793,3 +11793,12 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/materialized_views/ai_agent_metrics_hourly.sql
 
 NOTIFY pgrst, 'reload schema';
+
+-- ⛔ partner_profiles_public: ZÁPIS DO CIZÍCH PROFILŮ MIMO RLS (2026-10-04).
+-- Auto-updatable pohled (projekce jedné tabulky) s právy vlastníka a plným DML pro
+-- authenticated: UPDATE/DELETE skrz /rest/v1/partner_profiles_public obcházel RLS
+-- partner_profiles — přihlášený přepsal web/popis cizího partnera (phishing) nebo ho
+-- smazal. Pohled zůstává veřejný pro čtení, DML nemá nikdo. Grant soubor dosud v heals nebyl.
+\ir sql/grants/partner_profiles_public.sql
+
+NOTIFY pgrst, 'reload schema';

@@ -69,6 +69,33 @@ describe.skipIf(!isPgReachable())("pohled s právy vlastníka: bez přímého gr
     expect(zmizele, "výjimka pro pohled, který už neexistuje nebo dostal security_invoker — smaž ji").toEqual([]);
   });
 
+  it("⛔ žádný pohled s právy vlastníka nemá pro klienta zápis — bez výjimky", () => {
+    const zapisovatelne = pohledySPravyVlastnika()
+      .filter((p) => /:DML/.test(p.prava))
+      .map((p) => `${p.jmeno} (${p.prava})`);
+    expect(zapisovatelne, "DML skrz auto-updatable pohled s právy vlastníka obchází RLS podkladu").toEqual([]);
+  });
+
+  it("⛔ přihlášený NEpřepíše cizí partnerský profil skrz veřejný adresář", () => {
+    const partner = randomUUID();
+    const utocnik = randomUUID();
+    const run = partner.slice(0, 8);
+    fixtura(`INSERT INTO aisha_auth.users (id, email) VALUES
+               ('${partner}', 'adresar-partner-${run}@test.local'), ('${utocnik}', 'adresar-utocnik-${run}@test.local')
+             ON CONFLICT (id) DO NOTHING`);
+    fixtura(`INSERT INTO public.partner_profiles (user_id, display_name, city, website, is_visible)
+             VALUES ('${partner}', 'Partner ${run}', 'Brno', 'https://partner.example', true)`);
+
+    expect(jako(ANON, `SELECT count(*) FROM public.partner_profiles_public WHERE user_id = '${partner}'`),
+      "veřejný adresář partnera nevidí — sonda je slepá").toBe("1");
+    expect(zkus(prihlaseny(utocnik),
+      `UPDATE public.partner_profiles_public SET website = 'https://phish.example' WHERE user_id = '${partner}'`))
+      .toMatch(/permission denied for view partner_profiles_public/);
+    expect(zkus(prihlaseny(utocnik), `DELETE FROM public.partner_profiles_public WHERE user_id = '${partner}'`))
+      .toMatch(/permission denied for view partner_profiles_public/);
+    expect(fixtura(`SELECT website FROM public.partner_profiles WHERE user_id = '${partner}'`)).toBe("https://partner.example");
+  });
+
   it("anon nečte kohortní souhrny studií ani úpravy dávkování; admin je dostane přes DEFINER RPC", () => {
     for (const pohled of ["study_cohort_statistics", "study_cohort_trends", "distribution_adjustments_overview"]) {
       expect(zkus(ANON, `SELECT count(*) FROM public.${pohled}`)).toMatch(/permission denied for view/);

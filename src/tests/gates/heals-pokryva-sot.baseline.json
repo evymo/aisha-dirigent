@@ -1722,7 +1722,6 @@
     "sql/grants/partner_certifications.sql",
     "sql/grants/partner_matching_profiles.sql",
     "sql/grants/partner_profiles.sql",
-    "sql/grants/partner_profiles_public.sql",
     "sql/grants/partner_reviews.sql",
     "sql/grants/partner_stories.sql",
     "sql/grants/partner_templates.sql",
