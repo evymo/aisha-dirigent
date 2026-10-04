@@ -35,6 +35,9 @@ function pohledySPravyVlastnika(): Array<{ jmeno: string; prava: string }> {
              CASE WHEN has_table_privilege('authenticated', c.oid, 'INSERT,UPDATE,DELETE') THEN 'authenticated:DML' END)
       FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
      WHERE n.nspname = 'public' AND c.relkind IN ('v', 'm')
+       -- zz_* jsou dočasné kopie jiných testů ve sdílené DB (pohled-jde-nahradit
+       -- zakládá zz_replace_<pohled> a hned ho zahazuje) — ne schéma.
+       AND c.relname NOT LIKE 'zz\\_%'
        AND coalesce((SELECT option_value FROM pg_options_to_table(c.reloptions)
                       WHERE option_name = 'security_invoker'), 'false') <> 'true'
      ORDER BY c.relname`);
