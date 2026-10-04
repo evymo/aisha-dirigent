@@ -254,6 +254,10 @@ export function psqlMultiline(sql: string): string {
     return execFileSync("psql", buildPsqlArgs(["-f", tempFile]), {
       encoding: "utf-8",
       timeout: 60000,
+      // ⛔ Výchozí strop výstupu je 1 MB. Dotazy nad pg_proc vrací těla VŠECH
+      // funkcí (dnes > 1 800) a strop přetekly — test padal na `spawnSync psql
+      // ENOBUFS`, tedy na velikosti katalogu, ne na tom, co měří.
+      maxBuffer: 256 * 1024 * 1024,
       env: { ...process.env, PGPASSWORD: PG_PASSWORD },
     });
   } finally {
@@ -703,6 +707,8 @@ export const SINGLE_ROW_RPCS: ReadonlySet<string> = new Set<string>([
   "get_story_ptt_room",
   "get_study_detail",
   "get_web_page_admin",
+  // p_step_id je PK kroku; tělo skládá JEDEN řádek (RETURN QUERY bez FROM přes sady).
+  "get_workflow_step_detail",
   // ── Per-user singleton (profile / wallet / completeness) ──────────────────
   "get_health_document_download_info_audited",
   "get_health_document_for_analysis_audited",
