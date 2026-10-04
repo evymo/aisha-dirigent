@@ -20831,6 +20831,16 @@ WHERE te.twin_id IS NOT NULL
 COMMENT ON VIEW public.audience_admin_twin_timeline_v IS
   'Typed records and ingested events on one twin''s axis (subject twin, or the account bound to it). Filter by twin_id for the extranet twin detail (ADR-003).';
 
+-- ⛔ ŽÁDNÝ PŘÍMÝ GRANT KLIENTSKÝM ROLÍM (nález 2026-10-04). Pohled se čte právy
+-- VLASTNÍKA, tedy mimo RLS story_entries a twin_events — včetně interních
+-- záznamů (`is_internal`) a obsahu e-mailů z ingestu. S GRANT SELECT pro
+-- `authenticated` si ho kdokoli přihlášený přečetl celý přes /rest/v1/,
+-- a obešel tak stráž is_admin_or_staff() v get_audience_view_timeline_block.
+-- Jediná cesta ke čtení je ta DEFINER funkce; REVOKE ALL i z authenticated,
+-- protože na běžící DB žije explicitní grant z heals i default privileges.
+REVOKE ALL ON public.audience_admin_twin_timeline_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_twin_timeline_v TO service_role;
+
 
 -- -----------------------------------------------------------------------------
 -- File: aisha/db/sql/views/audience_creator_audience_v.sql

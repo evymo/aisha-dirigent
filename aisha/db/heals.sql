@@ -9562,7 +9562,7 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/functions/get_audience_view_timeline_block.sql
 \ir sql/functions/get_audience_view_kpi_block.sql
 \ir sql/views/audience_admin_twin_timeline_v.sql
-GRANT SELECT ON public.audience_admin_twin_timeline_v TO authenticated, service_role;
+-- (Granty pohledu nese jeho SoT; přímý GRANT pro authenticated byl únik — viz blok 2026-10-04.)
 
 NOTIFY pgrst, 'reload schema';
 
@@ -11698,5 +11698,16 @@ NOTIFY pgrst, 'reload schema';
 -- účtů. Zápisy teď jen služba (svc-stripe aktivaci po ověření u Stripe zapisuje
 -- service tokenem), čtení vlastník/služba/správa. Soubor dosud v heals nebyl.
 \ir sql/functions/edge_subscriptions.sql
+
+NOTIFY pgrst, 'reload schema';
+
+-- ⛔ audience_admin_twin_timeline_v ČITELNÝ KAŽDÝM PŘIHLÁŠENÝM (2026-10-04, nález z revize SQL).
+-- Pohled s právy vlastníka (mimo RLS story_entries/twin_events, včetně is_internal
+-- záznamů a předmětů e-mailů z ingestu) dostal výš `GRANT SELECT … TO authenticated`.
+-- Stráž is_admin_or_staff() v get_audience_view_timeline_block tím šla obejít
+-- přímým /rest/v1/audience_admin_twin_timeline_v. SoT pohledu teď grant odebírá
+-- (REVOKE ALL i z authenticated — explicitní grant z dřívějšího heals sám nezmizí)
+-- a nechává jen service_role; čte se výhradně přes DEFINER blokovou funkci.
+\ir sql/views/audience_admin_twin_timeline_v.sql
 
 NOTIFY pgrst, 'reload schema';
