@@ -43,7 +43,7 @@ describe.skipIf(!isPgReachable())("edge_bank_transactions: nárok podle akce", (
              ON CONFLICT DO NOTHING`);
     fixtura(`INSERT INTO public.orders (id, user_id, total, payment_method, payment_status, status, variable_symbol) VALUES
                ('${OBJ_CLENA}', '${CLEN}',  990, 'bank_transfer', 'awaiting_transfer', 'pending', 'vs-clen-${RUN}'),
-               ('${OBJ_ADMIN}', '${CLEN}',  990, 'bank_transfer', 'pending',           'pending', 'vs-admin-${RUN}'),
+               ('${OBJ_ADMIN}', '${CLEN}',  990, 'bank_transfer', 'awaiting_transfer', 'pending', 'vs-admin-${RUN}'),
                ('${OBJ_CIZI}',  '${CIZI}',  990, 'bank_transfer', 'awaiting_transfer', 'pending', 'vs-cizi-${RUN}')`);
     fixtura(`INSERT INTO public.bank_transactions (id, fio_transaction_id, amount, sender_account, sender_name, match_status) VALUES
                ('${TX_CLEN}',  'fio-clen-${RUN}',  990, '123456789/0100', 'Platce ${RUN}', 'unmatched'),
@@ -57,14 +57,15 @@ describe.skipIf(!isPgReachable())("edge_bank_transactions: nárok podle akce", (
     expect(fixtura(`SELECT match_status FROM public.bank_transactions WHERE id = '${TX_CLEN}'`)).toBe("unmatched");
   });
 
-  // Objednávka admina NEčeká na převod, takže párování nepřepne `status` na
-  // 'paid'. Přechod na 'paid' dnes shodí trigger handle_order_payment_completed
-  // (volá record_audit_log s uuid místo text) — to je jiná chyba než nárok
-  // a kontrolní vzorek ji nemá zakrývat ani na ni čekat.
-  it("admin párování provede (kontrolní vzorek: stráž admina pustí)", () => {
+  it("admin párování provede a objednávka je zaplacená (kontrolní vzorek)", () => {
     expect(jako(prihlaseny(ADMIN), volani("match_to_order", { transaction_id: TX_ADMIN, order_id: OBJ_ADMIN })))
       .toContain('"ok": true');
     expect(fixtura(`SELECT match_status FROM public.bank_transactions WHERE id = '${TX_ADMIN}'`)).toBe("matched");
+    // Přechod na 'paid' spouští handle_order_payment_completed. Do 2026-10-04 volal
+    // record_audit_log s uuid místo text a celé párování spadlo i adminovi.
+    expect(stavObjednavky(OBJ_ADMIN)).toBe("paid/paid");
+    expect(fixtura(`SELECT count(*) FROM public.audit_journal WHERE entity_type = 'orders' AND entity_id = '${OBJ_ADMIN}'`))
+      .toBe("1");
   });
 
   it("⛔ frontu nespárovaných (účty, jména plátců) čte admin, člen NE", () => {

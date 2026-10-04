@@ -48,11 +48,15 @@ BEGIN
       ON CONFLICT (schedule_id, order_id) DO NOTHING;
     END IF;
     
-    -- Log the payment event
+    -- Log the payment event.
+    -- ⛔ p_resource_id je TEXT. Do 2026-10-04 tu šlo holé NEW.id (uuid) a uuid
+    -- nemá implicitní přetypování na text — Postgres funkci nenašel a KAŽDÝ
+    -- přechod objednávky na 'paid' (webhook Stripe, párování bankovní platby)
+    -- spadl celý, včetně zápisu, který ho vyvolal.
     PERFORM public.record_audit_log(
       'order_paid',
       'orders',
-      NEW.id,
+      NEW.id::text,
       NULL,
       jsonb_build_object('total', NEW.total, 'shipping_method', NEW.shipping_method)
     );

@@ -11724,3 +11724,10 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/functions/edge_mobile_notifications.sql
 
 NOTIFY pgrst, 'reload schema';
+
+-- ⛔ handle_order_payment_completed: KAŽDÝ PŘECHOD OBJEDNÁVKY NA 'paid' PADAL (2026-10-04).
+-- Trigger volal record_audit_log(text, text, text, uuid, jsonb) s NEW.id (uuid) na místě
+-- p_resource_id (text) — uuid → text není implicitní, funkce se nenašla a UPDATE orders
+-- spadl celý (Stripe webhook, ruční párování bankovní platby). Naměřeno DB testem při
+-- opravě edge_bank_transactions. Soubor dosud v heals nebyl.
+\ir sql/functions/handle_order_payment_completed.sql

@@ -868,7 +868,6 @@
     "sql/functions/grant_permission_admin.sql",
     "sql/functions/grant_user_role_admin.sql",
     "sql/functions/handle_auth_send_email.sql",
-    "sql/functions/handle_order_payment_completed.sql",
     "sql/functions/has_document_sharing_access.sql",
     "sql/functions/has_section_access.sql",
     "sql/functions/health_data_bulk_upload.sql",
