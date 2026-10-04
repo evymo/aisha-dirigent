@@ -235,6 +235,10 @@
         "hooks": [
           {
             "type": "command",
+            "command": "${CLAUDE_PROJECT_DIR}/.claude/hooks/session-start.sh"
+          },
+          {
+            "type": "command",
             "command": "echo '--- Story Context ---' && cat .aisha/story.json 2>/dev/null || echo 'No active story' && echo '--- Branch ---' && git branch --show-current && echo '--- Status ---' && git status --short | head -10"
           },
           {

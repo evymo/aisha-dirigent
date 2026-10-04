@@ -30,14 +30,28 @@ const apiCoreRoot = path.resolve(repoRoot, "packages/api-core");
 // ⚠️ CI byla zelená: `Mobile: TypeScript & Tests` pouští tsc + jest, a ŽÁDNÁ
 // lane aplikaci nebalí. Zelená CI o rozložitelnosti balíčku nic netvrdí.
 const knockProtocolRoot = path.resolve(repoRoot, "packages/knock-protocol");
+// Extranet SDK (nativní kit + tokeny) — ze submodulu `packages/extranet-sdk`,
+// `file:` odkaz v package.json. Tentýž důvod jako u knock-protocol: Metro
+// symlink mimo kořen projektu nenásleduje, a `native` importuje tokeny
+// (`@aisha/extranet-sdk-tokens/native.js`) ze SVÉHO umístění, ne z mobile-app.
+const sdkNativeRoot = path.resolve(repoRoot, "packages/extranet-sdk/packages/native");
+const sdkTokensRoot = path.resolve(repoRoot, "packages/extranet-sdk/packages/tokens");
 
-config.watchFolders = [...(config.watchFolders || []), apiCoreRoot, knockProtocolRoot];
+config.watchFolders = [
+  ...(config.watchFolders || []),
+  apiCoreRoot,
+  knockProtocolRoot,
+  sdkNativeRoot,
+  sdkTokensRoot,
+];
 
 config.resolver = config.resolver || {};
 config.resolver.extraNodeModules = {
   ...(config.resolver.extraNodeModules || {}),
   "@aisha/api-core": apiCoreRoot,
   "@aisha/knock-protocol": knockProtocolRoot,
+  "@aisha/extranet-sdk-native": sdkNativeRoot,
+  "@aisha/extranet-sdk-tokens": sdkTokensRoot,
 };
 config.resolver.nodeModulesPaths = [
   ...(config.resolver.nodeModulesPaths || []),

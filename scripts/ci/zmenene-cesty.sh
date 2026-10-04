@@ -56,7 +56,13 @@ CHANGED=$(grep -v '^[[:space:]]*$' <<< "$CHANGED" || true)
 # Naměřeno 2026-09-14: každý bump ingestu přestavěl databázi, zatímco appku,
 # která se měnila, detektor nenašel. Kam submodul patří, určuje
 # aisha-changed-apps.mjs z COPY v Dockerfile (krok deploy_apps).
-SUBMODULY=$(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null | awk '{print $2}' || true)
+# ⭐ Výjimka (2026-10-04): submodul, který je ZDROJEM npm workspaces — extranet
+# SDK (packages/extranet-sdk → @aisha/extranet-sdk-ui/-tokens) — vstupem buildu
+# JE: root testy a brány, workbench-shell i mobil z něj staví. Jeho posun proto
+# app rozsvítit musí; mezi „cizí" submoduly nepatří.
+SUBMODULY_ZDROJ_BUILDU="packages/extranet-sdk"
+SUBMODULY=$(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null | awk '{print $2}' \
+  | grep -vxF "$SUBMODULY_ZDROJ_BUILDU" || true)
 CHANGED_BEZ_SUBMODULU=$(grep -vxF -f <(printf '%s\n' $SUBMODULY) <<< "$CHANGED" || true)
 echo "diag/submoduly: $(echo $SUBMODULY | tr '\n' ' ')" >&2
 
@@ -194,7 +200,7 @@ if [ -n "$CHANGED" ]; then
   # z `extraNodeModules` v `mobile-app/metro.config.js`; že oba seznamy sedí,
   # hlídá brána mobil-bundle-univerzum. `.forgejo/workflows/` z principu výš:
   # ZMĚNA BRÁNY MUSÍ BRÁNU SPUSTIT.
-  grep -qE '^(mobile-app/|packages/(api-core|knock-protocol)/|\.forgejo/workflows/)' <<< "$CHANGED" && MOBILE_APP=true || MOBILE_APP=false
+  grep -qE '^(mobile-app/|packages/(api-core|knock-protocol|extranet-sdk)/|packages/extranet-sdk$|\.forgejo/workflows/)' <<< "$CHANGED" && MOBILE_APP=true || MOBILE_APP=false
 
   # --- Cosmos Go chain ---
   grep -qE '^cosmos/' <<< "$CHANGED" && COSMOS=true || COSMOS=false
@@ -224,11 +230,11 @@ if [ -n "$CHANGED" ]; then
   # This list is not a taste call — it is exactly what the extranet image BUILDS
   # from (deploy/surface-host/Dockerfile: npm ci → build -w packages/surface-blocks
   # → build -w apps/$SHELL_APP with AISHA_INSTANCE_DIR=instances/$AISHA_INSTANCE).
-  # extranet-sdk-ui + design-language are here because the shell declares both as
+  # extranet SDK (submodul packages/extranet-sdk: gitlink i obsah) + design-language are here because the shell declares both as
   # `dependencies` and the Dockerfile bakes their SOURCE into the artifact.
   # Spelled as separate alternatives, not packages/(a|b|c)/: the ci-deploy-honesty
   # gate asserts this line CONTAINS each build input verbatim.
-  grep -qE '^(apps/|packages/surface-blocks/|packages/extranet-sdk-ui/|packages/design-language/|deploy/surface-host/|instances/|docker-compose\.coolify-extranet\.yml$|scripts/surfaces-build-all\.sh$|package-lock\.json$)' <<< "$CHANGED" && SURFACES=true || SURFACES=false
+  grep -qE '^(apps/|packages/surface-blocks/|packages/extranet-sdk/|packages/extranet-sdk$|packages/design-language/|deploy/surface-host/|instances/|docker-compose\.coolify-extranet\.yml$|scripts/surfaces-build-all\.sh$|package-lock\.json$)' <<< "$CHANGED" && SURFACES=true || SURFACES=false
 
   # --- Docs only (skip everything) ---
   NON_DOC=$(grep -vE '^(docs/|\.github/|README\.md|CONTRIBUTING\.md|AGENTS\.md|CLAUDE\.md|RULES\.md|FEEDBACK\.md|FINAL-DRAFT\.md|aisha-story\.md|dirigent-plugin\.md|idea-full-implmentation-orchestrator\.md|security_and_test_analysis\.md|\.aisha/)' <<< "$CHANGED" || true)
@@ -284,7 +290,7 @@ while IFS= read -r f; do
     mobile-app/*) EXPECT_MOBILE=true ;;
   esac
   case "$f" in
-    apps/*|packages/surface-blocks/*|packages/extranet-sdk-ui/*|packages/design-language/*|deploy/surface-host/*|instances/*) EXPECT_SURFACES=true ;;
+    apps/*|packages/surface-blocks/*|packages/extranet-sdk|packages/extranet-sdk/*|packages/design-language/*|deploy/surface-host/*|instances/*) EXPECT_SURFACES=true ;;
   esac
   case "$f" in
     aisha/db/*|src/tests/db/*|scripts/db/*|scripts/lib/postgres-major.mjs|config/image-versions.env|infra/postgres/*) EXPECT_DB=true ;;

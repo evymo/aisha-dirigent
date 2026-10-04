@@ -47,6 +47,10 @@ const OSS_RELATIVE_SUBMODULES = [
   // private today, published like insight's mirror when they go public).
   "../potok.git",
   "../aisha-local-ingest.git",
+  // Extranet SDK (2026-10-04): npm workspace ze zdroje místo balíku z privátního
+  // zrcadla — build nesmí záviset na vlastním npm. Relativní ze stejného důvodu
+  // jako insight (Coolify/CI dědí pověření rodičovského klonu).
+  "../aisha-extranet-sdk.git",
 ];
 
 /**

@@ -26,6 +26,7 @@ import { describe, expect, test } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parse } from "yaml";
+import { duvodVynechanoSnapshotem } from "./lib/vynechano-snapshotem";
 
 const ROOT = process.cwd();
 const cti = (p: string) => readFileSync(join(ROOT, p), "utf8");
@@ -76,7 +77,12 @@ describe("postgres: major verze je parametr", () => {
         else if (/\.(ya?ml|sh|mjs|cjs|js)$/.test(e.name) && !/\.test\.(mjs|js)$/.test(e.name)) soubory.push(cesta);
       }
     };
-    for (const kořen of [".forgejo/workflows", ".github/workflows", "scripts"]) projdi(kořen);
+    // Kořen, který veřejný snapshot nevozí (`.github/workflows/`), se neprochází —
+    // v tomhle stromu není; upstream ho má a měří. Chybějící kořen BEZ důvodu
+    // dál padá na ENOENT (vada, ne snapshot).
+    for (const kořen of [".forgejo/workflows", ".github/workflows", "scripts"]) {
+      if (duvodVynechanoSnapshotem(`${kořen}/`) === null) projdi(kořen);
+    }
     const volani: string[] = [];
     for (const f of soubory) {
       const radky = cti(f).split("\n");

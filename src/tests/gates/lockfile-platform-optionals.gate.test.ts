@@ -27,6 +27,7 @@
 import { describe, it, expect } from 'vitest';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { workspaceAdresare } from './lib/workspaces';
 
 const ROOT = process.cwd();
 const LOCKFILE = join(ROOT, 'package-lock.json');
@@ -105,16 +106,8 @@ describe('lockfile-platform-optionals — npm ci must work on every deploy platf
       : (rootPkg.workspaces?.packages ?? []);
     expect(globs.length, 'root package.json declares no workspaces — harness broken').toBeGreaterThan(0);
 
-    const declared: string[] = [];
-    for (const glob of globs) {
-      const dir = glob.replace(/\/\*$/, '');
-      const base = join(ROOT, dir);
-      if (!existsSync(base)) continue;
-      for (const entry of readdirSync(base)) {
-        const ws = `${dir}/${entry}`;
-        if (existsSync(join(ROOT, ws, 'package.json'))) declared.push(ws);
-      }
-    }
+    // Rozbalení jako npm (negace, doslovné cesty) — jeden domov v lib/workspaces.
+    const declared = workspaceAdresare(globs, ROOT);
 
     const missing = declared.filter((ws) => !lock.packages?.[ws]);
     expect(

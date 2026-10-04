@@ -70,7 +70,13 @@ function copyCileDoCss(): { cil: string; zdroje: string[]; zOverlaye: boolean }[
  * v Dockerfilu, ne vyjmenované. Nový balík se pod bránu dostane bez zásahu.
  */
 function balikyZeStagu(): string[] {
-  const obsah = readFileSync(join(ROOT, DOCKERFILE), "utf8").replace(/\\\n\s*/g, " ");
+  // Komentáře pryč dřív, než se slučují pokračovací řádky: věta v komentáři
+  // („…fetch-locked-package.mjs kopíruje…") se jinak četla jako jméno balíku.
+  const obsah = readFileSync(join(ROOT, DOCKERFILE), "utf8")
+    .split("\n")
+    .filter((radek) => !/^\s*#/.test(radek))
+    .join("\n")
+    .replace(/\\\n\s*/g, " ");
   const baliky = new Set<string>();
   for (const m of obsah.matchAll(/fetch-locked-package\.mjs\s+((?:--\S+\s+)*)(\S+)/g)) {
     baliky.add(m[2]);

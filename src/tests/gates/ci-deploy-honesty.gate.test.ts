@@ -38,6 +38,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 import yaml from "js-yaml";
+import { duvodVynechanoSnapshotem } from "./lib/vynechano-snapshotem";
 
 const ROOT = process.cwd();
 const CI = join(ROOT, ".forgejo/workflows/ci.yml");
@@ -53,6 +54,16 @@ const RESOLVER_WORKFLOWS = [
   ".forgejo/workflows/staging-deploy.yml",
   ".github/workflows/deploy.yml",
 ];
+
+/**
+ * Workflow, které veřejný snapshot nevozí (config/public-snapshot.exclude), se
+ * neměří — v tomhle stromu nejsou. Hlásí je samostatný PŘESKOČENÝ test s důvodem,
+ * aby „změřeno 3 ze 4" nevypadalo jako „změřeno všechno". Upstream je má → měří.
+ */
+const VYNECHANE_WORKFLOWS = RESOLVER_WORKFLOWS.map((rel) => duvodVynechanoSnapshotem(rel)).filter(
+  (d): d is string => d !== null,
+);
+const MERENE_WORKFLOWS = RESOLVER_WORKFLOWS.filter((rel) => duvodVynechanoSnapshotem(rel) === null);
 
 type Step = { name?: string; run?: string; uses?: string; env?: Record<string, unknown> };
 type Job = { name?: string; if?: string; needs?: string[] | string; steps?: Step[] };
@@ -71,7 +82,7 @@ function credentialGuards(run: string): string[] {
 /** Every step, in every resolver workflow, that shells out to the UUID resolver. */
 function resolverCallSites(): { where: string; run: string }[] {
   const sites: { where: string; run: string }[] = [];
-  for (const rel of RESOLVER_WORKFLOWS) {
+  for (const rel of MERENE_WORKFLOWS) {
     const doc = yaml.load(readFileSync(join(ROOT, rel), "utf8")) as {
       jobs?: Record<string, Job>;
     };
@@ -301,7 +312,8 @@ describe("CI deploy honesty (gate)", () => {
     for (const input of [
       "apps/",
       "packages/surface-blocks/",
-      "packages/extranet-sdk-ui/",
+      // SDK je od 2026-10-04 submodul (gitlink + obsah), ne adresář balíku.
+      "packages/extranet-sdk/",
       "packages/design-language/",
       "deploy/surface-host/",
       "instances/",
@@ -310,6 +322,13 @@ describe("CI deploy honesty (gate)", () => {
         .toContain(input);
     }
   });
+
+  test.skipIf(VYNECHANE_WORKFLOWS.length > 0)(
+    `všechny resolver workflow jsou ve stromu a měří se${VYNECHANE_WORKFLOWS.length ? ` — NEZMĚŘENO: ${VYNECHANE_WORKFLOWS.join("; ")}` : ""}`,
+    () => {
+      expect(MERENE_WORKFLOWS).toEqual(RESOLVER_WORKFLOWS);
+    },
+  );
 
   test("every resolver call site tells 'app absent' apart from 'resolve broke'", () => {
     const sites = resolverCallSites();

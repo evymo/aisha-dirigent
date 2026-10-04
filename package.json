@@ -11,6 +11,9 @@
   "homepage": "https://github.com/evymo/aisha-dirigent",
   "workspaces": [
     "packages/*",
+    "!packages/extranet-sdk",
+    "packages/extranet-sdk/packages/ui",
+    "packages/extranet-sdk/packages/tokens",
     "services/*",
     "apps/*"
   ],

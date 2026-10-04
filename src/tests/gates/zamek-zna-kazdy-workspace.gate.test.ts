@@ -29,9 +29,10 @@
  * jméno vypadá platně, druhá strana chybí, a pozná se to až u toho, kdo na ně sáhne.
  */
 import { describe, test, expect } from "vitest";
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { globSync } from "node:fs";
+import { vzoryWorkspaces, workspaceAdresare } from "./lib/workspaces";
 
 const ROOT = process.cwd();
 const cti = (p: string) => JSON.parse(readFileSync(join(ROOT, p), "utf-8"));
@@ -42,13 +43,10 @@ type Clen = { dir: string; name: string };
 function clenove(): Clen[] {
   const pj = cti("package.json") as { workspaces?: string[] };
   const out: Clen[] = [];
-  for (const vzor of pj.workspaces ?? []) {
-    for (const dir of globSync(vzor, { cwd: ROOT }).sort()) {
-      const pf = join(ROOT, dir, "package.json");
-      if (!existsSync(pf)) continue;
-      const name = (JSON.parse(readFileSync(pf, "utf-8")) as { name?: string }).name;
-      if (name) out.push({ dir, name });
-    }
+  // Rozbalení jako npm (negace, doslovné cesty) — jeden domov v lib/workspaces.
+  for (const dir of workspaceAdresare(vzoryWorkspaces(pj), ROOT)) {
+    const name = (JSON.parse(readFileSync(join(ROOT, dir, "package.json"), "utf-8")) as { name?: string }).name;
+    if (name) out.push({ dir, name });
   }
   return out;
 }
@@ -105,5 +103,28 @@ describe("kořenový zámek — zná každý workspace, a celý", () => {
       "Cesta v zámku, které neodpovídá žádný workspace ani adresář — zbytek po ořezu.\n" +
         "Sám o sobě mlčí; probudí se, až se to jméno znovu použije.",
     ).toEqual([]);
+  });
+
+  test("negativní sonda: rozbalení jako npm — glob, doslovná cesta a negace; adresář bez package.json ne", () => {
+    const koren = mkdtempSync(join(tmpdir(), "workspaces-sonda-"));
+    const balik = (dir: string) => {
+      mkdirSync(join(koren, dir), { recursive: true });
+      writeFileSync(join(koren, dir, "package.json"), JSON.stringify({ name: dir }));
+    };
+    try {
+      balik("packages/a");
+      balik("packages/sdk"); // kořen vnořeného monorepa — negace ho vyřadí
+      balik("packages/sdk/packages/ui");
+      balik("packages/sdk/packages/native"); // doslovně nevyjmenovaný → není workspace
+      mkdirSync(join(koren, "packages/prazdny"), { recursive: true }); // bez package.json
+      expect(
+        workspaceAdresare(["packages/*", "!packages/sdk", "packages/sdk/packages/ui"], koren),
+      ).toEqual(["packages/a", "packages/sdk/packages/ui"]);
+      expect(workspaceAdresare([], koren)).toEqual([]);
+      expect(vzoryWorkspaces({ workspaces: { packages: ["x/*"] } })).toEqual(["x/*"]);
+      expect(vzoryWorkspaces({})).toEqual([]);
+    } finally {
+      rmSync(koren, { recursive: true, force: true });
+    }
   });
 });

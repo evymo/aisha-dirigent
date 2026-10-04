@@ -71,15 +71,18 @@
  * 25 nových nálezů (11 v dosavadním univerzu, 14 mimo), všechny opraveny.
  */
 import { describe, it, expect } from "vitest";
-import { lstatSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // Jména instancí a tvar nálezu žijí v JEDNOM domově (lib/jmena-instanci.ts):
 // n8n brány měří touž vlastnost nad adresami uzlů a měly vlastní literál se
 // jménem skutečné instance — vzorek, ne vlastnost (naměřeno 2026-09-12).
+import { envWithoutGitLocation } from "../../../scripts/lib/git-worktree-health.mjs";
 import {
+  JMENO_PLATFORMY,
   ROOT,
+  jmenaInstanci,
   jmenaZRepozitaru,
   jmenoZPrefixu,
   jmenoZProfilu,
@@ -351,10 +354,18 @@ describe("kód stacku nesmí znát jméno konkrétní instance", () => {
   // Lockfile je ozvěna zdroje — vynechává se z měření jmen, ale ozvěna bez
   // zdroje je vada (viz workspacyBezZdroje). Měří se skutečný lockfile nad
   // skutečným `git ls-files`; sonda níž měří pravidlo nad fixturou.
+  // `--recurse-submodules`: workspace ze submodulu (extranet SDK) má zdroj ve
+  // stromu submodulu. Neinicializovaný submodul soubory nevydá → nález, správně:
+  // `npm ci` by bez něj taky neprošel.
   it("lockfile nenese workspace, jehož cesta ve stromu není", () => {
     const lock = JSON.parse(readFileSync(join(ROOT, "package-lock.json"), "utf8"));
     const sledovane = new Set(
-      execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024 }).split("\n"),
+      execFileSync("git", ["ls-files", "--recurse-submodules"], {
+        cwd: ROOT,
+        encoding: "utf-8",
+        env: envWithoutGitLocation(),
+        maxBuffer: 64 * 1024 * 1024,
+      }).split("\n"),
     );
     const workspacy = Object.keys(lock.packages ?? {}).filter((c) => c !== "" && !c.split("/").includes("node_modules"));
     expect(workspacy.length, "lockfile nemá žádný workspace-záznam — měřidlo čte špatný soubor").toBeGreaterThan(10);
@@ -393,6 +404,24 @@ describe("kód stacku nesmí znát jméno konkrétní instance", () => {
       expect(najdiJmena(textSouboru(join(dir, "nul.ts")) ?? "", ["testfork"]).length).toBe(1);
       expect(textSouboru(join(dir, "bin.dat"))).toBeNull();
       expect(textSouboru(join(dir, "neni"))).toBeNull();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // Veřejné zrcadlo upstreamu je `<platforma>-orchestrator` — jméno PLATFORMY,
+  // ne forku. Bez výjimky v kanálu remotů z něj vyšla „instance" `aisha`.
+  it("negativní sonda: remote `<platforma>-orchestrator` instanci nedává, `<fork>-orchestrator` ano", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmeno-remote-"));
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, env: envWithoutGitLocation() });
+    try {
+      git("init", "-q");
+      // jmenaInstanci() čte identitu stromu resolverem z <root>/scripts/lib.
+      symlinkSync(join(ROOT, "scripts"), join(dir, "scripts"));
+      git("remote", "add", "zrcadlo", `https://github.example/org/${JMENO_PLATFORMY}-orchestrator.git`);
+      expect(await jmenaInstanci(dir)).not.toContain(JMENO_PLATFORMY);
+      git("remote", "add", "fork", "https://forge.example/org/testfork-orchestrator.git");
+      expect(await jmenaInstanci(dir)).toContain("testfork");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

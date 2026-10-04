@@ -55,6 +55,9 @@ export default tseslint.config(
       "test-results/**",
       "trash/**",
       "workbench/**",
+      // Obsah submodulu měří jeho vlastní repo (evymo/aisha-extranet-sdk má
+      // vlastní testy a konvence — např. JSX v .js u React Native příkladu).
+      "packages/extranet-sdk/**",
       // Local git worktree checkouts (e.g. subagent isolation) — each worktree
       // lints itself; the main tree must not gate on their copies.
       ".worktrees/**",

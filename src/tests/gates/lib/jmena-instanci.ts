@@ -83,7 +83,11 @@ export async function jmenaInstanci(root: string = ROOT): Promise<string[]> {
     }
     const m = url.match(/\/([a-z][a-z0-9-]*)-orchestrator(?:\.git)?\s*$/);
     // `evymo-ai` je UPSTREAM, ne fork — jeho jméno není instanční identita.
-    if (m && m[1] !== "evymo-ai") jmena.add(m[1]);
+    // Totéž jméno PLATFORMY: veřejné zrcadlo upstreamu je `<platforma>-orchestrator`
+    // (github.com/evymo/aisha-orchestrator) a bez téhle výjimky vyrobilo z `aisha`
+    // „instanci" — 7 399 nálezů ve vlastním kódu platformy. Kanály identity
+    // a registru forků (níž) platformu vylučují už teď; remote byl jediný bez.
+    if (m && m[1] !== "evymo-ai" && m[1] !== JMENO_PLATFORMY) jmena.add(m[1]);
   }
   // ⛔ NAMĚŘENO 2026-09-12: fork pojmenovaný `<org>-<fork>` (ne `<fork>-orchestrator`)
   // nese identitu `<prefix>` (APP_NAME_PREFIX) a `<story>` (AISHA_STORY), která
