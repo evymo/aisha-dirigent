@@ -11668,3 +11668,12 @@ BEGIN
 END $$;
 
 NOTIFY pgrst, 'reload schema';
+
+-- ⛔ edge_bank_transactions BEZ STRÁŽE (2026-10-04, bezpečnostní nález z revize SQL).
+-- SECURITY DEFINER + GRANT authenticated, ale žádná kontrola role: přihlášený člen si
+-- přímým /rpc/ mohl párovat platbu na vlastní objednávku (→ orders.status = 'paid'),
+-- vkládat bankovní pohyby a číst frontu nespárovaných plateb (účty, jména plátců).
+-- Soubor dosud v heals nebyl vůbec, takže by se oprava na běžící DB nepřehrála.
+\ir sql/functions/edge_bank_transactions.sql
+
+NOTIFY pgrst, 'reload schema';

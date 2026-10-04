@@ -265,7 +265,6 @@
     "sql/functions/document_sensitivity_min_tier.sql",
     "sql/functions/document_visible_to.sql",
     "sql/functions/edge_app_versions.sql",
-    "sql/functions/edge_bank_transactions.sql",
     "sql/functions/edge_blockchain_audit.sql",
     "sql/functions/edge_database_dump_table.sql",
     "sql/functions/edge_mobile_notifications.sql",

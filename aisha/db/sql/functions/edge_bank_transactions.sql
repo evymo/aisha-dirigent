@@ -14,6 +14,21 @@ DECLARE
   v_tx_id text;
   v_order_id uuid;
 BEGIN
+  -- ⛔ SECURITY DEFINER vypíná RLS, takže nárok musí vymáhat tělo. Do 2026-10-04
+  -- tu žádná stráž nebyla a funkce má GRANT pro `authenticated` (admin UI ji volá
+  -- přímo): kdokoli přihlášený si přímým /rpc/edge_bank_transactions mohl
+  -- označit vlastní objednávku za zaplacenou (match_to_order), podstrčit
+  -- platbu (insert_transaction) a přečíst účty a jména plátců (get_unmatched).
+  -- Zápis pohybů z banky dělá jen služba (svc-fio-bank); párování a frontu
+  -- nespárovaných admin/staff. get_order_bank_transfer stráží vlastníka níž.
+  IF p_action = 'insert_transaction' AND NOT public.is_service_role() THEN
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+  END IF;
+  IF p_action IN ('match_to_order', 'get_unmatched')
+     AND NOT (public.is_service_role() OR public.is_admin_or_staff()) THEN
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+  END IF;
+
   -- INSERT a new bank transaction (deduplicate by fio_transaction_id)
   IF p_action = 'insert_transaction' THEN
     v_tx_id := NULLIF(p_payload ->> 'fio_transaction_id', '');
