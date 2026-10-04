@@ -27,8 +27,15 @@
  */
 
 import { describe, test, expect } from 'vitest';
-import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import {
+  SNAPSHOT_EXCLUDE,
+  duvodVynechanoSnapshotem,
+  vyrazenoVzorem,
+  vzorySnapshotu,
+} from './lib/vynechano-snapshotem';
 
 const ROOT = process.cwd();
 
@@ -177,10 +184,32 @@ describe('Static defense-in-depth umbrella gate', () => {
     ).toEqual([]);
   });
 
+  // Artefakty, které veřejný snapshot nevozí (config/public-snapshot.exclude):
+  // měří je samostatný test níž — v upstreamu je ověří, ve veřejném klonu se
+  // PŘESKOČÍ s důvodem. Viz lib/vynechano-snapshotem.
+  const vzory = existsSync(resolve(ROOT, SNAPSHOT_EXCLUDE))
+    ? vzorySnapshotu(readFileSync(resolve(ROOT, SNAPSHOT_EXCLUDE), 'utf8'))
+    : [];
+  const mimoSnapshot = LAYERS.flatMap((layer) =>
+    layer.artifacts.filter((a) => vyrazenoVzorem(a, vzory)).map((a) => ({ layer: layer.id, artifact: a })),
+  );
+  const nezmereno = mimoSnapshot
+    .map(({ artifact }) => duvodVynechanoSnapshotem(artifact))
+    .filter((d): d is string => d !== null);
+
+  test.skipIf(nezmereno.length > 0)(
+    `artefakty vrstev mimo veřejný snapshot existují${nezmereno.length ? ` — NEZMĚŘENO: ${nezmereno.join('; ')}` : ''}`,
+    () => {
+      const missing = mimoSnapshot.filter(({ artifact }) => !existsSync(resolve(ROOT, artifact)));
+      expect(missing.map(({ layer, artifact }) => `${layer} → ${artifact}`)).toEqual([]);
+    },
+  );
+
   test('every layer\'s supporting artifacts exist', () => {
     const missing: string[] = [];
     for (const layer of LAYERS) {
       for (const artifact of layer.artifacts) {
+        if (vyrazenoVzorem(artifact, vzory)) continue; // měří test výš
         const fullPath = resolve(ROOT, artifact);
         if (!existsSync(fullPath)) {
           missing.push(`${layer.id} → ${artifact}`);
@@ -214,5 +243,33 @@ describe('Static defense-in-depth umbrella gate', () => {
     // This is informational — the assertion is that 4 distinct layer ids exist.
     const ids = new Set(LAYERS.map((l) => l.id));
     expect(ids.size).toBe(LAYERS.length);
+  });
+
+  test('negativní sonda: vyřazení snapshotem — adresář i přesná cesta ano, glob a cizí cesta ne; tři odpovědi', () => {
+    const vzory = vzorySnapshotu('# komentář\n.github/workflows/\n.github/dependabot.yml\n\nfoo/*.yml\n');
+    expect(vzory).toEqual(['.github/workflows/', '.github/dependabot.yml', 'foo/*.yml']);
+    expect(vyrazenoVzorem('.github/workflows/deploy.yml', vzory)).toBe(true);
+    expect(vyrazenoVzorem('.github/workflows', vzory)).toBe(true);
+    expect(vyrazenoVzorem('.github/workflows/', vzory)).toBe(true);
+    expect(vyrazenoVzorem('.github/dependabot.yml', vzory)).toBe(true);
+    expect(vyrazenoVzorem('.github/workflowsX/a.yml', vzory)).toBe(false);
+    expect(vyrazenoVzorem('foo/a.yml', vzory)).toBe(false); // glob se NEvykládá → brána padá, nemlčí
+    expect(vyrazenoVzorem('.forgejo/workflows/ci.yml', vzory)).toBe(false);
+
+    const koren = mkdtempSync(join(tmpdir(), 'snapshot-sonda-'));
+    try {
+      mkdirSync(join(koren, 'config'), { recursive: true });
+      writeFileSync(join(koren, SNAPSHOT_EXCLUDE), '.github/workflows/\n');
+      mkdirSync(join(koren, '.forgejo/workflows'), { recursive: true });
+      writeFileSync(join(koren, '.forgejo/workflows/ci.yml'), 'on: push\n');
+      // soubor je → měří se
+      expect(duvodVynechanoSnapshotem('.forgejo/workflows/ci.yml', koren)).toBeNull();
+      // chybí a snapshot ho vyřazuje → důvod pro skip
+      expect(duvodVynechanoSnapshotem('.github/workflows/deploy.yml', koren)).toMatch(/veřejný snapshot nevozí/);
+      // chybí BEZ důvodu → null, brána má padnout
+      expect(duvodVynechanoSnapshotem('.forgejo/workflows/deploy.yml', koren)).toBeNull();
+    } finally {
+      rmSync(koren, { recursive: true, force: true });
+    }
   });
 });

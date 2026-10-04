@@ -29,6 +29,7 @@ import { describe, test, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { isTrackedService } from './lib/tracked-services';
+import { duvodVynechanoSnapshotem } from './lib/vynechano-snapshotem';
 
 const PROJECT_ROOT = process.cwd();
 const SERVICES_DIR = join(PROJECT_ROOT, 'services');
@@ -246,10 +247,19 @@ describe('OWASP — database-level controls (file-level signal)', () => {
   });
 });
 
+// Veřejný snapshot `.github/dependabot.yml` ani `.github/workflows/` nevozí
+// (config/public-snapshot.exclude) — tam se tyto testy PŘESKOČÍ s důvodem,
+// v upstreamu měří. Viz lib/vynechano-snapshotem.
+const DUVOD_DEPENDABOT = duvodVynechanoSnapshotem('.github/dependabot.yml');
+const DUVOD_PODPIS = duvodVynechanoSnapshotem('.github/workflows/container-signing.yml');
+
 describe('OWASP — CI controls', () => {
-  test('A06 — Dependabot config exists', () => {
-    expect(existsSync(join(PROJECT_ROOT, '.github/dependabot.yml'))).toBe(true);
-  });
+  test.skipIf(DUVOD_DEPENDABOT !== null)(
+    `A06 — Dependabot config exists${DUVOD_DEPENDABOT ? ` — NEZMĚŘENO: ${DUVOD_DEPENDABOT}` : ''}`,
+    () => {
+      expect(existsSync(join(PROJECT_ROOT, '.github/dependabot.yml'))).toBe(true);
+    },
+  );
 
   // 2026-07-14: the heavy supply-chain lane (npm-audit matrix, SBOM, trivy) was
   // extracted from ci.yml to supply-chain.yml (nightly schedule + dispatch) so
@@ -265,12 +275,15 @@ describe('OWASP — CI controls', () => {
     expect(wf).toMatch(/@cyclonedx\/cyclonedx-npm/);
   });
 
-  test('A08 — container-signing workflow uses cosign + SLSA provenance', () => {
-    const wfPath = join(PROJECT_ROOT, '.github/workflows/container-signing.yml');
-    expect(existsSync(wfPath)).toBe(true);
-    const wf = readFileSync(wfPath, 'utf8');
-    expect(wf).toMatch(/sigstore\/cosign-installer/);
-    expect(wf).toMatch(/cosign sign/);
-    expect(wf).toMatch(/slsaprovenance/);
-  });
+  test.skipIf(DUVOD_PODPIS !== null)(
+    `A08 — container-signing workflow uses cosign + SLSA provenance${DUVOD_PODPIS ? ` — NEZMĚŘENO: ${DUVOD_PODPIS}` : ''}`,
+    () => {
+      const wfPath = join(PROJECT_ROOT, '.github/workflows/container-signing.yml');
+      expect(existsSync(wfPath)).toBe(true);
+      const wf = readFileSync(wfPath, 'utf8');
+      expect(wf).toMatch(/sigstore\/cosign-installer/);
+      expect(wf).toMatch(/cosign sign/);
+      expect(wf).toMatch(/slsaprovenance/);
+    },
+  );
 });

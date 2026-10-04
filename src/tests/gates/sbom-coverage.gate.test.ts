@@ -30,6 +30,7 @@ import { describe, test, expect } from 'vitest';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { isTrackedService } from './lib/tracked-services';
+import { duvodVynechanoSnapshotem } from './lib/vynechano-snapshotem';
 
 const ROOT = process.cwd();
 // CI/CD runs on Forgejo (self-hosted); the GitHub mirror is cost-only. The
@@ -39,6 +40,10 @@ const ROOT = process.cwd();
 // is release/tag-time (cosign attestation) and stays on the GitHub side (manual).
 const DEP_SEC_WORKFLOW = resolve(ROOT, '.forgejo/workflows/supply-chain.yml');
 const CONTAINER_SIGN_WORKFLOW = resolve(ROOT, '.github/workflows/container-signing.yml');
+// Veřejný snapshot podpisový workflow nevozí (config/public-snapshot.exclude) —
+// tam se testy nad ním PŘESKOČÍ s důvodem; v upstreamu měří. Viz lib/vynechano-snapshotem.
+const DUVOD_PODPIS = duvodVynechanoSnapshotem('.github/workflows/container-signing.yml');
+const nezmereno = (nazev: string): string => (DUVOD_PODPIS ? `${nazev} — NEZMĚŘENO: ${DUVOD_PODPIS}` : nazev);
 
 /**
  * Services that legitimately don't produce a deployable container image
@@ -98,7 +103,7 @@ describe('SBOM coverage gate — OWASP A06 + A08', () => {
     expect(content).toMatch(/retention-days:\s*([1-9]\d{1,2}|\d{4,})/);
   });
 
-  test('container-signing workflow attaches SBOM as cosign attestation', () => {
+  test.skipIf(DUVOD_PODPIS !== null)(nezmereno('container-signing workflow attaches SBOM as cosign attestation'), () => {
     expect(existsSync(CONTAINER_SIGN_WORKFLOW)).toBe(true);
     const content = readFileSync(CONTAINER_SIGN_WORKFLOW, 'utf8');
     // Must reference cyclonedx attestation type
@@ -173,7 +178,7 @@ describe('SBOM coverage gate — OWASP A06 + A08', () => {
     expect(content).toMatch(/^\s*workflow_dispatch:/m);
   });
 
-  test('container-signing matrix ⊆ SBOM matrix (every signed image has SBOM)', () => {
+  test.skipIf(DUVOD_PODPIS !== null)(nezmereno('container-signing matrix ⊆ SBOM matrix (every signed image has SBOM)'), () => {
     // SBOM matrix = the union of BOTH SBOM lanes:
     //   • `sbom`        — cyclonedx-npm over services/<name>/package-lock.json
     //   • `sbom-python` — anchore/syft over the built root Dockerfile.<name>
@@ -212,7 +217,7 @@ describe('SBOM coverage gate — OWASP A06 + A08', () => {
     ).toEqual([]);
   });
 
-  test('Python images (svc-local-ingest, svc-potok) are covered by the sbom-python lane', () => {
+  test.skipIf(DUVOD_PODPIS !== null)(nezmereno('Python images (svc-local-ingest, svc-potok) are covered by the sbom-python lane'), () => {
     // The two packages/* Python submodule services have no npm lockfile, so the
     // cyclonedx-npm `sbom` job cannot cover them. A dedicated `sbom-python` job
     // runs anchore/syft over the built image instead. This gate makes sure the
