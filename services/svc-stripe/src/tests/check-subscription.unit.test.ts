@@ -98,6 +98,13 @@ describe('POST /check-subscription', () => {
     );
   });
 
+  it('odpověď nese stav po aktivaci, ne ten před ní', async () => {
+    const { reply, calls } = makeReply();
+    await (await route())({ headers: { authorization: 'Bearer jwt-1' } }, reply);
+
+    expect(calls.body).toMatchObject({ hasActiveSubscription: true, activeSubscription: { id: SUB, status: 'active' } });
+  });
+
   it('cizí předplatné ze Stripe metadat neaktivuje (není mezi předplatnými uživatele)', async () => {
     mockSubscriptionsList.mockResolvedValue({
       data: [{ id: 'sub_x', cancel_at_period_end: false, current_period_end: 1_900_000_000, metadata: { subscription_id: 'cizi' } }],

@@ -56,6 +56,9 @@ export async function checkSubscriptionRoute(app: FastifyInstance): Promise<void
                     status: 'active',
                   },
                 });
+                // Odpověď nese stav PO synchronizaci — jinak by klient až do
+                // dalšího volání viděl předplatné, které právě aktivoval, jako neaktivní.
+                dbSub.status = 'active';
               }
             }
           }
