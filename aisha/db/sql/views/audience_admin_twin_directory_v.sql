@@ -87,3 +87,11 @@ LEFT JOIN public.audience_actor_aggregate_latest_v agg ON agg.user_id = b.user_i
 
 COMMENT ON VIEW public.audience_admin_twin_directory_v IS
   'Registr dvojčat: entity jádra (s účtem i bez) + čočka zapojení. Řádky bez twin_id = účty před backfillem (twin_status unbound). Drives the extranet registr section (ADR-003 K1).';
+
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_twin_directory_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_twin_directory_v TO service_role;

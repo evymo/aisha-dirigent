@@ -27,3 +27,11 @@ FROM public.source_period_stats s
 WHERE s.kind = 'event';
 COMMENT ON VIEW public.audience_admin_source_event_stats_v IS
   'Events created per month (operator export shape). Filter by month (YYYY-MM). Admin/staff via get_audience_view_*_block.';
+
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_source_event_stats_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_source_event_stats_v TO service_role;

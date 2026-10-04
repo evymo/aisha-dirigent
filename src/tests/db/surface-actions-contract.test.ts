@@ -98,8 +98,13 @@ ORDER BY b.created_at DESC LIMIT 1;
 -- ⭐ POČÍTÁ SE NAD SVÝM SUBJEKTEM, ne nad celou tabulkou. Globální počet je
 -- měřidlo, které platí jen v prázdné databázi: v souběhu 79 souborů (jedna
 -- sdílená throwaway DB) do fronty vidí i cizí takty a test padá na cizí práci.
+-- Fronta se měří jako VLASTNÍK (RESET ROLE): pohled s právy vlastníka klient
+-- přímo nečte (od 2026-10-04 bez grantu pro authenticated — čte se přes DEFINER
+-- bloky). Měří se stav databáze po submitu, ne cesta, kterou ho klient uvidí.
+RESET ROLE;
 SELECT 'queue=' || count(*) AS out FROM public.audience_admin_followup_queue_v
  WHERE actor_user_id = '${SUBJ}';
+${asUser(OP)}
 -- 3b. značka
 SELECT 'tag=' || (r->>'ok') AS out
 FROM public.submit_surface_action('sa_test.tag', jsonb_build_object('twin_id', public.twin_for_account('${SUBJ}')), '{"label":"retreat"}'::jsonb) r;

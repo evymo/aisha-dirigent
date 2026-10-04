@@ -9521,10 +9521,12 @@ drop view if exists public.audience_admin_twin_directory_v;
 \ir sql/views/audience_admin_activity_monthly_v.sql
 \ir sql/views/audience_admin_twin_composition_v.sql
 \ir sql/views/audience_admin_relation_kinds_v.sql
+-- (Granty těchto pohledů nese jejich SoT — jen service_role; přímý grant pro
+--  authenticated obcházel stráž blokových funkcí, viz blok 2026-10-04 níž.)
 GRANT SELECT ON public.audience_admin_followup_queue_v, public.audience_admin_twin_directory_v,
                 public.audience_admin_twin_relations_v, public.audience_admin_activity_monthly_v,
                 public.audience_admin_twin_composition_v, public.audience_admin_relation_kinds_v
-                TO authenticated, service_role;
+                TO service_role;
 
 -- Šablona `follow-up` je DATA (seed jádra), ne schéma — na běžící instanci ji
 -- dodá seed profil při nasazení; tady se jen pojistí, aby create_followup po
@@ -10360,12 +10362,13 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/views/audience_admin_source_stats_monthly_v.sql
 \ir sql/views/audience_admin_source_topic_monthly_v.sql
 \ir sql/views/audience_admin_source_event_monthly_v.sql
+-- (Jen service_role — čte se přes DEFINER blokové funkce, viz blok 2026-10-04 níž.)
 GRANT SELECT ON public.audience_admin_source_topic_stats_v,
                 public.audience_admin_source_event_stats_v,
                 public.audience_admin_source_stats_monthly_v,
                 public.audience_admin_source_topic_monthly_v,
                 public.audience_admin_source_event_monthly_v
-                TO authenticated, service_role;
+                TO service_role;
 
 -- ── validate_mcp_token vrací i allowed_tools / denied_tools (2026-09-14) ─────
 -- Naměřeno: svc-mcp-knowledge nepřijímal `mcp_` PAT vůbec, a n8n agenti tak
@@ -11750,3 +11753,24 @@ NOTIFY pgrst, 'reload schema';
 -- volajícího) má v SoT REVOKE z authenticated, ale bez \ir by na běžící DB nedoletěl.
 \ir sql/functions/update_user_streak.sql
 \ir sql/functions/trigger_update_streak_on_health_checkin.sql
+
+-- ⛔ audience_admin_*_v: CELÁ TŘÍDA ČITELNÁ KAŽDÝM PŘIHLÁŠENÝM (2026-10-04).
+-- Stejná vada jako u osy dvojčete výš, jen u dalších jedenácti pohledů: práva vlastníka
+-- (mimo RLS podkladu) + GRANT SELECT pro authenticated z dřívějších bloků heals a ze SoT.
+-- Adresář dvojčat, fronta follow-upů, vazby, složení a statistiky zdrojů tak šly číst
+-- přímým /rest/v1/ mimo stráž is_admin_or_staff() blokových funkcí. Dva z nich
+-- (followup_queue, twin_directory) měly navíc INSERT z default privileges. Granty
+-- výš jsou zúžené na service_role; přehrání SoT tady odebere, co na běžící DB zůstalo.
+\ir sql/views/audience_admin_activity_monthly_v.sql
+\ir sql/views/audience_admin_followup_queue_v.sql
+\ir sql/views/audience_admin_relation_kinds_v.sql
+\ir sql/views/audience_admin_source_event_monthly_v.sql
+\ir sql/views/audience_admin_source_event_stats_v.sql
+\ir sql/views/audience_admin_source_stats_monthly_v.sql
+\ir sql/views/audience_admin_source_topic_monthly_v.sql
+\ir sql/views/audience_admin_source_topic_stats_v.sql
+\ir sql/views/audience_admin_twin_composition_v.sql
+\ir sql/views/audience_admin_twin_directory_v.sql
+\ir sql/views/audience_admin_twin_relations_v.sql
+
+NOTIFY pgrst, 'reload schema';

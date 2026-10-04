@@ -20021,8 +20021,13 @@ COMMENT ON VIEW public.audience_admin_activity_monthly_v IS
   'Aktivita v čase: doteky po měsících a druzích nad dvojčaty (twin_events).
    Nahrazuje měření starého modelu profiles/openclaw_notifications.';
 
-REVOKE ALL ON public.audience_admin_activity_monthly_v FROM PUBLIC;
-GRANT SELECT ON public.audience_admin_activity_monthly_v TO authenticated, service_role;
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_activity_monthly_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_activity_monthly_v TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -20329,6 +20334,14 @@ LEFT JOIN public.partner_stories ps ON b.subject_type = 'story' AND ps.id = b.su
 COMMENT ON VIEW public.audience_admin_followup_queue_v IS
   'Open beats bucketed (overdue/today/this_week/later) with the subject resolved to an actor when it has an account. Backed by story_pulse_beats since ADR-003 K2 (ai_tasks retired).';
 
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_followup_queue_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_followup_queue_v TO service_role;
+
 
 -- -----------------------------------------------------------------------------
 -- File: aisha/db/sql/views/audience_admin_relation_kinds_v.sql
@@ -20355,8 +20368,13 @@ CREATE OR REPLACE VIEW public.audience_admin_relation_kinds_v AS
 COMMENT ON VIEW public.audience_admin_relation_kinds_v IS
   'Struktura sítě: kolik vazeb kterého druhu, mezi kolika dvojčaty, od kdy.';
 
-REVOKE ALL ON public.audience_admin_relation_kinds_v FROM PUBLIC;
-GRANT SELECT ON public.audience_admin_relation_kinds_v TO authenticated, service_role;
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_relation_kinds_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_relation_kinds_v TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -20423,6 +20441,14 @@ WHERE s.kind = 'event';
 COMMENT ON VIEW public.audience_admin_source_event_stats_v IS
   'Events created per month (operator export shape). Filter by month (YYYY-MM). Admin/staff via get_audience_view_*_block.';
 
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_source_event_stats_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_source_event_stats_v TO service_role;
+
 
 -- -----------------------------------------------------------------------------
 -- File: aisha/db/sql/views/audience_admin_source_stats_monthly_v.sql
@@ -20445,6 +20471,14 @@ GROUP BY s.kind, s.month;
 COMMENT ON VIEW public.audience_admin_source_stats_monthly_v IS
   'Per (kind, month) counts over source_period_stats — chart source. Admin/staff.';
 
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_source_stats_monthly_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_source_stats_monthly_v TO service_role;
+
 
 -- -----------------------------------------------------------------------------
 -- File: aisha/db/sql/views/audience_admin_source_event_monthly_v.sql
@@ -20458,6 +20492,14 @@ FROM public.audience_admin_source_stats_monthly_v
 WHERE kind = 'event';
 COMMENT ON VIEW public.audience_admin_source_event_monthly_v IS
   'Events created per month (chart source). Admin/staff.';
+
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_source_event_monthly_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_source_event_monthly_v TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -20476,6 +20518,14 @@ FROM public.audience_admin_source_stats_monthly_v
 WHERE kind = 'topic';
 COMMENT ON VIEW public.audience_admin_source_topic_monthly_v IS
   'Topics created per month (chart source). Admin/staff.';
+
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_source_topic_monthly_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_source_topic_monthly_v TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -20513,6 +20563,14 @@ FROM public.source_period_stats s
 WHERE s.kind = 'topic';
 COMMENT ON VIEW public.audience_admin_source_topic_stats_v IS
   'Topics created per month (operator export shape). Filter by month (YYYY-MM). Admin/staff via get_audience_view_*_block.';
+
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_source_topic_stats_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_source_topic_stats_v TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -20598,8 +20656,13 @@ COMMENT ON VIEW public.audience_admin_twin_composition_v IS
   'Složení komunity: dvojčata po druhu a zdroji, kolik z nich má aktivitu,
    vazby a nedávný dotek. Odpovídá na otázku "kdo tu je".';
 
-REVOKE ALL ON public.audience_admin_twin_composition_v FROM PUBLIC;
-GRANT SELECT ON public.audience_admin_twin_composition_v TO authenticated, service_role;
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_twin_composition_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_twin_composition_v TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -20696,6 +20759,14 @@ LEFT JOIN public.audience_actor_aggregate_latest_v agg ON agg.user_id = b.user_i
 COMMENT ON VIEW public.audience_admin_twin_directory_v IS
   'Registr dvojčat: entity jádra (s účtem i bez) + čočka zapojení. Řádky bez twin_id = účty před backfillem (twin_status unbound). Drives the extranet registr section (ADR-003 K1).';
 
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_twin_directory_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_twin_directory_v TO service_role;
+
 
 -- -----------------------------------------------------------------------------
 -- File: aisha/db/sql/views/audience_admin_twin_relations_v.sql
@@ -20753,6 +20824,14 @@ JOIN public.twin_external_refs acct
 
 COMMENT ON VIEW public.audience_admin_twin_relations_v IS
   'Vazby (twin_relations, oba směry) a kontextové role (story_participants) jednoho dvojčete. Drives the extranet twin detail (ADR-003).';
+
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_twin_relations_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_twin_relations_v TO service_role;
 
 
 -- -----------------------------------------------------------------------------

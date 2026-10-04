@@ -19,5 +19,10 @@ CREATE OR REPLACE VIEW public.audience_admin_relation_kinds_v AS
 COMMENT ON VIEW public.audience_admin_relation_kinds_v IS
   'Struktura sítě: kolik vazeb kterého druhu, mezi kolika dvojčaty, od kdy.';
 
-REVOKE ALL ON public.audience_admin_relation_kinds_v FROM PUBLIC;
-GRANT SELECT ON public.audience_admin_relation_kinds_v TO authenticated, service_role;
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_relation_kinds_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_relation_kinds_v TO service_role;
