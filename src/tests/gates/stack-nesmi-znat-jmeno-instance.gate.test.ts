@@ -71,15 +71,18 @@
  * 25 nových nálezů (11 v dosavadním univerzu, 14 mimo), všechny opraveny.
  */
 import { describe, it, expect } from "vitest";
-import { lstatSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 // Jména instancí a tvar nálezu žijí v JEDNOM domově (lib/jmena-instanci.ts):
 // n8n brány měří touž vlastnost nad adresami uzlů a měly vlastní literál se
 // jménem skutečné instance — vzorek, ne vlastnost (naměřeno 2026-09-12).
+import { envWithoutGitLocation } from "../../../scripts/lib/git-worktree-health.mjs";
 import {
+  JMENO_PLATFORMY,
   ROOT,
+  jmenaInstanci,
   jmenaZRepozitaru,
   jmenoZPrefixu,
   jmenoZProfilu,
@@ -393,6 +396,24 @@ describe("kód stacku nesmí znát jméno konkrétní instance", () => {
       expect(najdiJmena(textSouboru(join(dir, "nul.ts")) ?? "", ["testfork"]).length).toBe(1);
       expect(textSouboru(join(dir, "bin.dat"))).toBeNull();
       expect(textSouboru(join(dir, "neni"))).toBeNull();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  // Veřejné zrcadlo upstreamu je `<platforma>-orchestrator` — jméno PLATFORMY,
+  // ne forku. Bez výjimky v kanálu remotů z něj vyšla „instance" `aisha`.
+  it("negativní sonda: remote `<platforma>-orchestrator` instanci nedává, `<fork>-orchestrator` ano", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "jmeno-remote-"));
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: dir, env: envWithoutGitLocation() });
+    try {
+      git("init", "-q");
+      // jmenaInstanci() čte identitu stromu resolverem z <root>/scripts/lib.
+      symlinkSync(join(ROOT, "scripts"), join(dir, "scripts"));
+      git("remote", "add", "zrcadlo", `https://github.example/org/${JMENO_PLATFORMY}-orchestrator.git`);
+      expect(await jmenaInstanci(dir)).not.toContain(JMENO_PLATFORMY);
+      git("remote", "add", "fork", "https://forge.example/org/testfork-orchestrator.git");
+      expect(await jmenaInstanci(dir)).toContain("testfork");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
