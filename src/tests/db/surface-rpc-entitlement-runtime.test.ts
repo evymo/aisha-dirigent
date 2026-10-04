@@ -3,6 +3,8 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { psqlMultiline, psqlQuery } from "./validation-utils";
 import { isPgReachable, reportTestCapabilities } from "./test-env-probe";
+// K overlayi vedou jedny dveře (brána overlay-jde-jen-jednemi-dvermi).
+import { overlayDir } from "../../../scripts/lib/instance-overlay.mjs";
 
 /**
  * Nárok na povrchových RPC — RUNTIME měření pod DVĚMA identitami.
@@ -75,11 +77,22 @@ function katalogBloku(): number {
     return 0;
   }
 }
+/**
+ * ⛔ Počet řádků v surface_blocks NESTAČÍ jako důkaz katalogu. Celá sada běží
+ * souběžně nad jednou zahazovací DB a jiné testy si tam zakládají fixtury bloků
+ * (polozky-dokladu je i commitne a nechá) — brána pak „viděla katalog" o jedné
+ * testovací funkci bez dat a padala na vakuové měření (naměřeno 2026-10-04 v plném
+ * běhu). Zahazovací DB z core seedu (AISHA_TESTDB_CONTAINER) bez instančního
+ * overlaye instanční katalog z DEFINICE nemá; co v ní je, jsou fixtury.
+ */
+const zahazovaciBezInstance = Boolean(process.env.AISHA_TESTDB_CONTAINER) && overlayDir() === null;
 const NEZMERENO = !dbAvailable
   ? "DB nedostupná"
-  : katalogBloku() === 0
-    ? "bez instančního katalogu surface_blocks (generický strom)"
-    : null;
+  : zahazovaciBezInstance
+    ? "zahazovací DB bez instančního overlaye — bloky v ní jsou fixtury jiných testů"
+    : katalogBloku() === 0
+      ? "bez instančního katalogu surface_blocks (generický strom)"
+      : null;
 const pozn = NEZMERENO ? ` — NEZMĚŘENO: ${NEZMERENO}` : "";
 
 /** Klíče, které nesou čas běhu, ne obsah — před porovnáním se odstraní. */
