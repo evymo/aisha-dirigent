@@ -38,8 +38,9 @@
 #     BASH_MAX_TIMEOUT_MS=1800000
 # =============================================================================
 set -uo pipefail
-# Bez -e záměrně: jeden selhaný krok nesmí zastavit ostatní ani start session.
-# Každý krok hlásí ✓/✗ do souhrnu a má vlastní log.
+# Bez -e na úrovni skriptu záměrně: jeden selhaný krok nesmí zastavit ostatní ani
+# start session. Každý krok hlásí ✓/✗ do souhrnu a má vlastní log — a UVNITŘ
+# kroku platí errexit (viz step), aby ✓ neznamenalo jen „poslední příkaz prošel".
 
 ROOT=/home/user
 LOGDIR=/var/log/aisha-setup
@@ -48,14 +49,23 @@ mkdir -p "$LOGDIR" /opt/venvs
 : > "$SUMMARY"
 
 # step <jméno> <funkce> — spustí funkci na pozadí s logem a záznamem do souhrnu.
+#
+# ⛔ errexit UVNITŘ kroku (review PR #1). Bez něj `if "$fn"` viděl jen návratový
+# kód POSLEDNÍHO příkazu funkce: selhaný `go install` následovaný úspěšným
+# semgrepem dal „✓ scanners" bez gitleaks, a selhaný session hook schoval
+# úspěšný build throwaway DB za ním. Pozor na past bashe: v podmínce `if` i na
+# levé straně `||`/`&&` se `set -e` IGNORUJE (i v subshellu) — proto se krok
+# spustí jako samostatný příkaz a jeho kód se čte až potom z `$?`.
 step() {
   local name="$1" fn="$2"
   (
-    local started=$SECONDS
-    if "$fn" > "$LOGDIR/$name.log" 2>&1; then
+    local started=$SECONDS rc
+    ( set -e; "$fn" ) > "$LOGDIR/$name.log" 2>&1
+    rc=$?
+    if [ "$rc" = 0 ]; then
       echo "✓ $name ($((SECONDS - started))s)" >> "$SUMMARY"
     else
-      echo "✗ $name ($((SECONDS - started))s) — viz $LOGDIR/$name.log" >> "$SUMMARY"
+      echo "✗ $name ($((SECONDS - started))s, kód $rc) — viz $LOGDIR/$name.log" >> "$SUMMARY"
     fi
   ) &
 }
