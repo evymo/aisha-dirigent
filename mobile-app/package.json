@@ -40,7 +40,8 @@
     "test:e2e:ridic": "bash ./e2e/scripts/run-e2e.sh ridic"
   },
   "dependencies": {
-    "@aisha/extranet-sdk-native": "^0.3.1",
+    "@aisha/extranet-sdk-native": "file:../packages/extranet-sdk/packages/native",
+    "@aisha/extranet-sdk-tokens": "file:../packages/extranet-sdk/packages/tokens",
     "@aisha/knock-protocol": "file:../packages/knock-protocol",
     "@cosmjs/amino": "^0.38.1",
     "@cosmjs/crypto": "^0.38.1",

@@ -32,6 +32,7 @@ import { envWithoutGitLocation } from "../../../scripts/lib/git-worktree-health.
 import { mkdtempSync, mkdirSync, writeFileSync, copyFileSync, rmSync, readFileSync, readdirSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
+import { vzoryWorkspaces, workspaceAdresare } from "./lib/workspaces";
 
 const ROOT = process.cwd();
 // git hooky exportují GIT_DIR — dočasné repo by jinak sáhlo na to skutečné (viz detektor-zna-edge)
@@ -142,8 +143,22 @@ function smerovacApp(changed: string): { APP: string; souhlasi: boolean } {
 }
 
 describe("směrování: posun submodulu nerozsvítí app (testy webu + Deploy Core/Edge)", () => {
+  // Submodul, který je ZDROJEM npm workspaces (extranet SDK), vstupem buildu JE —
+  // jeho posun app rozsvítit musí. Pozná se z deklarace workspaces, ne ze seznamu.
+  const zdrojeWorkspaces = (): string[] => {
+    const workspacy = workspaceAdresare(vzoryWorkspaces(JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8"))), ROOT);
+    return submoduly().filter((s) => workspacy.some((w) => w.startsWith(`${s}/`)));
+  };
+
   test.skipIf(!existsSync(join(ROOT, ".gitmodules")))("posun samotného submodulu: app=false a sebekontrola souhlasí", () => {
-    for (const s of submoduly()) expect(smerovacApp(s), s).toEqual({ APP: "false", souhlasi: true });
+    const zdroje = zdrojeWorkspaces();
+    for (const s of submoduly().filter((s) => !zdroje.includes(s))) {
+      expect(smerovacApp(s), s).toEqual({ APP: "false", souhlasi: true });
+    }
+  });
+
+  test.skipIf(!existsSync(join(ROOT, ".gitmodules")))("posun submodulu, který je zdrojem workspaces: app=true", () => {
+    for (const s of zdrojeWorkspaces()) expect(smerovacApp(s), s).toEqual({ APP: "true", souhlasi: true });
   });
 
   test("submodul spolu se zdrojem webu: app=true", () => {

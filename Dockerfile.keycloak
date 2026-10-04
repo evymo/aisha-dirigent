@@ -126,19 +126,19 @@ RUN --mount=type=secret,id=forgejo_token,required=false \
     fi
 
 # ── CSS extranetového SDK ────────────────────────────────────────────────────
-# `@aisha/extranet-sdk-ui` NENÍ workspace tohohle repa — je to publikovaný balík
-# z registru, závislost `apps/workbench-shell`. Dřív se jeho CSS kopírovalo
-# z `packages/extranet-sdk-ui/`, tedy z adresáře, který v gitu má NULA souborů;
-# na disku vývojáře leží jen jako výsledek `npm install` a `.dockerignore` navíc
-# vyřazuje `node_modules/`. Build proto padal na neexistující cestě.
+# `@aisha/extranet-sdk-ui` je workspace tohohle repa ze submodulu
+# `packages/extranet-sdk` (evymo/aisha-extranet-sdk, připnutý gitem). Build
+# nesahá na žádný registr: `package-lock.json` u balíku nese workspace link
+# a fetch-locked-package.mjs kopíruje soubory přímo ze zdroje. Dřív se balík
+# stahoval z privátního npm zrcadla — build Keycloaku tak závisel na službě,
+# kterou instance nemusí mít.
 #
-# Verzi, adresu i otisk určuje `package-lock.json` — nic se tu nepíše ručně,
-# takže se to nemůže rozejít s tím, co instaluje zbytek repa. Podrobnosti
-# i důvody, proč ne kopie v repu a ne `npm ci`, nese hlavička toho skriptu.
+# Odkud se bere a co se z CSS odstraní (externí @import), nese hlavička skriptu.
 FROM ${REGISTRY_PROXY}library/node:22-alpine AS esdk-css
 WORKDIR /esdk
 COPY package-lock.json ./
 COPY scripts/build/fetch-locked-package.mjs ./
+COPY packages/extranet-sdk/packages/ui/ packages/extranet-sdk/packages/ui/
 RUN node fetch-locked-package.mjs --bez-externich-importu \
       @aisha/extranet-sdk-ui /esdk/out styles.css adapter.css tokens.css
 

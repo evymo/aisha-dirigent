@@ -354,10 +354,18 @@ describe("kód stacku nesmí znát jméno konkrétní instance", () => {
   // Lockfile je ozvěna zdroje — vynechává se z měření jmen, ale ozvěna bez
   // zdroje je vada (viz workspacyBezZdroje). Měří se skutečný lockfile nad
   // skutečným `git ls-files`; sonda níž měří pravidlo nad fixturou.
+  // `--recurse-submodules`: workspace ze submodulu (extranet SDK) má zdroj ve
+  // stromu submodulu. Neinicializovaný submodul soubory nevydá → nález, správně:
+  // `npm ci` by bez něj taky neprošel.
   it("lockfile nenese workspace, jehož cesta ve stromu není", () => {
     const lock = JSON.parse(readFileSync(join(ROOT, "package-lock.json"), "utf8"));
     const sledovane = new Set(
-      execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf-8", maxBuffer: 64 * 1024 * 1024 }).split("\n"),
+      execFileSync("git", ["ls-files", "--recurse-submodules"], {
+        cwd: ROOT,
+        encoding: "utf-8",
+        env: envWithoutGitLocation(),
+        maxBuffer: 64 * 1024 * 1024,
+      }).split("\n"),
     );
     const workspacy = Object.keys(lock.packages ?? {}).filter((c) => c !== "" && !c.split("/").includes("node_modules"));
     expect(workspacy.length, "lockfile nemá žádný workspace-záznam — měřidlo čte špatný soubor").toBeGreaterThan(10);

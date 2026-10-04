@@ -16,3 +16,11 @@
 [submodule "packages/local-ingest"]
 	path = packages/local-ingest
 	url = ../aisha-local-ingest.git
+# Extranet SDK (evymo/aisha-extranet-sdk) — ZDROJ npm workspaces
+# @aisha/extranet-sdk-ui a -tokens (kořenový package.json), mobilní aplikace
+# bere -native/-tokens přes `file:`. Na rozdíl od ostatních submodulů je vstupem
+# buildu webu: bez něj `npm ci` neprojde (git submodule update --init packages/extranet-sdk).
+# Relativní URL ze stejného důvodu jako insight výš.
+[submodule "packages/extranet-sdk"]
+	path = packages/extranet-sdk
+	url = ../aisha-extranet-sdk.git

@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 /**
- * fetch-locked-package — stáhne JEDEN balík z registru přesně podle
- * `package-lock.json` a ověří ho proti otisku, který lock nese.
+ * fetch-locked-package — vezme soubory JEDNOHO balíku přesně podle
+ * `package-lock.json`: workspace (`"link": true`) ze zdroje ve stromu,
+ * jinak stažením z registru s ověřením proti otisku, který lock nese.
+ *
+ * ⭐ STAV OD 2026-10-04: `@aisha/extranet-sdk-ui` je WORKSPACE ze submodulu
+ * `packages/extranet-sdk` (evymo/aisha-extranet-sdk). Zdroj pravdy je SDK repo
+ * připnuté gitlinkem, build nesahá na žádný registr. Historie níž vysvětluje,
+ * proč skript existuje a proč ne kopie v repu: ta zůstává v platnosti — submodul
+ * kopie NENÍ, je to odkaz na místo, odkud se SDK vydává.
  *
  * ⛔ PROČ EXISTUJE (naměřeno 2026-08-18)
  *
@@ -93,64 +100,90 @@ if (!zaznam) {
       "  rozešel s package.json — regeneruj ho `npm install`.",
   );
 }
-// Tvrdě, ne s výchozí hodnotou: „nevím, odkud" a „nevím, co" nejsou stavy,
-// ze kterých se dá pokračovat.
-if (!zaznam.resolved) padni(`záznam node_modules/${balik} nemá \`resolved\` — není odkud stáhnout`);
-if (!zaznam.integrity) padni(`záznam node_modules/${balik} nemá \`integrity\` — nebylo by co ověřit`);
-
-const m = String(zaznam.integrity).match(/^(sha\d+)-(.+)$/);
-if (!m) padni(`\`integrity\` má neznámý tvar: ${String(zaznam.integrity).slice(0, 12)}…`);
-const [, algoritmus, ocekavanyOtisk] = m;
-
-process.stderr.write(`[fetch-locked-package] ${balik}@${zaznam.version ?? "?"} ← ${zaznam.resolved}\n`);
-
-// Timeout je povinný: registr, který přijme spojení a pak mlčí, by build držel
-// navěky — a zaseknutý build se od pomalého nepozná. Hlídá brána
-// codebase-security-patterns; tady je to navíc věcně správně.
-const hlidac = AbortSignal.timeout(60_000);
-let odpoved;
-try {
-  odpoved = await fetch(zaznam.resolved, { signal: hlidac });
-} catch (err) {
-  padni(
-    err?.name === "TimeoutError"
-      ? `registr neodpověděl do 60 s (${new URL(zaznam.resolved).host}) — nedostupný, nebo zaseknutý`
-      : `stažení selhalo: ${err?.message ?? err}`,
-  );
-}
-if (!odpoved.ok) {
-  padni(
-    `stažení skončilo HTTP ${odpoved.status}.\n` +
-      (odpoved.status === 401 || odpoved.status === 403
-        ? "  Registr začal vyžadovat pověření. NEPŘIDÁVEJ token jako build arg —\n" +
-          "  zapsal by se do `docker history`. Použij `--mount=type=secret`, jak to\n" +
-          "  v témž Dockerfilu dělá `forgejo_token`."
-        : "  Registr je nedostupný, nebo ta verze zmizela."),
-  );
+// Workspace balík (`"link": true`) se NEstahuje: jeho zdroj je v repu
+// (u SDK submodul packages/extranet-sdk, připnutý gitem na konkrétní commit),
+// takže verzi i obsah určuje strom, ne registr. Lock pak nese cestu, ne URL.
+let zdrojovyAdresar;
+if (zaznam.link) {
+  if (!zaznam.resolved) padni(`workspace záznam node_modules/${balik} nemá \`resolved\` — chybí cesta ke zdroji`);
+  zdrojovyAdresar = zaznam.resolved;
+  if (!existsSync(join(zdrojovyAdresar, "package.json"))) {
+    padni(
+      `workspace ${balik} → ${zdrojovyAdresar}/ ve stromu NENÍ.\n` +
+        "  U submodulu: `git submodule update --init` (v Dockerfilu `COPY` té cesty do stage).",
+    );
+  }
+  const verze = JSON.parse(readFileSync(join(zdrojovyAdresar, "package.json"), "utf8")).version;
+  zaznam.version = verze;
+  process.stderr.write(`[fetch-locked-package] ${balik}@${verze ?? "?"} ← workspace ${zdrojovyAdresar}/\n`);
+} else {
+  zdrojovyAdresar = await stahniOverenyArchiv(zaznam);
 }
 
-const archiv = Buffer.from(await odpoved.arrayBuffer());
-const otisk = createHash(algoritmus).update(archiv).digest("base64");
-if (otisk !== ocekavanyOtisk) {
-  padni(
-    `otisk staženého archivu NESOUHLASÍ s ${LOCK}.\n` +
-      `  čekáno: ${algoritmus}-${ocekavanyOtisk.slice(0, 16)}…\n` +
-      `  přišlo: ${algoritmus}-${otisk.slice(0, 16)}…\n` +
-      "  Registr vydal jiný obsah pod touž verzí — build se NESMÍ dokončit.",
-  );
+/** Stáhne archiv podle `resolved`, ověří `integrity` a vrátí adresář s rozbaleným `package/`. */
+async function stahniOverenyArchiv(zaznam) {
+  // Tvrdě, ne s výchozí hodnotou: „nevím, odkud" a „nevím, co" nejsou stavy,
+  // ze kterých se dá pokračovat.
+  if (!zaznam.resolved) padni(`záznam node_modules/${balik} nemá \`resolved\` — není odkud stáhnout`);
+  if (!zaznam.integrity) padni(`záznam node_modules/${balik} nemá \`integrity\` — nebylo by co ověřit`);
+
+  const m = String(zaznam.integrity).match(/^(sha\d+)-(.+)$/);
+  if (!m) padni(`\`integrity\` má neznámý tvar: ${String(zaznam.integrity).slice(0, 12)}…`);
+  const [, algoritmus, ocekavanyOtisk] = m;
+
+  process.stderr.write(`[fetch-locked-package] ${balik}@${zaznam.version ?? "?"} ← ${zaznam.resolved}\n`);
+
+  // Timeout je povinný: registr, který přijme spojení a pak mlčí, by build držel
+  // navěky — a zaseknutý build se od pomalého nepozná. Hlídá brána
+  // codebase-security-patterns; tady je to navíc věcně správně.
+  const hlidac = AbortSignal.timeout(60_000);
+  let odpoved;
+  try {
+    odpoved = await fetch(zaznam.resolved, { signal: hlidac });
+  } catch (err) {
+    padni(
+      err?.name === "TimeoutError"
+        ? `registr neodpověděl do 60 s (${new URL(zaznam.resolved).host}) — nedostupný, nebo zaseknutý`
+        : `stažení selhalo: ${err?.message ?? err}`,
+    );
+  }
+  if (!odpoved.ok) {
+    padni(
+      `stažení skončilo HTTP ${odpoved.status}.\n` +
+        (odpoved.status === 401 || odpoved.status === 403
+          ? "  Registr začal vyžadovat pověření. NEPŘIDÁVEJ token jako build arg —\n" +
+            "  zapsal by se do `docker history`. Použij `--mount=type=secret`, jak to\n" +
+            "  v témž Dockerfilu dělá `forgejo_token`."
+          : "  Registr je nedostupný, nebo ta verze zmizela."),
+    );
+  }
+
+  const archiv = Buffer.from(await odpoved.arrayBuffer());
+  const otisk = createHash(algoritmus).update(archiv).digest("base64");
+  if (otisk !== ocekavanyOtisk) {
+    padni(
+      `otisk staženého archivu NESOUHLASÍ s ${LOCK}.\n` +
+        `  čekáno: ${algoritmus}-${ocekavanyOtisk.slice(0, 16)}…\n` +
+        `  přišlo: ${algoritmus}-${otisk.slice(0, 16)}…\n` +
+        "  Registr vydal jiný obsah pod touž verzí — build se NESMÍ dokončit.",
+    );
+  }
+
+  mkdirSync(cil, { recursive: true });
+  const archivCesta = join(cil, ".stazeny.tgz");
+  writeFileSync(archivCesta, archiv);
+  // npm archivy mají všechno pod `package/`; rozbalí se celé a vybere se, co je
+  // potřeba — `--strip-components` busybox tar neumí spolehlivě.
+  execFileSync("tar", ["-xzf", archivCesta, "-C", cil], { stdio: "inherit" });
+  rmSync(archivCesta);
+
+  return join(cil, "package");
 }
 
 mkdirSync(cil, { recursive: true });
-const archivCesta = join(cil, ".stazeny.tgz");
-writeFileSync(archivCesta, archiv);
-// npm archivy mají všechno pod `package/`; rozbalí se celé a vybere se, co je
-// potřeba — `--strip-components` busybox tar neumí spolehlivě.
-execFileSync("tar", ["-xzf", archivCesta, "-C", cil], { stdio: "inherit" });
-rmSync(archivCesta);
-
 const chybi = [];
 for (const soubor of soubory) {
-  const zdroj = join(cil, "package", soubor);
+  const zdroj = join(zdrojovyAdresar, soubor);
   if (!existsSync(zdroj)) {
     chybi.push(soubor);
     continue;

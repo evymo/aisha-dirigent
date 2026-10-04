@@ -105,26 +105,12 @@ RUN --mount=type=secret,id=forgejo_token,required=false \
 # by its published entry (main=dist/index.js, types=dist/index.d.ts), so its dist/
 # must exist before the shell's tsc/vite build — otherwise TS2307 "Cannot find
 # module '@aisha/surface-blocks'". (Root `build` script builds it first too.)
-# ⛔ NAMĚŘENO 2026-08-18: tenhle build závisel na `VERDACCIO_URL`, a nikde to
-# nebylo napsané. `.npmrc` v kořeni repa nese `@aisha:registry=${VERDACCIO_URL}`,
-# `.dockerignore` ho nevyřazuje a `COPY . .` ho sem doveze. npm ty závorky
-# NEROZVINE, když proměnná chybí — nechá tam literál a `npm ci` padne na
-#     npm error code ERR_INVALID_URL
-# což vypadá jako závada registru, ale je to chybějící konfigurace.
 #
-# Fungovalo to jen tím, že Coolify si `ARG` pro každou build-time proměnnou
-# vkládá SÁM (`modify_dockerfiles_for_compose`). Vazba, kterou v repu nikdo
-# nevidí, je přesně to, na čem umřel netbird (`FROM ${NETBIRD_BASE_IMAGE}`
-# s prázdnou hodnotou, tři dny ticha). Deklarace to zviditelňuje a hlavně dělá
-# build reprodukovatelným MIMO Coolify:
-#     docker build --build-arg VERDACCIO_URL=https://npm.example.com/ …
-# Prázdná výchozí hodnota není fallback — je to stav „nedodáno", který o řádek
-# níž hlasitě padne. Pověření sem NEPATŘÍ: čtení `@aisha/*` je anonymní
-# (změřeno) a token by se přes build arg zapsal do `docker history`.
-#
-# ⚠️ Týchž 31 Dockerfilů v repu má tuhle závislost taky a zatím implicitně —
-# viz brána src/tests/gates/npmrc-registr-musi-mit-adresu.gate.test.ts.
-ARG VERDACCIO_URL=
+# Žádný registr pro vlastní balíky: `@aisha/*` včetně extranet SDK (submodul
+# packages/extranet-sdk, workspace) jsou ve stromu a `COPY . .` je doveze;
+# `npm ci` stahuje jen cizí balíky z registry.npmjs.org. Dřív tu stál
+# `ARG VERDACCIO_URL` — build závisel na privátním zrcadle kvůli jedinému
+# balíku (@aisha/extranet-sdk-ui), který dnes leží ve zdroji.
 RUN npm ci --no-audit --no-fund \
  && npm run build -w packages/surface-blocks \
  && AISHA_INSTANCE_DIR="$([ -f /app/instances/_overlay/app.config.json ] \
