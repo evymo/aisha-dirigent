@@ -74313,7 +74313,10 @@ AS $function$
   -- Vazba „volající smí do dat uživatele p_user_id jako jeho konzultant".
   -- Platí jen tehdy, když JSOU SPLNĚNY VŠECHNY čtyři podmínky:
   --   1. volající je PŘIHLÁŠENÝ a EXISTUJÍCÍ účet — gateway razí roli
-  --      `authenticated` i návštěvníkovi bez účtu, takže role nestačí;
+  --      `authenticated` i návštěvníkovi bez účtu, takže role nestačí. Existenci
+  --      dokládá partnerský profil volajícího (partner_profiles.user_id má cizí
+  --      klíč na aisha_auth.users); na aisha_auth se tu přímo neodkazuje, protože
+  --      LANGUAGE sql se validuje při CREATE a cold start by spadl;
   --   2. je schváleným konzultantem studie,
   --   3. v níž je p_user_id aktivně zapsaný,
   --   4. a p_user_id dal TOMUTO konzultantovi platný souhlas se sdílením dat.
@@ -74324,7 +74327,6 @@ AS $function$
   -- souhlasová funkce, kterou policy volá vedle).
   SELECT auth.uid() IS NOT NULL
      AND p_user_id IS NOT NULL
-     AND EXISTS (SELECT 1 FROM aisha_auth.users u WHERE u.id = auth.uid())
      AND EXISTS (
        SELECT 1
        FROM study_registrations se
