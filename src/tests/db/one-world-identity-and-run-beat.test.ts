@@ -83,7 +83,10 @@ WHERE r.ref_kind = 'account' AND r.source_key = '${SUBJ}' AND r.valid_to IS NULL
 -- 4. kolega BEZ účtu je také entita registru
 SELECT 'colleague=' || (public.twin_upsert_entity_audited('person','hr','emp-7781','Kolega bez účtu') ->> 'twin_id' IS NOT NULL)::text AS out;
 -- 5. backfill dorodí profil, který dvojče nemá
-SELECT 'backfilled>=1=' || (public.twin_backfill_accounts_admin(100) >= 1)::text AS out;
+-- ⭐ Bez stropu 100: backfill bere profily od NEJSTARŠÍHO a v souběžné sadě jich
+-- bez dvojčete přibývá z jiných testů — profil fixtury pak vypadl za strop a test
+-- padal na noacc_bound=false (naměřeno 2026-10-05). Výchozí strop 5000 sadu pokryje.
+SELECT 'backfilled>=1=' || (public.twin_backfill_accounts_admin() >= 1)::text AS out;
 SELECT 'noacc_bound=' || (public.twin_for_account('${NOACC}') IS NOT NULL)::text AS out;
 -- Pohledy audience_admin_*_v se měří jako VLASTNÍK (RESET ROLE): klient je přímo
 -- nečte (od 2026-10-04 bez grantu pro authenticated — čtou se přes DEFINER bloky).
