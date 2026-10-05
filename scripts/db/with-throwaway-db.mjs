@@ -344,6 +344,11 @@ async function main() {
       // ho potřebuje pro `docker network connect` a pro URI přes docker DNS;
       // dokud bylo na obou stranách natvrdo, drželo to jen náhodou.
       AISHA_TESTDB_CONTAINER: CONTAINER,
+      // Okamžik, kdy DB dostala baseline + seed a ještě na ni nesáhl žádný test.
+      // Kontroly „seed nechává tabulku prázdnou" (schema-validation-v2) podle něj
+      // počítají jen řádky z doby PŘED testy — v souběžné sadě jinak viděly
+      // přechodné fixtury jiných souborů (naměřeno 2026-10-05: news_articles).
+      AISHA_TESTDB_SEED_AT: new Date().toISOString(),
     };
 
     console.log(`\n🧪 Running: ${command.join(" ")}\n`);

@@ -374,13 +374,26 @@ export async function getRlsPolicies(tableName: string): Promise<RlsPolicy[]> {
 }
 
 export async function getTableCounts(
-  tables: string[]
+  tables: string[],
+  /**
+   * ISO čas, do kterého se řádky počítají (sloupec created_at). Zahazovací DB ho
+   * předává v AISHA_TESTDB_SEED_AT = okamžik po seedu, před prvním testem, takže
+   * se měří SEED, ne přechodné fixtury souběžných testů. Tabulka bez created_at
+   * se počítá celá.
+   */
+  vznikloDo?: string,
 ): Promise<Record<string, number>> {
   const counts: Record<string, number> = {};
-  
+  const hranice = vznikloDo && !Number.isNaN(Date.parse(vznikloDo)) ? new Date(vznikloDo).toISOString() : null;
+
   for (const table of tables) {
     try {
-      const result = psqlQuery(`SELECT COUNT(*) FROM "${table}"`);
+      const maCreatedAt = hranice !== null && psqlQuery(
+        `SELECT count(*) FROM information_schema.columns
+          WHERE table_schema = 'public' AND table_name = '${table.replace(/'/g, "''")}' AND column_name = 'created_at'`,
+      ) === "1";
+      const filtr = maCreatedAt ? ` WHERE created_at <= '${hranice}'::timestamptz` : "";
+      const result = psqlQuery(`SELECT COUNT(*) FROM "${table}"${filtr}`);
       counts[table] = parseInt(result, 10) || 0;
     } catch {
       counts[table] = 0;
