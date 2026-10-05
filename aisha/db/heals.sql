@@ -11802,3 +11802,14 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/grants/partner_profiles_public.sql
 
 NOTIFY pgrst, 'reload schema';
+
+-- ⛔ is_consultant_for_user: ČLEN NEČETL ANI SVÁ ZDRAVOTNÍ DATA (2026-10-05, rozhodnutí majitele).
+-- Funkci volá devět RLS politik na zdravotních tabulkách a neměla grant pro authenticated
+-- → každé čtení health_check_ins, lab_results, health_data… padalo na „permission denied
+-- for function". Rozhodnuto: kontrola souhlasu PŘÍMO VE FUNKCI; vazba platí jen pro
+-- přihlášený existující účet, schváleného konzultanta studie, kde je člen aktivně zapsaný,
+-- a s platným souhlasem člena. Pak grant pro authenticated (anon dál bez). Soubor dosud
+-- v heals nebyl.
+\ir sql/functions/is_consultant_for_user.sql
+
+NOTIFY pgrst, 'reload schema';

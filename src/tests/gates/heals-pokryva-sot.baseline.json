@@ -877,7 +877,6 @@
     "sql/functions/install_agent_as_story.sql",
     "sql/functions/is_certified_partner.sql",
     "sql/functions/is_consultant_for_registration.sql",
-    "sql/functions/is_consultant_for_user.sql",
     "sql/functions/is_health_document_owner.sql",
     "sql/functions/is_intranet_channel_member.sql",
     "sql/functions/is_study_consultant.sql",

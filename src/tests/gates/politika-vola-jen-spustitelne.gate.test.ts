@@ -142,16 +142,15 @@ function politiky(sql: string, znameFunkce: Set<string>): Politika[] {
 /**
  * DOLOŽENÁ VÝJIMKA, ne přehlédnutí.
  *
- * `is_consultant_for_user` je ŽIVÁ VADA, kterou tahle brána správně vidí —
- * jen ji zatím nelze opravit, aniž by se rozhodl rozpor s `security.gate`
- * (PHI + klientský grant ⇒ kontrola souhlasu UVNITŘ funkce; tady je souhlas
- * v POLITICE, u všech devíti volajících politik). Viz komentář v
- * aisha/db/sql/functions/is_consultant_for_user.sql.
+ * `is_consultant_for_user` tu byla do 2026-10-05 jako živá vada čekající na
+ * rozhodnutí, kde má žít kontrola souhlasu. Rozhodnuto: přímo ve funkci; grant
+ * pro authenticated dostala a ze seznamu vypadla (měří
+ * konzultant-jen-se-souhlasem.runtime.test.ts).
  *
  * ⛔ Tenhle seznam NESMÍ růst mlčky: test níž hlídá, že má právě jednu položku.
  *    Další výjimka = vědomé rozhodnutí, ne tichý přírůstek.
  */
-const CEKA_NA_ROZHODNUTI = new Set(["is_consultant_for_user", "is_story_partner"]);
+const CEKA_NA_ROZHODNUTI = new Set(["is_story_partner"]);
 
 describe("RLS politika volá jen funkce spustitelné danou rolí", () => {
   test("seznam výjimek nenaroste mlčky", () => {
@@ -159,7 +158,7 @@ describe("RLS politika volá jen funkce spustitelné danou rolí", () => {
       [...CEKA_NA_ROZHODNUTI].sort(),
       "Každá výjimka je otevřený nález s doloženým důvodem. Přibyla-li nová, " +
         "patří k ní rozhodnutí, ne řádek v seznamu.",
-    ).toEqual(["is_consultant_for_user", "is_story_partner"]);
+    ).toEqual(["is_story_partner"]);
   });
   const sql = nactiBaseline();
   const granty = grantyFunkci(sql);

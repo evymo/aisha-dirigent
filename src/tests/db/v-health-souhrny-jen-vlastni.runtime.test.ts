@@ -7,10 +7,8 @@
  * uživatelů tak šly přečíst přes /rest/v1/v_health_* i bez účtu.
  *
  * INVARIANT: pohled nesmí dát VÍC, než dá pod touž identitou podkladová
- * tabulka. Porovnává se odpověď pohledu s odpovědí health_check_ins — včetně
- * chyby: dokud `is_consultant_for_user` nemá grant pro authenticated (otevřené
- * rozhodnutí, viz její SoT), padá na ní čtení podkladu i pohledu stejně
- * (fail-closed). Bez security_invoker pohled místo chyby vracel všechny.
+ * tabulka. Porovnává se odpověď pohledu s odpovědí health_check_ins (včetně
+ * případné chyby). Bez security_invoker pohled vracel všechny.
  *
  * Kontrolní vzorek: služba vidí OBA uživatele — prázdno u člena by jinak mohlo
  * znamenat jen to, že fixtura do pohledu vůbec nedoteče.
@@ -62,9 +60,11 @@ describe.skipIf(!isPgReachable())("v_health_* souhrny: RLS podkladu platí i skr
       expect(viditelni(SLUZBA, pohled), "služba nevidí fixturu — sonda je slepá").toBe(oba);
     });
 
-    it(`⛔ ${pohled}: člen nevidí cizí souhrn`, () => {
-      expect(viditelni(prihlaseny(ALICE), pohled), "Alice vidí Bobova zdravotní data").not.toContain(BOB);
-      expect(viditelni(prihlaseny(BOB), pohled), "Bob vidí Alicina zdravotní data").not.toContain(ALICE);
+    it(`⛔ ${pohled}: člen vidí svůj souhrn, cizí ne`, () => {
+      // Od 2026-10-05 (grant is_consultant_for_user) čte člen přesně sebe — dřív
+      // padalo čtení podkladu i pohledu na „permission denied for function".
+      expect(viditelni(prihlaseny(ALICE), pohled), "Alice nevidí svůj souhrn, nebo vidí Bobův").toBe(ALICE);
+      expect(viditelni(prihlaseny(BOB), pohled), "Bob nevidí svůj souhrn, nebo vidí Alicin").toBe(BOB);
     });
 
     it(`⛔ ${pohled}: nikdo nedostane víc než z health_check_ins`, () => {
