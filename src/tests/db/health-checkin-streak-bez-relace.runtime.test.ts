@@ -11,7 +11,7 @@
  * jen trigger, ne přihlášený — jinak by si kdokoli posouval streak komukoli.
  */
 import { randomUUID } from "node:crypto";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { isPgReachable } from "./test-env-probe";
 import { SLUZBA, fixtura, jako, prihlaseny } from "./sonda-identity";
 
@@ -30,6 +30,12 @@ describe.skipIf(!isPgReachable())("streak trigger health_check_ins", () => {
              ON CONFLICT (id) DO NOTHING`);
     fixtura(`INSERT INTO public.user_roles (user_id, role) VALUES ('${IMPORT}', 'member'), ('${CLEN}', 'member')
              ON CONFLICT DO NOTHING`);
+  });
+
+  // Úklid: celá sada sdílí jednu DB a schema-validation-v2 hlídá, že projektové
+  // tabulky (PROJEKTOVE_TABULKY) zůstanou po seedu PRÁZDNÉ.
+  afterAll(() => {
+    fixtura(`DELETE FROM public.health_check_ins WHERE user_id IN ('${IMPORT}', '${CLEN}')`);
   });
 
   it("⛔ služba vloží check-in za uživatele a streak se započítá", () => {

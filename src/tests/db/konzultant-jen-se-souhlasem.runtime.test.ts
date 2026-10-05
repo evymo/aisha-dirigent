@@ -15,7 +15,7 @@
  * i nad prázdnou databází.
  */
 import { randomUUID } from "node:crypto";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { isPgReachable } from "./test-env-probe";
 import { ANON, fixtura, jako, prihlaseny, zkus } from "./sonda-identity";
 
@@ -61,6 +61,17 @@ describe.skipIf(!isPgReachable())("is_consultant_for_user: souhlas uvnitř, exis
     // Check-in zapisuje sám člen — tak, jak to dělá appka.
     jako(prihlaseny(ALICE), `INSERT INTO public.health_check_ins (user_id, pain_level) VALUES ('${ALICE}', 6)`);
     jako(prihlaseny(BOB), `INSERT INTO public.health_check_ins (user_id, pain_level) VALUES ('${BOB}', 2)`);
+  });
+
+  // Úklid: celá sada sdílí jednu DB a schema-validation-v2 hlídá, že projektové
+  // tabulky (PROJEKTOVE_TABULKY) zůstanou po seedu PRÁZDNÉ.
+  afterAll(() => {
+    fixtura(`DELETE FROM public.health_check_ins WHERE user_id IN ('${ALICE}', '${BOB}')`);
+    fixtura(`DELETE FROM public.data_sharing_consents WHERE partner_id IN ('${PARTNER_KAREL}', '${PARTNER_KLARA}')`);
+    fixtura(`DELETE FROM public.study_registrations WHERE study_id = '${STUDIE}'`);
+    fixtura(`DELETE FROM public.study_consultants WHERE study_id = '${STUDIE}'`);
+    fixtura(`DELETE FROM public.partner_profiles WHERE id IN ('${PARTNER_KAREL}', '${PARTNER_KLARA}')`);
+    fixtura(`DELETE FROM public.studies WHERE id = '${STUDIE}'`);
   });
 
   it("⛔ člen čte svá zdravotní data jako přihlášený — a jen svá", () => {

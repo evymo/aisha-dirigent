@@ -12,7 +12,7 @@
  * Kontrolní vzorek ke každé zamítnuté akci: služba ji PROVEDE.
  */
 import { randomUUID } from "node:crypto";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { isPgReachable } from "./test-env-probe";
 import { ANON, SLUZBA, fixtura, jako, prihlaseny, zkus } from "./sonda-identity";
 
@@ -43,6 +43,13 @@ describe.skipIf(!isPgReachable())("edge_subscriptions: nárok podle akce", () =>
     fixtura(`INSERT INTO public.member_subscriptions (id, user_id, package_id, status) VALUES
                ('${PRED_CLENA}', '${CLEN}', '${BALICEK}', 'pending_payment'),
                ('${PRED_CIZI}',  '${CIZI}', '${BALICEK}', 'active')`);
+  });
+
+  // Úklid: celá sada sdílí jednu DB a schema-validation-v2 hlídá, že projektové
+  // tabulky (PROJEKTOVE_TABULKY) zůstanou po seedu PRÁZDNÉ.
+  afterAll(() => {
+    fixtura(`DELETE FROM public.member_subscriptions WHERE package_id = '${BALICEK}'`);
+    fixtura(`DELETE FROM public.subscription_packages WHERE id = '${BALICEK}'`);
   });
 
   it("⛔ člen si NEaktivuje vlastní předplatné bez platby", () => {

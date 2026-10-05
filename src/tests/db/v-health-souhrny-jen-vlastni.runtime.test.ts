@@ -14,7 +14,7 @@
  * znamenat jen to, že fixtura do pohledu vůbec nedoteče.
  */
 import { randomUUID } from "node:crypto";
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { isPgReachable } from "./test-env-probe";
 import { ANON, SLUZBA, fixtura, jako, prihlaseny, zkus } from "./sonda-identity";
 
@@ -53,6 +53,12 @@ describe.skipIf(!isPgReachable())("v_health_* souhrny: RLS podkladu platí i skr
                              VALUES ('${ALICE}', 7, 2, 88)`);
     jako(prihlaseny(BOB), `INSERT INTO public.health_check_ins (user_id, pain_level, mood_level, heart_rate_avg)
                            VALUES ('${BOB}', 3, 8, 64)`);
+  });
+
+  // Úklid: celá sada sdílí jednu DB a schema-validation-v2 hlídá, že projektové
+  // tabulky (PROJEKTOVE_TABULKY) zůstanou po seedu PRÁZDNÉ.
+  afterAll(() => {
+    fixtura(`DELETE FROM public.health_check_ins WHERE user_id IN ('${ALICE}', '${BOB}')`);
   });
 
   for (const pohled of POHLEDY) {
