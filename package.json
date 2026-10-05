@@ -54,7 +54,7 @@
     "test:gates:heavy": "AISHA_SKIP_ONLINE=1 AISHA_GATES_LANE=heavy node scripts/test/run-vitest.mjs --config vitest.gates.config.ts --default-dir src/tests/gates/",
     "test:gates:dotcene": "node scripts/test/brany-dotcene-spust.mjs",
     "test:gates:all": "AISHA_SKIP_ONLINE=1 node scripts/test/run-vitest.mjs --config vitest.gates.config.ts --default-dir src/tests/gates/",
-    "test:db": "node scripts/db/with-throwaway-db.mjs -- npx vitest run src/tests/db/",
+    "test:db": "node scripts/db/with-throwaway-db.mjs -- npx vitest run src/tests/db/ --exclude src/tests/db/demo-seed-nabehne-na-cisto-runtime.test.ts",
     "test:db:rohatka": "node scripts/db/with-throwaway-db.mjs -- node scripts/test/test-db-rohatka.mjs",
     "test:db:demo-seed": "AISHA_TESTDB_NO_SEED=1 node scripts/db/with-throwaway-db.mjs -- npx vitest run src/tests/db/demo-seed-nabehne-na-cisto-runtime.test.ts",
     "test:db:surfaces": "node scripts/db/with-throwaway-db.mjs -- npx vitest run src/tests/db/surface-block-contract.runtime.test.ts",

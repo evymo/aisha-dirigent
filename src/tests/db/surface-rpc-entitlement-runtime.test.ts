@@ -1,8 +1,10 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { psqlMultiline } from "./validation-utils";
+import { psqlMultiline, psqlQuery } from "./validation-utils";
 import { isPgReachable, reportTestCapabilities } from "./test-env-probe";
+// K overlayi vedou jedny dveře (brána overlay-jde-jen-jednemi-dvermi).
+import { overlayDir } from "../../../scripts/lib/instance-overlay.mjs";
 
 /**
  * Nárok na povrchových RPC — RUNTIME měření pod DVĚMA identitami.
@@ -53,6 +55,45 @@ import { isPgReachable, reportTestCapabilities } from "./test-env-probe";
 
 const dbAvailable = isPgReachable();
 const BASELINE = path.join(process.cwd(), "src/tests/db/surface-rpc-entitlement.baseline.json");
+
+/**
+ * ⛔ TŘI HODNOTY, NE DVĚ (2026-10-04). Univerzum jsou INSTANČNÍ surface_blocks —
+ * sekce a bloky jsou data instance, generický strom (upstream, throwaway DB
+ * z core seedu) je nemá. Tam brána NEMÁ CO MĚŘIT a v `test:db` padala na
+ * „univerzum je prázdné". Prohlásit to za zelené by byl fail-open; padat by
+ * blokovalo upstream za něco, co není vada. SKIPPED s důvodem v názvu je
+ * poctivá třetí odpověď (`skipped ≠ success`).
+ *
+ * Proč ne univerzum ze SoT (jako patro 1 surface-block-contract): ověřeno
+ * 2026-10-04 — nad core seedem to dalo 31 „shodných" producentů a VŠECHNY
+ * byly prázdné obálky (`rows: []`, `value: 0`, popisky sloupců). Bez dat, která
+ * privilegovaná identita smí vidět a bezrolová ne, se shoda od úniku odlišit
+ * nedá; „chytřejší" detekce obsahu by bránu oslepila právě na únik jmen.
+ */
+function katalogBloku(): number {
+  try {
+    return Number(psqlQuery("SELECT count(*) FROM public.surface_blocks WHERE source_rpc IS NOT NULL")) || 0;
+  } catch {
+    return 0;
+  }
+}
+/**
+ * ⛔ Počet řádků v surface_blocks NESTAČÍ jako důkaz katalogu. Celá sada běží
+ * souběžně nad jednou zahazovací DB a jiné testy si tam zakládají fixtury bloků
+ * (polozky-dokladu je i commitne a nechá) — brána pak „viděla katalog" o jedné
+ * testovací funkci bez dat a padala na vakuové měření (naměřeno 2026-10-04 v plném
+ * běhu). Zahazovací DB z core seedu (AISHA_TESTDB_CONTAINER) bez instančního
+ * overlaye instanční katalog z DEFINICE nemá; co v ní je, jsou fixtury.
+ */
+const zahazovaciBezInstance = Boolean(process.env.AISHA_TESTDB_CONTAINER) && overlayDir() === null;
+const NEZMERENO = !dbAvailable
+  ? "DB nedostupná"
+  : zahazovaciBezInstance
+    ? "zahazovací DB bez instančního overlaye — bloky v ní jsou fixtury jiných testů"
+    : katalogBloku() === 0
+      ? "bez instančního katalogu surface_blocks (generický strom)"
+      : null;
+const pozn = NEZMERENO ? ` — NEZMĚŘENO: ${NEZMERENO}` : "";
 
 /** Klíče, které nesou čas běhu, ne obsah — před porovnáním se odstraní. */
 const VOLATILE_KEYS = [
@@ -226,7 +267,7 @@ beforeAll(async () => {
 describe("povrchová RPC rozlišují nárok podle identity", () => {
   const rows: Array<{ fn: string; verdict: string }> = [];
 
-  it.skipIf(!dbAvailable)("měření proběhne a univerzum není prázdné", () => {
+  it.skipIf(NEZMERENO !== null)(`měření proběhne a univerzum není prázdné${pozn}`, () => {
     const out = psqlMultiline(measurementSql());
     for (const line of out.split("\n")) {
       const m = /^([a-z0-9_]+)\|(.+)$/.exec(line.trim());
@@ -247,7 +288,7 @@ describe("povrchová RPC rozlišují nárok podle identity", () => {
     ).toBeGreaterThan(0);
   });
 
-  it.skipIf(!dbAvailable)("žádná NOVÁ funkce nevrací oběma identitám totéž", () => {
+  it.skipIf(NEZMERENO !== null)(`žádná NOVÁ funkce nevrací oběma identitám totéž${pozn}`, () => {
     const baseline: Baseline = JSON.parse(fs.readFileSync(BASELINE, "utf8"));
     const known = new Set(Object.keys(baseline.shodne_vedome));
     const offenders = rows.filter((r) => r.verdict === "SHODNA" && !known.has(r.fn)).map((r) => r.fn);
@@ -260,7 +301,7 @@ describe("povrchová RPC rozlišují nárok podle identity", () => {
     ).toEqual([]);
   });
 
-  it.skipIf(!dbAvailable)("baseline nezvětrala — co v ní je, pořád existuje a pořád je shodné", () => {
+  it.skipIf(NEZMERENO !== null)(`baseline nezvětrala — co v ní je, pořád existuje a pořád je shodné${pozn}`, () => {
     const baseline: Baseline = JSON.parse(fs.readFileSync(BASELINE, "utf8"));
     const byFn = new Map(rows.map((r) => [r.fn, r.verdict]));
     const stale: string[] = [];
@@ -273,7 +314,7 @@ describe("povrchová RPC rozlišují nárok podle identity", () => {
     expect(stale, "vyřaď je z baseline — výjimka bez důvodu je jen díra s razítkem").toEqual([]);
   });
 
-  it.skipIf(!dbAvailable)("nic nezůstalo neměřené potichu", () => {
+  it.skipIf(NEZMERENO !== null)(`nic nezůstalo neměřené potichu${pozn}`, () => {
     const unmeasured = rows.filter(
       (r) => r.verdict === "NEDETERMINISTICKA" || r.verdict.startsWith("CHYBA:"),
     );

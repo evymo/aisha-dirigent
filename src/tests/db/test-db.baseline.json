@@ -6,13 +6,8 @@
     "Změřeno: 13 pádů v 7 souborech, bez souběhu souborů (sdílená DB), 2 běhy.",
     "2026-09-30 integrační dávka: 8 opraveno (agent-marketplace 1, agent-runtime 2, flow-node-queue 3, publish-expert-rule 1, scope-vector 1) → zbývá 5 pádů ve 2 souborech:",
     "  orderby-validation.test.ts: 3",
-    "  surface-rpc-entitlement-runtime.test.ts: 2"
+    "  surface-rpc-entitlement-runtime.test.ts: 2",
+    "2026-10-04: zbylých 5 opraveno → dluh 0. orderby-validation: strop výstupu psql (ENOBUFS) + get_workflow_step_detail patří mezi jednořádkové (PK). surface-rpc-entitlement: bez instančního katalogu surface_blocks se nemá co měřit → SKIPPED s důvodem (ne zelená, ne pád); zastaralé výjimky get_answer_chain_* vyřazeny."
   ],
-  "pady": [
-    "src/tests/db/orderby-validation.test.ts › All RPC Functions - ORDER BY Analysis › all get_/list_ functions returning multiple rows have ORDER BY",
-    "src/tests/db/orderby-validation.test.ts › RPC Functions - ORDER BY for Ordering Tables › all get_/list_ functions for ordering tables have ORDER BY",
-    "src/tests/db/orderby-validation.test.ts › RPC Functions - ORDER BY for Ordering Tables › functions using ordering columns actually ORDER BY those columns",
-    "src/tests/db/surface-rpc-entitlement-runtime.test.ts › povrchová RPC rozlišují nárok podle identity › baseline nezvětrala — co v ní je, pořád existuje a pořád je shodné",
-    "src/tests/db/surface-rpc-entitlement-runtime.test.ts › povrchová RPC rozlišují nárok podle identity › měření proběhne a univerzum není prázdné"
-  ]
+  "pady": []
 }

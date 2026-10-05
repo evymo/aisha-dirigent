@@ -10,12 +10,9 @@
     "odsud PRYČ — výjimka, která už nic nekryje, je jen díra s razítkem.",
     "",
     "Naměřeno 2026-08-02 na produkční DB pod dvěma identitami (A s rolí, B bez):",
-    "24 povrchových RPC → 11 rozlišuje · 9 prázdných · 4 shodná."
+    "24 povrchových RPC → 11 rozlišuje · 9 prázdných · 4 shodná.",
+    "",
+    "2026-10-04: get_answer_chain_costs/metrics/runs/trend VYŘAZENY — měření pod dvěma identitami (univerzum rozšířené o producenty ze SoT, throwaway DB) je ukázalo jako LISI_SE: nárok se naučily (viz definer-narok-ne-jen-prihlaseni)."
   ],
-  "shodne_vedome": {
-    "get_answer_chain_costs": "⛔ ZNÁMÁ VADA, ne povolená výjimka. Jediná kontrola ve funkci je `auth.uid() is null` — to je ověření, že je někdo PŘIHLÁŠENÝ, ne že má na data nárok. Bezrolový vidí náklady modelů a počty volání ze `ai_trace_events`. Nejde o data podniku, ale o provoz platformy; opravit doplněním nároku, pak vyřadit odsud.",
-    "get_answer_chain_metrics": "⛔ ZNÁMÁ VADA — táž příčina jako u `costs`: `auth.uid() is null` místo nároku.",
-    "get_answer_chain_runs": "⛔ ZNÁMÁ VADA — táž příčina. Vydává log běhů z `ai_runs` (id, druh, čas, stav), tedy kdy a jak se systém používá.",
-    "get_answer_chain_trend": "⛔ ZNÁMÁ VADA — táž příčina jako u `costs`."
-  }
+  "shodne_vedome": {}
 }

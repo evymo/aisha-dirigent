@@ -363,7 +363,14 @@ describe('SECURITY DEFINER se subjektem odpovídá jen o volajícím', () => {
       expect(v.reason?.length ?? 0, `${v.name}: důvod musí vysvětlit, proč to není orákulum`).toBeGreaterThan(60);
     }
     // Dluh smí jen klesat. Horní mez chytí pokus „vyřešit" třídu dopsáním výjimek.
-    expect(vyjimky.length, 'výjimek přibylo — oprav funkci, nezapisuj ji').toBeLessThanOrEqual(10);
+    // ⛔ Dvě meze (2026-10-05): DLUH (k-revizi = známá vada) má vlastní strop, který
+    // smí jen klesat; celkový strop hlídá tiché přibývání zamer/vztah. Do té doby
+    // byla jediná mez 10 společná, takže zdokumentovaný vztahový predikát
+    // (is_consultant_for_user, rozhodnutí majitele) by šel přidat jen výměnou za
+    // „opravu" cizí vady, nebo vůbec.
+    const dluh = vyjimky.filter((v) => v.kategorie === 'k-revizi');
+    expect(dluh.length, 'známých vad přibylo — oprav funkci, nezapisuj ji').toBeLessThanOrEqual(3);
+    expect(vyjimky.length, 'výjimek přibylo — oprav funkci, nezapisuj ji').toBeLessThanOrEqual(11);
   });
 
   test('žádná vystavená definer funkce se subjektem není bez stráže volajícího', () => {

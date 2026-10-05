@@ -29,5 +29,10 @@ COMMENT ON VIEW public.audience_admin_activity_monthly_v IS
   'Aktivita v čase: doteky po měsících a druzích nad dvojčaty (twin_events).
    Nahrazuje měření starého modelu profiles/openclaw_notifications.';
 
-REVOKE ALL ON public.audience_admin_activity_monthly_v FROM PUBLIC;
-GRANT SELECT ON public.audience_admin_activity_monthly_v TO authenticated, service_role;
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_activity_monthly_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_activity_monthly_v TO service_role;

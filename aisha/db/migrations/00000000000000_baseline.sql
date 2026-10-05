@@ -20021,8 +20021,13 @@ COMMENT ON VIEW public.audience_admin_activity_monthly_v IS
   'Aktivita v čase: doteky po měsících a druzích nad dvojčaty (twin_events).
    Nahrazuje měření starého modelu profiles/openclaw_notifications.';
 
-REVOKE ALL ON public.audience_admin_activity_monthly_v FROM PUBLIC;
-GRANT SELECT ON public.audience_admin_activity_monthly_v TO authenticated, service_role;
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_activity_monthly_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_activity_monthly_v TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -20329,6 +20334,14 @@ LEFT JOIN public.partner_stories ps ON b.subject_type = 'story' AND ps.id = b.su
 COMMENT ON VIEW public.audience_admin_followup_queue_v IS
   'Open beats bucketed (overdue/today/this_week/later) with the subject resolved to an actor when it has an account. Backed by story_pulse_beats since ADR-003 K2 (ai_tasks retired).';
 
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_followup_queue_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_followup_queue_v TO service_role;
+
 
 -- -----------------------------------------------------------------------------
 -- File: aisha/db/sql/views/audience_admin_relation_kinds_v.sql
@@ -20355,8 +20368,13 @@ CREATE OR REPLACE VIEW public.audience_admin_relation_kinds_v AS
 COMMENT ON VIEW public.audience_admin_relation_kinds_v IS
   'Struktura sítě: kolik vazeb kterého druhu, mezi kolika dvojčaty, od kdy.';
 
-REVOKE ALL ON public.audience_admin_relation_kinds_v FROM PUBLIC;
-GRANT SELECT ON public.audience_admin_relation_kinds_v TO authenticated, service_role;
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_relation_kinds_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_relation_kinds_v TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -20423,6 +20441,14 @@ WHERE s.kind = 'event';
 COMMENT ON VIEW public.audience_admin_source_event_stats_v IS
   'Events created per month (operator export shape). Filter by month (YYYY-MM). Admin/staff via get_audience_view_*_block.';
 
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_source_event_stats_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_source_event_stats_v TO service_role;
+
 
 -- -----------------------------------------------------------------------------
 -- File: aisha/db/sql/views/audience_admin_source_stats_monthly_v.sql
@@ -20445,6 +20471,14 @@ GROUP BY s.kind, s.month;
 COMMENT ON VIEW public.audience_admin_source_stats_monthly_v IS
   'Per (kind, month) counts over source_period_stats — chart source. Admin/staff.';
 
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_source_stats_monthly_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_source_stats_monthly_v TO service_role;
+
 
 -- -----------------------------------------------------------------------------
 -- File: aisha/db/sql/views/audience_admin_source_event_monthly_v.sql
@@ -20458,6 +20492,14 @@ FROM public.audience_admin_source_stats_monthly_v
 WHERE kind = 'event';
 COMMENT ON VIEW public.audience_admin_source_event_monthly_v IS
   'Events created per month (chart source). Admin/staff.';
+
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_source_event_monthly_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_source_event_monthly_v TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -20476,6 +20518,14 @@ FROM public.audience_admin_source_stats_monthly_v
 WHERE kind = 'topic';
 COMMENT ON VIEW public.audience_admin_source_topic_monthly_v IS
   'Topics created per month (chart source). Admin/staff.';
+
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_source_topic_monthly_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_source_topic_monthly_v TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -20513,6 +20563,14 @@ FROM public.source_period_stats s
 WHERE s.kind = 'topic';
 COMMENT ON VIEW public.audience_admin_source_topic_stats_v IS
   'Topics created per month (operator export shape). Filter by month (YYYY-MM). Admin/staff via get_audience_view_*_block.';
+
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_source_topic_stats_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_source_topic_stats_v TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -20598,8 +20656,13 @@ COMMENT ON VIEW public.audience_admin_twin_composition_v IS
   'Složení komunity: dvojčata po druhu a zdroji, kolik z nich má aktivitu,
    vazby a nedávný dotek. Odpovídá na otázku "kdo tu je".';
 
-REVOKE ALL ON public.audience_admin_twin_composition_v FROM PUBLIC;
-GRANT SELECT ON public.audience_admin_twin_composition_v TO authenticated, service_role;
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_twin_composition_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_twin_composition_v TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -20696,6 +20759,14 @@ LEFT JOIN public.audience_actor_aggregate_latest_v agg ON agg.user_id = b.user_i
 COMMENT ON VIEW public.audience_admin_twin_directory_v IS
   'Registr dvojčat: entity jádra (s účtem i bez) + čočka zapojení. Řádky bez twin_id = účty před backfillem (twin_status unbound). Drives the extranet registr section (ADR-003 K1).';
 
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_twin_directory_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_twin_directory_v TO service_role;
+
 
 -- -----------------------------------------------------------------------------
 -- File: aisha/db/sql/views/audience_admin_twin_relations_v.sql
@@ -20753,6 +20824,14 @@ JOIN public.twin_external_refs acct
 
 COMMENT ON VIEW public.audience_admin_twin_relations_v IS
   'Vazby (twin_relations, oba směry) a kontextové role (story_participants) jednoho dvojčete. Drives the extranet twin detail (ADR-003).';
+
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_twin_relations_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_twin_relations_v TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -20830,6 +20909,16 @@ WHERE te.twin_id IS NOT NULL
 
 COMMENT ON VIEW public.audience_admin_twin_timeline_v IS
   'Typed records and ingested events on one twin''s axis (subject twin, or the account bound to it). Filter by twin_id for the extranet twin detail (ADR-003).';
+
+-- ⛔ ŽÁDNÝ PŘÍMÝ GRANT KLIENTSKÝM ROLÍM (nález 2026-10-04). Pohled se čte právy
+-- VLASTNÍKA, tedy mimo RLS story_entries a twin_events — včetně interních
+-- záznamů (`is_internal`) a obsahu e-mailů z ingestu. S GRANT SELECT pro
+-- `authenticated` si ho kdokoli přihlášený přečetl celý přes /rest/v1/,
+-- a obešel tak stráž is_admin_or_staff() v get_audience_view_timeline_block.
+-- Jediná cesta ke čtení je ta DEFINER funkce; REVOKE ALL i z authenticated,
+-- protože na běžící DB žije explicitní grant z heals i default privileges.
+REVOKE ALL ON public.audience_admin_twin_timeline_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_twin_timeline_v TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -21513,8 +21602,14 @@ ORDER BY se.study_id, week_start;
 
 -- View: public.v_health_monthly_summary
 -- Description: Monthly health metrics summary per user.
-
-CREATE OR REPLACE VIEW public.v_health_monthly_summary AS
+--
+-- ⛔ security_invoker JE POVINNÝ (nález 2026-10-04). Bez něj se pohled čte
+-- právy VLASTNÍKA, tedy MIMO RLS tabulky health_check_ins — a s GRANT SELECT
+-- pro anon/authenticated vydával zdravotní souhrny (tep, bolest, nálada,
+-- spánek) VŠECH uživatelů komukoli, i bez účtu. S security_invoker platí
+-- policies podkladu: člen vidí své, konzultant souhlasem sdílené, admin vše.
+CREATE OR REPLACE VIEW public.v_health_monthly_summary
+WITH (security_invoker = true) AS
 SELECT
   user_id,
   date_trunc('month', check_in_date)::date AS month_start,
@@ -21539,8 +21634,14 @@ GROUP BY user_id, date_trunc('month', check_in_date)::date;
 
 -- View: public.v_health_weekly_summary
 -- Description: Weekly health metrics summary per user.
-
-CREATE OR REPLACE VIEW public.v_health_weekly_summary AS
+--
+-- ⛔ security_invoker JE POVINNÝ (nález 2026-10-04). Bez něj se pohled čte
+-- právy VLASTNÍKA, tedy MIMO RLS tabulky health_check_ins — a s GRANT SELECT
+-- pro anon/authenticated vydával zdravotní souhrny (tep, bolest, nálada,
+-- spánek) VŠECH uživatelů komukoli, i bez účtu. S security_invoker platí
+-- policies podkladu: člen vidí své, konzultant souhlasem sdílené, admin vše.
+CREATE OR REPLACE VIEW public.v_health_weekly_summary
+WITH (security_invoker = true) AS
 SELECT
   user_id,
   date_trunc('week', check_in_date)::date AS week_start,
@@ -30542,141 +30643,6 @@ GRANT EXECUTE ON FUNCTION public.edge_app_versions(text, jsonb) TO service_role;
 
 
 -- -----------------------------------------------------------------------------
--- File: aisha/db/sql/functions/edge_bank_transactions.sql
--- -----------------------------------------------------------------------------
-
--- edge_bank_transactions: Edge-safe bank transaction operations (insert, match, list)
-CREATE OR REPLACE FUNCTION public.edge_bank_transactions(
-  p_action text,
-  p_payload jsonb DEFAULT '{}'::jsonb
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_row jsonb;
-  v_rows jsonb;
-  v_tx_id text;
-  v_order_id uuid;
-BEGIN
-  -- INSERT a new bank transaction (deduplicate by fio_transaction_id)
-  IF p_action = 'insert_transaction' THEN
-    v_tx_id := NULLIF(p_payload ->> 'fio_transaction_id', '');
-
-    -- Check for duplicate
-    IF v_tx_id IS NOT NULL THEN
-      SELECT id INTO v_order_id FROM public.bank_transactions WHERE fio_transaction_id = v_tx_id;
-      IF FOUND THEN
-        RETURN jsonb_build_object('ok', false, 'reason', 'duplicate');
-      END IF;
-    END IF;
-
-    INSERT INTO public.bank_transactions (
-      fio_transaction_id, amount, currency, variable_symbol,
-      sender_account, sender_name, transaction_date, message,
-      match_status, raw_data
-    ) VALUES (
-      v_tx_id,
-      (p_payload ->> 'amount')::numeric,
-      COALESCE(NULLIF(p_payload ->> 'currency', ''), public.commerce_base_currency()),
-      NULLIF(p_payload ->> 'variable_symbol', ''),
-      NULLIF(p_payload ->> 'sender_account', ''),
-      NULLIF(p_payload ->> 'sender_name', ''),
-      (NULLIF(p_payload ->> 'transaction_date', ''))::date,
-      NULLIF(p_payload ->> 'message', ''),
-      COALESCE(NULLIF(p_payload ->> 'match_status', ''), 'unmatched'),
-      p_payload -> 'raw_data'
-    );
-
-    RETURN jsonb_build_object('ok', true);
-  END IF;
-
-  -- MATCH a transaction to an order
-  IF p_action = 'match_to_order' THEN
-    v_order_id := (p_payload ->> 'order_id')::uuid;
-
-    UPDATE public.bank_transactions
-    SET matched_order_id = v_order_id,
-        match_status = 'matched',
-        match_notes = NULLIF(p_payload ->> 'notes', '')
-    WHERE id = (p_payload ->> 'transaction_id')::uuid;
-
-    -- Update order payment status
-    UPDATE public.orders
-    SET payment_status = 'paid',
-        status = 'paid',
-        updated_at = now()
-    WHERE id = v_order_id
-      AND payment_status = 'awaiting_transfer';
-
-    RETURN jsonb_build_object('ok', true);
-  END IF;
-
-  -- LIST unmatched transactions (admin)
-  IF p_action = 'get_unmatched' THEN
-    SELECT COALESCE(jsonb_agg(
-      jsonb_build_object(
-        'id', bt.id,
-        'fio_transaction_id', bt.fio_transaction_id,
-        'amount', bt.amount,
-        'currency', bt.currency,
-        'variable_symbol', bt.variable_symbol,
-        'sender_account', bt.sender_account,
-        'sender_name', bt.sender_name,
-        'transaction_date', bt.transaction_date,
-        'message', bt.message,
-        'match_status', bt.match_status,
-        'created_at', bt.created_at
-      ) ORDER BY bt.transaction_date DESC NULLS LAST
-    ), '[]'::jsonb) INTO v_rows
-    FROM public.bank_transactions bt
-    WHERE bt.match_status IN ('unmatched', 'amount_mismatch');
-
-    RETURN jsonb_build_object('rows', v_rows);
-  END IF;
-
-  -- GET bank transfer details for an order (member view)
-  IF p_action = 'get_order_bank_transfer' THEN
-    v_order_id := (p_payload ->> 'order_id')::uuid;
-
-    SELECT jsonb_build_object(
-      'order_id', o.id,
-      'variable_symbol', o.variable_symbol,
-      'iban', o.bank_transfer_iban,
-      'bic', o.bank_transfer_bic,
-      'amount', o.bank_transfer_amount,
-      'currency', o.currency,
-      'due_date', o.bank_transfer_due_date,
-      'payment_method', o.payment_method,
-      'payment_status', o.payment_status,
-      'status', o.status,
-      'total', o.total,
-      'invoice_number', o.invoice_number,
-      'invoice_pdf_path', o.invoice_pdf_path
-    ) INTO v_row
-    FROM public.orders o
-    WHERE o.id = v_order_id
-      AND (o.user_id = auth.uid() OR EXISTS (
-        SELECT 1 FROM public.user_roles ur
-        WHERE ur.user_id = auth.uid()
-          AND ur.role IN ('admin', 'staff')
-      ));
-
-    RETURN jsonb_build_object('row', v_row);
-  END IF;
-
-  RAISE EXCEPTION 'Unsupported action: %', p_action;
-END;
-$function$;
-
-REVOKE ALL ON FUNCTION public.edge_bank_transactions(text, jsonb) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.edge_bank_transactions(text, jsonb) TO service_role;
-GRANT EXECUTE ON FUNCTION public.edge_bank_transactions(text, jsonb) TO authenticated;
-
-
--- -----------------------------------------------------------------------------
 -- File: aisha/db/sql/functions/edge_blockchain_audit.sql
 -- -----------------------------------------------------------------------------
 
@@ -31272,197 +31238,6 @@ $function$;
 
 REVOKE ALL ON FUNCTION public.edge_stripe_disputes(text, jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.edge_stripe_disputes(text, jsonb) TO service_role;
-
-
--- -----------------------------------------------------------------------------
--- File: aisha/db/sql/functions/edge_subscriptions.sql
--- -----------------------------------------------------------------------------
-
--- Function: public.edge_subscriptions
--- Purpose: Edge-safe subscription and package operations.
-
-CREATE OR REPLACE FUNCTION public.edge_subscriptions(
-  p_action text,
-  p_payload jsonb DEFAULT '{}'::jsonb
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_id uuid;
-  v_package_id uuid;
-  v_row jsonb;
-  v_statuses text[];
-  v_stripe_subscription_id text;
-  v_user_id uuid;
-BEGIN
-  IF p_action = 'create_member_subscription' THEN
-    INSERT INTO public.member_subscriptions (
-      amount_paid,
-      billing_interval_months,
-      currency,
-      package_id,
-      payment_type,
-      period_end,
-      period_start,
-      status,
-      user_id
-    )
-    VALUES (
-      NULLIF(p_payload ->> 'amount_paid', '')::numeric,
-      NULLIF(p_payload ->> 'billing_interval_months', '')::integer,
-      COALESCE(NULLIF(p_payload ->> 'currency', ''), public.commerce_base_currency()),
-      NULLIF(p_payload ->> 'package_id', '')::uuid,
-      COALESCE(NULLIF(p_payload ->> 'payment_type', ''), 'one_time')::public.payment_type,
-      NULLIF(p_payload ->> 'period_end', '')::timestamptz,
-      NULLIF(p_payload ->> 'period_start', '')::timestamptz,
-      COALESCE(NULLIF(p_payload ->> 'status', ''), 'pending_payment'),
-      NULLIF(p_payload ->> 'user_id', '')::uuid
-    )
-    RETURNING id INTO v_id;
-
-    RETURN jsonb_build_object('id', v_id, 'ok', true);
-  END IF;
-
-  IF p_action = 'get_package_by_id' THEN
-    v_package_id := NULLIF(p_payload ->> 'package_id', '')::uuid;
-    IF v_package_id IS NULL THEN
-      RAISE EXCEPTION 'Missing package_id';
-    END IF;
-
-    SELECT jsonb_build_object(
-      'allow_one_time_payment', p.allow_one_time_payment,
-      'allow_recurring_payment', p.allow_recurring_payment,
-      'billing_interval_months', p.billing_interval_months,
-      'currency', p.currency,
-      'description', p.description,
-      'governance_tokens', p.governance_tokens,
-      'id', p.id,
-      'impact_tokens', p.impact_tokens,
-      'is_recurring', p.is_recurring,
-      'min_billing_months', p.min_billing_months,
-      'name', p.name,
-      'period', p.period,
-      'price', p.price,
-      'slug', p.slug,
-      'stripe_price_id', p.stripe_price_id,
-      'stripe_price_id_one_time', p.stripe_price_id_one_time,
-      'stripe_price_id_recurring', p.stripe_price_id_recurring,
-      'stripe_product_id', p.stripe_product_id,
-      'tier', p.tier
-    )
-    INTO v_row
-    FROM public.subscription_packages p
-    WHERE p.id = v_package_id
-      AND COALESCE(p.is_active, true) = true
-    LIMIT 1;
-
-    RETURN jsonb_build_object('row', v_row);
-  END IF;
-
-  IF p_action = 'get_user_subscriptions' THEN
-    v_user_id := NULLIF(p_payload ->> 'user_id', '')::uuid;
-    IF v_user_id IS NULL THEN
-      RAISE EXCEPTION 'Missing user_id';
-    END IF;
-
-    v_statuses := COALESCE(
-      (
-        SELECT array_agg(value)
-        FROM jsonb_array_elements_text(COALESCE(p_payload -> 'statuses', '[]'::jsonb)) AS t(value)
-      ),
-      ARRAY[]::text[]
-    );
-
-    RETURN jsonb_build_object(
-      'rows',
-      COALESCE(
-        (
-          SELECT jsonb_agg(
-            jsonb_build_object(
-              'cancel_at_period_end', ms.cancel_at_period_end,
-              'id', ms.id,
-              'next_billing_date', ms.next_billing_date,
-              'package', jsonb_build_object(
-                'governance_tokens', sp.governance_tokens,
-                'impact_tokens', sp.impact_tokens,
-                'name', sp.name,
-                'period', sp.period,
-                'tier', sp.tier
-              ),
-              'package_id', ms.package_id,
-              'payment_type', ms.payment_type,
-              'period_end', ms.period_end,
-              'period_start', ms.period_start,
-              'status', ms.status,
-              'stripe_subscription_id', ms.stripe_subscription_id
-            )
-            ORDER BY ms.created_at DESC
-          )
-          FROM public.member_subscriptions ms
-          LEFT JOIN public.subscription_packages sp ON sp.id = ms.package_id
-          WHERE ms.user_id = v_user_id
-            AND (
-              cardinality(v_statuses) = 0
-              OR ms.status = ANY(v_statuses)
-            )
-        ),
-        '[]'::jsonb
-      )
-    );
-  END IF;
-
-  IF p_action = 'update_package_stripe' THEN
-    v_package_id := NULLIF(p_payload ->> 'package_id', '')::uuid;
-    IF v_package_id IS NULL THEN
-      RAISE EXCEPTION 'Missing package_id';
-    END IF;
-
-    UPDATE public.subscription_packages
-    SET
-      stripe_price_id_one_time = CASE WHEN p_payload ? 'stripe_price_id_one_time' THEN NULLIF(p_payload ->> 'stripe_price_id_one_time', '') ELSE stripe_price_id_one_time END,
-      stripe_price_id_recurring = CASE WHEN p_payload ? 'stripe_price_id_recurring' THEN NULLIF(p_payload ->> 'stripe_price_id_recurring', '') ELSE stripe_price_id_recurring END,
-      stripe_product_id = CASE WHEN p_payload ? 'stripe_product_id' THEN NULLIF(p_payload ->> 'stripe_product_id', '') ELSE stripe_product_id END,
-      updated_at = now()
-    WHERE id = v_package_id;
-
-    RETURN jsonb_build_object('ok', true, 'updated', FOUND);
-  END IF;
-
-  IF p_action = 'update_subscription' THEN
-    v_id := NULLIF(p_payload ->> 'id', '')::uuid;
-    v_stripe_subscription_id := NULLIF(p_payload ->> 'stripe_subscription_id', '');
-
-    IF v_id IS NULL AND v_stripe_subscription_id IS NULL THEN
-      RAISE EXCEPTION 'Missing subscription selector';
-    END IF;
-
-    UPDATE public.member_subscriptions
-    SET
-      cancel_at_period_end = CASE WHEN p_payload ? 'cancel_at_period_end' THEN (p_payload ->> 'cancel_at_period_end')::boolean ELSE cancel_at_period_end END,
-      next_billing_date = CASE WHEN p_payload ? 'next_billing_date' THEN NULLIF(p_payload ->> 'next_billing_date', '')::timestamptz ELSE next_billing_date END,
-      status = COALESCE(NULLIF(p_payload ->> 'status', ''), status),
-      stripe_invoice_id = CASE WHEN p_payload ? 'stripe_invoice_id' THEN NULLIF(p_payload ->> 'stripe_invoice_id', '') ELSE stripe_invoice_id END,
-      stripe_payment_intent_id = CASE WHEN p_payload ? 'stripe_payment_intent_id' THEN NULLIF(p_payload ->> 'stripe_payment_intent_id', '') ELSE stripe_payment_intent_id END,
-      stripe_subscription_id = CASE WHEN p_payload ? 'new_stripe_subscription_id' THEN NULLIF(p_payload ->> 'new_stripe_subscription_id', '') ELSE stripe_subscription_id END
-    WHERE (
-      (v_id IS NOT NULL AND id = v_id)
-      OR
-      (v_id IS NULL AND v_stripe_subscription_id IS NOT NULL AND stripe_subscription_id = v_stripe_subscription_id)
-    );
-
-    RETURN jsonb_build_object('ok', true, 'updated', FOUND);
-  END IF;
-
-  RAISE EXCEPTION 'Unsupported action: %', p_action;
-END;
-$function$;
-
-REVOKE ALL ON FUNCTION public.edge_subscriptions(text, jsonb) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.edge_subscriptions(text, jsonb) TO service_role;
-GRANT EXECUTE ON FUNCTION public.edge_subscriptions(text, jsonb) TO authenticated;
 
 
 -- -----------------------------------------------------------------------------
@@ -63366,272 +63141,6 @@ GRANT EXECUTE ON FUNCTION public.discard_news_article_draft_admin(uuid) TO authe
 
 
 -- -----------------------------------------------------------------------------
--- File: aisha/db/sql/functions/edge_mobile_notifications.sql
--- -----------------------------------------------------------------------------
-
--- Function: public.edge_mobile_notifications
--- Purpose: Edge-safe mobile session + notification reads/writes.
-
-CREATE OR REPLACE FUNCTION public.edge_mobile_notifications(
-  p_action text,
-  p_payload jsonb DEFAULT '{}'::jsonb
-)
-RETURNS jsonb
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-DECLARE
-  v_id uuid;
-  v_user_id uuid;
-BEGIN
-  IF p_action = 'get_mobile_sessions' THEN
-    RETURN jsonb_build_object(
-      'rows',
-      COALESCE(
-        (
-          SELECT jsonb_agg(
-            jsonb_build_object(
-              'device_platform', m.device_platform,
-              'fcm_token', m.fcm_token,
-              'user_id', m.user_id
-            )
-          )
-          FROM public.mobile_sessions m
-          WHERE m.user_id = ANY(
-            COALESCE(
-              (
-                SELECT array_agg(value::uuid)
-                FROM jsonb_array_elements_text(COALESCE(p_payload -> 'user_ids', '[]'::jsonb)) AS t(value)
-              ),
-              ARRAY[]::uuid[]
-            )
-          )
-          AND m.fcm_token IS NOT NULL
-        ),
-        '[]'::jsonb
-      )
-    );
-  END IF;
-
-  IF p_action = 'get_notification_preferences' THEN
-    RETURN jsonb_build_object(
-      'rows',
-      COALESCE(
-        (
-          SELECT jsonb_agg(
-            jsonb_build_object(
-              'afternoon_start', n.afternoon_start::text,
-              'evening_start', n.evening_start::text,
-              'morning_start', n.morning_start::text,
-              'push_enabled', n.push_enabled,
-              'push_reminders', n.push_reminders,
-              'push_study_updates', n.push_study_updates,
-              'questionnaire_reminder_period', n.questionnaire_reminder_period,
-              'quiet_hours_enabled', n.quiet_hours_enabled,
-              'quiet_hours_end', n.quiet_hours_end::text,
-              'quiet_hours_start', n.quiet_hours_start::text,
-              'user_id', n.user_id,
-              'user_timezone', n.user_timezone
-            )
-          )
-          FROM public.notification_preferences n
-          WHERE n.user_id = ANY(
-            COALESCE(
-              (
-                SELECT array_agg(value::uuid)
-                FROM jsonb_array_elements_text(COALESCE(p_payload -> 'user_ids', '[]'::jsonb)) AS t(value)
-              ),
-              ARRAY[]::uuid[]
-            )
-          )
-        ),
-        '[]'::jsonb
-      )
-    );
-  END IF;
-
-  IF p_action = 'insert_notification_log' THEN
-    INSERT INTO public.notification_logs (
-      created_at,
-      data,
-      devices_failed,
-      devices_sent,
-      error_message,
-      notification_type,
-      recipients_count,
-      title
-    )
-    VALUES (
-      COALESCE(NULLIF(p_payload ->> 'created_at', '')::timestamptz, now()),
-      COALESCE(p_payload -> 'data', '{}'::jsonb),
-      COALESCE(NULLIF(p_payload ->> 'devices_failed', '')::integer, 0),
-      COALESCE(NULLIF(p_payload ->> 'devices_sent', '')::integer, 0),
-      NULLIF(p_payload ->> 'error_message', ''),
-      COALESCE(NULLIF(p_payload ->> 'notification_type', ''), 'push'),
-      COALESCE(NULLIF(p_payload ->> 'recipients_count', '')::integer, 0),
-      NULLIF(p_payload ->> 'title', '')
-    )
-    RETURNING id INTO v_id;
-
-    RETURN jsonb_build_object('id', v_id, 'ok', true);
-  END IF;
-
-  IF p_action = 'insert_notifications_bulk' THEN
-    RETURN jsonb_build_object(
-      'inserted',
-      (
-        WITH input_rows AS (
-          SELECT
-            COALESCE(NULLIF(row ->> 'link', ''), NULL) AS link,
-            NULLIF(row ->> 'message', '') AS message,
-            COALESCE(row -> 'metadata', '{}'::jsonb) AS metadata,
-            COALESCE(NULLIF(row ->> 'title', ''), 'Notification') AS title,
-            COALESCE(NULLIF(row ->> 'type', ''), 'campaign') AS type,
-            NULLIF(row ->> 'user_id', '')::uuid AS user_id
-          FROM jsonb_array_elements(COALESCE(p_payload -> 'rows', '[]'::jsonb)) AS t(row)
-        ),
-        inserted AS (
-          INSERT INTO public.notifications (
-            link,
-            message,
-            metadata,
-            title,
-            type,
-            user_id
-          )
-          SELECT
-            i.link,
-            i.message,
-            i.metadata,
-            i.title,
-            i.type,
-            i.user_id
-          FROM input_rows i
-          WHERE i.user_id IS NOT NULL
-          RETURNING 1
-        )
-        SELECT count(*) FROM inserted
-      )
-    );
-  END IF;
-
-  IF p_action = 'get_existing_questionnaire_reminder_keys' THEN
-    RETURN jsonb_build_object(
-      'rows',
-      COALESCE(
-        (
-          SELECT jsonb_agg(
-            jsonb_build_object(
-              'dedupe_key', n.metadata ->> 'dedupe_key'
-            )
-          )
-          FROM public.notifications n
-          WHERE n.user_id = ANY(
-            COALESCE(
-              (
-                SELECT array_agg(value::uuid)
-                FROM jsonb_array_elements_text(COALESCE(p_payload -> 'user_ids', '[]'::jsonb)) AS t(value)
-              ),
-              ARRAY[]::uuid[]
-            )
-          )
-            AND n.type = 'questionnaire_request'
-            AND n.metadata ? 'dedupe_key'
-            AND (n.metadata ->> 'dedupe_key') = ANY(
-              COALESCE(
-                (
-                  SELECT array_agg(value)
-                  FROM jsonb_array_elements_text(COALESCE(p_payload -> 'dedupe_keys', '[]'::jsonb)) AS t(value)
-                ),
-                ARRAY[]::text[]
-              )
-            )
-        ),
-        '[]'::jsonb
-      )
-    );
-  END IF;
-
-  IF p_action = 'get_campaign_notification_deliveries_admin' THEN
-    IF NOT public.is_admin_or_staff() THEN
-      RAISE EXCEPTION 'Access denied';
-    END IF;
-
-    RETURN jsonb_build_object(
-      'rows',
-      COALESCE(
-        (
-          SELECT jsonb_agg(
-            jsonb_build_object(
-              'created_at', q.created_at,
-              'id', q.id,
-              'is_read', q.is_read,
-              'link', q.link,
-              'message', q.message,
-              'profile_display_name', q.profile_display_name,
-              'profile_email', q.profile_email,
-              'schedule_id', q.schedule_id,
-              'title', q.title,
-              'type', q.type,
-              'user_id', q.user_id
-            )
-          )
-          FROM (
-            SELECT
-              n.created_at,
-              n.id,
-              n.is_read,
-              n.link,
-              n.message,
-              p.display_name AS profile_display_name,
-              p.email AS profile_email,
-              NULLIF(n.metadata ->> 'schedule_id', '')::uuid AS schedule_id,
-              n.title,
-              n.type,
-              n.user_id
-            FROM public.notifications n
-            LEFT JOIN public.profiles p ON p.user_id = n.user_id
-            WHERE (n.metadata ->> 'campaign_id') = NULLIF(p_payload ->> 'campaign_id', '')
-            ORDER BY n.created_at DESC
-            LIMIT GREATEST(COALESCE(NULLIF(p_payload ->> 'limit', '')::integer, 200), 1)
-          ) AS q
-        ),
-        '[]'::jsonb
-      )
-    );
-  END IF;
-
-  IF p_action = 'null_mobile_session_token' THEN
-    v_user_id := NULLIF(p_payload ->> 'user_id', '')::uuid;
-
-    UPDATE public.mobile_sessions
-    SET
-      fcm_token = NULL,
-      updated_at = now()
-    WHERE
-      (
-        v_user_id IS NULL
-        OR user_id = v_user_id
-      )
-      AND (
-        NOT (p_payload ? 'fcm_token')
-        OR fcm_token = NULLIF(p_payload ->> 'fcm_token', '')
-      );
-
-    RETURN jsonb_build_object('ok', true, 'updated', FOUND);
-  END IF;
-
-  RAISE EXCEPTION 'Unsupported action: %', p_action;
-END;
-$function$;
-
-REVOKE ALL ON FUNCTION public.edge_mobile_notifications(text, jsonb) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.edge_mobile_notifications(text, jsonb) TO service_role;
-GRANT EXECUTE ON FUNCTION public.edge_mobile_notifications(text, jsonb) TO authenticated;
-
-
--- -----------------------------------------------------------------------------
 -- File: aisha/db/sql/functions/edge_story_ai.sql
 -- -----------------------------------------------------------------------------
 
@@ -74801,60 +74310,55 @@ CREATE OR REPLACE FUNCTION public.is_consultant_for_user(p_user_id uuid)
  STABLE SECURITY DEFINER
  SET search_path TO 'public'
 AS $function$
-  SELECT EXISTS (
-    SELECT 1
-    FROM study_registrations se
-    JOIN study_consultants sc ON sc.study_id = se.study_id
-    JOIN partner_profiles pp ON pp.id = sc.partner_id
-    WHERE se.user_id = p_user_id
-      AND pp.user_id = auth.uid()
-      AND sc.status = 'approved'
-      AND se.status IN ('active', 'enrolled')
-  );
+  -- Vazba „volající smí do dat uživatele p_user_id jako jeho konzultant".
+  -- Platí jen tehdy, když JSOU SPLNĚNY VŠECHNY čtyři podmínky:
+  --   1. volající je PŘIHLÁŠENÝ a EXISTUJÍCÍ účet — gateway razí roli
+  --      `authenticated` i návštěvníkovi bez účtu, takže role nestačí. Existenci
+  --      dokládá partnerský profil volajícího (partner_profiles.user_id má cizí
+  --      klíč na aisha_auth.users); na aisha_auth se tu přímo neodkazuje, protože
+  --      LANGUAGE sql se validuje při CREATE a cold start by spadl;
+  --   2. je schváleným konzultantem studie,
+  --   3. v níž je p_user_id aktivně zapsaný,
+  --   4. a p_user_id dal TOMUTO konzultantovi platný souhlas se sdílením dat.
+  -- Vlastní data čte člen přes svou policy (user_id = auth.uid()), ne přes tuhle
+  -- vazbu. Souhlas se ověřuje UVNITŘ (rozhodnutí 2026-10-05): funkce pak sama nic
+  -- neprozradí — bez souhlasu je odpověď „ne", i když zápis ve studii existuje.
+  -- Bez auditního zápisu: běží v RLS predikátu per řádek (audit čtení zapisuje
+  -- souhlasová funkce, kterou policy volá vedle).
+  SELECT auth.uid() IS NOT NULL
+     AND p_user_id IS NOT NULL
+     AND EXISTS (
+       SELECT 1
+       FROM study_registrations se
+       JOIN study_consultants sc ON sc.study_id = se.study_id
+       JOIN partner_profiles pp ON pp.id = sc.partner_id
+       WHERE se.user_id = p_user_id
+         AND pp.user_id = auth.uid()
+         AND sc.status = 'approved'
+         AND se.status IN ('active', 'enrolled')
+         AND EXISTS (
+           SELECT 1
+           FROM data_sharing_consents dsc
+           WHERE dsc.user_id = p_user_id
+             AND dsc.partner_id = pp.id
+             AND dsc.revoked_at IS NULL
+             AND (dsc.expires_at IS NULL OR dsc.expires_at > now())
+         )
+     );
 $function$
 ;
 
 -- Permissions
 REVOKE ALL ON FUNCTION public.is_consultant_for_user(p_user_id uuid) FROM PUBLIC;
--- ⛔ NAMĚŘENO 2026-08-12: tahle funkce neměla ANI JEDEN grant. Nesměl ji spustit
--- nikdo — ani `authenticated`. Přitom ji volá DEVĚT politik na tabulkách se
--- zdravotními daty (health_data, lab_results, dosing_logs, wearables_data,
--- health_check_ins, operational_assessments, consents, member_distribution_plans,
--- member_compliance_scores).
---
--- PostgreSQL při SELECTu vyhodnocuje VŠECHNY použitelné politiky, ne jen tu,
--- která by řádek povolila. Takže člen, který si chce přečíst SVÁ VLASTNÍ data,
--- narazil na konzultantskou politiku a celý dotaz spadl na
--- „permission denied for function public.is_consultant_for_user".
--- Nešlo o „nevidí cizí" — nevidí ani svoje.
---
--- je „permission denied" na PHI tabulce fail-CLOSED, tedy správné chování.
--- Živá vada byla jinde: chyběl grant pro `authenticated`, což je role, kterou
--- gateway razí i nepřihlášenému návštěvníkovi.
--- ⚠️ ZÁMĚRNĚ BEZ GRANTU — a je to ZNÁMÁ ŽIVÁ VADA, ne stav, který by byl v pořádku.
---
--- Funkci volá DEVĚT politik na tabulkách se zdravotními daty. Bez grantu pro
--- `authenticated` spadne KAŽDÝ dotaz na ty tabulky na „permission denied for
--- function" — člen si nepřečte ani svoje vlastní health_data či lab_results.
---
--- Grant sem ale nemůže padnout jen tak: security.gate vyžaduje, aby funkce
--- sahající na PHI a mající klientský grant obsahovala kontrolu souhlasu UVNITŘ
--- SEBE. Tahle ji uvnitř nemá — mají ji všechny politiky, které ji volají
--- (has_data_sharing_consent, ověřeno u všech devíti).
---
--- Otevřené rozhodnutí (viz PR):
---   A) přidat kontrolu souhlasu i dovnitř funkce — dvojitá ochrana, ale dva
---      zdroje pravdy, které se časem rozejdou
---   B) naučit analyzátor uznat souhlas v politice — přesnější, ale je to změna
---      bezpečnostního pravidla kolem PHI a nepodařilo se mi ji OVĚŘIT mutací
---
--- Do rozhodnutí zůstává bez grantu. Brána politika-vola-jen-spustitelne tuhle
--- funkci proto zná jako doloženou výjimku — ne jako přehlédnutí.
--- Role bez oprávnění ZÁMĚRNĚ: konzultantský přístup k PHI je vázaný na souhlas,
--- takže ho nepřihlášený spouštět nemá — hlídá security.gate. Pro něj je
--- „permission denied" na PHI tabulce fail-CLOSED, tedy správné chování.
--- Živá vada byla jinde: chyběl grant pro `authenticated`, což je role, kterou
--- gateway razí i nepřihlášenému návštěvníkovi.
+REVOKE EXECUTE ON FUNCTION public.is_consultant_for_user(p_user_id uuid) FROM anon;
+-- ⛔ NAMĚŘENO 2026-08-12: funkce neměla ANI JEDEN grant, ačkoli ji volá devět politik
+-- na tabulkách se zdravotními daty. PostgreSQL vyhodnocuje VŠECHNY použitelné
+-- politiky, takže člen, který si četl SVÁ data, spadl na „permission denied for
+-- function is_consultant_for_user" — nečetl ani svoje. Grant čekal na rozhodnutí,
+-- kde má žít kontrola souhlasu; rozhodnuto 2026-10-05: přímo ve funkci (výš).
+-- anon grant nemá: nepřihlášený nemá konzultantský vztah k nikomu a „permission
+-- denied" na zdravotní tabulce je pro něj fail-closed.
+GRANT EXECUTE ON FUNCTION public.is_consultant_for_user(p_user_id uuid) TO authenticated, service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -79371,6 +78875,780 @@ $$;
 REVOKE ALL ON FUNCTION public.document_visible_to(uuid, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.document_visible_to(uuid, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.document_visible_to(uuid, text) TO service_role;
+
+
+-- -----------------------------------------------------------------------------
+-- File: aisha/db/sql/functions/edge_bank_transactions.sql
+-- -----------------------------------------------------------------------------
+
+-- edge_bank_transactions: Edge-safe bank transaction operations (insert, match, list)
+--   služba (svc-fio-bank): insert_transaction, auto_match_by_vs
+--   admin/staff (AdminBankReconciliation): get_unmatched, get_all, get_awaiting_orders,
+--                                          match_to_order, dismiss_transaction
+--   vlastník objednávky: get_order_bank_transfer
+CREATE OR REPLACE FUNCTION public.edge_bank_transactions(
+  p_action text,
+  p_payload jsonb DEFAULT '{}'::jsonb
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_row jsonb;
+  v_rows jsonb;
+  v_tx_id text;
+  v_order_id uuid;
+  v_expected numeric;
+  v_order_currency text;
+  v_tx_uuid uuid;
+  v_limit int;
+BEGIN
+  -- ⛔ SECURITY DEFINER vypíná RLS, takže nárok musí vymáhat tělo. Do 2026-10-04
+  -- tu žádná stráž nebyla a funkce má GRANT pro `authenticated` (admin UI ji volá
+  -- přímo): kdokoli přihlášený si přímým /rpc/edge_bank_transactions mohl
+  -- označit vlastní objednávku za zaplacenou (match_to_order), podstrčit
+  -- platbu (insert_transaction) a přečíst účty a jména plátců (get_unmatched).
+  -- Zápis pohybů z banky dělá jen služba (svc-fio-bank); párování a frontu
+  -- nespárovaných admin/staff. get_order_bank_transfer stráží vlastníka níž.
+  IF p_action IN ('insert_transaction', 'auto_match_by_vs') AND NOT public.is_service_role() THEN
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+  END IF;
+  IF p_action IN ('match_to_order', 'get_unmatched', 'get_all', 'get_awaiting_orders', 'dismiss_transaction')
+     AND NOT (public.is_service_role() OR public.is_admin_or_staff()) THEN
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+  END IF;
+
+  -- INSERT a new bank transaction (deduplicate by fio_transaction_id)
+  IF p_action = 'insert_transaction' THEN
+    v_tx_id := NULLIF(p_payload ->> 'fio_transaction_id', '');
+
+    -- Check for duplicate
+    IF v_tx_id IS NOT NULL THEN
+      SELECT id INTO v_order_id FROM public.bank_transactions WHERE fio_transaction_id = v_tx_id;
+      IF FOUND THEN
+        RETURN jsonb_build_object('ok', false, 'reason', 'duplicate');
+      END IF;
+    END IF;
+
+    INSERT INTO public.bank_transactions (
+      fio_transaction_id, amount, currency, variable_symbol,
+      sender_account, sender_name, transaction_date, message,
+      match_status, raw_data
+    ) VALUES (
+      v_tx_id,
+      (p_payload ->> 'amount')::numeric,
+      COALESCE(NULLIF(p_payload ->> 'currency', ''), public.commerce_base_currency()),
+      NULLIF(p_payload ->> 'variable_symbol', ''),
+      NULLIF(p_payload ->> 'sender_account', ''),
+      NULLIF(p_payload ->> 'sender_name', ''),
+      (NULLIF(p_payload ->> 'transaction_date', ''))::date,
+      NULLIF(p_payload ->> 'message', ''),
+      COALESCE(NULLIF(p_payload ->> 'match_status', ''), 'unmatched'),
+      p_payload -> 'raw_data'
+    );
+
+    RETURN jsonb_build_object('ok', true);
+  END IF;
+
+  -- MATCH a transaction to an order
+  IF p_action = 'match_to_order' THEN
+    v_order_id := (p_payload ->> 'order_id')::uuid;
+
+    UPDATE public.bank_transactions
+    SET matched_order_id = v_order_id,
+        match_status = 'matched',
+        match_type = 'manual',
+        match_notes = NULLIF(p_payload ->> 'notes', '')
+    WHERE id = (p_payload ->> 'transaction_id')::uuid;
+
+    -- Update order payment status
+    UPDATE public.orders
+    SET payment_status = 'paid',
+        status = 'paid',
+        updated_at = now()
+    WHERE id = v_order_id
+      AND payment_status = 'awaiting_transfer';
+
+    RETURN jsonb_build_object('ok', true);
+  END IF;
+
+  -- LIST unmatched transactions (admin)
+  IF p_action = 'get_unmatched' THEN
+    SELECT COALESCE(jsonb_agg(
+      jsonb_build_object(
+        'id', bt.id,
+        'fio_transaction_id', bt.fio_transaction_id,
+        'amount', bt.amount,
+        'currency', bt.currency,
+        'variable_symbol', bt.variable_symbol,
+        'sender_account', bt.sender_account,
+        'sender_name', bt.sender_name,
+        'transaction_date', bt.transaction_date,
+        'message', bt.message,
+        'match_status', bt.match_status,
+        'created_at', bt.created_at
+      ) ORDER BY bt.transaction_date DESC NULLS LAST
+    ), '[]'::jsonb) INTO v_rows
+    FROM public.bank_transactions bt
+    WHERE bt.match_status IN ('unmatched', 'amount_mismatch');
+
+    RETURN jsonb_build_object('rows', v_rows);
+  END IF;
+
+  -- ⛔ DO 2026-10-04 NÁSLEDUJÍCÍ ČTYŘI AKCE NEEXISTOVALY, ačkoli je volali
+  -- klienti: svc-fio-bank `auto_match_by_vs` (po prvním pohybu s VS spadla celá
+  -- synchronizace na „Unsupported action") a admin UI `get_all`,
+  -- `get_awaiting_orders`, `dismiss_transaction` (stránka párování ukazovala
+  -- chybu místo dat). Tvar odpovědí odpovídá Zod schématům v
+  -- src/hooks/useBankReconciliation.ts a očekávání svc-fio-bank.
+
+  -- AUTO-MATCH právě vloženého pohybu na objednávku podle variabilního symbolu.
+  -- Zaplaceno jen při PŘESNÉ shodě částky (a měny, je-li známá) — přeplatek
+  -- i nedoplatek jde adminovi jako amount_mismatch, nic se nedomýšlí.
+  IF p_action = 'auto_match_by_vs' THEN
+    SELECT o.id, COALESCE(o.bank_transfer_amount, o.total), o.currency
+      INTO v_order_id, v_expected, v_order_currency
+    FROM public.orders o
+    WHERE o.variable_symbol = NULLIF(p_payload ->> 'variable_symbol', '')
+      AND o.payment_status = 'awaiting_transfer'
+    ORDER BY o.created_at DESC
+    LIMIT 1;
+
+    IF v_order_id IS NULL THEN
+      RETURN jsonb_build_object('matched', false, 'reason', 'no_order');
+    END IF;
+
+    SELECT bt.id INTO v_tx_uuid
+    FROM public.bank_transactions bt
+    WHERE bt.variable_symbol = NULLIF(p_payload ->> 'variable_symbol', '')
+      AND bt.match_status = 'unmatched'
+    ORDER BY bt.created_at DESC
+    LIMIT 1;
+
+    IF v_tx_uuid IS NULL THEN
+      RETURN jsonb_build_object('matched', false, 'reason', 'no_transaction');
+    END IF;
+
+    IF (p_payload ->> 'amount')::numeric IS DISTINCT FROM v_expected
+       OR (NULLIF(p_payload ->> 'currency', '') IS NOT NULL AND v_order_currency IS NOT NULL
+           AND upper(p_payload ->> 'currency') <> upper(v_order_currency)) THEN
+      UPDATE public.bank_transactions
+      SET match_status = 'amount_mismatch',
+          matched_order_id = v_order_id,
+          match_type = 'auto_vs',
+          match_notes = format('Očekáváno %s %s', v_expected, COALESCE(v_order_currency, ''))
+      WHERE id = v_tx_uuid;
+      RETURN jsonb_build_object('matched', false, 'reason', 'amount_mismatch', 'order_id', v_order_id);
+    END IF;
+
+    UPDATE public.bank_transactions
+    SET matched_order_id = v_order_id,
+        match_status = 'matched',
+        match_type = 'auto_vs'
+    WHERE id = v_tx_uuid;
+
+    UPDATE public.orders
+    SET payment_status = 'paid',
+        status = 'paid',
+        updated_at = now()
+    WHERE id = v_order_id
+      AND payment_status = 'awaiting_transfer';
+
+    RETURN jsonb_build_object('matched', true, 'order_id', v_order_id);
+  END IF;
+
+  -- LIST all transactions (admin), newest first
+  IF p_action = 'get_all' THEN
+    v_limit := LEAST(GREATEST(COALESCE(NULLIF(p_payload ->> 'limit', '')::int, 500), 1), 2000);
+    SELECT COALESCE(jsonb_agg(
+      jsonb_build_object(
+        'id', t.id,
+        'fio_transaction_id', t.fio_transaction_id,
+        'amount', t.amount,
+        'currency', COALESCE(t.currency, public.commerce_base_currency()),
+        'variable_symbol', t.variable_symbol,
+        'sender_account', t.sender_account,
+        'sender_name', t.sender_name,
+        'transaction_date', t.transaction_date,
+        'message', t.message,
+        'match_status', t.match_status,
+        'match_type', t.match_type,
+        'match_notes', t.match_notes,
+        'matched_order_id', t.matched_order_id,
+        'created_at', t.created_at
+      ) ORDER BY t.transaction_date DESC NULLS LAST, t.created_at DESC
+    ), '[]'::jsonb) INTO v_rows
+    FROM (
+      SELECT bt.*
+      FROM public.bank_transactions bt
+      ORDER BY bt.transaction_date DESC NULLS LAST, bt.created_at DESC
+      LIMIT v_limit
+    ) t;
+
+    RETURN jsonb_build_object('rows', v_rows);
+  END IF;
+
+  -- LIST orders awaiting a bank transfer (admin, manual matching)
+  IF p_action = 'get_awaiting_orders' THEN
+    SELECT COALESCE(jsonb_agg(
+      jsonb_build_object(
+        'id', o.id,
+        'total', o.total,
+        'currency', COALESCE(o.currency, public.commerce_base_currency()),
+        'variable_symbol', o.variable_symbol,
+        'bank_transfer_amount', o.bank_transfer_amount,
+        'bank_transfer_due_date', o.bank_transfer_due_date,
+        'created_at', o.created_at
+      ) ORDER BY o.created_at DESC
+    ), '[]'::jsonb) INTO v_rows
+    FROM public.orders o
+    WHERE o.payment_status = 'awaiting_transfer';
+
+    RETURN jsonb_build_object('rows', v_rows);
+  END IF;
+
+  -- DISMISS (ignore) a transaction that is not a payment for any order (admin)
+  IF p_action = 'dismiss_transaction' THEN
+    UPDATE public.bank_transactions
+    SET match_status = 'dismissed',
+        match_notes = NULLIF(p_payload ->> 'notes', '')
+    WHERE id = (p_payload ->> 'transaction_id')::uuid
+      AND match_status IN ('unmatched', 'amount_mismatch');
+
+    RETURN jsonb_build_object('ok', FOUND);
+  END IF;
+
+  -- GET bank transfer details for an order (member view)
+  IF p_action = 'get_order_bank_transfer' THEN
+    v_order_id := (p_payload ->> 'order_id')::uuid;
+
+    SELECT jsonb_build_object(
+      'order_id', o.id,
+      'variable_symbol', o.variable_symbol,
+      'iban', o.bank_transfer_iban,
+      'bic', o.bank_transfer_bic,
+      'amount', o.bank_transfer_amount,
+      'currency', o.currency,
+      'due_date', o.bank_transfer_due_date,
+      'payment_method', o.payment_method,
+      'payment_status', o.payment_status,
+      'status', o.status,
+      'total', o.total,
+      'invoice_number', o.invoice_number,
+      'invoice_pdf_path', o.invoice_pdf_path
+    ) INTO v_row
+    FROM public.orders o
+    WHERE o.id = v_order_id
+      AND (o.user_id = auth.uid() OR EXISTS (
+        SELECT 1 FROM public.user_roles ur
+        WHERE ur.user_id = auth.uid()
+          AND ur.role IN ('admin', 'staff')
+      ));
+
+    RETURN jsonb_build_object('row', v_row);
+  END IF;
+
+  RAISE EXCEPTION 'Unsupported action: %', p_action;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.edge_bank_transactions(text, jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.edge_bank_transactions(text, jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.edge_bank_transactions(text, jsonb) TO authenticated;
+
+
+-- -----------------------------------------------------------------------------
+-- File: aisha/db/sql/functions/edge_mobile_notifications.sql
+-- -----------------------------------------------------------------------------
+
+-- Function: public.edge_mobile_notifications
+-- Purpose: Edge-safe mobile session + notification reads/writes.
+
+CREATE OR REPLACE FUNCTION public.edge_mobile_notifications(
+  p_action text,
+  p_payload jsonb DEFAULT '{}'::jsonb
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_id uuid;
+  v_inserted bigint;
+  v_user_id uuid;
+BEGIN
+  -- ⛔ SECURITY DEFINER vypíná RLS, takže nárok musí vymáhat tělo. Do 2026-10-04
+  -- tu stráž měla jen admin akce a funkce má GRANT pro `authenticated` (admin UI
+  -- čte doručení kampaně). Kdokoli přihlášený si tak přímým
+  -- /rpc/edge_mobile_notifications mohl přečíst FCM tokeny cizích zařízení
+  -- (get_mobile_sessions → push komukoli mimo platformu), poslat in-app
+  -- notifikaci s odkazem libovolnému účtu (insert_notifications_bulk → phishing),
+  -- vynulovat tokeny VŠEM (null_mobile_session_token bez user_id) a číst
+  -- preference cizích účtů. Všechno kromě admin čtení doručení je práce služby
+  -- (svc-push, gateway — volají service tokenem).
+  IF p_action IS DISTINCT FROM 'get_campaign_notification_deliveries_admin'
+     AND NOT public.is_service_role() THEN
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+  END IF;
+
+  IF p_action = 'get_mobile_sessions' THEN
+    RETURN jsonb_build_object(
+      'rows',
+      COALESCE(
+        (
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'device_platform', m.device_platform,
+              'fcm_token', m.fcm_token,
+              'user_id', m.user_id
+            )
+          )
+          FROM public.mobile_sessions m
+          WHERE m.user_id = ANY(
+            COALESCE(
+              (
+                SELECT array_agg(value::uuid)
+                FROM jsonb_array_elements_text(COALESCE(p_payload -> 'user_ids', '[]'::jsonb)) AS t(value)
+              ),
+              ARRAY[]::uuid[]
+            )
+          )
+          AND m.fcm_token IS NOT NULL
+        ),
+        '[]'::jsonb
+      )
+    );
+  END IF;
+
+  IF p_action = 'get_notification_preferences' THEN
+    RETURN jsonb_build_object(
+      'rows',
+      COALESCE(
+        (
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'afternoon_start', n.afternoon_start::text,
+              'evening_start', n.evening_start::text,
+              'morning_start', n.morning_start::text,
+              'push_enabled', n.push_enabled,
+              'push_reminders', n.push_reminders,
+              'push_study_updates', n.push_study_updates,
+              'questionnaire_reminder_period', n.questionnaire_reminder_period,
+              'quiet_hours_enabled', n.quiet_hours_enabled,
+              'quiet_hours_end', n.quiet_hours_end::text,
+              'quiet_hours_start', n.quiet_hours_start::text,
+              'user_id', n.user_id,
+              'user_timezone', n.user_timezone
+            )
+          )
+          FROM public.notification_preferences n
+          WHERE n.user_id = ANY(
+            COALESCE(
+              (
+                SELECT array_agg(value::uuid)
+                FROM jsonb_array_elements_text(COALESCE(p_payload -> 'user_ids', '[]'::jsonb)) AS t(value)
+              ),
+              ARRAY[]::uuid[]
+            )
+          )
+        ),
+        '[]'::jsonb
+      )
+    );
+  END IF;
+
+  IF p_action = 'insert_notification_log' THEN
+    INSERT INTO public.notification_logs (
+      created_at,
+      data,
+      devices_failed,
+      devices_sent,
+      error_message,
+      notification_type,
+      recipients_count,
+      title
+    )
+    VALUES (
+      COALESCE(NULLIF(p_payload ->> 'created_at', '')::timestamptz, now()),
+      COALESCE(p_payload -> 'data', '{}'::jsonb),
+      COALESCE(NULLIF(p_payload ->> 'devices_failed', '')::integer, 0),
+      COALESCE(NULLIF(p_payload ->> 'devices_sent', '')::integer, 0),
+      NULLIF(p_payload ->> 'error_message', ''),
+      COALESCE(NULLIF(p_payload ->> 'notification_type', ''), 'push'),
+      COALESCE(NULLIF(p_payload ->> 'recipients_count', '')::integer, 0),
+      NULLIF(p_payload ->> 'title', '')
+    )
+    RETURNING id INTO v_id;
+
+    RETURN jsonb_build_object('id', v_id, 'ok', true);
+  END IF;
+
+  IF p_action = 'insert_notifications_bulk' THEN
+    -- ⛔ WITH s INSERT MUSÍ BÝT NA NEJVYŠŠÍ ÚROVNI. Do 2026-10-04 tu byl jako
+    -- poddotaz uvnitř jsonb_build_object(...) a Postgres ho odmítal při KAŽDÉM
+    -- volání („WITH clause containing a data-modifying statement must be at
+    -- the top level") — in-app notifikace kampaní a připomínek dotazníků
+    -- nevznikla ani jedna, svc-push jen zalogoval chybu.
+    WITH input_rows AS (
+      SELECT
+        NULLIF(row ->> 'link', '') AS link,
+        NULLIF(row ->> 'message', '') AS message,
+        COALESCE(row -> 'metadata', '{}'::jsonb) AS metadata,
+        COALESCE(NULLIF(row ->> 'title', ''), 'Notification') AS title,
+        COALESCE(NULLIF(row ->> 'type', ''), 'campaign') AS type,
+        NULLIF(row ->> 'user_id', '')::uuid AS user_id
+      FROM jsonb_array_elements(COALESCE(p_payload -> 'rows', '[]'::jsonb)) AS t(row)
+    ),
+    inserted AS (
+      INSERT INTO public.notifications (
+        link,
+        message,
+        metadata,
+        title,
+        type,
+        user_id
+      )
+      SELECT
+        i.link,
+        i.message,
+        i.metadata,
+        i.title,
+        i.type,
+        i.user_id
+      FROM input_rows i
+      WHERE i.user_id IS NOT NULL
+      RETURNING 1
+    )
+    SELECT count(*) INTO v_inserted FROM inserted;
+
+    RETURN jsonb_build_object('inserted', v_inserted);
+  END IF;
+
+  IF p_action = 'get_existing_questionnaire_reminder_keys' THEN
+    RETURN jsonb_build_object(
+      'rows',
+      COALESCE(
+        (
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'dedupe_key', n.metadata ->> 'dedupe_key'
+            )
+          )
+          FROM public.notifications n
+          WHERE n.user_id = ANY(
+            COALESCE(
+              (
+                SELECT array_agg(value::uuid)
+                FROM jsonb_array_elements_text(COALESCE(p_payload -> 'user_ids', '[]'::jsonb)) AS t(value)
+              ),
+              ARRAY[]::uuid[]
+            )
+          )
+            AND n.type = 'questionnaire_request'
+            AND n.metadata ? 'dedupe_key'
+            AND (n.metadata ->> 'dedupe_key') = ANY(
+              COALESCE(
+                (
+                  SELECT array_agg(value)
+                  FROM jsonb_array_elements_text(COALESCE(p_payload -> 'dedupe_keys', '[]'::jsonb)) AS t(value)
+                ),
+                ARRAY[]::text[]
+              )
+            )
+        ),
+        '[]'::jsonb
+      )
+    );
+  END IF;
+
+  IF p_action = 'get_campaign_notification_deliveries_admin' THEN
+    IF NOT public.is_admin_or_staff() THEN
+      RAISE EXCEPTION 'Access denied';
+    END IF;
+
+    RETURN jsonb_build_object(
+      'rows',
+      COALESCE(
+        (
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'created_at', q.created_at,
+              'id', q.id,
+              'is_read', q.is_read,
+              'link', q.link,
+              'message', q.message,
+              'profile_display_name', q.profile_display_name,
+              'profile_email', q.profile_email,
+              'schedule_id', q.schedule_id,
+              'title', q.title,
+              'type', q.type,
+              'user_id', q.user_id
+            )
+          )
+          FROM (
+            SELECT
+              n.created_at,
+              n.id,
+              n.is_read,
+              n.link,
+              n.message,
+              p.display_name AS profile_display_name,
+              p.email AS profile_email,
+              NULLIF(n.metadata ->> 'schedule_id', '')::uuid AS schedule_id,
+              n.title,
+              n.type,
+              n.user_id
+            FROM public.notifications n
+            LEFT JOIN public.profiles p ON p.user_id = n.user_id
+            WHERE (n.metadata ->> 'campaign_id') = NULLIF(p_payload ->> 'campaign_id', '')
+            ORDER BY n.created_at DESC
+            LIMIT GREATEST(COALESCE(NULLIF(p_payload ->> 'limit', '')::integer, 200), 1)
+          ) AS q
+        ),
+        '[]'::jsonb
+      )
+    );
+  END IF;
+
+  IF p_action = 'null_mobile_session_token' THEN
+    v_user_id := NULLIF(p_payload ->> 'user_id', '')::uuid;
+
+    UPDATE public.mobile_sessions
+    SET
+      fcm_token = NULL,
+      updated_at = now()
+    WHERE
+      (
+        v_user_id IS NULL
+        OR user_id = v_user_id
+      )
+      AND (
+        NOT (p_payload ? 'fcm_token')
+        OR fcm_token = NULLIF(p_payload ->> 'fcm_token', '')
+      );
+
+    RETURN jsonb_build_object('ok', true, 'updated', FOUND);
+  END IF;
+
+  RAISE EXCEPTION 'Unsupported action: %', p_action;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.edge_mobile_notifications(text, jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.edge_mobile_notifications(text, jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.edge_mobile_notifications(text, jsonb) TO authenticated;
+
+
+-- -----------------------------------------------------------------------------
+-- File: aisha/db/sql/functions/edge_subscriptions.sql
+-- -----------------------------------------------------------------------------
+
+-- Function: public.edge_subscriptions
+-- Purpose: Edge-safe subscription and package operations.
+
+CREATE OR REPLACE FUNCTION public.edge_subscriptions(
+  p_action text,
+  p_payload jsonb DEFAULT '{}'::jsonb
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_id uuid;
+  v_package_id uuid;
+  v_row jsonb;
+  v_statuses text[];
+  v_stripe_subscription_id text;
+  v_user_id uuid;
+BEGIN
+  -- ⛔ SECURITY DEFINER vypíná RLS, takže nárok musí vymáhat tělo. Do 2026-10-04
+  -- tu žádná stráž nebyla a funkce má GRANT pro `authenticated` (svc-stripe čte
+  -- předplatné uživatelským tokenem): kdokoli přihlášený si přímým
+  -- /rpc/edge_subscriptions mohl přepnout VLASTNÍ předplatné na 'active' bez
+  -- platby (update_subscription), založit si ho (create_member_subscription),
+  -- přepsat Stripe ceny balíčku (update_package_stripe) a číst předplatné cizích
+  -- účtů (get_user_subscriptions s cizím user_id).
+  -- Zápisy dělá jen služba (svc-stripe po ověření u Stripe / z webhooku); číst
+  -- předplatné smí vlastník, služba a správa. Katalog balíčků zůstává čitelný.
+  IF p_action IN ('create_member_subscription', 'update_package_stripe', 'update_subscription')
+     AND NOT public.is_service_role() THEN
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+  END IF;
+
+  IF p_action = 'create_member_subscription' THEN
+    INSERT INTO public.member_subscriptions (
+      amount_paid,
+      billing_interval_months,
+      currency,
+      package_id,
+      payment_type,
+      period_end,
+      period_start,
+      status,
+      user_id
+    )
+    VALUES (
+      NULLIF(p_payload ->> 'amount_paid', '')::numeric,
+      NULLIF(p_payload ->> 'billing_interval_months', '')::integer,
+      COALESCE(NULLIF(p_payload ->> 'currency', ''), public.commerce_base_currency()),
+      NULLIF(p_payload ->> 'package_id', '')::uuid,
+      COALESCE(NULLIF(p_payload ->> 'payment_type', ''), 'one_time')::public.payment_type,
+      NULLIF(p_payload ->> 'period_end', '')::timestamptz,
+      NULLIF(p_payload ->> 'period_start', '')::timestamptz,
+      COALESCE(NULLIF(p_payload ->> 'status', ''), 'pending_payment'),
+      NULLIF(p_payload ->> 'user_id', '')::uuid
+    )
+    RETURNING id INTO v_id;
+
+    RETURN jsonb_build_object('id', v_id, 'ok', true);
+  END IF;
+
+  IF p_action = 'get_package_by_id' THEN
+    v_package_id := NULLIF(p_payload ->> 'package_id', '')::uuid;
+    IF v_package_id IS NULL THEN
+      RAISE EXCEPTION 'Missing package_id';
+    END IF;
+
+    SELECT jsonb_build_object(
+      'allow_one_time_payment', p.allow_one_time_payment,
+      'allow_recurring_payment', p.allow_recurring_payment,
+      'billing_interval_months', p.billing_interval_months,
+      'currency', p.currency,
+      'description', p.description,
+      'governance_tokens', p.governance_tokens,
+      'id', p.id,
+      'impact_tokens', p.impact_tokens,
+      'is_recurring', p.is_recurring,
+      'min_billing_months', p.min_billing_months,
+      'name', p.name,
+      'period', p.period,
+      'price', p.price,
+      'slug', p.slug,
+      'stripe_price_id', p.stripe_price_id,
+      'stripe_price_id_one_time', p.stripe_price_id_one_time,
+      'stripe_price_id_recurring', p.stripe_price_id_recurring,
+      'stripe_product_id', p.stripe_product_id,
+      'tier', p.tier
+    )
+    INTO v_row
+    FROM public.subscription_packages p
+    WHERE p.id = v_package_id
+      AND COALESCE(p.is_active, true) = true
+    LIMIT 1;
+
+    RETURN jsonb_build_object('row', v_row);
+  END IF;
+
+  IF p_action = 'get_user_subscriptions' THEN
+    v_user_id := NULLIF(p_payload ->> 'user_id', '')::uuid;
+    IF v_user_id IS NULL THEN
+      RAISE EXCEPTION 'Missing user_id';
+    END IF;
+    IF v_user_id IS DISTINCT FROM auth.uid()
+       AND NOT (public.is_service_role() OR public.is_admin_or_staff()) THEN
+      RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+    END IF;
+
+    v_statuses := COALESCE(
+      (
+        SELECT array_agg(value)
+        FROM jsonb_array_elements_text(COALESCE(p_payload -> 'statuses', '[]'::jsonb)) AS t(value)
+      ),
+      ARRAY[]::text[]
+    );
+
+    RETURN jsonb_build_object(
+      'rows',
+      COALESCE(
+        (
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'cancel_at_period_end', ms.cancel_at_period_end,
+              'id', ms.id,
+              'next_billing_date', ms.next_billing_date,
+              'package', jsonb_build_object(
+                'governance_tokens', sp.governance_tokens,
+                'impact_tokens', sp.impact_tokens,
+                'name', sp.name,
+                'period', sp.period,
+                'tier', sp.tier
+              ),
+              'package_id', ms.package_id,
+              'payment_type', ms.payment_type,
+              'period_end', ms.period_end,
+              'period_start', ms.period_start,
+              'status', ms.status,
+              'stripe_subscription_id', ms.stripe_subscription_id
+            )
+            ORDER BY ms.created_at DESC
+          )
+          FROM public.member_subscriptions ms
+          LEFT JOIN public.subscription_packages sp ON sp.id = ms.package_id
+          WHERE ms.user_id = v_user_id
+            AND (
+              cardinality(v_statuses) = 0
+              OR ms.status = ANY(v_statuses)
+            )
+        ),
+        '[]'::jsonb
+      )
+    );
+  END IF;
+
+  IF p_action = 'update_package_stripe' THEN
+    v_package_id := NULLIF(p_payload ->> 'package_id', '')::uuid;
+    IF v_package_id IS NULL THEN
+      RAISE EXCEPTION 'Missing package_id';
+    END IF;
+
+    UPDATE public.subscription_packages
+    SET
+      stripe_price_id_one_time = CASE WHEN p_payload ? 'stripe_price_id_one_time' THEN NULLIF(p_payload ->> 'stripe_price_id_one_time', '') ELSE stripe_price_id_one_time END,
+      stripe_price_id_recurring = CASE WHEN p_payload ? 'stripe_price_id_recurring' THEN NULLIF(p_payload ->> 'stripe_price_id_recurring', '') ELSE stripe_price_id_recurring END,
+      stripe_product_id = CASE WHEN p_payload ? 'stripe_product_id' THEN NULLIF(p_payload ->> 'stripe_product_id', '') ELSE stripe_product_id END,
+      updated_at = now()
+    WHERE id = v_package_id;
+
+    RETURN jsonb_build_object('ok', true, 'updated', FOUND);
+  END IF;
+
+  IF p_action = 'update_subscription' THEN
+    v_id := NULLIF(p_payload ->> 'id', '')::uuid;
+    v_stripe_subscription_id := NULLIF(p_payload ->> 'stripe_subscription_id', '');
+
+    IF v_id IS NULL AND v_stripe_subscription_id IS NULL THEN
+      RAISE EXCEPTION 'Missing subscription selector';
+    END IF;
+
+    UPDATE public.member_subscriptions
+    SET
+      cancel_at_period_end = CASE WHEN p_payload ? 'cancel_at_period_end' THEN (p_payload ->> 'cancel_at_period_end')::boolean ELSE cancel_at_period_end END,
+      next_billing_date = CASE WHEN p_payload ? 'next_billing_date' THEN NULLIF(p_payload ->> 'next_billing_date', '')::timestamptz ELSE next_billing_date END,
+      status = COALESCE(NULLIF(p_payload ->> 'status', ''), status),
+      stripe_invoice_id = CASE WHEN p_payload ? 'stripe_invoice_id' THEN NULLIF(p_payload ->> 'stripe_invoice_id', '') ELSE stripe_invoice_id END,
+      stripe_payment_intent_id = CASE WHEN p_payload ? 'stripe_payment_intent_id' THEN NULLIF(p_payload ->> 'stripe_payment_intent_id', '') ELSE stripe_payment_intent_id END,
+      stripe_subscription_id = CASE WHEN p_payload ? 'new_stripe_subscription_id' THEN NULLIF(p_payload ->> 'new_stripe_subscription_id', '') ELSE stripe_subscription_id END
+    WHERE (
+      (v_id IS NOT NULL AND id = v_id)
+      OR
+      (v_id IS NULL AND v_stripe_subscription_id IS NOT NULL AND stripe_subscription_id = v_stripe_subscription_id)
+    );
+
+    RETURN jsonb_build_object('ok', true, 'updated', FOUND);
+  END IF;
+
+  RAISE EXCEPTION 'Unsupported action: %', p_action;
+END;
+$function$;
+
+REVOKE ALL ON FUNCTION public.edge_subscriptions(text, jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.edge_subscriptions(text, jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.edge_subscriptions(text, jsonb) TO authenticated;
 
 
 -- -----------------------------------------------------------------------------
@@ -131082,10 +131360,13 @@ CREATE OR REPLACE FUNCTION public.trigger_update_streak_on_health_checkin()
  SET search_path TO 'public'
 AS $function$
 BEGIN
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'Unauthorized';
-  END IF;
-
+  -- ⛔ BEZ STRÁŽE NA auth.uid() (2026-10-04). Do té doby tu stálo
+  -- `IF auth.uid() IS NULL THEN RAISE 'Unauthorized'` — trigger funkci nejde
+  -- zavolat přímo (RETURNS trigger), takže stráž neměla koho odmítat, jen
+  -- shazovala KAŽDÝ zápis bez přihlášeného uživatele (služba, import, obnova
+  -- dat): AFTER INSERT spadl a s ním i vložený check-in. Kdo smí check-in
+  -- vložit, rozhoduje RLS tabulky a volající RPC; streak je jen důsledek.
+  -- Sesterský trigger_update_streak_on_activity stráž nikdy neměl.
   PERFORM update_user_streak(NEW.user_id);
   RETURN NEW;
 END;
@@ -131095,7 +131376,7 @@ $function$
 -- Permissions
 REVOKE ALL ON FUNCTION public.trigger_update_streak_on_health_checkin() FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.trigger_update_streak_on_health_checkin() FROM anon;
-GRANT EXECUTE ON FUNCTION public.trigger_update_streak_on_health_checkin() TO authenticated;
+REVOKE EXECUTE ON FUNCTION public.trigger_update_streak_on_health_checkin() FROM authenticated;
 
 
 -- -----------------------------------------------------------------------------
@@ -162765,11 +163046,15 @@ BEGIN
       ON CONFLICT (schedule_id, order_id) DO NOTHING;
     END IF;
     
-    -- Log the payment event
+    -- Log the payment event.
+    -- ⛔ p_resource_id je TEXT. Do 2026-10-04 tu šlo holé NEW.id (uuid) a uuid
+    -- nemá implicitní přetypování na text — Postgres funkci nenašel a KAŽDÝ
+    -- přechod objednávky na 'paid' (webhook Stripe, párování bankovní platby)
+    -- spadl celý, včetně zápisu, který ho vyvolal.
     PERFORM public.record_audit_log(
       'order_paid',
       'orders',
-      NEW.id,
+      NEW.id::text,
       NULL,
       jsonb_build_object('total', NEW.total, 'shipping_method', NEW.shipping_method)
     );
@@ -174512,7 +174797,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_agent_metrics_hourly_pk
   ON ai_agent_metrics_hourly (hour, agent_slug, event_type);
 
 -- Grants
-GRANT SELECT ON ai_agent_metrics_hourly TO authenticated;
+-- ⛔ Jen služba (nález 2026-10-04): čtecí RPC get_ai_agent_metrics(_timeseries)
+-- jsou DEFINER se stráží is_admin_or_staff(); přímý SELECT pro authenticated
+-- ji obcházel a vydával náklady a latence agentů komukoli přihlášenému.
+REVOKE ALL ON public.ai_agent_metrics_hourly FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.ai_agent_metrics_hourly TO service_role;
 
 
 -- =============================================================================
@@ -205099,10 +205388,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ba
 -- -----------------------------------------------------------------------------
 
 -- Grants: batch_inventory_overview
-
-GRANT SELECT ON public.batch_inventory_overview TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.batch_inventory_overview TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.batch_inventory_overview TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (stav šarží a zásob) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.batch_inventory_overview FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.batch_inventory_overview TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -205421,10 +205714,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.di
 -- -----------------------------------------------------------------------------
 
 -- Grants: distribution_adjustments_overview
-
-GRANT SELECT ON public.distribution_adjustments_overview TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_adjustments_overview TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_adjustments_overview TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (úpravy dávkování členů (member_token, poznámka konzultanta, e-mail autorizujícího)) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.distribution_adjustments_overview FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.distribution_adjustments_overview TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -205476,10 +205773,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.di
 -- -----------------------------------------------------------------------------
 
 -- Grants: distribution_overview
-
-GRANT SELECT ON public.distribution_overview TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_overview TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_overview TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (plán distribuce (počty členů a balení)) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.distribution_overview FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.distribution_overview TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -205581,10 +205882,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ex
 -- -----------------------------------------------------------------------------
 
 -- Grants: expedition_overview
-
-GRANT SELECT ON public.expedition_overview TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expedition_overview TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expedition_overview TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (expediční kalendář studií) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.expedition_overview FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.expedition_overview TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -206758,10 +207063,15 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pa
 -- -----------------------------------------------------------------------------
 
 -- Grants: partner_profiles_public
-
-GRANT SELECT ON public.partner_profiles_public TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_profiles_public TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_profiles_public TO service_role;
+--
+-- Veřejný adresář partnerů (filtr is_visible = true) — ČÍST smí kdokoli, ZAPISOVAT
+-- nikdo z klientů. Pohled je jednoduchá projekce jedné tabulky, tedy AUTO-UPDATABLE,
+-- a běží s právy vlastníka: UPDATE/DELETE skrz něj obchází RLS partner_profiles.
+-- Do 2026-10-04 měl authenticated plné DML — kdokoli přihlášený přepsal web a popis
+-- cizího viditelného partnera nebo ho smazal. REVOKE ALL napřed: na běžící DB žijí
+-- i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.partner_profiles_public FROM PUBLIC, anon, authenticated, service_role;
+GRANT SELECT ON public.partner_profiles_public TO anon, authenticated, service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -207824,10 +208134,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.sh
 -- -----------------------------------------------------------------------------
 
 -- Grants: shipment_statistics
-
-GRANT SELECT ON public.shipment_statistics TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.shipment_statistics TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.shipment_statistics TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (tržby, slevy a tokeny zásilek) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.shipment_statistics FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.shipment_statistics TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -208082,10 +208396,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- -----------------------------------------------------------------------------
 
 -- Grants: study_cohort_lab_trends
-
-GRANT SELECT ON public.study_cohort_lab_trends TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_cohort_lab_trends TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_cohort_lab_trends TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (měsíční průměry laboratorních výsledků kohort studií) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.study_cohort_lab_trends FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.study_cohort_lab_trends TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -208093,10 +208411,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- -----------------------------------------------------------------------------
 
 -- Grants: study_cohort_statistics
-
-GRANT SELECT ON public.study_cohort_statistics TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_cohort_statistics TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_cohort_statistics TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (souhrny zdraví a laboratoří kohort studií) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.study_cohort_statistics FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.study_cohort_statistics TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -208104,10 +208426,14 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- -----------------------------------------------------------------------------
 
 -- Grants: study_cohort_trends
-
-GRANT SELECT ON public.study_cohort_trends TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_cohort_trends TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_cohort_trends TO service_role;
+--
+-- ⛔ Pohled s právy VLASTNÍKA (týdenní průměry bolesti, energie, nálady a spánku kohort) — mimo RLS podkladu. Do 2026-10-04 měl
+-- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
+-- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
+-- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
+-- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+REVOKE ALL ON public.study_cohort_trends FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.study_cohort_trends TO service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -208683,10 +209009,13 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.us
 -- -----------------------------------------------------------------------------
 
 -- Grants: v_health_monthly_summary
-
-GRANT SELECT ON public.v_health_monthly_summary TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_health_monthly_summary TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_health_monthly_summary TO service_role;
+--
+-- Jen čtení, jen přihlášeným a službě. Dřív SELECT pro anon a plné DML pro
+-- authenticated — nad pohledem s právy vlastníka to byl únik zdravotních dat
+-- bez přihlášení. REVOKE ALL napřed: na běžící DB žijí i granty z ALTER DEFAULT
+-- PRIVILEGES, které samotný GRANT nezruší.
+REVOKE ALL ON public.v_health_monthly_summary FROM PUBLIC, anon, authenticated, service_role;
+GRANT SELECT ON public.v_health_monthly_summary TO authenticated, service_role;
 
 
 -- -----------------------------------------------------------------------------
@@ -208694,10 +209023,13 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_
 -- -----------------------------------------------------------------------------
 
 -- Grants: v_health_weekly_summary
-
-GRANT SELECT ON public.v_health_weekly_summary TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_health_weekly_summary TO authenticated;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.v_health_weekly_summary TO service_role;
+--
+-- Jen čtení, jen přihlášeným a službě. Dřív SELECT pro anon a plné DML pro
+-- authenticated — nad pohledem s právy vlastníka to byl únik zdravotních dat
+-- bez přihlášení. REVOKE ALL napřed: na běžící DB žijí i granty z ALTER DEFAULT
+-- PRIVILEGES, které samotný GRANT nezruší.
+REVOKE ALL ON public.v_health_weekly_summary FROM PUBLIC, anon, authenticated, service_role;
+GRANT SELECT ON public.v_health_weekly_summary TO authenticated, service_role;
 
 
 -- -----------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { verifyToken, AuthError } from '../auth.js';
 import { createStripeClient } from '../lib/stripe-client.js';
-import { rpcUser } from '../postgrest.js';
+import { rpcService, rpcUser } from '../postgrest.js';
 
 export async function checkSubscriptionRoute(app: FastifyInstance): Promise<void> {
   app.post('/check-subscription', async (req: FastifyRequest, reply: FastifyReply) => {
@@ -43,7 +43,10 @@ export async function checkSubscriptionRoute(app: FastifyInstance): Promise<void
             if (dbSubId) {
               const dbSub = subscriptions.find((s) => s.id === dbSubId);
               if (dbSub && dbSub.status !== 'active') {
-                await rpcUser('edge_subscriptions', {
+                // Aktivaci zapisuje SLUŽBA: stav potvrdil Stripe a dbSub pochází
+                // z předplatných tohoto uživatele. Uživatelský token zápis
+                // nesmí — jinak by si předplatné aktivoval kdokoli přímým RPC.
+                await rpcService('edge_subscriptions', {
                   p_action: 'update_subscription',
                   p_payload: {
                     cancel_at_period_end: stripeSub.cancel_at_period_end,
@@ -52,7 +55,10 @@ export async function checkSubscriptionRoute(app: FastifyInstance): Promise<void
                     next_billing_date: new Date(stripeSub.current_period_end * 1000).toISOString(),
                     status: 'active',
                   },
-                }, jwt);
+                });
+                // Odpověď nese stav PO synchronizaci — jinak by klient až do
+                // dalšího volání viděl předplatné, které právě aktivoval, jako neaktivní.
+                dbSub.status = 'active';
               }
             }
           }

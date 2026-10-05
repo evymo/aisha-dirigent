@@ -572,7 +572,6 @@ describe('Security Gates', () => {
       'has_section_access.sql',
       'is_certified_partner.sql',
       'is_consultant_for_registration.sql',
-      'is_consultant_for_user.sql',
       'is_study_consultant.sql',
       'sync_checkin_to_metrics.sql',
       'trg_update_training_dataset_counts.sql',

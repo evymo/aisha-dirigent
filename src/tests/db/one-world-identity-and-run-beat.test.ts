@@ -83,8 +83,14 @@ WHERE r.ref_kind = 'account' AND r.source_key = '${SUBJ}' AND r.valid_to IS NULL
 -- 4. kolega BEZ účtu je také entita registru
 SELECT 'colleague=' || (public.twin_upsert_entity_audited('person','hr','emp-7781','Kolega bez účtu') ->> 'twin_id' IS NOT NULL)::text AS out;
 -- 5. backfill dorodí profil, který dvojče nemá
-SELECT 'backfilled>=1=' || (public.twin_backfill_accounts_admin(100) >= 1)::text AS out;
+-- ⭐ Bez stropu 100: backfill bere profily od NEJSTARŠÍHO a v souběžné sadě jich
+-- bez dvojčete přibývá z jiných testů — profil fixtury pak vypadl za strop a test
+-- padal na noacc_bound=false (naměřeno 2026-10-05). Výchozí strop 5000 sadu pokryje.
+SELECT 'backfilled>=1=' || (public.twin_backfill_accounts_admin() >= 1)::text AS out;
 SELECT 'noacc_bound=' || (public.twin_for_account('${NOACC}') IS NOT NULL)::text AS out;
+-- Pohledy audience_admin_*_v se měří jako VLASTNÍK (RESET ROLE): klient je přímo
+-- nečte (od 2026-10-04 bez grantu pro authenticated — čtou se přes DEFINER bloky).
+RESET ROLE;
 -- 6. registr nese oboje: entitu s účtem i bez něj, a nikdo nezmizel
 SELECT 'reg_with_account=' || count(*) AS out FROM public.audience_admin_twin_directory_v
  WHERE user_id = '${SUBJ}' AND twin_id IS NOT NULL;
@@ -119,11 +125,14 @@ SELECT 'run_steps=' || count(*) AS out FROM public.production_workflow_steps s
 SELECT 'beat_source=' || b.source_type || '/' || b.subject_type || '/' ||
        (b.subject_id = public.twin_for_account('${SUBJ}'))::text AS out
 FROM public.story_pulse_beats b WHERE b.status = 'open' AND ${FOLLOWUP_BEATS} ORDER BY b.created_at DESC LIMIT 1;
+-- (fronta jako vlastník — viz pozn. u registru výš)
+RESET ROLE;
 -- fronta ho vidí a umí ho zařadit do koše
 SELECT 'queue=' || q.bucket || '/' || (q.actor_user_id = '${SUBJ}')::text || '/' || q.beat_type AS out
 FROM public.audience_admin_followup_queue_v q
 WHERE q.task_id IN (SELECT b.id FROM public.story_pulse_beats b WHERE ${FOLLOWUP_BEATS})
 ORDER BY q.created_at DESC LIMIT 1;
+${asUser(OP)}
 -- potvrzení: uzavře se KROKEM (jediná zápisová cesta práce)
 SELECT 'completed=' || public.audience_admin_complete_followup(
   (SELECT b.id FROM public.story_pulse_beats b WHERE b.status = 'open' AND ${FOLLOWUP_BEATS}
@@ -142,8 +151,10 @@ ORDER BY se.created_at DESC LIMIT 1;
 -- fronta je prázdná, práce je hotová
 -- ⭐ NAD SVÝM SUBJEKTEM: globální počet platí jen v prázdné databázi a v souběhu
 -- (jedna sdílená throwaway DB) měří cizí práci.
+RESET ROLE;
 SELECT 'queue_empty=' || (count(*) = 0)::text AS out FROM public.audience_admin_followup_queue_v
  WHERE actor_user_id = '${SUBJ}';
+${asUser(OP)}
 -- krok běhu je dokončený (ne jen takt)
 SELECT 'step_done=' || count(*) AS out FROM public.production_workflow_steps s
   JOIN public.production_batches b ON b.id = s.batch_id

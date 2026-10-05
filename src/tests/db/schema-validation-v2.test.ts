@@ -103,7 +103,9 @@ describe("Source of Truth - Seed SQL Content", () => {
 
 describe("Database Validation - Expected Record Counts", () => {
   it.skipIf(!dbAvailable)("validates expected record counts in DB", async () => {
-    const counts = await getTableCounts(Object.keys(SOURCE_OF_TRUTH.expectedCounts));
+    // Měří se SEED: na zahazovací DB jen řádky vzniklé před prvním testem
+    // (AISHA_TESTDB_SEED_AT) — jinak souběžná sada počítá cizí přechodné fixtury.
+    const counts = await getTableCounts(Object.keys(SOURCE_OF_TRUTH.expectedCounts), process.env.AISHA_TESTDB_SEED_AT);
 
     // Accumulate ALL mismatches (don't abort at the first) so a single run
     // surfaces every drift between the expectations and the actual seed.

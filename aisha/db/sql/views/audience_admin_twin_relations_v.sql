@@ -50,3 +50,11 @@ JOIN public.twin_external_refs acct
 
 COMMENT ON VIEW public.audience_admin_twin_relations_v IS
   'Vazby (twin_relations, oba směry) a kontextové role (story_participants) jednoho dvojčete. Drives the extranet twin detail (ADR-003).';
+
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_twin_relations_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_twin_relations_v TO service_role;

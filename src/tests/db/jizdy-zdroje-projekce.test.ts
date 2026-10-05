@@ -113,7 +113,15 @@ INSERT INTO public.tc_drivers (tc_driver_id, name) VALUES (990001, 'Zkušební  
 
 describe.skipIf(!dbAvailable)("návrhy vazeb ze shody signálů", () => {
   it("navrhne, ale NEZALOŽÍ dvojče; víc shodných signálů = vyšší jistota", () => {
-    const dvojcatPred = Number(sluzba(`SELECT count(*) FROM public.twin_entities;`));
+    // ⭐ NAD SVÝMI KLÍČI, ne nad celou tabulkou: celá sada běží souběžně nad jednou
+    // DB a jiné testy dvojčata zakládají (naměřeno 2026-10-05: 21 → 23 mezi dvěma
+    // počty, ani jedno od tc_propose_identity). Nové dvojče od návrhu by neslo
+    // referenci tcars-fleet na náš klíč 9900xx a nebylo by žádným z fixtury.
+    const cizichDvojcat = () =>
+      Number(sluzba(`SELECT count(DISTINCT r.twin_id) FROM public.twin_external_refs r
+                      WHERE r.source = 'tcars-fleet' AND r.source_key LIKE '%9900%'
+                        AND r.twin_id NOT IN ('${VUZ}', '${VUZ2}', '${RIDIC}');`));
+    const dvojcatPred = cizichDvojcat();
 
     const vysledek = JSON.parse(sluzba(`SELECT public.tc_propose_identity()::text;`)) as {
       vozidla: Record<string, number>;
@@ -128,7 +136,7 @@ describe.skipIf(!dbAvailable)("návrhy vazeb ze shody signálů", () => {
       bez_kandidata: 1,
     });
     expect(vysledek.ridici).toMatchObject({ objektu: 1, navrzeno: 1 });
-    expect(Number(sluzba(`SELECT count(*) FROM public.twin_entities;`))).toBe(dvojcatPred);
+    expect(cizichDvojcat(), "návrh založil dvojče").toBe(dvojcatPred);
 
     // Tři nezávislé shody (jednotka 0,8 · RZ 0,6 · evidenční číslo 0,5) → strop 0,95.
     const silny = JSON.parse(navrh(VUZ, "vozidlo:990001"));

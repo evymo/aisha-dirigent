@@ -33,6 +33,23 @@
 
 set -euo pipefail
 
+# ⛔ EXTRANET SDK JE VSTUP INSTALACE, NE VOLITELNÝ SUBMODUL (2026-10-04, review PR #1).
+# Kořenový package.json má workspaces packages/extranet-sdk/{ui,tokens} a mobilní
+# aplikace bere -native/-tokens přes `file:`. actions/checkout submoduly nestahuje
+# (výchozí `submodules: false`; test-web to má i výslovně, protože na insight runner
+# nedosáhne), takže se instalovalo proti prázdnému adresáři: odkazy do prázdna,
+# build/typecheck přes rozbité importy a brána stack-nesmi-znat-jmeno-instance
+# neinicializované SDK záměrně hlásí jako chybu. Tady je jediné místo, kterým
+# prochází instalace všech úloh — inicializuje se JEN SDK (ne insight), relativní
+# URL v .gitmodules zdědí autentizaci checkoutu. Selhání je tvrdé: bez SDK nemá
+# smysl pokračovat a matoucí pád o tři kroky dál je horší než jasný tady.
+koren="${GITHUB_WORKSPACE:-$(git rev-parse --show-toplevel)}"
+if grep -q 'path = packages/extranet-sdk' "$koren/.gitmodules" 2>/dev/null \
+   && [ ! -f "$koren/packages/extranet-sdk/package.json" ]; then
+  echo "▶ inicializuji submodul packages/extranet-sdk (vstup npm workspaces)"
+  git -C "$koren" submodule update --init packages/extranet-sdk
+fi
+
 if npm ci "$@"; then
   exit 0
 fi

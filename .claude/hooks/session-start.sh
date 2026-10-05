@@ -81,10 +81,14 @@ fi
 # ── Buildy ───────────────────────────────────────────────────────────────────
 STAMP_DIR="node_modules/.cache/aisha-session-start"
 STAMP_FILE="$STAMP_DIR/build.stamp"
+# Otisk = HEAD + OBSAH sledovaných změn (index i pracovní strom proti HEAD).
+# ⛔ Ne `git status --porcelain`: ten nese jen stav a cestu, takže druhá úprava
+# už změněného souboru otisk nezměnila a další session vzala zastaralý dist/
+# (review PR #1).
 build_key() {
   printf '%s %s' \
     "$(git rev-parse HEAD 2>/dev/null)" \
-    "$(git status --porcelain=v1 --untracked-files=no 2>/dev/null | sha1sum | cut -c1-16)"
+    "$(git diff HEAD --binary 2>/dev/null | sha1sum | cut -c1-16)"
 }
 
 if [ "$INSTALL_OK" != 1 ]; then
@@ -107,9 +111,22 @@ fi
 # ── Docker pro DB testy ──────────────────────────────────────────────────────
 # Snapshot cloudového prostředí drží soubory, ne procesy: dockerd se startuje
 # v každé session znovu. `npm run test:db` pak postaví/vezme throwaway Postgres.
+# ⛔ Na démona se ČEKÁ (omezeně): hlásit „spuštěn" hned po forku znamenalo, že
+# okamžité `npm run test:db` mohlo trefit docker dřív, než démon přijímá
+# spojení, a náhodně spadnout (review PR #1).
 if command -v dockerd > /dev/null 2>&1 && ! docker info > /dev/null 2>&1; then
   (dockerd > /tmp/dockerd.log 2>&1 &)
-  SUMMARY+=("• dockerd spuštěn na pozadí (npm run test:db)")
+  DOCKER_READY=0
+  for _ in $(seq 1 60); do
+    if docker info > /dev/null 2>&1; then DOCKER_READY=1; break; fi
+    sleep 1
+  done
+  if [ "$DOCKER_READY" = 1 ]; then
+    SUMMARY+=("• dockerd běží (npm run test:db)")
+  else
+    SUMMARY+=("✗ dockerd nenaběhl do 60 s — viz /tmp/dockerd.log (npm run test:db nepoběží)")
+    FAILED=1
+  fi
 fi
 
 # ── Souhrn (stdout jde Claudovi do kontextu) ─────────────────────────────────

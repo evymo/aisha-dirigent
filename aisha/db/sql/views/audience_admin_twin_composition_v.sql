@@ -33,5 +33,10 @@ COMMENT ON VIEW public.audience_admin_twin_composition_v IS
   'Složení komunity: dvojčata po druhu a zdroji, kolik z nich má aktivitu,
    vazby a nedávný dotek. Odpovídá na otázku "kdo tu je".';
 
-REVOKE ALL ON public.audience_admin_twin_composition_v FROM PUBLIC;
-GRANT SELECT ON public.audience_admin_twin_composition_v TO authenticated, service_role;
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_twin_composition_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_twin_composition_v TO service_role;

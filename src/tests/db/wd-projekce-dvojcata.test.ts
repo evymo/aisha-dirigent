@@ -114,11 +114,18 @@ VALUES (5, '1A1 1111', current_date - 1, 7200, 1800, 39600, 600, 180.00, '[{"typ
 
 describe.skipIf(!dbAvailable)("Webdispečink → dvojčata", () => {
   it("návrhy: vozidlo podle RZ, řidič podle osobního čísla — dva různé klíče pro číslo 5", () => {
-    const dvojcat = sluzba(`SELECT count(*) FROM public.twin_entities;`);
+    // ⭐ NAD SVÝM ZDROJEM, ne nad celou tabulkou: v souběžné sadě dvojčata zakládají
+    // jiné testy (naměřeno 2026-10-05: 35 → 36 bez přispění wd_propose_identity).
+    // Nové dvojče od návrhu by neslo referenci 'webdispecink' (fixtura je na začátku
+    // všechny maže) a nebylo by W5 ani R5.
+    const cizichDvojcat = () =>
+      sluzba(`SELECT count(DISTINCT twin_id) FROM public.twin_external_refs
+               WHERE source = 'webdispecink' AND twin_id NOT IN ('${W5}', '${R5}');`);
+    const dvojcat = cizichDvojcat();
     const r = JSON.parse(sluzba(`SELECT public.wd_propose_identity()::text;`));
     expect(r.vozidla).toMatchObject({ objektu: 1, navrzeno: 1 });
     expect(r.ridici).toMatchObject({ objektu: 1, navrzeno: 1 });
-    expect(sluzba(`SELECT count(*) FROM public.twin_entities;`)).toBe(dvojcat);
+    expect(cizichDvojcat(), "návrh založil dvojče").toBe(dvojcat);
     expect(ref("5")).toMatchObject({ twin: W5, proposed_by: "rule:signals:vehicle_machine_plate" });
     expect(ref("ridic:5")).toMatchObject({ twin: R5, proposed_by: "rule:signals:driver_personal_number" });
     expect(Number(ref("ridic:5").confidence)).toBe(0.7);

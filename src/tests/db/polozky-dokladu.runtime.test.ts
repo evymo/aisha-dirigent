@@ -10,7 +10,7 @@
  */
 import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import { PG_HOST, PG_PORT, PG_USER, PG_PASSWORD, PG_DATABASE, isPgReachable } from "./test-env-probe";
 
 const DB_SLIBENA = Boolean(process.env.AISHA_DB_URL);
@@ -36,6 +36,14 @@ const pol = (i: number, nazev: string, mn: string, mj: string, cena: string, cel
   `"unit":{"value":"${mj}"},"unit_price":{"value":"${cena}"},"line_total":{"value":"${celkem}"}}}`;
 
 describe.skipIf(!isPgReachable() && !DB_SLIBENA)("položky dokladu: tabulka se třídou a kontrolou součtu", () => {
+  // Úklid: celá sada sdílí jednu DB. Blok knihy, který tu zůstal, viděly jiné
+  // testy jako „instanční katalog" (surface-rpc-entitlement, naměřeno 2026-10-04).
+  afterAll(() => {
+    if (!isPgReachable()) return;
+    psql(`DELETE FROM public.surface_blocks WHERE block_slug = '${BLOK}'`);
+    psql(`DELETE FROM public.li_source_registry WHERE doc_slug IN ('${A}', '${B}', '${C}', '${D}', '${E}')`);
+  });
+
   it("příprava: tři faktury a blok knihy s katalogem", () => {
     const polozky = `[${pol(0, "Nájemné za 09/2026", "1", "ks", "1000", "1000")},${pol(1, "Záloha elektřina", "2.5", "kWh", "100", "250")}]`;
     const doc = (slug: string, items: string, zaklad: string) =>

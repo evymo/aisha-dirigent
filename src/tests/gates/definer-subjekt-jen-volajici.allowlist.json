@@ -62,6 +62,11 @@
       "name": "create_ai_run",
       "kategorie": "k-revizi",
       "reason": "ZNÁMÁ VADA (akce za cizí subjekt): přihlášený založí ai_run s actor_user_id = kdokoli (COALESCE(p_actor_user_id, auth.uid())) a s libovolným p_story_id. Oprava actor je jednořádková, ale vazba na story a útrata (fn_authorize_task_spend) jsou jeden návrh; volá ji get_answer_block, svc-ai-chat a n8n. Rozhodnutí patří vlastníkovi — stejná vada je ve fn_create_workflow_run, kterou statická brána nevidí (stráž „přihlášen, nebo služba“ se tváří jako role)."
+    },
+    {
+      "name": "is_consultant_for_user",
+      "kategorie": "vztah",
+      "reason": "Predikát RLS (volá ho devět politik na zdravotních tabulkách), proto musí mít EXECUTE pro authenticated. Odpovídá jen o vztahu VOLAJÍCÍHO k subjektu: pravda jen když auth.uid() je schválený konzultant (partner_profiles.user_id = auth.uid()) studie, kde je p_user_id aktivně zapsaný, A p_user_id dal tomuto konzultantovi platný souhlas (data_sharing_consents.partner_id = jeho profil). Bez souhlasu je odpověď false i při existujícím zápisu, nepřihlášený/účet bez profilu dostane vždy false — o cizích vztazích neprozradí nic. Rozhodnutí majitele 2026-10-05 (souhlas uvnitř funkce); chování drží konzultant-jen-se-souhlasem.runtime.test.ts."
     }
   ]
 }

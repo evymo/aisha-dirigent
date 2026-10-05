@@ -12,8 +12,23 @@ SET search_path TO 'public'
 AS $function$
 DECLARE
   v_id uuid;
+  v_inserted bigint;
   v_user_id uuid;
 BEGIN
+  -- ⛔ SECURITY DEFINER vypíná RLS, takže nárok musí vymáhat tělo. Do 2026-10-04
+  -- tu stráž měla jen admin akce a funkce má GRANT pro `authenticated` (admin UI
+  -- čte doručení kampaně). Kdokoli přihlášený si tak přímým
+  -- /rpc/edge_mobile_notifications mohl přečíst FCM tokeny cizích zařízení
+  -- (get_mobile_sessions → push komukoli mimo platformu), poslat in-app
+  -- notifikaci s odkazem libovolnému účtu (insert_notifications_bulk → phishing),
+  -- vynulovat tokeny VŠEM (null_mobile_session_token bez user_id) a číst
+  -- preference cizích účtů. Všechno kromě admin čtení doručení je práce služby
+  -- (svc-push, gateway — volají service tokenem).
+  IF p_action IS DISTINCT FROM 'get_campaign_notification_deliveries_admin'
+     AND NOT public.is_service_role() THEN
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+  END IF;
+
   IF p_action = 'get_mobile_sessions' THEN
     RETURN jsonb_build_object(
       'rows',
@@ -107,42 +122,44 @@ BEGIN
   END IF;
 
   IF p_action = 'insert_notifications_bulk' THEN
-    RETURN jsonb_build_object(
-      'inserted',
-      (
-        WITH input_rows AS (
-          SELECT
-            COALESCE(NULLIF(row ->> 'link', ''), NULL) AS link,
-            NULLIF(row ->> 'message', '') AS message,
-            COALESCE(row -> 'metadata', '{}'::jsonb) AS metadata,
-            COALESCE(NULLIF(row ->> 'title', ''), 'Notification') AS title,
-            COALESCE(NULLIF(row ->> 'type', ''), 'campaign') AS type,
-            NULLIF(row ->> 'user_id', '')::uuid AS user_id
-          FROM jsonb_array_elements(COALESCE(p_payload -> 'rows', '[]'::jsonb)) AS t(row)
-        ),
-        inserted AS (
-          INSERT INTO public.notifications (
-            link,
-            message,
-            metadata,
-            title,
-            type,
-            user_id
-          )
-          SELECT
-            i.link,
-            i.message,
-            i.metadata,
-            i.title,
-            i.type,
-            i.user_id
-          FROM input_rows i
-          WHERE i.user_id IS NOT NULL
-          RETURNING 1
-        )
-        SELECT count(*) FROM inserted
+    -- ⛔ WITH s INSERT MUSÍ BÝT NA NEJVYŠŠÍ ÚROVNI. Do 2026-10-04 tu byl jako
+    -- poddotaz uvnitř jsonb_build_object(...) a Postgres ho odmítal při KAŽDÉM
+    -- volání („WITH clause containing a data-modifying statement must be at
+    -- the top level") — in-app notifikace kampaní a připomínek dotazníků
+    -- nevznikla ani jedna, svc-push jen zalogoval chybu.
+    WITH input_rows AS (
+      SELECT
+        NULLIF(row ->> 'link', '') AS link,
+        NULLIF(row ->> 'message', '') AS message,
+        COALESCE(row -> 'metadata', '{}'::jsonb) AS metadata,
+        COALESCE(NULLIF(row ->> 'title', ''), 'Notification') AS title,
+        COALESCE(NULLIF(row ->> 'type', ''), 'campaign') AS type,
+        NULLIF(row ->> 'user_id', '')::uuid AS user_id
+      FROM jsonb_array_elements(COALESCE(p_payload -> 'rows', '[]'::jsonb)) AS t(row)
+    ),
+    inserted AS (
+      INSERT INTO public.notifications (
+        link,
+        message,
+        metadata,
+        title,
+        type,
+        user_id
       )
-    );
+      SELECT
+        i.link,
+        i.message,
+        i.metadata,
+        i.title,
+        i.type,
+        i.user_id
+      FROM input_rows i
+      WHERE i.user_id IS NOT NULL
+      RETURNING 1
+    )
+    SELECT count(*) INTO v_inserted FROM inserted;
+
+    RETURN jsonb_build_object('inserted', v_inserted);
   END IF;
 
   IF p_action = 'get_existing_questionnaire_reminder_keys' THEN

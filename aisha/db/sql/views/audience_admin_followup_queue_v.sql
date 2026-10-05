@@ -54,3 +54,11 @@ LEFT JOIN public.partner_stories ps ON b.subject_type = 'story' AND ps.id = b.su
 
 COMMENT ON VIEW public.audience_admin_followup_queue_v IS
   'Open beats bucketed (overdue/today/this_week/later) with the subject resolved to an actor when it has an account. Backed by story_pulse_beats since ADR-003 K2 (ai_tasks retired).';
+
+-- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
+-- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
+-- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
+-- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
+-- a default privileges na běžící DB.
+REVOKE ALL ON public.audience_admin_followup_queue_v FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.audience_admin_followup_queue_v TO service_role;

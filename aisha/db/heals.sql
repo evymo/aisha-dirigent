@@ -9521,10 +9521,12 @@ drop view if exists public.audience_admin_twin_directory_v;
 \ir sql/views/audience_admin_activity_monthly_v.sql
 \ir sql/views/audience_admin_twin_composition_v.sql
 \ir sql/views/audience_admin_relation_kinds_v.sql
+-- (Granty těchto pohledů nese jejich SoT — jen service_role; přímý grant pro
+--  authenticated obcházel stráž blokových funkcí, viz blok 2026-10-04 níž.)
 GRANT SELECT ON public.audience_admin_followup_queue_v, public.audience_admin_twin_directory_v,
                 public.audience_admin_twin_relations_v, public.audience_admin_activity_monthly_v,
                 public.audience_admin_twin_composition_v, public.audience_admin_relation_kinds_v
-                TO authenticated, service_role;
+                TO service_role;
 
 -- Šablona `follow-up` je DATA (seed jádra), ne schéma — na běžící instanci ji
 -- dodá seed profil při nasazení; tady se jen pojistí, aby create_followup po
@@ -9562,7 +9564,7 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/functions/get_audience_view_timeline_block.sql
 \ir sql/functions/get_audience_view_kpi_block.sql
 \ir sql/views/audience_admin_twin_timeline_v.sql
-GRANT SELECT ON public.audience_admin_twin_timeline_v TO authenticated, service_role;
+-- (Granty pohledu nese jeho SoT; přímý GRANT pro authenticated byl únik — viz blok 2026-10-04.)
 
 NOTIFY pgrst, 'reload schema';
 
@@ -10360,12 +10362,13 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/views/audience_admin_source_stats_monthly_v.sql
 \ir sql/views/audience_admin_source_topic_monthly_v.sql
 \ir sql/views/audience_admin_source_event_monthly_v.sql
+-- (Jen service_role — čte se přes DEFINER blokové funkce, viz blok 2026-10-04 níž.)
 GRANT SELECT ON public.audience_admin_source_topic_stats_v,
                 public.audience_admin_source_event_stats_v,
                 public.audience_admin_source_stats_monthly_v,
                 public.audience_admin_source_topic_monthly_v,
                 public.audience_admin_source_event_monthly_v
-                TO authenticated, service_role;
+                TO service_role;
 
 -- ── validate_mcp_token vrací i allowed_tools / denied_tools (2026-09-14) ─────
 -- Naměřeno: svc-mcp-knowledge nepřijímal `mcp_` PAT vůbec, a n8n agenti tak
@@ -11666,5 +11669,147 @@ BEGIN
     RAISE WARNING 'ai_proactive_defs_executor_principal_check: existují pravidla kanálů executoru bez created_by — dispečer je přeskakuje; doplň principála';
   END;
 END $$;
+
+NOTIFY pgrst, 'reload schema';
+
+-- ⛔ edge_bank_transactions BEZ STRÁŽE (2026-10-04, bezpečnostní nález z revize SQL).
+-- SECURITY DEFINER + GRANT authenticated, ale žádná kontrola role: přihlášený člen si
+-- přímým /rpc/ mohl párovat platbu na vlastní objednávku (→ orders.status = 'paid'),
+-- vkládat bankovní pohyby a číst frontu nespárovaných plateb (účty, jména plátců).
+-- Soubor dosud v heals nebyl vůbec, takže by se oprava na běžící DB nepřehrála.
+\ir sql/functions/edge_bank_transactions.sql
+
+NOTIFY pgrst, 'reload schema';
+
+-- ⛔ v_health_weekly/monthly_summary: ZDRAVOTNÍ DATA BEZ PŘIHLÁŠENÍ (2026-10-04, nález z revize SQL).
+-- Pohledy bez security_invoker se čtou právy vlastníka, tedy MIMO RLS health_check_ins,
+-- a měly GRANT SELECT pro anon (+ plné DML pro authenticated): souhrny tepu, bolesti,
+-- nálady a spánku všech uživatelů četl kdokoli přes /rest/v1/v_health_*. Teď
+-- security_invoker = true (platí policies podkladu) a jen SELECT pro přihlášené
+-- a službu. Oba páry souborů dosud v heals nebyly — na běžící DB by oprava nedotekla.
+\ir sql/views/v_health_weekly_summary.sql
+\ir sql/views/v_health_monthly_summary.sql
+\ir sql/grants/v_health_weekly_summary.sql
+\ir sql/grants/v_health_monthly_summary.sql
+
+NOTIFY pgrst, 'reload schema';
+
+-- ⛔ edge_subscriptions BEZ STRÁŽE (2026-10-04, bezpečnostní nález z revize SQL).
+-- SECURITY DEFINER + GRANT authenticated bez kontroly role: přihlášený si přímým
+-- /rpc/ přepnul vlastní předplatné na 'active' bez platby (update_subscription),
+-- zakládal předplatné, přepisoval Stripe ceny balíčků a četl předplatné cizích
+-- účtů. Zápisy teď jen služba (svc-stripe aktivaci po ověření u Stripe zapisuje
+-- service tokenem), čtení vlastník/služba/správa. Soubor dosud v heals nebyl.
+\ir sql/functions/edge_subscriptions.sql
+
+NOTIFY pgrst, 'reload schema';
+
+-- ⛔ audience_admin_twin_timeline_v ČITELNÝ KAŽDÝM PŘIHLÁŠENÝM (2026-10-04, nález z revize SQL).
+-- Pohled s právy vlastníka (mimo RLS story_entries/twin_events, včetně is_internal
+-- záznamů a předmětů e-mailů z ingestu) dostal výš `GRANT SELECT … TO authenticated`.
+-- Stráž is_admin_or_staff() v get_audience_view_timeline_block tím šla obejít
+-- přímým /rest/v1/audience_admin_twin_timeline_v. SoT pohledu teď grant odebírá
+-- (REVOKE ALL i z authenticated — explicitní grant z dřívějšího heals sám nezmizí)
+-- a nechává jen service_role; čte se výhradně přes DEFINER blokovou funkci.
+\ir sql/views/audience_admin_twin_timeline_v.sql
+
+NOTIFY pgrst, 'reload schema';
+
+-- ⛔ edge_mobile_notifications BEZ STRÁŽE (2026-10-04, bezpečnostní nález z revize SQL).
+-- SECURITY DEFINER + GRANT authenticated; stráž měla jen admin akce. Přihlášený si
+-- přímým /rpc/ četl FCM tokeny cizích zařízení, posílal in-app notifikace s odkazem
+-- komukoli (phishing), vynuloval push tokeny všem uživatelům naráz a četl cizí
+-- preference. Teď vše kromě get_campaign_notification_deliveries_admin (admin UI,
+-- is_admin_or_staff) jen služba — svc-push i gateway volají service tokenem.
+-- Soubor dosud v heals nebyl.
+-- + insert_notifications_bulk padal pro VŠECHNY (WITH … INSERT v poddotazu) — in-app
+--   notifikace kampaní a připomínek nevznikaly; opraveno v témže souboru.
+\ir sql/functions/edge_mobile_notifications.sql
+
+NOTIFY pgrst, 'reload schema';
+
+-- ⛔ handle_order_payment_completed: KAŽDÝ PŘECHOD OBJEDNÁVKY NA 'paid' PADAL (2026-10-04).
+-- Trigger volal record_audit_log(text, text, text, uuid, jsonb) s NEW.id (uuid) na místě
+-- p_resource_id (text) — uuid → text není implicitní, funkce se nenašla a UPDATE orders
+-- spadl celý (Stripe webhook, ruční párování bankovní platby). Naměřeno DB testem při
+-- opravě edge_bank_transactions. Soubor dosud v heals nebyl.
+\ir sql/functions/handle_order_payment_completed.sql
+
+-- ⛔ edge_bank_transactions: ČTYŘI AKCE, KTERÉ KLIENTI VOLALI A SQL NEZNALO (2026-10-04).
+-- svc-fio-bank volá auto_match_by_vs (po prvním pohybu s VS spadla celá synchronizace
+-- na „Unsupported action"), admin UI get_all / get_awaiting_orders / dismiss_transaction
+-- (stránka párování plateb ukazovala chybu). Doplněno v SoT; auto-párování zaplatí jen
+-- při přesné shodě částky, jinak amount_mismatch pro admina. Funkce už je výš \ir —
+-- přehraje se znovu, aby chronologie ukazovala, kdy akce přibyly.
+\ir sql/functions/edge_bank_transactions.sql
+
+NOTIFY pgrst, 'reload schema';
+
+-- ⛔ STREAK TRIGGER SHAZOVAL CHECK-IN BEZ PŘIHLÁŠENÉHO (2026-10-04).
+-- trigger_update_streak_on_health_checkin hlídal `auth.uid() IS NULL → RAISE`, takže
+-- každý INSERT do health_check_ins mimo uživatelskou relaci (služba, import, obnova)
+-- spadl i s check-inem. Trigger funkce přímo volat nejde; stráž pryč, grant pro
+-- authenticated taky (nepotřebuje ho). update_user_streak (DEFINER, p_user_id od
+-- volajícího) má v SoT REVOKE z authenticated, ale bez \ir by na běžící DB nedoletěl.
+\ir sql/functions/update_user_streak.sql
+\ir sql/functions/trigger_update_streak_on_health_checkin.sql
+
+-- ⛔ audience_admin_*_v: CELÁ TŘÍDA ČITELNÁ KAŽDÝM PŘIHLÁŠENÝM (2026-10-04).
+-- Stejná vada jako u osy dvojčete výš, jen u dalších jedenácti pohledů: práva vlastníka
+-- (mimo RLS podkladu) + GRANT SELECT pro authenticated z dřívějších bloků heals a ze SoT.
+-- Adresář dvojčat, fronta follow-upů, vazby, složení a statistiky zdrojů tak šly číst
+-- přímým /rest/v1/ mimo stráž is_admin_or_staff() blokových funkcí. Dva z nich
+-- (followup_queue, twin_directory) měly navíc INSERT z default privileges. Granty
+-- výš jsou zúžené na service_role; přehrání SoT tady odebere, co na běžící DB zůstalo.
+\ir sql/views/audience_admin_activity_monthly_v.sql
+\ir sql/views/audience_admin_followup_queue_v.sql
+\ir sql/views/audience_admin_relation_kinds_v.sql
+\ir sql/views/audience_admin_source_event_monthly_v.sql
+\ir sql/views/audience_admin_source_event_stats_v.sql
+\ir sql/views/audience_admin_source_stats_monthly_v.sql
+\ir sql/views/audience_admin_source_topic_monthly_v.sql
+\ir sql/views/audience_admin_source_topic_stats_v.sql
+\ir sql/views/audience_admin_twin_composition_v.sql
+\ir sql/views/audience_admin_twin_directory_v.sql
+\ir sql/views/audience_admin_twin_relations_v.sql
+
+NOTIFY pgrst, 'reload schema';
+
+-- ⛔ POHLEDY S PRÁVY VLASTNÍKA ČITELNÉ BEZ PŘIHLÁŠENÍ (2026-10-04, naměřeno katalogem čisté DB).
+-- Osm pohledů mělo GRANT SELECT pro anon (+ DML pro authenticated) a čte se mimo RLS
+-- podkladu: úpravy dávkování členů s poznámkou konzultanta a e-mailem autorizujícího,
+-- zdravotní a laboratorní souhrny kohort studií (malé kohorty = reidentifikace), tržby
+-- zásilek, šarže a expedice. Klient je přímo nečte (studie přes DEFINER *_secure RPC),
+-- takže zůstává jen service_role. Totéž u ai_agent_metrics_hourly: přímý SELECT obcházel
+-- stráž is_admin_or_staff() v get_ai_agent_metrics. Grant soubory dosud v heals nebyly.
+\ir sql/grants/distribution_adjustments_overview.sql
+\ir sql/grants/study_cohort_lab_trends.sql
+\ir sql/grants/study_cohort_statistics.sql
+\ir sql/grants/study_cohort_trends.sql
+\ir sql/grants/batch_inventory_overview.sql
+\ir sql/grants/distribution_overview.sql
+\ir sql/grants/expedition_overview.sql
+\ir sql/grants/shipment_statistics.sql
+\ir sql/materialized_views/ai_agent_metrics_hourly.sql
+
+NOTIFY pgrst, 'reload schema';
+
+-- ⛔ partner_profiles_public: ZÁPIS DO CIZÍCH PROFILŮ MIMO RLS (2026-10-04).
+-- Auto-updatable pohled (projekce jedné tabulky) s právy vlastníka a plným DML pro
+-- authenticated: UPDATE/DELETE skrz /rest/v1/partner_profiles_public obcházel RLS
+-- partner_profiles — přihlášený přepsal web/popis cizího partnera (phishing) nebo ho
+-- smazal. Pohled zůstává veřejný pro čtení, DML nemá nikdo. Grant soubor dosud v heals nebyl.
+\ir sql/grants/partner_profiles_public.sql
+
+NOTIFY pgrst, 'reload schema';
+
+-- ⛔ is_consultant_for_user: ČLEN NEČETL ANI SVÁ ZDRAVOTNÍ DATA (2026-10-05, rozhodnutí majitele).
+-- Funkci volá devět RLS politik na zdravotních tabulkách a neměla grant pro authenticated
+-- → každé čtení health_check_ins, lab_results, health_data… padalo na „permission denied
+-- for function". Rozhodnuto: kontrola souhlasu PŘÍMO VE FUNKCI; vazba platí jen pro
+-- přihlášený existující účet, schváleného konzultanta studie, kde je člen aktivně zapsaný,
+-- a s platným souhlasem člena. Pak grant pro authenticated (anon dál bez). Soubor dosud
+-- v heals nebyl.
+\ir sql/functions/is_consultant_for_user.sql
 
 NOTIFY pgrst, 'reload schema';

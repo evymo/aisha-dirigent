@@ -27,4 +27,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_ai_agent_metrics_hourly_pk
   ON ai_agent_metrics_hourly (hour, agent_slug, event_type);
 
 -- Grants
-GRANT SELECT ON ai_agent_metrics_hourly TO authenticated;
+-- ⛔ Jen služba (nález 2026-10-04): čtecí RPC get_ai_agent_metrics(_timeseries)
+-- jsou DEFINER se stráží is_admin_or_staff(); přímý SELECT pro authenticated
+-- ji obcházel a vydával náklady a latence agentů komukoli přihlášenému.
+REVOKE ALL ON public.ai_agent_metrics_hourly FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.ai_agent_metrics_hourly TO service_role;
