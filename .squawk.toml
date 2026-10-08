@@ -10,16 +10,20 @@
 #   npm run db:migrations:lint:report     # list every violation, never fail
 #   npm run db:migrations:lint:baseline   # snapshot current violations into the allowlist
 # Gated in src/tests/gates/migration-safety.gate.test.ts (runs in test:gates).
+#
+# ⚠️ Stav 2026-10-08: repo je baseline-only (brána baseline-only-release) — v
+# aisha/db/migrations/ je JEN generovaný baseline, který je níž vyloučený. Lint tak
+# dnes nemá vstup. Skutečná cesta změny do běžící DB je aisha/db/heals.sql (\ir na SoT
+# soubory); jeho lint je otevřený úkol, ne něco, co tahle konfigurace pokrývá.
 
-pg_version = "17"
+# Major verze Postgresu nových instancí (config/image-versions.env, POSTGRES_MAJOR).
+pg_version = "18"
 
-# Most migrations are applied file-by-file via psql (autocommit); only ~20/190 wrap in
-# an explicit BEGIN. So do NOT assume an ambient transaction — the conservative default
-# keeps transactionality-sensitive rules honest.
+# Soubory se aplikují přes psql v autocommitu; okolní transakci nepředpokládat —
+# konzervativní výchozí stav drží pravidla citlivá na transakce poctivá.
 assume_in_transaction = false
 
-# The generated full-schema baseline is not a "migration" — linting its 136k lines
-# would drown the real delta signal.
+# Generovaný baseline (celé schéma, ~209k řádků) není migrace.
 excluded_paths = ["00000000000000_baseline.sql"]
 
 # Keep the gate on PROD-SAFETY hazards (locks / data-loss / breaking changes). Exclude:
