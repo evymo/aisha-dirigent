@@ -2,7 +2,8 @@
 /**
  * aisha-mint-pat — self-service Personal Access Token (PAT) minting for the AISHA Omni /v1
  * model endpoint (IDE napoj). A KC-authenticated developer mints a token bound to THEIR OWN
- * identity, scoped to a story they can access, then points any editor at ask.aisha.guru/v1.
+ * identity, scoped to a story they can access, then points any editor at <your AISHA>/v1
+ * (default: the local stack gateway http://localhost:3001).
  *
  * Auth: the caller's KC access token (JWT). Resolution order:
  *   1. --token <jwt>            (explicit)
@@ -13,7 +14,7 @@
  *
  * Usage:
  *   node scripts/aisha-mint-pat.mjs --story <uuid> [--scope story] [--expires-days 90]
- *        [--rpm 60] [--daily 1000] [--api https://api.aisha.guru] [--token <jwt>]
+ *        [--rpm 60] [--daily 1000] [--api http://localhost:3001] [--token <jwt>]
  *
  * On success prints the raw `mcp_…` token ONCE plus the ready-to-paste editor napoj recipe.
  */
@@ -21,6 +22,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = process.cwd();
+/** Gateway of the local stack (scripts/local-warmup.sh) — default when nothing is configured. */
+const LOCAL_API_BASE = "http://localhost:3001";
 const argv = process.argv.slice(2);
 function arg(name, def) {
   const i = argv.indexOf(`--${name}`);
@@ -57,27 +60,29 @@ function resolveApiBase() {
     if (!existsSync(f)) continue;
     try {
       const cfg = JSON.parse(readFileSync(f, "utf8"));
-      const p = cfg.profiles?.[cfg.activeProfile] || cfg.profiles?.aisha;
+      const p = cfg.profiles?.[cfg.activeProfile];
       const url = p?.aishaUrl;
       if (url) return url.replace(/\/$/, "");
     } catch (e) {
       console.warn("⚠ aisha-mint-pat: skipping unreadable config — " + (e && e.message ? e.message : String(e)));
     }
   }
-  return "https://api.aisha.guru";
+  return LOCAL_API_BASE;
 }
 
 const story = arg("story");
-const modelBase = arg("model-base", "https://ask.aisha.guru");
+// Editor base URL for the recipe: explicit flag, else env, else the API base
+// itself (the gateway serves /v1) — never a hosted instance.
+const modelBaseArg = arg("model-base", process.env.AISHA_MODEL_BASE_URL || "");
 if (has("help") || !story) {
   console.log(`aisha-mint-pat — mint a self-service PAT for the AISHA Omni /v1 endpoint
 
   --story <uuid>       (required) story to scope the token to (must be one you can access)
   --scope story|chat   (default: story)
   --expires-days 90    (self-service cap: 90)   --rpm 60 (cap 120)   --daily 1000 (cap 5000)
-  --api <url>          AISHA core API base (default: resolved / https://api.aisha.guru)
+  --api <url>          AISHA core API base (default: $AISHA_API_BASE_URL / .aisha profile / ${LOCAL_API_BASE})
   --token <jwt>        your KC access token (else $AISHA_ACCESS_TOKEN / .aisha config)
-  --model-base <url>   editor base URL to print in the recipe (default: https://ask.aisha.guru)`);
+  --model-base <url>   editor base URL to print in the recipe (default: $AISHA_MODEL_BASE_URL / the API base)`);
   process.exit(story ? 0 : 1);
 }
 
@@ -87,6 +92,7 @@ if (!token) {
   process.exit(2);
 }
 const apiBase = resolveApiBase();
+const modelBase = (modelBaseArg || apiBase).replace(/\/$/, "");
 
 const body = {
   p_scope: arg("scope", "story"),

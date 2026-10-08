@@ -139,7 +139,12 @@ fi
 # after login ("Something went wrong", HTTP 401). Set the realm's own public
 # origin (NOT a wildcard) so self-service credential/passkey management loads.
 # Soft-fail: never aborts cold-start (set -e is relaxed per-step with || true).
-ACCOUNT_ORIGIN="https://${KEYCLOAK_DOMAIN_PUBLIC:-${KC_HOSTNAME:-auth.aisha.guru}}"
+# Bez deklarované domény = lokální stack (Keycloak na :8180), nikdy cizí instance.
+if [ -n "${KEYCLOAK_DOMAIN_PUBLIC:-${KC_HOSTNAME:-}}" ]; then
+  ACCOUNT_ORIGIN="https://${KEYCLOAK_DOMAIN_PUBLIC:-${KC_HOSTNAME}}"
+else
+  ACCOUNT_ORIGIN="http://localhost:8180"
+fi
 for CLIENT_ID in account account-console; do
   CUUID=$(curl -sf -H "${AUTH}" \
     "${KC_URL}/admin/realms/${APP_REALM}/clients?clientId=${CLIENT_ID}" 2>/dev/null \

@@ -292,11 +292,10 @@ function deriveKeycloakUrl(gatewayUrl: string): string {
     "aisha";
   try {
     const url = new URL(gatewayUrl);
+    // Local stack (scripts/local-warmup.sh publishes Keycloak on 8180). A
+    // deployed instance passes keycloakUrl explicitly — no hosted default.
     if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
-      return `http://localhost:8080/realms/${realm}`;
-    }
-    if (/\.aisha\.guru$/i.test(url.hostname)) {
-      return `https://kc.aisha.guru/realms/${realm}`;
+      return `http://localhost:8180/realms/${realm}`;
     }
   } catch {
     // Keep explicit configuration required for invalid gateway URLs.

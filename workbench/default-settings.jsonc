@@ -36,9 +36,10 @@
     "badge.foreground": "#ffffff"
   },
 
-  // ── AISHA Dirigent — cloud backend defaults ──
-  // supabaseUrl enables bootstrap (anonKey is fetched automatically from .well-known)
-  "aisha.dirigent.supabaseUrl": "https://api.aisha.guru",
-  "aisha.dirigent.webUrl": "https://app.aisha.guru",
-  "aisha.dirigent.dashboardUrl": "https://appsmith.aisha.guru"
+  // ── AISHA Dirigent — backend defaults: the local stack (scripts/local-warmup.sh) ──
+  // supabaseUrl enables bootstrap (anonKey is fetched automatically from .well-known).
+  // For your deployed AISHA set https://api.<your-domain> etc. in user settings.
+  "aisha.dirigent.supabaseUrl": "http://localhost:3001",
+  "aisha.dirigent.webUrl": "http://localhost:8083",
+  "aisha.dirigent.dashboardUrl": "http://localhost:8090"
 }

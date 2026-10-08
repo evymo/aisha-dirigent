@@ -394,7 +394,8 @@ log_info "Zdroj archivu: $GIT_VETEV @ $GIT_COMMIT"
 # Upload dSYMs to (self-hosted) Sentry
 # ============================================
 # BY DESIGN: every archive ships its debug symbols to our self-hosted Sentry
-# (org/project/url from mobile-app/sentry.properties → https://sentry.id3a.cz).
+# (org/project/url from mobile-app/sentry.properties / version.json brand.sentry —
+# default http://localhost:9000, override with SENTRY_URL for your Sentry).
 # A release without dSYMs = unsymbolicated crashes, so a missing token, a missing
 # sentry-cli, missing dSYMs, or a failed upload is a HARD build failure — never a
 # silent skip. Provide the token via SENTRY_AUTH_TOKEN (or SENTRY_TOKEN), e.g. in

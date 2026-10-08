@@ -23,7 +23,7 @@ export class AishaNocoDbApi implements ICredentialType {
 			name: 'baseUrl',
 			type: 'string',
 			default: '',
-			placeholder: 'https://nocodb.aisha.guru',
+			placeholder: 'http://localhost:8085',
 			description: 'Base URL of the NocoDB instance',
 			required: true,
 		},

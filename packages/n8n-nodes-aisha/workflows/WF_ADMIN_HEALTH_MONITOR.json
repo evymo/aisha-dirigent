@@ -245,7 +245,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ ($env.N8N_WEBHOOK_BASE_URL || 'https://n8n.aisha.guru') + '/webhook/expert-notification' }}",
+        "url": "={{ ($env.N8N_WEBHOOK_BASE_URL || 'http://localhost:5678') + '/webhook/expert-notification' }}",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ severity: 'critical', subject: 'Service Recovery Failed — Human Intervention Required', message: 'Auto-recovery circuit breaker tripped. The following services could not be recovered after 3 attempts:\\n\\n' + JSON.stringify($('Self-Healing Logic').item.json.escalations, null, 2) + '\\n\\nOriginal alert:\\n' + $('Self-Healing Logic').item.json.originalAlert.message, context: { escalations: $('Self-Healing Logic').item.json.escalations, originalAlert: $('Self-Healing Logic').item.json.originalAlert }, source: 'health_monitor' }) }}",
@@ -265,7 +265,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ ($env.N8N_WEBHOOK_BASE_URL || 'https://n8n.aisha.guru') + '/webhook/dirigent-agent' }}",
+        "url": "={{ ($env.N8N_WEBHOOK_BASE_URL || 'http://localhost:5678') + '/webhook/dirigent-agent' }}",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ action: 'admin_bridge_alert', severity: $json.severity || 'warning', alert: { degradedServices: $json.originalAlert?.degradedServices || [], recoveryActions: $json.recoveryActions || [], escalations: $json.escalations || [], timestamp: $json.timestamp }, source: 'health_monitor' }) }}",
@@ -345,7 +345,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ ($env.N8N_WEBHOOK_BASE_URL || 'https://n8n.aisha.guru') + '/webhook/dirigent-agent' }}",
+        "url": "={{ ($env.N8N_WEBHOOK_BASE_URL || 'http://localhost:5678') + '/webhook/dirigent-agent' }}",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ action: 'workflow_drift_detected', severity: ($json.missingWorkflows || []).length > 2 ? 'high' : 'medium', alert: { missingWorkflows: $json.missingWorkflows || [], inactiveWorkflows: $json.inactiveWorkflows || [], totalExpected: $json.totalExpected || 0, totalFound: $json.totalFound || 0, timestamp: $json.timestamp || new Date().toISOString() }, source: 'health_monitor' }) }}",

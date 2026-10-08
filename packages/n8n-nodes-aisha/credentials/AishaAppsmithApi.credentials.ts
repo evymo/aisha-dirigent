@@ -23,7 +23,7 @@ export class AishaAppsmithApi implements ICredentialType {
 			name: 'baseUrl',
 			type: 'string',
 			default: '',
-			placeholder: 'https://appsmith.aisha.guru',
+			placeholder: 'http://localhost:8090',
 			description: 'Base URL of the Appsmith instance (without /api/v1)',
 			required: true,
 		},

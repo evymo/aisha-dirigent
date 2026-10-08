@@ -37,7 +37,7 @@
     "deploy:n8n": "node scripts/deploy-to-n8n.mjs",
     "deploy:api": "node scripts/deploy-to-n8n.mjs --api",
     "deploy:publish": "node scripts/deploy-to-n8n.mjs --publish",
-    "postpublish": "curl -sf -X POST https://n8n.aisha.guru/webhook/self-deploy -H 'Content-Type: application/json' -d '{\"source\":\"postpublish\",\"version\":\"'$npm_package_version'\"}' || true"
+    "postpublish": "curl -sf -X POST \"${N8N_WEBHOOK_URL:-http://localhost:5678}/webhook/self-deploy\" -H 'Content-Type: application/json' -d '{\"source\":\"postpublish\",\"version\":\"'$npm_package_version'\"}' || true"
   },
   "files": [
     "dist",

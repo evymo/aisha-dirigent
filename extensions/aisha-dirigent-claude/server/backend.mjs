@@ -21,6 +21,23 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 
 const UNSAFE_URL_CHARS = /[\u0000-\u001F\u007F"'<>`\\]/;
 
+/**
+ * Expand `${VAR}` / `${VAR:-default}` the way Claude Code expands them in
+ * `.mcp.json` — the tracked file reads
+ * `${AISHA_MCP_URL:-http://localhost:3001/functions/v1/mcp-knowledge-server}`,
+ * so the plugin must resolve it to the same URL Claude Code connects to.
+ * @param {unknown} input
+ * @param {Record<string, string|undefined>} [env]
+ * @returns {unknown}
+ */
+export function expandEnvPlaceholders(input, env = process.env) {
+  if (typeof input !== "string") return input;
+  return input.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)(?::-([^}]*))?\}/g, (_, name, fallback) => {
+    const value = env[name];
+    return value !== undefined && value !== "" ? value : (fallback ?? "");
+  });
+}
+
 function normalizeHttpUrl(input) {
   if (typeof input !== "string") return null;
   const value = input.trim();
@@ -116,7 +133,9 @@ export function resolveBackend(root) {
 
   const mcp = readJson(root, ".mcp.json") || {};
   const envMcpUrl = normalizeHttpUrl(process.env.AISHA_MCP_URL);
-  const workspaceMcpUrl = normalizeHttpUrl(mcp.mcpServers?.["aisha-knowledge"]?.url);
+  const workspaceMcpUrl = normalizeHttpUrl(
+    expandEnvPlaceholders(mcp.mcpServers?.["aisha-knowledge"]?.url),
+  );
   const derivedMcpUrl = url ? `${url}/functions/v1/mcp-knowledge-server` : null;
 
   const mcpUrl = envMcpUrl || workspaceMcpUrl || derivedMcpUrl;

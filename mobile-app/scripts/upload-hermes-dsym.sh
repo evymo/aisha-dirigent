@@ -69,7 +69,7 @@ if [ ! -d "$DSYM" ]; then
 fi
 
 echo "[hermes-dsym] Uploading $(dwarfdump --uuid "$DSYM" 2>/dev/null | grep -oE '[0-9A-F-]{36}' | head -1) to Sentry…"
-SENTRY_URL="${SENTRY_URL:-${BRAND_SENTRY_URL:-https://sentry.id3a.cz}}" \
+SENTRY_URL="${SENTRY_URL:-${BRAND_SENTRY_URL:-http://localhost:9000}}" \
 SENTRY_ORG="${SENTRY_ORG:-${BRAND_SENTRY_ORG:-sentry}}" \
 SENTRY_PROJECT="${SENTRY_PROJECT:-${BRAND_SENTRY_PROJECT:-aisha-dirigent}}" \
 SENTRY_AUTH_TOKEN="$TOKEN" \

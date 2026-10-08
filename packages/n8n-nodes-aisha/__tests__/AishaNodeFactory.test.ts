@@ -235,7 +235,7 @@ export class AishaStar implements INodeType {
 			const ctx = createMockExecuteFunctions({
 				operation: 'deploy',
 				nodeName: 'AishaHealthCheck',
-				n8nInstanceUrl: 'https://n8n.aisha.guru',
+				n8nInstanceUrl: 'http://localhost:5678',
 				deployMethod: 'npm',
 			});
 
@@ -253,7 +253,7 @@ export class AishaStar implements INodeType {
 			const ctx = createMockExecuteFunctions({
 				operation: 'deploy',
 				nodeName: 'AishaHealthCheck',
-				n8nInstanceUrl: 'https://n8n.aisha.guru',
+				n8nInstanceUrl: 'http://localhost:5678',
 				deployMethod: 'package',
 			});
 

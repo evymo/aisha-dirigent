@@ -23,7 +23,7 @@ export class AishaLangfuseApi implements ICredentialType {
 			name: 'host',
 			type: 'string',
 			default: '',
-			placeholder: 'https://langfuse.aisha.guru',
+			placeholder: 'http://localhost:3100',
 			description: 'Self-hosted Langfuse base URL',
 			required: true,
 		},

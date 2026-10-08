@@ -104,14 +104,18 @@ const configChangeEmitter = new vscode.EventEmitter<DirigentConfig>();
 export const onConfigChanged = configChangeEmitter.event;
 
 /**
- * Canonical AISHA Cloud dual-domain pair. The hosted cloud serves web/API on
- * the public proxy plane (*.aisha.guru) while Matrix (federation/websockets)
- * lives on the internal plane (*.backend.id3a.cz). BYO deployments configure
- * aisha.dirigent.cloudTLD / internalTLD instead; the served
- * /.well-known/app-config.json always wins over client-side derivation.
+ * Backend used when nothing is configured (no settings, profile, env or MCP
+ * URL): the gateway of the local stack started by `scripts/local-warmup.sh`.
+ * Anyone who clones the repo connects to THEIR OWN AISHA — a deployed instance
+ * is configured via settings, `.aisha/dirigent.local.json` or AISHA_* env.
+ * No hosted instance is ever assumed.
  */
-const AISHA_CLOUD_PUBLIC_TLD = "aisha.guru";
-const AISHA_CLOUD_INTERNAL_TLD = "backend.id3a.cz";
+export const DEFAULT_LOCAL_AISHA_URL = "http://localhost:3001";
+
+/**
+ * Keycloak of the local stack (`scripts/local-warmup.sh` publishes it on 8180).
+ */
+const LOCAL_KEYCLOAK_ORIGIN = "http://localhost:8180";
 
 /** True when `hostname` is `tld` itself or any subdomain of it. */
 function hostnameUnder(hostname: string, tld: string): boolean {
@@ -130,9 +134,12 @@ export function resolveConnectionLabel(aishaUrl: string, instanceLabel?: string)
   try {
     const url = new URL(aishaUrl);
     if (url.hostname === "localhost" || url.hostname === "127.0.0.1") return "Local Dev";
+    // A deployment is labelled "AISHA Cloud" only by the operator's own TLD
+    // pair (aisha.dirigent.cloudTLD / internalTLD) — never by a built-in domain.
+    const { cloudTLD, internalTLD } = getTLDs();
     if (
-      hostnameUnder(url.hostname, AISHA_CLOUD_PUBLIC_TLD) ||
-      hostnameUnder(url.hostname, AISHA_CLOUD_INTERNAL_TLD)
+      (cloudTLD && hostnameUnder(url.hostname, cloudTLD)) ||
+      (internalTLD && hostnameUnder(url.hostname, internalTLD))
     ) {
       return "AISHA Cloud";
     }
@@ -217,7 +224,9 @@ function settingsFallback(): DirigentConfig {
   return {
     mcpUrl: settings.get<string>("mcpUrl") ?? "",
     n8nTriggerUrl: settings.get<string>("n8nTriggerUrl") ?? "",
-    aishaUrl: settings.get<string>("aishaUrl") ?? "",
+    // `supabaseUrl` is the declared (legacy-named) setting in package.json;
+    // `aishaUrl` the current key. Either one configures the backend.
+    aishaUrl: settings.get<string>("aishaUrl") || settings.get<string>("supabaseUrl") || "",
     anonKey: settings.get<string>("anonKey") ?? "",
     storyId: settings.get<string>("storyId") ?? "",
     expertiseLevel: settings.get<string>("expertiseLevel") ?? "intermediate",
@@ -415,7 +424,7 @@ function deriveOrchestrationUrl(apiUrl: string): string {
  * Derive Keycloak realm URL from aishaUrl.
  * Cloud tier: hostname ending in cloudTLD → auth.${cloudTLD}/realms/${realm}
  * Internal tier: hostname ending in internalTLD → auth.{server}.${internalTLD}/realms/${realm}
- * Local dev: localhost → localhost:8080/realms/${realm}
+ * Local dev: localhost → localhost:8180/realms/${realm} (local stack Keycloak)
  */
 function deriveKeycloakUrl(aishaUrl: string): string {
   const realm = process.env.KEYCLOAK_REALM ?? "aisha";
@@ -430,11 +439,11 @@ function deriveKeycloakUrl(aishaUrl: string): string {
       return `${url.protocol}//${authHostname}/realms/${realm}`;
     }
     if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
-      return `http://localhost:8080/realms/${realm}`;
+      return `${LOCAL_KEYCLOAK_ORIGIN}/realms/${realm}`;
     }
     // Generic dynamic composition: api.<domain> → auth.<domain>/realms/<realm>.
-    // Works for both planes (api.aisha.guru, api.backend.id3a.cz) and any BYO
-    // deployment following the subdomain convention — no TLD settings needed.
+    // Works for both planes (public api.<domain>, internal api.<server>.<tld>)
+    // of any deployment following the subdomain convention — no TLD settings needed.
     if (/^api\./i.test(url.hostname)) {
       const authHostname = url.hostname.replace(/^api\./i, "auth.");
       return `${url.protocol}//${authHostname}/realms/${realm}`;
@@ -458,13 +467,10 @@ function deriveMatrixUrl(aishaUrl: string): string {
       return "http://localhost:8448";
     }
     // Cross-plane: Matrix (federation/websockets) is NOT proxied through the
-    // public plane — it lives on the internal plane. Configured TLD pair wins;
-    // the canonical AISHA Cloud pair covers the hosted instance.
+    // public plane — it lives on the internal plane, declared by the operator's
+    // TLD pair (aisha.dirigent.cloudTLD / internalTLD).
     if (cloudTLD && internalTLD && url.hostname.endsWith(`.${cloudTLD}`)) {
       return `https://matrix.${internalTLD}`;
-    }
-    if (hostnameUnder(url.hostname, AISHA_CLOUD_PUBLIC_TLD)) {
-      return `https://matrix.${AISHA_CLOUD_INTERNAL_TLD}`;
     }
     const parts = url.hostname.split(".");
     if (parts.length >= 2) {
@@ -552,7 +558,9 @@ export function getDirigentConfig(): DirigentConfig {
   };
 
   merged.aishaUrl = normalizeAishaUrl(
-    merged.aishaUrl || (merged.mcpUrl ? deriveAishaUrlFromMcp(merged.mcpUrl) : ""),
+    merged.aishaUrl ||
+      (merged.mcpUrl ? deriveAishaUrlFromMcp(merged.mcpUrl) : "") ||
+      DEFAULT_LOCAL_AISHA_URL,
   );
   const backendUrl = merged.aishaUrl;
 

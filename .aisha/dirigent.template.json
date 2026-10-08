@@ -1,18 +1,11 @@
 {
-  "activeProfile": "id3a",
+  "activeProfile": "local",
   "profiles": {
     "local": {
-      "supabaseUrl": "",
+      "supabaseUrl": "http://localhost:3001",
+      "aishaUrl": "http://localhost:3001",
       "anonKey": "",
-      "modelEndpoint": "http://127.0.0.1:3001"
-    },
-    "id3a": {
-      "supabaseUrl": "https://api.backend.id3a.cz"
-    },
-    "aisha": {
-      "supabaseUrl": "https://api.aisha.guru",
-      "aishaUrl": "https://api.aisha.guru",
-      "modelEndpoint": "https://ask.aisha.guru"
+      "modelEndpoint": "http://localhost:3001"
     }
   },
   "expertiseLevel": "expert",

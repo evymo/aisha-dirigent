@@ -2,7 +2,7 @@
   "mcpServers": {
     "aisha-knowledge": {
       "type": "http",
-      "url": "https://api.backend.id3a.cz/functions/v1/mcp-knowledge-server"
+      "url": "${AISHA_MCP_URL:-http://localhost:3001/functions/v1/mcp-knowledge-server}"
     }
   }
 }

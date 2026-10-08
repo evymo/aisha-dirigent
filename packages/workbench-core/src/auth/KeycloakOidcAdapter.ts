@@ -37,11 +37,11 @@ interface KeycloakUserInfo {
 
 /** Options for KeycloakOidcAdapter compatibility class. */
 export interface KeycloakOidcAdapterOptions {
-  /** AISHA gateway URL, e.g. https://api.aisha.guru or http://127.0.0.1:8000 (from local-warmup) */
+  /** AISHA gateway URL, e.g. http://localhost:3001 (local-warmup) or https://api.<your-domain> */
   gatewayUrl: string;
   /** Backward-compatible public API key, passed through when present. */
   anonKey: string;
-  /** Keycloak realm URL, e.g. https://kc.aisha.guru/realms/aisha. Derived from gatewayUrl when omitted. */
+  /** Keycloak realm URL, e.g. https://kc.<your-domain>/realms/aisha. Derived for the local stack when omitted. */
   keycloakUrl?: string;
   /** Keycloak public client ID. Default: aisha-dirigent-device. */
   clientId?: string;
@@ -286,11 +286,10 @@ function deriveKeycloakUrl(gatewayUrl: string): string {
     "aisha";
   try {
     const url = new URL(gatewayUrl);
+    // Local stack (scripts/local-warmup.sh publishes Keycloak on 8180). A
+    // deployed instance passes keycloakUrl explicitly — no hosted default.
     if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
-      return `http://localhost:8080/realms/${realm}`;
-    }
-    if (/\.aisha\.guru$/i.test(url.hostname)) {
-      return `https://kc.aisha.guru/realms/${realm}`;
+      return `http://localhost:8180/realms/${realm}`;
     }
   } catch {
     // Keep explicit configuration required for invalid gateway URLs.

@@ -188,7 +188,7 @@ export class AishaNodeFactory implements INodeType {
 				name: 'n8nInstanceUrl',
 				type: 'string',
 				displayOptions: { show: { operation: ['deploy'] } },
-				default: '={{ $env.N8N_URL || "https://n8n.aisha.guru" }}',
+				default: '={{ $env.N8N_URL || "http://localhost:5678" }}',
 				description: 'URL of the n8n instance to deploy to',
 			},
 			{

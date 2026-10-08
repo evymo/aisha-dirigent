@@ -20,7 +20,7 @@
     "sentry": {
       "project": "aisha-dirigent",
       "organization": "sentry",
-      "url": "https://sentry.id3a.cz"
+      "url": "http://localhost:9000"
     },
     "defaultSurface": "tabs"
   },

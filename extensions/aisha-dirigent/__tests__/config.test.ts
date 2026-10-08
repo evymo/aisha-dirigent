@@ -13,6 +13,18 @@ vi.mock("fs", () => ({
 
 const WORKSPACE = "/test/workspace";
 
+type MockVscode = {
+  __setMockConfig: (key: string, value: unknown) => void;
+  __clearMockConfig: () => void;
+};
+
+/** Declare the operator's TLD pair on the (fresh) vscode mock. */
+async function setTldPair(cloudTLD: string, internalTLD: string) {
+  const vscode = (await import("vscode")) as unknown as MockVscode;
+  vscode.__setMockConfig("aisha.dirigent.cloudTLD", cloudTLD);
+  vscode.__setMockConfig("aisha.dirigent.internalTLD", internalTLD);
+}
+
 /**
  * Helper: configure fs mocks for specific files and re-import config module.
  */
@@ -52,10 +64,23 @@ describe("config.ts", () => {
       expect(resolveConnectionLabel("http://localhost:57421")).toBe("Local Dev");
     });
 
-    it("returns 'AISHA Cloud' for AISHA platform domains", async () => {
+    it("returns 'AISHA Cloud' for the operator's configured TLD pair", async () => {
       const { resolveConnectionLabel } = await import("../src/config");
-      expect(resolveConnectionLabel("https://api.aisha.guru")).toBe("AISHA Cloud");
-      expect(resolveConnectionLabel("https://api.backend.id3a.cz")).toBe("AISHA Cloud");
+      const vscode = (await import("vscode")) as unknown as MockVscode;
+      vscode.__setMockConfig("aisha.dirigent.cloudTLD", "example.com");
+      vscode.__setMockConfig("aisha.dirigent.internalTLD", "internal.example.com");
+      try {
+        expect(resolveConnectionLabel("https://api.example.com")).toBe("AISHA Cloud");
+        expect(resolveConnectionLabel("https://api.internal.example.com")).toBe("AISHA Cloud");
+      } finally {
+        vscode.__clearMockConfig();
+      }
+    });
+
+    it("has no built-in hosted domain — without a TLD pair it shows the hostname", async () => {
+      const { resolveConnectionLabel } = await import("../src/config");
+      expect(resolveConnectionLabel("https://api.aisha.guru")).toBe("api.aisha.guru");
+      expect(resolveConnectionLabel("https://api.backend.id3a.cz")).toBe("api.backend.id3a.cz");
     });
 
     it("returns custom label when instanceLabel is provided", async () => {
@@ -80,10 +105,10 @@ describe("config.ts", () => {
               anonKey: "local-anon-key",
             },
             cloud: {
-              aishaUrl: "https://api.aisha.guru",
-              keycloakUrl: "https://auth.aisha.guru/realms/aisha",
-              matrixUrl: "https://matrix.backend.id3a.cz",
-              matrixServiceUrl: "https://api.aisha.guru/functions/v1/matrix-token-exchange",
+              aishaUrl: "https://api.example.com",
+              keycloakUrl: "https://auth.example.com/realms/aisha",
+              matrixUrl: "https://matrix.internal.example.com",
+              matrixServiceUrl: "https://api.example.com/functions/v1/matrix-token-exchange",
             },
           },
           expertiseLevel: "expert",
@@ -114,7 +139,7 @@ describe("config.ts", () => {
               anonKey: "local-anon-key",
             },
             cloud: {
-              aishaUrl: "https://api.aisha.guru",
+              aishaUrl: "https://api.example.com",
             },
           },
         },
@@ -128,14 +153,16 @@ describe("config.ts", () => {
         },
       });
 
+      // Matrix lives on the internal plane — only the operator's TLD pair says where.
+      await setTldPair("example.com", "internal.example.com");
       const config = getDirigentConfig();
 
       expect(config.activeProfile).toBe("cloud");
-      expect(config.aishaUrl).toBe("https://api.aisha.guru");
+      expect(config.aishaUrl).toBe("https://api.example.com");
       expect(config.anonKey).toBe("prod-anon-key");
-      expect(config.keycloakUrl).toBe("https://auth.aisha.guru/realms/aisha");
-      expect(config.matrixUrl).toBe("https://matrix.backend.id3a.cz");
-      expect(config.matrixServiceUrl).toBe("https://api.aisha.guru/functions/v1/matrix-token-exchange");
+      expect(config.keycloakUrl).toBe("https://auth.example.com/realms/aisha");
+      expect(config.matrixUrl).toBe("https://matrix.internal.example.com");
+      expect(config.matrixServiceUrl).toBe("https://api.example.com/functions/v1/matrix-token-exchange");
     });
 
     it("deep-merges local profile secrets into tracked profile", async () => {
@@ -144,7 +171,7 @@ describe("config.ts", () => {
           activeProfile: "cloud",
           profiles: {
             cloud: {
-              aishaUrl: "https://api.aisha.guru",
+              aishaUrl: "https://api.example.com",
             },
           },
         },
@@ -157,18 +184,38 @@ describe("config.ts", () => {
         },
       });
 
+      await setTldPair("example.com", "internal.example.com");
       const config = getDirigentConfig();
 
       // URL from tracked, secrets from local
-      expect(config.aishaUrl).toBe("https://api.aisha.guru");
+      expect(config.aishaUrl).toBe("https://api.example.com");
       expect(config.anonKey).toBe("secret-anon");
-      expect(config.keycloakUrl).toBe("https://auth.aisha.guru/realms/aisha");
-      expect(config.matrixUrl).toBe("https://matrix.backend.id3a.cz");
-      expect(config.matrixServiceUrl).toBe("https://api.aisha.guru/functions/v1/matrix-token-exchange");
+      expect(config.keycloakUrl).toBe("https://auth.example.com/realms/aisha");
+      expect(config.matrixUrl).toBe("https://matrix.internal.example.com");
+      expect(config.matrixServiceUrl).toBe("https://api.example.com/functions/v1/matrix-token-exchange");
 
       // Merged profiles should contain both
-      expect(config.profiles.cloud.aishaUrl).toBe("https://api.aisha.guru");
+      expect(config.profiles.cloud.aishaUrl).toBe("https://api.example.com");
       expect(config.profiles.cloud.anonKey).toBe("secret-anon");
+    });
+
+    it("defaults to the local stack gateway when nothing is configured", async () => {
+      const { getDirigentConfig, DEFAULT_LOCAL_AISHA_URL } = await loadConfigWith({});
+
+      const config = getDirigentConfig();
+
+      expect(DEFAULT_LOCAL_AISHA_URL).toBe("http://localhost:3001");
+      expect(config.aishaUrl).toBe("http://localhost:3001");
+      expect(config.mcpUrl).toBe("http://localhost:3001/functions/v1/mcp-knowledge-server");
+      expect(config.keycloakUrl).toBe("http://localhost:8180/realms/aisha");
+    });
+
+    it("an MCP URL alone still wins over the local default", async () => {
+      const { getDirigentConfig } = await loadConfigWith({
+        "dirigent.json": { mcpUrl: "https://api.example.com/functions/v1/mcp-knowledge-server" },
+      });
+
+      expect(getDirigentConfig().aishaUrl).toBe("https://api.example.com");
     });
 
     it("derives mcpUrl from aishaUrl when not set", async () => {
@@ -201,7 +248,7 @@ describe("config.ts", () => {
           activeProfile: "cloud",
           profiles: {
             cloud: {
-              aishaUrl: "https://api.aisha.guru",
+              aishaUrl: "https://api.example.com",
               anonKey: "prod-anon-key",
             },
           },
@@ -211,13 +258,13 @@ describe("config.ts", () => {
 
       const config = getDirigentConfig();
 
-      expect(config.aishaUrl).toBe("https://api.aisha.guru");
-      expect(config.mcpUrl).toBe("https://api.aisha.guru/functions/v1/mcp-knowledge-server");
-      expect(config.keycloakUrl).toBe("https://auth.aisha.guru/realms/aisha");
-      expect(config.n8nTriggerUrl).toBe("https://api.aisha.guru/admin/n8n-trigger");
-      expect(config.bootstrapUrl).toBe("https://api.aisha.guru/.well-known/app-config.json");
-      expect(config.webUrl).toBe("https://web.aisha.guru");
-      expect(config.orchestrationUrl).toBe("https://dirigent.aisha.guru");
+      expect(config.aishaUrl).toBe("https://api.example.com");
+      expect(config.mcpUrl).toBe("https://api.example.com/functions/v1/mcp-knowledge-server");
+      expect(config.keycloakUrl).toBe("https://auth.example.com/realms/aisha");
+      expect(config.n8nTriggerUrl).toBe("https://api.example.com/admin/n8n-trigger");
+      expect(config.bootstrapUrl).toBe("https://api.example.com/.well-known/app-config.json");
+      expect(config.webUrl).toBe("https://web.example.com");
+      expect(config.orchestrationUrl).toBe("https://dirigent.example.com");
     });
 
     it("derives public API URL from gateway MCP URL", async () => {
@@ -226,7 +273,7 @@ describe("config.ts", () => {
           activeProfile: "cloud",
           profiles: {
             cloud: {
-              mcpUrl: "https://api.backend.id3a.cz/functions/v1/mcp-knowledge-server",
+              mcpUrl: "https://api.internal.example.com/functions/v1/mcp-knowledge-server",
               anonKey: "prod-anon-key",
             },
           },
@@ -236,9 +283,9 @@ describe("config.ts", () => {
 
       const config = getDirigentConfig();
 
-      expect(config.aishaUrl).toBe("https://api.backend.id3a.cz");
-      expect(config.keycloakUrl).toBe("https://auth.backend.id3a.cz/realms/aisha");
-      expect(config.mcpUrl).toBe("https://api.backend.id3a.cz/functions/v1/mcp-knowledge-server");
+      expect(config.aishaUrl).toBe("https://api.internal.example.com");
+      expect(config.keycloakUrl).toBe("https://auth.internal.example.com/realms/aisha");
+      expect(config.mcpUrl).toBe("https://api.internal.example.com/functions/v1/mcp-knowledge-server");
     });
 
     it("local.json activeProfile overrides tracked activeProfile", async () => {

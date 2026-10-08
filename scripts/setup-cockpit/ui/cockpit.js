@@ -678,7 +678,7 @@ function renderMode(el) {
     el.querySelector("#mode-hint").textContent =
       mode === "selfhost"
         ? "→ Doplníš infra/topology inputy (krok „Deploy config“) a spustíš cold-start. Krok „Cloud“ přeskoč."
-        : "→ Přeskoč „Deploy config“. V kroku „Cloud“ se přihlásíš a napojíš editor na ask.aisha.guru (PAT). Žádnou infrastrukturu nehostíš.";
+        : "→ Přeskoč „Deploy config“. V kroku „Cloud“ se přihlásíš ke své AISHA (výchozí lokální http://localhost:3001) a napojíš editor přes PAT.";
   };
   el.innerHTML = `
     <h2>Jak chceš AISHA používat?</h2>
@@ -687,11 +687,11 @@ function renderMode(el) {
       <div class="card card-selectable" data-mode="selfhost">
         <h3>🏠 Vlastní instance (self-host)</h3>
         <p>Rozjedeš CELÝ stack na svém Coolify — vlastní domény, data, uživatelé. Fork.</p>
-        <p style="font-size:12px">Dodáš: Coolify/Forgejo creds, 3 TLD, admin e-mail, profil. Zbytek se generuje/derivuje.</p>
+        <p style="font-size:12px">Dodáš: Coolify creds (+ GitHub token pro git operace), 3 TLD, admin e-mail, profil. Zbytek se generuje/derivuje.</p>
       </div>
       <div class="card card-selectable" data-mode="central">
-        <h3>🔌 Napojení na centrální AISHA</h3>
-        <p>Doplněk (Dirigent) řídí TVŮJ projekt proti hostované AISHA (<code>ask.aisha.guru</code>). Nic nehostuješ.</p>
+        <h3>🔌 Napojení na existující AISHA</h3>
+        <p>Doplněk (Dirigent) řídí TVŮJ projekt proti AISHA, která už běží — lokální stack (<code>http://localhost:3001</code>) nebo tvoje nasazená instance.</p>
         <p style="font-size:12px">Dodáš: jen přihlášení → PAT pro tvou story. Editor napojíš přes base-URL + token.</p>
       </div>
     </div>

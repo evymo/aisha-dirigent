@@ -160,12 +160,12 @@
         "aisha.dirigent.cloudTLD": {
           "type": "string",
           "default": "",
-          "description": "Public top-level domain for your AISHA deployment (e.g. aisha.guru). Used to derive companion service URLs from the API URL."
+          "description": "Public top-level domain for your AISHA deployment (e.g. example.com). Used to derive companion service URLs from the API URL."
         },
         "aisha.dirigent.internalTLD": {
           "type": "string",
           "default": "",
-          "description": "Internal top-level domain for your AISHA deployment (e.g. id3a.cz). Used to identify internal-tier service URLs."
+          "description": "Internal top-level domain for your AISHA deployment (e.g. internal.example.com). Used to identify internal-tier service URLs."
         },
         "aisha.dirigent.anonKey": {
           "type": "string",

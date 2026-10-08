@@ -5,7 +5,7 @@
   "dataFolderName": ".aisha-workbench",
   "quality": "stable",
   "urlProtocol": "aisha-workbench",
-  "reportIssueUrl": "${FORGEJO_BASE_URL}/aisha/aisha-workbench/issues",
+  "reportIssueUrl": "${RELEASE_REPO}/issues",
   "licenseUrl": "${FORGEJO_BASE_URL}/aisha/aisha-workbench/src/branch/main/LICENSE",
   "serverLicense": [],
   "serverLicensePrompt": "",
@@ -28,8 +28,7 @@
   "extensionEnabledApiProposals": {},
   "linkProtectionTrustedDomains": [
     "https://*.${INTERNAL_TLD}",
-    "https://*.${PUBLIC_TLD}",
-    "https://*.evymo.com"
+    "https://*.${PUBLIC_TLD}"
   ],
   "builtInExtensions": [],
   "crashReporter": {
@@ -37,9 +36,9 @@
   },
   "enableTelemetry": false,
   "sendASmile": {
-    "reportIssueUrl": "${FORGEJO_BASE_URL}/aisha/aisha-workbench/issues"
+    "reportIssueUrl": "${RELEASE_REPO}/issues"
   },
   "updateUrl": "",
-  "checksumFailMoreInfoUrl": "${FORGEJO_BASE_URL}/aisha/aisha-workbench/wiki/Checksums",
-  "documentationUrl": "https://docs.evymo.com/workbench"
+  "checksumFailMoreInfoUrl": "${RELEASE_REPO}/wiki/Checksums",
+  "documentationUrl": "${RELEASE_REPO}#readme"
 }

@@ -75,6 +75,19 @@ describe("backend.mjs — resolveBackend precedence", () => {
     expect(resolveBackend(root).mcpUrl).toBe("https://mcp.example/x");
   });
 
+  test(".mcp.json ${VAR:-default} placeholder resolves like Claude Code does", async () => {
+    const { resolveBackend } = await importBackend();
+    const url = "${AISHA_MCP_URL:-http://localhost:3001/functions/v1/mcp-knowledge-server}";
+    const root = workspace({ ".mcp.json": { mcpServers: { "aisha-knowledge": { url } } } });
+    expect(resolveBackend(root).mcpUrl).toBe("http://localhost:3001/functions/v1/mcp-knowledge-server");
+    process.env.AISHA_MCP_URL = "https://api.example.com/functions/v1/mcp-knowledge-server";
+    try {
+      expect(resolveBackend(root).mcpUrl).toBe("https://api.example.com/functions/v1/mcp-knowledge-server");
+    } finally {
+      delete process.env.AISHA_MCP_URL;
+    }
+  });
+
   test("local activeProfile keys the TEMPLATE profile too (aishaUrl from template)", async () => {
     const { resolveBackend } = await importBackend();
     // Developer selects "aisha" locally without duplicating the shared URL;

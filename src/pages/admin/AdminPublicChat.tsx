@@ -453,7 +453,7 @@ export default function AdminPublicChat() {
                           webhook_url: e.target.value,
                         })
                       }
-                      placeholder="https://n8n.aisha.guru/webhook/public-chat"
+                      placeholder="http://localhost:5678/webhook/public-chat"
                     />
                     <p className="text-xs text-muted-foreground">
                       {t("publicChat.fields.webhookUrlHelp")}
