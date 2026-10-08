@@ -222,7 +222,7 @@ services:
     container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-grafana
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
-      LANGFUSE_PUBLIC_URL: ${LANGFUSE_PUBLIC_URL:-http://localhost:3100}
+      LANGFUSE_PUBLIC_URL: ${LANGFUSE_PUBLIC_URL:-}
       GF_SECURITY_ALLOW_EMBEDDING: "true"
       GF_AUTH_PROXY_ENABLED: "true"
       GF_AUTH_PROXY_HEADER_NAME: X-Forwarded-User
