@@ -4,7 +4,7 @@ import path from "path";
 import { spustiSePriGovernance, ulohyNasazujiciDbZmeny, zavisiNaGovernance } from "./lib/nasazeni-db-zmen";
 
 const ROOT = path.resolve(__dirname, "../../..");
-const CI_YML = path.join(ROOT, ".forgejo/workflows/ci.yml");
+const CI_YML = path.join(ROOT, ".github/workflows/ci.yml");
 const DOC_OPERATOR = path.join(ROOT, "docs/operations/OPERATOR_HANDBOOK.md");
 const DOC_RELEASE_EVIDENCE = path.join(ROOT, "docs/operations/RELEASE_EVIDENCE_CHECKLIST.md");
 const DOC_GOVERNANCE = path.join(ROOT, "docs/governance/GOVERNANCE_INDEX.md");

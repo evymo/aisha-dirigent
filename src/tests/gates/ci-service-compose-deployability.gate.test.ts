@@ -52,8 +52,8 @@ const ROOT = process.cwd();
 // every CI workflow that builds/scans service images, so collect the matrix
 // union across BOTH files.
 const CI_WORKFLOWS = [
-  join(ROOT, ".forgejo/workflows/ci.yml"),
-  join(ROOT, ".forgejo/workflows/supply-chain.yml"),
+  join(ROOT, ".github/workflows/ci.yml"),
+  join(ROOT, ".github/workflows/supply-chain.yml"),
 ];
 const BASELINE = join(ROOT, "src/tests/gates/ci-service-compose-deployability.baseline.json");
 

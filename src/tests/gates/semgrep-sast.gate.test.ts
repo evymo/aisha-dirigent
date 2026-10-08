@@ -23,10 +23,10 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const ROOT = process.cwd();
-// CI/CD runs on Forgejo (self-hosted); the GitHub mirror is cost-only. The SAST
-// workflow was relocated from .github/ to .forgejo/ (2026-05-30) — content
-// unchanged, so every integrity assertion below still enforces the full ruleset.
-const SEMGREP_WORKFLOW = resolve(ROOT, '.forgejo/workflows/ci.yml');
+// CI/CD runs on GitHub Actions (.github/workflows/). The SAST job lives in
+// ci.yml (folded in 2026-05-30, content unchanged), so every integrity
+// assertion below still enforces the full ruleset.
+const SEMGREP_WORKFLOW = resolve(ROOT, '.github/workflows/ci.yml');
 const SEMGREP_RULES = resolve(ROOT, '.semgrep/aisha-rules.yml');
 
 const REQUIRED_REGISTRY_RULES = [
@@ -64,7 +64,7 @@ describe('Semgrep SAST integrity gate', () => {
     const content = readFileSync(SEMGREP_WORKFLOW, 'utf8');
     // Match the pinned Semgrep image wherever it is referenced — as a job
     // `container: image:` OR on a `docker run semgrep/semgrep:<ver>` line
-    // (the latter is required on Forgejo, whose act_runner can't run JS
+    // (the latter form exists for container-based runners that can't run JS
     // actions inside a job container). Spec unchanged: a pinned semgrep/semgrep
     // image must be used, and `:latest` is rejected below.
     const imageMatch = content.match(/semgrep\/semgrep:([^\s"'\\]+)/);

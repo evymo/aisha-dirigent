@@ -1,21 +1,22 @@
 # =============================================================================
-# Supply-chain heavy lane — AISHA Platform (Forgejo Actions)
+# Supply-chain heavy lane — AISHA Platform (GitHub Actions)
 # =============================================================================
 # SYSTEMIC SPLIT (2026-07-14): the docker/matrix-heavy supply-chain scanners
 # (npm-audit root+services, SBOM ~35-target matrix, Trivy ~24-target matrix)
-# were extracted from ci.yml so the shared soren runner is NEVER loaded with
-# them at peak (push/PR = fast lane). This lane runs the FULL load nightly
-# (off-peak cron) + on demand via workflow_dispatch. Semgrep stays in ci.yml
-# on push/PR by design (SEC-02: diff-aware, pip-based, no docker — light).
+# were extracted from ci.yml so the push/PR fast lane never carries them. This
+# lane runs the FULL load nightly (off-peak cron) + on demand via
+# workflow_dispatch. Semgrep stays in ci.yml on push/PR by design (SEC-02:
+# diff-aware, pip-based, no docker — light).
 #
-# WHO RUNS IT (2026-07-25): the runner on soren is registered instance-wide and
-# serves 14 repositories across two orgs at capacity 2. Every repo that adopts
-# this platform inherits this file, so a plain nightly cron meant N repositories
-# firing the same ~60-job matrix into 2 slots at the same minute. Running the
-# matrix unattended is therefore a per-repository PARAMETER — the repo variable
-# HEAVY_LANE_NIGHTLY — resolved by the `lane-gate` job below. This file names no
-# repository and grants no repository a default: unset ⇒ stand down, loudly.
-# workflow_dispatch always runs, everywhere, with no configuration.
+# WHO RUNS IT (2026-07-25): every repository that adopts this platform inherits
+# this file, and a shared runner (measured: one runner serving 14 repositories
+# at capacity 2) meant N repositories firing the same ~60-job matrix into 2
+# slots at the same minute. Hosted runners bill the same minutes N times over.
+# Running the matrix unattended is therefore a per-repository PARAMETER — the
+# repo variable HEAVY_LANE_NIGHTLY — resolved by the `lane-gate` job below.
+# This file names no repository and grants no repository a default: unset ⇒
+# stand down, loudly. workflow_dispatch always runs, everywhere, with no
+# configuration.
 #
 # Gates parsing this file: sbom-coverage.gate.test.ts (sbom + sbom-python jobs,
 # cyclonedx), wp-3-8-supply-chain.gate.test.ts (trivy-scan job + severity/
@@ -35,9 +36,9 @@ on:
   schedule:
     # STAGGERED SLOTS (2026-07-25). Every repository that adopts this platform
     # inherits this file verbatim, so a SINGLE cron made every derivative fire
-    # its ~60-job matrix in the same minute onto the one shared runner
-    # (soren, capacity 2). Measured in the runner log: a sibling repo
-    # started at 01:17:40 UTC — our own cron, inherited.
+    # its ~60-job matrix in the same minute onto one shared runner (capacity 2).
+    # Measured in the runner log: a sibling repo started at 01:17:40 UTC — our
+    # own cron, inherited.
     #
     # Four off-peak slots, 01:17–04:17 UTC ≈ 03:17–06:17 Europe/Prague. The
     # `lane-gate` job picks ONE slot per repository, derived from the repo name,
@@ -53,6 +54,10 @@ on:
     - cron: "17 4 * * *"
   workflow_dispatch: {}
 
+# Nejmenší oprávnění; trivy-scan si přidá security-events: write (SARIF).
+permissions:
+  contents: read
+
 concurrency:
   # Own group (not aisha-ci-serialized): the nightly heavy lane must queue
   # against itself, and at 03:17 there is no fast-lane contention to manage.
@@ -62,9 +67,9 @@ concurrency:
 env:
   NODE_VERSION: "22"
   N8N_NODE_VERSION: "22"
-  VERDACCIO_URL: ${{ vars.VERDACCIO_URL }}
-  # Pull-through cache pro obrazy z Docker Hubu (prefix, končí `/`); ověřuje
-  # scripts/ci/registry-proxy-guard.sh. Stejný vstup a důvod jako v ci.yml.
+  # Pull-through cache pro obrazy z Docker Hubu (prefix, končí `/`) — VOLITELNÁ,
+  # prázdná = stahuje se přímo; tvar ověřuje scripts/ci/registry-proxy-guard.sh.
+  # Stejný vstup a důvod jako v ci.yml.
   REGISTRY_PROXY: ${{ vars.REGISTRY_PROXY }}
   # WHICH hour this repository runs in: the UTC hours of the cron slots declared
   # above, in order. Keep the two lists in sync — supply-chain-lane-gate.gate.test.ts
@@ -192,10 +197,10 @@ jobs:
       - name: Install
         run: npm ci
       - name: Audit (fail on high/critical)
-        # --registry: Verdaccio has no /-/npm/v1/security/audits endpoint (404 →
-        # the audit evaluated nothing). Advisory queries go to the public registry;
-        # package INSTALLS still resolve via .npmrc/Verdaccio. Replace with the
-        # self-hosted advisory DB when it lands (osv-scan below is the primary gate).
+        # --registry pinned to the public registry: the advisory endpoint must be
+        # the public one even if a developer's npmrc points elsewhere (a private
+        # proxy may have no /-/npm/v1/security/audits → the audit evaluates
+        # nothing). osv-scan below is the primary gate.
         run: npm audit --audit-level=high --registry=https://registry.npmjs.org
 
   # ADVISORY (continue-on-error: true) as of 2026-05-30. Most service HIGH
@@ -258,19 +263,18 @@ jobs:
       - name: Install in service dir
         run: |
           cd "services/${SERVICE_NAME}"
-          # SYSTEMIC FIX: a service-dir `npm install` does NOT inherit the
-          # monorepo-root .npmrc, so @aisha/* would 404 (install fails before
-          # audit even runs). Re-declare the private scope here — the proven
-          # svc-*/Dockerfile pattern. The committed root .npmrc carries the
-          # Verdaccio scope + token (via VERDACCIO_URL/VERDACCIO_TOKEN); left in place for the audit step.
+          # A service-dir `npm install` does NOT inherit the monorepo-root .npmrc;
+          # copy it so the service resolves exactly like the workspace (default
+          # registry). @aisha/* deps that only exist as workspaces may fail to
+          # resolve here — that is tolerated (advisory job, see header).
           cp "${GITHUB_WORKSPACE}/.npmrc" .npmrc 2>/dev/null || true
           npm install --no-audit --no-fund || echo "::warning::install failed for ${SERVICE_NAME} (advisory)"
       - name: Audit (advisory — see job comment)
         run: |
           cd "services/${SERVICE_NAME}"
-          # ADVISORY: tolerate non-zero so the job CONCLUDES success. On
-          # Forgejo a job-level `continue-on-error` does NOT suppress the
-          # per-job commit-status check, so we gate at the step instead.
+          # ADVISORY: tolerate non-zero so the job CONCLUDES success (tolerance
+          # at the STEP, so the job's own check stays green rather than relying
+          # on job-level `continue-on-error`, which still reports a failed job).
           # Findings still print in the log for review.
           # FLIP TO GATING: drop the `|| { ...; }` wrapper below.
           npm audit --audit-level=high --registry=https://registry.npmjs.org || {
@@ -294,11 +298,14 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install osv-scanner (pinned release binary)
         run: |
+          # Do RUNNER_TEMP, ne /usr/local/bin: hostovaný runner neběží jako root.
           OSV_VERSION=v2.4.0
-          curl -sSL -o /usr/local/bin/osv-scanner \
+          mkdir -p "$RUNNER_TEMP/bin"
+          curl -sSL -o "$RUNNER_TEMP/bin/osv-scanner" \
             "https://github.com/google/osv-scanner/releases/download/${OSV_VERSION}/osv-scanner_linux_amd64"
-          chmod +x /usr/local/bin/osv-scanner
-          osv-scanner --version
+          chmod +x "$RUNNER_TEMP/bin/osv-scanner"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/osv-scanner" --version
       - name: Scan all lockfiles (recursive)
         run: |
           osv-scanner scan --recursive --format table . 2>&1 | tail -80
@@ -311,10 +318,9 @@ jobs:
     # RE-ENABLED 2026-07-14: the ELSPROBLEMS failure is fixed by cyclonedx-npm
     # --package-lock-only (Generate step below) — it builds the SBOM straight from
     # package-lock.json and never shells to `npm ls`, so no installed node_modules
-    # are needed. Runs on auto PUSH (post-merge deployable-image evidence for
-    # supply-chain forensics + EU AI Act) and on-demand; NOT on every PR, because
-    # the ~35-target matrix on the shared (cap~1) soren runner would serialize into
-    # a long tail per PR. Matrix alignment with container-signing is enforced by
+    # are needed. Runs nightly + on demand (deployable-image evidence for
+    # supply-chain forensics + EU AI Act); NOT on every PR, because the ~35-target
+    # matrix would turn every PR into a long tail. Matrix alignment with container-signing is enforced by
     # sbom-coverage.gate.test.ts.
     # runs on every trigger of this workflow (nightly schedule + manual dispatch)
     strategy:
@@ -389,8 +395,8 @@ jobs:
           WORKDIR_PATH: ${{ steps.workdir.outputs.path }}
         run: |
           cd "${WORKDIR_PATH}"
-          # SYSTEMIC FIX: service-dir installs don't inherit the root .npmrc →
-          # @aisha/* 404. Copy the scoped root .npmrc (no-op for root target).
+          # Service-dir installs don't inherit the root .npmrc — copy it so the
+          # lockfile resolves like the workspace (no-op for root target).
           [ "${WORKDIR_PATH}" = "." ] || cp "${GITHUB_WORKSPACE}/.npmrc" .npmrc 2>/dev/null || true
           # cyclonedx-npm builds the SBOM from package-lock.json — it does NOT
           # need node_modules. Float services (lockfile deleted to let overrides
@@ -426,8 +432,8 @@ jobs:
             --spec-version 1.5
       - name: Upload SBOM artifact (90d expiry)
         # Tolerant: the SBOM is already GENERATED by the step above (the real
-        # deliverable). Artifact upload is retention only, and Forgejo's
-        # act_runner artifact backend may not implement the upload-artifact@v4
+        # deliverable). Artifact upload is retention only, and a self-hosted
+        # runner's artifact backend may not implement the upload-artifact@v4
         # API — don't fail the SBOM job over a retention hiccup.
         continue-on-error: true
         uses: actions/upload-artifact@v4
@@ -440,7 +446,7 @@ jobs:
       # Artifacts expire in 90 days, insufficient for supply-chain forensics +
       # EU AI Act compliance. MinIO bucket `aisha-sbom-artifacts` provides
       # unbounded content-addressable storage indexed by service + commit SHA.
-      # Skips gracefully when AISHA_MINIO_S3_PUBLIC_ENDPOINT is unset.
+      # OPT-IN: skips gracefully when AISHA_MINIO_S3_PUBLIC_ENDPOINT is unset.
       - name: Mirror SBOM to MinIO
         if: ${{ env.MINIO_PUBLIC_ENDPOINT != '' }}
         # Tolerant: unbounded archival is best-effort. If MinIO is unreachable
@@ -515,16 +521,18 @@ jobs:
       - name: Install syft (pinned release binary)
         run: |
           # anchore/syft — pinned; the installer writes the single static binary
-          # to /usr/local/bin (act runner is root, no sudo needed).
+          # to RUNNER_TEMP/bin (user-writable on every runner shape).
           SYFT_VERSION=v1.18.1
+          mkdir -p "$RUNNER_TEMP/bin"
           curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
-            | sh -s -- -b /usr/local/bin "${SYFT_VERSION}"
-          syft version
-      - name: Install docker CLI (DinD socket mounted by the runner)
+            | sh -s -- -b "$RUNNER_TEMP/bin" "${SYFT_VERSION}"
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/syft" version
+      - name: Install docker CLI (if the runner image lacks it)
         run: |
-          # Same recipe as ci.yml's cold-start build job: the runner image binds
-          # the DinD socket but ships no `docker` binary. Idempotent — a baked
-          # docker-capable job image short-circuits.
+          # Same recipe as ci.yml's cold-start build job: a container-based runner
+          # image may bind the Docker socket but ship no `docker` binary.
+          # Idempotent — GitHub-hosted runners (Docker preinstalled) short-circuit.
           if command -v docker >/dev/null 2>&1; then docker --version; exit 0; fi
           if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
           $SUDO apt-get update
@@ -536,16 +544,16 @@ jobs:
           $SUDO apt-get update
           $SUDO apt-get install -y --no-install-recommends docker-ce-cli
           docker --version
-      - name: Detect DinD availability
+      - name: Detect Docker availability
         id: dind
         run: |
           # Honest fail (NOT skip-to-green): this lane builds the image then syfts
-          # it, so it CANNOT run without a docker daemon. DinD is guaranteed by
-          # the soren build runner (same contract as the cold-start build gate).
+          # it, so it CANNOT run without a docker daemon (same contract as the
+          # cold-start build gate).
           if command -v docker >/dev/null 2>&1 && timeout 30 docker info >/dev/null 2>&1; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::error title=sbom-python::DinD daemon UNREACHABLE — the Python SBOM lane builds the image then runs syft over it and MUST NOT skip-to-green. Restart the build runner DinD daemon."
+            echo "::error title=sbom-python::Docker daemon UNREACHABLE — the Python SBOM lane builds the image then runs syft over it and MUST NOT skip-to-green. Fix the runner's Docker daemon."
             exit 1
           fi
       - name: Resolve Dockerfile path
@@ -559,7 +567,7 @@ jobs:
         run: |
           # context = repo root (Coolify ARG_MAX pattern — the root Dockerfiles
           # COPY packages/<name>/...). Tag is local/CI-only (syft reads it off the
-          # DinD daemon; never pushed).
+          # local daemon; never pushed).
           bash scripts/ci/registry-proxy-guard.sh
           docker build --build-arg REGISTRY_PROXY="$REGISTRY_PROXY" \
             -f "${DOCKERFILE_PATH}" -t "aisha-sbom/${TARGET_NAME}:ci" .
@@ -572,8 +580,8 @@ jobs:
             --output "cyclonedx-json=sbom-${TARGET_NAME}.cdx.json"
       - name: Upload SBOM artifact (90d expiry)
         # Tolerant: the SBOM is already generated above (the real deliverable);
-        # artifact upload is retention only, and Forgejo's act_runner artifact
-        # backend may not implement upload-artifact@v4. Mirrors the npm job.
+        # artifact upload is retention only (a self-hosted runner's artifact
+        # backend may not implement upload-artifact@v4). Mirrors the npm job.
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
@@ -618,29 +626,25 @@ jobs:
   # current base-image CVE baseline, so a hard gate would block every PR on
   # pre-existing image CVEs unrelated to the change. The scan still RUNS and
   # the table/SARIF artifact is produced + reviewable. Tolerance is applied at
-  # the STEP level (step `continue-on-error: true` below) because a job-level
-  # `continue-on-error` does NOT suppress Forgejo's per-job commit status.
+  # the STEP level (the `|| echo` below) so the job's own check stays green.
   # FLIP BACK TO GATING: once `.trivyignore` captures the accepted baseline
-  # (each entry justified + dated), delete the step `continue-on-error: true`
-  # — exit-code: 1 then fails the build on any unlisted CRITICAL/HIGH CVE.
-  # NOTE: SARIF upload to a Security tab is GitHub-only — on Forgejo we emit a
-  # table + artifact and rely on exit-code for gating (severity policy intact).
+  # (each entry justified + dated), drop the trailing `|| echo` — exit-code: 1
+  # then fails the build on any unlisted CRITICAL/HIGH CVE.
+  # SARIF goes to the GitHub Security tab (code scanning) AND stays a 90-day
+  # artifact for forensics; the exit-code severity policy is unchanged.
   trivy-scan:
     name: Trivy CVE scan
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: [lane-gate]
     if: needs.lane-gate.outputs.run == 'true'
-    # DISABLED (skipped, NOT hollow-green) pending DinD runner support.
-    # Same root cause as the semgrep job: jobs run in node:20-bookworm with NO
-    # docker CLI, so `docker run aquasec/trivy` fails "docker: command not
-    # found" and the `|| echo` would falsely green it without scanning. Honest
-    # ON-DEMAND ONLY (workflow_dispatch + run_supply_chain=yes). Deferred from
-    # auto push/PR; needs docker the runner exposes only via DinD (follow-up) —
-    # an on-demand run still requires a docker-capable runner.
-    # runs on every trigger of this workflow (nightly schedule + manual dispatch)
+    # Needs a docker-capable runner (`docker run aquasec/trivy`); GitHub-hosted
+    # runners have it. runs on every trigger of this workflow (nightly schedule
+    # + manual dispatch).
     permissions:
       contents: read
+      security-events: write   # upload SARIF to code scanning
+      actions: read            # upload-sarif reads the run (private repos)
     strategy:
       fail-fast: false
       matrix:
@@ -678,12 +682,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run Trivy filesystem scan (CRITICAL + HIGH severities)
-        # Run trivy via `docker run` (docker-hub image — the runner pulls those
-        # fine, as semgrep/minio prove) instead of the aquasecurity/trivy-action.
-        # The act_runner DOES reach github to clone the action, but then can't
-        # resolve its git tag (`0.24.0^{commit}` unknown) — a bare-clone/tag
-        # quirk. The action only wraps this same docker invocation anyway, so
-        # invoking trivy directly removes the failure mode.
+        # Run trivy via `docker run` (Docker Hub image, optional pull-through
+        # cache) instead of the aquasecurity/trivy-action: the action only wraps
+        # this same docker invocation, and calling it directly keeps the step
+        # runnable on any docker-capable runner (a container-based runner could
+        # not resolve the action's git tag — a bare-clone/tag quirk).
         # CRITICAL,HIGH + exit-code 1 + .trivyignore allowlist preserved.
         # ADVISORY (|| echo): keep the job green while findings still print;
         # FLIP TO GATING by dropping the trailing `|| echo`.
@@ -701,12 +704,22 @@ jobs:
               "services/${TARGET_NAME}" \
           || echo "::warning::trivy CRITICAL/HIGH or scan/registry issue for ${TARGET_NAME} (advisory)"
 
-      # Forgejo has no GitHub Security tab — preserve the SARIF as a CI artifact
-      # for supply-chain forensics (the Security-tab-equivalent on self-hosted).
+      # SARIF → GitHub Security tab (code scanning), one category per target so
+      # the matrix entries don't overwrite each other. Tolerant: a repository
+      # without code scanning enabled must not fail the scan over the upload.
+      - name: Upload Trivy SARIF to code scanning
+        if: always() && hashFiles(format('trivy-{0}.sarif', matrix.target)) != ''
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-${{ matrix.target }}.sarif
+          category: trivy-${{ matrix.target }}
+
+      # …and the same SARIF as a CI artifact for supply-chain forensics.
       - name: Upload Trivy SARIF artifact
         if: always()
-        # Tolerant: SARIF retention is best-effort; Forgejo's artifact backend
-        # may not implement upload-artifact@v4 (same as the SBOM job).
+        # Tolerant: SARIF retention is best-effort (a self-hosted runner's
+        # artifact backend may not implement upload-artifact@v4).
         continue-on-error: true
         uses: actions/upload-artifact@v4
         with:

@@ -16,7 +16,7 @@ const read = (rel: string) => (existsSync(join(ROOT, rel)) ? readFileSync(join(R
 
 const mintScript = read("scripts/verdaccio-mint-token.mjs");
 const coldStart = read("scripts/aisha-cold-start.sh");
-const publishWf = read(".forgejo/workflows/aisha-packages-publish.yml");
+const publishWf = read(".github/workflows/aisha-packages-publish.yml");
 
 describe("Verdaccio token auto-mint", () => {
   test("the mint script exists", () => {

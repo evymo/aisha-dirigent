@@ -23,7 +23,7 @@ const tryGit = (args) => { try { return git(args); } catch { return null; } };
 
 const baseRef = process.argv[2]
   ?? (tryGit(['rev-parse', '--verify', '--quiet', 'origin/main']) ? 'origin/main'
-    : tryGit(['rev-parse', '--verify', '--quiet', 'forgejo/main']) ? 'forgejo/main'
+    : tryGit(['rev-parse', '--verify', '--quiet', 'upstream/main']) ? 'upstream/main'
       : 'main');
 
 const parseRef = (name) => {

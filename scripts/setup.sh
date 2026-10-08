@@ -200,7 +200,7 @@ fi
 
 # Initialize git submodules (packages/insight is pinned upstream code that
 # insight-patches.gate + insight-usp-integrity.gate require). CI does this
-# via `submodules: recursive` in .forgejo/workflows/ci.yml; local devs
+# via `submodules: recursive` in .github/workflows/ci.yml; local devs
 # need it once after a fresh checkout. Idempotent — git submodule update
 # is a no-op when already initialized.
 if [[ -f .gitmodules ]]; then

@@ -45,7 +45,7 @@ import { join } from "node:path";
 import yaml from "js-yaml";
 
 const ROOT = process.cwd();
-const CI = join(ROOT, ".forgejo/workflows/ci.yml");
+const CI = join(ROOT, ".github/workflows/ci.yml");
 
 type Job = { name?: string; if?: string; needs?: string[] | string };
 const wf = yaml.load(readFileSync(CI, "utf8")) as { jobs: Record<string, Job> };
@@ -78,7 +78,7 @@ const VYPINANE = new Set(
 // `needs.*.result`, `needs.detect.outputs.*`, `github.*`. Nic víc — parser,
 // který by uměl víc, by musel víc i hádat.
 // ---------------------------------------------------------------------------
-import { vyhodnotit, type Hodnota } from "./lib/ci-vyraz";
+import { SVET_S_INSTANCI, vyhodnotit, type Hodnota } from "./lib/ci-vyraz";
 
 /** Které výstupy detectu daný job používá jako DŮVOD, proč nasadit. */
 function duvody(vyraz: string): string[] {
@@ -154,8 +154,9 @@ if (VSECHNY_APPKY.length === 0) {
  * podmínek, ve světě daném jedním důvodem změny. Odpověď „spustí se deploy?"
  * pak stojí na těch samých pravidlech jako skutečný běh.
  */
-function simulovat(duvod: string, guardPlati: boolean): Record<string, string> {
+function simulovat(duvod: string, guardPlati: boolean, instance: Record<string, Hodnota> = SVET_S_INSTANCI): Record<string, string> {
   const svet: Record<string, Hodnota> = {
+    ...instance,
     "github.event_name": "push",
     "github.ref": "refs/heads/main",
     [`needs.detect.outputs.${GUARD}`]: guardPlati ? "true" : "false",
@@ -246,6 +247,26 @@ describe("brána: nasazení se nesmí přeskočit kvůli úspoře měření", ()
         "`(needs.detect.outputs.already_verified == 'true' || needs.X.result == 'success')`\n" +
         "a doplnit `always()`, pokud tam není. Výjimku `already_verified` dávej DOVNITŘ\n" +
         "větve o výsledcích testů, nikdy před rozhodnutí o RELEVANCI změny.",
+    ).toEqual([]);
+  });
+
+  /**
+   * OPT-IN je vlastnost, ne pravopis: v repozitáři BEZ deklarované instance
+   * (veřejný klon, fork bez nasazení) se nesmí spustit ŽÁDNÁ deploy/provision
+   * úloha — z žádného důvodu. Měří se týmž simulátorem: kdyby některá úloha
+   * podmínku `vars.APP_NAME_PREFIX` ztratila, tady se rozsvítí.
+   */
+  test("bez deklarované instance (vars.APP_NAME_PREFIX) se nespustí žádné nasazení", () => {
+    const spustene: string[] = [];
+    for (const duvod of [...VSECHNY_DUVODY, "deploy_apps"]) {
+      for (const guard of [true, false]) {
+        const r = simulovat(duvod, guard, { "vars.APP_NAME_PREFIX": "" });
+        for (const [id, j] of deployJobs) if (r[id] !== "skipped") spustene.push(`${id} (${duvod}, guard=${guard}): ${r[id]}`);
+      }
+    }
+    expect(
+      [...new Set(spustene)],
+      "tyhle úlohy by nasazovaly i v repu, které si nasazení nezapnulo:\n  " + [...new Set(spustene)].join("\n  "),
     ).toEqual([]);
   });
 

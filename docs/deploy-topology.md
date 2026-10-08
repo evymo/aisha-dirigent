@@ -25,7 +25,7 @@ Concretely, deploying "the core" does **not** deploy the customer surface:
 
 **Never hardcode the prefix.** `coolify-deploy-init.sh` says why in its own
 comment: a fork that did not set `APP_NAME_PREFIX` would discover and mutate the
-UPSTREAM `aisha-*` apps. Measured 2026-07-29: `.forgejo/workflows/ci.yml` had
+UPSTREAM `aisha-*` apps. Measured 2026-07-29: `.github/workflows/ci.yml` had
 `aisha-core` hardcoded, so this fork's pipeline deployed another instance's stack
 and never once deployed its own.
 
@@ -70,7 +70,7 @@ Registering a stack means all of these, in one change:
 | `coolify/manifests/aisha.manifest` | `app:` line (WAVES parity gate) |
 | `scripts/lib/derive-domains.mjs` | public face, guarded |
 | `docker-compose.coolify-prebuilt.yml` | edge route |
-| `.forgejo/workflows/ci.yml` | a Deploy job |
+| `.github/workflows/ci.yml` | a Deploy job |
 
 Two gates enforce parts of this and both caught a real omission while this was
 being written: `redeploy-wave-coverage` (WAVES ↔ manifest parity) and

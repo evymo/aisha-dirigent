@@ -33,11 +33,11 @@ Guide through the deployment process with pre-flight validation.
 5. **Deployment**:
    - Report pre-flight results
    - If all pass, confirm with user before `git push`
-   - CI/CD pipeline (Forgejo Actions) triggers automatically on push to main
+   - CI/CD pipeline (GitHub Actions) triggers automatically on push to main
    - Coolify deploys via webhook
 
 6. **Post-deploy**: Remind to check:
-   - CI pipeline status (Forgejo Actions)
+   - CI pipeline status (GitHub Actions)
    - Production health after deploy
 
 7. **Story status update** (if `.aisha/story.json` has an active story):

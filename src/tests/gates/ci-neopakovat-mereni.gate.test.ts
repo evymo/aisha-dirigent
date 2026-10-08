@@ -30,7 +30,7 @@ import { join } from "node:path";
 import yaml from "js-yaml";
 
 const ROOT = process.cwd();
-const CI = join(ROOT, ".forgejo/workflows/ci.yml");
+const CI = join(ROOT, ".github/workflows/ci.yml");
 
 type Step = { name?: string; run?: string; id?: string };
 type Job = { name?: string; if?: string; needs?: string[] | string; steps?: Step[] };
@@ -86,8 +86,12 @@ describe("Neopakovat měření, které už proběhlo (gate)", () => {
     // vznikl až sloučením s posunutým mainem.
     expect(run, "musí porovnávat strom HEAD se stromem druhého rodiče").toContain("HEAD^2");
     expect(run, "musí porovnávat STROMY, ne SHA commitů").toContain("^{tree}");
-    // A samotná rovnost nestačí: ten běh musel být zelený.
-    expect(run, "musí číst stav běhu hlavy PR").toContain("/status");
+    // A samotná rovnost nestačí: ten běh musel být zelený. Na GitHubu nesou
+    // výsledky úloh check runy (commit status by bez statusů vrátil věčné
+    // `pending`) — a „zelený" znamená verdikt PR, jedinou úlohu, která vidí na
+    // všechny ostatní (main-visi-na-jedne-kontrole).
+    expect(run, "musí číst check runy hlavy PR").toContain("/check-runs");
+    expect(run, "musí se ptát na verdikt PR, ne na libovolnou kontrolu").toMatch(/check_name=PR:%20verdikt/);
     expect(run, "zelená je jediný stav, který opravňuje přeskočit").toContain("success");
     // Fail-closed: výchozí hodnota je false, přeskakuje se jen po důkazu.
     expect(run, "výchozí hodnota musí být false — bez důkazu se měří").toMatch(/V=false/);

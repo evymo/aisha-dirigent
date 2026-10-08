@@ -16,10 +16,12 @@ Consequences:
 - `git log` on GitHub shows the previews only. The upstream commit each preview was cut from is
   recorded in the commit message.
 - There are no branches other than `main` on GitHub.
-- **Nothing runs on GitHub** (owner's decision, 2026-10-03): the snapshot carries no
-  `.github/workflows/` and no Dependabot configuration, and Actions are disabled on the repository.
-  CI, deployment and dependency updates live upstream (`.forgejo/workflows/`,
-  `scripts/aisha-deps-update.mjs`).
+- **CI runs on GitHub** (owner's decision, 2026-10-08, superseding the 2026-10-03 "nothing runs on
+  GitHub"): the snapshot carries `.github/workflows/` — GitHub Actions on GitHub-hosted runners, with
+  no private runner, registry or forge. Instance-specific lanes (deploys, kiosk/mobile publishing,
+  package publishing, the scheduled dependency sweep) are opt-in through repository variables and
+  are skipped otherwise. The exclude list must therefore NOT drop `.github/workflows/`; Dependabot
+  configuration stays excluded (`scripts/aisha-deps-update.mjs` is the updater).
 - Replacing `main` is a forced push by design — and **a forced push does not remove history from a
   repository that already had some**. See the next section before making any repository public.
 
@@ -169,14 +171,16 @@ The repository is private until the owner flips it. Before flipping:
 - make sure it is a repository **without pull-request refs** (section above) — the one that existed
   until 2026-10-03 is not;
 - enable branch protection on `main` (force pushes only by the release identity);
-- keep Actions disabled — nothing runs on GitHub, the full CI runs upstream;
+- enable Actions — the CI (`.github/workflows/`) runs on GitHub-hosted runners; leave the instance
+  variables (`APP_NAME_PREFIX`, `VERDACCIO_URL`, `KIOSK_REGISTRY_REPO`, …) unset unless the repository
+  should deploy or publish;
 - confirm the licence texts (`LICENSE`, `NOTICE`, `CLA.md`) against the official ELv2 source.
 
 ## Known limitations carried into the preview
 
 | Item | State | Where tracked |
 |------|-------|---------------|
-| Four gates read `.github/workflows/*` and `.github/dependabot.yml`, which the snapshot does not carry | red in a public clone (`ci-deploy-honesty`, `no-hardcoded-coolify-uuids`, `owasp-orchestrator-adoption`, `sbom-coverage`); green upstream | this document |
+| Gates that read `.github/workflows/*` and `.github/dependabot.yml` | previews up to 6 did not carry them, so those gates skipped (with the reason in the test name) in a public clone; once the exclude list no longer drops `.github/workflows/`, only the Dependabot checks skip | this document |
 | Package metadata, plugin manifests and install instructions still name the previous mirror `evymo/aisha-dirigent` | links break once that repository is deleted | rename tracked as a follow-up (generated manifests + package versions) |
 | Extranet SDK (`@aisha/extranet-sdk-*`) not public | carries instance brands; installs from the maintainers' npm mirror | section "Repositories outside this one" |
 | Lockfiles resolve through the maintainers' npm mirror | anonymous read works; public lockfiles move to `registry.npmjs.org` upstream | B7, branch `fix/b7-instalace-bez-nasi-infra` |

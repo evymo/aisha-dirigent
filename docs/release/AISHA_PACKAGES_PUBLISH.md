@@ -26,7 +26,7 @@ with no manual `npm publish` step to forget.
 push to main (paths: packages/**)
                 │
                 ▼
-.forgejo/workflows/aisha-packages-publish.yml
+.github/workflows/aisha-packages-publish.yml   (opt-in: vars.VERDACCIO_URL)
                 │
                 ▼
 scripts/aisha-packages-publish.mjs
@@ -34,11 +34,11 @@ scripts/aisha-packages-publish.mjs
                 ├─ walks packages/*/package.json
                 ├─ picks publishable: private:false + publishConfig + build
                 ├─ for each:
-                │   ├─ GET https://npm.id3a.cz/<name> → registered version
+                │   ├─ GET https://npm.example.com/<name> → registered version
                 │   ├─ if workspace > registered → npm run build + npm publish
                 │   └─ else → skip (idempotent, no-op)
                 ▼
-        Verdaccio (npm.id3a.cz) updated
+        Verdaccio (npm.example.com) updated
                 │
                 ▼
         log_integration_action audit row
@@ -86,18 +86,27 @@ modifying `packages/X/package.json` version" — that's an open follow-up
 (see `feedback_aisha_capability_applied_not_new`: Aisha can wire this in
 once we settle on the convention).
 
-## Required secrets
+## Repository configuration (opt-in)
 
-| Secret | Where set | What it does |
+Publishing is OPT-IN: nothing in the platform build needs a private registry
+(`@aisha/*` are npm workspaces built from source). The workflow's `publish` job
+runs only in a repository that sets the variable `VERDACCIO_URL`; forks do not
+inherit repository variables, so a fork never writes into someone else's
+registry. Set them in **Settings → Secrets and variables → Actions**:
+
+| Name | Kind | What it does |
 |---|---|---|
-| `VERDACCIO_TOKEN` | Forgejo repo secrets | JWT with publish scope for `@aisha/*` on `npm.id3a.cz` |
-| `AISHA_GATEWAY_URL` | Forgejo repo secrets (optional) | Used for the audit-log step at end of workflow |
-| `POSTGREST_SERVICE_TOKEN` | Forgejo repo secrets (optional) | Same |
+| `VERDACCIO_URL` | variable | Registry URL — the opt-in switch |
+| `VERDACCIO_USER` + `VERDACCIO_PASSWORD` | secrets (preferred) | Mint a fresh publish token per run (no 30-day expiry drift) |
+| `VERDACCIO_TOKEN` | secret (fallback) | Static token with publish scope for `@aisha/*` |
+| `AISHA_GATEWAY_URL` | secret (optional) | Used for the audit-log step at end of workflow |
+| `POSTGREST_SERVICE_TOKEN` | secret (optional) | Same |
 
-Without `VERDACCIO_TOKEN` the workflow exits 1 immediately. The token
-must have publish scope; the runner queries the registry to detect
-already-published versions, so read scope is also required (or the
-workflow will assume "never published" and try to publish 0.0.0 → conflict).
+With `VERDACCIO_URL` set but no credentials the job warns and publishes
+nothing (skipped, not failed). The token must have publish scope; the runner
+queries the registry to detect already-published versions, so read scope is
+also required (or the workflow will assume "never published" and try to
+publish 0.0.0 → conflict).
 
 ## Manual runs
 
@@ -110,14 +119,15 @@ export VERDACCIO_TOKEN=<jwt>
 node scripts/aisha-packages-publish.mjs
 ```
 
-Or via Forgejo UI: **Actions → AISHA Packages Publish → Run workflow** with
-**Dry run** toggle.
+Or via GitHub: **Actions → AISHA Packages Publish → Run workflow** with
+**Dry run** toggle (`gh workflow run aisha-packages-publish.yml -f dry_run=true`).
 
 ## Failure modes & remediation
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Workflow run fails with `VERDACCIO_TOKEN secret is not set` | Secret not added in repo settings | Add `VERDACCIO_TOKEN` in Forgejo repo settings → Secrets |
+| Job `publish` is skipped | `VERDACCIO_URL` variable not set (opt-in) | Set the variable if this repository should publish |
+| Run warns `publish skipped` | Registry set, credentials missing | Add `VERDACCIO_USER`+`VERDACCIO_PASSWORD` (or `VERDACCIO_TOKEN`) in repo settings → Secrets |
 | Workflow runs but says "skipped" for every package | Workspace versions == published versions | If you intended a publish: bump version in the relevant `packages/<name>/package.json` |
 | `registry returned 401` in script output | Token expired or wrong scope | Re-issue the Verdaccio token with `@aisha:*` publish scope |
 | Workflow doesn't trigger after merge | `paths` filter mismatch (changes outside `packages/**`) | Trigger manually via `workflow_dispatch` |
@@ -151,7 +161,8 @@ Document the reason in the commit body when you use the override.
 
 * `src/tests/gates/aisha-packages-publish.gate.test.ts` asserts:
   * runner script exists and contains the documented selection rule
-  * Forgejo workflow exists, triggers on `packages/**`, plumbs `VERDACCIO_TOKEN`
+  * the workflow exists, triggers on `packages/**`, plumbs `VERDACCIO_TOKEN`, and is opt-in
+    (`vars.VERDACCIO_URL`, no repository name pinned)
   * **every `@aisha/X` that services consume via `"*"` is publishable**
   * runner is idempotent (version comparison, not blind republish)
   * runner has `DRY_RUN` escape hatch
@@ -168,7 +179,7 @@ via `"*"` but not publishable (was `private:true` or missing
 
 - **Cross-stack republish** — operator stack instances (the upstream
   Aisha stack, partner tenants, accounting offices) have their own Verdaccio. Right now this
-  workflow targets only `npm.id3a.cz`; per-stack mirrors are manual.
+  workflow targets only `npm.example.com`; per-stack mirrors are manual.
 - **CVE rollback path** — when a security CVE is found in `@aisha/security`,
   the rollback today is "bump packages/security version, merge, wait for
   workflow". A dedicated emergency-publish path bypassing the

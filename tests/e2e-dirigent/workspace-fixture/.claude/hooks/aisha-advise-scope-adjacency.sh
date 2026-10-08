@@ -42,7 +42,7 @@ if printf '%s' "$FILE_PATH" | grep -qiE '(^|/)\.env|secret|credential|\.pem$|\.k
 fi
 
 # 4. Deploy / infra topology.
-if printf '%s' "$FILE_PATH" | grep -qiE 'docker-compose.*\.ya?ml$|(^|/)compose\.ya?ml$|\.forgejo/workflows/|(^|/)coolify|Dockerfile$'; then
+if printf '%s' "$FILE_PATH" | grep -qiE 'docker-compose.*\.ya?ml$|(^|/)compose\.ya?ml$|\.github/workflows/|(^|/)coolify|Dockerfile$'; then
   HITS+=("Deploy / infra topologie — dopad na běžící službu, ne jen na kód.")
 fi
 

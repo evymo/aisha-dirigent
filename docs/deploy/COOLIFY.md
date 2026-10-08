@@ -157,15 +157,16 @@ Fixes (in order):
    - If you paste Compose/YAML content into Coolify UI, it may get inlined into the runner script.
    - Prefer selecting a Compose file path from the repository instead.
 
-## Forgejo Actions (deploy webhook)
+## CI (GitHub Actions)
 
-CI/CD pipeline běží na Forgejo (git.id3a.cz). Deploy se triggeruje přes Coolify webhook.
+CI/CD pipeline běží na GitHub Actions (hostované runnery). Nasazení je opt-in: deploy
+úlohy běží jen v repu s proměnnou `APP_NAME_PREFIX` a nasazují přes Coolify API.
 
-Nastavit v Forgejo repo → Settings → Secrets:
+Nastavit v repu → Settings → Secrets and variables → Actions:
 
-- `COOLIFY_WEBHOOK_URL` — Webhook URL z Coolify projektu
+- `APP_NAME_PREFIX` (variable), `COOLIFY_URL` a `COOLIFY_API_TOKEN` (secrets)
 
-Pipeline: `.forgejo/workflows/ci.yml`
+Pipeline: `.github/workflows/ci.yml`
 Detaily: [CICD.md](CICD.md) a [COOLIFY_SETUP.md](COOLIFY_SETUP.md)
 
 

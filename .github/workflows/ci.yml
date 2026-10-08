@@ -1,9 +1,19 @@
 # =============================================================================
-# CI/CD Pipeline — AISHA Platform (Forgejo Actions)
+# CI/CD Pipeline — AISHA Platform (GitHub Actions)
 # =============================================================================
-# Self-hosted Forgejo runner (git.id3a.cz), DinD (Docker-in-Docker).
-# Actions: git.id3a.cz (mirrory actions/checkout, actions/setup-node)
-# NPM: npm.id3a.cz (Verdaccio proxy/cache -> npmjs.org)
+# Runs on GitHub-hosted runners (`ubuntu-latest`, Docker preinstalled) with the
+# official upstream actions — no private runner, mirror or registry is needed.
+# NPM: the default registry (registry.npmjs.org); @aisha/* are npm workspaces
+# built from source. Docker Hub pull-through cache is OPTIONAL
+# (vars.REGISTRY_PROXY, empty = pull directly).
+#
+# Every test lane is also runnable locally without any forge — see
+# CONTRIBUTING.md („Testy lokálně"): npm run test:run / test:gates /
+# test:scripts / test:services / test:db …
+#
+# Deployment (Coolify) is OPT-IN: deploy/provision jobs run only in a
+# repository that declares its instance (repository variable APP_NAME_PREFIX)
+# and only on push to main; everywhere else they show as skipped.
 #
 # Smart routing: detect job analyzes changed paths and triggers ONLY relevant
 # CI + deploy jobs. Each Coolify stack has its own deploy step.
@@ -15,7 +25,7 @@
 #   VS Code extension — test-extension (manual marketplace publish)
 #   infra per-stack   — deploy without CI (Coolify rebuild)
 #
-# Manual deploy: use .forgejo/workflows/deploy.yml (workflow_dispatch)
+# Manual deploy: .github/workflows/deploy.yml (workflow_dispatch, same opt-in)
 # =============================================================================
 
 name: CI/CD
@@ -31,16 +41,11 @@ on:
   workflow_dispatch: {}
 
 concurrency:
-  # Per-ref, not one global lane. The previous constant group (aisha-ci-runner)
-  # was a patch for a runner that OOMed when heavy jobs from several runs met
-  # (#279). The runner has since been given hard cpus/mem_limit on its DinD,
-  # twice the RAM and cores, and a shared package cache -- so the patch now only
-  # costs: a concurrency group is a gate BEFORE the scheduler, so jobs never
-  # reach the runner at all and its capacity sits idle. Measured median queue
-  # wait was 30 min, p90 105 min, while the runner ran a single job.
-  #
-  # Overlap is now bounded where it belongs -- on the machine (runner capacity +
-  # DinD cpus/mem_limit), not in the workflow.
+  # Per-ref, not one global lane. A constant group was once a patch for a
+  # single shared runner that OOMed when heavy jobs from several runs met
+  # (#279); a concurrency group is a gate BEFORE the scheduler, so it only made
+  # runs queue (measured median wait 30 min, p90 105 min). Each GitHub-hosted
+  # job gets its own VM, so overlap is bounded by the machine, not the workflow.
   group: ${{ github.workflow }}-${{ github.ref }}
   # Cancel superseded runs on PR branches only. NOT on main: deploy jobs hang off
   # main CI and killing an in-flight deploy is worse than waiting for it.
@@ -49,6 +54,9 @@ concurrency:
 env:
   NODE_VERSION: "22"
   N8N_NODE_VERSION: "22"
+  # Privátní npm registr (Verdaccio) je OPT-IN a CI ho k ničemu nepotřebuje:
+  # čte ho jen publikace n8n nodů (deploy-n8n) a npm-scope-guard. Prázdný =
+  # žádná publikace a soukromé scope se zamknou do neexistujícího registru.
   VERDACCIO_URL: ${{ vars.VERDACCIO_URL }}
   # TVAR NASAZENÍ, který tahle CI měří. ⛔ Naměřeno 2026-08-22: dosud se
   # nedeklaroval vůbec, takže každý nástroj si dosadil vlastní (resolver
@@ -56,11 +64,17 @@ env:
   # se nasazuje, a obojí bylo zelené. Změna tvaru patří sem, do viditelného
   # řádku, ne do dosazení uvnitř knihovny.
   AISHA_PROFILE: ${{ vars.AISHA_PROFILE || 'cloud-multi' }}
-  # Pull-through cache pro obrazy z Docker Hubu (prefix, končí `/`). Kroky, které
-  # obraz staví nebo spouštějí, ho ověří `scripts/ci/registry-proxy-guard.sh`.
-  # ⛔ Naměřeno 2026-09-13: bez předání šel cold-start build přímo na Docker Hub
-  # a PR #955 padl na 429 dřív, než se spustila jediná SQL.
+  # Pull-through cache pro obrazy z Docker Hubu (prefix, končí `/`) — VOLITELNÁ:
+  # prázdná = obrazy se stahují přímo. Kroky, které obraz staví nebo spouštějí,
+  # ji předávají a tvar ověří `scripts/ci/registry-proxy-guard.sh`.
+  # ⛔ Naměřeno 2026-09-13: deklarovaná cache, kterou workflow do kroku
+  # nepředal, poslala cold-start build přímo na Docker Hub a PR #955 padl na
+  # 429 dřív, než se spustila jediná SQL — proto se předává VŽDY.
   REGISTRY_PROXY: ${{ vars.REGISTRY_PROXY }}
+
+# Nejmenší oprávnění GITHUB_TOKEN; úlohy, které víc potřebují, si ho rozšíří samy.
+permissions:
+  contents: read
 
 jobs:
   # ===========================================================================
@@ -70,6 +84,9 @@ jobs:
     name: Detect Changes
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      checks: read   # verdikt běhu hlavy PR (krok `verified`)
     outputs:
       app: ${{ steps.changes.outputs.app }}
       edge_functions: ${{ steps.changes.outputs.edge_functions }}
@@ -112,7 +129,7 @@ jobs:
       # právě prohlásil za zelený. Při globální sériové concurrency skupině to
       # zdvojnásobuje nejen náklad, ale i čekání každého dalšího PR.
       #
-      # Přeskočit se ale NESMÍ podle „PR byl zelený" — status visí na hlavě
+      # Přeskočit se ale NESMÍ podle „PR byl zelený" — kontrola visí na hlavě
       # větve, kdežto CI měřila merge commit. Když se main mezitím pohnul, je
       # to JINÝ strom a přeskočení by pustilo do main obsah, který nikdo neměřil.
       #
@@ -123,12 +140,17 @@ jobs:
       # celá sada. Fail-closed: cokoli nečekaného (mělký klon, chybějící druhý
       # rodič, API mlčí) končí na false, tedy plným během.
       #
+      # „Zelená" = check run `PR: verdikt` na hlavě PR skončil `success`. Na
+      # GitHubu nesou výsledky úloh Actions check runy, ne commit statusy
+      # (`/commits/{sha}/status` by bez statusů vrátil věčné `pending`), a verdikt
+      # je JEDINÁ úloha, která vidí na všechny ostatní (main-visi-na-jedne-kontrole).
+      #
       # Deploy joby na tomhle výstupu ZÁMĚRNĚ nevisí — smyslem běhu nad main je
       # nasadit. Hlídá to brána ci-neopakovat-mereni.
       - name: Merge nad main, jehož strom už CI změřila?
         id: verified
         env:
-          TOK: ${{ github.token }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -uo pipefail
           V=false
@@ -138,12 +160,14 @@ jobs:
               T_HEAD=$(git rev-parse 'HEAD^{tree}' 2>/dev/null || echo x)
               T_P2=$(git rev-parse "$P2^{tree}" 2>/dev/null || echo y)
               if [ "$T_HEAD" = "$T_P2" ]; then
-                STATE=$(SHA="$P2" node -e 'const https=require("https");const u=new URL(process.env.GITHUB_API_URL+"/repos/"+process.env.GITHUB_REPOSITORY+"/commits/"+process.env.SHA+"/status");https.get(u,{headers:{Authorization:"token "+process.env.TOK}},r=>{let b="";r.on("data",d=>b+=d);r.on("end",()=>{try{process.stdout.write(String(JSON.parse(b).state||""))}catch{}})}).on("error",()=>{});' 2>/dev/null || true)
+                # Závěr check runu „PR: verdikt" na hlavě PR (gh je na GitHub-hosted runneru).
+                STATE=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${P2}/check-runs?check_name=PR:%20verdikt" \
+                  --jq '[.check_runs[] | .conclusion] | if length > 0 and all(. == "success") then "success" else (first // "") end' 2>/dev/null || true)
                 if [ "$STATE" = "success" ]; then
                   V=true
                   echo "::notice title=testy přeskočeny::merge nepřinesl nic nad ${P2} (shodný strom ${T_HEAD}) a ten běh byl zelený — sada se nepřehrává, deploy joby jedou"
                 else
-                  echo "shodný strom, ale status hlavy PR je '${STATE:-<nedostupný>}' — jede plná sada"
+                  echo "shodný strom, ale verdikt hlavy PR je '${STATE:-<nedostupný>}' — jede plná sada"
                 fi
               else
                 echo "main se mezitím pohnul (tree ${T_HEAD} != ${T_P2}) — tenhle strom nikdo neměřil, jede plná sada"
@@ -169,15 +193,15 @@ jobs:
           # NASTALA. Doloženo pokusem:
           #
           #     set -e -o pipefail
-          #     echo "$SEZNAM" | grep -qE '^\.forgejo/'   → rc=141, tedy „false"
-          #     grep -qE '^\.forgejo/' <<< "$SEZNAM"      → rc=0,   tedy true
+          #     echo "$SEZNAM" | grep -qE '^\.github/'   → rc=141, tedy „false"
+          #     grep -qE '^\.github/' <<< "$SEZNAM"      → rc=0,   tedy true
           #
           # Nastane to jen když vstup přeroste kapacitu roury (zapisovatel ještě
           # píše, když čtenář skončí), tedy u VELKÝCH změn — a je to ZÁVOD, ne
           # práh: tentýž vstup jednou projde a podruhé ne. Odpovídá to pozorování
           # z běhů 3570 / 3592 / 3598: čím DŘÍV vzor v setříděném seznamu poprvé
           # sedne, tím spíš příznak zhasl (`services/` na řádku 282 přežilo,
-          # `.forgejo/` na řádku 1 zhaslo).
+          # CI adresář na řádku 1 zhasl).
           #
           # Herestring rouru neotevírá vůbec, takže tahle třída odpadá celá.
           # ⚠️ Zda je v téhle úloze `pipefail` opravdu zapnutý, ZATÍM NEVÍME:
@@ -189,7 +213,7 @@ jobs:
           echo "diag/shell: $(set -o | grep -E '^(pipefail|errexit|nounset)' | tr '\n' ' ')BASH_VERSION=${BASH_VERSION:-<none>}"
 
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            # PR: diff the head against the PR BASE sha. HEAD~1 is unreliable here — Forgejo
+            # PR: diff the head against the PR BASE sha. HEAD~1 is unreliable here — a PR run
             # checks out a merge commit whose parent order can make `git diff HEAD~1 HEAD`
             # return EMPTY, which silently skipped the DB/security gates (db_change/security_change
             # defaulted false while APP defaulted true → only Web/SBOM ran on DB-only PRs). The
@@ -287,7 +311,8 @@ jobs:
       # K1 JEN HLÁSÍ: `deploy_apps` se tu nemění. Nezměřeno = varování s důvodem,
       # ne pád detekce — přepnutí na rekonciliaci (a fail-closed) je K2.
       - name: "Rekonciliace K1 (jen hlášení): co by se nasadilo navíc"
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        # Opt-in jako nasazení samo: bez deklarované instance není co měřit.
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.APP_NAME_PREFIX != ''
         env:
           COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
@@ -315,10 +340,9 @@ jobs:
       # Both steps here peak near ~2GB on this repo: the `npx tsc` type-check and
       # `npm run lint`. Node's DEFAULT old-space ceiling is ~2048MB, so each OOM'd
       # ("FATAL ERROR: ... heap out of memory", 2026-07-13) — the earlier package.json
-      # NODE_OPTIONS only reached ESLint, never the direct `npx tsc` step. The soren
-      # runner has ~8GB and NO cgroup memory limit (verified /sys/fs/cgroup/memory.max
-      # = max), so raise V8's ceiling for the WHOLE job. Verified locally: tsc + eslint
-      # both pass at 4096, both OOM below ~2GB.
+      # NODE_OPTIONS only reached ESLint, never the direct `npx tsc` step. A
+      # GitHub-hosted ubuntu-latest VM has 16 GB, so raise V8's ceiling for the WHOLE
+      # job. Verified locally: tsc + eslint both pass at 4096, both OOM below ~2GB.
       NODE_OPTIONS: --max-old-space-size=4096
     steps:
       - uses: actions/checkout@v4
@@ -407,10 +431,13 @@ jobs:
 
       - name: Install gitleaks
         run: |
+          # Do RUNNER_TEMP, ne /usr/local/bin: hostovaný runner neběží jako root.
           GL_VERSION=8.18.4
+          mkdir -p "$RUNNER_TEMP/bin"
           curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GL_VERSION}/gitleaks_${GL_VERSION}_linux_x64.tar.gz" \
-            | tar -xz -C /usr/local/bin gitleaks
-          gitleaks version
+            | tar -xz -C "$RUNNER_TEMP/bin" gitleaks
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/bin/gitleaks" version
 
       - name: Scan introduced commits against .gitleaks.toml
         run: |
@@ -471,14 +498,22 @@ jobs:
     timeout-minutes: 45
     needs: [detect, check-web]
     if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.app == 'true'
+    # Diagnostika pádu (poslední krok) píše komentář k PR / issue na mainu a
+    # commit status — jen tahle oprávnění navíc.
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+      statuses: write
     steps:
       - uses: actions/checkout@v4
         with:
-          # packages/insight is a github.com submodule the self-hosted runner
-          # cannot reach (checkout failed at ~10s). Check out WITHOUT submodules;
-          # the insight gates skip-when-absent and run fully in any checkout that
-          # HAS the submodule (local dev / full clones). The pin/patch-drift check
-          # still runs here (it reads the gitlink via `git ls-tree`, no content).
+          # packages/insight is a separate submodule repository that a CI token
+          # need not be able to read. Check out WITHOUT submodules; the insight
+          # gates skip-when-absent and run fully in any checkout that HAS the
+          # submodule (local dev / full clones). The pin/patch-drift check still
+          # runs here (it reads the gitlink via `git ls-tree`, no content).
+          # The extranet SDK submodule is initialised by scripts/ci/npm-ci.sh.
           submodules: false
 
       - uses: actions/setup-node@v4
@@ -518,8 +553,8 @@ jobs:
 
       - name: Run tests (sharded, 1 worker/shard — fits runner memory)
         # The unit suite’s jsdom base is ~1.7 GB with 2 workers (~2 GB peak),
-        # which OOM-kills the memory-limited self-hosted runner mid-suite
-        # (#279 layer 2). Run as 4 sequential shards, each a fresh SINGLE-worker
+        # which OOM-killed the memory-limited shared runner mid-suite (#279
+        # layer 2); sharding also keeps the job inside a hosted VM's budget. Run as 4 sequential shards, each a fresh SINGLE-worker
         # process: 1-worker base (~0.7 GB) + ~1/4 of the files ≈ ~1.1 GB peak per
         # shard. Local dev keeps one fast 2-worker run (VITEST_MAX_WORKERS unset).
         env:
@@ -534,9 +569,9 @@ jobs:
           # Strop haldy dělá dvojí práci: sníží špičku (V8 uklízí dřív, místo aby
           # rostl do limitu) a hlavně ZMĚNÍ TVAR SELHÁNÍ — místo tichého SIGKILL
           # přijde `JS heap out of memory`, což diagnostika níž umí zachytit.
-          # ⛔ 3072 NESTAČILO (naměřeno 2026-08-19, druhý pokus). Runner má
-          # `FORGEJO_RUNNER_CAPACITY=4`, takže uvnitř JEDNOHO DinD s limitem 15 GB
-          # běží až ČTYŘI joby naráz — a padly dva zároveň:
+          # ⛔ 3072 NESTAČILO (naměřeno 2026-08-19, druhý pokus). Sdílený runner
+          # měl kapacitu 4, takže uvnitř JEDNOHO DinD s limitem 15 GB
+          # běželo až ČTYŘI joby naráz — a padly dva zároveň:
           #     JOB-Web-Tests exit=137     JOB-probe exit=137
           # Rozpočet je tedy ~15/4 GB na job, ne 15 GB. Ověřeno lokálně, že shard
           # projde i na 2048 (51 souborů / 585 testů).
@@ -566,7 +601,7 @@ jobs:
             # REAL failure still fails both attempts and fails the job.
             #
             # ⛔ NAMĚŘENO 2026-08-19: značky o pádu šly jen na stdout, tedy do job
-            # logu — a ten Forgejo přes API nedává. `diag/webtests-cause` grepuje
+            # logu — a ten tehdejší forge přes API nedával. `diag/webtests-cause` grepuje
             # /tmp/webtests.log, kde po pádu NEBYLO NIC: shard umřel bez shrnutí
             # vitestu, takže se nenašel ani „Test Files N failed". Diagnostika pak
             # vracela jediný řádek, a ten PROŠEL. Výsledek se proto píše DO TÉHOŽ
@@ -605,31 +640,17 @@ jobs:
         # ⛔ NAMĚŘENO 2026-09-12: brána odvozuje jména instancí z `instances/`,
         # z remotů `<jméno>-orchestrator` a z identity stromu — v CI upstreamu
         # (jen `origin`, bez .env*) je množina prázdná a brána se PŘESKAKUJE,
-        # tedy identitu žádného forku tu nikdy neměřila. Jediný registr forků je
-        # organizace na Forgejo, a ta je PRIVÁTNÍ (anonymně HTTP 200 + prázdné
-        # pole). Stahuje se proto TADY, SAMOSTATNÝM krokem s tokenem, do souboru —
-        # token se do kroku s testy NEDÁVÁ (ten spouští kód z PR, plný token
-        # organizace by z něj šel vynést). Bez tokenu (PR z forku) se soubor
-        # nezaloží a brána ohlásí NEZMĚŘENO s důvodem, ne zelenou.
+        # tedy identitu žádného forku tu nikdy neměřila. Registr forků je vlastník
+        # repa na GitHubu: forky upstreamu (`GET /repos/{repo}/forks`) a
+        # `*-instance-data` repa vlastníka, která jsou zpravidla PRIVÁTNÍ — bez
+        # tokenu je nevidět (prázdný výpis není „žádné instance"). Stahuje se proto
+        # TADY, SAMOSTATNÝM krokem s tokenem, do souboru — token se do kroku
+        # s testy NEDÁVÁ (ten spouští kód z PR a token by z něj šel vynést).
         #
-        # ⛔ KTERÉ SECRETY BĚH DOSTANE (naměřeno 2026-09-12 06:08 UTC tokenem z
-        # `git credential fill`, Forgejo `GET /version` = 16.0.2+gitea-1.22.0,
-        # nezávisle 2×):
-        #   · `GET /repos/aisha/evymo-ai-orchestrator/actions/secrets` — 100 jmen
-        #     (2 stránky po 50, X-Total-Count=100, po dedup 100): `FORGEJO_API_TOKEN`
-        #     JE, `REPO_API_TOKEN` NENÍ;
-        #   · `GET /orgs/aisha/actions/secrets` — 1 jméno: `REPO_API_TOKEN`.
-        # Forgejo (models/secret/secret.go, FetchActionSecrets) slévá secrety
-        # vlastníka + repa do jedné mapy BEZ filtru, takže neforkový běh dostane
-        # OBA. `ValidateName` zakazuje ZALOŽIT nový secret s prefixem FORGEJO_/
-        # GITEA_/GITHUB_ (proto HTTP 400 na PUT z 2026-08-02) — existující se
-        # přesto doručuje. Běh PR z forku nedostane ŽÁDNÝ. První verze kroku
-        # četla jen `secrets.REPO_API_TOKEN` a tvrdila „v repu není → vždy
-        # prázdný" — v repo-scope opravdu není, jenže z org-scope do neforkového
-        # běhu dorazí; co tehdy v běhu skutečně přišlo, změřeno nebylo. Čtou se
-        # proto OBA (repo-scope jméno první, org-scope jako záloha, týž vzor jako
-        # „Získat instanční overlay"): jméno secretu je adresa, a brána pinuje
-        # invariant, ne adresu.
+        # OPT-IN: token je secret `GIT_TOKEN` (čtení privátních rep instance —
+        # týž, kterým nasazení čte overlaye). Bez něj (veřejný klon, PR z forku —
+        # ten secrety nedostává) se soubor nezaloží a brána ohlásí NEZMĚŘENO
+        # s důvodem, ne zelenou.
         #
         # IDENTITA FORKU Z JEHO INSTANCE-DATA: jméno repa NENÍ jméno instance —
         # nasazený prefix je DEKLARACE v `<fork>-instance-data/profiles/*.json`
@@ -649,8 +670,7 @@ jobs:
         # řádku v jednoduchých uvozovkách).
         shell: bash
         env:
-          TOK_PRIMARY: ${{ secrets.FORGEJO_API_TOKEN }}
-          TOK_FALLBACK: ${{ secrets.REPO_API_TOKEN }}
+          TOK: ${{ secrets.GIT_TOKEN }}
         run: |
           set -o pipefail
           nezmereno() {
@@ -658,44 +678,52 @@ jobs:
             echo "AISHA_FORK_REGISTRY_NEZMERENO=$1" >> "$GITHUB_ENV"
             exit 0
           }
-          TOK="${TOK_PRIMARY:-${TOK_FALLBACK:-}}"
-          [ -n "$TOK" ] || nezmereno "nedorazil ani FORGEJO_API_TOKEN (repo-scope), ani REPO_API_TOKEN (org-scope) — fork-PR běh secrety nedostává"
-          origin="$(git remote get-url origin)"
-          server="$(printf '%s' "$origin" | sed -E 's#^(https?://[^/]+)/.*$#\1#')"
-          org="$(printf '%s' "$origin" | sed -E 's#^https?://[^/]+/([^/]+)/.*$#\1#')"
-          # GET přes API: tělo do souboru ($2), HTTP kód na stdout. Návrat ≠ 0 =
+          [ -n "${TOK:-}" ] || nezmereno "secret GIT_TOKEN není nastaven (opt-in) nebo běh PR z forku secrety nedostává"
+          api_url="${GITHUB_API_URL:?}"
+          org="${GITHUB_REPOSITORY_OWNER:?}"
+          # GET přes REST API: tělo do souboru ($2), HTTP kód na stdout. Návrat ≠ 0 =
           # síť/TLS selhaly — a HTTP 000 není „žádné forky". (Kód se NEVRACÍ
-          # proměnnou: `$(api …)` běží v podshellu a proměnná by se ztratila —
-          # naměřeno při lokální replice kroku: „vrátil HTTP “ s prázdným kódem.)
+          # proměnnou: `$(api …)` běží v podshellu a proměnná by se ztratila.)
           api() {
-            curl -sS --max-time 30 -o "$2" -w '%{http_code}' -H "Authorization: token $TOK" "$1"
+            curl -sS --max-time 30 -o "$2" -w '%{http_code}' \
+              -H "Authorization: Bearer $TOK" -H "Accept: ${3:-application/vnd.github+json}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" "$1"
           }
           out="${RUNNER_TEMP:-/tmp}/fork-registry.json"
           : > "$out.pages"
-          for page in 1 2 3 4 5 6 7 8 9 10; do
-            HTTP="$(api "$server/api/v1/orgs/$org/repos?limit=50&page=$page" "$out.davka")" || nezmereno "curl na registr organizace $org selhal (síť/TLS, HTTP ${HTTP:-000})"
-            [ "$HTTP" = "200" ] || nezmereno "registr organizace $org vrátil HTTP $HTTP"
-            jq -c '.[]' "$out.davka" >> "$out.pages" || nezmereno "odpověď registru organizace není JSON pole"
-            [ "$(jq 'length' "$out.davka")" -lt 50 ] && break
+          # Repa vlastníka (organizace; u osobního účtu /users/…) + forky upstreamu.
+          zdroj="$api_url/orgs/$org/repos"
+          HTTP="$(api "$zdroj?per_page=100&page=1" "$out.davka")" || nezmereno "curl na $zdroj selhal (síť/TLS, HTTP ${HTTP:-000})"
+          [ "$HTTP" = "404" ] && zdroj="$api_url/users/$org/repos"
+          for zdroj in "$zdroj" "$api_url/repos/$GITHUB_REPOSITORY/forks"; do
+            for page in 1 2 3 4 5 6 7 8 9 10; do
+              HTTP="$(api "$zdroj?per_page=100&page=$page" "$out.davka")" || nezmereno "curl na $zdroj selhal (síť/TLS, HTTP ${HTTP:-000})"
+              [ "$HTTP" = "200" ] || nezmereno "$zdroj vrátil HTTP $HTTP"
+              case "$zdroj" in
+                */forks) jq -c --arg up "$GITHUB_REPOSITORY" '.[] | {name, fork: true, parent: {full_name: $up}}' "$out.davka" >> "$out.pages" ;;
+                *) jq -c '.[] | {name, fork, parent}' "$out.davka" >> "$out.pages" ;;
+              esac || nezmereno "odpověď $zdroj není JSON pole"
+              [ "$(jq 'length' "$out.davka")" -lt 100 ] && break
+            done
           done
           # Jména z instance-data: profiles/*.json → prefix, jinak první label vlastní veřejné zóny
           JQ_JMENO_Z_PROFILU='((.domain? // {}) | (.subdomain_prefix // "" | tostring | ascii_downcase | gsub("^\\s+|\\s+$"; "") | sub("[-.]+$"; "")) as $p | if ($p | length) > 0 then $p else (.public_tld // "" | tostring | ascii_downcase | gsub("^\\s+|\\s+$"; "") | split(".")[0] // "") end)'
           : > "$out.prefixes"
           while IFS= read -r repo; do
             [ -n "$repo" ] || continue
-            HTTP="$(api "$server/api/v1/repos/$org/$repo/contents/profiles" "$out.seznam")" || nezmereno "curl na $repo/contents/profiles selhal (síť/TLS, HTTP ${HTTP:-000})"
+            HTTP="$(api "$api_url/repos/$org/$repo/contents/profiles" "$out.seznam")" || nezmereno "curl na $repo/contents/profiles selhal (síť/TLS, HTTP ${HTTP:-000})"
             if [ "$HTTP" = "404" ]; then continue; fi
             [ "$HTTP" = "200" ] || nezmereno "$repo/contents/profiles vrátil HTTP $HTTP"
             while IFS= read -r soubor; do
               [ -n "$soubor" ] || continue
-              HTTP="$(api "$server/api/v1/repos/$org/$repo/raw/profiles/$soubor" "$out.profil")" || nezmereno "curl na $repo/profiles/$soubor selhal (síť/TLS, HTTP ${HTTP:-000})"
+              HTTP="$(api "$api_url/repos/$org/$repo/contents/profiles/$soubor" "$out.profil" "application/vnd.github.raw+json")" || nezmereno "curl na $repo/profiles/$soubor selhal (síť/TLS, HTTP ${HTTP:-000})"
               [ "$HTTP" = "200" ] || nezmereno "$repo/profiles/$soubor vrátil HTTP $HTTP"
               jmeno="$(jq -r "$JQ_JMENO_Z_PROFILU" "$out.profil")" || nezmereno "$repo/profiles/$soubor není JSON"
               if [ -n "$jmeno" ]; then
                 jq -cn --arg r "$repo" --arg p "$jmeno" '{repo: $r, jmeno: $p}' >> "$out.prefixes"
               fi
             done < <(jq -r '.[] | select(.type == "file") | select(.name | endswith(".json")) | .name' "$out.seznam")
-          done < <(jq -r 'select(.name | endswith("-instance-data")) | .name' "$out.pages")
+          done < <(jq -r 'select(.name | endswith("-instance-data")) | .name' "$out.pages" | sort -u)
           jq -s --slurpfile pref "$out.prefixes" '
             ($pref | group_by(.repo) | map({key: .[0].repo, value: map(.jmeno)}) | from_entries) as $pp
             | map(. + {jmena_z_profilu: ($pp[.name] // [])})
@@ -709,8 +737,8 @@ jobs:
         # parallel at a fraction of the memory. No timeout on this job.
         env:
           VITEST_MAX_WORKERS: "2"
-          # Týž rozpočet jako u test:run: 2 workery × halda se SČÍTAJÍ, a runner
-          # pouští 4 joby naráz v jednom DinD (15 GB). Viz komentář u test:run.
+          # Týž rozpočet jako u test:run: 2 workery × halda se SČÍTAJÍ (historie
+          # sdíleného runneru se 4 joby v jednom DinD — viz komentář u test:run).
           NODE_OPTIONS: "--max-old-space-size=2048"
         shell: bash
         run: |
@@ -759,35 +787,22 @@ jobs:
         # and deterministic, so no shard/retry dance is needed.
         env:
           VITEST_MAX_WORKERS: "2"
-          # Týž rozpočet jako u test:run: 2 workery × halda se SČÍTAJÍ, a runner
-          # pouští 4 joby naráz v jednom DinD (15 GB). Viz komentář u test:run.
+          # Týž rozpočet jako u test:run: 2 workery × halda se SČÍTAJÍ (historie
+          # sdíleného runneru se 4 joby v jednom DinD — viz komentář u test:run).
           NODE_OPTIONS: "--max-old-space-size=2048"
         shell: bash
         run: |
           set -o pipefail
           npm run test:scripts 2>&1 | tee -a /tmp/scripts-tests.log
 
-      - name: Surface failure cause (CI hygiene — runner logs unreachable via API)
+      - name: Surface failure cause (CI hygiene — failure lands where it gets solved)
         if: failure()
         shell: bash
         env:
-          # github.token lacks comment/status:write on this Forgejo runner (the diag
-          # silently no-op'd on #283), so a full-scope API token secret is needed.
-          # ⛔ NAMĚŘENO 2026-09-12 06:08 UTC (token z `git credential fill`,
-          # Forgejo `GET /version` = 16.0.2+gitea-1.22.0, nezávisle 2×):
-          # `GET /repos/aisha/evymo-ai-orchestrator/actions/secrets` (100 jmen)
-          # má `FORGEJO_API_TOKEN` a NEMÁ `REPO_API_TOKEN`;
-          # `GET /orgs/aisha/actions/secrets` (1 jméno) má `REPO_API_TOKEN`.
-          # FetchActionSecrets (models/secret/secret.go) slévá owner + repo
-          # secrety bez filtru → neforkový běh dostane OBA, fork-PR běh ŽÁDNÝ.
-          # Dřívější tvrzení „Forgejo rezervuje prefix FORGEJO_,
-          # secrets.FORGEJO_API_TOKEN nemůže existovat" (2026-08-02, z HTTP 400
-          # na PUT) platí jen pro ZALOŽENÍ (ValidateName) — existující secret
-          # se doručuje. Tenhle krok čte org-scope jméno, které do neforkového
-          # běhu dorazí; jeho chování se tu nemění. Dluh mainu mimo tuhle větev:
-          # číst obě jména jako krok „Registr forků" výš, aby krok nezávisel na
-          # tom, ve kterém rozsahu jméno zrovna leží.
-          TOK: ${{ secrets.REPO_API_TOKEN }}
+          # github.token s oprávněními úlohy výš (issues/pull-requests/statuses:
+          # write). Běh PR z forku dostává token jen pro čtení — zápis pak selže,
+          # vypíše kód a krok jede dál (diagnostika nesmí shodit nic sama).
+          TOK: ${{ github.token }}
           PRNUM: ${{ github.event.pull_request.number }}
           SHA: ${{ github.event.pull_request.head.sha }}
         run: |
@@ -803,9 +818,9 @@ jobs:
           echo "::group::failure signatures"
           grep -iEn "Killed|heap out of memory|JS heap|FATAL ERROR|Test Files +[0-9]+ failed|onTaskUpdate|ECONN|ENOTFOUND|npm error|Cannot find module" /tmp/webtests.log /tmp/gates.log 2>/dev/null | tail -50 || true
           echo "::endgroup::"
-          # Forgejo job logs are unreachable via the API, so a failing Web:Tests is
-          # otherwise undiagnosable. Post the failure cause where it gets SOLVED
-          # (majitel 08-02): a PR failure comments on the PR; a MAIN failure files
+          # Post the failure cause where it gets SOLVED (majitel 08-02) — a red
+          # badge nobody opens the log for is exactly the failure this diag exists
+          # to surface: a PR failure comments on the PR; a MAIN failure files
           # an ISSUE — main has no PR thread, and a red main that nobody opens the
           # runner for is exactly the failure this diag exists to surface.
           # Permanent CI hygiene (#279) — keep it.
@@ -823,7 +838,7 @@ jobs:
             TITLE="Web:Tests selhal na main (${GITHUB_SHA:-?})"
             node -e 'const https=require("https");const data=JSON.stringify({title:process.argv[1],body:process.argv[2]});const u=new URL(process.env.GITHUB_API_URL+"/repos/"+process.env.GITHUB_REPOSITORY+"/issues");const r=https.request(u,{method:"POST",headers:{Authorization:"token "+process.env.TOK,"Content-Type":"application/json","Content-Length":Buffer.byteLength(data)}},res=>{res.resume();res.on("end",()=>console.log("issue filed:",res.statusCode))});r.on("error",e=>console.log("issue err:",e.message));r.write(data);r.end();' "$TITLE" "$BODY"
           fi
-          # also a commit status (github.token reliably has status:write) — readable via the combined-status API
+          # also a commit status (statuses: write above) — readable via the combined-status API
           if [ -n "${SHA:-}" ]; then
             node -e 'const https=require("https");const d=JSON.stringify({state:"error",context:"diag/webtests-cause",description:(process.argv[1]||"no-signature").replace(/\s+/g," ").slice(0,240)});const u=new URL(process.env.GITHUB_API_URL+"/repos/"+process.env.GITHUB_REPOSITORY+"/statuses/"+process.env.SHA);const r=https.request(u,{method:"POST",headers:{Authorization:"token "+process.env.TOK,"Content-Type":"application/json","Content-Length":Buffer.byteLength(d)}},res=>{res.resume();res.on("end",()=>console.log("status set:",res.statusCode))});r.on("error",e=>console.log("status err:",e.message));r.write(d);r.end();' "${SIG:-no-signature-matched}"
           fi
@@ -1026,6 +1041,7 @@ jobs:
       always()
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
+      && vars.APP_NAME_PREFIX != ''
       && needs.detect.result == 'success'
       && needs.deploy-koren.result != 'failure'
       && needs.deploy-koren.result != 'cancelled'
@@ -1075,9 +1091,9 @@ jobs:
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
           # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
           # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
-          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
-          # deploy joby běží jen na push do main (kód z main), ne na PR.
-          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          # se postavily z KEŠOVANÉHO overlaye. Deploy joby běží jen na push do main
+          # (kód z main), ne na PR.
+          GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
           COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
           GIT_SHA: ${{ github.sha }}
           # Veřejná adresa pro sondu „odpovídá to?". Ze SECRETU, ne ze zdrojáku:
@@ -1168,6 +1184,7 @@ jobs:
       always()
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
+      && vars.APP_NAME_PREFIX != ''
       && needs.detect.result == 'success'
       && needs.deploy-koren.result != 'failure'
       && needs.deploy-koren.result != 'cancelled'
@@ -1212,9 +1229,9 @@ jobs:
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
           # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
           # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
-          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
-          # deploy joby běží jen na push do main (kód z main), ne na PR.
-          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          # se postavily z KEŠOVANÉHO overlaye. Deploy joby běží jen na push do main
+          # (kód z main), ne na PR.
+          GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
           COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
           GIT_SHA: ${{ github.sha }}
           # Veřejná adresa pro sondu „odpovídá to?". Ze SECRETU, ne ze zdrojáku:
@@ -1272,6 +1289,7 @@ jobs:
       always()
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
+      && vars.APP_NAME_PREFIX != ''
       && needs.detect.result == 'success'
       && needs.deploy-koren.result != 'failure'
       && needs.deploy-koren.result != 'cancelled'
@@ -1316,9 +1334,9 @@ jobs:
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
           # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
           # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
-          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
-          # deploy joby běží jen na push do main (kód z main), ne na PR.
-          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          # se postavily z KEŠOVANÉHO overlaye. Deploy joby běží jen na push do main
+          # (kód z main), ne na PR.
+          GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
           COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
           # Revizi bere `vite.config.ts` (define __GIT_SHA__) přes build arg
           # `GIT_SHA`, který prebuilt compose PŘEDÁVÁ — na rozdíl od core compose.
@@ -1350,6 +1368,7 @@ jobs:
       always()
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
+      && vars.APP_NAME_PREFIX != ''
       && needs.detect.result == 'success'
       && needs.detect.outputs.n8n_nodes == 'true'
       && needs.test-n8n.result != 'failure'
@@ -1369,13 +1388,15 @@ jobs:
           bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
           npm run build
 
-      - name: Publish to Verdaccio
+      - name: Publish to Verdaccio (opt-in)
+        # Jen repo s vlastním registrem (vars.VERDACCIO_URL); jinak se krok přeskočí.
+        if: vars.VERDACCIO_URL != ''
         working-directory: packages/n8n-nodes-aisha
         env:
           VERDACCIO_TOKEN: ${{ secrets.VERDACCIO_TOKEN }}
         run: |
           if [ -z "$VERDACCIO_TOKEN" ]; then
-            echo "VERDACCIO_TOKEN not set — skipping publish"
+            echo "::warning::vars.VERDACCIO_URL je nastaven, ale VERDACCIO_TOKEN ne — publikace přeskočena"
             exit 0
           fi
 
@@ -1408,7 +1429,7 @@ jobs:
           if [ -z "$APP_PREFIX" ]; then
             echo "::error title=deploy neví, kterou instanci nasadit::APP_NAME_PREFIX není nastaven."
             echo "Coolify appky se jmenují <prefix>-<role>. Prefix je DEKLARACE, ne odvozenina:"
-            echo "  nastav repo variable APP_NAME_PREFIX (Settings → Actions → Variables)."
+            echo "  nastav repo variable APP_NAME_PREFIX (Settings → Secrets and variables → Actions → Variables)."
             exit 1
           fi
           # ⛔ Sufix je `-orchestration`, NE `-n8n`. Appka `<prefix>-n8n` neexistuje,
@@ -1430,7 +1451,7 @@ jobs:
             echo "::warning title=deploy je ručně::${APP_PREFIX}-orchestration v Coolify nenalezen — NIC se nenasadilo (nasazuje se ručně přes scripts/aisha-redeploy.mjs)."
             exit 0
           fi
-          printf 'Restarting ${APP_PREFIX}-orchestration (uuid=%s) — entrypoint installs latest from Verdaccio\n' "${UUID:0:12}"
+          printf 'Restarting %s-orchestration (uuid=%s) — entrypoint installs the latest published nodes\n' "$APP_PREFIX" "${UUID:0:12}"
           curl -sS -X POST "${COOLIFY_URL}/api/v1/applications/${UUID}/restart" \
             -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
             -H "Content-Type: application/json"
@@ -1464,6 +1485,7 @@ jobs:
       always()
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
+      && vars.APP_NAME_PREFIX != ''
       && needs.detect.result == 'success'
       && (needs.detect.outputs.n8n_workflow == 'true'
           || needs.detect.outputs.n8n_nodes == 'true')
@@ -1485,14 +1507,10 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
-          FORGEJO_URL: ${{ secrets.N8N_FORGEJO_URL }}
-          # env name stays FORGEJO_API_TOKEN (consumer contract); the SECRET is
-          # REPO_API_TOKEN — org-scope (`GET /orgs/aisha/actions/secrets`, naměřeno
-          # 2026-09-12, Forgejo 16.0.2). Forgejo's FORGEJO_ prefix ban (ValidateName)
-          # applies to CREATING a secret only: an existing repo-scope
-          # FORGEJO_API_TOKEN exists and is delivered too — FetchActionSecrets
-          # merges owner + repo secrets, so non-fork runs receive both.
-          FORGEJO_API_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          # Forge credential pro n8n workflowy (committer, issue toky): forge je
+          # GitHub, takže GITHUB_API_URL / GITHUB_REPOSITORY dodá běh sám a token
+          # je týž, který dostává pověření „GitHub API" (scripts/n8n/provision-credentials.mjs).
+          GITHUB_TOKEN: ${{ secrets.N8N_GITHUB_API_TOKEN }}
           GITHUB_API_TOKEN: ${{ secrets.N8N_GITHUB_API_TOKEN }}
           LANGFUSE_HOST: ${{ secrets.LANGFUSE_HOST }}
           LANGFUSE_PUBLIC_KEY: ${{ secrets.LANGFUSE_PUBLIC_KEY }}
@@ -1576,6 +1594,7 @@ jobs:
       always()
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
+      && vars.APP_NAME_PREFIX != ''
       && needs.detect.result == 'success'
       && needs.detect.outputs.deploy_apps != ',,'
       && needs.check-web.result != 'failure'
@@ -1612,9 +1631,9 @@ jobs:
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
           # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
           # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
-          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
-          # deploy joby běží jen na push do main (kód z main), ne na PR.
-          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          # se postavily z KEŠOVANÉHO overlaye. Deploy joby běží jen na push do main
+          # (kód z main), ne na PR.
+          GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
           COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
           GIT_SHA: ${{ github.sha }}
           APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
@@ -1634,6 +1653,7 @@ jobs:
       always()
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
+      && vars.APP_NAME_PREFIX != ''
       && needs.detect.result == 'success'
       && needs.detect.outputs.deploy_apps != ',,'
       && needs.check-web.result != 'failure'
@@ -1678,9 +1698,9 @@ jobs:
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
           # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
           # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
-          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
-          # deploy joby běží jen na push do main (kód z main), ne na PR.
-          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          # se postavily z KEŠOVANÉHO overlaye. Deploy joby běží jen na push do main
+          # (kód z main), ne na PR.
+          GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
           COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
           GIT_SHA: ${{ github.sha }}
           APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
@@ -1724,11 +1744,11 @@ jobs:
 
   # ===========================================================================
   # Build-runner health (ALWAYS-ON) — the one job with NO detect gate, so a
-  # down build runner / DinD daemon turns CI RED on EVERY push/PR instead of
-  # being masked by the cold-start gate's skip→success (that masking hid the
-  # build daemon being down for weeks, 2026-05→06). Cheap: just pings the DinD
-  # daemon (docker:2375) the build jobs use. node ships in the runner image
-  # (node:20-bookworm) so there is no apt install.
+  # runner without a usable Docker daemon turns CI RED on EVERY push/PR instead
+  # of being masked by the cold-start gate's skip→success (that masking hid a
+  # down build daemon for weeks, 2026-05→06). Cheap: `docker info` over the
+  # same channel the build jobs use. On GitHub-hosted runners Docker is
+  # preinstalled; on a self-hosted runner the probe is what catches a lost daemon.
   # ===========================================================================
   build-runner-health:
     name: "Build-runner health (always-on)"
@@ -1759,13 +1779,13 @@ jobs:
       - name: Check DinD build daemon via runner DOCKER_HOST — fail fast if down
         run: |
           if ! command -v docker >/dev/null 2>&1; then
-            echo "::error::docker CLI could not be installed on the build-runner-health job — cannot verify the DinD daemon. Investigate the runner image."
+            echo "::error::docker CLI could not be installed on the build-runner-health job — cannot verify the Docker daemon. Investigate the runner image."
             exit 1
           fi
           if timeout 30 docker info >/dev/null 2>&1; then
             echo "✅ DinD build daemon healthy (docker info OK via DOCKER_HOST=${DOCKER_HOST:-<socket>})"
           else
-            echo "::error::Build-runner DinD daemon UNREACHABLE (docker info failed) — the aisha-ci-runner build daemon is DOWN; build / cold-start jobs cannot run. Restart the aisha-ci-runner on the build server via Coolify."
+            echo "::error::Build-runner Docker daemon UNREACHABLE (docker info failed) — build / cold-start jobs cannot run on this runner. Fix the runner's Docker daemon (self-hosted) or re-run (hosted)."
             exit 1
           fi
 
@@ -1782,7 +1802,7 @@ jobs:
       # CONTAINS the host's own resolver (192.168.2.1 in /etc/resolv.conf). The
       # resolver then looks on-link to the job container, its queries never
       # leave the bridge, and every checkout dies on
-      #     fatal: unable to access '…': Could not resolve host: repo.id3a.cz
+      #     fatal: unable to access '…': Could not resolve host: <forge host>
       # — 8 leaked networks accumulated since June before it crossed over.
       #
       # No addresses are pinned here: the check READS the daemon's own pools and
@@ -1842,21 +1862,21 @@ jobs:
       # deps), so the heavy `npm ci` is unnecessary here — just the psql client.
       - name: Install psql client
         run: |
-          # The act-based Forgejo runner runs as root and has no `sudo`
-          # (nektos/act#107) — `sudo` would exit 127. A real GitHub runner is
-          # non-root and needs sudo. Use sudo only when it's actually present.
+          # A GitHub-hosted runner is non-root and needs sudo; a container-based
+          # self-hosted runner (nektos/act) runs as root WITHOUT sudo
+          # (nektos/act#107) — `sudo` would exit 127. Use sudo only when present.
           if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
           $SUDO apt-get update && $SUDO apt-get install -y --no-install-recommends postgresql-client
 
       - name: Install docker CLI (DinD daemon already reachable via the runner socket mount)
         run: |
-          # node:20-bookworm has the DinD socket bound (CI runner config.yml) but
-          # no `docker` binary, so `docker build` below failed with
-          # "docker: command not found" (exit 127). Install the CLI with the same
+          # A container-based runner image (node:20-bookworm) may have the Docker
+          # socket bound but no `docker` binary, so `docker build` below failed with
+          # "docker: command not found" (exit 127). GitHub-hosted: preinstalled. Install the CLI with the same
           # apt recipe the ci-runner image uses. Idempotent: a baked job image that
           # already ships docker (the ci-docker label, once activated) short-circuits.
           if command -v docker >/dev/null 2>&1; then docker --version; exit 0; fi
-          # act-based Forgejo runner is root (no sudo); a real GitHub runner needs it.
+          # container-based runner is root (no sudo); a GitHub-hosted runner needs it.
           if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
           $SUDO apt-get update
           $SUDO apt-get install -y --no-install-recommends ca-certificates curl gnupg
@@ -1877,10 +1897,10 @@ jobs:
       # transient infra outage from masquerading as a DB-security gate failure.
       - name: Detect DinD availability
         id: dind
-        # Retry the reachability probe before failing loud. The soren build
-        # runner is SHARED (capacity 2 → two coldstart jobs hit ONE DinD
-        # concurrently); a single `docker info` can transiently time out when the
-        # daemon is momentarily saturated, which previously red-failed a
+        # Retry the reachability probe before failing loud. On a SHARED runner
+        # (capacity 2 → two coldstart jobs hit ONE daemon concurrently) a single
+        # `docker info` can transiently time out when the daemon is momentarily
+        # saturated, which previously red-failed a
         # code-correct PR (a false negative). Up to 5 attempts over ~50 s absorbs
         # that blip WITHOUT masking a genuine outage: if DinD is truly down it
         # still exits 1 after the last attempt (fail-loud contract preserved — no
@@ -1898,7 +1918,7 @@ jobs:
           if [ "$available" = "true" ]; then
             echo "available=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::error title=coldstart-db-gate::DinD daemon UNREACHABLE after 5 attempts — the cold-start apply + DB-security gate (incl. check-definer-rpc-security.mjs) CANNOT run and MUST NOT skip-to-green. DinD is a HARD requirement, guaranteed by the soren build runner in the Coolify stack. Restart the aisha-ci-runner DinD daemon; do not merge on a masked gate."
+            echo "::error title=coldstart-db-gate::Docker daemon UNREACHABLE after 5 attempts — the cold-start apply + DB-security gate (incl. check-definer-rpc-security.mjs) CANNOT run and MUST NOT skip-to-green. Docker is a HARD requirement of this job; fix the runner's daemon, do not merge on a masked gate."
             echo "available=false" >> "$GITHUB_OUTPUT"
             exit 1
           fi
@@ -1906,7 +1926,7 @@ jobs:
       - name: Build platform Postgres image (pgvector + pgaudit + substrate)
         if: steps.dind.outputs.available == 'true'
         # Context = infra/postgres (NOT repo root): the image only COPYs these 5
-        # files. Streaming the full 27 MB+ repo tar to the remote DinD daemon
+        # files. Streaming the full 27 MB+ repo tar to a remote (DinD) daemon
         # broke the pipe ("write: broken pipe" → cold-start CI failure); a ~40 KB
         # context transfers reliably.
         # Major verze = domov config/image-versions.env (táž, kterou env-doktor
@@ -1918,40 +1938,54 @@ jobs:
           docker build --build-arg REGISTRY_PROXY="$REGISTRY_PROXY" --build-arg PG_MAJOR="$PG_MAJOR" \
             -f infra/postgres/Dockerfile -t aisha-postgres-coldstart infra/postgres
 
-      # Service containers JOIN THE JOB'S NETWORK NAMESPACE: with the runner's
-      # dind-socket job mount, the job container and every `docker run`
-      # container are SIBLINGS on the shared DinD — `-p 5432:5432` publishes on
-      # the DinD host, which the job's `localhost` can never reach. Every
-      # coldstart run on the consolidated soren runner failed exactly here: PG
-      # logged "accepting connections" (unix-socket pg_isready inside the
-      # container) while the job's TCP psql got ECONNREFUSED.
+      # TWO RUNNER SHAPES, ONE ADDRESS (127.0.0.1:5432 / :5433):
+      #   · GitHub-hosted (job runs ON the VM, Docker daemon local): publish the
+      #     port on loopback (`-p 127.0.0.1:5432:5432`).
+      #   · container-based self-hosted runner (job runs IN a container with a
+      #     DinD socket mount): the job container and every `docker run`
+      #     container are SIBLINGS on the shared daemon — `-p` publishes on the
+      #     DinD host, which the job's `localhost` can never reach (measured:
+      #     PG "accepting connections" while the job's TCP psql got
+      #     ECONNREFUSED). There the PG container JOINS THE JOB'S NETWORK
+      #     NAMESPACE instead.
+      # Which shape is decided from /proc/self/mountinfo: a /containers/<64-hex>/
+      # mount source is the daemon's ground truth that the job itself runs in a
+      # container (works on the host docker layout AND the DinD named-volume
+      # layout) — NOT $(hostname): act can set a custom hostname for the job
+      # container (run 1840: the hostname join silently produced a non-joined PG).
       #
-      # The job's OWN container id is resolved from /proc/self/mountinfo
-      # (the /containers/<64-hex>/ mount source — works on both the host
-      # docker layout AND the DinD named-volume layout _data/containers/) — NOT
-      # from $(hostname): act_runner can set
-      # a custom hostname/alias for the job container (run 1840 proved the
-      # hostname join silently produced a non-joined PG), while the mountinfo
-      # path is the daemon's ground truth for the running container.
-      #
-      # Container names carry ${{ github.run_id }}: the single consolidated
-      # runner (capacity 2) executes two runs' coldstart jobs CONCURRENTLY on
-      # ONE shared DinD — fixed names collide ("name already in use").
+      # Container names carry ${{ github.run_id }}: a shared runner can execute
+      # two runs' coldstart jobs CONCURRENTLY on ONE daemon — fixed names
+      # collide ("name already in use").
       - name: Start cold-start Postgres
         if: steps.dind.outputs.available == 'true'
         run: |
-          CID=$( (grep -m1 -oE '/containers/[0-9a-f]{64}' /proc/self/mountinfo || true) | awk -F/ '{print $3}')
-          test -n "$CID" || { echo "::error::cannot resolve own container id from /proc/self/mountinfo"; exit 1; }
-          echo "job container id: ${CID:0:12}"
+          # /.dockerenv = job běží V kontejneru; na hostovaném VM by mountinfo mohl
+          # ukázat mounty CIZÍCH kontejnerů lokálního démona.
+          CID=""
+          if [ -f /.dockerenv ]; then
+            CID=$( (grep -m1 -oE '/containers/[0-9a-f]{64}' /proc/self/mountinfo || true) | awk -F/ '{print $3}')
+            test -n "$CID" || { echo "::error::job runs in a container but its id is not in /proc/self/mountinfo"; exit 1; }
+          fi
+          if [ -n "$CID" ]; then
+            echo "job runs in container ${CID:0:12} → PG joins its network namespace"
+            SIT=(--network "container:${CID}")
+          else
+            echo "job runs on the host → PG publishes 5432 on loopback"
+            SIT=(-p 127.0.0.1:5432:5432)
+          fi
+          echo "SIT_CID=${CID}" >> "$GITHUB_ENV"
           docker run -d --name "coldstart-${{ github.run_id }}" \
-            --network "container:${CID}" \
+            "${SIT[@]}" \
             -e POSTGRES_PASSWORD=ci -e POSTGRES_DB=postgres -e JWT_SECRET=ci-coldstart \
             -e VAULT_ENCRYPTION_KEY=ci-vault-encryption-key -e COLUMN_ENCRYPTION_KEY=ci-column-encryption-key \
             aisha-postgres-coldstart
           # Assert the join actually happened — a silent non-join is exactly the
           # failure mode this step replaces; fail loudly instead of at psql.
-          MODE=$(docker inspect "coldstart-${{ github.run_id }}" --format '{{.HostConfig.NetworkMode}}')
-          case "$MODE" in container:*) echo "network join OK ($MODE)";; *) echo "::error::PG container did not join the job namespace (mode=$MODE)"; exit 1;; esac
+          if [ -n "$CID" ]; then
+            MODE=$(docker inspect "coldstart-${{ github.run_id }}" --format '{{.HostConfig.NetworkMode}}')
+            case "$MODE" in container:*) echo "network join OK ($MODE)";; *) echo "::error::PG container did not join the job namespace (mode=$MODE)"; exit 1;; esac
+          fi
           for i in $(seq 1 60); do
             pg_isready -h 127.0.0.1 -p 5432 -U postgres >/dev/null 2>&1 && break
             docker exec "coldstart-${{ github.run_id }}" pg_isready -U postgres >/dev/null 2>&1 || true
@@ -1968,20 +2002,21 @@ jobs:
       - name: Verify no deferred-migration overrides (baseline == cold-start fn bodies)
         if: steps.dind.outputs.available == 'true'
         run: |
-          # Same job-namespace join as the FULL container; both PGs share the
-          # job's network namespace, so BASE listens on 5433 via a server arg
-          # (the image CMD's config_file is preserved; `-p` publishing is
-          # meaningless under the namespace join — see the Start step note).
-          CID=$( (grep -m1 -oE '/containers/[0-9a-f]{64}' /proc/self/mountinfo || true) | awk -F/ '{print $3}')
-          test -n "$CID" || { echo "::error::cannot resolve own container id from /proc/self/mountinfo"; exit 1; }
+          # Same runner shape as the FULL container (see the Start step note):
+          # BASE listens on 5433 via a server arg (the image CMD's config_file is
+          # preserved) — published on loopback on the host, or reachable through
+          # the shared job namespace in a container-based runner.
+          if [ -n "${SIT_CID:-}" ]; then SIT=(--network "container:${SIT_CID}"); else SIT=(-p 127.0.0.1:5433:5433); fi
           docker run -d --name "coldstart-base-${{ github.run_id }}" \
-            --network "container:${CID}" \
+            "${SIT[@]}" \
             -e POSTGRES_PASSWORD=ci -e POSTGRES_DB=postgres -e JWT_SECRET=ci-coldstart \
             -e VAULT_ENCRYPTION_KEY=ci-vault-encryption-key -e COLUMN_ENCRYPTION_KEY=ci-column-encryption-key \
             aisha-postgres-coldstart \
             postgres -c config_file=/etc/postgresql/postgresql.conf -c port=5433
-          MODE=$(docker inspect "coldstart-base-${{ github.run_id }}" --format '{{.HostConfig.NetworkMode}}')
-          case "$MODE" in container:*) echo "network join OK ($MODE)";; *) echo "::error::BASE PG did not join the job namespace (mode=$MODE)"; exit 1;; esac
+          if [ -n "${SIT_CID:-}" ]; then
+            MODE=$(docker inspect "coldstart-base-${{ github.run_id }}" --format '{{.HostConfig.NetworkMode}}')
+            case "$MODE" in container:*) echo "network join OK ($MODE)";; *) echo "::error::BASE PG did not join the job namespace (mode=$MODE)"; exit 1;; esac
+          fi
           for i in $(seq 1 60); do
             pg_isready -h 127.0.0.1 -p 5433 -U postgres >/dev/null 2>&1 && break
             sleep 1
@@ -2090,15 +2125,17 @@ jobs:
 
       - name: AV integration (real clamd + MinIO, EICAR) — skips if DinD unavailable
         run: |
-          # DinD is a HARD requirement (soren build runner). Do NOT skip-to-green when it is
+          # Docker is a HARD requirement of this job. Do NOT skip-to-green when it is
           # unreachable — that masks the live clamd+MinIO AV gate. Fail loud so the daemon
           # gets fixed. The AV flow is also covered locally (npm run test:integration:av, 6/6).
           if ! command -v docker >/dev/null 2>&1 || ! timeout 30 docker info >/dev/null 2>&1; then
-            echo "::error title=av-integration::DinD daemon UNREACHABLE — the live clamd+MinIO integration CANNOT run and MUST NOT skip-to-green. DinD is guaranteed by the soren runner; restart the aisha-ci-runner DinD daemon."
+            echo "::error title=av-integration::Docker daemon UNREACHABLE — the live clamd+MinIO integration CANNOT run and MUST NOT skip-to-green. Fix the runner's Docker daemon."
             exit 1
           fi
-          # cwd-independent @aisha/@evymo → Verdaccio pin + fail-loud on empty URL
-          # (dependency-confusion class; the 2026-07-14 @aisha/observability 404).
+          # cwd-independent pin of the private scopes (@aisha/@evymo): to the
+          # configured Verdaccio, or — without one — to a registry that cannot
+          # resolve, so a stray lookup fails instead of installing a squatted public
+          # package (dependency-confusion class; the 2026-07-14 @aisha/observability 404).
           bash scripts/ci/npm-scope-guard.sh
           bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
           npm run build:packages   # storage-auth imports @aisha/* via built dist/
@@ -2285,11 +2322,11 @@ jobs:
           # past the DinD guard — a mis-wired lane must not silently self-skip.
           BLOCKCHAIN_INTEGRATION: "1"
         run: |
-          # DinD is a HARD requirement (soren build runner). Do NOT skip-to-green when it is
+          # Docker is a HARD requirement of this job. Do NOT skip-to-green when it is
           # unreachable — that masks the live PostgREST+Postgres roundtrip gate. Fail loud.
           # The roundtrip is also covered locally (npm run test:integration:blockchain).
           if ! command -v docker >/dev/null 2>&1 || ! timeout 30 docker info >/dev/null 2>&1; then
-            echo "::error title=blockchain-integration::DinD daemon UNREACHABLE — the live PostgREST+Postgres roundtrip CANNOT run and MUST NOT skip-to-green. DinD is guaranteed by the soren runner; restart the aisha-ci-runner DinD daemon."
+            echo "::error title=blockchain-integration::Docker daemon UNREACHABLE — the live PostgREST+Postgres roundtrip CANNOT run and MUST NOT skip-to-green. Fix the runner's Docker daemon."
             exit 1
           fi
           # The throwaway-DB chain (migrate.mjs + with-throwaway-db auth-settle/seed) drives
@@ -2485,13 +2522,11 @@ jobs:
   # ===========================================================================
   # Security: SAST + dependency/SBOM/CVE scanning — runs on every PR
   # ===========================================================================
-  # Relocated from .github/workflows/{semgrep-sast,dependency-security}.yml
-  # (2026-05-30): the GitHub mirror is cost-only; all CI — incl. security
-  # scanning — runs on Forgejo. Folded into ci.yml (no standalone workflow
-  # files) per the new-file policy. Enforced by semgrep-sast.gate,
-  # sbom-coverage.gate, wp-3-8-supply-chain.gate, owasp-orchestrator-adoption.gate
-  # (all repointed to this file). Trivy emits SARIF as a CI artifact (Forgejo
-  # has no Security tab); CVE exit-code gating + MinIO SBOM mirror preserved.
+  # Folded into ci.yml from the former standalone semgrep-sast /
+  # dependency-security workflows (2026-05-30, new-file policy); the heavy
+  # scanners (npm-audit / SBOM / Trivy) live in supply-chain.yml. Enforced by
+  # semgrep-sast.gate, sbom-coverage.gate, wp-3-8-supply-chain.gate,
+  # owasp-orchestrator-adoption.gate.
   semgrep:
     name: Semgrep SAST
     runs-on: ubuntu-latest
@@ -2501,9 +2536,9 @@ jobs:
     # theatre. NO `if:` here, so the scan runs on push and pull_request (the
     # top-level triggers) as well as manual dispatch.
     #
-    # Installed via a PINNED `pip install` — NOT `docker run` — because the
-    # Forgejo act_runner runs jobs in node:20-bookworm with NO docker CLI, so the
-    # old `docker run semgrep/semgrep` could never execute on push/PR. The pin
+    # Installed via a PINNED `pip install` — NOT `docker run` — so it runs on
+    # any runner, including container-based ones without a docker CLI (where the
+    # old `docker run semgrep/semgrep` could never execute on push/PR). The pin
     # tracks the semgrep/semgrep:1.103.0 image tag for reproducibility (same
     # version, no `:latest`). Unlike SBOM/trivy/npm-audit (docker-bound, still
     # on-demand via run_supply_chain), Semgrep is pure-Python and needs no docker.
@@ -2517,12 +2552,11 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Install Semgrep (pinned — runner has no docker)
-        # Pin == semgrep/semgrep:1.103.0 for reproducibility. The runner image
-        # (node:20-bookworm) ships python3 WITHOUT pip ("No module named pip",
-        # "pip3: command not found" — act#107 class), so install pip+venv via apt
-        # first and use a venv (bookworm pip is PEP 668 externally-managed; a
-        # venv sidesteps --break-system-packages entirely).
+      - name: Install Semgrep (pinned, pip in a venv)
+        # Pin == semgrep/semgrep:1.103.0 for reproducibility. Some runner images
+        # ship python3 WITHOUT pip ("No module named pip" — act#107 class), so
+        # pip+venv is installed via apt when missing, and a venv is used (PEP 668
+        # externally-managed system pip; a venv sidesteps --break-system-packages).
         run: |
           if command -v sudo >/dev/null 2>&1; then SUDO=sudo; else SUDO=; fi
           if ! python3 -m pip --version >/dev/null 2>&1; then
@@ -2587,8 +2621,8 @@ jobs:
   # aisha-branding.baseline.json): brána je proto ZELENÁ na dnešním stavu a shodí
   # se, jakmile přibude NOVÉ porušení. Dluh smí jen klesat.
   #
-  # Potřebuje Docker/DinD (throwaway PG17) — stejné primitivy jako
-  # blockchain-integration. Když je DinD nedostupný, FAIL LOUD, ne skok do zelené.
+  # Potřebuje Docker (throwaway PG17) — stejné primitivy jako
+  # blockchain-integration. Když je démon nedostupný, FAIL LOUD, ne skok do zelené.
   # ===========================================================================
   surface-contract-gate:
     name: "DB: Kontrakt bloků povrchu (runtime)"
@@ -2609,7 +2643,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # node:20-bookworm má DinD socket, ale ne docker binárku (viz blockchain-integration).
+      # Kontejnerový runner (node:20-bookworm) může mít socket bez docker binárky (viz blockchain-integration).
       - name: Install docker CLI (best-effort)
         continue-on-error: true
         run: |
@@ -2627,10 +2661,10 @@ jobs:
 
       - name: Kontrakt bloků proti throwaway DB
         run: |
-          # DinD je TVRDÝ požadavek: brána měří hodnotu, kterou vydá živá funkce.
+          # Docker je TVRDÝ požadavek: brána měří hodnotu, kterou vydá živá funkce.
           # Skok do zelené by z ní udělal dekoraci — přesně to, čemu má bránit.
           if ! command -v docker >/dev/null 2>&1 || ! timeout 30 docker info >/dev/null 2>&1; then
-            echo "::error title=surface-contract-gate::DinD daemon UNREACHABLE — runtime brána kontraktu NEMŮŽE běžet a NESMÍ skončit zeleně."
+            echo "::error title=surface-contract-gate::Docker daemon UNREACHABLE — runtime brána kontraktu NEMŮŽE běžet a NESMÍ skončit zeleně."
             exit 1
           fi
           # Throwaway řetěz jede přes psql, který v node:20-bookworm není.
@@ -2807,7 +2841,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      # node:20-bookworm má DinD socket, ale ne docker binárku (viz blockchain-integration).
+      # Kontejnerový runner (node:20-bookworm) může mít socket bez docker binárky (viz blockchain-integration).
       - name: Install docker CLI (best-effort)
         continue-on-error: true
         run: |
@@ -2825,10 +2859,10 @@ jobs:
 
       - name: Celá test:db proti throwaway DB (rohatka známých pádů)
         run: |
-          # DinD je TVRDÝ požadavek: bez DB by sada nic nezměřila a skok do
+          # Docker je TVRDÝ požadavek: bez DB by sada nic nezměřila a skok do
           # zelené by z rohatky udělal dekoraci.
           if ! command -v docker >/dev/null 2>&1 || ! timeout 30 docker info >/dev/null 2>&1; then
-            echo "::error title=db-runtime-rohatka::DinD daemon UNREACHABLE — celá test:db NEMŮŽE běžet a NESMÍ skončit zeleně."
+            echo "::error title=db-runtime-rohatka::Docker daemon UNREACHABLE — celá test:db NEMŮŽE běžet a NESMÍ skončit zeleně."
             exit 1
           fi
           if ! command -v psql >/dev/null 2>&1; then
@@ -2873,7 +2907,7 @@ jobs:
   # neznamená „nic tam není", ale „nic jsem nenašel".
   #
   # Přepínač je JEDEN: deklaruj secret `INSTANCE_OVERLAY_REPO` (host/cesta k
-  # overlay repu). Bez něj lane doběhne s viditelným varováním a NIC nepředstírá;
+  # overlay repu) a k němu `GIT_TOKEN` (čtení privátního repa). Bez něj lane doběhne s viditelným varováním a NIC nepředstírá;
   # s ním se overlay stáhne a `AISHA_OVERLAY_REQUIRED=1` udělá ze všech
   # volitelných čtení povinná — kontrola bez overlaye pak spadne se jménem toho,
   # kdo ho potřeboval, místo aby tiše prošla.
@@ -2885,6 +2919,9 @@ jobs:
     name: "Instance: brány nad overlayem"
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      statuses: write   # vlastní commit status `overlay-gates` (co lane prohlédla)
     needs: [detect]
     if: >-
       ${{ needs.detect.outputs.already_verified != 'true' && !cancelled() && (
@@ -2904,20 +2941,10 @@ jobs:
         id: overlay
         env:
           OVERLAY_REPO: ${{ secrets.INSTANCE_OVERLAY_REPO }}
-          # ⚠️ POŘADÍ TOKENŮ = KONVENCE ORGANIZACE NAPŘED.
-          # Naměřeno 2026-09-12 06:08 UTC (Forgejo 16.0.2+gitea-1.22.0):
-          # `REPO_API_TOKEN` je secret ORGANIZACE (`GET /orgs/aisha/actions/secrets`,
-          # jediný tam), `FORGEJO_API_TOKEN` je secret REPA (`GET /repos/aisha/
-          # evymo-ai-orchestrator/actions/secrets`, 100 jmen); FetchActionSecrets
-          # doručí neforkovému běhu oba, fork-PR běhu žádný. 2026-08-06 lane sáhla
-          # jen po `FORGEJO_API_TOKEN`, který tehdy v repu (33 secretů) nebyl,
-          # takže se klonovalo bez pověření a brány mlčky nezměřily nic.
-          # Sesterská brána v instančních datech si přitom v komentáři píše
-          # „konvence organizace (REPO_API_TOKEN, tak to má orchestrator)" —
-          # dvě brány, dvě různá jména pro touž věc, a obě slepé.
-          # Zkouší se proto obě, konvenční (org-scope) jako první.
-          OVERLAY_TOKEN_PRIMARY: ${{ secrets.REPO_API_TOKEN }}
-          OVERLAY_TOKEN_FALLBACK: ${{ secrets.FORGEJO_API_TOKEN }}
+          # Token čtení privátního repa instance — týž secret, kterým nasazení čte
+          # overlaye (GIT_TOKEN). 2026-08-06 lane klonovala bez platného pověření
+          # a brány mlčky nezměřily nic; proto se klon bez tokenu ani nezkouší.
+          OVERLAY_TOKEN: ${{ secrets.GIT_TOKEN }}
         run: |
           set -uo pipefail
           if [ -z "${OVERLAY_REPO:-}" ]; then
@@ -2926,16 +2953,12 @@ jobs:
             exit 0
           fi
           # Adresa overlaye zůstává SECRETEM schválně: nese jméno instance, a to
-          # v generickém kódu platformy stát nesmí (split-rule). Token je věc
-          # druhá — ten se jen zkouší v pořadí.
-          for T in "${OVERLAY_TOKEN_PRIMARY:-}" "${OVERLAY_TOKEN_FALLBACK:-}"; do
-            [ -n "$T" ] || continue
-            if git clone --depth 1 "https://oauth2:${T}@${OVERLAY_REPO}" "${RUNNER_TEMP}/overlay" 2>/dev/null; then
-              echo "have=true" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          done
-          echo "::warning title=overlay-gates::overlay je deklarovaný, ale ŽÁDNÝM z tokenů (REPO_API_TOKEN, FORGEJO_API_TOKEN) se nepodařilo naklonovat — brány nad overlayem NEBĚŽELY. Mlčení by vypadalo jako průchod; doplň platný token s právem číst instanční repo."
+          # v generickém kódu platformy stát nesmí (split-rule).
+          if [ -n "${OVERLAY_TOKEN:-}" ] && git clone --depth 1 "https://x-access-token:${OVERLAY_TOKEN}@${OVERLAY_REPO#https://}" "${RUNNER_TEMP}/overlay" 2>/dev/null; then
+            echo "have=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "::warning title=overlay-gates::overlay je deklarovaný, ale tokenem GIT_TOKEN se nepodařilo naklonovat (chybí nebo nemá právo číst instanční repo) — brány nad overlayem NEBĚŽELY. Mlčení by vypadalo jako průchod; doplň platný token."
           echo "have=false" >> "$GITHUB_OUTPUT"
 
       # ⭐ LANE MUSÍ ŘÍCT, JESTLI PROHLÉDLA — a musí to říct tam, kam se dá dosáhnout.
@@ -2944,7 +2967,7 @@ jobs:
       # proběhnou, tak když jen degraduje na warning a skončí `exit 0`. Ty dva
       # případy NEJDE odlišit: souhrn statusů dá „success" u obou, `created_at`
       # i `updated_at` jsou totožné (délku běhu tedy neposkytne) a logy Actions
-      # tenhle Forgejo přes API nevydává (`/actions/*` → 404, ověřeno).
+      # tehdejší forge přes API nevydával (`/actions/*` → 404, ověřeno).
       # Zelená lane byla tedy k nerozeznání od no-opu — přesně to, co brány mají
       # znemožňovat ostatním.
       #
@@ -2955,10 +2978,9 @@ jobs:
         if: always()
         env:
           MEASURED: ${{ steps.overlay.outputs.have }}
-          TOK: ${{ secrets.REPO_API_TOKEN }}
+          TOK: ${{ github.token }}
           SHA: ${{ github.sha }}
           REPO: ${{ github.repository }}
-          SERVER: ${{ github.server_url }}
         run: |
           set -uo pipefail
           if [ "${MEASURED:-false}" = "true" ]; then
@@ -2972,11 +2994,11 @@ jobs:
             DESC="NEPROHLÉDNUTO — overlay nedostupný (viz warning v běhu)"
           fi
           if [ -z "${TOK:-}" ]; then
-            echo "::warning title=overlay-gates::stav nelze publikovat (chybí REPO_API_TOKEN) — $DESC"
+            echo "::warning title=overlay-gates::stav nelze publikovat (chybí token běhu) — $DESC"
             exit 0
           fi
-          curl -sS -X POST -H "Authorization: token ${TOK}" -H "Content-Type: application/json" \
-            "${SERVER}/api/v1/repos/${REPO}/statuses/${SHA}" \
+          curl -sS -X POST -H "Authorization: Bearer ${TOK}" -H "Accept: application/vnd.github+json" \
+            "${GITHUB_API_URL}/repos/${REPO}/statuses/${SHA}" \
             -d "$(printf '{"state":"%s","context":"overlay-gates","description":"%s"}' "$STATE" "$DESC")" \
             -o /dev/null -w 'status publikován: HTTP %%{http_code}\n' || \
             echo "::warning title=overlay-gates::publikace stavu selhala — $DESC"
@@ -2989,8 +3011,8 @@ jobs:
           # takže jeho nepřítomnost by byla vada zapojení, ne stav světa.
           AISHA_OVERLAY_REQUIRED: "1"
           VITEST_MAX_WORKERS: "2"
-          # Týž rozpočet jako u test:run: 2 workery × halda se SČÍTAJÍ, a runner
-          # pouští 4 joby naráz v jednom DinD (15 GB). Viz komentář u test:run.
+          # Týž rozpočet jako u test:run: 2 workery × halda se SČÍTAJÍ (historie
+          # sdíleného runneru se 4 joby v jednom DinD — viz komentář u test:run).
           NODE_OPTIONS: "--max-old-space-size=2048"
         run: |
           set -o pipefail

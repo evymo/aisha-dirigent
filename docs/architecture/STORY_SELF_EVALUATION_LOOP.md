@@ -312,7 +312,7 @@ Per tvoje zadání — **všechny čtyři osy**, plus workbench/extension/multi-
 
 | Osa | Jak | Kde |
 |---|---|---|
-| **Gate test** | Deterministický `*.gate.test.ts` per PR proti seedovaným fixturám | `src/tests/gates/`, CI job v [.forgejo/ci.yml](../../.forgejo/ci.yml) |
+| **Gate test** | Deterministický `*.gate.test.ts` per PR proti seedovaným fixturám | `src/tests/gates/`, CI job v [.github/workflows/ci.yml](../../.github/workflows/ci.yml) |
 | **Live ověření** | curl/RPC proti běžícímu stacku (žádné SSH — Coolify API / n8n / `rpcService`) | `docs/architecture/STORY_SELF_EVALUATION_RUNBOOK.md` (§ live verify, vzor deploy-doc § 0) |
 | **Cold-start parita** | `scripts/verify-story-self-eval.sh` po `--wipe`, bez prod hodnot, fail-open | navázat na `verify-cold-start-apply.sh` pattern |
 | **Runbook + dashboard** | Runbook + viditelný stav v Appsmith Ops | RUNBOOK doc + PR 6 |

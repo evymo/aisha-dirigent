@@ -265,13 +265,13 @@ describe('OWASP — CI controls', () => {
   // extracted from ci.yml to supply-chain.yml (nightly schedule + dispatch) so
   // the shared runner never carries it at peak. Same controls, new home.
   test('A06 — npm-audit workflow runs across services (matrix)', () => {
-    const wf = readFileSync(join(PROJECT_ROOT, '.forgejo/workflows/supply-chain.yml'), 'utf8');
+    const wf = readFileSync(join(PROJECT_ROOT, '.github/workflows/supply-chain.yml'), 'utf8');
     expect(wf).toMatch(/npm-audit-services/);
     expect(wf).toMatch(/strategy:\s*\n\s*fail-fast: false\s*\n\s*matrix:/);
   });
 
   test('A06/A08 — CycloneDX SBOM step exists in CI', () => {
-    const wf = readFileSync(join(PROJECT_ROOT, '.forgejo/workflows/supply-chain.yml'), 'utf8');
+    const wf = readFileSync(join(PROJECT_ROOT, '.github/workflows/supply-chain.yml'), 'utf8');
     expect(wf).toMatch(/@cyclonedx\/cyclonedx-npm/);
   });
 

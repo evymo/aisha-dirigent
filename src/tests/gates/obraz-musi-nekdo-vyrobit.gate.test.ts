@@ -12,7 +12,7 @@
  *
  * Tři cesty stavějí týž Dockerfile a KAŽDÁ ho tavuje jinak:
  *
- *     CI (.forgejo/workflows/ci.yml)   → aisha-pg17-coldstart
+ *     CI (.github/workflows/ci.yml)   → aisha-pg17-coldstart
  *     Coolify build fáze               → <app-uuid>_<služba>:<commit>
  *     compose při `up` OČEKÁVÁ         → aisha-db-pg17:local
  *

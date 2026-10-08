@@ -66,10 +66,10 @@ The `Mirror SBOM to MinIO` step:
 ### Operator wiring (one-time)
 
 1. **Expose MinIO via secure public endpoint** — choose ONE:
-   - **Option A (preferred)**: Self-hosted Forgejo / GHA runner in
+   - **Option A (preferred)**: Self-hosted GitHub Actions runner in the
      cluster with mesh access. Set env: `AISHA_MINIO_S3_PUBLIC_ENDPOINT=minio:9000`.
      No public exposure of MinIO required.
-   - **Option B**: Public-facing MinIO route at `minio.backend.id3a.cz` with
+   - **Option B**: Public-facing MinIO route at `minio.<your-domain>` with
      dedicated IAM service-account for CI (read-only on most buckets,
      write-only on `aisha-sbom-artifacts`). Add to Coolify
      `docker_compose_domains` for MinIO service.
@@ -85,8 +85,8 @@ The `Mirror SBOM to MinIO` step:
      "Resource":"arn:aws:s3:::aisha-sbom-artifacts/*"
    }]}
    ```
-3. **Add GHA repo secrets** (or Forgejo equivalent):
-   - `AISHA_MINIO_S3_PUBLIC_ENDPOINT` — `minio.backend.id3a.cz` or `minio:9000`
+3. **Add GitHub Actions repo secrets** (the mirror step is opt-in — it is skipped while unset):
+   - `AISHA_MINIO_S3_PUBLIC_ENDPOINT` — `minio.<your-domain>` or `minio:9000`
    - `AISHA_MINIO_ACCESS_KEY` — `aisha-sbom-ci`
    - `AISHA_MINIO_SECRET_KEY` — the password set above
 4. **Trigger one workflow run** to confirm upload works:

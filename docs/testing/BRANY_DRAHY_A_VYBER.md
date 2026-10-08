@@ -6,9 +6,10 @@
 ## Proč to vzniklo
 
 Sada bran měla 630 souborů a pouštěla se vždy celá. Pre-push hook s ní běžel
-20–35 minut a byl jedinou existující kontrolou — Forgejo Actions je na tomhle
-repu vypnuté (`enable_actions=false`), takže serverové CI se nikdy nespouští.
-Stavění a nasazování dělá Coolify, testy na serveru neběží.
+20–35 minut a byl tehdy jedinou kontrolou, která se na tomhle repu opravdu
+spouštěla — serverové CI bylo vypnuté. Dnes běží CI v GitHub Actions
+(`.github/workflows/ci.yml`, job `Web: Tests` → `npm run test:gates`); výběr
+drah níž zůstává tím, co spouští pre-push lokálně (`npm run test:gates:dotcene`).
 
 Ekonomika té smyčky tlačí k částečnému ověřování („pustím jen tu jednu bránu"),
 a to selhává tiše.
@@ -105,7 +106,7 @@ změna jednoho compose souboru → 7 bran místo 627 → 8 s místo 53 s
 ### Fail-closed je základ, ne výjimka
 
 Cestu, kterou mapa nezná, NELZE mlčky prohlásit za nedotčenou. Táž třída mapy
-se v `.forgejo/workflows/ci.yml` zdokumentovaně spletla **třikrát** (chyběly
+se v `.github/workflows/ci.yml` zdokumentovaně spletla **třikrát** (chyběly
 `apps/`, `docker-compose*.yml` + `config/`, `packages/`) a pokaždé to znamenalo,
 že „zelená znamenala NEMĚŘENO". Neznámá cesta proto padá na celou lehkou dráhu.
 

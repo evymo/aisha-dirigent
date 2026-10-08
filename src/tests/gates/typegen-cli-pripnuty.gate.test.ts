@@ -10,7 +10,7 @@
  *
  * Hlídá:
  *  1. žádné `supabase@latest|next|beta|^…|~…` ani `npx supabase gen` bez verze v nástrojích
- *     a CI (scripts/, .forgejo/, package.json) — verze se zvedá VĚDOMÝM PR;
+ *     a CI (scripts/, .github/, package.json) — verze se zvedá VĚDOMÝM PR;
  *  2. TYPEGEN_CLI v gen-types.mjs je přesná verze;
  *  3. adresa pro generátor: loopback bez sslmode → sslmode=disable, jinak beze změny.
  */
@@ -22,7 +22,7 @@ import { adresaProGeneratorTypu } from "../../../scripts/db/lib/typegen-db-url.m
 const ROOT = process.cwd();
 
 /**
- * Soubory nástrojů a CI: celé `scripts/` a `.forgejo/` + každý `package.json` stromu.
+ * Soubory nástrojů a CI: celé `scripts/` a `.github/` + každý `package.json` stromu.
  * Procházka, ne `git ls-files`: brána na lehké dráze nemá spouštět podproces
  * (ratchet `drahy-bran-manifest`). Závislosti a výstupy buildu se přeskakují.
  */
@@ -39,10 +39,10 @@ function projdi(adresar: string, vezmi: (rel: string) => boolean, out: string[])
 
 function sledovane(): string[] {
   const vse: string[] = [];
-  for (const koren of ["scripts", ".forgejo"]) {
+  for (const koren of ["scripts", ".github"]) {
     if (existsSync(join(ROOT, koren))) projdi(koren, () => true, vse);
   }
-  projdi("", (rel) => rel.endsWith("package.json") && !rel.startsWith("scripts") && !rel.startsWith(".forgejo"), vse);
+  projdi("", (rel) => rel.endsWith("package.json") && !rel.startsWith("scripts") && !rel.startsWith(".github"), vse);
   return vse.filter((f) =>
     /\.(mjs|cjs|js|ts|sh|ya?ml|json)$/.test(f) &&
     !f.endsWith("package-lock.json") &&
@@ -58,7 +58,7 @@ describe("generátor typů: připnutá verze CLI", () => {
     expect(s).toContain("scripts/db/gen-types.mjs");
     expect(s).toContain("package.json");
     expect(s).toContain("mobile-app/package.json");
-    expect(s.some((f) => /^\.forgejo\/.+\.ya?ml$/.test(f))).toBe(true);
+    expect(s.some((f) => /^\.github\/.+\.ya?ml$/.test(f))).toBe(true);
     expect(s.some((f) => f.split("/").length >= 3 && f.endsWith("package.json"))).toBe(true);
     expect(s.some((f) => f.includes("node_modules/"))).toBe(false);
   });

@@ -117,7 +117,7 @@ const PRAVIDLA = [
     // se zapisuje na sdíleného démona. Naměřeno při prvním běhu tohohle skriptu:
     // bez téhle výjimky by „oprava" rozpojila funkční odkaz.
     ok: (radek, _m, klice) => radek.includes("APP_NAME_PREFIX") || klice.has(`aisha-${_m[1]}`),
-    jen: (rel) => /\.(yml|yaml|template)$/.test(rel) && !rel.startsWith(".forgejo/") && !rel.startsWith(".github/"),
+    jen: (rel) => /\.(yml|yaml|template)$/.test(rel) && !rel.startsWith(".github/"),
   },
 ];
 

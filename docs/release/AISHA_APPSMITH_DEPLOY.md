@@ -72,7 +72,7 @@ node scripts/build-aisha-appsmith.mjs --force --slug aisha-ops
 
 ### Manual UI import (current path)
 
-1. Open Appsmith UI (`https://appsmith.backend.id3a.cz/` or equivalent).
+1. Open Appsmith UI (`https://appsmith.<your-domain>/` or equivalent).
 2. Sign in as admin.
 3. **Dashboards** (`aisha-ops`): navigate to your workspace → **Import** → upload `dist/appsmith/aisha-ops.json`. Appsmith replaces the application.
 4. **Pages** (`playwright-qa`, `aitg-automation-control`): open the AISHA Ops application → **Pages** sidebar → **+ Add page** → paste the page JSON or use Appsmith's "Import page" if your version exposes it.

@@ -22,7 +22,7 @@ import { ENV_DB_POVINNA, MIMO_SADU, SADA, ZNACKA_DB_NEDOSTUPNA } from "../../../
 
 const ROOT = process.cwd();
 const cti = (p: string) => readFileSync(path.join(ROOT, p), "utf8");
-const CI = cti(".forgejo/workflows/ci.yml");
+const CI = cti(".github/workflows/ci.yml");
 const PKG = JSON.parse(cti("package.json")) as { scripts: Record<string, string> };
 const BASELINE = JSON.parse(cti(`${SADA}/test-db.baseline.json`)) as { pady: string[] };
 

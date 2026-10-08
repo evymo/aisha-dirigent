@@ -69,7 +69,7 @@ describe("Node 22 everywhere", () => {
   test("every CI setup-node pins Node 22 (env refs + runner-base comments excluded)", () => {
     const offenders: string[] = [];
     for (const f of walkFiles(ROOT, (n) => /\.ya?ml$/.test(n))) {
-      if (!/\.(forgejo|github)\/workflows\//.test(rel(f))) continue;
+      if (!/\.github\/workflows\//.test(rel(f))) continue;
       read(f)
         .split("\n")
         .forEach((line, i) => {

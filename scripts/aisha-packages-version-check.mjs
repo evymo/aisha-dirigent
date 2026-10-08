@@ -223,7 +223,7 @@ function main() {
   console.log('');
   console.log(`${RED}${BOLD}✗ Stale-publish guard${NC}`);
   console.log('');
-  console.log(`The auto-publish workflow (.forgejo/workflows/aisha-packages-publish.yml)`);
+  console.log(`The auto-publish workflow (.github/workflows/aisha-packages-publish.yml)`);
   console.log(`is idempotent on the package version. Shipping code changes without a`);
   console.log(`version bump means the workflow runs but skips the publish — Verdaccio`);
   console.log(`stays stale and consumers using "@aisha/<pkg>": "*" keep getting old code.`);

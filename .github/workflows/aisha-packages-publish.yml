@@ -1,12 +1,22 @@
 # =============================================================================
-# AISHA packages auto-publish to Verdaccio
+# AISHA packages auto-publish to a private npm registry (Verdaccio) — OPT-IN
 # =============================================================================
 # When a push to main touches packages/*, this workflow rebuilds + republishes
 # every publishable @aisha/* package whose workspace version is ahead of the
-# Verdaccio registry. Closes the "stale Verdaccio publish" gap that caused PR
-# #73's svc-plugin-system test failure (Verdaccio had @aisha/security 0.1.1
-# without constantTimeStringCompare while packages/security/src/ already had
-# it).
+# configured Verdaccio registry. Closes the "stale Verdaccio publish" gap that
+# caused PR #73's svc-plugin-system test failure (Verdaccio had @aisha/security
+# 0.1.1 without constantTimeStringCompare while packages/security/src/ already
+# had it).
+#
+# OPT-IN: nothing here is needed to build or test the platform — every @aisha/*
+# package is an npm workspace built from source, third-party packages come from
+# the default npm registry. A repository publishes ONLY when it declares its own
+# registry in the repository variable VERDACCIO_URL; without it the job is
+# skipped (shown as skipped, not green). Forks do not inherit repository
+# variables, so a fork never writes into someone else's registry.
+# (Why not `NPM_REGISTRY_URL`: that key already means the INSTALL registry in
+# the env-doctor contract and defaults to registry.npmjs.org — reusing it here
+# would publish @aisha/* to the public registry.)
 #
 # Idempotent: the script (scripts/aisha-packages-publish.mjs) compares each
 # workspace package.json version against the latest published version and
@@ -18,8 +28,10 @@
 #   - push to main when packages/** changes
 #   - manual via workflow_dispatch (operator can force a publish sweep)
 #
-# Required secrets:
-#   VERDACCIO_TOKEN   JWT with publish scope for @aisha/* on npm.id3a.cz
+# Repository configuration:
+#   vars.VERDACCIO_URL         registry URL (the opt-in switch)
+#   secrets.VERDACCIO_USER + VERDACCIO_PASSWORD   preferred (token minted per run)
+#   secrets.VERDACCIO_TOKEN    fallback static token with publish scope for @aisha/*
 # =============================================================================
 
 name: AISHA Packages Publish
@@ -32,7 +44,7 @@ on:
       # Re-run if the publish runner itself changes (so a bug fix in the runner
       # picks up packages that should have already been published but weren't).
       - 'scripts/aisha-packages-publish.mjs'
-      - '.forgejo/workflows/aisha-packages-publish.yml'
+      - '.github/workflows/aisha-packages-publish.yml'
   workflow_dispatch:
     inputs:
       dry_run:
@@ -58,6 +70,9 @@ on:
         type: boolean
         default: false
 
+permissions:
+  contents: read
+
 concurrency:
   # Only one publish sweep runs at a time. A second push to main while one is
   # mid-flight is queued; we never publish the same version twice (the script
@@ -72,15 +87,14 @@ env:
 jobs:
   publish:
     name: Publish @aisha/* to Verdaccio
-    # Publisher of record: ONLY the SoT repo of the packages publishes @aisha/*.
+    # Publisher of record = the repository that declares a registry of its own.
     # Forks inherit this workflow (and its push-to-main trigger) but must never
-    # write to the shared registry — two writers race for the same names, and a
-    # fork-side build could shadow the upstream artefact. Measured on the riq
-    # fork 2026-07-27: three consecutive main pushes red on this job over a
-    # version bump born in a fork merge commit. Identity is pinned by full repo
-    # name, so the guard also blocks workflow_dispatch on forks (intended —
-    # owner decision: forks never publish, not even manually).
-    if: github.repository == 'aisha/evymo-ai-orchestrator'
+    # write to a registry they do not own — two writers race for the same names,
+    # and a fork-side build could shadow the upstream artefact (measured on a fork
+    # 2026-07-27: three consecutive main pushes red over a version bump born in a
+    # fork merge commit). Repository variables are not inherited by forks, so the
+    # variable is the identity: no repository name is written into this file.
+    if: vars.VERDACCIO_URL != ''
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -114,12 +128,8 @@ jobs:
           VERDACCIO_USER: ${{ secrets.VERDACCIO_USER }}
           VERDACCIO_PASSWORD: ${{ secrets.VERDACCIO_PASSWORD }}
         run: |
-          # VERDACCIO_URL comes from the vars.VERDACCIO_URL Actions VARIABLE (env
-          # block at job top). Fail fast with an actionable message if unset.
-          if [ -z "$VERDACCIO_URL" ]; then
-            echo "::error::vars.VERDACCIO_URL Actions variable is not set — set it at the org level (aisha) so all publish/CI workflows resolve the Verdaccio registry. Cannot publish."
-            exit 1
-          fi
+          # VERDACCIO_URL comes from the vars.VERDACCIO_URL repository VARIABLE
+          # (env block at the top); the job only runs when it is set.
           # Prefer a freshly-minted token (no 30-day expiry drift).
           if [ -n "$VERDACCIO_USER" ] && [ -n "$VERDACCIO_PASSWORD" ]; then
             if FRESH="$(node scripts/verdaccio-mint-token.mjs --check 2>/dev/null)" && [ -n "$FRESH" ]; then
@@ -129,22 +139,16 @@ jobs:
               echo "::warning::Verdaccio token mint failed; falling back to static VERDACCIO_TOKEN secret"
             fi
           fi
-          # No credentials = THIS CHECKOUT IS NOT THE PUBLISHER, which is the
-          # normal state of a fork: the shared registry is published from the
-          # upstream repository, and a fork publishes only if it configures a
-          # registry of its OWN (set VERDACCIO_USER+VERDACCIO_PASSWORD, or
-          # VERDACCIO_TOKEN, on that fork). Measured 2026-07-29: upstream holds
-          # VERDACCIO_TOKEN, the fork holds none — so on the fork this job
-          # red-failed on EVERY packages/** push forever, for doing exactly what
-          # it should do, which is nothing.
-          #
-          # Skipped, not failed — but LOUDLY (warning + audit line), because the
-          # gap this workflow exists to close is a SILENT stale registry. On the
-          # publisher the credential is present, so a lost token still fails the
-          # publish itself; what is tolerated here is only "this repo does not
-          # publish", never "this repo failed to publish".
+          # A registry WITHOUT credentials is a half-configured publisher: the
+          # repository said "I publish" (vars.VERDACCIO_URL) but cannot. Measured
+          # 2026-07-29 on a fork: a job that red-failed on EVERY packages/** push
+          # for doing nothing taught people to ignore it — so this is skipped, not
+          # failed — but LOUDLY (warning + audit line), because the gap this
+          # workflow exists to close is a SILENT stale registry. On a configured
+          # publisher a lost token still fails the publish itself; what is
+          # tolerated here is only "credentials missing", never "publish failed".
           if [ -z "$VERDACCIO_TOKEN" ]; then
-            echo "::warning title=publish skipped::No Verdaccio credentials in this repository — not the publisher, skipping. This is expected on a fork; the shared registry is published from upstream. To publish from here, set VERDACCIO_USER+VERDACCIO_PASSWORD (preferred, auto-refresh) or VERDACCIO_TOKEN on THIS repository."
+            echo "::warning title=publish skipped::vars.VERDACCIO_URL is set but no Verdaccio credentials are — nothing published. Set VERDACCIO_USER+VERDACCIO_PASSWORD (preferred, auto-refresh) or VERDACCIO_TOKEN on THIS repository."
             echo "publish=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -222,7 +226,7 @@ jobs:
             --arg ref "${REF:-main}" \
             --arg sha "${SHA:-unknown}" \
             '{
-              p_service_name: "forgejo",
+              p_service_name: "github",
               p_action: "aisha_packages_publish",
               p_action_detail: { outcome: $outcome, ref: $ref, sha: $sha },
               p_status: $outcome,

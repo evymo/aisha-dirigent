@@ -202,7 +202,6 @@ function listTrackedFiles() {
     .filter((p) => {
       // Only scan script-like files
       if (p.startsWith('scripts/')) return true;
-      if (p.startsWith('.forgejo/workflows/')) return true;
       if (p.startsWith('.github/workflows/')) return true;
       if (p.startsWith('.husky/')) return true;
       if (p.endsWith('.sh') || p.endsWith('.mjs') || p.endsWith('.js')) return true;

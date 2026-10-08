@@ -11,7 +11,7 @@
  *
  * ⭐ Brána SPOUŠTÍ skutečný detektor (scripts/aisha-changed-apps.mjs) v dočasném
  * repu se skutečným manifestem a compose soubory, jeho `deploy_apps` dosadí do
- * SKUTEČNÝCH podmínek úloh z .forgejo/workflows/ci.yml a vyhodnotí je
+ * SKUTEČNÝCH podmínek úloh z .github/workflows/ci.yml a vyhodnotí je
  * (lib/ci-vyraz). Hrubé příznaky nastaví na NEJHORŠÍ případ (`true`), takže
  * relevance na nich záviset nesmí; testovací úlohy jsou zelené.
  */
@@ -21,10 +21,10 @@ import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import yaml from "js-yaml";
-import { vyhodnotit, type Hodnota } from "./lib/ci-vyraz";
+import { SVET_S_INSTANCI, vyhodnotit, type Hodnota } from "./lib/ci-vyraz";
 
 const ROOT = process.cwd();
-const WF = yaml.load(readFileSync(join(ROOT, ".forgejo/workflows/ci.yml"), "utf8")) as {
+const WF = yaml.load(readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8")) as {
   jobs: Record<string, { if?: string }>;
 };
 const CISTE_PROSTREDI = { PATH: process.env.PATH ?? "", HOME: tmpdir(), GIT_CONFIG_NOSYSTEM: "1" };
@@ -79,7 +79,7 @@ function deployApps(soubory: string[]): string {
 function spusti(uloha: string, deployAppsHodnota: string): boolean {
   const vyraz = String(WF.jobs[uloha]?.if ?? "");
   if (!vyraz) throw new Error(`úloha ${uloha} nemá podmínku — brána ztratila předmět`);
-  const svet: Record<string, Hodnota> = { "github.event_name": "push", "github.ref": "refs/heads/main" };
+  const svet: Record<string, Hodnota> = { ...SVET_S_INSTANCI, "github.event_name": "push", "github.ref": "refs/heads/main" };
   for (const m of vyraz.matchAll(/needs\.([A-Za-z0-9_-]+)\.result/g)) svet[m[0]] = "success";
   for (const m of vyraz.matchAll(/needs\.detect\.outputs\.([A-Za-z0-9_]+)/g)) svet[m[0]] = "true";
   svet["needs.detect.outputs.already_verified"] = "false";

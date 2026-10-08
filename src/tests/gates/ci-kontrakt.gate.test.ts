@@ -30,7 +30,7 @@ const n = nalezyKontraktu({ reference, kontrakt: KONTRAKT_CI, racna, doktor, ove
 
 describe("kontrakt tajemství a proměnných CI", () => {
   it("měřidlo vidí workflow i kontrakt doktora (jinak by brána mlčela)", () => {
-    expect(reference.size, "žádný odkaz secrets./vars. ve .forgejo/workflows").toBeGreaterThan(10);
+    expect(reference.size, "žádný odkaz secrets./vars. ve .github/workflows").toBeGreaterThan(10);
     expect(doktor.size, "kontrakt aisha-env-doctor nejde přečíst").toBeGreaterThan(100);
   });
 

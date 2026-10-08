@@ -84,8 +84,8 @@ describe("mobilní bundle — CI vidí na všechno, co se rozkládá", () => {
     // mergnout naslepo — což je přesně, jak vznikl PR #140.
     expect(
       ci.radek,
-      "filtr MOBILE_APP nereaguje na .forgejo/workflows/ — balicí krok by neproběhl " +
+      "filtr MOBILE_APP nereaguje na .github/workflows/ — balicí krok by neproběhl " +
         "ani na PR, který ho mění",
-    ).toContain(".forgejo/workflows/");
+    ).toContain(".github/workflows/");
   });
 });

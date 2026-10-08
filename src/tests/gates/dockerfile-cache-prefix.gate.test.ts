@@ -221,7 +221,7 @@ const JE_BUILD = [
 ];
 
 function stavitelskeSoubory(): string[] {
-  const out = execFileSync("git", ["ls-files", ".forgejo/workflows", "scripts"], {
+  const out = execFileSync("git", ["ls-files", ".github/workflows", "scripts"], {
     cwd: ROOT,
     encoding: "utf-8",
     stdio: ["ignore", "pipe", "pipe"],

@@ -38,10 +38,10 @@ import { readFileSync, readdirSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import { vyhodnotit, type Hodnota } from "./lib/ci-vyraz";
+import { SVET_S_INSTANCI, vyhodnotit, type Hodnota } from "./lib/ci-vyraz";
 
 const ROOT = process.cwd();
-const CI = join(ROOT, ".forgejo/workflows/ci.yml");
+const CI = join(ROOT, ".github/workflows/ci.yml");
 const MANIFEST = join(ROOT, "coolify/manifests/aisha.manifest");
 const BASELINE = join(__dirname, "stack-bez-deploy-ulohy.baseline.json");
 
@@ -178,6 +178,7 @@ describe("stack bez deploy úlohy (brána)", () => {
           const appka = m[1];
           // Svět, ve kterém je JEDINÝM důvodem právě tahle appka.
           const svet: Record<string, Hodnota> = {
+            ...SVET_S_INSTANCI,
             "github.event_name": "push",
             "github.ref": "refs/heads/main",
             "needs.detect.outputs.deploy_apps": `,${appka},`,
@@ -339,7 +340,7 @@ describe("stack bez deploy úlohy (brána)", () => {
   // `jen_kontrakt`), je nešlo dohnat přes CI — jen ručně v Coolify. Ruční dispatch je
   // druhá CI cesta a musí znát KAŽDOU appku z téhož zdroje, ze kterého nasazují vlny.
   test("ruční dispatch (deploy.yml) zná každou appku z WAVES a umí z ní složit jméno", () => {
-    const dispatch = yaml.load(readFileSync(join(ROOT, ".forgejo/workflows/deploy.yml"), "utf8")) as {
+    const dispatch = yaml.load(readFileSync(join(ROOT, ".github/workflows/deploy.yml"), "utf8")) as {
       on?: { workflow_dispatch?: { inputs?: { stack?: { options?: string[] } } } };
       true?: { workflow_dispatch?: { inputs?: { stack?: { options?: string[] } } } };
       jobs?: Record<string, { steps?: Array<{ run?: string }> }>;

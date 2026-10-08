@@ -41,7 +41,7 @@ import yaml from "js-yaml";
 import { duvodVynechanoSnapshotem } from "./lib/vynechano-snapshotem";
 
 const ROOT = process.cwd();
-const CI = join(ROOT, ".forgejo/workflows/ci.yml");
+const CI = join(ROOT, ".github/workflows/ci.yml");
 
 /**
  * Every workflow that resolves a Coolify UUID — not just ci.yml. deploy.yml is
@@ -49,10 +49,9 @@ const CI = join(ROOT, ".forgejo/workflows/ci.yml");
  * to ci.yml alone leaves the two lanes people actually deploy from still blind.
  */
 const RESOLVER_WORKFLOWS = [
-  ".forgejo/workflows/ci.yml",
-  ".forgejo/workflows/deploy.yml",
-  ".forgejo/workflows/staging-deploy.yml",
+  ".github/workflows/ci.yml",
   ".github/workflows/deploy.yml",
+  ".github/workflows/staging-deploy.yml",
 ];
 
 /**

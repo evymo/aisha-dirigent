@@ -82,19 +82,17 @@ npm run test                  # runs both VS Code + CLI specs
 docker compose down
 ```
 
-### CI (Forgejo Actions — pure-Node tier only)
+### CI (GitHub Actions — pure-Node tier only)
 
-`.forgejo/workflows/e2e-dirigent.yml` runs a **pure-Node subset** of this
+`.github/workflows/e2e-dirigent.yml` runs a **pure-Node subset** of this
 suite — boots the mock backend in-process (no Docker), runs the CLI
 hook + relay specs against it. Target wall time: < 5 min.
 
-**Why CI doesn't run the full Docker stack:** the only Forgejo runner
-currently registered on `repo.id3a.cz` (`aisha-runner`, labels:
-`ubuntu-latest, ubuntu-22.04, self-hosted`) does not have DinD enabled.
-Until a docker-capable runner is added, the VS Code Playwright tier is
-**local-dev verification only** — contributors run
-`npm run test:e2e:dirigent` from their workstation before merging
-supervisor-affecting changes.
+**Why CI doesn't run the full Docker stack:** the CLI tier is the part
+that must hold on every runner (it needs no Docker and finishes in minutes);
+the VS Code Playwright tier boots code-server + Chromium and stays
+**local-dev verification** — contributors run `npm run test:e2e:dirigent`
+from their workstation before merging supervisor-affecting changes.
 
 | Tier | Runs in CI | Runs locally | Coverage |
 |---|---|---|---|

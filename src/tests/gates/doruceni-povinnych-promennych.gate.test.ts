@@ -41,7 +41,7 @@ describe("doručení povinných proměnných compose (brána)", () => {
       "scripts/cold-start-doctor.sh",
       "scripts/local-compose-gen.mjs",
       "scripts/local-warmup.sh",
-      ".forgejo/workflows/ci.yml",
+      ".github/workflows/ci.yml",
     ]) {
       expect(existsSync(join(ROOT, p)), `${p} chybí`).toBe(true);
     }
@@ -187,7 +187,7 @@ describe("doručení povinných proměnných compose (brána)", () => {
       const graf = [...grafImportu(KNIHOVNA)].sort();
       expect(graf, "graf importů je podezřele malý — parser importů přestal sedět").toContain("scripts/lib/compose-env-refs.mjs");
 
-      const yml = cti(".forgejo/workflows/ci.yml");
+      const yml = cti(".github/workflows/ci.yml");
       const ulohy = yml.split(/\n(?= {2}[a-z0-9-]+:\s*\n)/);
       const volajici = ulohy.filter((u) => /(?<![\w./-])bash[ \t]+scripts\/ci\/deploy-and-verify\.sh/.test(u));
       expect(volajici.length, "žádná úloha nevolá deploy-and-verify.sh — brána by neměřila nic").toBeGreaterThan(0);

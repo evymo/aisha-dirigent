@@ -49,7 +49,7 @@ Autorita je `coolify/manifests/aisha.manifest`, ne odhad:
 
 ```bash
 grep '^app:' coolify/manifests/aisha.manifest      # jméno:vrstva:compose
-grep -n 'deploy-and-verify.sh\|coolify-resolve-uuid.sh' .forgejo/workflows/ci.yml
+grep -n 'deploy-and-verify.sh\|coolify-resolve-uuid.sh' .github/workflows/ci.yml
 ```
 
 Hlídají to brány `stack-bez-deploy-ulohy` (compose s `build:` musí být

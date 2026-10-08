@@ -121,7 +121,7 @@ the **AISHA workspace** directory, passed to the server as `AISHA_WORKSPACE`.
 
 ## Release
 
-`.forgejo/workflows/claude-app-release.yml` builds and publishes the `.mcpb` on a
+`.github/workflows/claude-app-release.yml` builds and publishes the `.mcpb` on a
 dedicated tag (so the Claude app releases independently of the monorepo version):
 
 ```bash

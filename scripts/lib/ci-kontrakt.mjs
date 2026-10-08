@@ -1,42 +1,50 @@
 #!/usr/bin/env node
 /**
- * ci-kontrakt.mjs — tajemství a proměnné, které čtou workflow CI (Forgejo
- * Actions), odkud se berou a jestli je repo opravdu MÁ.
+ * ci-kontrakt.mjs — tajemství a proměnné, které čtou workflow CI (GitHub
+ * Actions, .github/workflows/), odkud se berou a jestli je repo opravdu MÁ.
  *
  * ⛔ NAMĚŘENO 2026-09-27 na upstream mainu: workflow odkazují 49 jmen
  * (`secrets.X`, `vars.X`) a ~35 z nich neexistuje v repu, ve forku ani
  * v organizaci. Krok se pak spustí s PRÁZDNOU hodnotou — a nic to neřekne.
- * Env-doktor hlídá env pro Coolify, cold-start doktor jen dosažitelnost
- * Forgeja; otázku „má repo všechno, co jeho CI čte?“ nekladl nikdo.
- * (Majitel 2026-09-26: token balíčků kiosku ať zná doktor i warmup.)
+ * Env-doktor hlídá env pro Coolify; otázku „má repo všechno, co jeho CI
+ * čte?“ nekladl nikdo. (Majitel 2026-09-26: token balíčků kiosku ať zná
+ * doktor i warmup.)
  *
  * Tenhle modul je JEDINÉ místo, kde se na ni odpovídá:
  *   · KONTRAKT_CI — co CI čte a ODKUD to pochází. Zdroj „trezor“ jen ODKAZUJE
  *     na klíč z kontraktu aisha-env-doctor (týž název) — druh ani odvození se
  *     tu nekopírují; brána `ci-kontrakt` hlídá, že klíč v doktorovi existuje.
- *   · report — kontrakt × Forgejo (repo + organizace, JEN JMÉNA) × trezor
- *     (má hodnotu?) × ověřovače (zásuvné funkce nad hodnotou z trezoru).
- *   · apply — trezor → Forgejo (PUT secret / variable). Mění trvalou
- *     konfiguraci repa, proto JEN ručně, s výslovným potvrzením repa pro
- *     každý běh; nikdy z CI ani z warmupu. Hodnoty z Forgeja zpět vyčíst nejde
- *     a nezkouší se to.
+ *   · report — kontrakt × repo na GitHubu (repo + tajemství/proměnné
+ *     organizace sdílené s repem, JEN JMÉNA) × trezor (má hodnotu?) ×
+ *     ověřovače (zásuvné funkce nad hodnotou z trezoru).
+ *   · apply — trezor → repo (proměnná přes REST, tajemství přes `gh secret
+ *     set`, které hodnotu zašifruje veřejným klíčem repa). Mění trvalou
+ *     konfiguraci repa, proto JEN ručně, s výslovným potvrzením repa pro každý
+ *     běh; nikdy z CI ani z warmupu. Hodnoty tajemství zpět vyčíst nejde a
+ *     nezkouší se to.
+ *
+ * Většina položek je OPT-IN (nasazení, kiosk, publikace): veřejný klon bez
+ * nich CI projde, jen se ty úlohy přeskočí. `povinne` říká, bez čeho daná
+ * dráha nefunguje, když je zapnutá.
  *
  * Hodnoty se NIKDY nevypisují — ani délky, ani otisky. Jen jména a akce.
  *
- * Oprávnění: výpis tajemství a proměnných repa i organizace vyžaduje token
- * SPRÁVCE repa/organizace (Forgejo vrací 403 jinak); stačí scope
- * `read:repository` + `read:organization`, pro `apply` `write:repository`.
- * Bez oprávnění je výsledek NEMĚŘENO, ne prázdný seznam.
+ * Oprávnění: výpis tajemství a proměnných vyžaduje token SPRÁVCE repa
+ * (GitHub vrací 403/404 jinak); fine-grained token s „Secrets: read“ +
+ * „Variables: read“, pro `apply` „write“. Bez oprávnění je výsledek NEMĚŘENO,
+ * ne prázdný seznam.
  *
  * CLI:
  *   node scripts/lib/ci-kontrakt.mjs --repo <vlastník/repo> [--env-file <trezor>]
  *   node scripts/lib/ci-kontrakt.mjs --repo <v/r> --env-file <trezor> --apply --potvrzuji <v/r>
- * Prostředí: FORGEJO_URL (nebo --forgejo <url>), FORGEJO_TOKEN.
+ * Prostředí: GITHUB_TOKEN (nebo GH_TOKEN), GITHUB_API_URL (nebo --api <url>:
+ * https://api.github.com, GitHub Enterprise https://<host>/api/v3 — bez ní NEMĚŘENO).
  *
  * Návratový kód (jako povinne-promenne): 0 = vše sedí · 1 = nález ·
- * 2 = NEMĚŘENO (Forgejo nečitelné, chybný vstup) · 3 = bez nálezu, ale část
+ * 2 = NEMĚŘENO (repo nečitelné, chybný vstup) · 3 = bez nálezu, ale část
  * změřit nešla (trezor, ověřovač).
  */
+import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -48,7 +56,7 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
 /**
  * Co CI čte a odkud. Pole:
- *   jmeno   — jméno v Forgeju (secrets.X / vars.X)
+ *   jmeno   — jméno v repu (secrets.X / vars.X)
  *   druh    — "secret" | "var"
  *   zdroj   — { trezor: "KLIC" } (klíč kontraktu aisha-env-doctor) | "externi"
  *             (vydává člověk/správce mimo trezor; apply ho nedoplní)
@@ -60,12 +68,12 @@ const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
  * — jako MNOŽINA jmen: vypadnout smí, přibýt ne.
  */
 export const KONTRAKT_CI = [
-  { jmeno: "COOLIFY_URL", druh: "secret", zdroj: { trezor: "COOLIFY_URL" }, povinne: true, ucel: "nasazení a stav aplikací přes Coolify API" },
-  { jmeno: "COOLIFY_API_TOKEN", druh: "secret", zdroj: "externi", povinne: true, ucel: "nasazení přes Coolify API (token vydává Coolify)" },
-  { jmeno: "APP_NAME_PREFIX", druh: "var", zdroj: { trezor: "APP_NAME_PREFIX" }, povinne: true, ucel: "identita instance pro jména aplikací (bez ní nasazení STOP)" },
-  { jmeno: "REGISTRY_PROXY", druh: "var", zdroj: { trezor: "REGISTRY_PROXY" }, povinne: false, ucel: "centrální cache obrazů" },
+  { jmeno: "COOLIFY_URL", druh: "secret", zdroj: { trezor: "COOLIFY_URL" }, povinne: true, ucel: "nasazení a stav aplikací přes Coolify API (opt-in nasazení)" },
+  { jmeno: "COOLIFY_API_TOKEN", druh: "secret", zdroj: "externi", povinne: true, ucel: "nasazení přes Coolify API (token vydává Coolify; opt-in nasazení)" },
+  { jmeno: "APP_NAME_PREFIX", druh: "var", zdroj: { trezor: "APP_NAME_PREFIX" }, povinne: true, ucel: "identita instance pro jména aplikací — a přepínač nasazení: bez ní se deploy úlohy přeskočí" },
+  { jmeno: "REGISTRY_PROXY", druh: "var", zdroj: { trezor: "REGISTRY_PROXY" }, povinne: false, ucel: "volitelná pull-through cache obrazů Docker Hubu (prázdná = stahuje se přímo)" },
   { jmeno: "INSTANCE_OVERLAY_REPO", druh: "secret", zdroj: "externi", povinne: false, ucel: "repo dat instance (host/vlastník/repo) pro overlay v CI" },
-  { jmeno: "REPO_API_TOKEN", druh: "secret", zdroj: "externi", povinne: false, ucel: "čtení repa dat instance v CI" },
+  { jmeno: "GIT_TOKEN", druh: "secret", zdroj: "externi", povinne: false, ucel: "čtení privátních rep instance v CI: overlaye (cachebust, brány, mobil) a registr forků" },
   { jmeno: "API_DOMAIN_PUBLIC", druh: "secret", zdroj: { trezor: "API_DOMAIN_PUBLIC" }, povinne: false, ucel: "ověření nasazení (deploy.yml)" },
   { jmeno: "APP_DOMAIN", druh: "secret", zdroj: { trezor: "APP_DOMAIN" }, povinne: false, ucel: "ověření nasazení (deploy.yml)" },
   { jmeno: "KEYCLOAK_DOMAIN", druh: "secret", zdroj: { trezor: "KEYCLOAK_DOMAIN" }, povinne: false, ucel: "ověření nasazení (deploy.yml)" },
@@ -75,8 +83,10 @@ export const KONTRAKT_CI = [
   { jmeno: "ANTHROPIC_API_KEY", druh: "secret", zdroj: { trezor: "ANTHROPIC_API_KEY" }, povinne: false, ucel: "testy s modelem (ci.yml)" },
   { jmeno: "OPENAI_API_KEY", druh: "secret", zdroj: { trezor: "OPENAI_API_KEY" }, povinne: false, ucel: "testy s modelem (ci.yml)" },
   { jmeno: "GOOGLE_AI_API_KEY", druh: "secret", zdroj: { trezor: "GOOGLE_AI_API_KEY" }, povinne: false, ucel: "testy s modelem (ci.yml)" },
-  { jmeno: "FORGEJO_TOKEN", druh: "secret", zdroj: { trezor: "FORGEJO_TOKEN" }, povinne: false, ucel: "vydání (claude-app-release.yml)" },
-  { jmeno: "KIOSK_BALICKY_TOKEN", druh: "secret", zdroj: "externi", povinne: true, ucel: "balíčky kiosku: registr a úložiště APK (kiosk-balicky.yml)" },
+  { jmeno: "DEPS_UPDATE_TOKEN", druh: "secret", zdroj: "externi", povinne: false, ucel: "PR aktualizací závislostí, na kterých poběží CI (aisha-deps-update.yml; bez něj GITHUB_TOKEN)" },
+  { jmeno: "DEPS_UPDATE_SCHEDULED", druh: "var", zdroj: "externi", povinne: false, ucel: "týdenní běh aisha-deps-update.yml (opt-in; ruční spuštění jde vždy)" },
+  { jmeno: "KIOSK_REGISTRY_REPO", druh: "var", zdroj: "externi", povinne: true, ucel: "registr balíčků kiosku — vlastník/repo, jehož GitHub Releases drží APK (kiosk-balicky.yml; přepínač opt-in)" },
+  { jmeno: "KIOSK_BALICKY_TOKEN", druh: "secret", zdroj: "externi", povinne: true, ucel: "balíčky kiosku: zápis vydání do registru a PR do dat instance (kiosk-balicky.yml)" },
   { jmeno: "HLIDAC_KEYSTORE_B64", druh: "secret", zdroj: "externi", povinne: true, ucel: "podpis Kiosk Admin — keystore (kiosk-balicky.yml); otisk certifikátu je v QR tabletů, nový klíč = nové zapsání" },
   { jmeno: "HLIDAC_KEYSTORE_PASSWORD", druh: "secret", zdroj: "externi", povinne: true, ucel: "podpis Kiosk Admin — heslo keystore (kiosk-balicky.yml)" },
   { jmeno: "HLIDAC_KEY_ALIAS", druh: "secret", zdroj: "externi", povinne: true, ucel: "podpis Kiosk Admin — alias klíče (kiosk-balicky.yml)" },
@@ -105,7 +115,7 @@ export function klicKontraktuDoktora(zdrojDoktora) {
 /**
  * Co workflow čtou: klíč `druh:jméno` → { druh, jmeno, workflow[] }.
  * Komentáře YAML se přeskočí (zmínka v komentáři není čtení); `GITHUB_TOKEN`
- * dodává Forgejo samo.
+ * dodává GitHub Actions samo.
  */
 export function referenceWorkflow(soubory) {
   const out = new Map();
@@ -148,18 +158,18 @@ export function nalezyKontraktu({ reference, kontrakt, racna, doktor, overovace 
 }
 
 /**
- * Změří kontrakt proti Forgeju a trezoru.
+ * Změří kontrakt proti repu a trezoru.
  * @param {object} o
  * @param {object[]} o.kontrakt
- * @param {{ secrets: Set<string>, vars: Set<string> } | null} o.forgejo  null = NEMĚŘENO
+ * @param {{ secrets: Set<string>, vars: Set<string> } | null} o.repozitar  null = NEMĚŘENO
  * @param {Map<string,string> | null} o.trezor  null = trezor nedodán
  * @returns {Promise<{ radky: object[], kod: 0|1|2|3 }>}
  */
-export async function zmer({ kontrakt, forgejo, trezor, overovace = OVEROVACE }) {
-  if (!forgejo) return { radky: [], kod: 2 };
+export async function zmer({ kontrakt, repozitar, trezor, overovace = OVEROVACE }) {
+  if (!repozitar) return { radky: [], kod: 2 };
   const radky = [];
   for (const p of kontrakt) {
-    const veForgeju = (p.druh === "secret" ? forgejo.secrets : forgejo.vars).has(p.jmeno);
+    const vRepu = (p.druh === "secret" ? repozitar.secrets : repozitar.vars).has(p.jmeno);
     const zTrezoru = typeof p.zdroj === "object";
     const hodnota = zTrezoru && trezor ? trezor.get(p.zdroj.trezor) : undefined;
     const vTrezoru = !zTrezoru ? "n/a" : trezor === null ? "nemereno" : hodnota ? "ano" : "ne";
@@ -182,74 +192,98 @@ export async function zmer({ kontrakt, forgejo, trezor, overovace = OVEROVACE })
       }
     }
     let stav = "ok";
-    if (!veForgeju) stav = p.povinne ? "chybi" : "chybi-nepovinne";
+    if (!vRepu) stav = p.povinne ? "chybi" : "chybi-nepovinne";
     if (vTrezoru === "ne" && p.povinne) stav = "chybi";
     if (overeni === "nesedi") stav = "nesedi";
     const akce =
-      !veForgeju && vTrezoru === "ano" ? `doplnit z trezoru (${p.zdroj.trezor})` :
-      !veForgeju && !zTrezoru ? "zadá správce (externí)" :
+      !vRepu && vTrezoru === "ano" ? `doplnit z trezoru (${p.zdroj.trezor})` :
+      !vRepu && !zTrezoru ? "zadá správce (externí)" :
       vTrezoru === "ne" ? `chybí i v trezoru (${p.zdroj.trezor}) — nejdřív env-doktor` : "";
-    radky.push({ druh: p.druh, jmeno: p.jmeno, povinne: !!p.povinne, veForgeju, vTrezoru, overeni, duvod, stav, akce });
+    radky.push({ druh: p.druh, jmeno: p.jmeno, povinne: !!p.povinne, vRepu, vTrezoru, overeni, duvod, stav, akce });
   }
   const nalez = radky.some((r) => r.stav === "chybi" || r.stav === "nesedi");
   const castecne = radky.some((r) => r.vTrezoru === "nemereno" || r.overeni === "nemereno");
   return { radky, kod: nalez ? 1 : castecne ? 3 : 0 };
 }
 
-/** Co by `apply` zapsal: položky ze zdroje trezor s hodnotou. Existující se PŘEPÍŠE (hodnotu Forgejo nevydá). */
-export function planApply({ kontrakt, forgejo, trezor }) {
+/** Co by `apply` zapsal: položky ze zdroje trezor s hodnotou. Existující se PŘEPÍŠE (hodnotu tajemství repo nevydá). */
+export function planApply({ kontrakt, repozitar, trezor }) {
   return kontrakt
     .filter((p) => typeof p.zdroj === "object" && trezor?.get(p.zdroj.trezor))
     .map((p) => ({
       druh: p.druh,
       jmeno: p.jmeno,
       klic: p.zdroj.trezor,
-      akce: (p.druh === "secret" ? forgejo.secrets : forgejo.vars).has(p.jmeno) ? "prepsat" : "pridat",
+      akce: (p.druh === "secret" ? repozitar.secrets : repozitar.vars).has(p.jmeno) ? "prepsat" : "pridat",
     }));
 }
 
-// ─── Forgejo (I/O přes předaný fetch) ───────────────────────────────────────
+// ─── GitHub (I/O přes předaný fetch) ────────────────────────────────────────
 
-/** Jména z jednoho výpisu (stránkovaně). 401/403 = bez oprávnění → výjimka (NEMĚŘENO). */
-async function jmena(url, h, f) {
+/** Hlavičky REST API GitHubu. */
+function hlavicky(token, navic = {}) {
+  return { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28", ...navic };
+}
+
+/**
+ * Jména z jednoho stránkovaného výpisu (`{ total_count, <klic>: [{ name }] }`).
+ * 404 = výpis tu není (repo bez organizace) → prázdno se značkou; 401/403 = bez
+ * oprávnění → výjimka (NEMĚŘENO), nikdy prázdná množina.
+ */
+async function jmena(url, klic, h, f, naStranu = 30) {
   const out = new Set();
-  for (let strana = 1; strana < 50; strana++) {
-    const r = await f(`${url}${url.includes("?") ? "&" : "?"}limit=50&page=${strana}`, { headers: h });
+  for (let strana = 1; strana < 100; strana++) {
+    const r = await f(`${url}${url.includes("?") ? "&" : "?"}per_page=${naStranu}&page=${strana}`, { headers: h });
     if (r.status === 404) return { jmena: out, chybi: true };
-    if (r.status === 401 || r.status === 403) throw new Error(`${new URL(url).pathname}: ${r.status} — token nemá oprávnění správce (read:repository/read:organization)`);
+    if (r.status === 401 || r.status === 403) throw new Error(`${new URL(url).pathname}: ${r.status} — token nemá oprávnění správce repa (Secrets/Variables: read)`);
     if (!r.ok) throw new Error(`${new URL(url).pathname}: ${r.status}`);
     const s = await r.json();
-    if (!Array.isArray(s)) throw new Error(`${new URL(url).pathname}: odpověď není seznam`);
-    for (const x of s) if (x?.name) out.add(x.name);
-    if (s.length < 50) break;
+    const polozky = s?.[klic];
+    if (!Array.isArray(polozky)) throw new Error(`${new URL(url).pathname}: odpověď nenese seznam ${klic}`);
+    for (const x of polozky) if (x?.name) out.add(x.name);
+    if (polozky.length < naStranu) break;
   }
   return { jmena: out, chybi: false };
 }
 
-/** Tajemství a proměnné viditelné pro repo = repo ∪ organizace vlastníka. */
-export async function nactiForgejo({ forgejo, repo, token, f = fetch }) {
-  const [vlastnik] = repo.split("/");
-  const api = `${new URL(forgejo).origin}/api/v1`;
-  const h = { Authorization: `token ${token}` };
-  const rs = await jmena(`${api}/repos/${repo}/actions/secrets`, h, f);
-  if (rs.chybi) throw new Error(`repo ${repo} nenalezeno`);
-  const rv = await jmena(`${api}/repos/${repo}/actions/variables`, h, f);
-  // Vlastník nemusí být organizace (404) — pak organizační úroveň prostě není.
-  const os = await jmena(`${api}/orgs/${vlastnik}/actions/secrets`, h, f);
-  const ov = await jmena(`${api}/orgs/${vlastnik}/actions/variables`, h, f);
+/**
+ * Tajemství a proměnné, které běh CI v repu uvidí = repo ∪ organizační
+ * sdílené s TÍMHLE repem (`/actions/organization-*` — GitHub sám filtruje
+ * podle viditelnosti, takže se nepočítá, co by repo nedostalo).
+ */
+export async function nactiRepozitar({ api, repo, token, f = fetch }) {
+  const zaklad = `${String(api).replace(/\/+$/, "")}/repos/${repo}/actions`;
+  const h = hlavicky(token);
+  const rs = await jmena(`${zaklad}/secrets`, "secrets", h, f, 100);
+  if (rs.chybi) throw new Error(`repo ${repo} nenalezeno (nebo token nevidí jeho nastavení)`);
+  const rv = await jmena(`${zaklad}/variables`, "variables", h, f, 30);
+  // Repo osobního účtu organizační úroveň nemá (404) — pak prostě není.
+  const os = await jmena(`${zaklad}/organization-secrets`, "secrets", h, f, 100);
+  const ov = await jmena(`${zaklad}/organization-variables`, "variables", h, f, 30);
   return { secrets: new Set([...rs.jmena, ...os.jmena]), vars: new Set([...rv.jmena, ...ov.jmena]) };
 }
 
-async function zapis({ forgejo, repo, token, polozka, hodnota, f = fetch }) {
-  const api = `${new URL(forgejo).origin}/api/v1/repos/${repo}/actions`;
-  const h = { Authorization: `token ${token}`, "Content-Type": "application/json" };
+/**
+ * Zápis jedné položky. Proměnná přes REST (POST nová / PATCH existující);
+ * tajemství přes `gh secret set` — REST bere jen hodnotu zašifrovanou veřejným
+ * klíčem repa (libsodium) a to gh dělá samo. Hodnota jde na stdin, ne do argv.
+ */
+export async function zapis({ api, repo, token, polozka, hodnota, f = fetch, spust = execFileSync }) {
   if (polozka.druh === "secret") {
-    const r = await f(`${api}/secrets/${polozka.jmeno}`, { method: "PUT", headers: h, body: JSON.stringify({ data: hodnota }) });
-    if (!r.ok) throw new Error(`secret ${polozka.jmeno}: ${r.status}`);
+    spust("gh", ["secret", "set", polozka.jmeno, "--repo", repo], {
+      input: hodnota,
+      env: { ...process.env, GH_TOKEN: token },
+      stdio: ["pipe", "ignore", "pipe"],
+    });
     return;
   }
-  const metoda = polozka.akce === "prepsat" ? "PUT" : "POST";
-  const r = await f(`${api}/variables/${polozka.jmeno}`, { method: metoda, headers: h, body: JSON.stringify({ value: hodnota }) });
+  const zaklad = `${String(api).replace(/\/+$/, "")}/repos/${repo}/actions/variables`;
+  const nova = polozka.akce !== "prepsat";
+  const r = await f(nova ? zaklad : `${zaklad}/${polozka.jmeno}`, {
+    method: nova ? "POST" : "PATCH",
+    headers: hlavicky(token, { "Content-Type": "application/json" }),
+    body: JSON.stringify({ name: polozka.jmeno, value: hodnota }),
+  });
   if (!r.ok) throw new Error(`variable ${polozka.jmeno}: ${r.status}`);
 }
 
@@ -270,8 +304,8 @@ async function hlavni(argv) {
     console.error("ci-kontrakt: NEMĚŘENO — chybí --repo <vlastník/repo>");
     return 2;
   }
-  const forgejo = a.forgejo ?? process.env.FORGEJO_URL ?? "";
-  const token = process.env.FORGEJO_TOKEN ?? "";
+  const api = a.api ?? process.env.GITHUB_API_URL ?? "";
+  const token = process.env.GITHUB_TOKEN || process.env.GH_TOKEN || "";
   let trezor = null;
   if (a["env-file"]) {
     if (!existsSync(a["env-file"])) {
@@ -282,16 +316,16 @@ async function hlavni(argv) {
   }
   let stav;
   try {
-    if (!forgejo || !token) throw new Error("chybí FORGEJO_URL nebo FORGEJO_TOKEN");
-    stav = await nactiForgejo({ forgejo, repo, token });
+    if (!api || !token) throw new Error("chybí GITHUB_API_URL (nebo --api) nebo GITHUB_TOKEN (GH_TOKEN)");
+    stav = await nactiRepozitar({ api, repo, token });
   } catch (e) {
-    console.error(`ci-kontrakt: NEMĚŘENO — Forgejo: ${e.message}`);
+    console.error(`ci-kontrakt: NEMĚŘENO — repo: ${e.message}`);
     return 2;
   }
 
   if (a.apply) {
     // ⛔ Trvalá konfigurace repa: jen ručně, s potvrzením TOHOTO repa, nikdy z CI.
-    if (process.env.CI || process.env.GITHUB_ACTIONS || process.env.FORGEJO_ACTIONS) {
+    if (process.env.CI || process.env.GITHUB_ACTIONS) {
       console.error("ci-kontrakt: apply se v CI nespouští — zapisuje jen člověk s výslovným „ano“ majitele");
       return 2;
     }
@@ -303,24 +337,24 @@ async function hlavni(argv) {
       console.error("ci-kontrakt: apply vyžaduje --env-file <trezor>");
       return 2;
     }
-    for (const p of planApply({ kontrakt: KONTRAKT_CI, forgejo: stav, trezor })) {
-      await zapis({ forgejo, repo, token, polozka: p, hodnota: trezor.get(p.klic) });
+    for (const p of planApply({ kontrakt: KONTRAKT_CI, repozitar: stav, trezor })) {
+      await zapis({ api, repo, token, polozka: p, hodnota: trezor.get(p.klic) });
       console.log(`${p.akce === "pridat" ? "přidáno" : "přepsáno"}: ${p.druh} ${p.jmeno} ← trezor ${p.klic}`);
     }
-    stav = await nactiForgejo({ forgejo, repo, token });
+    stav = await nactiRepozitar({ api, repo, token });
   }
 
-  const { radky, kod } = await zmer({ kontrakt: KONTRAKT_CI, forgejo: stav, trezor });
+  const { radky, kod } = await zmer({ kontrakt: KONTRAKT_CI, repozitar: stav, trezor });
   console.log(`ci-kontrakt: repo ${repo} · položek ${radky.length}${trezor ? "" : " · trezor nedodán"}`);
   for (const r of radky) {
     const znak = r.stav === "ok" ? "✓" : r.stav === "chybi-nepovinne" ? "·" : "✗";
-    console.log(`  ${znak} ${r.druh.padEnd(6)} ${r.jmeno.padEnd(28)} Forgejo:${r.veForgeju ? "ano" : "NE "} trezor:${r.vTrezoru}${r.overeni !== "n/a" ? ` ověření:${r.overeni}${r.duvod ? ` (${r.duvod})` : ""}` : ""}${r.akce ? ` → ${r.akce}` : ""}`);
+    console.log(`  ${znak} ${r.druh.padEnd(6)} ${r.jmeno.padEnd(28)} repo:${r.vRepu ? "ano" : "NE "} trezor:${r.vTrezoru}${r.overeni !== "n/a" ? ` ověření:${r.overeni}${r.duvod ? ` (${r.duvod})` : ""}` : ""}${r.akce ? ` → ${r.akce}` : ""}`);
   }
   return kod;
 }
 
 export function nactiWorkflow(koren = REPO_ROOT) {
-  const dir = join(koren, ".forgejo", "workflows");
+  const dir = join(koren, ".github", "workflows");
   return readdirSync(dir)
     .filter((f) => /\.ya?ml$/.test(f))
     .map((f) => ({ soubor: f, text: readFileSync(join(dir, f), "utf8") }));

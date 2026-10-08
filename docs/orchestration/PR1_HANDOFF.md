@@ -143,7 +143,7 @@ git add services/svc-ai-chat/src/reflection/decision.ts \
 ALLOW_NEW_FILES=1 git commit -m "feat(orchestration): L0-c journal task_kind + per-candidate ranking into decision_json"
 git push forgejo feat/orch-feedback-plane-foundation
 ```
-> ⚠️ `git status` ukáže i **nesouvisející** rozpracované soubory (`.forgejo/workflows/ci.yml`, `docs/…`,
+> ⚠️ `git status` ukáže i **nesouvisející** rozpracované soubory (`.github/workflows/ci.yml`, `docs/…`,
 > `extensions/aisha-dirigent-claude/…`) — ty NEJSOU součástí tohoto PR; **přidávej jen 3 soubory výše** (žádné `git add -A`).
 
 ---

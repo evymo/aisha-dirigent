@@ -19,7 +19,7 @@ import { join, normalize } from "node:path";
 import { buildyZCompose, soupis } from "../../../scripts/registry/obraz-jde-stahnout.mjs";
 
 const ROOT = process.cwd();
-const WF = ".forgejo/workflows/obrazy-jdou-stahnout.yml";
+const WF = ".github/workflows/obrazy-jdou-stahnout.yml";
 const SKRIPT = "scripts/registry/obraz-jde-stahnout.mjs";
 
 describe("obrazy jdou stáhnout — kontrola je zapojená", () => {

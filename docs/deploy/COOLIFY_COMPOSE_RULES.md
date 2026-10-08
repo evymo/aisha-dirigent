@@ -299,7 +299,7 @@ ji nepřepočítal vůbec. Nasadit změněný overlay tedy nešlo a nic to neohl
 
 Ruční a CI cesty používají `scripts/deploy/refresh-overlay-cachebust.sh` —
 tentýž výpočet, ale zapsaný rovnou na Coolify aplikaci a volaný těsně před
-sestavením. `.forgejo/workflows/deploy.yml` ho volá v `deploy_stack()`.
+sestavením. `.github/workflows/deploy.yml` ho volá v `deploy_stack()`.
 
 #### Pravidlo výš platilo jen na papíře — naměřeno 2026-08-31
 
@@ -311,7 +311,7 @@ STARÝM obsahem z obrazu. Rostoucí čítač aktivity vypadal jako důkaz, že
 oprava dorazila.
 
 Příčinou nebyl chybějící výrobce, ale **cesta, která ho míjela**:
-`GET /api/v1/deploy` (ručně i z `.forgejo/workflows/deploy.yml` a
+`GET /api/v1/deploy` (ručně i z `.github/workflows/deploy.yml` a
 `scripts/ci/deploy-and-verify.sh`) spustí sestavení bez toho, co
 `aisha-redeploy.mjs` dělá PŘED ním.
 

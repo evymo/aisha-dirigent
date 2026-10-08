@@ -217,7 +217,7 @@ describe("MinIO obraz ze zdroje — compose a okolí", () => {
   });
 
   it("nikdo netahá MinIO obraz z registru", () => {
-    const soubory = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "docker-compose*.yml", ".forgejo/workflows", "scripts", "config"], {
+    const soubory = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "docker-compose*.yml", ".github/workflows", "scripts", "config"], {
       cwd: ROOT,
       encoding: "utf8",
     })

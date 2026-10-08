@@ -236,18 +236,18 @@ HUSKY=0 git commit -m "..." && HUSKY=0 git push origin main
 
 ### Nemergovat `main` do větve „pro narovnání"
 
-Forgejo při události `pull_request` checkoutuje **merge commit**, ne holou hlavu
+GitHub Actions při události `pull_request` checkoutuje **merge commit**, ne holou hlavu
 větve (je to i důvod, proč `detect` počítá změny proti `PR_BASE_SHA` a ne proti
 `HEAD~1`). CI tedy **už měří výsledek sloučení** se základem.
 
 Domergovat `main` do větve, která jde sloučit sama, proto nic nezpřesní — jen
 vyrobí nový push, a tím **celý běh CI navíc**. Při sériové concurrency skupině
-(`group: aisha-ci-runner`) to zdrží i všechny PR ve frontě za ním.
+to zdrží i všechny PR ve frontě za ním (a na hostovaných runnerech to stojí minuty).
 
 | stav PR | co udělat |
 |---|---|
 | `mergeable = true` | **nic.** Počkat na CI a mergnout. |
-| `mergeable = false` | Domergovat `main`, konflikt vyřešit ručně, pushnout — a mergovat teprve až projde automaticky. Co Forgejo neumí sloučit, to neumí ani otestovat. |
+| `mergeable = false` | Domergovat `main`, konflikt vyřešit ručně, pushnout — a mergovat teprve až projde automaticky. Co forge neumí sloučit, to neumí ani otestovat. |
 
 Stav se zjistí z API PR (`GET /repos/{owner}/{repo}/pulls/{n}` → pole `mergeable`).
 Pozor, počítá se proti **aktuálnímu** `main`: když mezitím přistane jiný PR na týž

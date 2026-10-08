@@ -19,7 +19,7 @@
 Obě role dnes tečou stejnou cestou — **Verdaccio**:
 
 - Služby konzumují `@aisha/*` jako `"*"` z per-stack Verdaccio (uplink na hub `npm.id3a.cz`, viz `scripts/render-per-stack-verdaccio-config.mjs`).
-- `.forgejo/workflows/aisha-packages-publish.yml` + `scripts/aisha-packages-publish.mjs` publikují `packages/*` na hub; `aisha-packages-publish.gate` chrání integritu publish-loopu.
+- `.github/workflows/aisha-packages-publish.yml` + `scripts/aisha-packages-publish.mjs` publikují `packages/*` na hub; `aisha-packages-publish.gate` chrání integritu publish-loopu.
 
 ### Problém: service buildy závisí na publish-before-build
 

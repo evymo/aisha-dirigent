@@ -169,7 +169,7 @@ function affectedApps(file, manifest) {
   //
   // Následek byl měřitelný: web servíroval bundle starý dva dny, zatímco se do
   // mainu slilo deset PR. Táž mylná představa („SPA je core") seděla i v
-  // `.forgejo/workflows/ci.yml`, kde se opravila v #174. Tady je podruhé.
+  // `.github/workflows/ci.yml`, kde se opravila v #174. Tady je podruhé.
   //
   // ⚠️ `core` se NEODEBÍRÁ: core svou `web` službu opravdu staví (byť bez args),
   // takže změna `src/` se ho týká taky. Nejde o přesunutí, ale o doplnění.

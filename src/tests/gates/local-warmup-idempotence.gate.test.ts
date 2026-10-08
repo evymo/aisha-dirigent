@@ -40,7 +40,7 @@ const GENERATOR = join(ROOT, "scripts/local-compose-gen.mjs");
 /**
  * The generator pipes through `docker compose config --format json` to
  * canonicalize YAML + resolve env interpolation. CI sandboxes without
- * Docker (e.g. Forgejo runners not configured with Docker-in-Docker)
+ * Docker (e.g. container-based runners not configured with Docker-in-Docker)
  * fail every test in this gate with "docker: command not found". Skip
  * cleanly when docker isn't available — the gate is only meaningful in
  * an environment with the generator's full dependency chain. Production

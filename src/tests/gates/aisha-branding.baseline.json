@@ -8,7 +8,7 @@
     ".env.coolify.example": 2,
     ".env.docker.example": 5,
     ".env.tokens": 12,
-    ".forgejo/workflows/ci.yml": 1,
+    ".github/workflows/ci.yml": 1,
     ".github/workflows/test-community-nodes.yml": 1,
     ".vscode/settings.json": 1,
     "coolify/livekit.yaml": 1,

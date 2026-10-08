@@ -2,6 +2,10 @@
 
 > **Verze:** 1.0 | **Datum:** 2025-07  
 > **Status:** DRAFT — čeká na review
+>
+> **Historický dokument.** Popisuje infrastrukturu jedné instance z roku 2025. CI dnes
+> běží na GitHub Actions (`.github/workflows/`, hostované runnery, nasazení opt-in) —
+> aktuální stav je v [deploy/CICD.md](deploy/CICD.md).
 
 ---
 
@@ -34,7 +38,7 @@ AISHA platforma přechází na **plně autonomní infrastrukturu** s vlastním N
 |--------|------|-----|------------------|
 | **Forgejo** | ✅ Produkce | `git.id3a.cz` | `coolify/apps/forgejo/` |
 | **Forgejo Runner** | ✅ Produkce | (součást Forgejo stacku) | DinD, `runner:6.2.2` |
-| **Forgejo Actions** | ✅ Funkční | — | `.forgejo/workflows/ci.yml` |
+| **CI workflow** | ✅ Funkční | — | `.github/workflows/ci.yml` |
 
 ### ❌ Neexistuje
 
@@ -161,14 +165,14 @@ Forgejo je nasazeno na `git.id3a.cz` (Forgejo 13.0.3 + PostgreSQL 16):
 #### B3. Coolify deploy z Forgejo ✅ HOTOVO
 
 - [x] Forgejo je source v Coolify pro web deploy
-- [x] Coolify webhook pro auto-deploy (z `.forgejo/workflows/ci.yml`)
+- [x] Coolify webhook pro auto-deploy (z `.github/workflows/ci.yml`)
 - [x] Web deploy přes `docker-compose.coolify-prebuilt.yml` (~2KB, žádný ARG_MAX)
 - [x] Migrate + web services v compose
 
 #### B4. Forgejo Actions (CI) ✅ HOTOVO
 
 - [x] Forgejo runner nasazený (DinD, součást Forgejo stacku)
-- [x] `.forgejo/workflows/ci.yml` — plná CI/CD pipeline
+- [x] `.github/workflows/ci.yml` — plná CI/CD pipeline
 - [x] Smart change detection (skip docs-only, detekce migration/code/functions změn)
 - [x] Pipeline: detect → check → test → build → deploy (webhook)
 - [x] Node 22, npm přes Verdaccio (`npm.id3a.cz`)

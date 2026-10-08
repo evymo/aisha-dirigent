@@ -312,7 +312,7 @@ Příčina nezjištěna — build logy se z Coolify API vytáhnout nedají, jsou
 
 | apka | co v ní běží | co to NENÍ |
 |---|---|---|
-| `<prefix>-exec` | `svc-agent-runner` — AISHA si tudy pouští, co potřebuje | **NE CI runner.** Forgejo CI běží mimo tenhle cluster; na hostiteli instance žádný `act_runner` není. Nasazovat ji lze jako každou jinou. |
+| `<prefix>-exec` | `svc-agent-runner` — AISHA si tudy pouští, co potřebuje | **NE CI runner.** CI běží na hostovaných runnerech GitHub Actions mimo tenhle cluster; na hostiteli instance žádný CI runner není. Nasazovat ji lze jako každou jinou. |
 
 Zaznamenáno 2026-07-31: ze slova „runner" v názvu kontejneru jsem usoudil, že jde
 o CI runner, a půl hodiny obcházel překážku, která neexistuje. Jméno kontejneru

@@ -56,19 +56,29 @@ npm run test:run && npm run build
 - [ ] \`npx tsc --noEmit\` — žádné TypeScript chyby
 - [ ] \`npm audit\` — žádné kritické zranitelnosti
 
-### CI: Automatický dependency security scan
+### CI: GitHub Actions a lokální běh
 
-V CI běží workflow `.github/workflows/dependency-security.yml`, které se spouští:
+CI běží v **GitHub Actions** (`.github/workflows/`) na runnerech hostovaných GitHubem — žádný
+soukromý runner, registr ani forge. Slití do `main` visí na jediné kontrole `PR: verdikt`.
+Nasazení (Coolify), publikace balíčků a kiosku i plánované aktualizace závislostí jsou **opt-in**:
+běží jen v repu, které je nakonfiguruje (proměnné `APP_NAME_PREFIX`, `VERDACCIO_URL`,
+`KIOSK_REGISTRY_REPO`, …); jinde se přeskočí.
 
-- při každém `pull_request`
-- jednou týdně (`cron`: pondělí 04:00 UTC)
+Každá dráha jde spustit **lokálně bez forge** — tabulka příkazů je v
+[CONTRIBUTING.md › Running the CI lanes locally](CONTRIBUTING.md#running-the-ci-lanes-locally)
+(`npm run test:run`, `npm run test:gates`, `npm run test:scripts`, `npm run test:services`,
+`npm run test:db`, …).
 
-Workflow provádí:
+### CI: Dependency security scan
 
-1. `npm ci`
-2. `npm audit --audit-level=high`
+Těžké skenery dodavatelského řetězce běží ve workflow `.github/workflows/supply-chain.yml`
+(ruční spuštění kdykoli; noční běh je opt-in proměnnou `HEAVY_LANE_NIGHTLY=true`):
 
-Pipeline **selže**, pokud audit najde zranitelnost se závažností **high** nebo **critical**.
+1. `npm audit --audit-level=high` (kořen blokuje, služby zatím jen hlásí)
+2. OSV scan všech lockfilů, SBOM (CycloneDX) a Trivy (SARIF do záložky Security)
+
+Lokálně: `npm audit --audit-level=high`.
+Pipeline **selže**, pokud audit kořene najde zranitelnost se závažností **high** nebo **critical**.
 
 #### Jak řešit audit findings
 

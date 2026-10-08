@@ -129,7 +129,7 @@ fi
 # 2. JS workspace sub-balíčky — test:stack:ci pokrývá offline suite HLAVNÍ app
 #    (src/, services/ přes test:run + gates), ale NE samostatné JS workspace
 #    balíčky `extensions/aisha-dirigent` a `packages/n8n-nodes-aisha`. Ty CI
-#    spouští jako vlastní path-filtrované joby (.forgejo/workflows/ci.yml:
+#    spouští jako vlastní path-filtrované joby (.github/workflows/ci.yml:
 #    test-extension / n8n-nodes) — a TÝŽ filtr (extension / n8n_nodes ze
 #    zmenene-cesty.sh) rozhoduje i tady. Bez výběru (rezim=vse) běží obě vždy.
 #    (Těžší suity — mobile-app, cosmos/Go, plné svc integrační testy — zůstávají

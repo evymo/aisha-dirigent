@@ -1,5 +1,5 @@
 # =============================================================================
-# Manual Deploy — AISHA Platform (Forgejo Actions)
+# Manual Deploy — AISHA Platform (GitHub Actions)
 # =============================================================================
 # Manually trigger deployment of a specific Coolify stack.
 # Useful for re-deploys, rollbacks, and infrastructure-only changes.
@@ -10,13 +10,17 @@
 # so static UUID secrets would break on every rebuild — see
 # scripts/lib/coolify-resolve-uuid.sh for the shared resolver.
 #
-# Usage: Forgejo UI -> Actions -> Deploy -> Run workflow
-#   or via API: POST /repos/{owner}/{repo}/actions/workflows/deploy.yml/dispatches
+# Usage: GitHub → Actions → Deploy → Run workflow
+#   or: gh workflow run deploy.yml -f stack=core
 #
 # "all" deploys keycloak → core → web in correct dependency order.
 #
-# Required secrets:
-#   COOLIFY_API_TOKEN, COOLIFY_URL
+# OPT-IN: runs only in a repository that declares its instance (repository
+# variable APP_NAME_PREFIX); otherwise the run only explains what to configure.
+#
+# Required (when opted in):
+#   vars.APP_NAME_PREFIX, secrets COOLIFY_API_TOKEN, COOLIFY_URL
+# Optional: GIT_TOKEN (read private overlay repos for the cachebust refresh)
 # Optional secrets for db-migrate + autopilot smoke:
 #   AISHA_DB_URL, POSTGREST_URL, POSTGREST_SERVICE_TOKEN,
 #   AISHA_LLM_GATEWAY_URL, OPENCLAW_URL,
@@ -90,9 +94,32 @@ concurrency:
   group: deploy-${{ github.event.inputs.stack }}
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
+  # Bez deklarované instance se nic nenasazuje — a ruční spuštění to řekne
+  # nahlas (souhrn běhu), místo aby skončilo prázdným přeskočením.
+  nenakonfigurovano:
+    name: "Nasazení není nakonfigurované"
+    if: vars.APP_NAME_PREFIX == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Opt-in vysvětlení
+        run: |
+          echo "::notice title=nasazení je opt-in::Tohle repo nedeklaruje instanci (proměnná APP_NAME_PREFIX), takže se nic nenasazuje."
+          {
+            echo "### Nasazení je opt-in"
+            echo
+            echo "Nastav v **Settings → Secrets and variables → Actions**:"
+            echo "- proměnnou \`APP_NAME_PREFIX\` (identita instance — prefix jmen Coolify aplikací),"
+            echo "- secrety \`COOLIFY_URL\` a \`COOLIFY_API_TOKEN\` (+ volitelně \`GIT_TOKEN\` pro privátní overlaye)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
     name: "Deploy: ${{ github.event.inputs.stack }}"
+    if: vars.APP_NAME_PREFIX != ''
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -115,9 +142,8 @@ jobs:
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
           # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
           # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
-          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
-          # deploy joby běží jen na push do main (kód z main), ne na PR.
-          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          # se postavily z KEŠOVANÉHO overlaye.
+          GIT_TOKEN: ${{ secrets.GIT_TOKEN }}
           COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
           STACK_INPUT: ${{ github.event.inputs.stack }}
           FORCE_INPUT: ${{ github.event.inputs.force }}
@@ -129,7 +155,8 @@ jobs:
           BASE_URL="${COOLIFY_URL:?COOLIFY_URL must be set via repository secret}"
           export COOLIFY_URL="$BASE_URL"
 
-          # Instance se ověří DŘÍV, než se čehokoli dotkneme. Na jednom Coolify
+          # Instance se ověří DŘÍV, než se čehokoli dotkneme (úloha se bez ní ani
+          # nespustí — tohle je pojistka pro případ, že by podmínka úlohy zmizela). Na jednom Coolify
           # stojí vedle sebe produkce několika zákazníků a jméno aplikace je jediné,
           # co je odlišuje — takže nejistota v prefixu je nejistota v tom, ČÍ provoz
           # se právě restartuje. Žádná výchozí hodnota: 2026-08-04 mířil dispatch
@@ -242,7 +269,7 @@ jobs:
                 bash scripts/deploy/refresh-overlay-cachebust.sh "$UUID" "$STACK" || CB_RC=$?
               case "$CB_RC" in
                 0) : ;;
-                3) echo "::warning title=cachebust NEDOKÁZÁN::'$STACK' — overlay je deklarovaný, ale cachebust se neobnovil (HEAD nečitelný, zápis nebo envy selhaly); build vezme overlay z KEŠE (chybí FORGEJO_TOKEN?)" ;;
+                3) echo "::warning title=cachebust NEDOKÁZÁN::'$STACK' — overlay je deklarovaný, ale cachebust se neobnovil (HEAD nečitelný, zápis nebo envy selhaly); build vezme overlay z KEŠE (chybí GIT_TOKEN?)" ;;
                 *) echo "::error title=cachebust: chyba zadání::'$STACK' — refresh-overlay-cachebust.sh kód ${CB_RC} (chybí argument, COOLIFY_API_TOKEN nebo COOLIFY_BASE_URL) — oprav konfiguraci workflow; build může vzít overlay z keše" ;;
               esac
 

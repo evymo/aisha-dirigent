@@ -244,7 +244,7 @@ describe("Agent Role Contract: Bypass paths are explicit and limited", () => {
   });
 
   it("governance-gate CI job exists (prevents unreviewed model/agent changes from deploying)", () => {
-    const ciPath = path.join(ROOT, ".forgejo/workflows/ci.yml");
+    const ciPath = path.join(ROOT, ".github/workflows/ci.yml");
     const content = fs.readFileSync(ciPath, "utf-8");
     expect(content).toContain("governance-gate");
   });

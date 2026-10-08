@@ -20,9 +20,9 @@ import { storageInit } from './lib/storage-init';
 const ROOT = process.cwd();
 const WORKFLOW = path.join(
   ROOT,
-  // Relocated to Forgejo (2026-05-30): CI/CD runs on self-hosted infra; the
-  // GitHub mirror is cost-only. SBOM + MinIO-mirror content preserved verbatim.
-  '.forgejo/workflows/supply-chain.yml',
+  // Heavy supply-chain lane (split out of ci.yml 2026-07-14). SBOM + MinIO-mirror
+  // content preserved verbatim.
+  '.github/workflows/supply-chain.yml',
 );
 const IMAGE_VERSIONS = path.join(ROOT, 'config/image-versions.env');
 const TRIVYIGNORE = path.join(ROOT, '.trivyignore');
@@ -45,9 +45,8 @@ describe('Phase 12 WP 3.8 — Trivy CVE scan job', () => {
   });
 
   it('uses trivy (aquasecurity/trivy-action OR aquasec/trivy docker image)', () => {
-    // On Forgejo the act_runner can't resolve the action's git tag, so trivy
-    // runs via `docker run aquasec/trivy:<ver>` instead. Either form satisfies
-    // the spec (a pinned trivy scanner is invoked).
+    // Trivy runs via `docker run aquasec/trivy:<ver>` (the action only wraps the
+    // same invocation). Either form satisfies the spec (a pinned scanner runs).
     expect(yaml).toMatch(/aquasecurity\/trivy-action@|aquasec\/trivy:\d/);
   });
 
@@ -71,14 +70,13 @@ describe('Phase 12 WP 3.8 — Trivy CVE scan job', () => {
     expect(yaml).toMatch(/trivyignores:\s*\.trivyignore|--ignorefile\s+\.trivyignore/);
   });
 
-  it('generates + preserves Trivy SARIF (Security-tab on GitHub, artifact on Forgejo)', () => {
+  it('generates + preserves Trivy SARIF (code scanning + CI artifact)', () => {
     // SARIF must actually be produced (machine-readable supply-chain evidence)...
     expect(yaml).toMatch(/format[:\s=]+sarif/);
     expect(yaml).toMatch(/trivy-[^\s"']*\.sarif/);
-    // ...and preserved. On GitHub that's the Security tab (codeql upload-sarif +
-    // security-events: write); on self-hosted Forgejo (no Security tab) the SARIF
-    // is retained as a CI artifact instead. Either mechanism satisfies the intent
-    // (the scan result is captured, not discarded).
+    // ...and preserved: the Security tab (codeql upload-sarif + security-events:
+    // write) and/or a CI artifact. Either mechanism satisfies the intent (the
+    // scan result is captured, not discarded).
     expect(yaml).toMatch(/codeql-action\/upload-sarif|upload-artifact/);
   });
 
@@ -156,10 +154,10 @@ describe('Phase 12 WP 3.8 — Python SBOM lane (svc-local-ingest, svc-potok)', (
     expect(yaml).toMatch(/name:\s*sbom-\$\{\{\s*matrix\.target\s*\}\}/);
   });
 
-  it('fails honestly when DinD is unavailable (no skip-to-green)', () => {
+  it('fails honestly when Docker is unavailable (no skip-to-green)', () => {
     // The lane builds the image then syfts it — it cannot run without a docker
     // daemon and must not hollow-green. An explicit detect step errors + exits.
-    expect(yaml).toMatch(/DinD daemon UNREACHABLE/);
+    expect(yaml).toMatch(/Docker daemon UNREACHABLE[\s\S]{0,200}MUST NOT skip-to-green/);
   });
 });
 

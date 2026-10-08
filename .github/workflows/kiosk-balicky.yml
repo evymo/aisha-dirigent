@@ -4,34 +4,39 @@
 # ⭐ ROZHODNUTÍ MAJITELE 2026-09-24: build appek i Kiosk Admina se spustí SÁM
 # a balíček se do úložiště dostane bez člověka. Vyžádání je zvednutá verze
 # v datech instance. Tahle úloha ji DOŽENE: build → podpis (tajemství forku) →
-# generic registr (neměnný) → PR s artefaktem do dat instance → sloučení po
-# zelené. Dál už existující cesta: storage-auth si balíček doplní ze `zdroj`
-# a Kiosk Admin ho rozdá v nočním okně.
+# registr = GitHub Releases repa instance (neměnný: asset se nepřepisuje) → PR
+# s artefaktem do dat instance → sloučení po zelené. Dál už existující cesta:
+# storage-auth si balíček doplní ze `zdroj` a Kiosk Admin ho rozdá v nočním okně.
 #
 # ⭐ KONVERGENCE, NE UDÁLOST. Plán (scripts/ci/kiosk-balicky.mjs) porovná, co
 # data CHTĚJÍ, co registr MÁ a co deklarace UVÁDÍ. Build běží jen na
 # „postavit"; jinak úloha skončí za minutu. Zmeškaný nebo spadlý běh dožene
 # příští.
 #
-# Rozvrh: v :37 každou hodinu, mimo 01–04 UTC (tam běží supply-chain). Runner
-# je jeden, sdílený, s kapacitou 2 — domluveno s RIQi 2026-09-25.
-# ⛔ Rozvrh VYPNUTÝ do kola 12 (jen workflow_dispatch). Návrat, až platí obojí:
-# (1) anon klíč z API; (2) token read:package + FORGEJO_URL doručené do
-# <fork>-domain-services. Do té doby by přestavěný ruční artefakt z 28. 9.
-# storage-auth ze `zdroj` nestáhl. Pak je přestavba záměr (C1, 24. 9.).
+# ⛔ Rozvrh VYPNUTÝ (jen workflow_dispatch). Návrat, až platí obojí:
+# (1) anon klíč z API; (2) storage-auth umí stáhnout `zdroj` z registru
+# (token pro čtení vydání doručený do <fork>-domain-services). Do té doby by
+# přestavěný artefakt storage-auth ze `zdroj` nestáhl.
+#
+# OPT-IN: běží jen v repu, které deklaruje registr balíčků — proměnná
+# KIOSK_REGISTRY_REPO (vlastník/repo, jehož GitHub Releases drží APK; typicky
+# privátní repo instance, NIKDY veřejné repo platformy). Bez ní se build
+# nespustí a běh jen řekne, co nastavit.
 #
 # Build APPKY kiosku (Řidič) potřebuje veřejnou tvář instance (AISHA_INSTANCE_ENV):
 # skládá ji scripts/ci/verejna-tvar.mjs z derivace profilu, výbavy kiosku a anon
 # klíče OVĚŘENÉHO proti nasazenému webu — žádná druhá ruční kopie trezoru.
 #
 # Tajemství forku (zadává majitel; hodnoty nikde jinde):
-#   KIOSK_BALICKY_TOKEN   čtení dat instance, write:package, PR do dat instance
+#   KIOSK_BALICKY_TOKEN   čtení dat instance, contents:write na repu registru
+#                         (vydání + assety), PR do dat instance (pull-requests:write)
 #   HLIDAC_KEYSTORE_B64 · HLIDAC_KEY_ALIAS · HLIDAC_KEYSTORE_PASSWORD · HLIDAC_KEY_PASSWORD
 #   INSTANCE_OVERLAY_REPO (už je) — host/vlastník/repo dat instance
 #   ANDROID_KEYSTORE_B64 · ANDROID_KEYSTORE_ALIAS · ANDROID_KEYSTORE_PASSWORD · ANDROID_KEY_PASSWORD
 # Anon klíč instance NENÍ tajemství forku: build Řidiče ho čte z veřejné konfigurace
 # API (/.well-known/app-config.json) a ověří proti nasazenému webu (majitel 28. 9.).
-# Proměnná forku: APP_NAME_PREFIX (identita instance; týž domov jako deploy.yml)
+# Proměnné forku: KIOSK_REGISTRY_REPO (registr, opt-in), APP_NAME_PREFIX
+# (identita instance; týž domov jako deploy.yml)
 name: "Kiosk: balíčky z CI"
 
 on:
@@ -45,10 +50,31 @@ concurrency:
 
 env:
   NODE_VERSION: "22"
+  KIOSK_REGISTRY_REPO: ${{ vars.KIOSK_REGISTRY_REPO }}
+
+permissions:
+  contents: read
 
 jobs:
+  nenakonfigurovano:
+    name: "Registr balíčků není nakonfigurovaný"
+    if: vars.KIOSK_REGISTRY_REPO == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Opt-in vysvětlení
+        run: |
+          echo "::notice title=kiosk-balicky je opt-in::Repo nedeklaruje registr balíčků (proměnná KIOSK_REGISTRY_REPO) — nic se nestaví."
+          {
+            echo "### Kiosk: balíčky z CI jsou opt-in"
+            echo
+            echo "Nastav proměnnou \`KIOSK_REGISTRY_REPO\` (vlastník/repo pro vydání APK) a secrety"
+            echo "\`INSTANCE_OVERLAY_REPO\`, \`KIOSK_BALICKY_TOKEN\` a podpisové klíče (viz hlavička workflow)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   plan:
     name: "Plán: co postavit a deklarovat"
+    if: vars.KIOSK_REGISTRY_REPO != ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
@@ -72,8 +98,6 @@ jobs:
       - name: Plán
         id: plan
         env:
-          FORGEJO_URL: ${{ github.server_url }}
-          VLASTNIK_BALICKU: ${{ github.repository_owner }}
           KIOSK_BALICKY_TOKEN: ${{ secrets.KIOSK_BALICKY_TOKEN }}
         run: node scripts/ci/kiosk-balicky.mjs plan --data "$RUNNER_TEMP/data"
 
@@ -131,8 +155,6 @@ jobs:
 
       - name: Zveřejnit v registru
         env:
-          FORGEJO_URL: ${{ github.server_url }}
-          VLASTNIK_BALICKU: ${{ github.repository_owner }}
           KIOSK_BALICKY_TOKEN: ${{ secrets.KIOSK_BALICKY_TOKEN }}
         run: >-
           node scripts/ci/kiosk-balicky.mjs zverejni --data "$RUNNER_TEMP/data"
@@ -147,7 +169,7 @@ jobs:
     needs: plan
     if: needs.plan.outputs.appky != '' && needs.plan.outputs.appky != '[]'
     runs-on: ubuntu-latest
-    # Build appky (prebuild + Gradle) trvá ~40 min; runner je sdílený.
+    # Build appky (prebuild + Gradle) trvá ~40 min.
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
@@ -203,8 +225,6 @@ jobs:
           ANDROID_KEYSTORE_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          FORGEJO_URL: ${{ github.server_url }}
-          VLASTNIK_BALICKU: ${{ github.repository_owner }}
           KIOSK_BALICKY_TOKEN: ${{ secrets.KIOSK_BALICKY_TOKEN }}
         run: |
           set -euo pipefail
@@ -255,9 +275,7 @@ jobs:
 
       - name: PR a sloučení po zelené
         env:
-          FORGEJO_URL: ${{ github.server_url }}
-          VLASTNIK_BALICKU: ${{ github.repository_owner }}
           KIOSK_BALICKY_TOKEN: ${{ secrets.KIOSK_BALICKY_TOKEN }}
           DATA_REPO: ${{ secrets.INSTANCE_OVERLAY_REPO }}
-          BEH_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_number }}
+          BEH_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: node scripts/ci/kiosk-balicky.mjs deklaruj --data "$RUNNER_TEMP/data"

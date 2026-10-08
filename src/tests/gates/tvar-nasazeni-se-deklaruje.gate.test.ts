@@ -15,7 +15,7 @@
  * dosazuje `cloud-multi`, zatímco dosazoval `cloud-single`. Vymyšlenou hodnotu
  * nikdo nečte, tak si ji každý pamatuje jinak.
  *
- * ⛔ NEJHORŠÍ NA TOM: `.forgejo/workflows/ci.yml` tvar NEDEKLAROVALA vůbec, takže
+ * ⛔ NEJHORŠÍ NA TOM: `.github/workflows/ci.yml` tvar NEDEKLAROVALA vůbec, takže
  * CI celou dobu ověřovala JINÝ tvar, než jaký se nasazuje — a obojí bylo zelené.
  * Zelená nad nezvoleným tvarem netvrdí „je to v pořádku", tvrdí „nic jsme
  * o tomhle tvaru nezjistili".
@@ -121,7 +121,7 @@ describe("tvar nasazení se deklaruje, nedosazuje", () => {
 
   test("CI a brány DEKLARUJÍ, jaký tvar měří", () => {
     expect(
-      read(".forgejo/workflows/ci.yml"),
+      read(".github/workflows/ci.yml"),
       "CI nedeklaruje AISHA_PROFILE — pak měří tvar, který nikdo nezvolil,\n" +
         "a její zelená o nasazovaném tvaru netvrdí nic.",
     ).toMatch(/^\s*AISHA_PROFILE:/m);

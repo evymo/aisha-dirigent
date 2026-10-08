@@ -32,7 +32,7 @@
  *
  * Scope:
  *   - scripts/, services/, packages/, mobile-app/, extensions/,
- *     docker-compose.coolify-*.yml, .forgejo/workflows/
+ *     docker-compose.coolify-*.yml, .github/workflows/
  *   - EXCLUDED: trash/, packages/insight/, archive/, docs/, *.md,
  *     coolify/servers.json (SoT catalog), config/profiles/*.json (SoT),
  *     config/domains.env (SoT), test mocks, package-lock.json

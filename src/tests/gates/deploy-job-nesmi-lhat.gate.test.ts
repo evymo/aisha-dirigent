@@ -37,7 +37,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(__dirname, "../../..");
-const CI = join(ROOT, ".forgejo/workflows/ci.yml");
+const CI = join(ROOT, ".github/workflows/ci.yml");
 
 /**
  * Úlohy rozsekané na (jméno, tělo). YAML se tu ZÁMĚRNĚ neparsuje knihovnou:

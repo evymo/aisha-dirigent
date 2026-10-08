@@ -75,7 +75,7 @@ const IDENTITY_VARS = [
  * měří, hlásí nálezy o kódu, který v repu není.
  */
 function scannedFiles(): string[] {
-  // Univerzum je CELÝ repozitář, ne `scripts/` + `.forgejo/`. Ten užší výběr byl
+  // Univerzum je CELÝ repozitář, ne `scripts/` + `.github/`. Ten užší výběr byl
   // díra: `infra/pki/pki-renewer.sh` leží mimo něj, a tak si tam dva `${APP_NAME
   // _PREFIX:-aisha}` běžely se zelenou bránou — renewer by na sdíleném Coolify
   // doručil cert CIZÍ instanci. Brána, která hlídá vlastnost, ji musí hlídat

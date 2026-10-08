@@ -91,7 +91,7 @@ describe('gate: plugin-has-tests', () => {
   });
 
   it('CI runs the aggregate runner on plugin changes', () => {
-    const ci = readFileSync(path.join(ROOT, '.forgejo/workflows/ci.yml'), 'utf8');
+    const ci = readFileSync(path.join(ROOT, '.github/workflows/ci.yml'), 'utf8');
     // The job that runs test:services is the one that now also covers plugins;
     // its change filter must therefore include plugins/, or a plugin-only PR
     // skips the job entirely and merges without ever running its tests.

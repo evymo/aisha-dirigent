@@ -8,13 +8,17 @@
 # zatímco v telefonu byl pořád rozbitý build — a dvakrát se rozestavěný build
 # ztratil s restartem, protože ho dělal jeden konkrétní stroj, ne infrastruktura.
 #
-# ⭐ iOS TU ZÁMĚRNĚ NENÍ. Archiv vyžaduje macOS runner a podpisové certifikáty;
-# registrované runnery jsou jen `ubuntu-latest`. Slibovat iOS úlohu, která nemá
-# na čem běžet, by bylo horší než ji nemít — proto zůstává lokální
+# ⭐ iOS TU ZÁMĚRNĚ NENÍ. Archiv vyžaduje macOS runner a podpisové certifikáty
+# instance; tahle úloha je na `ubuntu-latest`. Slibovat iOS úlohu bez certifikátů
+# by bylo horší než ji nemít — proto zůstává lokální
 # (`scripts/prepare-xcode-build.sh`) a tady je poznamenané PROČ.
 #
 # Spouští se ručně (`workflow_dispatch`), protože číslo buildu je rozhodnutí
 # člověka: každé odeslání spotřebuje jedno a zpátky se vzít nedá.
+#
+# OPT-IN: instanční appka potřebuje data instance — secret INSTANCE_OVERLAY_REPO
+# (host/vlastník/repo) a GIT_TOKEN (čtení). Repo bez deklarované instance
+# (proměnná APP_NAME_PREFIX) build nespouští a jen řekne, co nastavit.
 name: "Mobile: Android"
 
 on:
@@ -35,9 +39,29 @@ on:
 env:
   NODE_VERSION: "22"
 
+permissions:
+  contents: read
+
 jobs:
+  nenakonfigurovano:
+    name: "Instance není nakonfigurovaná"
+    if: vars.APP_NAME_PREFIX == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Opt-in vysvětlení
+        run: |
+          echo "::notice title=mobilní build je opt-in::Repo nedeklaruje instanci (proměnná APP_NAME_PREFIX) — instanční appku není z čeho postavit."
+          {
+            echo "### Mobilní build je opt-in"
+            echo
+            echo "Nastav proměnnou \`APP_NAME_PREFIX\` a secrety \`INSTANCE_OVERLAY_REPO\` + \`GIT_TOKEN\`"
+            echo "(Settings → Secrets and variables → Actions)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   android:
     name: "Android: APK"
+    if: vars.APP_NAME_PREFIX != ''
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -60,22 +84,19 @@ jobs:
       - name: Získat instanční overlay
         env:
           OVERLAY_REPO: ${{ secrets.INSTANCE_OVERLAY_REPO }}
-          OVERLAY_TOKEN_PRIMARY: ${{ secrets.REPO_API_TOKEN }}
-          OVERLAY_TOKEN_FALLBACK: ${{ secrets.FORGEJO_API_TOKEN }}
+          OVERLAY_TOKEN: ${{ secrets.GIT_TOKEN }}
+          SURFACE: ${{ inputs.surface }}
         run: |
           set -uo pipefail
           if [ -z "${OVERLAY_REPO:-}" ]; then
             echo "::error title=android::secret INSTANCE_OVERLAY_REPO není deklarovaný — instanční appku NELZE postavit."
             exit 1
           fi
-          for T in "${OVERLAY_TOKEN_PRIMARY:-}" "${OVERLAY_TOKEN_FALLBACK:-}"; do
-            [ -n "$T" ] || continue
-            if git clone --depth 1 "https://oauth2:${T}@${OVERLAY_REPO}" "${RUNNER_TEMP}/overlay" 2>/dev/null; then
-              echo "AISHA_INSTANCE_OVERLAY=${RUNNER_TEMP}/overlay/surfaces/${{ inputs.surface }}" >> "$GITHUB_ENV"
-              exit 0
-            fi
-          done
-          echo "::error title=android::overlay je deklarovaný, ale žádným z tokenů se nedal stáhnout."
+          if [ -n "${OVERLAY_TOKEN:-}" ] && git clone --depth 1 "https://x-access-token:${OVERLAY_TOKEN}@${OVERLAY_REPO#https://}" "${RUNNER_TEMP}/overlay" 2>/dev/null; then
+            echo "AISHA_INSTANCE_OVERLAY=${RUNNER_TEMP}/overlay/surfaces/${SURFACE}" >> "$GITHUB_ENV"
+            exit 0
+          fi
+          echo "::error title=android::overlay je deklarovaný, ale tokenem GIT_TOKEN se nedal stáhnout (chybí nebo nemá právo číst)."
           exit 1
 
       - name: Ověřit, že povrch v overlayi existuje
