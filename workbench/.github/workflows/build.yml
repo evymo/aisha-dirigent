@@ -29,6 +29,9 @@ on:
 env:
   VSCODIUM_REF: '1.112.01907'
   NODE_OPTIONS: '--max-old-space-size=8192'
+  # build.sh/utils.sh require the release repo URL (product.json: issues, licence, checksums);
+  # in GitHub Actions that is the repository the workflow runs in.
+  RELEASE_REPO: ${{ github.server_url }}/${{ github.repository }}
 
 jobs:
   # ── Linux x64 (primary, fastest) ────────────────────────

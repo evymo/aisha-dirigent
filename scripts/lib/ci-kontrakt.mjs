@@ -73,7 +73,7 @@ export const KONTRAKT_CI = [
   { jmeno: "APP_NAME_PREFIX", druh: "var", zdroj: { trezor: "APP_NAME_PREFIX" }, povinne: true, ucel: "identita instance pro jména aplikací — a přepínač nasazení: bez ní se deploy úlohy přeskočí" },
   { jmeno: "REGISTRY_PROXY", druh: "var", zdroj: { trezor: "REGISTRY_PROXY" }, povinne: false, ucel: "volitelná pull-through cache obrazů Docker Hubu (prázdná = stahuje se přímo)" },
   { jmeno: "INSTANCE_OVERLAY_REPO", druh: "secret", zdroj: "externi", povinne: false, ucel: "repo dat instance (host/vlastník/repo) pro overlay v CI" },
-  { jmeno: "GIT_TOKEN", druh: "secret", zdroj: "externi", povinne: false, ucel: "čtení privátních rep instance v CI: overlaye (cachebust, brány, mobil) a registr forků" },
+  { jmeno: "GIT_TOKEN", druh: "secret", zdroj: { trezor: "GIT_TOKEN" }, povinne: false, ucel: "čtení privátních rep instance v CI: overlaye (cachebust, brány, mobil) a registr forků" },
   { jmeno: "API_DOMAIN_PUBLIC", druh: "secret", zdroj: { trezor: "API_DOMAIN_PUBLIC" }, povinne: false, ucel: "ověření nasazení (deploy.yml)" },
   { jmeno: "APP_DOMAIN", druh: "secret", zdroj: { trezor: "APP_DOMAIN" }, povinne: false, ucel: "ověření nasazení (deploy.yml)" },
   { jmeno: "KEYCLOAK_DOMAIN", druh: "secret", zdroj: { trezor: "KEYCLOAK_DOMAIN" }, povinne: false, ucel: "ověření nasazení (deploy.yml)" },

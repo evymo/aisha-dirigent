@@ -316,7 +316,7 @@ const merged = {
   name: LOCAL_STACK,
   services: {},
   volumes: {},
-  // Build secrets (`build.secrets: [forgejo_token]` u Keycloaku). Bez top-level
+  // Build secrets (`build.secrets: [git_token]` u Keycloaku). Bez top-level
   // deklarace compose odmítne celý projekt („refers to undefined build secret").
   secrets: {},
   networks: {

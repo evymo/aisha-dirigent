@@ -1016,7 +1016,7 @@ describe("Docker Compose Domain Configuration", () => {
   // host's deploy runner. When the encoded payload + substituted env values
   // exceeds the kernel's posix_spawn ARG_MAX, deploy fails with
   //   `proc_open(): posix_spawn() failed: Argument list too long`
-  // Documented failure point: ~47 KB *base64* (docs/deploy/CICD.md:75) — that
+  // Documented failure point: ~47 KB *base64* (docs/deploy/CICD.md, Troubleshooting) — that
   // was on a 35 KB raw compose with 18 services on a Coolify v3-era runner.
   // Coolify v4.x raised the actual ceiling (719 lines was reported as
   // deploying fine in the prior gate comment) but the new ceiling is not

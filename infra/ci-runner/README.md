@@ -1,62 +1,54 @@
 # CI runner (`aisha-ci-runner`) — odkaz na domov definice
 
-Runner Forgejo Actions běží na **Sorenu** jako **služba v Coolify**
-(uuid `ozwf7a47ik8qtzwpmstdcfph`) — mimo tenhle repozitář. Jeho definice
-**nebydlí tady**:
+CI tohoto repa běží na **hostovaných runnerech GitHub Actions** (`.github/workflows/`) — vlastní
+runner není potřeba. Instance, která přesto provozuje vlastní (self-hosted) runner, ho nasazuje
+jako **službu v Coolify** — mimo tenhle repozitář. Jeho definice **nebydlí tady**:
 
-> **Zdroj pravdy:** katalog `Evymo/coolify` (repo.id3a.cz),
+> **Zdroj pravdy:** katalog Coolify aplikací instance (např. `example-org/coolify`),
 > `apps/aisha-ci-runner/docker-compose.yml` + `apps/aisha-ci-runner/README.md`
 > (nasazení, proměnné, labely, úklid, ověření po deployi).
-> Main katalogu je verze, která na Sorenu běží.
+> Main katalogu je verze, která na hostiteli běží.
 
-## ⛔ Proč tu už není kopie
+## ⛔ Proč tu není kopie
 
-Do 2026-09-29 tu ležela kopie `aisha-ci-runner.compose.yml` s návodem, jak ji
-poslat do Coolify (`PATCH docker_compose_raw`). Naměřeno ten den proti živé
-službě (Coolify API) a katalogu:
+Do 2026-09-29 tu ležela kopie compose runneru s návodem, jak ji poslat do Coolify
+(`PATCH docker_compose_raw`). Naměřeno ten den proti živé službě (Coolify API) a katalogu:
 
 - **Rozešla se s živou verzí.** Janitor v ní neznal hlídání disku hostitele
-  (`CI_HOST_MIN_FREE_GB` / `CI_HOST_ESCALATE_FREE_GB` /
-  `CI_HOST_CACHE_RESERVED_GB`, mount `host-docker.sock`) a měl jiný interval
-  (1800 s místo 600) i práh (25 % místo 35 %). Katalog živou verzi nese —
-  služby `docker`, `runner` i `prune` shodné.
-- **Nešla by nasadit.** Vstupní skripty byly víceřádkový řetězec v dvojitých
-  uvozovkách. YAML v něm skládá sousední řádky do jednoho, takže každý
-  `# komentář` spolkne příkazy až do prázdného řádku. Po parsování (PyYAML,
-  tak jak ho vidí Compose) zbylo ze skriptu runneru 9 řádků: registrace je
-  celá v komentáři, `set -e cd /data` nikam nepřejde a `exec forgejo-runner
-  daemon` je jen další argument `echo` — runner by se nespustil. Hlavní
-  smyčka janitoru (`sleep` + `while … sweep`) skončila v komentáři taky.
-  Katalog používá blokový skalár `- |`, který konce řádků drží.
+  (`CI_HOST_MIN_FREE_GB` / `CI_HOST_ESCALATE_FREE_GB` / `CI_HOST_CACHE_RESERVED_GB`,
+  mount `host-docker.sock`) a měl jiný interval (1800 s místo 600) i práh (25 % místo 35 %).
+- **Nešla by nasadit.** Vstupní skripty byly víceřádkový řetězec v dvojitých uvozovkách. YAML
+  v něm skládá sousední řádky do jednoho, takže každý `# komentář` spolkne příkazy až do
+  prázdného řádku. Po parsování (tak jak ho vidí Compose) byla registrace runneru celá
+  v komentáři a démon runneru jen další argument `echo` — runner by se nespustil. Katalog
+  používá blokový skalár `- |`, který konce řádků drží.
 
-Dvě kopie téže definice se rozejdou vždycky; ta, ze které se nenasazuje,
-navíc zestárne potichu. Proto tu zůstává jen odkaz — a brána
-`infra-mimo-pipeline-ma-domov` hlídá, že se kopie nevrátí.
+Dvě kopie téže definice se rozejdou vždycky; ta, ze které se nenasazuje, navíc zestárne
+potichu. Proto tu zůstává jen odkaz — a brána `infra-mimo-pipeline-ma-domov` hlídá, že se
+kopie nevrátí.
 
-Vlastnost, kvůli které domov vznikl (janitor nemaže cache balíčků pod
-běžícími joby, 2026-09-02), hlídá v katalogu test `tests/janitor-pod-tlakem.sh`.
-Ten janitor z compose VYTÁHNE a SPUSTÍ proti falešnému `docker`, tedy měří
-chování, ne text.
+Vlastnost, kvůli které domov vznikl (janitor nemaže cache balíčků pod běžícími joby,
+2026-09-02), hlídá v katalogu test `tests/janitor-pod-tlakem.sh`. Ten janitor z compose
+VYTÁHNE a SPUSTÍ proti falešnému `docker`, tedy měří chování, ne text.
 
 ## Co potřebuješ vědět i bez katalogu
 
-⛔ **Joby běží uvnitř DinD, ne na hostiteli.** `docker ps` na Sorenu je
-NEUKÁŽE a odpoví „nic neběží". 2026-09-01 se podle toho smazala npm cache pod
-třemi běžícími joby. Běžící joby:
+⛔ **Joby self-hosted runneru s DinD běží uvnitř DinD, ne na hostiteli.** `docker ps` na
+hostiteli je NEUKÁŽE a odpoví „nic neběží". 2026-09-01 se podle toho smazala npm cache pod
+třemi běžícími joby. Běžící joby ukáže až dotaz uvnitř DinD:
 
 ```bash
-ssh soren 'docker exec docker-ozwf7a47ik8qtzwpmstdcfph docker ps --format "{{.Names}}" | grep -c FORGEJO-ACTIONS-TASK'
+docker exec <dind-kontejner-runneru> docker ps --format '{{.Names}}'
 ```
 
-⚠️ **Přenasazení služby zabije běžící joby.** Dělej ho, když je fronta prázdná
-(`GET /api/v1/admin/actions/runners/jobs` jako admin Forgejo).
+⚠️ **Přenasazení služby zabije běžící joby.** Dělej ho, když je fronta jobů prázdná.
 
-⚠️ **`FORGEJO_RUNNER_JOB_TIMEOUT` je tvrdý strop.** Runner utne job po té době
-bez ohledu na `timeout-minutes` ve workflow.
+⚠️ **Timeout jobu v konfiguraci runneru je tvrdý strop.** Runner utne job po té době bez
+ohledu na `timeout-minutes` ve workflow.
 
 ## Změna runneru
 
-PR do katalogu `Evymo/coolify`: validace
+PR do katalogu: validace
 `docker compose -f apps/aisha-ci-runner/docker-compose.yml config --no-interpolate`
 a `bash tests/janitor-pod-tlakem.sh`, nasazení podle README katalogu.
 Do tohoto repa definici nekopírovat.

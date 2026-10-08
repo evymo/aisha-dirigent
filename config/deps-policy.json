@@ -1,5 +1,5 @@
 {
-  "$comment": "Dependency-update policy for scripts/aisha-deps-update.mjs (Forgejo-native replacement of .github/dependabot.yml — Dependabot never ran on the primary forge). Cadence lives in .forgejo/workflows/aisha-deps-update.yml (cron). Semver-major updates are NEVER automated — majors land in bespoke PRs after a manual compat check, mirroring the dependabot ignore rule.",
+  "$comment": "Dependency-update policy for scripts/aisha-deps-update.mjs (the repository's own replacement of .github/dependabot.yml). Cadence lives in .github/workflows/aisha-deps-update.yml (cron, opt-in via the DEPS_UPDATE_SCHEDULED repository variable). Semver-major updates are NEVER automated — majors land in bespoke PRs after a manual compat check, mirroring the dependabot ignore rule.",
   "version": 1,
   "allowedUpdateTypes": ["minor", "patch"],
   "groups": {

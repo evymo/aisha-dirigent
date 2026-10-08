@@ -35,8 +35,8 @@ the `gen:ide` `claude-app` adapter. Tag: `claude-app-v0.7.0`.
 - **One-command install** — `.claude-plugin/marketplace.json`:
   `claude plugin marketplace add evymo/aisha-dirigent` →
   `claude plugin install aisha-dirigent@evymo`.
-- **Release automation** — `.forgejo/workflows/claude-app-release.yml` builds,
-  checksums, and attaches `aisha-dirigent.mcpb` to the Forgejo release on
+- **Release automation** — `.github/workflows/claude-app-release.yml` builds,
+  checksums, and attaches `aisha-dirigent.mcpb` to the release on
   `claude-app-v*` tags (zero-dep, no `npm ci`).
 - **Contract drift gate** — `scripts/ide-adapters/__tests__/claude-app-drift.test.mjs`
   fails CI if the standalone server's inlined bring-up contract

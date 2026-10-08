@@ -337,7 +337,7 @@ export async function getProjectAnalysis(): Promise<ProjectAnalysis> {
         repoUrl = remote;
         if (remote.includes("github.com")) repoProvider = "github";
         else if (remote.includes("gitlab.com") || remote.includes("gitlab")) repoProvider = "gitlab";
-        else if (remote.includes("forgejo") || remote.includes("gitea")) repoProvider = "forgejo";
+        else if (remote.includes("gitea")) repoProvider = "gitea";
         else repoProvider = "git";
       }
     } catch { /* no git remote */ }

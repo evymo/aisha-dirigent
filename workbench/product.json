@@ -6,7 +6,7 @@
   "quality": "stable",
   "urlProtocol": "aisha-workbench",
   "reportIssueUrl": "${RELEASE_REPO}/issues",
-  "licenseUrl": "${FORGEJO_BASE_URL}/aisha/aisha-workbench/src/branch/main/LICENSE",
+  "licenseUrl": "${RELEASE_REPO}/blob/main/LICENSE",
   "serverLicense": [],
   "serverLicensePrompt": "",
   "darwinBundleIdentifier": "cz.id3a.aisha-workbench",
