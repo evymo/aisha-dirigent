@@ -44,9 +44,9 @@ set -uo pipefail
 
 ROOT=/home/user
 LOGDIR=/var/log/aisha-setup
+# Návratový kód kroku „nebylo co dělat" (volitelné repo není připojené).
+SKIPPED=3
 SUMMARY="$LOGDIR/summary.txt"
-mkdir -p "$LOGDIR" /opt/venvs
-: > "$SUMMARY"
 
 # step <jméno> <funkce> — spustí funkci na pozadí s logem a záznamem do souhrnu.
 #
@@ -64,6 +64,9 @@ step() {
     rc=$?
     if [ "$rc" = 0 ]; then
       echo "✓ $name ($((SECONDS - started))s)" >> "$SUMMARY"
+    elif [ "$rc" = "$SKIPPED" ]; then
+      # Přeskočený krok není úspěch: souhrn musí odlišit „hotovo" od „nebylo co dělat".
+      echo "– $name (přeskočeno: $(tail -n 1 "$LOGDIR/$name.log"))" >> "$SUMMARY"
     else
       echo "✗ $name ($((SECONDS - started))s, kód $rc) — viz $LOGDIR/$name.log" >> "$SUMMARY"
     fi
@@ -75,9 +78,26 @@ scanners() {
   UV_TOOL_BIN_DIR=/usr/local/bin uv tool install --force semgrep
 }
 
+# Platformní repo podle jména balíčku, ne adresáře: repo se přejmenovalo
+# (aisha-orchestrator → aisha-dirigent) a fork se může jmenovat jakkoli. Natvrdo
+# dané jméno adresáře tu tiše přeskočilo celou instalaci a souhrn hlásil ✓.
+platform_repo() {
+  local pkg
+  for pkg in "$ROOT"/*/package.json; do
+    [ -f "$pkg" ] || continue
+    if grep -q '"name": *"aisha-platform"' "$pkg"; then
+      dirname "$pkg"
+      return 0
+    fi
+  done
+  return 1
+}
+
 orchestrator() {
-  local repo="$ROOT/aisha-orchestrator"
-  [ -f "$repo/package.json" ] || { echo "repo chybí: $repo"; return 0; }
+  local repo
+  # Bez platformního repa nemá prostředí smysl — to je chyba nastavení, ne přeskok.
+  repo="$(platform_repo)" || { echo "platformní repo (package.json \"aisha-platform\") v $ROOT/* není"; return 1; }
+  echo "platformní repo: $repo"
   # Instalace + build: tentýž skript, který běží jako SessionStart hook.
   # Větev, která hook ještě nemá, dostane tytéž kroky natvrdo.
   local hook="$repo/.claude/hooks/session-start.sh"
@@ -98,14 +118,14 @@ orchestrator() {
 
 venv_potok() {
   local repo="$ROOT/potok"
-  [ -d "$repo" ] || { echo "repo chybí: $repo"; return 0; }
+  [ -d "$repo" ] || { echo "repo chybí: $repo"; return "$SKIPPED"; }
   uv venv --allow-existing /opt/venvs/potok
   uv pip install --python /opt/venvs/potok -r "$repo/requirements-ci.txt"
 }
 
 venv_local_ingest() {
   local repo="$ROOT/aisha-local-ingest"
-  [ -d "$repo" ] || { echo "repo chybí: $repo"; return 0; }
+  [ -d "$repo" ] || { echo "repo chybí: $repo"; return "$SKIPPED"; }
   uv venv --allow-existing /opt/venvs/aisha-local-ingest
   uv pip install --python /opt/venvs/aisha-local-ingest \
     -e "$repo[pdf,docx,xlsx,imaging,tokenizer,schema]" pytest
@@ -113,7 +133,7 @@ venv_local_ingest() {
 
 venv_insight() {
   local repo="$ROOT/insight"
-  [ -d "$repo" ] || { echo "repo chybí: $repo"; return 0; }
+  [ -d "$repo" ] || { echo "repo chybí: $repo"; return "$SKIPPED"; }
   # Kořenový Pipfile = vývojový souhrn všech podprojektů (kronos, maestro, ragnarok).
   # ⛔ Lock pinuje torch s CUDA stackem (nvidia-*, triton) = jednotky GB; to se
   # do 5minutového limitu cache nevejde a VM nemá GPU. Lock je úplný (tranzitivní
@@ -129,14 +149,23 @@ venv_insight() {
   fi
 }
 
-step scanners scanners
-step aisha-orchestrator orchestrator
-step venv-potok venv_potok
-step venv-aisha-local-ingest venv_local_ingest
-step venv-insight venv_insight
-wait
+main() {
+  mkdir -p "$LOGDIR" /opt/venvs
+  : > "$SUMMARY"
+  step scanners scanners
+  step aisha-orchestrator orchestrator
+  step venv-potok venv_potok
+  step venv-aisha-local-ingest venv_local_ingest
+  step venv-insight venv_insight
+  wait
 
-echo "--- AISHA cloud environment setup ---"
-sort "$SUMMARY"
-echo "Logy: $LOGDIR"
-exit 0
+  echo "--- AISHA cloud environment setup ---"
+  sort "$SUMMARY"
+  echo "Logy: $LOGDIR"
+}
+
+# Jen při přímém běhu; `source` (scripts/cloud/__tests__) načte funkce bez kroků.
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+  main
+  exit 0
+fi
