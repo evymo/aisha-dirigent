@@ -111,4 +111,20 @@ Klíčová dokumentace:
 | [docs/enterprise/SOURCE_ONBOARDING_CONTRACT.md](docs/enterprise/SOURCE_ONBOARDING_CONTRACT.md) | Source onboarding contract — klasifikace, consent, BYOD governance |
 | [docs/onboarding/SOURCE_APPLICATION_ONBOARDING_HANDBOOK.md](docs/onboarding/SOURCE_APPLICATION_ONBOARDING_HANDBOOK.md) | Operační onboarding postup pro nové source aplikace |
 
+<!-- aisha:user-section:start -->
+## 📌 Pravidla tohoto repa (uživatelská sekce — `gen:ide` ji zachová)
+
+Vygenerovaná část výš je obecná. Tohle jsou pravidla, na kterých tu stojí brány:
+
+- **Data jen přes RPC.** Klient volá `aisha.rpc()`, nikdy tabulky. Gateway pouští `anon`/`authenticated` přes `/rest/v1` jen na `/rpc/<funkce>`; tabulky smí jen `service_role`.
+- **Změna schématu:** SoT soubor `aisha/db/sql/<druh>/<objekt>.sql` (idempotentní) → `\ir` v `aisha/db/heals.sql` (bez něj se změna do běžící DB nedostane) → `npm run db:init:generate` (baseline nikdy ručně). Žádné timestampované migrace. Skill `aisha-migration`.
+- **RPC:** `SECURITY DEFINER` + `SET search_path` + vlastní autorizace + `REVOKE … FROM PUBLIC` + explicitní `GRANT`; mutace se sufixem `_audited` a zápisem do `audit_journal`. Skill `aisha-rpc`.
+- **Granty na tabulky:** `anon` jen SELECT, `authenticated` jen SELECT/INSERT/UPDATE/DELETE (brány `anon-grants-select-only`, `authenticated-grants-bez-ddl`).
+- **Route ve službě:** auth → Zod → `withAitgGuard` u LLM → `safeFetch` → RPC → `toPublicError` → safe logger; `process.env` jen v `config.ts`. Skill `aisha-edge-fn`.
+- **Brány jsou specifikace** (`src/tests/gates/`). Ratchet baseline smí jen klesat; test se nevypíná ani nepřeskakuje.
+- **Testy:** `npm run test:run` · `test:gates` (light + heavy) · `test:gates:dotcene` (jen dotčené) · `test:services` · `test:db` (throwaway Postgres v Dockeru).
+- **Commity:** `type(scope): popis`, česky. Nový soubor jen explicitním `git add` a `ALLOW_NEW_FILES=1 git commit`. Pre-push pouští plnou sadu (~10 min) a chce `node_modules` přesně podle `npm ci`.
+- **Instance data a tajemství nikdy do repa** (brány `no-instance-data-in-public`, `no-committed-secrets`).
+<!-- aisha:user-section:end -->
+
 <!-- gen:metadata {"story_id":null,"output_path":"CLAUDE.md","length_chars":null,"adapter":"claude","payload_version":1,"fingerprint":null,"generated_at":"2026-05-28T00:26:34.174Z"} -->
