@@ -48,6 +48,25 @@ cloned repo silently becomes a directory inside the container).
 See /memories/repo/coolify-bind-mount-trap.md
 ---------------------------------------------------------------------------
 
+## `- SYNAPSE_OIDC_ISSUER=…` (matrix-config-init)
+
+Synapse přihlašuje přes Keycloak **bez discovery** (`discover: false` v
+`coolify/synapse/homeserver.yaml`): `issuer` (porovnává se s `iss` tokenu) a
+`authorization_endpoint` jdou přes veřejnou tvář, `token`/`userinfo`/`jwks_uri`
+přes vnitřní jméno. Jedna adresa pro obojí (discovery) neexistuje tam, kde se
+vnější a vnitřní cesta liší — lokální stack (`scripts/lib/kc-host-auth.mjs`
+adresy přepíše podle cesty) i mesh. Adresy skládá compose, šablona je jen bere.
+
+⛔ Do 2026-10-08 si šablona skládala `…/realms/${KEYCLOAK_REALM}` sama, ale
+`matrix-config-init` `KEYCLOAK_REALM` nedostával — envsubst dosadil prázdno a
+issuer byl `https://<auth>/realms/` (naměřeno ve vyrenderovaném `homeserver.yaml`).
+Realm je identita instance, proto `:?`.
+
+`skip_verification` (kontrola metadat authlib, mj. „issuer MUST use https") se
+zapíná jen pro `http` issuer na loopbacku — tedy lokální Keycloak bez TLS.
+Odvozuje ho skript `matrix-config-init` ze schématu a hostitele issueru;
+produkce skládá issuer vždy `https`, takže tam zůstává `false`.
+
 ## `command:`
 
 envsubst expands ${VAR} placeholders (SYNAPSE_DB_PASSWORD, secrets, etc.)

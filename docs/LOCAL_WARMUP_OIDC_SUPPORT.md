@@ -10,14 +10,17 @@ docker DNS. The model-driven Keycloak resolver
 
 ## Support matrix
 
-| Consumer | Mechanism | local-warmup |
+| Consumer (service) | Mechanism | local-warmup |
 |---|---|---|
-| `aisha-gateway`, `aisha-svc-mcp-knowledge`, `aisha-svc-plugin-system` | `KC_ISSUER` + explicit `KC_JWKS_URL` | ✅ works (host-facing iss, in-network JWKS) |
-| oauth2-proxy admin/monitoring UIs (`aisha-nocodb-auth`, `aisha-appsmith-auth`, `aisha-intranet-auth`, `aisha-pgadmin-auth`, `frontend--n8n--auth`, …) | `OAUTH2_PROXY_SKIP_OIDC_DISCOVERY=true` + explicit endpoints | ✅ works |
-| `aisha-svc-matrix` | `KEYCLOAK_ISSUER` (iss) + `KEYCLOAK_URL` (in-network JWKS) | ✅ works |
-| **Langfuse** (`aisha-langfuse`) | NextAuth Keycloak provider — server-side discovery | ❌ login can't complete |
-| **LLM Gateway** (`aisha-llm-gateway`) / **OpenClaw** (`aisha-openclaw`) | server-side OIDC discovery | ❌ |
-| **Matrix Synapse** (`aisha-synapse`) | `oidc_providers` — no JWKS split in its config | ❌ |
+| `gateway`, `svc-mcp-knowledge`, `svc-plugin-system` | `KC_ISSUER` + explicit `KC_JWKS_URL` | ✅ works (host-facing iss, in-network JWKS) |
+| oauth2-proxy admin/monitoring UIs (`nocodb-auth`, `appsmith-auth`, `intranet-auth`, `pgadmin-auth`, `n8n--auth`, …) | `OAUTH2_PROXY_SKIP_OIDC_DISCOVERY=true` + explicit endpoints | ✅ works |
+| `svc-matrix` | `KEYCLOAK_ISSUER` (iss) + `KEYCLOAK_URL` (in-network JWKS) | ✅ works |
+| **Matrix Synapse** (`synapse`) | `oidc_providers` with `discover: false` + explicit `issuer` / `authorization_endpoint` / `token_endpoint` / `userinfo_endpoint` / `jwks_uri` (composed in `docker-compose.coolify-matrix.yml`, rewritten by the resolver like any explicit consumer) | ✅ starts (healthy) and offers SSO via `oidc-keycloak` (since 2026-10-08; before that it ran discovery at startup and crashed). The browser SSO round-trip still needs Synapse's `public_baseurl` (`https://…`) to be reachable — Traefik/e2e stack |
+| **Langfuse** (`langfuse`) | NextAuth Keycloak provider — server-side discovery | ❌ login can't complete |
+| **LLM Gateway** (`llm-gateway`) / **OpenClaw** (`openclaw`) | server-side OIDC discovery | ❌ |
+
+Container names carry the instance identity (`<APP_NAME_PREFIX>-<service>`, locally
+`local-<service>`); the generator's warning matches on the service suffix.
 
 ## Why discovery consumers can't work here
 

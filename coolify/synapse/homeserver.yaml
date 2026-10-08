@@ -5,7 +5,7 @@
 #
 # Sensitive values reference environment variables set via Coolify.
 # Database: shared ${APP_NAME_PREFIX}-db with dedicated 'synapse' database (LOCALE C).
-# OIDC: Keycloak at ${KEYCLOAK_DOMAIN_PUBLIC}/realms/aisha
+# OIDC: Keycloak (adresy skládá compose — viz oidc_providers níž)
 # =============================================================================
 
 server_name: "${SYNAPSE_SERVER_NAME}"
@@ -73,15 +73,24 @@ signing_key_path: "/data/${SYNAPSE_SERVER_NAME}.signing.key"
 # ─── OIDC — Keycloak SSO ─────────────────────────────────────
 oidc_providers:
   - idp_id: keycloak
-    idp_name: "Evymo SSO"
+    idp_name: "Keycloak SSO"
     idp_brand: "org.matrix.msc3866.keycloak"
-    issuer: "https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}"
+    # Bez discovery: issuer (porovnává se s `iss` tokenu) a autorizace jdou přes
+    # tvář, kterou vidí prohlížeč; token/userinfo/JWKS jdou vnitřní cestou. Jedna
+    # adresa pro obojí (discovery) neexistuje tam, kde se vnější a vnitřní cesta
+    # liší — lokální stack (scripts/lib/kc-host-auth.mjs) i mesh. Adresy skládá
+    # compose (matrix-config-init), ne tahle šablona.
+    discover: false
+    # true jen pro http issuer na loopbacku (lokální stack) — odvozuje matrix-config-init.
+    skip_verification: ${SYNAPSE_OIDC_SKIP_VERIFICATION}
+    issuer: "${SYNAPSE_OIDC_ISSUER}"
     client_id: "synapse"
     client_secret: "${SYNAPSE_OIDC_CLIENT_SECRET}"
     scopes: ["openid", "profile", "email"]
-    authorization_endpoint: "https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/auth"
-    token_endpoint: "https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token"
-    userinfo_endpoint: "https://${KEYCLOAK_DOMAIN}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/userinfo"
+    authorization_endpoint: "${SYNAPSE_OIDC_AUTHORIZE_URL}"
+    token_endpoint: "${SYNAPSE_OIDC_TOKEN_URL}"
+    userinfo_endpoint: "${SYNAPSE_OIDC_USERINFO_URL}"
+    jwks_uri: "${SYNAPSE_OIDC_JWKS_URL}"
     user_mapping_provider:
       config:
         localpart_template: "{{ user.preferred_username }}"

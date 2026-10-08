@@ -640,7 +640,10 @@ if (merged.services.migrate) {
 const discoveryConsumers = findDiscoveryConsumersInStack(merged);
 if (discoveryConsumers.length > 0) {
   console.error(`[local-compose-gen] ⚠ ${discoveryConsumers.length} discovery-OIDC consumer(s) won't complete login under local-warmup (use the e2e/full Traefik stack):`);
-  for (const cn of discoveryConsumers) console.error(`     - ${cn}: ${DISCOVERY_OIDC_CONSUMERS[cn]}`);
+  for (const cn of discoveryConsumers) {
+    const sluzba = Object.keys(DISCOVERY_OIDC_CONSUMERS).find((k) => cn.endsWith(`-${k}`));
+    console.error(`     - ${cn}: ${DISCOVERY_OIDC_CONSUMERS[sluzba]}`);
+  }
 }
 
 // ── Container-name namespacing (coexistence) ─────────────────────────────────
