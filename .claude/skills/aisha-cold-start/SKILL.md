@@ -69,13 +69,13 @@ bash scripts/cold-start-doctor.sh --phase A,B,C   # jen vybrané fáze
 
 | Fáze | Co ověřuje |
 |---|---|
-| A | Environment vars (FORGEJO_TOKEN, COOLIFY_API_KEY, server UUIDs) |
+| A | Environment vars (GIT_TOKEN — povinný se soukromým overlayem, COOLIFY_API_KEY, server UUIDs) |
 | B | Files (manifest, compose, infra) |
 | C | Env contract — `scripts/aisha-env-doctor.mjs --report` |
 | D | Compose interpolation — `scripts/preflight-compose.sh` |
 | E | Manifest ↔ compose bidirectional match |
 | F | Coolify API connectivity |
-| G | Forgejo connectivity |
+| G | Git host (origin) connectivity |
 | H | Federation readiness (source-broker) — no-op když `SOURCE_API_URL` unset |
 | I | OpenClaw wiring — statický 4-SoT koherence check (viz níže) |
 

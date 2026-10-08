@@ -47,13 +47,13 @@ bash scripts/cold-start-doctor.sh
 ```
 
 Doctor validuje 7 fází:
-- A. Environment vars (FORGEJO_TOKEN, COOLIFY_API_KEY, server UUIDs)
+- A. Environment vars (GIT_TOKEN — povinný jen se soukromým overlayem, COOLIFY_API_KEY, server UUIDs)
 - B. Files (manifest, scripts, infra/postgres)
 - C. Env contract (.env.coolify completeness)
 - D. Compose interpolation (preflight-compose.sh)
 - E. Manifest ↔ compose consistency (13/13 refs)
 - F. Coolify API connectivity
-- G. Forgejo connectivity
+- G. Git host (origin) connectivity
 
 **Exit kódy**: `0` ready / `1` fatal / `2` warn-only.
 
@@ -68,7 +68,9 @@ Doctor je integrovaný jako step 0 v `aisha-cold-start.sh` — můžeš ho samos
 ```bash
 # Required env vars (v .env-prod-backup nebo exportované):
 COOLIFY_API_TOKEN=<token>          # alias: COOLIFY_API_KEY
-FORGEJO_API_TOKEN=<token>          # alias: FORGEJO_TOKEN
+GIT_TOKEN=<token>                  # klon soukromých repozitářů (overlaye, soukromý kód)
+GITHUB_REPOSITORY=<owner>/<repo>   # volitelné: GitHub integrace + CI secrets (deploy-init)
+GITHUB_TOKEN=<token>               # volitelné: GitHub REST API pro výše uvedené
 COOLIFY_SERVER_UUID_FRONTEND=<uuid>   # default: rwskgw088gkcc0k4gg40sw4c
 COOLIFY_SERVER_UUID_BACKEND=<uuid>
 COOLIFY_SERVER_UUID_EXPERIMENTAL=<uuid>
@@ -373,15 +375,16 @@ node scripts/aisha-redeploy.mjs --only=netbird
 
 Před bumpem na 0.31+ ověř upstream changelog na env-var changes.
 
-### FORGEJO_TOKEN empty → git clone 401
+### GIT_TOKEN empty → git clone 401
 
-**Symptom**: Apps se vytvoří, ale `docker_compose_raw` zůstane null → wave deploy padá.
+**Symptom**: soukromé repo (kód stacku nebo deklarovaný overlay) se nenaklonuje —
+Coolify nemá `docker_compose_raw`, build overlaye / migrate hook padne na 401.
 
-**Fix**: Doctor ho už chytá, ale pro jistotu:
+**Fix**: Doctor ho chytá (fail, když je overlay deklarovaný), pro jistotu:
 
 ```bash
-grep "^FORGEJO_API_TOKEN=" .env-prod-backup   # musí mít hodnotu
-# Pokud chybí, regeneruj v Forgejo UI → Settings → Applications → New Token
+grep "^GIT_TOKEN=" .env-prod-backup   # musí mít hodnotu
+# Pokud chybí, vygeneruj na git hostingu token s read přístupem k obsahu repa
 ```
 
 ---

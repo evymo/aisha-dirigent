@@ -90,7 +90,7 @@ The app-read flagged these as **blockers**; all are in-scope here:
 
 ### W2b — wire potok learning onto the stack's existing fine-tune lane (§2.5‑B/C, applied-not-new)
 - **Converge, don't rebuild:** map potok's harvest → the stack's `training_datasets`/`training_examples` (via `WF_TRAINING_EXPORT`); potok's `/learn/*` on the mesh = **trigger `WF_FINE_TUNE_JOB` via aishaRpc** (writes a `training_jobs` row), never trains in-process. The fine-tune executes through the existing `scripts/ai/train-lora.sh` (MLX) → adapter → `ai_model_registry`; potok's monotonic-promote/eval maps onto the `training_jobs` `evaluating`→`completed` states. Reconcile potok's `continual.py` schema (rank/alpha/epochs/held-out metric) with `train-lora.sh` flags + `training_jobs` columns.
-- **Mac Mini fine-tune worker install = the stack way:** set it up with the existing `mlx:setup` (native venv + Metal deps), register it as the `WF_FINE_TUNE_JOB` execution host (a labelled `macos`/`mlx` Forgejo runner matching the existing self-hosted setup, or an n8n-reachable native worker). MLX training stays native (no Metal in a Linux container) — but installed/managed identically to the stack's other local runtimes (`vllm`/`ollama`, `local-only` tier).
+- **Mac Mini fine-tune worker install = the stack way:** set it up with the existing `mlx:setup` (native venv + Metal deps), register it as the `WF_FINE_TUNE_JOB` execution host (a labelled `macos`/`mlx` CI runner matching the existing self-hosted setup, or an n8n-reachable native worker). MLX training stays native (no Metal in a Linux container) — but installed/managed identically to the stack's other local runtimes (`vllm`/`ollama`, `local-only` tier).
 - **Optional non-Apple branch:** add a `cuda`/`rocm`/`xpu` code path to `train-lora.sh` (PyTorch+PEFT) if a Linux GPU box joins — same `WF_FINE_TUNE_JOB`/`training_jobs` lane, no potok change.
 - **Re-pin loop:** the promoted adapter (40-hex) flows back into local-ingest's advisory lane through its 3 gates (bundle-variant rollback preserved) — closing Seam‑C through the stack's own registry.
 
@@ -166,7 +166,7 @@ Support **Jetson + NVIDIA + Mac**, all installable & controllable within the sta
 
 **Open (small):**
 - **Which hosts exist now** → build/test those adapters first (Jetson? Mac Mini spec? NVIDIA box?). The others ship as availability-gated adapters.
-- **Worker wiring**: fine-tune host as a labelled Forgejo runner (`macos`/`mlx`, `linux`/`cuda`, `jetson`/`cuda`) vs an n8n-reachable native/container worker.
+- **Worker wiring**: fine-tune host as a labelled CI runner (`macos`/`mlx`, `linux`/`cuda`, `jetson`/`cuda`) vs an n8n-reachable native/container worker.
 - **potok ↔ train-lora reconciliation**: confirm potok's `continual.py` defers to `train-lora.sh` + `training_jobs` (recommended convergence).
 - **vllm-metal LoRA-serving**: verify vllm-metal/Model Runner can serve a fine-tuned adapter (for hot re-pinning); vLLM core supports it, Metal variant TBD.
 - Export **transport**: pull-from-drop (recommended, no egress) vs push. Default: pull.

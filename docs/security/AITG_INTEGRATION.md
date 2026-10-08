@@ -30,7 +30,7 @@ hardening — this document narrows to the AI-specific testing layer.
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
 │  PR / Nightly / Sentinel triggers                                        │
-│   ├─ WF_AITG_PR_GATE          (Forgejo webhook → static + probes)        │
+│   ├─ WF_AITG_PR_GATE          (PR webhook → static + probes)             │
 │   ├─ WF_AITG_NIGHTLY_FULL     (cron 03:30 → 32 tests)                    │
 │   └─ WF_AITG_RUNTIME_SENTINEL (Langfuse anomaly → re-run probes)         │
 └──────────────────────────────────────────────────────────────────────────┘

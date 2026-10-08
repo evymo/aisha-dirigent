@@ -129,7 +129,7 @@ one-world model, capability gates, seed layers), [docs/deploy/STACK_TOPOLOGY.md]
 | Network / PKI | NetBird mesh 0.70, OpenXPKI internal CA, Caddy edge, Traefik (Coolify) |
 | Observability | Langfuse, Prometheus, Loki, Grafana, Sentry, OpenTelemetry (`@aisha/observability`) |
 | Admin tooling | NocoDB (analytical backend), Appsmith (operations dashboards), pgAdmin, Dozzle |
-| Delivery | Docker Compose stacks deployed through Coolify; CI on Forgejo Actions (upstream) |
+| Delivery | Docker Compose stacks deployed through Coolify; CI workflows in `.github/workflows` |
 | Mobile | Expo / React Native; native Android kiosk guardian |
 
 ---

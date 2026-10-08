@@ -8,7 +8,7 @@ change needs before it can be merged, and the rules that the repository enforces
 
 ## Where development happens
 
-- **Upstream** is the maintainers' own forge (Forgejo). CI, gates and deployments run there.
+- **Upstream** is the maintainers' own private git server. CI, gates and deployments run there.
 - **GitHub** (`evymo/aisha-orchestrator`) is the public, history-free snapshot of upstream. Issues and pull
   requests opened here are reviewed by the maintainers and ported upstream; expect a reply, not an
   automatic CI run: nothing runs on GitHub — the public snapshot carries no workflows.

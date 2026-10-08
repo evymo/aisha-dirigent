@@ -193,8 +193,8 @@ KC_URL="https://auth.aisha.guru" \
 | `RAGNAROK_API_KEY` | svc-mcp-knowledge, gateway |
 | `COOLIFY_API_KEY` | gateway (deployment-executor) |
 | `COOLIFY_BASE_URL` | gateway (deployment-executor) |
-| `FORGEJO_URL` | gateway (dev-patch) |
-| `FORGEJO_TOKEN` | gateway (dev-patch) |
+| `GITHUB_API_URL` / `GITHUB_REPOSITORY` | gateway (dev-patch; prázdné repo = `not_configured`) |
+| `GITHUB_TOKEN` | gateway (dev-patch) |
 | `PACKETA_API_KEY` | svc-packeta |
 | `N8N_WEBHOOK_URL` | gateway |
 | `N8N_API_KEY` | gateway |

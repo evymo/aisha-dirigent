@@ -115,7 +115,7 @@ Realm konfigurace: `keycloak/aisha-realm.json` (auto-import při prvním startu 
 ### Web app (doporučený setup)
 
 1. Vytvořit nový projekt → **Docker Compose**
-2. Source: `git.id3a.cz` (Forgejo)
+2. Source: git repo (`GIT_BASE_URL/<owner>/<repo>.git`)
 3. Docker Compose file: `docker-compose.coolify-prebuilt.yml`
 4. Set environment variables (viz níže)
 5. Nastavit webhook pro auto-deploy
@@ -123,7 +123,7 @@ Realm konfigurace: `keycloak/aisha-realm.json` (auto-import při prvním startu 
 ### Supabase stack (separátní projekt)
 
 1. Vytvořit nový projekt → **Docker Compose**
-2. Source: `git.id3a.cz` (Forgejo) nebo ruční paste
+2. Source: git repo (`GIT_BASE_URL/<owner>/<repo>.git`) nebo ruční paste
 3. Docker Compose file: `docker-compose.coolify.yml`
 4. Set ALL environment variables (175+ vars)
 5. Deploy manuálně
@@ -157,15 +157,15 @@ Fixes (in order):
    - If you paste Compose/YAML content into Coolify UI, it may get inlined into the runner script.
    - Prefer selecting a Compose file path from the repository instead.
 
-## Forgejo Actions (deploy webhook)
+## CI (deploy webhook)
 
-CI/CD pipeline běží na Forgejo (git.id3a.cz). Deploy se triggeruje přes Coolify webhook.
+CI/CD pipeline běží jako CI workflow (`.github/workflows/`). Deploy se triggeruje přes Coolify webhook.
 
-Nastavit v Forgejo repo → Settings → Secrets:
+Nastavit v repu na GitHubu → Settings → Secrets and variables → Actions (nebo `npm run deploy:init` s `GITHUB_REPOSITORY` + `GITHUB_TOKEN`):
 
 - `COOLIFY_WEBHOOK_URL` — Webhook URL z Coolify projektu
 
-Pipeline: `.forgejo/workflows/ci.yml`
+Pipeline: `.github/workflows/ci.yml`
 Detaily: [CICD.md](CICD.md) a [COOLIFY_SETUP.md](COOLIFY_SETUP.md)
 
 

@@ -116,7 +116,7 @@ CREATE POLICY ... TO public USING (is_active AND (expires_at IS NULL OR expires_
 - `.DS_Store` napříč repem; lokálně sedí `.env.coolify`, `.env-prod-backup*` — gitignorované (OK), ale citlivá data ve working tree.
 - `src/tests` — `strict:true` ale `noImplicitAny:false`, `noUnusedLocals:false` → mrtvý kód se hromadí neviditelně.
 - `index.html:33` og:image míří na ephemeral Lovable R2 bucket.
-- `workbench/.forgejo/workflows/build.yml` — dead CI (Forgejo čte jen root) + hard-fail bez `FORGEJO_BASE_URL`.
+- `workbench/.github/workflows/build.yml` — dead CI (git server čte jen root) + hard-fail bez `RELEASE_REPO`.
 - `extensions` CI lane `npm run build` (neexistuje; je `compile`) → no-op; zed/claude bez CI.
 - `.env.coolify.example` legacy Supabase template — chybí ~22 OpenClaw, ~23 PKI, ~43 exec vars (mnohé `:?required`).
 

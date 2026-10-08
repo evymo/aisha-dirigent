@@ -322,7 +322,7 @@ L2J_GAME_JAVA_OPTS=-Xms512m -Xmx2g
 
 ## CI/CD pro multi-server stories
 
-### Forgejo workflow template
+### CI workflow template (GitHub Actions)
 
 ```yaml
 name: Deploy Story
@@ -364,11 +364,11 @@ jobs:
             -H "Authorization: Bearer ${{ secrets.COOLIFY_API_TOKEN }}"
 ```
 
-### Forgejo Secrets (per repo)
+### CI Secrets (per repo)
 
 | Secret | Popis |
 |--------|-------|
-| `COOLIFY_URL` | `https://frontend.id3a.cz` |
+| `COOLIFY_URL` | `https://<coolify-host>` |
 | `COOLIFY_API_TOKEN` | Coolify API Bearer token |
 | `COOLIFY_UUID_FRONTEND` | UUID Coolify app pro frontend |
 | `COOLIFY_UUID_BACKEND` | UUID Coolify app pro backend |
@@ -415,6 +415,6 @@ Coolify `restart` = FULL redeploy (pull + build + recreate). Pokud to nepomáhá
 - [ ] Cross-server IPs nastaveny jako env vars (ne hardcoded)
 - [ ] `coolify/servers.json` aktualizován
 - [ ] `scripts/check-infra.mjs` aktualizován (UUID + health endpoints)
-- [ ] Forgejo secrets nastaveny (COOLIFY_UUID_*)
+- [ ] CI secrets nastaveny (COOLIFY_UUID_*; `coolify-story-init.sh` je zapíše přes `gh`, když je `GITHUB_REPOSITORY` + `GITHUB_TOKEN`)
 - [ ] Deploy triggered a verified
 - [ ] Langfuse projekt vytvořen (pokud AI komponenta) s dedikovanými klíči

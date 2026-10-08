@@ -7,12 +7,12 @@
 ## Stats (at time of analysis)
 - Local worktrees: **23**
 - Local branches: **108**
-- Remote branches on `origin` (Forgejo): **322**
+- Remote branches on `origin` (git server): **322**
 - Local branches already fully merged into `origin/main`: **70+**
 - Remote `origin/*` branches already merged into `origin/main`: **~293**
 
 Remotes:
-- `origin` + `forgejo` = same Forgejo instance (`repo.id3a.cz/aisha/evymo-ai-orchestrator`)
+- `origin` + `git server` = same git server instance (`git.example.com/<org>/aisha-orchestrator`)
 - `github` + `gitlab` = additional mirrors (fetch requires auth)
 
 ## Key Findings from Analysis
@@ -52,10 +52,10 @@ Detailed investigation of branches with commits not yet in `origin/main`:
   - New `scripts/ensure-worktree-hooks.sh`, updated `.husky/post-checkout`, CONTRIBUTING.md updates.
   - **NOT present** on `origin/main` nor on local `feat/inbound-comms-story-tree`.
   - High value in this repo because of heavy `.claude/worktrees/*` + external `_xxx` worktree usage.
-- **integrate/forgejo-forgotten-coldstart-pki** (newest, 5 uniq commits, dedicated `/private/tmp/...` worktree, 2026-06-07):
+- **integrate/git-forgotten-coldstart-pki** (newest, 5 uniq commits, dedicated `/private/tmp/...` worktree, 2026-06-07):
   - Bundles: pki-bridge route derivation for cold-start, env-doctor prod pki overrides preservation, seed regen, husky hooks, ci-runner health.
   - Some pieces (husky scripts, specific pki/cold-start bits) are **not on main**.
-  - Appears to be "forgotten pieces" integration from previous Forgejo/coldstart waves. Active and worth reviewing/landing.
+  - Appears to be "forgotten pieces" integration from previous git server/coldstart waves. Active and worth reviewing/landing.
 
 ### 3. Worktree hygiene problem
 Many worktrees remain long after their branch's changes were merged into main. This is common with AI-assisted parallel development (spin worktree → do task → PR lands from `claude/xxx` or directly → worktree left behind).
@@ -72,7 +72,7 @@ The script that listed "SAFE-PRONE-CANDIDATE" (branch fully ancestor of main + <
 ### B. Recently active / small pending value (review & land or integrate)
 | Worktree path | Branch | Uniq vs main | Last activity | Recommendation |
 |---------------|--------|--------------|---------------|----------------|
-| `/private/tmp/aisha-forgejo-integrate3` | `integrate/forgejo-forgotten-coldstart-pki` | 5 | 2026-06-07 | **Highest priority review.** Contains real pki/cold-start + husky worktree hooks not yet on main. Decide: land as-is, cherry-pick pieces, or rebase onto inbound. |
+| `/private/tmp/aisha-git-integrate3` | `integrate/git-forgotten-coldstart-pki` | 5 | 2026-06-07 | **Highest priority review.** Contains real pki/cold-start + husky worktree hooks not yet on main. Decide: land as-is, cherry-pick pieces, or rebase onto inbound. |
 | `.../.claude/worktrees/vigorous-ritchie-c46b10` | `claude/ci-coldstart-docker-cli` | 0 (but CI health related) | 2026-06-06 | CI health probe bits already on main. Safe after confirming. |
 | `.../.claude/worktrees/agitated-bardeen-0f9183` | `claude/hook-factory-settings-patch` | 0 | 2026-06-06 | Already merged. |
 | (external) `.../_husky-worktree-hooks` | `claude/husky-worktree-hooks` | 1 | 2026-06-06 | **Husky worktree support not landed.** See "pending value" above. Consider landing the scripts + post-checkout hook support. |
@@ -110,7 +110,7 @@ These are tracking branches or old experiments without a materialized worktree r
 - `claude/self-tooling-activation` (3 uniq, docs)
 - `claude/awesome-driscoll-1ecabf`, `claude/angry-swirles-7f3e3b`, `claude/pedantic-dijkstra-59cf5d`, etc.
 - `chore/licensing-elv2` (note: variants like `chore/licensing-elv2-on-main` are merged)
-- `integrate/forgejo-forgotten-coldstart-pki` (already covered above)
+- `integrate/git-forgotten-coldstart-pki` (already covered above)
 - Various `fix/*`, `ci/*`, `backup/*`, `save/*`, `public-fresh`, `release/0.9.0-alpha-public` etc.
 
 Many of the claude/* here have very small uniq counts (1-3) and recent dates — likely trailing polish after the main PR landed under a different claude/ name.
@@ -129,7 +129,7 @@ We will use this doc + (optionally) git notes or branch descriptions later. Prop
 ## Recommended Immediate Next Steps
 
 1. **Review the 2-3 pending items** (highest risk of losing work):
-   - `integrate/forgejo-forgotten-coldstart-pki` (and its /tmp worktree)
+   - `integrate/git-forgotten-coldstart-pki` (and its /tmp worktree)
    - `claude/husky-worktree-hooks` (the ensure-worktree-hooks.sh + post-checkout)
    - Confirm the personality enum + dosing + storeAtProvider deltas are truly covered on main (evidence above suggests yes).
 
@@ -165,14 +165,14 @@ Ran full re-enumeration after the initial analysis:
 - All 23 worktrees re-listed via `git worktree list --porcelain` (plus status of uncommitted changes per worktree).
 - Every worktree branch deeply checked: unique commit count + ancestor status vs **both** `origin/main` **and** the local `feat/inbound-comms-story-tree`, plus the actual list of unique commits and files touched when >0.
 - Full scan of **all 108 local branches** (not just the ones with worktrees) for any carrying unique commits vs origin/main → exactly **38** branches have >=1 unique commit.
-- Bucketed: 38 with >=1, 15 with >=2, 7 with >=3, **only 1 with >=5** (the integrate/forgejo-forgotten-coldstart-pki branch with 5).
+- Bucketed: 38 with >=1, 15 with >=2, 7 with >=3, **only 1 with >=5** (the integrate/git-forgotten-coldstart-pki branch with 5).
 - Targeted clean presence checks for the critical files we care about (.husky/post-checkout, ensure-worktree-hooks.sh, validate_dose_proposal.sql, llmRouter.ts storeAtProvider logic, ci.yml health probe, personality enum migration).
 - Checked `git stash list`, detached HEAD worktrees, and the most recent remote origin/ branches (last ~10 days).
 
 ### Key confirmations from the second pass
 - Worktree count and mapping identical to first pass. One additional detached worktree (`_testfix` on 3594a5af).
 - Uncommitted changes: main inbound worktree has **183** lines (active development), integrate pki worktree has 2, _release-090 has 16; most others clean.
-- The **only branch with non-trivial unique work (>4 commits)** is `integrate/forgejo-forgotten-coldstart-pki` (5 commits, ~390 insertions). It bundles:
+- The **only branch with non-trivial unique work (>4 commits)** is `integrate/git-forgotten-coldstart-pki` (5 commits, ~390 insertions). It bundles:
   - husky worktree hooks support
   - pki-bridge cold-start derivation + env-doctor prod overrides
   - seed regeneration
@@ -214,7 +214,7 @@ We are in a good position to:
 **Nature and scope of the uncommitted work (categorized from fresh `git status --porcelain`):**
 - **70 scripts/**: massive modernization — heavy edits to `rebrand-id3a-to-aisha-guru.py`, almost all provision-*, smoke-*, test-*, warmup, pki-*, cold-start-*, n8n-*, netbird-*, appsmith-*, etc. scripts. Also new/fixed local-db.mjs, .fix-domains.pl scripts.
 - **Many docker-compose.* + coolify configs** (11+ coolify ymls, synapse bridges for matrix, element, netbird, pki, llm-gateway, monitoring, n8n, openclaw, registry, etc.).
-- **.forgejo/workflows/** (ci.yml, e2e-dirigent, onboard-server, aisha-packages-publish, etc.).
+- **.github/workflows/** (ci.yml, e2e-dirigent, onboard-server, aisha-packages-publish, etc.).
 - **16 n8n/workflows/** (many WF_* updated, plus .fix-domains.pl).
 - **Extensions** (aisha-dirigent: package, changelog, i18n, license, vscodeignore).
 - **Mobile-app**, **e2e/** tests, **keycloak** configs, **openxpki-config**, **infra**, **aisha/db/seed/** (backbone + translations for consents/kpis/questionnaires), **config/** (domains.env, local-presets).
@@ -236,7 +236,7 @@ We are in a good position to:
 
 **How the uncommitted changes relate to the other branches & worktrees (the consolidation picture):**
 - This is the **active consolidation point**. The big inbound-comms story is absorbing and evolving a huge amount of the recent "claude/*", "feat/local-warmup*", "chore/licensing*", "feat/kc-oidc*", "claude/release-090-blockers", dosing, ci health, etc. work that we saw as "already merged to main" in the earlier analysis.
-- Many files touched in the uncommitted set directly overlap with changes that arrived via the 51 (and with files changed in the integrate/forgejo-forgotten-coldstart-pki branch). The user is doing a broad, cross-cutting update (rebrand to aisha + ELv2 everywhere, cold-start/local-warmup hardening, script + compose + n8n + e2e modernization, new gates for licensing/secrets, pki/coolify tweaks).
+- Many files touched in the uncommitted set directly overlap with changes that arrived via the 51 (and with files changed in the integrate/git-forgotten-coldstart-pki branch). The user is doing a broad, cross-cutting update (rebrand to aisha + ELv2 everywhere, cold-start/local-warmup hardening, script + compose + n8n + e2e modernization, new gates for licensing/secrets, pki/coolify tweaks).
 - **Specific pending items and the WIP:**
   - Husky worktree hooks support (`.husky/post-checkout`, `scripts/ensure-worktree-hooks.sh`): **still clean / not present** in the current uncommitted changes. These remain a real pending delta (the integrate pki branch carries them). They have not yet been folded into the inbound story.
   - Pki / cold-start / env-doctor: **some** related scripts are actively modified here (`scripts/aisha-env-doctor.mjs`, `scripts/aisha-cold-start.sh`, `scripts/cold-start-verify.mjs`, plus many docker-compose.coolify-pki.yml etc.). The integrate pki branch's specific "derive pki-bridge route" + "preserve prod pki bridge overrides" + the gate test appear to be more targeted pieces that may still need explicit integration (or are being done at larger scale in the uncommitted layer).
@@ -260,7 +260,7 @@ Next practical step after this verification: decide on folding the husky support
 
 ## Integration & Prune Log (systematic, one-by-one, documents-driven)
 
-**2026-06-07 — First item processed: integrate/forgejo-forgotten-coldstart-pki (worktree + branch)**
+**2026-06-07 — First item processed: integrate/git-forgotten-coldstart-pki (worktree + branch)**
 - Integrated: husky worktree hooks support (core missing piece — .husky/post-checkout + ensure-worktree-hooks.sh + package.json script + CONTRIBUTING section) + pki-bridge topology derivation (PKI_BRIDGE_DOMAIN etc. in cold-start/env-doctor/redeploy/diagnose/compose/gate) + env-doctor prod override preservation.
 - Skipped from this branch: ci health retry and seed regen (superseded by scope of current massive uncommitted rebrand/coldstart/gates/scripts WIP).
 - Changes folded into the active inbound uncommitted layer (protected worktree).
@@ -356,8 +356,8 @@ The request is complete.
 The guiding inventory document has been the driver throughout — decisions, integrations, and prunes logged here. Worktree hygiene debt dramatically reduced. Only the active inbound story worktree + a short list of remaining branches + stashes left. Nothing from the mapped list was skipped.
 ## Decision Log — Integration & Cleanup (one by one, guided by this doc)
 
-### 2026-06-07 — integrate/forgejo-forgotten-coldstart-pki + its worktree
-- **Source**: /private/tmp/aisha-forgejo-integrate3 on branch `integrate/forgejo-forgotten-coldstart-pki` (5 unique commits vs main, newest on 2026-06-07).
+### 2026-06-07 — integrate/git-forgotten-coldstart-pki + its worktree
+- **Source**: /private/tmp/aisha-git-integrate3 on branch `integrate/git-forgotten-coldstart-pki` (5 unique commits vs main, newest on 2026-06-07).
 - **What was integrated** (into current feat/inbound-comms-story-tree uncommitted WIP):
   - Full husky worktree hooks support: `.husky/post-checkout` (new), `scripts/ensure-worktree-hooks.sh` (new), package.json "setup:worktree-hooks" entry, CONTRIBUTING.md section. (Highest value — enables hooks in .claude/worktrees and all external worktrees. Was missing from the big rebrand/coldstart uncommitted changes.)
   - pki-bridge topology derivation + env-doctor prod override preservation (from patches 0004 and 0005): PKI_BRIDGE_DOMAIN/URL/HEALTH_URL derivation in cold-start, env-doctor (prefer prodEnv before topology), redeploy, diagnose script, compose labels, gate test updates. Some files already being heavily edited in the inbound WIP for rebrand/genericization; the specific "derive + preserve operator overrides" logic was folded in.
@@ -377,7 +377,7 @@ The guiding inventory document has been the driver throughout — decisions, int
 
 ## 2026-06-08 — Baseline capture & push (per user request)
 
-**Current state prepared into commit + pushed for Forgejo CI + merge to main.**
+**Current state prepared into commit + pushed for CI + merge to main.**
 
 - Commit: `8e7414d1` "chore(rebrand) + feat(inbound-comms): aisha + ELv2 licensing, public mirror prep, cold-start/generic, husky hygiene, pki topology, scripts/gates overhaul"
   - 175 files: full aisha/ELv2 rebrand, 0.9 public prep, inbound-comms story pieces, integrated husky worktree hooks + pki topology derivation/preserve, new/updated gates, CLA.md + LICENSING_INTENT.md + this inventory, temp .fix-*.pl, scripts/compose/workflows overhaul, i18n seeds, n8n, e2e, mobile, keycloak, openxpki etc.
@@ -389,7 +389,7 @@ The guiding inventory document has been the driver throughout — decisions, int
   - test:gates: 243 passed / 15 failed (known rebrand-transition issues in CSP/PKI/silent/legacy gates after templating + domain genericization; will be polished in follow-ups on main)
 - Only 1 worktree remains (main on this branch). All 23 mapped + branches processed per this doc.
 - Branch pushed to `origin/feat/inbound-comms-story-tree` (ahead on local tip with this commit; still behind 51 on remote tracking from parallel main merges during hygiene).
-- Next: User reviews on Forgejo. When all CI/tests (esp. gates) green there, approve merge to `main`. After merge, `main` will have this as the clean current baseline to branch further work from.
+- Next: User reviews on git server. When all CI/tests (esp. gates) green there, approve merge to `main`. After merge, `main` will have this as the clean current baseline to branch further work from.
 
 **"to co z toho zbylo a co mame aktualne" is now captured and ready for the new main baseline.**
 

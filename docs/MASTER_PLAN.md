@@ -2,7 +2,7 @@
 
 > **Verze:** 3.0 | **Datum:** 2026-04  
 > **Status:** ACTIVE — Alpha  
-> **Repo:** [repo.id3a.cz/aisha/evymo-ai-orchestrator](https://repo.id3a.cz/aisha/evymo-ai-orchestrator)  
+> **Repo:** [git.example.com/<org>/aisha-orchestrator](https://git.example.com/<org>/aisha-orchestrator)  
 > **Nahrazuje:** AUTONOMY_PLAN.md, IMPLEMENTATION_PLAN.md, AISHA-Self-Managing-Organism.md (jako unified view)
 
 ---
@@ -29,7 +29,7 @@ AISHA platforma se transformuje na **samoorganizující se celek** tvořený tř
 
 ### Klíčové principy
 
-1. **Aisha = Dirigent celého ekosystému.** Řídí NocoDB, Appsmith, n8n workflows, Forgejo — **sama si upravuje management board, navrhuje UI změny, vytváří nové views a dashboardy.**
+1. **Aisha = Dirigent celého ekosystému.** Řídí NocoDB, Appsmith, n8n workflows, git server — **sama si upravuje management board, navrhuje UI změny, vytváří nové views a dashboardy.**
 2. **NocoDB ↔ Appsmith oboustranná spolupráce** pod Aišinou kontrolou. NocoDB = analytický backend a strukturální nástroj. Appsmith = frontend dashboardy. Obě komponenty spolupracují přes sdílenou PostgreSQL DB s API propojením. Aisha obsluhuje obě rozhraní — z NocoDB si čte/zapisuje analytická data, v Appsmith navrhuje a modifikuje dashboardy.
 3. **Multi-source, multi-bot, user-level response** — evoluce původní Aisha architektury. Agent routing přes `agent_catalog` + `agent_configurations`, LLM Router (OpenAI/Gemini/Anthropic), kontextová odpověď podle role uživatele (member/practitioner/staff/admin).
 4. **Komponisté = uživatelé platformy**, kteří se registrují na veřejném webu a zásobují Dirigenta expertními znalostmi. Public website backend kde Dirigent koordinuje celou komunitu odborníků.
@@ -40,14 +40,14 @@ AISHA platforma se transformuje na **samoorganizující se celek** tvořený tř
 ```
 Aisha detekuje potřebu → NocoDB: vytvoří/upraví view/strukturu →
 Appsmith: modifikuje/vytvoří dashboard → n8n: upraví/vytvoří workflow →
-Forgejo: commitne změny → Self-test → Expert approval (pokud třeba) → Deploy
+git server: commitne změny → Self-test → Expert approval (pokud třeba) → Deploy
 ```
 
 **Aisha MUSÍ umět:**
 - Modifikovat vlastní management board v NocoDB (přes NocoDB API v AishaAdminBridge)
 - Navrhovat a aplikovat UI změny v Appsmith (přes Appsmith API + Git sync)
 - Vytvářet/upravovat n8n workflows (přes WF_NODE_FACTORY)
-- Commitovat do Forgejo (přes Git API)
+- Commitovat do git server (přes Git API)
 - Rozhodovat o eskalaci k expertovi vs. automatické řešení
 - Řídit agent_catalog a agent_configurations — přidávat nové boty, měnit routing, upravovat decision trees
 
@@ -58,7 +58,7 @@ Forgejo: commitne změny → Self-test → Expert approval (pokud třeba) → De
 | **NocoDB** | Views, tabulky, statistiky | Vytvářet views, upravovat struktury, zapisovat data | NocoDB REST API |
 | **Appsmith** | Dashboard stav, stránky, queries | Navrhovat změny dashboardů, deploye | Appsmith REST API + Git sync |
 | **n8n** | Workflow status, execution logs | Vytvářet/editovat workflows, aktivace/deaktivace | n8n REST API |
-| **Forgejo** | Repozitáře, branches, PRs | Commity, branches, PR vytváření | Forgejo REST API |
+| **git server** | Repozitáře, branches, PRs | Commity, branches, PR vytváření | git host REST API |
 | **Supabase** | Data přes RPC, schéma info | Migrace (přes soubory), seed data | PostgREST API |
 | **Langfuse** | Traces, spans, metriky | Projekty, prompt management | Langfuse REST API |
 
@@ -92,7 +92,7 @@ Naše instance je lehká:
 | **Appsmith** | `appsmith.aisha.guru` | `localhost:8090` | ✅ Produkce + lokálně funguje |
 | **Langfuse** | `langfuse.aisha.guru` | `localhost:3100` | ✅ Dual-write tracing (DB + REST) |
 | **Verdaccio** | `npm.id3a.cz` | — | ✅ n8n-nodes-aisha v0.3.0 |
-| **Forgejo** | `repo.id3a.cz` | — | ✅ Git mirror a CI/CD |
+| **git server** | `git.example.com` | — | ✅ Git mirror a CI/CD |
 
 ### Databáze — Baseline Konsolidace (2026-04-01)
 
@@ -353,7 +353,7 @@ appsmith-mongo:
 - [x] **StoryLoop Admin** app vytvořen — lokálně (App ID: `69abf93b8b5c8e4325ca73c3`)
 - [x] Setup skript: `scripts/appsmith-api-setup.py` (idempotentní — detekuje existující resources)
 - [ ] Zopakovat workspace/datasource setup na produkci (po fixu 503)
-- [ ] Nastavit Git sync (Forgejo/GitHub) pro version control dashboardů
+- [ ] Nastavit Git sync (git server/GitHub) pro version control dashboardů
 - [ ] RBAC: Admin role → full access, Staff/Dirigent → view + limited edit
 - [ ] **Appsmith API token** pro Aisha (AishaAdminBridge) — Aisha bude přes API modifikovat dashboardy
 
@@ -368,17 +368,17 @@ appsmith-mongo:
 
 ---
 
-### Fáze 1: Forgejo Connect + StoryLoop Dashboard Design (2-3 dny)
+### Fáze 1: git server Connect + StoryLoop Dashboard Design (2-3 dny)
 
-**Cíl:** Forgejo jako mirror/backup propojeno, StoryLoop dashboard navržen v Appsmith.
+**Cíl:** git server jako mirror/backup propojeno, StoryLoop dashboard navržen v Appsmith.
 
-#### 1.1 Forgejo — stav
+#### 1.1 git server — stav
 
-- [x] Forgejo nasazeno na `repo.id3a.cz` ✅ (Forgejo je primary Git, ne mirror)
+- [x] git server nasazeno na `git.example.com` ✅ (git server je primary Git, ne mirror)
 - [x] Organizace `aisha` vytvořena ✅ (repo: `aisha/evymo-ai-orchestrator`)
-- [ ] Mirror z GitHub (Forgejo je primary, GitHub mirror nepotřeba)
-- [ ] Appsmith Git sync → Forgejo (`evymo/appsmith-configs`)
-- [ ] n8n workflow export → Forgejo (`evymo/n8n-workflows`)
+- [ ] Mirror z GitHub (git server je primary, GitHub mirror nepotřeba)
+- [ ] Appsmith Git sync → git server (`<org>/appsmith-configs`)
+- [ ] n8n workflow export → git server (`<org>/n8n-workflows`)
 
 #### 1.2 StoryLoop Admin Dashboard — Design v Appsmith
 
@@ -427,7 +427,7 @@ NocoDB NENAHRAZUJE admin stránky přímo — slouží jako:
 | `agent_routing_overview` | `agent_catalog` + `agent_configurations` | Multi-bot routing overview |
 
 #### Deliverables
-- [ ] Forgejo deployed a propojeno (mirror, Git sync)
+- [ ] git server deployed a propojeno (mirror, Git sync)
 - [ ] StoryLoop dashboard wireframe v Appsmith
 - [ ] NocoDB analytické views vytvořeny (10+ views)
 - [ ] Appsmith ↔ NocoDB datasource propojení
@@ -727,7 +727,7 @@ CREATE TABLE consultations (...);
 | Gap | Stav | Dopad |
 |-----|------|-------|
 | Rule propagation | ✅ DB trigger + notification implementovány | trg_expert_rule_propagation, fn_notify_rule_change(), pg_notify |
-| Forgejo/Git operace | ✅ admin_forgejo_git MCP tool | Aisha commituje, vytváří PR, merguje přes MCP |
+| git server/Git operace | ✅ admin_github_git MCP tool | Aisha commituje, vytváří PR, merguje přes MCP |
 | Appsmith API | ✅ admin_appsmith MCP tool | Aisha modifikuje dashboardy, deploye, git sync |
 | Proaktivní workflows | ✅ Watchdogs rozšířeny (+3 WF) | Nightly audit, reminders, guild match, story scaffold aktivovány |
 | Self-learning loop | ✅ WF_SELF_LEARNING_LOOP implementován | Proposal → branch → PR → compliance gate, rate-limited 3 PR/h |
@@ -773,32 +773,32 @@ expert_rules changed
 - [x] pg_net webhook bridge ✅ (migrace `20260311090000` — `net.http_post()` na n8n webhook, graceful fallback)
 - [ ] E2E test: změna expert_rule → ověření nového fingerpritu
 
-#### 7.2 Module 2: Forgejo Bridge
+#### 7.2 Module 2: git server Bridge
 
-**Problém:** Aisha nemá žádný kód pro Git operace. `AishaAdminBridge` má NocoDB (8 ops) + Langfuse (6 ops) + Health (2 ops), ale ZERO Forgejo.
+**Problém:** Aisha nemá žádný kód pro Git operace. `AishaAdminBridge` má NocoDB (8 ops) + Langfuse (6 ops) + Health (2 ops), ale ZERO git server.
 
-**Řešení:** Rozšířit `AishaAdminBridge` o Forgejo operace + MCP tools.
+**Řešení:** Rozšířit `AishaAdminBridge` o git server operace + MCP tools.
 
-**Forgejo API operace (6):**
+**git host API operace (6):**
 
-| Operace | Forgejo API endpoint | MCP tool |
+| Operace | git host API endpoint | MCP tool |
 |---------|---------------------|----------|
-| `list_repos` | `GET /api/v1/repos/search` | `forgejo_list_repos` |
-| `create_branch` | `POST /api/v1/repos/{owner}/{repo}/branches` | `forgejo_create_branch` |
-| `commit_file` | `POST /api/v1/repos/{owner}/{repo}/contents/{path}` | `forgejo_commit_file` |
-| `create_pr` | `POST /api/v1/repos/{owner}/{repo}/pulls` | `forgejo_create_pr` |
-| `get_diff` | `GET /api/v1/repos/{owner}/{repo}/pulls/{id}/files` | `forgejo_get_diff` |
-| `merge_pr` | `POST /api/v1/repos/{owner}/{repo}/pulls/{id}/merge` | `forgejo_merge_pr` |
+| `list_repos` | `GET /api/v1/repos/search` | `github_list_repos` |
+| `create_branch` | `POST /api/v1/repos/{owner}/{repo}/branches` | `github_create_branch` |
+| `commit_file` | `POST /api/v1/repos/{owner}/{repo}/contents/{path}` | `github_commit_file` |
+| `create_pr` | `POST /api/v1/repos/{owner}/{repo}/pulls` | `github_create_pr` |
+| `get_diff` | `GET /api/v1/repos/{owner}/{repo}/pulls/{id}/files` | `github_get_diff` |
+| `merge_pr` | `POST /api/v1/repos/{owner}/{repo}/pulls/{id}/merge` | `github_merge_pr` |
 
 **Credential management:**
-- Forgejo API token uložen v n8n credentials
-- Base URL: `https://git.id3a.cz/api/v1`
-- Auth: `Authorization: token {FORGEJO_TOKEN}`
+- git host API token uložen v n8n credentials
+- Base URL: `https://git.example.com/api/v1`
+- Auth: `Authorization: token {GIT_TOKEN}`
 
 **Deliverables:**
-- [x] `AishaAdminBridge` rozšířen o `forgejo` service (6 operací) ✅ (implementováno v AishaAdminBridge.node.ts)
-- [x] MCP tools: `forgejo_*` (6 nástrojů) ✅ (implementováno jako `admin_forgejo_git` v mcp-knowledge-server, commit `3395682`)
-- [x] n8n credential type: `AishaForgejoApi` ✅ (implementováno v AishaForgejoApi.credentials.ts)
+- [x] `AishaAdminBridge` rozšířen o `git server` service (6 operací) ✅ (implementováno v AishaAdminBridge.node.ts)
+- [x] MCP tools: `github_*` (6 nástrojů) ✅ (implementováno jako `admin_github_git` v mcp-knowledge-server, commit `3395682`)
+- [x] n8n credential type: `AishaGitHubApi` ✅ (implementováno v AishaGitHubApi.credentials.ts)
 - [ ] E2E test: create_branch → commit_file → create_pr pipeline
 
 #### 7.3 Module 3: Appsmith Connector
@@ -863,16 +863,16 @@ Analysis (WF_DIRIGENT decision tree)
 Proposal (ai_trace_events: event='improvement_proposal')
   │
   ▼
-Branch (Module 2: forgejo_create_branch)
+Branch (Module 2: github_create_branch)
   │
   ▼
 Implementation (n8n + MCP tools)
   │
   ▼
-Commit (Module 2: forgejo_commit_file)
+Commit (Module 2: github_commit_file)
   │
   ▼
-PR (Module 2: forgejo_create_pr)
+PR (Module 2: github_create_pr)
   │
   ▼
 Compliance Gate (WF_PR_COMPLIANCE_GATE)
@@ -884,7 +884,7 @@ Expert Approval (if risk > threshold)
   │  └── high_risk: require expert + admin
   │
   ▼
-Merge + Deploy (forgejo_merge_pr → WF_SELF_DEPLOY)
+Merge + Deploy (github_merge_pr → WF_SELF_DEPLOY)
   │
   ▼
 Verify (health monitor confirms fix)
@@ -956,7 +956,7 @@ Learn (update agent_decision_trees weight)
         ┌─────────────────┼────────────────────┐
         │                 │                    │
    ┌────▼────┐    ┌──────▼──────┐     ┌──────▼──────┐
-   │ Forgejo │    │  Langfuse   │     │  Verdaccio  │
+   │ Git srv │    │  Langfuse   │     │  Verdaccio  │
    │ (Git)   │    │ (AI Obs.)   │     │ (npm reg.)  │
    │ git.    │    │ langfuse.   │     │ npm.        │
    │ id3a.cz │    │ id3a.cz     │     │ id3a.cz     │
@@ -1016,10 +1016,10 @@ Aisha řídí obě strany:
 - [x] Coolify deploy na `appsmith.aisha.guru` úspěšný ✅ (Admin stack running:healthy)
 - [ ] Git sync nastaveno
 
-### Fáze 1 Checklist — Forgejo + StoryLoop Design
+### Fáze 1 Checklist — git server + StoryLoop Design
 
-- [x] Forgejo deployed na `repo.id3a.cz` ✅ (Forgejo produkčně funguje, aisha/evymo-ai-orchestrator existuje)
-- [ ] Mirror z GitHub funkční (Forgejo je primary, ne mirror)
+- [x] git server deployed na `git.example.com` ✅ (git server produkčně funguje, <org>/aisha-orchestrator existuje)
+- [ ] Mirror z GitHub funkční (git server je primary, ne mirror)
 - [ ] StoryLoop dashboard wireframe v Appsmith
 - [ ] NocoDB analytické views vytvořeny (10+ views)
 - [x] AishaAdminBridge health check Appsmith ✅ (health_check operace v AishaAdminBridge včetně Appsmith service)
@@ -1042,7 +1042,7 @@ Aisha řídí obě strany:
 | Fáze | Dny | Kumulativně | Závislosti |
 |------|-----|-------------|------------|
 | **0: Appsmith Deploy** | 1-2 | 1-2 | Žádné |
-| **1: Forgejo + StoryLoop Design** | 2-3 | 3-5 | Fáze 0 |
+| **1: git server + StoryLoop Design** | 2-3 | 3-5 | Fáze 0 |
 | **2: StoryLoop + Aisha Autonomy** | 3-5 | 6-10 | Fáze 1 |
 | **3: Financial & Operations** | 3-5 | 9-15 | Fáze 2 |
 | **4: Knowledge Graph + Multi-Bot** | 2-3 | 11-18 | Paralelizovatelné s Fází 3 |
@@ -1054,7 +1054,7 @@ Aisha řídí obě strany:
 
 > **Poznámka k Fázi 7:** Moduly 1-3 jsou nezávislé na Fázi 5-6 a lze je implementovat paralelně.
 > Module 1 (Rule Propagation) závisí pouze na existujícím expert_rules + story_rulesets (Fáze 5 deliverable, již hotovo).
-> Module 2 (Forgejo) závisí na běžícím Forgejo (Fáze 1, není blokující — mock API pro testy).
+> Module 2 (git server) závisí na běžícím git server (Fáze 1, není blokující — mock API pro testy).
 > Module 4-5 závisí na Modulech 1-3.
 
 ---
@@ -1091,7 +1091,7 @@ Aisha řídí obě strany:
 
 ## Immediate Next Step
 
-**Fáze 7 Moduly 1-3 HOTOVÉ** — Rule Propagation ✅, Forgejo Bridge ✅, Appsmith Connector ✅
+**Fáze 7 Moduly 1-3 HOTOVÉ** — Rule Propagation ✅, git server Bridge ✅, Appsmith Connector ✅
 
 **compose_context pipeline HOTOVÝ** — expert_rules seeded (10), story_rulesets (1), story_contexts (1), E2E verified ✅
 **copilot-instructions.md GENEROVÁN** — 574 řádků, 10 pravidel ✅  

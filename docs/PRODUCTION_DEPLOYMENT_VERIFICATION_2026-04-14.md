@@ -12,11 +12,11 @@ Tento dokument shrnuje:
 Kontrola po `git fetch --all --prune`:
 - `HEAD`: `b7a1f159`
 - `origin/main`: `9b260a76`
-- `forgejo/main`: `b7a1f159`
+- `origin/main`: `b7a1f159`
 - `gitlab/main`: `26ad4c61`
 
 Interpretace:
-- Forgejo je synchronizovaný s lokálním `main`.
+- git server je synchronizovaný s lokálním `main`.
 - GitHub (`origin`) je v tomto snapshotu o 1 commit pozadu.
 - GitLab je v tomto snapshotu o více commitů pozadu.
 
@@ -42,7 +42,7 @@ Pre-push hooky byly spuštěny (gate testy, static validation, i18n check, unit 
 - Produkční frontend URL odpovídá.
 - Produkční ingress/API vrací očekávané auth chování.
 - Runtime endpointy hlavních služeb jsou síťově dostupné.
-- Release commit je na `forgejo/main`.
+- Release commit je na `origin/main`.
 
 ## Co tímto NENÍ 100% potvrzeno
 - Že všechny kontejnery v produkci běží na posledním image/tagu.
@@ -106,7 +106,7 @@ Pass kritérium:
 git fetch --all --prune
 git rev-parse --short HEAD
 git rev-parse --short origin/main
-git rev-parse --short forgejo/main
+git rev-parse --short origin/main
 git rev-parse --short gitlab/main
 ```
 Pass kritérium:

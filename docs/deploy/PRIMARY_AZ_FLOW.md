@@ -35,7 +35,7 @@ Poznamka: pred push do main musi projit gates a build.
 
 ## Step 3: One-Time Deploy Bootstrap
 
-Toto je jednorazove nastaveni napojeni Forgejo -> Coolify:
+Toto je jednorazove nastaveni napojeni CI (GitHub) -> Coolify:
 
 ```bash
 npm run deploy:init
@@ -45,7 +45,7 @@ Co to dela:
 
 1. najde/nebo sparuje Coolify web stack
 2. nastavi required env vars
-3. nastavi Forgejo secret `COOLIFY_WEBHOOK_URL`
+3. nastavi CI secret `COOLIFY_WEBHOOK_URL` v repu na GitHubu (volitelne, s `GITHUB_REPOSITORY` + `GITHUB_TOKEN`)
 
 Detailni postup je v [COOLIFY_SETUP.md](COOLIFY_SETUP.md).
 
@@ -53,8 +53,8 @@ Detailni postup je v [COOLIFY_SETUP.md](COOLIFY_SETUP.md).
 
 Bezny deploy flow je jednoduchy:
 
-1. `git push` do `main` na Forgejo
-2. Forgejo CI provede checks, testy a build
+1. `git push` do `main`
+2. CI provede checks, testy a build
 3. CI zavola Coolify webhook
 4. Coolify nasadi web stack (`docker-compose.coolify-prebuilt.yml`)
 
@@ -66,7 +66,7 @@ To je vse. Pro web produkci neni potreba spoustet core/langfuse/admin stacky.
 - `setup.sh`: scriptable first-time local setup
 - `warmup.sh`: stage-based verify/recovery workflow
 - `deploy:init`: one-time deployment bootstrap
-- `.forgejo/workflows/ci.yml`: gate + build + deploy orchestrace
+- `.github/workflows/ci.yml`: gate + build + deploy orchestrace
 
 ## Out of Scope (Advanced)
 

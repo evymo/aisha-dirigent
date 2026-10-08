@@ -15,7 +15,7 @@
 | **AishaStoryManager** | Execute | Delivery lifecycle management | 8 operací (status, env, effort) |
 | **AishaModelRouter** | Execute | Multi-LLM routing s fixními výstupy | 4 výstupy (OpenAI/Google/Anthropic/Fallback) |
 | **AishaLlmRouter** | AI Language Model | Langchain-compatible LLM sub-node s provider failover | Připojení k Agent node jako language model |
-| **AishaAdminBridge** | Execute | Autonomní admin interface (NocoDB/Langfuse/Forgejo) | 3 systémy, 10+ operací |
+| **AishaAdminBridge** | Execute | Autonomní admin interface (NocoDB/Langfuse/GitHub/Appsmith) | 4 systémy, 10+ operací |
 | **AishaTrigger** | Trigger (Poll) | Platform event listener | 8 typů událostí + deduplikace |
 | **AishaNodeFactory** | Execute | Self-orchestration meta-node | Generate/Validate/Test/Deploy/Register |
 
@@ -39,7 +39,7 @@
 │  └─────────────┘  └──────────────┘  └──────────────────┘   │
 │                                                              │
 │  Credentials: AishaPostgrestApi | AishaMcpApi | AishaNocoDbApi │
-│               AishaLangfuseApi | AishaForgejoApi | AishaAppsmithApi │
+│               AishaLangfuseApi | AishaGitHubApi  | AishaAppsmithApi │
 │                                                              │
 ├──────────────────────────────────────────────────────────────┤
 │  Supabase PostgREST → RPC Functions → PostgreSQL             │
@@ -112,11 +112,11 @@ Po instalaci nodů je nutné vytvořit credentials v n8n UI:
 | Secret Key | Langfuse secret key |
 | Public Key | Langfuse public key |
 
-#### AishaForgejoApi
+#### AishaGitHubApi
 | Pole | Hodnota |
 |------|--------|
-| Forgejo URL | `https://repo.id3a.cz` |
-| API Token | Forgejo Personal Access Token |
+| API URL | `https://api.github.com` (GitHub Enterprise: `https://<host>/api/v3`) |
+| API Token | GitHub fine-grained token (contents, pull requests, commit statuses) |
 
 #### AishaAppsmithApi
 | Pole | Hodnota |
@@ -225,11 +225,11 @@ Poskytuje Aishe přímý přístup k interním admin systémům bez React UI:
 |--------|----------------|
 | **NocoDB** | `list_tables`, `list_rows`, `create_row`, `update_row`, `delete_row`, `list_views`, `aggregate` |
 | **Langfuse** | `get_traces`, `get_sessions`, `create_score`, `get_metrics`, `get_observations` |
-| **Forgejo** | `list_repos`, `get_file`, `create_pr`, `list_issues`, `create_issue`, `push_file` |
+| **GitHub** | `list_repos`, `create_branch`, `delete_branch`, `commit_file`, `commit_files`, `create_pr`, `get_diff`, `merge_pr`, `set_commit_status` |
 
-**Credentials:** `AishaNocoDbApi`, `AishaLangfuseApi`, `AishaForgejoApi` (separátní per systém)
+**Credentials:** `AishaNocoDbApi`, `AishaLangfuseApi`, `AishaGitHubApi` (separátní per systém; repo = node parametry `repoOwner`/`repoName` z `GITHUB_REPOSITORY`, prázdné = fail-closed)
 
-**Použití:** Aisha vytváří záznamy v NocoDB pro reporty, čte Langfuse traces pro self-debugging, spravuje PR přes Forgejo při autonomním deploymentu.
+**Použití:** Aisha vytváří záznamy v NocoDB pro reporty, čte Langfuse traces pro self-debugging, spravuje PR na GitHubu při autonomním deploymentu.
 
 ### AishaNodeFactory — Self-Orchestration 🏭
 

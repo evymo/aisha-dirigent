@@ -28,8 +28,10 @@ níže liší od kódu, platí kód** — spec byl psán dopředu a v těchto bo
    jsou **dvě samostatná tlačítka**. Committer řeší proposal **přímo podle id** a
    guarduje `approval_status='approved'` — NEpoužívá `get_pending_tooling_proposals`
    (ten filtruje `pending`, takže schválený proposal by nikdy neviděl).
-5. **Forgejo token env var:** committer čte `FORGEJO_API_TOKEN` (operator secret z
-   `.env-prod-backup`; cold-start z něj odvozuje alias `FORGEJO_TOKEN`).
+5. **GitHub cíl + token:** committer píše do repa `GITHUB_REPOSITORY` (owner/repo,
+   operátorská deklarace — bez ní committer **odmítne**, žádné dosazené repo) přes
+   `GITHUB_API_URL` (výchozí veřejné API, GHE ho přepíše) a autentizuje se n8n pověřením
+   `GitHub API` mintnutým z `GITHUB_TOKEN` (operator secret z `.env-prod-backup`).
 
 Regression guard pro body 1–4 je v `src/tests/gates/aisha-self-tooling.gate.test.ts` §8.
 
@@ -42,7 +44,7 @@ AISHA je **autorizovaný autor svých vlastních nástrojů** v Claude Code pros
 2. **Hook** (`.claude/hooks/{name}.sh` + zápis do `.claude/settings.json`) — když chyba je deterministicky detekovatelná před commitem
 3. **Slash command** (`.claude/commands/{name}.md`) — když opakovaný workflow má smysl jako jednorázová zkratka
 
-Návrhy jdou do tabulky `aisha_tooling_proposals`. Admin schvaluje. Po schválení AISHA commituje do Forgejo přes vlastní stack (žádné GitHub PR magic).
+Návrhy jdou do tabulky `aisha_tooling_proposals`. Admin schvaluje. Po schválení AISHA otevře PR v repu na GitHubu (`GITHUB_REPOSITORY`) vlastním n8n workflow přes GitHub REST API — merge zůstává na člověku.
 
 ---
 
@@ -61,7 +63,7 @@ Návrhy jdou do tabulky `aisha_tooling_proposals`. Admin schvaluje. Po schválen
 | Detekce nutnosti | Devops si všimne | AISHA z audit_journal patternů |
 | Návrh řešení | Devops píše ručně | AISHA generuje + admin schvaluje |
 | Validace | Reviewer | gate test + risk evaluator |
-| Distribuce | Manual git commit | Forgejo commit z AISHA stacku |
+| Distribuce | Manual git commit | GitHub PR z AISHA stacku |
 | Reflexe | TBD | Telemetrie use-rate per skill, drift detection per hook |
 
 ### 1.3 Co AISHA NESMÍ
@@ -107,9 +109,9 @@ Návrhy jdou do tabulky `aisha_tooling_proposals`. Admin schvaluje. Po schválen
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │  WF_AISHA_TOOLING_COMMITTER (webhook-triggered)              │
-│  ├─ Forgejo API: create branch `aisha/tooling/<proposal_id>` │
-│  ├─ Forgejo API: write file (skill MD / hook .sh / cmd MD)   │
-│  ├─ Forgejo API: open PR + assign admin                      │
+│  ├─ GitHub API: create branch `aisha/tooling/<proposal_id>`  │
+│  ├─ GitHub API: write file (skill MD / hook .sh / cmd MD)    │
+│  ├─ GitHub API: open PR (+ assign GITHUB_DEFAULT_ASSIGNEE)   │
 │  ├─ update_tooling_proposal_status('committed', pr_url)      │
 │  └─ Send notification to admin                               │
 └─────────────────────────────────────────────────────────────┘
@@ -142,7 +144,7 @@ CREATE TABLE public.aisha_tooling_proposals (
   approval_id         uuid,
   approved_by         uuid,
   approved_at         timestamptz,
-  committed_sha       text,                            -- Forgejo commit SHA po merge
+  committed_sha       text,                            -- git commit SHA artefaktu (GitHub contents API)
   committed_at        timestamptz,
   reverted_sha        text,                            -- pokud reverted později
   reverted_at         timestamptz,
@@ -168,7 +170,7 @@ CREATE TABLE public.aisha_tooling_proposals (
 - `approved` — admin schválil, čeká na committer
 - `rejected` — admin odmítl s reason v `metadata.rejected_reason`
 - `expired` — proposal stará >7 dní bez akce, auto-expire
-- `committed` — Forgejo PR vytvořen + smerged, `committed_sha` populated
+- `committed` — GitHub PR vytvořen, `committed_sha` populated
 - `reverted` — admin/AISHA vrátila zpět, `reverted_sha` populated
 
 `UNIQUE (proposal_kind, artifact_path)` zabraňuje duplicitě. `manual_locked = true` chrání artefakty po admin manual úprave (AISHA respektuje "lidský dotek").
@@ -341,7 +343,7 @@ Same flow, different prompt + validation:
 
 ---
 
-## 6. Forgejo committer
+## 6. GitHub committer
 
 ### 6.1 `WF_AISHA_TOOLING_COMMITTER`
 
@@ -350,18 +352,22 @@ Webhook input (after admin approval):
 { "proposal_id": "uuid", "approved_by": "user_id" }
 ```
 
-Steps:
+Steps (GitHub REST API; `{repo}` = `GITHUB_REPOSITORY`, `Authorization: Bearer <token>`,
+`Accept: application/vnd.github+json`):
+0. Guard: bez `GITHUB_REPOSITORY` (owner/repo) nebo https `GITHUB_API_URL` committer
+   **odmítne** — repo se nehádá.
 1. Read proposal record (rendered_content, proposed_path, artifact_kind)
-2. Forgejo API: `POST /api/v1/repos/{owner}/{repo}/branches`
+2. Branch = git ref z hlavy `main`:
+   `GET /repos/{repo}/git/ref/heads/main` → `object.sha`, pak `POST /repos/{repo}/git/refs`
    ```json
-   { "new_branch_name": "aisha/tooling/{proposal_id}", "old_branch_name": "main" }
+   { "ref": "refs/heads/aisha/tooling/{proposal_id}", "sha": "{main head sha}" }
    ```
-3. Forgejo API: `POST /api/v1/repos/{owner}/{repo}/contents/{path}` (s `branch` query)
+3. `PUT /repos/{repo}/contents/{path}` (nový soubor = bez `sha`)
    ```json
    {
      "message": "feat(aisha-tooling): {artifact_kind} {proposed_name}\n\nProposal: {rationale}\n\nRef: aisha_tooling_proposals.id={proposal_id}",
      "content": "{base64(rendered_content)}",
-     "new_branch": "aisha/tooling/{proposal_id}"
+     "branch": "aisha/tooling/{proposal_id}"
    }
    ```
 4. **For `proposal_kind = 'hook'` only**: a hook `.sh` is inert until it is registered
@@ -377,21 +383,23 @@ Steps:
      default `PreToolUse` on `Edit|Write|MultiEdit`. An unknown event coerces to `PreToolUse`.
    - the injected entry is tagged `_aisha: { kind: 'self-tooling', managed: true, proposal_id }`
    - skills and commands are standalone files and skip this step (gated by `Is Hook Proposal?`)
-5. Forgejo API: `POST /api/v1/repos/{owner}/{repo}/pulls`
+5. `POST /repos/{repo}/pulls`
    ```json
    {
      "title": "AISHA tooling proposal: {artifact_kind} {proposed_name}",
      "body": "...rationale + evidence summary...",
      "head": "aisha/tooling/{proposal_id}",
-     "base": "main",
-     "assignees": ["{admin_username}"]
+     "base": "main"
    }
    ```
-6. `update_tooling_proposal_status(proposal_id, 'committed', { forgejo_pr_url, forgejo_branch })`
+   then (optional, `onError: continue`) `POST /repos/{repo}/issues/{number}/assignees`
+   with `GITHUB_DEFAULT_ASSIGNEE` (CSV; empty = nobody — no guessed default user)
+6. `update_tooling_proposal_status(proposal_id, 'committed', { committed_sha })` + audit
+   (`pr_url`, `pr_number`, `branch`)
 
 ### 6.2 Auth
 
-Forgejo token uložen v `FORGEJO_API_TOKEN` env var (cold-start z něj odvozuje alias `FORGEJO_TOKEN`). Scoped na single repo + write permission. Token rotace přes `WF_PKI_CERT_ROTATION` (TBD — out-of-scope V1).
+GitHub token uložen v `GITHUB_TOKEN` (operator secret, `.env-prod-backup`) a v n8n žije jen jako šifrované pověření `GitHub API`. Doporučení: fine-grained token scoped na `GITHUB_REPOSITORY` (contents + pull requests write, commit statuses pro PR bránu). Token rotace přes `WF_PKI_CERT_ROTATION` (TBD — out-of-scope V1).
 
 ---
 
@@ -431,7 +439,7 @@ LLM-generovaný obsah neaplikujeme přímo do .claude/. Jde nejdřív do:
 1. `aisha_tooling_proposals.artifact_content` (DB string)
 2. Validation gate (parse + lint)
 3. Admin review (UI)
-4. Forgejo PR (admin merge)
+4. GitHub PR (admin merge)
 
 Žádný step nepíše přímo do filesystému core stacku.
 
@@ -486,7 +494,8 @@ Per slash command, count invocations. Top 10 stays, bottom suggested for review.
 - [`.claude/settings.json`](../../.claude/settings.json) — current hooks registry
 - [`.claude/skills/`](../../.claude/skills/) — current skills catalog
 - [Anthropic API: Messages](https://docs.claude.com/en/api/messages)
-- [Forgejo API: Repository Contents](https://forgejo.org/docs/latest/user/api-usage/)
+- [GitHub REST API: Repository contents](https://docs.github.com/en/rest/repos/contents)
+- [GitHub REST API: Git references](https://docs.github.com/en/rest/git/refs)
 - [SEED_DATA_LAYERS_TENANT_SEPARATION.md](../architecture/SEED_DATA_LAYERS_TENANT_SEPARATION.md) — seed vrstvy (platform/implementation/instance)
 
 ---
@@ -571,7 +580,7 @@ seedované do **instance vrstvy**, NE do OSS. Factory je „plní" přes enrichm
 | Factory strukturální prompt | OSS base | `WF_AISHA_*_FACTORY.json` (committed) |
 | Expert tooling playbooky | **Expert / instance** | `seed/instance/` (private) + live `knowledge_items` |
 | Vyrenderovaný `artifact_content` | Instance data (do approvalu) | `aisha_tooling_proposals.artifact_content` |
-| Schválený + committed artefakt | Crosses seam → OSS | `.claude/{skills,hooks,commands}/` přes Forgejo PR |
+| Schválený + committed artefakt | Crosses seam → OSS | `.claude/{skills,hooks,commands}/` přes GitHub PR |
 
 **Invariant:** proprietární expertní znalost (Tier 1/2) se **NIKDY** necommitne do public OSS
 seedu (`seed/core|demo`). Jde výhradně do `seed/instance/` (`AISHA_SEED_PROFILE=instance`) nebo
@@ -590,10 +599,10 @@ aisha-cold-start.sh
   → coolify-deploy-init.sh (orchestration blok): push kanonických app env vars na n8n app
   → docker-compose.coolify-n8n.yml:
       ├─ n8n + n8n-worker: passthrough ${VAR:-} jen NESECRET routing vars (URLs, webhook)
-      └─ n8n-workflow-init (transient): + 2 bootstrap secrets (FORGEJO_API_TOKEN, ANTHROPIC_API_KEY)
+      └─ n8n-workflow-init (transient): + 2 bootstrap secrets (GITHUB_TOKEN, ANTHROPIC_API_KEY)
   → n8n-workflow-init → deploy-workflows.mjs:
       ├─ ensureSelfToolingCredentials() — vytvoří 3 šifrované n8n credentials z env:
-      │     'AISHA PostgREST' (aishaPostgrestApi), 'Forgejo API' + 'Anthropic API' (httpHeaderAuth)
+      │     'AISHA PostgREST' (aishaPostgrestApi), 'GitHub API' + 'Anthropic API' (httpHeaderAuth)
       ├─ glob n8n/workflows/*.json (5 self-tooling se naberou samy, žádný manifest)
       ├─ remap __REMAP__ → reálné credential id (by name)
       └─ activate (cron + webhooks)
@@ -606,7 +615,7 @@ secrets. Hodnoty se čtou **jen jednou** v transient `n8n-workflow-init` pro vyt
 
 | Tajemství | Jak | Kde |
 |---|---|---|
-| Forgejo token | n8n credential `Forgejo API` (httpHeaderAuth `Authorization: token …`) | encrypted store; bootstrap value jen v transient init |
+| GitHub token | n8n credential `GitHub API` (httpHeaderAuth `Authorization: Bearer …`; + `aishaGitHubApi` pro AishaAdminBridge) | encrypted store; bootstrap value jen v transient init |
 | Anthropic key | n8n credential `Anthropic API` (httpHeaderAuth `x-api-key`) | encrypted store; bootstrap value jen v transient init |
 | PostgREST service key | committer **reuse `$env.AISHA_SERVICE_KEY`** (už wired, žádný nový secret) | existing n8n env |
 
@@ -616,8 +625,9 @@ secrets. Hodnoty se čtou **jen jednou** v transient `n8n-workflow-init` pro vyt
 |---|---|---|
 | `AISHA_POSTGREST_URL` | `${AISHA_API_URL}` | orchestration push + compose passthrough |
 | `N8N_WEBHOOK_URL` | `${N8N_WEBHOOK_URL}` (z N8N_DOMAIN, topology resolver) | orchestration push + passthrough |
-| `FORGEJO_API_URL` / `FORGEJO_OWNER` / `FORGEJO_REPO` | `${FORGEJO_API_URL:-${FORGEJO_URL}}` atd. | orchestration push (soft) + passthrough |
-| `ANTHROPIC_API_URL` / `FORGEJO_DEFAULT_ASSIGNEE` | — (in-workflow fallback) | optional |
+| `GITHUB_API_URL` | env-doctor kontrakt (`static`, výchozí veřejné API; GHE přepíše v `.env-prod-backup`) | orchestration push + passthrough |
+| `GITHUB_REPOSITORY` | operátorská deklarace (`external`) — **nikdy odvozeno**; prázdné = committer odmítne | orchestration push (soft) + passthrough |
+| `ANTHROPIC_API_URL` / `GITHUB_DEFAULT_ASSIGNEE` | — (prázdné = výchozí API / nikdo) | optional |
 
 **Vynuceno:** `aisha-self-tooling.gate.test.ts` §9 ověřuje, že workflows **NEčtou** secret `$env`,
 že factories/committer používají credentials, že long-running n8n/worker drží ≤1 secret deklaraci
@@ -636,8 +646,8 @@ secrets. Hodnoty se čtou **jen jednou** v transient `n8n-workflow-init` pro vyt
 
 | Aspekt | Chování při wipe / cold-reset |
 |---|---|
-| `FORGEJO_API_TOKEN`, `ANTHROPIC_API_KEY` | **operator BYOK** — `aisha-cold-start.sh` je čte z `.env-prod-backup` (`read_env_key`), **NEgenerují se**. Persistují přes wipe; orchestration je pushne na n8n app při každém startu. |
-| n8n credentials (Forgejo/Anthropic/PostgREST) | **re-mintují se každý cold-start** — na čisté post-wipe n8n je credMap prázdná → `ensureCredential` vytvoří; jinak idempotentní skip (`if (credMap.has(name)) return`). |
+| `GITHUB_TOKEN`, `ANTHROPIC_API_KEY` | **operator BYOK** — `aisha-cold-start.sh` je čte z `.env-prod-backup` (`read_env_key`), **NEgenerují se**. Persistují přes wipe; orchestration je pushne na n8n app při každém startu. |
+| n8n credentials (GitHub/Anthropic/PostgREST) | **re-mintují se každý cold-start** — na čisté post-wipe n8n je credMap prázdná → `ensureCredential` vytvoří; jinak idempotentní skip (`if (credMap.has(name)) return`). |
 | `N8N_ENCRYPTION_KEY` | v `REGEN_KEYS` (cold-start ho přegeneruje/zachová). Staré encrypted credentials zmizí s wiped n8n DB a mintnou se nové konzistentně novým klíčem — bez ručního zásahu. |
 | Generated secrets (hesla, certy, klíče) | regenerují se cold-startem (`generator pushes creds` invariant); reference v compose se nemění. |
 

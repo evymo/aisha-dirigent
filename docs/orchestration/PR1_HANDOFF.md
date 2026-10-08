@@ -1,7 +1,7 @@
 # Foundation PR — handoff (runtime-axis parity fix + L0 feedback-plane substrate)
 
-> **Stav:** ✅ **COMMITTED + PUSHED na Forgejo.** Větev `feat/orch-feedback-plane-foundation`, commit `3021fb6b`.
-> **Otevři PR (1 klik):** https://repo.id3a.cz/aisha/evymo-ai-orchestrator/compare/main...feat/orch-feedback-plane-foundation
+> **Stav:** ✅ **COMMITTED + PUSHED na git server.** Větev `feat/orch-feedback-plane-foundation`, commit `3021fb6b`.
+> **Otevři PR (1 klik):** https://git.example.com/<org>/aisha-orchestrator/compare/main...feat/orch-feedback-plane-foundation
 > (base `main` ← compare `feat/orch-feedback-plane-foundation`); title/body níže.
 >
 > **DŮLEŽITÝ caveat:** commit i push proběhly s `--no-verify`, protože husky pre-commit i pre-push hooky
@@ -74,8 +74,8 @@ npm run test:gates -- src/tests/gates/runtime-enum-parity.gate.test.ts \
 npm run test:db                 # decision-outcomes-rpc-runtime + ai-decisions-journal (migrace aplikují, RPC běží)
 npm run typecheck:repo          # runtime_dispatch.ts změna typuje
 
-git push -u forgejo feat/orch-feedback-plane-foundation   # remote dle git log = 'forgejo'
-# → otevři PR na Forgejo: base = main, compare = feat/orch-feedback-plane-foundation
+git push -u origin feat/orch-feedback-plane-foundation   # remote dle git log = 'origin'
+# → otevři PR na git server: base = main, compare = feat/orch-feedback-plane-foundation
 ```
 
 ## PR popis (vlož do Forgeje)
@@ -141,9 +141,9 @@ git add services/svc-ai-chat/src/reflection/decision.ts \
         services/svc-ai-chat/src/reflection/nodes/openclaw_resolve_clow.ts \
         src/tests/gates/decision-candidates-journaled.gate.test.ts
 ALLOW_NEW_FILES=1 git commit -m "feat(orchestration): L0-c journal task_kind + per-candidate ranking into decision_json"
-git push forgejo feat/orch-feedback-plane-foundation
+git push origin feat/orch-feedback-plane-foundation
 ```
-> ⚠️ `git status` ukáže i **nesouvisející** rozpracované soubory (`.forgejo/workflows/ci.yml`, `docs/…`,
+> ⚠️ `git status` ukáže i **nesouvisející** rozpracované soubory (`.github/workflows/ci.yml`, `docs/…`,
 > `extensions/aisha-dirigent-claude/…`) — ty NEJSOU součástí tohoto PR; **přidávej jen 3 soubory výše** (žádné `git add -A`).
 
 ---
@@ -202,7 +202,7 @@ npm run test:db -- src/tests/db/rollup-outcomes-rpc-runtime.test.ts
 npm run typecheck:repo
 
 git commit -m "feat(orchestration): L0-c journal task_kind+candidates + L1 reactive outcome rollup -> ai_model_benchmarks"
-git push forgejo feat/orch-feedback-plane-foundation
+git push origin feat/orch-feedback-plane-foundation
 ```
 
 > POZN.: jestli husky pre-commit hlásí „Nepotvrzené nové soubory", přidej `ALLOW_NEW_FILES=1` před `git commit`.
@@ -275,7 +275,7 @@ npm run test:db    -- src/tests/db/rollup-outcomes-rpc-runtime.test.ts \
 npm run typecheck:repo
 
 git commit -m "feat(orchestration): L0-c journal + L1 reactive rollup + T1 task_kind normalize/observe (non-ossifying)"
-git push forgejo feat/orch-feedback-plane-foundation
+git push origin feat/orch-feedback-plane-foundation
 ```
 > ⚠️ CÍLENĚ — working tree má i nesouvisející změny (`ci.yml`, `extensions/…`); přidávej jen soubory výše, žádné `git add -A`.
 > Husky pre-commit „Nepotvrzené nové soubory" → přidej `ALLOW_NEW_FILES=1` před `git commit`.

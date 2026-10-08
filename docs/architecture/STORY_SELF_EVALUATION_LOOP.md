@@ -26,7 +26,7 @@ AISHA dnes **umí pozorovat sebe** (health + metriky + signály) a **umí navrho
 Supabase architektuře** a po migraci na `svc-*` nebyly re-ověřené.
 
 Tento doc definuje **integrační páteř** — RPC `evaluate_story_self(story_id, backend)` — a
-**sekvenci 8 malých Forgejo PRs**, které uzavřou smyčku na našem default repu, ověří ji
+**sekvenci 8 malých PRs**, které uzavřou smyčku na našem default repu, ověří ji
 (gate + live + cold-start + runbook + dashboard + workbench + extension), a položí
 **generický seam přes `(backend, story)`**, na který se napojí multi-repo (Epocha 4).
 
@@ -223,7 +223,7 @@ LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public'
 
 ---
 
-## 5. PR sekvence (8 PRs, Forgejo, malé a nezávisle ověřitelné)
+## 5. PR sekvence (8 PRs, git server, malé a nezávisle ověřitelné)
 
 > Pořadí respektuje závislosti (páteř první). Každý PR: **Cíl / Změny / Gate / Live / Risk / Závisí na**.
 
@@ -312,7 +312,7 @@ Per tvoje zadání — **všechny čtyři osy**, plus workbench/extension/multi-
 
 | Osa | Jak | Kde |
 |---|---|---|
-| **Gate test** | Deterministický `*.gate.test.ts` per PR proti seedovaným fixturám | `src/tests/gates/`, CI job v [.forgejo/ci.yml](../../.forgejo/ci.yml) |
+| **Gate test** | Deterministický `*.gate.test.ts` per PR proti seedovaným fixturám | `src/tests/gates/`, CI job v [.github/workflows/ci.yml](../../.github/workflows/ci.yml) |
 | **Live ověření** | curl/RPC proti běžícímu stacku (žádné SSH — Coolify API / n8n / `rpcService`) | `docs/architecture/STORY_SELF_EVALUATION_RUNBOOK.md` (§ live verify, vzor deploy-doc § 0) |
 | **Cold-start parita** | `scripts/verify-story-self-eval.sh` po `--wipe`, bez prod hodnot, fail-open | navázat na `verify-cold-start-apply.sh` pattern |
 | **Runbook + dashboard** | Runbook + viditelný stav v Appsmith Ops | RUNBOOK doc + PR 6 |
@@ -335,7 +335,7 @@ PR 8 položí generický seam. Multi-repo („stejná služba pro cizí repa") p
 navazující iniciativa**, která na seam napojí:
 - `external_repositories` jako first-class entitu (dnes je repo jen vlastnost story: `partner_stories.repo_url`);
 - per-repo namespace izolaci knowledge (dnes global/story-scoped);
-- push-back generovaných instrukcí přes Forgejo (vzor `WF_AISHA_TOOLING_COMMITTER` z META-2);
+- push-back generovaných instrukcí přes GitHub PR (vzor `WF_AISHA_TOOLING_COMMITTER` z META-2);
 - odpověď na otevřenou otázku [AISHA_SELF_TOOLING.md §11.3](../deploy/AISHA_SELF_TOOLING.md) (cross-project skill catalog).
 
 Tato iniciativa to **umožní**, ale **nestaví** — drží scope „uzavřít vlastní repo".
