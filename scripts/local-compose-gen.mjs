@@ -299,6 +299,9 @@ const merged = {
   name: LOCAL_STACK,
   services: {},
   volumes: {},
+  // Build secrets (`build.secrets: [forgejo_token]` u Keycloaku). Bez top-level
+  // deklarace compose odmítne celý projekt („refers to undefined build secret").
+  secrets: {},
   networks: {
     [LOCAL_STACK]: { driver: "bridge" },
   },
@@ -329,6 +332,7 @@ for (const app of appsToBuild) {
     composeFile: app.composeFile,
     services: transformed.services || {},
     volumes: transformed.volumes || {},
+    secrets: transformed.secrets || {},
   });
 }
 
@@ -410,6 +414,12 @@ for (const b of appBundles) {
   }
   for (const [volName, volDef] of Object.entries(b.volumes)) {
     merged.volumes[volName] = volDef;
+  }
+  for (const [secretName, secretDef] of Object.entries(b.secrets)) {
+    // `name` je projektové jméno zdrojového compose souboru — merged projekt má
+    // vlastní (LOCAL_STACK), takže zdroj (`environment:` / `file:`) stačí.
+    const { name: _projectScopedName, ...source } = secretDef || {};
+    merged.secrets[secretName] = source;
   }
 }
 
