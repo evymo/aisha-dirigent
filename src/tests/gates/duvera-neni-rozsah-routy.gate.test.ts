@@ -52,6 +52,9 @@ function vyrobciSeznamu(): string[] {
     for (const e of readdirSync(join(ROOT, rel), { withFileTypes: true })) {
       if (VYNECHAT.has(e.name)) continue;
       const cesta = rel ? `${rel}/${e.name}` : e.name;
+      // Vnořené worktrees (.claude/worktrees/*) jsou jiné checkouty, ne tenhle strom —
+      // nález o nich není nález o repu (týž šum jako v schema-deklarace-se-plni).
+      if (cesta === ".claude/worktrees") continue;
       if (e.isDirectory()) {
         projdi(cesta);
         continue;
