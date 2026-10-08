@@ -1,5 +1,5 @@
 -- Grants: wearables_data
 
 GRANT SELECT ON public.wearables_data TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.wearables_data TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.wearables_data TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.wearables_data TO service_role;

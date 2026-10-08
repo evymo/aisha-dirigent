@@ -11813,3 +11813,20 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/functions/is_consultant_for_user.sql
 
 NOTIFY pgrst, 'reload schema';
+
+-- ⛔ authenticated: TRUNCATE / REFERENCES / TRIGGER NA KAŽDÉ TABULCE MIMO RLS (2026-10-08).
+-- Granty z pg_dump éry dávaly authenticated sedm práv na 254 tabulkách. SELECT/INSERT/
+-- UPDATE/DELETE hlídá RLS, tahle tři ne: TRUNCATE vyprázdní celou tabulku bez ohledu na
+-- politiky, TRIGGER/REFERENCES dovolí věšet na tabulku triggery a cizí klíče. Žádná
+-- klientská cesta je nepotřebuje (PostgREST je nevydává; SoT funkce s TRUNCATE jsou
+-- SECURITY DEFINER). Týž zásah jako u anon výš (#566), teď pro přihlášené: SoT granty
+-- jsou zúžené (scripts/db/scope-authenticated-grants-rls-only.mjs), tohle je cesta, jak
+-- to doteče do BĚŽÍCÍ DB — baseline se na ni znovu nepouští. Default privileges pro
+-- authenticated už jsou SELECT/INSERT/UPDATE/DELETE (fix_missing_table_grants.sql);
+-- REVOKE níž je jen pojistka pro DB, kde vznikly dřív. Idempotentní: REVOKE nic nepřidá.
+-- storage: buckets/objects měly z infra init GRANT ALL — totéž zúžení.
+REVOKE TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA public FROM authenticated;
+REVOKE TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA storage FROM authenticated;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  REVOKE TRUNCATE, REFERENCES, TRIGGER ON TABLES FROM authenticated;
+
