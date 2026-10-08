@@ -2,7 +2,8 @@ import { Readable } from 'node:stream';
 import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 
 /**
- * Stažení balíčku z deklarovaného zdroje (typicky registr balíčků Forgejo).
+ * Stažení balíčku z deklarovaného zdroje (registr balíčků, kam je publikuje CI —
+ * původ deklaruje operátor v `ZARIZENI_ZDROJ_PUVOD`).
  *
  * ⛔ TOKEN JEN NA NAKONFIGUROVANÝ PŮVOD. Adresa přichází z DAT INSTANCE; kdyby
  *    se token přikládal ke každé, stačil by jeden překlep nebo cizí zdroj
@@ -31,7 +32,7 @@ export function vytvorStahovani(r: RegistrZdroj, f: typeof fetch = fetch): (url:
     //    instance; kdyby smělo jít o jakékoli https, deklarace by poslala službu
     //    na vnitřní adresu (metadata, localhost, privátní rozsah) — naslepo, ale
     //    z NAŠÍ sítě. Přesměrování z registru jinam (úložiště blobů) projde, bez tokenu.
-    if (!puvodRegistru) throw new Error('původ registru (FORGEJO_URL) není nastavený — zdroj nejde ověřit');
+    if (!puvodRegistru) throw new Error('původ registru (ZARIZENI_ZDROJ_PUVOD) není nastavený — zdroj nejde ověřit');
     if (new URL(url).origin !== puvodRegistru) throw new Error(`zdroj není na registru ${puvodRegistru}: ${new URL(url).origin}`);
     const signal = AbortSignal.timeout(r.limitMs);
     let adresa = url;
