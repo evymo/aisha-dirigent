@@ -47,7 +47,13 @@ koren="${GITHUB_WORKSPACE:-$(git rev-parse --show-toplevel)}"
 if grep -q 'path = packages/extranet-sdk' "$koren/.gitmodules" 2>/dev/null \
    && [ ! -f "$koren/packages/extranet-sdk/package.json" ]; then
   echo "▶ inicializuji submodul packages/extranet-sdk (vstup npm workspaces)"
-  git -C "$koren" submodule update --init packages/extranet-sdk
+  if ! git -C "$koren" submodule update --init packages/extranet-sdk; then
+    # Relativní URL dědí pověření checkoutu. Token běhu (GITHUB_TOKEN) ale čte
+    # jen VLASTNÍ repo — je-li repo SDK privátní, klon tady padne. Řekne se to
+    # jménem, ne až kaskádou rozbitých importů o tři kroky dál.
+    echo "::error title=extranet SDK nedostupné::submodul packages/extranet-sdk nejde naklonovat pověřením checkoutu — repo SDK musí být čitelné pro tenhle běh (veřejné, nebo checkout s tokenem, který na něj vidí)." >&2
+    exit 1
+  fi
 fi
 
 if npm ci "$@"; then
