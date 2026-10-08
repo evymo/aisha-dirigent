@@ -2,12 +2,12 @@
  * Edge Function: dev-patch
  *
  * Implements code changes for improvement proposals via the dev_patch agent.
- * Receives a proposal, generates a patch using LLM, and commits to Forgejo branch.
+ * Receives a proposal, generates a patch using LLM, and commits to a GitHub branch.
  *
  * Workflow:
  * 1. Load proposal + agent context (via compose_context)
  * 2. Generate patch via LLM (local MLX or cloud)
- * 3. Commit changes to Forgejo branch
+ * 3. Commit changes to a GitHub branch
  * 4. Return patch summary
  *
  * Called by WF_SELF_LEARNING_LOOP "Implement Change" node.
@@ -181,35 +181,38 @@ Generate the minimal code changes needed. Return valid JSON only.`;
 }
 
 // ============================================
-// FORGEJO GIT OPERATIONS
+// GITHUB GIT OPERATIONS
 // ============================================
 
 /**
- * Commit files to a Forgejo branch.
+ * Commit files to a GitHub branch (REST contents API — PUT creates and updates).
+ * GITHUB_REPOSITORY (`owner/repo`) is an operator declaration: never defaulted,
+ * so a missing value commits nowhere instead of into someone else's repository.
  */
-async function commitToForgejo(
+async function commitToGitHub(
   branch: string,
   files: PatchFile[],
   commitMessage: string,
 ): Promise<{ sha: string; success: boolean }> {
-  const forgejoUrl = Deno.env.get("FORGEJO_URL");
-  const forgejoToken = Deno.env.get("FORGEJO_TOKEN");
-  const forgejoRepo = Deno.env.get("FORGEJO_REPO") ?? "evymo/evymo-ai-orchestrator";
+  const githubApiUrl = (Deno.env.get("GITHUB_API_URL") ?? "").replace(/\/$/, "");
+  const githubToken = Deno.env.get("GITHUB_TOKEN");
+  const githubRepo = Deno.env.get("GITHUB_REPOSITORY");
 
-  if (!forgejoUrl || !forgejoToken) {
+  if (!githubApiUrl || !githubToken || !githubRepo) {
     return { sha: "", success: false };
   }
 
-  // Commit each file via Forgejo Contents API
+  // Commit each file via the GitHub contents API
   let lastSha = "";
   for (const file of files) {
-    const endpoint = `${forgejoUrl}/api/v1/repos/${forgejoRepo}/contents/${encodeURIComponent(file.path)}`;
+    const encodedPath = file.path.split("/").map(encodeURIComponent).join("/");
+    const endpoint = `${githubApiUrl}/repos/${githubRepo}/contents/${encodedPath}`;
 
     // Check if file exists to get its SHA
     let existingSha: string | undefined;
     try {
       const getResp = await fetch(`${endpoint}?ref=${encodeURIComponent(branch)}`, {
-        headers: { "Authorization": `token ${forgejoToken}` },
+        headers: { "Authorization": `Bearer ${githubToken}`, "Accept": "application/vnd.github+json" },
         signal: AbortSignal.timeout(15_000),
       });
       if (getResp.ok) {
@@ -231,9 +234,10 @@ async function commitToForgejo(
     }
 
     const resp = await fetch(endpoint, {
-      method: existingSha ? "PUT" : "POST",
+      method: "PUT",
       headers: {
-        "Authorization": `token ${forgejoToken}`,
+        "Authorization": `Bearer ${githubToken}`,
+        "Accept": "application/vnd.github+json",
         "Content-Type": "application/json",
       },
       body: JSON.stringify(body),
@@ -242,9 +246,9 @@ async function commitToForgejo(
 
     if (resp.ok) {
       const result = await resp.json();
-      lastSha = result.content?.sha ?? "";
+      lastSha = result.commit?.sha ?? result.content?.sha ?? "";
     } else {
-      safeError("dev-patch.forgejo.commit-failed", new Error(`HTTP ${resp.status} for ${file.path}`));
+      safeError("dev-patch.github.commit-failed", new Error(`HTTP ${resp.status} for ${file.path}`));
       return { sha: "", success: false };
     }
   }
@@ -315,8 +319,8 @@ serve(async (req: Request) => {
       });
     }
 
-    // 3. Commit to Forgejo
-    const commitResult = await commitToForgejo(
+    // 3. Commit to GitHub
+    const commitResult = await commitToGitHub(
       body.branch,
       patch.files,
       patch.commit_message,

@@ -43,7 +43,7 @@
  *   - admin_langfuse_traces  — Admin Bridge: query Langfuse traces/sessions/generations
  *   - admin_log_action       — Admin Bridge: log admin action to audit trail
  *   - admin_n8n_workflows    — Admin Bridge: manage n8n workflows (list/deploy/update/activate/compare)
- *   - admin_forgejo_git      — Admin Bridge: Forgejo Git operations (branches, commits, PRs, diffs)
+ *   - admin_github_git       — Admin Bridge: GitHub Git operations over REST (branches, commits, PRs, diffs)
  *   - search_ragnarok        — Hybrid RAG search via Ragnarok engine (Elasticsearch)
  *   - github_repo            — GitHub App: repo operations via installation token (13 ops)
  *   - get_integration_health — Integration: event health stats + AISHA maturity score
@@ -3434,11 +3434,11 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
           },
           repo_owner: {
             type: "string",
-            description: "Forgejo repo owner for compare_all/sync_from_repo (default: from Forgejo config or 'evymo').",
+            description: "GitHub repo owner for compare_all/sync_from_repo (default: config.default_owner of the github service; required when unset).",
           },
           repo_name: {
             type: "string",
-            description: "Forgejo repo name for compare_all/sync_from_repo (default: from Forgejo config or 'aisha-dirigent').",
+            description: "GitHub repo name for compare_all/sync_from_repo (default: config.default_repo of the github service; required when unset).",
           },
           branch: {
             type: "string",
@@ -3702,46 +3702,48 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
           }
 
           case "compare_all": {
-            // Batch drift detection: fetch all WF JSONs from Forgejo repo, compare with n8n server
-            // 1. Look up Forgejo service
-            const { data: forgejoBatchData, error: forgejoBatchErr } = await db.rpc("list_integration_services", {
+            // Batch drift detection: fetch all WF JSONs from the GitHub repo, compare with n8n server
+            // 1. Look up GitHub service
+            const { data: githubBatchData, error: githubBatchErr } = await db.rpc("list_integration_services", {
               p_active_only: true,
               p_service_type: null,
             });
-            if (forgejoBatchErr) return toolError(`Failed to look up Forgejo service: ${forgejoBatchErr.message}`);
+            if (githubBatchErr) return toolError(`Failed to look up GitHub service: ${githubBatchErr.message}`);
 
-            const batchServices = (Array.isArray(forgejoBatchData) ? forgejoBatchData : []) as Array<Record<string, unknown>>;
-            const forgejoBatchSvc = batchServices.find(
-              (s) => String(s.service_name).toLowerCase() === "forgejo",
+            const batchServices = (Array.isArray(githubBatchData) ? githubBatchData : []) as Array<Record<string, unknown>>;
+            const githubBatchSvc = batchServices.find(
+              (s) => String(s.service_name).toLowerCase() === "github",
             );
 
-            if (!forgejoBatchSvc) {
-              return toolError("Forgejo service not found in integration_services. Required for compare_all.");
+            if (!githubBatchSvc) {
+              return toolError("GitHub service not found in integration_services. Required for compare_all.");
             }
 
-            const forgejoBatchUrl = String(forgejoBatchSvc.base_url ?? "").replace(/\/$/, "");
-            const forgejoBatchConfig = (forgejoBatchSvc.config ?? {}) as Record<string, unknown>;
-            const forgejoBatchToken = String(forgejoBatchConfig.api_token ?? "");
-            const batchOwner = String(args.repo_owner ?? forgejoBatchConfig.default_owner ?? "evymo");
-            const batchRepo = String(args.repo_name ?? forgejoBatchConfig.default_repo ?? "aisha-dirigent");
+            const githubBatchUrl = String(githubBatchSvc.base_url ?? "").replace(/\/$/, "");
+            const githubBatchConfig = (githubBatchSvc.config ?? {}) as Record<string, unknown>;
+            const githubBatchToken = String(githubBatchConfig.api_token ?? "");
+            const batchOwner = String(args.repo_owner ?? githubBatchConfig.default_owner ?? "");
+            const batchRepo = String(args.repo_name ?? githubBatchConfig.default_repo ?? "");
             const batchBranch = String(args.branch ?? "main");
 
-            if (!forgejoBatchUrl || !forgejoBatchToken) {
-              return toolError("Forgejo config missing base_url or config.api_token.");
+            if (!githubBatchUrl || !githubBatchToken) {
+              return toolError("GitHub config missing base_url (REST API base) or config.api_token.");
+            }
+            if (!batchOwner || !batchRepo) {
+              return toolError("compare_all requires repo_owner and repo_name (or config.default_owner / config.default_repo).");
             }
 
-            // Helper: fetch from Forgejo API
-            async function forgejoBatchApi(path: string): Promise<{ status: number; data: unknown }> {
-              const res = await fetch(`${forgejoBatchUrl}/api/v1${path}`, {
+            // Helper: fetch from the GitHub REST API
+            async function githubBatchApi(path: string): Promise<{ status: number; data: unknown }> {
+              const res = await fetch(`${githubBatchUrl}${path}`, {
                   signal: AbortSignal.timeout(15000),
                 headers: {
-                  Authorization: `token ${forgejoBatchToken}`,
-                  Accept: "application/json",
+                  Authorization: `Bearer ${githubBatchToken}`,
+                  Accept: "application/vnd.github+json",
                 },
               });
               const text = await res.text();
-              // Forgejo content endpoints return raw file bytes for non-JSON;
-              // pass through as text without raising.
+              // Non-JSON bodies are passed through as text without raising.
               const data = ((): unknown => {
                 if (!text) return null;
                 try { return JSON.parse(text); } catch { return text; }
@@ -3749,12 +3751,12 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
               return { status: res.status, data };
             }
 
-            // 2. List all WF_*.json files from Forgejo repo
+            // 2. List all WF_*.json files from the GitHub repo
             const dirPath = `/repos/${batchOwner}/${batchRepo}/contents/n8n/workflows?ref=${encodeURIComponent(batchBranch)}`;
-            const { status: dirStatus, data: dirData } = await forgejoBatchApi(dirPath);
+            const { status: dirStatus, data: dirData } = await githubBatchApi(dirPath);
 
             if (dirStatus >= 400) {
-              return toolError(`Failed to list workflow files from Forgejo (${dirStatus}): ${JSON.stringify(dirData)}`);
+              return toolError(`Failed to list workflow files from GitHub (${dirStatus}): ${JSON.stringify(dirData)}`);
             }
 
             const repoFiles = (Array.isArray(dirData) ? dirData : []) as Array<Record<string, unknown>>;
@@ -3775,7 +3777,7 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
             for (const file of wfFiles) {
               const fileName = String(file.name ?? "");
               const filePath = `/repos/${batchOwner}/${batchRepo}/contents/n8n/workflows/${encodeURIComponent(fileName)}?ref=${encodeURIComponent(batchBranch)}`;
-              const { status: fStatus, data: fData } = await forgejoBatchApi(filePath);
+              const { status: fStatus, data: fData } = await githubBatchApi(filePath);
 
               if (fStatus >= 400) {
                 driftReport.push({ name: fileName, status: "error", error: `Failed to fetch (${fStatus})` });
@@ -3880,53 +3882,56 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
           }
 
           case "sync_from_repo": {
-            // Fetch a specific workflow JSON from Forgejo repo and deploy/update on n8n server
+            // Fetch a specific workflow JSON from the GitHub repo and deploy/update on n8n server
             const syncWfName = String(args.workflow_name ?? "");
             if (!syncWfName) {
               return toolError("workflow_name is required for sync_from_repo (e.g. 'WF_SELF_DEPLOY').");
             }
 
-            // 1. Look up Forgejo service
-            const { data: forgejoSyncData, error: forgejoSyncErr } = await db.rpc("list_integration_services", {
+            // 1. Look up GitHub service
+            const { data: githubSyncData, error: githubSyncErr } = await db.rpc("list_integration_services", {
               p_active_only: true,
               p_service_type: null,
             });
-            if (forgejoSyncErr) return toolError(`Failed to look up Forgejo service: ${forgejoSyncErr.message}`);
+            if (githubSyncErr) return toolError(`Failed to look up GitHub service: ${githubSyncErr.message}`);
 
-            const syncServices = (Array.isArray(forgejoSyncData) ? forgejoSyncData : []) as Array<Record<string, unknown>>;
-            const forgejoSyncSvc = syncServices.find(
-              (s) => String(s.service_name).toLowerCase() === "forgejo",
+            const syncServices = (Array.isArray(githubSyncData) ? githubSyncData : []) as Array<Record<string, unknown>>;
+            const githubSyncSvc = syncServices.find(
+              (s) => String(s.service_name).toLowerCase() === "github",
             );
 
-            if (!forgejoSyncSvc) {
-              return toolError("Forgejo service not found in integration_services. Required for sync_from_repo.");
+            if (!githubSyncSvc) {
+              return toolError("GitHub service not found in integration_services. Required for sync_from_repo.");
             }
 
-            const forgejoSyncUrl = String(forgejoSyncSvc.base_url ?? "").replace(/\/$/, "");
-            const forgejoSyncConfig = (forgejoSyncSvc.config ?? {}) as Record<string, unknown>;
-            const forgejoSyncToken = String(forgejoSyncConfig.api_token ?? "");
-            const syncOwner = String(args.repo_owner ?? forgejoSyncConfig.default_owner ?? "evymo");
-            const syncRepo = String(args.repo_name ?? forgejoSyncConfig.default_repo ?? "aisha-dirigent");
+            const githubSyncUrl = String(githubSyncSvc.base_url ?? "").replace(/\/$/, "");
+            const githubSyncConfig = (githubSyncSvc.config ?? {}) as Record<string, unknown>;
+            const githubSyncToken = String(githubSyncConfig.api_token ?? "");
+            const syncOwner = String(args.repo_owner ?? githubSyncConfig.default_owner ?? "");
+            const syncRepo = String(args.repo_name ?? githubSyncConfig.default_repo ?? "");
             const syncBranch = String(args.branch ?? "main");
 
-            if (!forgejoSyncUrl || !forgejoSyncToken) {
-              return toolError("Forgejo config missing base_url or config.api_token.");
+            if (!githubSyncUrl || !githubSyncToken) {
+              return toolError("GitHub config missing base_url (REST API base) or config.api_token.");
+            }
+            if (!syncOwner || !syncRepo) {
+              return toolError("sync_from_repo requires repo_owner and repo_name (or config.default_owner / config.default_repo).");
             }
 
-            // 2. Fetch WF JSON from Forgejo
+            // 2. Fetch WF JSON from GitHub
             const syncFileName = syncWfName.endsWith(".json") ? syncWfName : `${syncWfName}.json`;
             const syncPath = `/repos/${syncOwner}/${syncRepo}/contents/n8n/workflows/${encodeURIComponent(syncFileName)}?ref=${encodeURIComponent(syncBranch)}`;
 
-            const syncRes = await fetch(`${forgejoSyncUrl}/api/v1${syncPath}`, {
+            const syncRes = await fetch(`${githubSyncUrl}${syncPath}`, {
                 signal: AbortSignal.timeout(15000),
               headers: {
-                Authorization: `token ${forgejoSyncToken}`,
-                Accept: "application/json",
+                Authorization: `Bearer ${githubSyncToken}`,
+                Accept: "application/vnd.github+json",
               },
             });
 
             if (!syncRes.ok) {
-              return toolError(`Failed to fetch ${syncFileName} from Forgejo (${syncRes.status}). Verify the file exists in n8n/workflows/.`);
+              return toolError(`Failed to fetch ${syncFileName} from GitHub (${syncRes.status}). Verify the file exists in n8n/workflows/.`);
             }
 
             const syncFileData = await syncRes.json() as Record<string, unknown>;
@@ -3993,13 +3998,13 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
   );
 
   // -------------------------------------------------------------------------
-  // admin_forgejo_git — Forgejo Git operations (branches, commits, PRs)
+  // admin_github_git — GitHub Git operations over REST (branches, commits, PRs)
   // -------------------------------------------------------------------------
   server.registerDeferredTool(
     {
-      name: "admin_forgejo_git",
+      name: "admin_github_git",
       description:
-        "Perform Git operations on the Forgejo instance. Supports listing repositories, " +
+        "Perform Git operations on GitHub (REST API). Supports listing repositories, " +
         "creating branches, committing files, creating/merging pull requests, and viewing diffs. " +
         "Used by Aisha for autonomous code changes, self-improvement loop, and PR workflows.",
       inputSchema: {
@@ -4062,7 +4067,7 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
           },
           search_query: {
             type: "string",
-            description: "Search query for list_repos.",
+            description: "Search query for list_repos (without it: repositories of the token's user).",
           },
         },
         required: ["operation"],
@@ -4071,7 +4076,7 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
     async (args: Record<string, unknown>): Promise<McpToolResult> => {
       const operation = String(args.operation ?? "");
 
-      // Look up Forgejo service from integration_services
+      // Look up the GitHub service from integration_services
       const { data: svcData, error: svcErr } = await db.rpc("list_integration_services", {
         p_active_only: true,
         p_service_type: null,
@@ -4080,27 +4085,28 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
       if (svcErr) return toolError(`Failed to look up services: ${svcErr.message}`);
 
       const services = (Array.isArray(svcData) ? svcData : []) as Array<Record<string, unknown>>;
-      const forgejoSvc = services.find(
-        (s) => String(s.service_name).toLowerCase() === "forgejo",
+      const githubSvc = services.find(
+        (s) => String(s.service_name).toLowerCase() === "github",
       );
 
-      if (!forgejoSvc) {
+      if (!githubSvc) {
         return toolError(
-          "Forgejo service not found in integration_services. " +
-          "Register it with service_name='forgejo', base_url, and config.api_token.",
+          "GitHub service not found in integration_services. " +
+          "Register it with service_name='github', base_url (REST API base, e.g. the public " +
+          "GitHub API or a GitHub Enterprise /api/v3), and config.api_token.",
         );
       }
 
-      const forgejoUrl = String(forgejoSvc.base_url ?? "").replace(/\/$/, "");
-      const config = (forgejoSvc.config ?? {}) as Record<string, unknown>;
+      const githubApiUrl = String(githubSvc.base_url ?? "").replace(/\/$/, "");
+      const config = (githubSvc.config ?? {}) as Record<string, unknown>;
       const apiToken = String(config.api_token ?? "");
 
-      if (!forgejoUrl || !apiToken) {
-        return toolError("Forgejo service config missing base_url or config.api_token.");
+      if (!githubApiUrl || !apiToken) {
+        return toolError("GitHub service config missing base_url or config.api_token.");
       }
 
-      // Forgejo API helper
-      async function forgejoApi(
+      // GitHub REST API helper
+      async function githubApi(
         path: string,
         method = "GET",
         body?: Record<string, unknown>,
@@ -4108,14 +4114,14 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
         const opts: RequestInit = {
           method,
           headers: {
-            Authorization: `token ${apiToken}`,
+            Authorization: `Bearer ${apiToken}`,
             "Content-Type": "application/json",
-            Accept: "application/json",
+            Accept: "application/vnd.github+json",
           },
         };
         if (body) opts.body = JSON.stringify(body);
         opts.signal = AbortSignal.timeout(15_000);
-        const res = await fetch(`${forgejoUrl}/api/v1${path}`, opts);
+        const res = await fetch(`${githubApiUrl}${path}`, opts);
         const text = await res.text();
         let data: unknown;
         try {
@@ -4127,20 +4133,24 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
         return { status: res.status, data };
       }
 
+      /** Repo-relative path → URL path, each segment encoded (slashes stay separators). */
+      const encodePath = (p: string): string => p.split("/").map(encodeURIComponent).join("/");
+
       try {
         switch (operation) {
           case "list_repos": {
             const query = String(args.search_query ?? "");
-            const qs = query ? `?q=${encodeURIComponent(query)}&limit=50` : "?limit=50";
-            const { status, data } = await forgejoApi(`/repos/search${qs}`);
-            if (status >= 400) return toolError(`Forgejo list repos failed (${status}): ${JSON.stringify(data)}`);
+            const { status, data } = query
+              ? await githubApi(`/search/repositories?q=${encodeURIComponent(query)}&per_page=50`)
+              : await githubApi("/user/repos?per_page=50");
+            if (status >= 400) return toolError(`GitHub list repos failed (${status}): ${JSON.stringify(data)}`);
 
             const result = data as Record<string, unknown>;
-            const repos = (Array.isArray(result.data) ? result.data : Array.isArray(result) ? result : []) as Array<Record<string, unknown>>;
+            const repos = (Array.isArray(result.items) ? result.items : Array.isArray(data) ? data : []) as Array<Record<string, unknown>>;
 
-            let md = `## Forgejo Repositories\n\n**Found:** ${repos.length}\n\n`;
+            let md = `## GitHub Repositories\n\n**Found:** ${repos.length}\n\n`;
             for (const r of repos.slice(0, 20)) {
-              md += `- **${r.full_name}** — ${r.description || "(no description)"} ⭐${r.stars_count ?? 0}\n`;
+              md += `- **${r.full_name}** — ${r.description || "(no description)"} ⭐${r.stargazers_count ?? 0}\n`;
             }
 
             return toolSuccess([markdownContent(md), jsonContent({ repos: repos.length, data: repos })]);
@@ -4156,9 +4166,15 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
               return toolError("create_branch requires owner, repo, and branch_name.");
             }
 
-            const { status, data } = await forgejoApi(`/repos/${owner}/${repo}/branches`, "POST", {
-              new_branch_name: branchName,
-              old_branch_name: baseBranch,
+            // GitHub creates a branch as a git ref pointing at the base branch's head commit.
+            const base = await githubApi(`/repos/${owner}/${repo}/git/ref/heads/${encodePath(baseBranch)}`);
+            if (base.status >= 400) return toolError(`Base branch lookup failed (${base.status}): ${JSON.stringify(base.data)}`);
+            const baseSha = String(((base.data as Record<string, unknown>).object as Record<string, unknown> | undefined)?.sha ?? "");
+            if (!baseSha) return toolError(`Base branch \`${baseBranch}\` has no commit SHA.`);
+
+            const { status, data } = await githubApi(`/repos/${owner}/${repo}/git/refs`, "POST", {
+              ref: `refs/heads/${branchName}`,
+              sha: baseSha,
             });
 
             if (status >= 400) return toolError(`Create branch failed (${status}): ${JSON.stringify(data)}`);
@@ -4181,12 +4197,12 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
               return toolError("commit_file requires owner, repo, branch_name, file_path, file_content, and commit_message.");
             }
 
-            // Check if file exists to decide create vs update
+            const contentsPath = `/repos/${owner}/${repo}/contents/${encodePath(filePath)}`;
+
+            // An existing file must be updated with its blob SHA
             let sha: string | undefined;
             try {
-              const existing = await forgejoApi(
-                `/repos/${owner}/${repo}/contents/${filePath}?ref=${encodeURIComponent(branchName)}`,
-              );
+              const existing = await githubApi(`${contentsPath}?ref=${encodeURIComponent(branchName)}`);
               if (existing.status < 400) {
                 const existingData = existing.data as Record<string, unknown>;
                 sha = String(existingData.sha ?? "");
@@ -4208,12 +4224,8 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
             };
             if (sha) body.sha = sha;
 
-            const method = sha ? "PUT" : "POST";
-            const { status, data } = await forgejoApi(
-              `/repos/${owner}/${repo}/contents/${filePath}`,
-              method,
-              body,
-            );
+            // PUT creates and updates alike on GitHub
+            const { status, data } = await githubApi(contentsPath, "PUT", body);
 
             if (status >= 400) return toolError(`Commit file failed (${status}): ${JSON.stringify(data)}`);
 
@@ -4236,7 +4248,7 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
               return toolError("create_pr requires owner, repo, pr_title, and head_branch.");
             }
 
-            const { status, data } = await forgejoApi(`/repos/${owner}/${repo}/pulls`, "POST", {
+            const { status, data } = await githubApi(`/repos/${owner}/${repo}/pulls`, "POST", {
               title: prTitle,
               body: prBody,
               head: headBranch,
@@ -4265,7 +4277,7 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
               return toolError("get_diff requires owner, repo, and pr_number.");
             }
 
-            const { status, data } = await forgejoApi(`/repos/${owner}/${repo}/pulls/${prNumber}/files`);
+            const { status, data } = await githubApi(`/repos/${owner}/${repo}/pulls/${prNumber}/files?per_page=100`);
 
             if (status >= 400) return toolError(`Get diff failed (${status}): ${JSON.stringify(data)}`);
 
@@ -4290,10 +4302,10 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
               return toolError("merge_pr requires owner, repo, and pr_number.");
             }
 
-            const { status, data } = await forgejoApi(
+            const { status, data } = await githubApi(
               `/repos/${owner}/${repo}/pulls/${prNumber}/merge`,
-              "POST",
-              { Do: mergeMethod },
+              "PUT",
+              { merge_method: mergeMethod },
             );
 
             if (status >= 400) return toolError(`Merge PR failed (${status}): ${JSON.stringify(data)}`);
@@ -4311,7 +4323,7 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
             );
         }
       } catch (err) {
-        return toolError(`Forgejo API error: ${err instanceof Error ? err.message : "Unknown error"}`);
+        return toolError(`GitHub API error: ${err instanceof Error ? err.message : "Unknown error"}`);
       }
     },
   );
@@ -4746,8 +4758,8 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
               },
               repo_provider: {
                 type: "string",
-                description: "Git provider: github, forgejo, gitlab.",
-                enum: ["github", "forgejo", "gitlab"],
+                description: "Git provider: github, gitea, gitlab.",
+                enum: ["github", "gitea", "gitlab"],
               },
               default_branch: {
                 type: "string",
@@ -5028,7 +5040,7 @@ function registerTools(server: McpServer, db: SupabaseClient): void {
           event_source: {
             type: "string",
             description:
-              "Filter by event source (e.g. 'github_webhook', 'forgejo_webhook', 'deployment').",
+              "Filter by event source (e.g. 'github_webhook', 'git_webhook', 'deployment').",
           },
           story_id: {
             type: "string",
