@@ -87,8 +87,16 @@ function urlFromDomain(urlEnvKey, domainEnvKey, hintConfigFile) {
 
 // ─── Required URLs (validated at import time) ────────────────────────────────
 
-/** Coolify control-plane URL. Source: `.env-prod-backup`. */
-export const COOLIFY_URL = required('COOLIFY_URL', '.env-prod-backup');
+/**
+ * Coolify control-plane URL (operator-declared in `.env-prod-backup`).
+ * OPTIONAL and NOT validated at import, like GIT_BASE_URL below: only
+ * finalize-production-kb records it, and it checks it itself. Validating it here
+ * failed every other importer — measured 2026-10-08: the n8n workflow init
+ * (deploy-workflows, provision-credentials need only N8N_URL + key) died on
+ * "Missing required env var COOLIFY_URL" and no workflow was delivered.
+ * Empty = not declared — never a derived or literal host.
+ */
+export const COOLIFY_URL = process.env.COOLIFY_URL ?? '';
 
 /**
  * Git host the stack is cloned from (operator-declared, e.g. in .env-prod-backup).

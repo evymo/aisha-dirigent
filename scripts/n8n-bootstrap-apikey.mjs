@@ -126,6 +126,14 @@ async function claimOwnerSession(heslo) {
   // /rest/owner/setup`. Původní podmínka znala jen 400, takže tenhle stav
   // spadl do FATAL — a entrypoint ho spolkl `exit 0`.
   if (setup.status === 400 || setup.status === 404) {
+    // ⛔ 400 NENÍ VŽDY „vlastník už nastaven". Neplatná data vlastníka vrací TAKÉ
+    // 400 — s polem `validation`. Naměřeno 2026-10-08 lokálně: `n8n-owner@local`
+    // (doména bez tečky) → bootstrap ohlásil „already set up", přihlásil se
+    // toutéž adresou a padl až na `/rest/login` s „Invalid email".
+    const text = setup.status === 400 ? await setup.text().catch(() => "") : "";
+    if (/"validation"\s*:/.test(text)) {
+      throw new Error(`/rest/owner/setup odmítl data vlastníka (N8N_BOOTSTRAP_OWNER_EMAIL?): ${text.slice(0, 200)}`);
+    }
     log(`owner already set up (HTTP ${setup.status}) — přihlašuji se jako vlastník`);
     return null;
   }

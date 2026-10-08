@@ -13,6 +13,12 @@ import { fileURLToPath } from "url";
 import { ANON_KEY, PG_URL as PG_META_URL } from './lib/remote-api.mjs';
 import { DIRIGENT_API_URL, N8N_URL, GIT_BASE_URL, LANGFUSE_URL, COOLIFY_URL } from './lib/env.mjs';
 
+// env.mjs no longer validates COOLIFY_URL at import (other importers do not need
+// it) — this script records it, so it fails fast here instead.
+if (!COOLIFY_URL) {
+  throw new Error("[finalize-production-kb] Missing required env var COOLIFY_URL. Add it to .env-prod-backup (or export COOLIFY_URL=...).");
+}
+
 // Well-known UUIDs for AISHA's own story
 const AISHA_STORY_ID = "a0000000-0000-0000-0000-000000000001";
 const AISHA_RULESET_ID = "b0000000-0000-0000-0000-000000000001";

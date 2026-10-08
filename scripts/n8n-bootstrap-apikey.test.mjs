@@ -46,6 +46,10 @@ beforeAll(async () => {
       if (req.method === "GET" && req.url === "/rest/settings") return odpovez(res, 200, { data: {} });
       if (req.method === "POST" && req.url === "/rest/owner/setup") {
         n8n.hesla.push(telo.password);
+        if (n8n.rezim === "neplatny-email") {
+          // Přesný tvar odpovědi n8n na adresu bez tečky v doméně (naměřeno 2026-10-08).
+          return odpovez(res, 400, { validation: "email", code: "invalid_string", message: "Invalid email", path: ["email"] });
+        }
         return n8n.rezim === "cerstva" ? odpovez(res, 200, { data: {} }, "setup-session") : odpovez(res, 404, {});
       }
       if (req.method === "POST" && req.url === "/rest/login") {
@@ -123,6 +127,13 @@ describe("n8n bootstrap API klíče", () => {
   test("vlastník s cizím heslem: selže nahlas a řekne cestu ven, klíč nezapíše", async () => {
     n8n.rezim = "cizi-heslo";
     await expect(bootstrap.main()).rejects.toThrow(/HTTP 401[\s\S]*user-management:reset/);
+    expect(existsSync(join(tmp, "apikey"))).toBe(false);
+  });
+
+  test("⛔ neplatný e-mail vlastníka: 400 s `validation` NENÍ „vlastník už nastaven“ — selže hned a jmenuje vstup", async () => {
+    n8n.rezim = "neplatny-email";
+    await expect(bootstrap.main()).rejects.toThrow(/owner\/setup odmítl data vlastníka[\s\S]*Invalid email/);
+    expect(n8n.pozadavky).not.toContain("POST /rest/login");
     expect(existsSync(join(tmp, "apikey"))).toBe(false);
   });
 
