@@ -717,7 +717,7 @@ describe("Compose Secret Hygiene", () => {
       // this ARG, so the token is absent from the pushed image's history — a
       // stronger bound than VERDACCIO_TOKEN. Coolify delivers it as a build arg
       // (no BuildKit secret-mount support for compose builds); migration tracked.
-      FORGEJO_TOKEN: "build-stage-only (absent from runtime image) + private-registry-bounded; BuildKit secret migration tracked",
+      GIT_TOKEN: "build-stage-only (absent from runtime image) + private-registry-bounded; BuildKit secret migration tracked",
       // Sentry sourcemap upload at web build. Same bound + follow-up.
       SENTRY_AUTH_TOKEN: "private-registry-bounded; migration to BuildKit secret mounts tracked",
       // Publishable client-side values (baked into the SPA bundle by design).
@@ -1173,14 +1173,14 @@ describe("Docker Compose Domain Configuration", () => {
     const buildBlocks = (coreCompose.content.match(/^\s+build:/gm) || []).length;
 
     // Pre-built images eliminate Coolify ARG injection and reduce deploy size.
-    // Currently using build directives because Forgejo registry auth is not
+    // Currently using build directives because private container-registry auth is not
     // configured on Frontend Docker daemon.
     //
     // Cap raised 9 → 10 in upstream-sync 2026-05-26 to admit PR #105's
     // pgbouncer wrapper — it's a thin Dockerfile over edoburu/pgbouncer
     // that strips Coolify quote-leak from DB_PASSWORD before exec'ing the
     // upstream entrypoint. Baking the wrapper as a pre-built image would
-    // require Forgejo registry auth on every cold-start, which the same
+    // require private container-registry auth on every cold-start, which the same
     // CI block above explains we don't have yet — until then a tenant-
     // local `build:` is the production-safe path (image rebuild ~3 sec,
     // cached after first cold-start).
@@ -1197,7 +1197,7 @@ describe("Docker Compose Domain Configuration", () => {
       console.warn(
         `⚠️  Core compose has ${buildBlocks} build: blocks. ` +
         `These cause Coolify ARG injection overhead. Use pre-built images from ` +
-        `Forgejo registry (repo.id3a.cz/aisha/dirigent-{service}:latest) instead.`
+        `a private container registry (<registry>/aisha/dirigent-{service}:latest) instead.`
       );
     }
   });

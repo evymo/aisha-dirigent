@@ -9,7 +9,7 @@
  * ⛔ NAMĚŘENO 2026-09-18 (guru, n8n 1.79.0): veřejné API pověření nevypíše
  * (`GET /api/v1/credentials` → 405). Skript na výpisu padal a nevzniklo nic;
  * deploy-workflows výpis přeskočil a zakládal pověření při každém nasazení
- * znovu (Anthropic API ×2, Forgejo API ×2). Proto se pracuje přes interní REST
+ * znovu (Anthropic API ×2, Git API ×2). Proto se pracuje přes interní REST
  * se session vlastníka (relace-vlastnika.mjs):
  *   · chybí            → založí,
  *   · existuje jedno   → UPRAVÍ na hodnoty z env (rotace se tak propíše),
@@ -120,22 +120,20 @@ export const DESIRED = [
     }),
   },
   {
-    name: "Forgejo API",
-    type: "aishaForgejoApi",
-    needs: ["FORGEJO_URL", "FORGEJO_API_TOKEN"],
-    data: () => ({ baseUrl: env("FORGEJO_URL"), apiToken: env("FORGEJO_API_TOKEN") }),
+    // GitHub REST (AishaAdminBridge service `github`: větve, commity, PR, statusy).
+    // GITHUB_API_URL dodává compose (výchozí veřejné API, GHE přepíše).
+    name: "GitHub API",
+    type: "aishaGitHubApi",
+    needs: ["GITHUB_API_URL", "GITHUB_TOKEN"],
+    data: () => ({ apiUrl: env("GITHUB_API_URL"), apiToken: env("GITHUB_TOKEN") }),
   },
   {
-    name: "Forgejo API",
+    // Tentýž token pro HTTP uzly workflowů (WF_AISHA_TOOLING_COMMITTER,
+    // WF_STATIC_DEFENSE_COMMITTER, …) — GitHub čte `Authorization: Bearer`.
+    name: "GitHub API",
     type: "httpHeaderAuth",
-    needs: ["FORGEJO_API_TOKEN"],
-    data: () => ({ name: "Authorization", value: `token ${env("FORGEJO_API_TOKEN")}` }),
-  },
-  {
-    name: "Forgejo API Token",
-    type: "httpHeaderAuth",
-    needs: ["FORGEJO_API_TOKEN"],
-    data: () => ({ name: "Authorization", value: `token ${env("FORGEJO_API_TOKEN")}` }),
+    needs: ["GITHUB_TOKEN"],
+    data: () => ({ name: "Authorization", value: `Bearer ${env("GITHUB_TOKEN")}` }),
   },
   {
     name: "GitHub account",

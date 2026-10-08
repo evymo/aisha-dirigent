@@ -10,7 +10,7 @@
 # dynamic" architecture (see memory: feedback_bootstrap_creds_generator_pushes.md).
 #
 # Mirrors the resolve_uuid() inline helper that already lives inside
-# scripts/aisha-cold-start.sh (step 4). Extracted so .github/.forgejo workflows
+# scripts/aisha-cold-start.sh (step 4). Extracted so CI workflows (.github/)
 # and check-infra.mjs can use the same logic without duplication.
 #
 # Required env when sourcing:
@@ -95,7 +95,7 @@ coolify_app_prefix() {
 # ---------------------------------------------------------------------------
 # JSON helpers — jq is NOT a given.
 #
-# Measured 2026-08-02: the Forgejo runner maps `ubuntu-latest` to
+# Measured 2026-08-02: the self-hosted CI runner mapped `ubuntu-latest` to
 # `node:20-bookworm`, which ships NO jq. Every jq call here silently fell back
 # to its `|| echo 0` / `|| echo ''` guard, so the resolver reported "app not
 # found", the deploy job printed its manual-deploy warning and went GREEN

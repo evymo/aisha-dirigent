@@ -12,7 +12,7 @@
 #   D. Compose interpolation — preflight-compose.sh (každý compose se renderuje)
 #   E. Manifest ↔ compose match — bidirectional consistency
 #   F. Coolify API — connectivity check
-#   G. Forgejo — git remote connectivity check
+#   G. Git host — dosažitelnost gitového původu (origin), ze kterého staví Coolify
 #   K. Keycloak    — servíruje instance svůj realm? (varování; --no-network = neměřeno)
 #
 # Exit codes:
@@ -109,7 +109,7 @@ if [[ -f "$ENV_LOCAL_FILE" ]] && [[ "$ENV_LOCAL_FILE" != "/dev/null" ]]; then
   set +a
 fi
 
-# Source .env-prod-backup if exists (for FORGEJO_TOKEN, COOLIFY_API_KEY, etc.).
+# Source .env-prod-backup if exists (for GIT_TOKEN, COOLIFY_API_KEY, etc.).
 # Override path via AISHA_PROD_BACKUP_FILE — testy mohou nastavit na /dev/null
 # aby doctor neložil real production creds.
 PROD_BACKUP_FILE="${AISHA_PROD_BACKUP_FILE:-$REPO_ROOT/.env-prod-backup}"
@@ -123,9 +123,9 @@ fi
 # Credentials the vault does not hold: fill from the canonical chain.
 #
 # .env-prod-backup carries the GENERATED secrets (that is what the reverse-sync
-# reconstructs). Operator credentials — the Coolify and Forgejo tokens — are not
+# reconstructs). Operator credentials — the Coolify and git tokens — are not
 # generated, so they legitimately live in .env.coolify and never appear there.
-# Sourcing only the vault therefore reported "FORGEJO_TOKEN empty" while the
+# Sourcing only the vault therefore reported "<token> empty" while the
 # token sat in .env.coolify, blocking a wipe on a condition that was not true.
 #
 # A doctor must diagnose what the toolchain will ACTUALLY see, so it reads the
@@ -134,7 +134,7 @@ fi
 # shellcheck source=scripts/lib/coolify-credentials.sh
 if [[ -f "$REPO_ROOT/scripts/lib/coolify-credentials.sh" ]] && [[ "$PROD_BACKUP_FILE" != "/dev/null" ]]; then
   . "$REPO_ROOT/scripts/lib/coolify-credentials.sh"
-  for _k in FORGEJO_TOKEN FORGEJO_API_TOKEN COOLIFY_API_TOKEN COOLIFY_API_KEY COOLIFY_URL COOLIFY_PROJECT_UUID; do
+  for _k in GIT_TOKEN GITHUB_TOKEN COOLIFY_API_TOKEN COOLIFY_API_KEY COOLIFY_URL COOLIFY_PROJECT_UUID; do
     [[ -n "${!_k:-}" ]] && continue
     _v="$(config_env_key "$_k" 2>/dev/null || true)"
     [[ -n "$_v" ]] && export "$_k=$_v"
@@ -168,7 +168,7 @@ if ! MANIFEST=$(node "$REPO_ROOT/scripts/lib/coolify-instance-scope.mjs" --manif
 fi
 STORY="$(basename "$MANIFEST" .manifest)"
 if [[ -n "${AISHA_INSTANCE:-}" ]] && [[ -f "$REPO_ROOT/config/domains-${AISHA_INSTANCE}.env" ]]; then
-  # nounset off while sourcing: the overlay may reference vault vars (FORGEJO_URL)
+  # nounset off while sourcing: the overlay may reference vault vars (GIT_BASE_URL)
   # that are empty on a from-committed-repo preflight — don't abort the doctor.
   set +u
   set -a
@@ -228,8 +228,7 @@ if should_run_phase A; then
   # v repu používají TOKEN, jiné KEY; .env-prod-backup obsahuje TOKEN).
   COOLIFY_API_KEY="${COOLIFY_API_KEY:-}"
   COOLIFY_API_TOKEN="${COOLIFY_API_TOKEN:-}"
-  FORGEJO_TOKEN="${FORGEJO_TOKEN:-}"
-  FORGEJO_API_TOKEN="${FORGEJO_API_TOKEN:-}"
+  GIT_TOKEN="${GIT_TOKEN:-}"
 
   coolify_val="$COOLIFY_API_KEY"
   [[ -z "$coolify_val" ]] && coolify_val="$COOLIFY_API_TOKEN"
@@ -239,13 +238,15 @@ if should_run_phase A; then
     fail "COOLIFY_API_KEY (alias COOLIFY_API_TOKEN) empty — bez něj nelze volat Coolify API → cold-start step 1 (safety check) okamžitě failuje"
   fi
 
-  # FORGEJO_TOKEN with FORGEJO_API_TOKEN alias fallback
-  forgejo_val="$FORGEJO_TOKEN"
-  [[ -z "$forgejo_val" ]] && forgejo_val="$FORGEJO_API_TOKEN"
-  if [[ -n "$forgejo_val" ]]; then
-    ok "FORGEJO_TOKEN present (${#forgejo_val} chars)"
+  # GIT_TOKEN — klon SOUKROMÝCH repozitářů (kód v Coolify, instanční overlaye přes
+  # BuildKit secret git_token). Veřejný kód se naklonuje i bez něj; deklarovaný
+  # overlay je ale soukromý z podstaty → bez tokenu build/migrate padne na 401.
+  if [[ -n "$GIT_TOKEN" ]]; then
+    ok "GIT_TOKEN present (${#GIT_TOKEN} chars)"
+  elif [[ -n "${AISHA_INSTANCE_DATA_GIT_URL:-}${AISHA_WEB_DESIGN_GIT_URL:-}${KC_THEME_OVERLAY_GIT_URL:-}" ]]; then
+    fail "GIT_TOKEN empty — instance deklaruje soukromý overlay (AISHA_INSTANCE_DATA_GIT_URL / AISHA_WEB_DESIGN_GIT_URL / KC_THEME_OVERLAY_GIT_URL); klon v buildu/migrate padne na 401"
   else
-    fail "FORGEJO_TOKEN empty — drives git clone v Coolify; bez něj wave deploy padne na 401 a docker_compose_raw zůstane null"
+    warn "GIT_TOKEN empty — Coolify i buildy naklonují jen veřejná repa (kód stacku musí být veřejný)"
   fi
 
   if [[ -n "${COOLIFY_PROJECT_UUID:-}" ]]; then
@@ -501,7 +502,6 @@ if should_run_phase D; then
           --preserve=1 \
           --netbird-mgmt-host="${NETBIRD_MGMT_HOST:-}" \
           --mesh-tld="${MESH_TLD:-}" \
-          --forgejo-org="${AISHA_FORGEJO_ORG:-${APP_NAME_PREFIX:-${AISHA_STORY:-}}}" \
           --nocodb-admin-email="${NOCODB_ADMIN_EMAIL:-${SMTP_ADMIN_EMAIL:-}}" \
           >>"$_fresh_env" 2>/dev/null || true
       fi
@@ -803,42 +803,42 @@ if should_run_phase P && [[ "$NO_NETWORK" -eq 0 ]]; then
 fi
 
 # ============================================================================
-# Phase G — Forgejo connectivity
+# Phase G — Git host (origin) connectivity
 # ============================================================================
 if should_run_phase G && [[ "$NO_NETWORK" -eq 0 ]]; then
-  phase G "Forgejo (git remote) connectivity"
+  phase G "Git host (origin) connectivity"
 
-  # Adresa Forgeja se NEDEKLARUJE — odvodí se z gitového původu tohohle stromu.
+  # Adresa git hostingu se NEMUSÍ deklarovat — odvodí se z gitového původu tohohle stromu.
   #
   # PROČ (naměřeno 2026-08-13 na riqu): dokud se čekala deklarace, chyběla —
   # a kontrola se „přeskočila" s warningem. Jenže Coolify staví VŠECH 37 riq
-  # aplikací právě z toho Forgeja: nedosažitelnost není volitelný detail, je to
+  # aplikací právě z toho git hostingu: nedosažitelnost není volitelný detail, je to
   # důvod, proč by celý cold-start postavil starý strom nebo nic. Přeskočená
   # kontrola nad povinnou závislostí je mlčení, ne úspěch — a deklarace, kterou
   # nikdo nevyplní, je ozdoba.
   #
   # Původ je přitom po ruce: `git remote` ho drží vždycky, a je to TÁŽ adresa,
   # ze které staví Coolify. Přihlašovací údaje v URL se ořežou (nesmí do logu).
-  _forgejo_url="${FORGEJO_URL:-}"
-  _forgejo_zdroj="deklarováno (FORGEJO_URL)"
-  if [[ -z "$_forgejo_url" ]]; then
+  _git_host_url="${GIT_BASE_URL:-}"
+  _git_host_zdroj="deklarováno (GIT_BASE_URL)"
+  if [[ -z "$_git_host_url" ]]; then
     _remote_url="$(git -C "$REPO_ROOT" remote get-url origin 2>/dev/null || true)"
     if [[ -n "$_remote_url" ]]; then
       # Parsování má jeden domov — lib/git-origin.mjs. Vlastní sed výraz tady by
       # byl druhá implementace téhož, a ta se rozejde (viz identita instance, #905).
-      _forgejo_url="$(node "$REPO_ROOT/scripts/lib/git-origin.mjs" "$_remote_url" 2>/dev/null || true)"
-      _forgejo_zdroj="odvozeno z git remote origin"
+      _git_host_url="$(node "$REPO_ROOT/scripts/lib/git-origin.mjs" "$_remote_url" 2>/dev/null || true)"
+      _git_host_zdroj="odvozeno z git remote origin"
     fi
   fi
 
-  if [[ -z "$_forgejo_url" ]]; then
-    fail "Forgejo adresu nelze zjistit: FORGEJO_URL není a strom nemá remote 'origin'. Coolify staví aplikace z gitu — bez původu není z čeho stavět."
+  if [[ -z "$_git_host_url" ]]; then
+    fail "Adresu git hostingu nelze zjistit: GIT_BASE_URL není a strom nemá remote 'origin'. Coolify staví aplikace z gitu — bez původu není z čeho stavět."
   else
-    rc=$(curl -sS -o /dev/null -w "%{http_code}" -m "$API_TIMEOUT" "$_forgejo_url" 2>/dev/null || true)
+    rc=$(curl -sS -o /dev/null -w "%{http_code}" -m "$API_TIMEOUT" "$_git_host_url" 2>/dev/null || true)
     case "$rc" in
-      200|301|302) ok "Forgejo reachable: $_forgejo_url (HTTP $rc, $_forgejo_zdroj)" ;;
-      000) fail "Forgejo unreachable: $_forgejo_url ($_forgejo_zdroj)" ;;
-      *)   warn "Forgejo returned HTTP $rc — $_forgejo_url ($_forgejo_zdroj)" ;;
+      200|301|302) ok "Git host reachable: $_git_host_url (HTTP $rc, $_git_host_zdroj)" ;;
+      000) fail "Git host unreachable: $_git_host_url ($_git_host_zdroj)" ;;
+      *)   warn "Git host returned HTTP $rc — $_git_host_url ($_git_host_zdroj)" ;;
     esac
 
     # Má repo všechno, co jeho CI čte (secrets./vars.)? Kontrakt a měření bydlí
@@ -858,8 +858,8 @@ if should_run_phase G && [[ "$NO_NETWORK" -eq 0 ]]; then
     else
       _ci_out="$(mktemp)"
       _ci_rc=0
-      FORGEJO_URL="$_forgejo_url" FORGEJO_TOKEN="${FORGEJO_TOKEN:-${FORGEJO_API_TOKEN:-}}" \
-        node "$REPO_ROOT/scripts/lib/ci-kontrakt.mjs" --repo "$_ci_repo" \
+      # API a token dědí ci-kontrakt z prostředí (GITHUB_API_URL / GITHUB_TOKEN).
+      node "$REPO_ROOT/scripts/lib/ci-kontrakt.mjs" --repo "$_ci_repo" \
         --env-file "$DOKTOR_ENV_SOUBOR" >"$_ci_out" 2>&1 || _ci_rc=$?
       case "$_ci_rc" in
         0) ok "CI kontrakt: repo $_ci_repo má vše, co jeho CI čte ($_ci_zdroj)" ;;

@@ -7,7 +7,7 @@ description: Operate Appsmith dashboards in the AISHA platform via REST API + Gi
 
 V tomto repu je **Appsmith = frontend dashboard vrstva** celé platformy (`appsmith.aisha.guru` v prod, `localhost:8090` lokálně). Zde žije StoryLoop admin dashboard, AISHA Ops observability dashboard a postupně migruje 15+ operačních/finančních stránek. Appsmith je zároveň **canvas pro Aishine autonomní UI modifikace** — Aisha přes REST API čte stav stránek, navrhuje změny layoutu, deployuje a synchronizuje do Gitu.
 
-Connector (Fáze 7 Modul 3) je **hotový**: 5 API operací v `executeAppsmithOps()` v AishaAdminBridge n8n nodu + MCP tools `admin_appsmith` (full, `admin.write`) a `admin_appsmith_manage` (safe subset, `admin.read`). Dashboardová vrstva Fáze 0/1 je částečně hotová — deploy funguje, StoryLoop wireframe a Git sync na Forgejo zatím ne (viz Pitfalls).
+Connector (Fáze 7 Modul 3) je **hotový**: 5 API operací v `executeAppsmithOps()` v AishaAdminBridge n8n nodu + MCP tools `admin_appsmith` (full, `admin.write`) a `admin_appsmith_manage` (safe subset, `admin.read`). Dashboardová vrstva Fáze 0/1 je částečně hotová — deploy funguje, StoryLoop wireframe a Git sync na git server zatím ne (viz Pitfalls).
 
 ## Kdy to platí
 
@@ -77,7 +77,7 @@ Vždy v tomto pořadí — nikdy slepý write:
 2. **Propose** — uprav DSL lokálně; u autonomních změn zapiš návrh do trace/proposal, ne rovnou do Appsmith
 3. **Apply** — `update_page` s celým novým layoutem (JSON string; operace je replace, ne patch)
 4. **Deploy** — `deploy_app` (bez toho zůstane změna jen v edit módu)
-5. **Git sync** — `git_sync` na branch pro backup/review (cílový repo `evymo/appsmith-configs` na Forgejo — propojení je zatím nedokončený deliverable Fáze 1.1 v `docs/MASTER_PLAN.md`)
+5. **Git sync** — `git_sync` na branch pro backup/review (cílový repo deklaruje operátor na svém git hostingu — propojení je zatím nedokončený deliverable Fáze 1.1 v `docs/MASTER_PLAN.md`)
 
 V n8n: node **AishaAdminBridge** se `service: appsmith` + credential `AISHA Appsmith API`. Pro orchestraci celého flow (schedule, approval gate, audit) viz `aisha-n8n-workflow` skill.
 
@@ -110,7 +110,7 @@ Sekvence builderu: template → widget katalog (`appsmith/widgets/`, Mustache pl
 ❌ Action button widget bez `role_required` — gate to kontroluje (`appsmith/widgets/button.json`).
 ❌ Admin credentials v kódu — `scripts/appsmith-api-setup.py` čte `APPSMITH_ADMIN_EMAIL`/`APPSMITH_ADMIN_PASSWORD` z env (emituje `generate-secrets.mjs`).
 ⚠️ **Appsmith API token pro Aishu zatím nevystaven** (deliverable Fáze 0 v `docs/MASTER_PLAN.md`) — bez něj operace fungují jen lokálně s vlastním API key.
-⚠️ **Git sync → Forgejo `evymo/appsmith-configs` zatím nepropojen** (Fáze 1.1 + `docs/AUTONOMY_PLAN.md` Fáze D) — `git_sync` operace existuje, ale prod aplikace nemá připojený Git repo.
+⚠️ **Git sync → git repo konfigurací Appsmithu zatím nepropojen** (Fáze 1.1 + `docs/AUTONOMY_PLAN.md` Fáze D) — `git_sync` operace existuje, ale prod aplikace nemá připojený Git repo.
 ⚠️ **StoryLoop dashboard wireframe zatím neexistuje** — vznikne ve WP-02 (`docs/planning/DELEGATION_PLAN.md` §5); sekce a datové zdroje jsou specifikované v `docs/MASTER_PLAN.md` §1.2 (dashboard volá Supabase RPC, nikdy `.from()`).
 
 ## Gates / validace

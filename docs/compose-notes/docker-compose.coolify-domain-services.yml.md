@@ -324,20 +324,22 @@ množiny, `:-` by ho tiše vyprázdnilo. Bez klíče odpoví transformace 501
 Sůl k IMGPROXY_KEY — podepisuje se `salt || cesta`, obě půlky musí být z téže
 dvojice jako u imgproxy jádra (jinak imgproxy vrátí 403 a proxy 502).
 
-## `      ZARIZENI_ZDROJ_TOKEN: ${ZARIZENI_ZDROJ_TOKEN:-}` · `      FORGEJO_URL: ${FORGEJO_URL}` (2026-09-24)
+## `      ZARIZENI_ZDROJ_TOKEN: ${ZARIZENI_ZDROJ_TOKEN:-}` · `      ZARIZENI_ZDROJ_PUVOD: ${ZARIZENI_ZDROJ_PUVOD:-}` (2026-09-24)
 
 Doplnění balíčků schopnosti „zařízení" (Kiosk Admin a appky, které rozdává) do
-bucketu `zarizeni` z deklarovaného `zdroj` — typicky registr balíčků Forgejo, kam
-je publikuje build v CI. Zadání majitele: „aby se spustil build, který balíček
+bucketu `zarizeni` z deklarovaného `zdroj` — registr balíčků, kam je publikuje
+build v CI. Zadání majitele: „aby se spustil build, který balíček
 nahraje do storage automaticky, aby uživatel nemusel".
 
 - `ZARIZENI_ZDROJ_TOKEN` je token JEN pro čtení balíčků (`read:package`), ne
-  `FORGEJO_TOKEN` — ten má širší práva a Coolify vkládá env appky do VŠECH služeb
+  `GIT_TOKEN` — ten má širší práva a Coolify vkládá env appky do VŠECH služeb
   tohoto compose. `:-` jako ostatní VOLITELNÁ tajemství od operátora (`ANTHROPIC_API_KEY`,
   `COOLIFY_API_KEY`): generátor ho nevyrábí (v kontraktu doktora `external`), holé `${…}`
   patří jen hodnotám, které platforma SAMA generuje (brána env-doctor-contract-coverage).
   Prázdnota tu není tichá — spotřebitel ji hlásí: doplnění skončí `zdroj … vrátil 401`.
-- `FORGEJO_URL` určuje JEDINÝ původ, na který se token přikládá
+- `ZARIZENI_ZDROJ_PUVOD` určuje JEDINÝ původ, na který se token přikládá
+  (deklaruje ho operátor, `external` v kontraktu doktora; dřív se bral z
+  adresy git hostingu, který dnes registr balíčků nemusí být)
   (`services/storage-auth/src/lib/registr-zdroj.ts`, i při přesměrování). Adresa
   balíčku přichází z dat instance; token s ní mimo dům neodejde.
 - Chybí-li token a zdroj ho vyžaduje, doplnění selže NAHLAS v logu storage-auth

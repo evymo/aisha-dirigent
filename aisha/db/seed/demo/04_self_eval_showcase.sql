@@ -34,13 +34,13 @@ INSERT INTO public.coolify_app_slots (id, app_name, blue_app_uuid, green_app_uui
   ('5e1f5e1f-0000-4000-8000-0000000000c1', 'self-eval-showcase-svc', 'se-blue-0001', 'se-green-0001', 'blue', '5e1f5e1f-0000-4000-8000-000000000001')
 ON CONFLICT (id) DO NOTHING;
 
--- ── integration_events — 2 forgejo webhooks (completed) + 1 deploy (completed)
+-- ── integration_events — 2 github webhooks (completed) + 1 deploy (completed)
 --    → webhook_reliability 2/2, deployment 1/1. duration_ms is a GENERATED column
 --    (= whole-second epoch of finished-started × 1000), so we drive it via a 1s
 --    processing window → duration_ms 1000ms each, avg 1000ms.
 INSERT INTO public.integration_events (id, event_source, external_id, event_type, status, story_id, processing_started_at, processing_finished_at, created_at) VALUES
-  ('5e1f5e1f-0000-4000-8000-0000000000f1', 'forgejo_webhook', 'se-wh-1',  'push',   'completed', '5e1f5e1f-0000-4000-8000-000000000001', now() - interval '3 days', now() - interval '3 days' + interval '1 second', now() - interval '3 days'),
-  ('5e1f5e1f-0000-4000-8000-0000000000f2', 'forgejo_webhook', 'se-wh-2',  'push',   'completed', '5e1f5e1f-0000-4000-8000-000000000001', now() - interval '2 days', now() - interval '2 days' + interval '1 second', now() - interval '2 days'),
+  ('5e1f5e1f-0000-4000-8000-0000000000f1', 'github_webhook',  'se-wh-1',  'push',   'completed', '5e1f5e1f-0000-4000-8000-000000000001', now() - interval '3 days', now() - interval '3 days' + interval '1 second', now() - interval '3 days'),
+  ('5e1f5e1f-0000-4000-8000-0000000000f2', 'github_webhook',  'se-wh-2',  'push',   'completed', '5e1f5e1f-0000-4000-8000-000000000001', now() - interval '2 days', now() - interval '2 days' + interval '1 second', now() - interval '2 days'),
   ('5e1f5e1f-0000-4000-8000-0000000000f3', 'deployment',      'se-dep-1', 'deploy', 'completed', '5e1f5e1f-0000-4000-8000-000000000001', now() - interval '1 day',  now() - interval '1 day'  + interval '1 second', now() - interval '1 day')
 ON CONFLICT (id) DO NOTHING;
 

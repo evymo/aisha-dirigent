@@ -48,7 +48,7 @@ The four groups:
 
 | Group | You supply | Notes |
 |-------|-----------|-------|
-| **Infra endpoints** | Coolify + Forgejo base URLs + tokens, (optional) registry proxy | tokens are secrets |
+| **Infra endpoints** | Coolify URL, git host URL (`GIT_BASE_URL`), optional `GITHUB_REPOSITORY`/`GITHUB_API_URL` + tokens, (optional) registry proxy | tokens are secrets |
 | **Topology** | the 3 TLDs (`PUBLIC`/`INTERNAL`/`MESH`), namespace, admin email, profile | everything derives from these |
 | **Instance identity** | private overlay repo URL, `operators.json` roster, (optional) `config/tenant.json` | see [instance-data-template](instance-data-template/README.md) |
 | **BYOK** | LLM / mesh / email / observability keys | each is optional and gates one capability; the full annotated list is [`config/external-secrets.required.env`](../../config/external-secrets.required.env) |

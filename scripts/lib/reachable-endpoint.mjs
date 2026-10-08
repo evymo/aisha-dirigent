@@ -2,7 +2,7 @@
  * reachable-endpoint — resolve a host:port the CURRENT process can actually reach
  * for a docker container, robust to the CI runner's DinD model.
  *
- * The problem (proven by the AV lane logs): on this Forgejo DinD runner,
+ * The problem (proven by the AV lane logs): on a self-hosted DinD CI runner,
  * `docker run -p 127.0.0.1:HOSTPORT:CONTPORT` publishes the port on the docker
  * DAEMON's host, NOT on the job container's loopback — so the job's
  * `127.0.0.1:HOSTPORT` is unreachable, while the container IS reachable at its
@@ -52,7 +52,7 @@ export function containerIps(name) {
   }
 }
 
-/** The docker networks the CURRENT process's container is attached to. The Forgejo CI
+/** The docker networks the CURRENT process's container is attached to. The self-hosted CI
  *  job runs as a dind container on a PER-JOB network (NOT the default bridge), so a
  *  sibling service container started without `--network` lands on the default bridge
  *  and is unreachable from the job (cross-network isolation — verified on soren).

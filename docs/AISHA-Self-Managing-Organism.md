@@ -31,7 +31,7 @@ n8n orchestrační vrstva běží jako produkční stack v Coolify
   `AishaStoryManager`, `AishaModelRouter`, `AishaLlmRouter`, `AishaTrigger`,
   `AishaNodeFactory`, `AishaAdminBridge`, `AishaGitHubApp`) + 6 credential typů
   (`AishaPostgrestApi`, `AishaMcpApi`, `AishaNocoDbApi`, `AishaLangfuseApi`,
-  `AishaForgejoApi`, `AishaAppsmithApi`); nody se loadují přes `N8N_CUSTOM_EXTENSIONS`,
+  `AishaGitHubApi`, `AishaAppsmithApi`); nody se loadují přes `N8N_CUSTOM_EXTENSIONS`,
   ne přes community-packages API
 - **~87 workflows** (`n8n/workflows/WF_*.json`) pokrývajících orchestraci, compliance,
   delivery, observability a self-* smyčky; provisioning + credential remap řeší
@@ -116,7 +116,7 @@ routuje přes `route_task()`.
   kontejneru (entrypoint); nody přes `N8N_CUSTOM_EXTENSIONS`
 - **Watchdog workflows** — `WF_ADMIN_HEALTH_MONITOR`, `WF_NIGHTLY_STORY_AUDIT`,
   `WF_LANGFUSE_PERFORMANCE_REVIEW`
-- **Self-deploy pipeline** — `WF_SELF_DEPLOY`: git push → Forgejo webhook → n8n sync
+- **Self-deploy pipeline** — `WF_SELF_DEPLOY`: git push → git server webhook → n8n sync
   workflow JSONů
 - **Observability** — Langfuse (traces/costs) napojený na `ai_agent_metrics_hourly`;
   denní report, anomálie → `WF_EXPERT_NOTIFICATION`

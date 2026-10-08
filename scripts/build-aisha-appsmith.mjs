@@ -434,7 +434,7 @@ function renderWidgetForSlot(slotName, pageSlug, catalog, sources, row) {
     },
 
     // ── Self-Tooling slots (appsmith/dashboards/aisha-ops.template.json) ──────
-    // AISHA-generated skill/hook/command proposals → human review → Forgejo PR.
+    // AISHA-generated skill/hook/command proposals → human review → GitHub PR.
     // Two-step admin gate: Approve (status→approved) then Commit (fires committer).
     'statbox-pending-proposals': {
       kind: 'statbox', title: 'Pending Proposals', value_query: 'getToolingProposalCountPending',
@@ -468,13 +468,13 @@ function renderWidgetForSlot(slotName, pageSlug, catalog, sources, row) {
     'btn-approve-proposal': {
       kind: 'button', label: 'Approve', role_required: 'admin',
       action_query_name: 'approveProposal', icon: 'tick', variant: 'PRIMARY',
-      button_color: '#10b981', confirm_message: 'Approve this proposal? You then click Commit to open the Forgejo PR.',
+      button_color: '#10b981', confirm_message: 'Approve this proposal? You then click Commit to open the GitHub PR.',
       tooltip: 'Step 1/2 — sets approval_status=approved',
     },
     'btn-commit-proposal': {
-      kind: 'button', label: 'Commit → Forgejo PR', role_required: 'admin',
+      kind: 'button', label: 'Commit → GitHub PR', role_required: 'admin',
       action_query_name: 'triggerCommitter', icon: 'git-branch', variant: 'PRIMARY',
-      button_color: '#4F46E5', confirm_message: 'Create the Forgejo PR for this approved proposal?',
+      button_color: '#4F46E5', confirm_message: 'Create the GitHub PR for this approved proposal?',
       tooltip: 'Step 2/2 — fires WF_AISHA_TOOLING_COMMITTER (only commits approved proposals)',
     },
     'btn-reject-proposal': {

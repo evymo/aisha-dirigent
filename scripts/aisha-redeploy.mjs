@@ -2112,14 +2112,14 @@ async function refreshOverlayCachebusts(short, uuid) {
     try {
       // Overlay URL do buildu NENESOU pověření (build arg = `docker history`;
       // naměřeno 2026-09-13 na SURFACE_OVERLAY_GIT_URL). `ls-remote` na privátní
-      // repo token potřebuje — skript si ho doplní z FORGEJO_TOKEN, a ten tenhle
+      // repo token potřebuje — skript si ho doplní z GIT_TOKEN, a ten tenhle
       // proces sám v prostředí nemá: leží v .env.coolify vedle URL.
       const { stdout } = await execFileP(
         "bash",
         [join(ROOT, "scripts/deploy/overlay-cachebust.sh"), url, ov.refKey ? val(ov.refKey) : ""],
         // Odvozená URL je bez tokenu (jde do build ARGu); HEAD soukromého repa
         // se pak čte tokenem z SoT — týmž, který build dostává secretem.
-        { cwd: ROOT, env: { ...process.env, FORGEJO_TOKEN: process.env.FORGEJO_TOKEN || val("FORGEJO_TOKEN") } },
+        { cwd: ROOT, env: { ...process.env, GIT_TOKEN: process.env.GIT_TOKEN || val("GIT_TOKEN") } },
       );
       sha = stdout.trim();
     } catch (e) {

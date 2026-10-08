@@ -11,8 +11,6 @@ while (<>) {
     s/\$env\?\.N8N_WEBHOOK_BASE_URL \|\| 'https:\/\/n8n\.aisha\.guru'/\$env?.N8N_WEBHOOK_BASE_URL || ''/g;
     # verdaccio / npm registry
     s/\$env\?\.VERDACCIO_URL \|\| 'https:\/\/npm\.id3a\.cz'/\$env?.VERDACCIO_URL || ''/g;
-    # forgejo / git
-    s/\$env\.FORGEJO_URL \|\| 'https:\/\/git\.id3a\.cz'/\$env?.FORGEJO_URL || ''/g;
     # MCP postgrest API (most common — 60+ hits)
     s/\|\| 'https:\/\/api\.backend\.id3a\.cz'/|| ''/g;
     print;

@@ -44,13 +44,34 @@ const NON_SECRET_INPUTS = [
     example: "https://coolify.example.com",
   },
   {
-    key: "FORGEJO_URL",
+    key: "GIT_BASE_URL",
     category: "infra-endpoints",
-    label: "Forgejo base URL",
-    description: "Your Forgejo host — Coolify clones the stack + overlays from here (the TOKEN is a secret, sourced separately).",
+    label: "Git host base URL",
+    description: "Your git host — Coolify clones the stack from <GIT_BASE_URL>/<owner>/<repo>.git (GIT_TOKEN for private repos is a secret, sourced separately).",
     required: true,
     secret: false,
     example: "https://git.example.com",
+    derive: "unset → the host of this checkout's own git remote (never a literal)",
+  },
+  {
+    key: "GITHUB_REPOSITORY",
+    category: "infra-endpoints",
+    label: "GitHub repository (owner/repo)",
+    description: "Repository the GitHub integrations write to: dev-patch commits, self-tooling PRs, CI secrets for the deploy webhook.",
+    required: false,
+    secret: false,
+    example: "acme/aisha-orchestrator",
+    derive: "unset → GitHub integrations report 'not configured' (never derived — a guessed repo would receive commits)",
+  },
+  {
+    key: "GITHUB_API_URL",
+    category: "infra-endpoints",
+    label: "GitHub REST API URL",
+    description: "GitHub REST API base URL (GitHub Enterprise Server: https://<host>/api/v3).",
+    required: false,
+    secret: false,
+    example: "https://git.example.com/api/v3",
+    derive: "unset → the public GitHub API (set it only for GitHub Enterprise Server)",
   },
   {
     key: "PUBLIC_TLD",
@@ -83,20 +104,10 @@ const NON_SECRET_INPUTS = [
     key: "APP_NAME_PREFIX",
     category: "topology",
     label: "Instance namespace",
-    description: "Short slug that namespaces Coolify scope, mesh ports, and (by default) the overlay repos.",
+    description: "Short slug that namespaces Coolify scope, mesh ports and container names.",
     required: true,
     secret: false,
     example: "acme",
-  },
-  {
-    key: "AISHA_FORGEJO_ORG",
-    category: "topology",
-    label: "Forgejo org for overlays",
-    description: "Org that holds <org>-instance-data / <org>-guru-web overlays.",
-    required: false,
-    secret: false,
-    example: "acme",
-    derive: "unset → falls back to APP_NAME_PREFIX",
   },
   // ── Operator identity ──────────────────────────────────────────────────────
   // Who RUNS this instance. Distinct from the software's own name: whoever
@@ -188,8 +199,8 @@ const NON_SECRET_INPUTS = [
     description: "The private aisha-instance-data overlay: KB + web content + Keycloak clients + operator roster.",
     required: false,
     secret: true,
-    example: "https://<user>:<token>@git.example.com/acme/acme-instance-data.git#main",
-    derive: "unset → derived from AISHA_FORGEJO_ORG + FORGEJO_URL + FORGEJO_API_TOKEN (community install → no overlay)",
+    example: "https://git.example.com/acme/acme-instance-data.git#main",
+    derive: "unset → community install, no overlay (never derived); declare it token-free — GIT_TOKEN is added for the clone",
   },
   {
     key: "operators.json",
@@ -226,7 +237,7 @@ const NON_SECRET_INPUTS = [
 ];
 
 const NON_SECRET_CATEGORIES = {
-  "infra-endpoints": "Infra endpoints — where your Coolify / Forgejo live (the URLs; matching tokens are secrets, below)",
+  "infra-endpoints": "Infra endpoints — where your Coolify / git host / GitHub repo live (the URLs; matching tokens are secrets, below)",
   topology: "Topology — the instance's public shape: its 3 TLDs, namespace, admin, and where it deploys",
   identity: "Instance identity — which content/users/overlay make this instance itself (the private overlay repo)",
 };

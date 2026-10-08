@@ -6,12 +6,12 @@
  * pak dostane žlutou, kterou nemá jak vyhodnotit, a naučí se ji přeskakovat.
  * Obojí naměřeno 2026-08-13 na riqu, oboje ve stejném běhu:
  *
- *   ⚠ FORGEJO_URL not set — skipping Forgejo reachability check
+ *   ⚠ <git host URL> not set — skipping <git host> reachability check
  *   ⚠ subnet NEODPOVÍDÁ odvození — buď vědomý override, nebo zděděná hodnota
  *
- * PRVNÍ: adresa Forgeja se čekala jako DEKLARACE. Chyběla, tak se kontrola
+ * PRVNÍ: adresa git hostingu se čekala jako DEKLARACE. Chyběla, tak se kontrola
  * přeskočila — přestože Coolify staví všech 37 aplikací té instance právě
- * z toho Forgeja. Přeskočená kontrola nad POVINNOU závislostí je mlčení, ne
+ * z toho git hostingu. Přeskočená kontrola nad POVINNOU závislostí je mlčení, ne
  * úspěch. Původ je přitom po ruce v `git remote`. Deklarace, kterou nikdo
  * nevyplní, je ozdoba; odvození je odpověď.
  *
@@ -83,8 +83,8 @@ describe("doctor nehlásí to, co nezměřil", () => {
       expect(src, "Phase G musí delegovat na lib/git-origin.mjs").toMatch(/lib\/git-origin\.mjs/);
       expect(
         src,
-        "chybějící FORGEJO_URL se nesmí „přeskočit“ — Coolify z toho Forgeja staví aplikace",
-      ).not.toMatch(/skipping Forgejo/);
+        "chybějící GIT_BASE_URL se nesmí „přeskočit“ — Coolify z toho git hostingu staví aplikace",
+      ).not.toMatch(/skipping (git host|origin)/i);
     });
   });
 

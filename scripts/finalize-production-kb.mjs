@@ -11,7 +11,7 @@
  */
 import { fileURLToPath } from "url";
 import { ANON_KEY, PG_URL as PG_META_URL } from './lib/remote-api.mjs';
-import { DIRIGENT_API_URL, N8N_URL, GIT_URL, LANGFUSE_URL, COOLIFY_URL } from './lib/env.mjs';
+import { DIRIGENT_API_URL, N8N_URL, GIT_BASE_URL, LANGFUSE_URL, COOLIFY_URL } from './lib/env.mjs';
 
 // Well-known UUIDs for AISHA's own story
 const AISHA_STORY_ID = "a0000000-0000-0000-0000-000000000001";
@@ -125,7 +125,7 @@ async function main() {
       '${JSON.stringify({
         supabase_url: "${DIRIGENT_API_URL}",
         n8n_url: "${N8N_URL}",
-        forgejo_url: "${GIT_URL}",
+        git_base_url: "${GIT_BASE_URL}",
         langfuse_url: "${LANGFUSE_URL}",
         coolify_url: "${COOLIFY_URL}",
       })}'::jsonb,

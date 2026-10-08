@@ -76,7 +76,7 @@ bash scripts/init-new-tenant.sh \
 
 # 2. Create the acme-instance-data + acme-web private repos (KB, web, operators).
 # 3. Set operator secrets in Coolify env / .env-prod-backup (NEVER committed):
-#      COOLIFY_API_TOKEN, FORGEJO token, SOURCE_* (if federated),
+#      COOLIFY_API_TOKEN, GIT_TOKEN / GITHUB_TOKEN, SOURCE_* (if federated),
 #      AISHA_PRIMARY_ADMIN_EMAIL, and the Coolify project/server UUIDs.
 # 4. git commit; then on the deploy host:
 AISHA_PRIMARY_ADMIN_EMAIL=... bash scripts/aisha-cold-start.sh --wipe
@@ -84,7 +84,7 @@ AISHA_PRIMARY_ADMIN_EMAIL=... bash scripts/aisha-cold-start.sh --wipe
 ```
 
 **Operator-supplied (never committed):** the Coolify **server + project creation
-itself** (the two isolation boundaries), `COOLIFY_API_TOKEN`, Forgejo token,
+itself** (the two isolation boundaries), `COOLIFY_API_TOKEN`, `GIT_TOKEN` / `GITHUB_TOKEN`,
 `SOURCE_*` secrets, `AISHA_PRIMARY_ADMIN_EMAIL`, and the UUIDs.
 
 ## Guarantee

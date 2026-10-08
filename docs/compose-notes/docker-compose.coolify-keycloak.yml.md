@@ -276,7 +276,7 @@ aisha-clamav: "network ... has active endpoints").
 
 NE build arg: hodnota argu se zapíše do metadat obrazu a `docker history`
 ji vydá komukoli, kdo na obraz dosáhne. Secret žije jen po dobu jedné
-instrukce v tmpfs. Coolify musí mít FORGEJO_TOKEN označený jako
+instrukce v tmpfs. Coolify musí mít GIT_TOKEN označený jako
 runtime-only, jinak ho pošle jako `--build-arg` navíc a únik se vrátí.
 
 ## `KC_CACHE: local`

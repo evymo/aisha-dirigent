@@ -340,7 +340,7 @@ Každá auto-remediation generuje:
 
 ## 9. Otevřené otázky
 
-1. **Manifest update flow**: pokud admin manuálně přidá env var v Coolify UI, drift observer ho označí jako `env_var_extra`. Měl by **auto-update manifest** (commit do `aisha-stack.yml` přes Forgejo)? — *future enhancement, riskantní*
+1. **Manifest update flow**: pokud admin manuálně přidá env var v Coolify UI, drift observer ho označí jako `env_var_extra`. Měl by **auto-update manifest** (commit do `aisha-stack.yml` přes git server)? — *future enhancement, riskantní*
 2. **Drift remediation logs in dashboard**: viditelnost kdo/kdy schválil je nutná. Phase 4 dashboard musí mít Drift History page s approver, timestamp, decision reasoning.
 3. **Cross-server drift**: Frontend vs Backend vs Experimental apps — jeden Coolify spravuje vše. Drift checker iteruje po Coolify aplikacích bez ohledu na server. OK pro V1.
 

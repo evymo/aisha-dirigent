@@ -57,7 +57,7 @@ ARG INSTANCE_DIR=instances/_default
 # `oauth2:<token>@` — a jako build arg by skončila v `docker history` napořád
 # (sesterské měření 2026-08-15 na svc-web-artifact: přes build ARG 2 výskyty
 # hodnoty v metadatech, přes BuildKit secret 0). Token proto chodí stejně jako
-# u svc-web-artifact a Dockerfile.keycloak: `--mount=type=secret,id=forgejo_token`.
+# u svc-web-artifact a Dockerfile.keycloak: `--mount=type=secret,id=git_token`.
 # URL s pověřením build ODMÍTNE — tiché přijetí by únik vrátilo.
 ARG SURFACE_OVERLAY_GIT_URL=
 # ŽÁDNÝ výchozí overlay path: cesta uvnitř instančního repa je identita
@@ -66,7 +66,7 @@ ARG SURFACE_OVERLAY_GIT_URL=
 ARG SURFACE_OVERLAY_PATH=
 ARG SURFACE_OVERLAY_REF=
 ARG SURFACE_OVERLAY_CACHEBUST=
-RUN --mount=type=secret,id=forgejo_token,required=false \
+RUN --mount=type=secret,id=git_token,required=false \
     if [ -n "$SURFACE_OVERLAY_GIT_URL" ]; then \
       [ -n "$SURFACE_OVERLAY_CACHEBUST" ] || { \
         echo "CHYBA: SURFACE_OVERLAY_GIT_URL je zadané, ale SURFACE_OVERLAY_CACHEBUST prázdné." >&2; \
@@ -81,15 +81,15 @@ RUN --mount=type=secret,id=forgejo_token,required=false \
       OVERLAY_AUTORITA="${SURFACE_OVERLAY_GIT_URL#https://}"; OVERLAY_AUTORITA="${OVERLAY_AUTORITA%%/*}"; \
       case "$OVERLAY_AUTORITA" in *@*) \
         echo "CHYBA: SURFACE_OVERLAY_GIT_URL nese pověření v URL (URL se nevypisuje)." >&2; \
-        echo "       Build arg se zapisuje do docker history — token patří do BuildKit secretu forgejo_token." >&2; exit 1 ;; \
+        echo "       Build arg se zapisuje do docker history — token patří do BuildKit secretu git_token." >&2; exit 1 ;; \
       esac; \
-      FORGEJO_TOKEN="$(cat /run/secrets/forgejo_token 2>/dev/null || true)"; \
-      [ -n "$FORGEJO_TOKEN" ] || { \
-        echo "CHYBA: SURFACE_OVERLAY_GIT_URL je zadané, ale BuildKit secret forgejo_token je prázdný." >&2; \
+      GIT_TOKEN="$(cat /run/secrets/git_token 2>/dev/null || true)"; \
+      [ -n "$GIT_TOKEN" ] || { \
+        echo "CHYBA: SURFACE_OVERLAY_GIT_URL je zadané, ale BuildKit secret git_token je prázdný." >&2; \
         echo "       Instanční repo je privátní; bez tokenu klon selže až u gitu, bez souvislosti s příčinou." >&2; exit 1; }; \
       apk add --no-cache git >/dev/null && \
       git clone --quiet --depth 1 ${SURFACE_OVERLAY_REF:+--branch "$SURFACE_OVERLAY_REF"} \
-        "https://${FORGEJO_TOKEN}@${SURFACE_OVERLAY_GIT_URL#https://}" /tmp/overlay && \
+        "https://${GIT_TOKEN}@${SURFACE_OVERLAY_GIT_URL#https://}" /tmp/overlay && \
       test -f "/tmp/overlay/${SURFACE_OVERLAY_PATH}/app.config.json" || \
         { echo "CHYBA: overlay ${SURFACE_OVERLAY_PATH}/app.config.json v instančním repu není" >&2; exit 1; } && \
       mkdir -p "/app/instances/_overlay" && \

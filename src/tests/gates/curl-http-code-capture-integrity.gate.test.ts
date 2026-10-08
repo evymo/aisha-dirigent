@@ -29,7 +29,7 @@
  * Found 2026-08-09 while merging #846. Three confirmed live consequences:
  *
  *   · scripts/cold-start-doctor.sh — `000) fail "Coolify API unreachable"` and
- *     the Forgejo equivalent were UNREACHABLE. An unreachable Coolify produced
+ *     the git-host equivalent were UNREACHABLE. An unreachable Coolify produced
  *     `warn "returned HTTP 000000 (unexpected)"` instead of a hard fail. The
  *     doctor is the instrument the whole deploy is verified with; it could not
  *     fail on the one condition that matters most.

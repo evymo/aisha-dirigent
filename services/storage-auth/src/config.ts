@@ -87,12 +87,12 @@ export const config = {
   maxApkMb: num(process.env.MAX_APK_MB, 200),
   /**
    * Doplnění balíčků z deklarovaného `zdroj` (lib/doplneni-baliku.ts). Token JEN
-   * pro čtení balíčků registru; přikládá se výhradně na původ `FORGEJO_URL`
+   * pro čtení balíčků registru; přikládá se výhradně na původ `ZARIZENI_ZDROJ_PUVOD`
    * (lib/registr-zdroj.ts). Prázdný token = stahuje se bez něj (veřejný zdroj),
    * a když ho zdroj vyžaduje, doplnění selže NAHLAS — nehádá se jinde.
    */
   zarizeniZdrojToken: process.env.ZARIZENI_ZDROJ_TOKEN ?? '',
-  zarizeniZdrojPuvod: (process.env.FORGEJO_URL ?? '').replace(/\/+$/, ''),
+  zarizeniZdrojPuvod: (process.env.ZARIZENI_ZDROJ_PUVOD ?? '').replace(/\/+$/, ''),
 
   // ── Public buckets (no auth required for read) ──
   publicBuckets: new Set([

@@ -26,7 +26,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Validate webhook input.\n//\n// Trigger contexts (any of):\n//   - Operator clicks 'Publish' in Appsmith UI; UI posts here AFTER\n//     aisha_publish_static_defense_rule RPC succeeds\n//   - Aisha autonomous loop after publish RPC\n//\n// Payload shape: { rule_id: string, action: 'published' | 'deprecated',\n//                  approver?: string }\n//\n// Output: enriched payload for downstream nodes\n\nconst body = $input.first().json.body || $input.first().json;\nconst ruleId = body.rule_id;\nconst action = body.action;\nconst approver = body.approver;\n\nif (!ruleId || typeof ruleId !== 'string') {\n  throw new Error('rule_id required (string)');\n}\nif (!['published', 'deprecated'].includes(action)) {\n  throw new Error(\"action must be 'published' or 'deprecated' (got: \" + action + ')');\n}\nif (!/^[a-z][a-z0-9-]+$/.test(ruleId)) {\n  throw new Error('rule_id must be kebab-case (got: ' + ruleId + ')');\n}\n\nconst timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);\nconst branchName = `aisha/static-defense/${action}-${ruleId}-${timestamp.slice(8, 14)}`;\n\nreturn [{\n  json: {\n    rule_id: ruleId,\n    action,\n    approver: approver || null,\n    branch_name: branchName,\n    timestamp,\n    requested_at: new Date().toISOString(),\n  },\n}];"
+        "jsCode": "// Validate webhook input.\n//\n// Trigger contexts (any of):\n//   - Operator clicks 'Publish' in Appsmith UI; UI posts here AFTER\n//     aisha_publish_static_defense_rule RPC succeeds\n//   - Aisha autonomous loop after publish RPC\n//\n// Payload shape: { rule_id: string, action: 'published' | 'deprecated',\n//                  approver?: string }\n//\n// Output: enriched payload for downstream nodes\n\n// ⛔ GitHub cíl se NEHÁDÁ: bez deklarovaného GITHUB_REPOSITORY (owner/repo) a\n// https GITHUB_API_URL workflow odmítne commitovat — dosazené repo by zapisovalo\n// do cizího repozitáře.\nconst githubRepository = String($env.GITHUB_REPOSITORY || '').trim();\nif (!/^[A-Za-z0-9][A-Za-z0-9-]*\\/[A-Za-z0-9_.-]+$/.test(githubRepository)) {\n  throw new Error('GITHUB_REPOSITORY not configured (owner/repo) — refusing to commit to a guessed repository');\n}\nif (!String($env.GITHUB_API_URL || '').startsWith('https://')) {\n  throw new Error('GITHUB_API_URL not configured (https)');\n}\n\nconst body = $input.first().json.body || $input.first().json;\nconst ruleId = body.rule_id;\nconst action = body.action;\nconst approver = body.approver;\n\nif (!ruleId || typeof ruleId !== 'string') {\n  throw new Error('rule_id required (string)');\n}\nif (!['published', 'deprecated'].includes(action)) {\n  throw new Error(\"action must be 'published' or 'deprecated' (got: \" + action + ')');\n}\nif (!/^[a-z][a-z0-9-]+$/.test(ruleId)) {\n  throw new Error('rule_id must be kebab-case (got: ' + ruleId + ')');\n}\n\nconst timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);\nconst branchName = `aisha/static-defense/${action}-${ruleId}-${timestamp.slice(8, 14)}`;\n\nreturn [{\n  json: {\n    rule_id: ruleId,\n    action,\n    approver: approver || null,\n    branch_name: branchName,\n    timestamp,\n    requested_at: new Date().toISOString(),\n  },\n}];"
       },
       "id": "validate-input",
       "name": "Validate Input",
@@ -80,11 +80,58 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/branches",
+        "method": "GET",
+        "url": "={{ $env.GITHUB_API_URL }}/repos/{{ $env.GITHUB_REPOSITORY }}/git/ref/heads/main",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "get-base-branch",
+      "name": "Get Base Branch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        520
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "GitHub API"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GITHUB_API_URL }}/repos/{{ $env.GITHUB_REPOSITORY }}/git/refs",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
             {
               "name": "Content-Type",
               "value": "application/json"
@@ -93,7 +140,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"new_branch_name\": \"{{ $json.branch_name }}\", \"old_branch_name\": \"main\"}",
+        "jsonBody": "={\"ref\": \"refs/heads/{{ $('Validate Input').first().json.branch_name }}\", \"sha\": \"{{ $('Get Base Branch').first().json.object.sha }}\"}",
         "options": {
           "timeout": 15000
         },
@@ -101,7 +148,7 @@
         "genericAuthType": "httpHeaderAuth"
       },
       "id": "create-branch",
-      "name": "Create Forgejo Branch",
+      "name": "Create GitHub Branch",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -112,17 +159,65 @@
       "credentials": {
         "httpHeaderAuth": {
           "id": "__REMAP__",
-          "name": "Forgejo API"
+          "name": "GitHub API"
         }
       }
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/contents/{{ $('Generate YAML').first().json.yaml_path }}",
+        "method": "GET",
+        "url": "={{ $env.GITHUB_API_URL }}/repos/{{ $env.GITHUB_REPOSITORY }}/contents/{{ $('Generate YAML').first().json.yaml_path }}?ref={{ $('Validate Input').first().json.branch_name }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "read-yaml",
+      "name": "Read Current YAML",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        520
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "GitHub API"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $env.GITHUB_API_URL }}/repos/{{ $env.GITHUB_REPOSITORY }}/contents/{{ $('Generate YAML').first().json.yaml_path }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
             {
               "name": "Content-Type",
               "value": "application/json"
@@ -131,7 +226,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"content\": \"{{ $('Generate YAML').first().json.yaml_base64 }}\",\n  \"message\": \"chore(static-defense): regenerate aisha-rules.yml after {{ $('Validate Input').first().json.action }} of {{ $('Validate Input').first().json.rule_id }}\\n\\nAuto-committed by WF_STATIC_DEFENSE_COMMITTER after operator approval.\\nRule lifecycle: {{ $('Validate Input').first().json.action }}\\nApprover: {{ $('Validate Input').first().json.approver || 'autonomous' }}\\nActive rules in DB: {{ $('Generate YAML').first().json.rule_count }}\",\n  \"branch\": \"{{ $('Validate Input').first().json.branch_name }}\"\n}",
+        "jsonBody": "={{ JSON.stringify(Object.assign({\n  content: $('Generate YAML').first().json.yaml_base64,\n  message: 'chore(static-defense): regenerate aisha-rules.yml after ' + $('Validate Input').first().json.action + ' of ' + $('Validate Input').first().json.rule_id + '\\n\\nAuto-committed by WF_STATIC_DEFENSE_COMMITTER after operator approval.\\nRule lifecycle: ' + $('Validate Input').first().json.action + '\\nApprover: ' + ($('Validate Input').first().json.approver || 'autonomous') + '\\nActive rules in DB: ' + $('Generate YAML').first().json.rule_count,\n  branch: $('Validate Input').first().json.branch_name\n}, $('Read Current YAML').first().json.sha ? { sha: $('Read Current YAML').first().json.sha } : {})) }}",
         "options": {
           "timeout": 15000
         },
@@ -150,17 +245,25 @@
       "credentials": {
         "httpHeaderAuth": {
           "id": "__REMAP__",
-          "name": "Forgejo API"
+          "name": "GitHub API"
         }
       }
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/pulls",
+        "url": "={{ $env.GITHUB_API_URL }}/repos/{{ $env.GITHUB_REPOSITORY }}/pulls",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
             {
               "name": "Content-Type",
               "value": "application/json"
@@ -188,7 +291,7 @@
       "credentials": {
         "httpHeaderAuth": {
           "id": "__REMAP__",
-          "name": "Forgejo API"
+          "name": "GitHub API"
         }
       }
     },
@@ -273,18 +376,7 @@
       "main": [
         [
           {
-            "node": "Create Forgejo Branch",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Create Forgejo Branch": {
-      "main": [
-        [
-          {
-            "node": "Write Regenerated YAML",
+            "node": "Get Base Branch",
             "type": "main",
             "index": 0
           }
@@ -318,6 +410,39 @@
         [
           {
             "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Base Branch": {
+      "main": [
+        [
+          {
+            "node": "Create GitHub Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create GitHub Branch": {
+      "main": [
+        [
+          {
+            "node": "Read Current YAML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Current YAML": {
+      "main": [
+        [
+          {
+            "node": "Write Regenerated YAML",
             "type": "main",
             "index": 0
           }

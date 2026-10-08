@@ -24,7 +24,7 @@
 # submodulu packages/extranet-sdk — bez připojení ho GitHub proxy nenaklonuje),
 # insight, potok, aisha-local-ingest.
 #
-# Žádný vlastní npm ani Forgejo: @aisha/* se staví ze zdroje (workspaces,
+# Žádný vlastní npm ani soukromý git server: @aisha/* se staví ze zdroje (workspaces,
 # SDK ze submodulu), cizí balíky z registry.npmjs.org podle lockfilů.
 #
 # ── Nastavení prostředí, ke kterému skript patří ─────────────────────────────

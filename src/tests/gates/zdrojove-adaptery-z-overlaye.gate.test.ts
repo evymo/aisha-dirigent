@@ -119,7 +119,7 @@ describe("zdrojové adaptéry z instančního overlaye", () => {
   describe("stage source-adapters (spuštěním)", () => {
     function stage(args: Record<string, string>) {
       const koren = mkdtempSync(join(tmpdir(), "aisha-adapter-stage-"));
-      const skript = doTempu(runSkript("RUN --mount=type=secret,id=forgejo_token"), koren);
+      const skript = doTempu(runSkript("RUN --mount=type=secret,id=git_token"), koren);
       const r = spawnSync("sh", ["-c", `apk() { return 0; }\n${skript}`], {
         encoding: "utf8",
         env: { PATH: process.env.PATH, HOME: process.env.HOME, SOURCE_ADAPTER_OVERLAY_PATH: "source-adapters", ...args },
@@ -194,20 +194,20 @@ describe("zdrojové adaptéry z instančního overlaye", () => {
   });
 
   describe("token a doručení", () => {
-    test("FORGEJO_TOKEN nikdy jako ARG — jen BuildKit secret", () => {
-      expect(DOCKERFILE).not.toMatch(/^ARG\s+FORGEJO_TOKEN/m);
-      expect(DOCKERFILE).toMatch(/RUN --mount=type=secret,id=forgejo_token,required=false/);
-      expect(readFileSync(COMPOSE, "utf8")).toMatch(/secrets:\n\s+- forgejo_token/);
+    test("GIT_TOKEN nikdy jako ARG — jen BuildKit secret", () => {
+      expect(DOCKERFILE).not.toMatch(/^ARG\s+GIT_TOKEN/m);
+      expect(DOCKERFILE).toMatch(/RUN --mount=type=secret,id=git_token,required=false/);
+      expect(readFileSync(COMPOSE, "utf8")).toMatch(/secrets:\n\s+- git_token/);
     });
 
     test("compose-env-refs vidí `secrets: … environment:` — jinak sync token nedoručí", () => {
       const reference = referenceCompose(readFileSync(COMPOSE, "utf8"), "source-broker");
       expect(
         jmenaReferenci(reference),
-        "Naměřeno 2026-09-14: FORGEJO_TOKEN neměla v Coolify appka brokeru ani Keycloaku —\n" +
+        "Naměřeno 2026-09-14: GIT_TOKEN neměla v Coolify appka brokeru ani Keycloaku —\n" +
           "sync doručuje jen klíče, které compose-env-refs vrátí. Klon soukromého overlaye pak selže.",
-      ).toContain("FORGEJO_TOKEN");
-      expect(jmenaReferenci(reference, "bez-defaultu"), "token je volitelný (required=false), povinný být nesmí").not.toContain("FORGEJO_TOKEN");
+      ).toContain("GIT_TOKEN");
+      expect(jmenaReferenci(reference, "bez-defaultu"), "token je volitelný (required=false), povinný být nesmí").not.toContain("GIT_TOKEN");
     });
 
     test("compose předává build ARGy bez vnořené interpolace (Coolify ji neumí)", () => {
@@ -253,7 +253,7 @@ describe("zdrojové adaptéry z instančního overlaye", () => {
       const zavolej = (url: string) => {
         spawnSync("sh", [join(ROOT, "scripts/deploy/overlay-cachebust.sh"), url, ""], {
           encoding: "utf8",
-          env: { PATH: `${bin}:${process.env.PATH}`, FORGEJO_TOKEN: "tok123" },
+          env: { PATH: `${bin}:${process.env.PATH}`, GIT_TOKEN: "tok123" },
         });
         const volano = readFileSync(join(bin, "volano"), "utf8").trim().split("\n").pop() ?? "";
         return volano;

@@ -60,14 +60,14 @@ FROM ${REGISTRY_PROXY}library/busybox:1.37.0-musl AS busybox
 # a nemá `git` ani správce balíčků (proto do něj repo vkládá busybox). Do
 # běhového obrazu tak jde jen výsledek, ne nástroje ani `.git`.
 #
-# FORGEJO_TOKEN chodí přes BuildKit secret, NE přes build ARG.
+# GIT_TOKEN chodí přes BuildKit secret, NE přes build ARG.
 #
 # Dřív tu stálo, že token je bezpečný, protože se spotřebuje jen v tomhle stage
 # a běhový stage ho nedeklaruje. U běžného `docker build` by to platilo. Pod
 # Coolify NE: `modify_dockerfiles_for_compose()` vkládá `ARG <KEY>` za KAŽDÝ
 # `FROM` — tedy i za ten běhový — čímž deklaraci znovu zavede a hodnota se
 # zapíše do metadat. Naměřeno 2026-08-15 na sesterském svc-web-artifactu:
-# FORGEJO_TOKEN v `docker history` KONEČNÉHO obrazu, přesně tam, kde podle
+# GIT_TOKEN v `docker history` KONEČNÉHO obrazu, přesně tam, kde podle
 # tehdejšího komentáře být nemohl. Obrana postavená na tvaru Dockerfilu neobstojí,
 # když ten tvar někdo za běhu přepisuje.
 #
@@ -99,7 +99,7 @@ ARG KC_THEME_OVERLAY_CACHEBUST=
 # se do obrazu opravdu dostalo — zakešovaný běh vypadá jinak stejně jako čerstvý.
 # (Komentáře patří SEM, ne dovnitř `RUN`: `#` uvnitř pokračovacího řádku je
 #  footgun, který spolehlivě splete každý čtecí nástroj i člověka.)
-RUN --mount=type=secret,id=forgejo_token,required=false \
+RUN --mount=type=secret,id=git_token,required=false \
     mkdir -p /themes && \
     if [ -z "$KC_THEME_OVERLAY_GIT_URL" ]; then \
       echo "[theme-overlay] přeskočeno (KC_THEME_OVERLAY_GIT_URL nenastaveno) — platformní téma"; \
@@ -110,8 +110,8 @@ RUN --mount=type=secret,id=forgejo_token,required=false \
         echo "[theme-overlay]        Pošli commit SHA instančního repa nebo časové razítko." >&2; exit 1; }; \
       apk add --no-cache git >/dev/null || { echo "[theme-overlay] CHYBA: git se nenainstaloval" >&2; exit 1; }; \
       URL="$KC_THEME_OVERLAY_GIT_URL"; \
-      FORGEJO_TOKEN="$(cat /run/secrets/forgejo_token 2>/dev/null || true)"; \
-      case "$URL" in *@*) : ;; *) [ -n "$FORGEJO_TOKEN" ] && URL="https://${FORGEJO_TOKEN}@${URL#https://}" ;; esac; \
+      GIT_TOKEN="$(cat /run/secrets/git_token 2>/dev/null || true)"; \
+      case "$URL" in *@*) : ;; *) [ -n "$GIT_TOKEN" ] && URL="https://${GIT_TOKEN}@${URL#https://}" ;; esac; \
       git clone --quiet --depth 1 ${KC_THEME_OVERLAY_REF:+--branch "$KC_THEME_OVERLAY_REF"} "$URL" /tmp/overlay \
         || { echo "[theme-overlay] CHYBA: klon instančního repa selhal" >&2; exit 1; }; \
       [ -d "/tmp/overlay/${KC_THEME_OVERLAY_PATH}" ] \

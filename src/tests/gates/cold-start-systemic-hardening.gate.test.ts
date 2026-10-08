@@ -123,14 +123,15 @@ describe("cold-start systemic hardening", () => {
     expect(source).toContain('registry)      echo "docker-compose.coolify-registry.yml"');
   });
 
-  test("deploy-init normalizes Forgejo host and owner/repository path", () => {
+  test("deploy-init normalizes the GitHub API URL and owner/repository path (no guessing)", () => {
     const source = read("scripts/coolify-deploy-init.sh");
-    expect(source).toContain("normalize_forgejo_coordinates()");
-    expect(source).toContain('FORGEJO_URL="${FORGEJO_URL%/}"');
-    expect(source).toContain('if [[ "${FORGEJO_REPO:-}" == */* ]]');
-    expect(source).toContain('FORGEJO_OWNER="${repo_path%%/*}"');
-    expect(source).toContain('FORGEJO_REPO="${repo_path##*/}"');
-    expect(source.indexOf("normalize_forgejo_coordinates\n\nload_topology_env")).toBeGreaterThan(
+    expect(source).toContain("normalize_github_coordinates()");
+    expect(source).toContain('GITHUB_API_URL="${GITHUB_API_URL%/}"');
+    expect(source).toContain('repo="${repo%.git}"');
+    // A declared value that is not owner/repo is a declaration error → fail, never a guess.
+    expect(source).toMatch(/nemá tvar owner\/repo[\s\S]{0,120}exit 1/);
+    expect(source).not.toMatch(/GITHUB_REPOSITORY="\$\{GITHUB_REPOSITORY:-[^}]/);
+    expect(source.indexOf("normalize_github_coordinates\n\nload_topology_env")).toBeGreaterThan(
       source.lastIndexOf('load_env_file "$PROJECT_ROOT/.env.coolify"'),
     );
   });

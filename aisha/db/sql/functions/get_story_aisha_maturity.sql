@@ -32,7 +32,7 @@ BEGIN
   INTO v_webhook_total, v_webhook_success
   FROM integration_events
   WHERE story_id = p_story_id
-    AND event_source IN ('github_webhook', 'forgejo_webhook')
+    AND event_source IN ('github_webhook', 'git_webhook')
     AND created_at > v_cutoff;
 
   -- Average response time — uses idx_integration_events_maturity_duration

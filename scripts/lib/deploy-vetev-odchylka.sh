@@ -36,7 +36,7 @@ deploy_vetev_odchylka() {
     ok "deploy větev: main — bez odchylky"
   else
     # ⛔ MĚŘÍTKO SE VYBÍRÁ PODLE URL, NE PODLE JMÉNA REMOTE. `upstream`,
-    # `upstream-forgejo` a spol. jsou ZVYKLOST, ne vlastnost: ve forku může
+    # `upstream-github` a spol. jsou ZVYKLOST, ne vlastnost: ve forku může
     # `upstream` ukazovat na mezifork a brána by pak měřila proti cizímu stromu —
     # a o větvi, která něco nese, řekla „už nic nenese". Identita repozitáře je
     # v URL (scripts/lib/git-origin.mjs::originRepo, tentýž normalizátor, ne druhý).
@@ -45,7 +45,7 @@ deploy_vetev_odchylka() {
     # v manifestu. Nic z toho = NEZMĚŘENO. Zapsat sem literál platformy by byl
     # týž omyl o úroveň výš: fork nad forkem má jiného rodiče.
     #
-    # ⛔ FORGEJO_REPO SEM NEPATŘÍ (naměřeno 2026-09-25 na <fork>). Je to repo,
+    # ⛔ GITHUB_REPOSITORY SEM NEPATŘÍ (naměřeno 2026-09-25 na <fork>). Je to repo,
     # ZE KTERÉHO Coolify staví — u forku fork sám. Jako měřítko by porovnávalo
     # odchylku proti vlastnímu `main`, tedy ne proti tomu, kam se má slít.
     # Samostatný doktor ho v prostředí neměl a vyšel správně; uvnitř cold-startu,

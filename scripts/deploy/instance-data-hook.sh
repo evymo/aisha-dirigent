@@ -16,14 +16,14 @@
 #
 # Env contract (all optional → community installs no-op cleanly):
 #   AISHA_INSTANCE_DATA_GIT_URL   clone URL for the private overlay repo. Prefer a
-#                                 TOKEN-FREE URL + the FORGEJO_TOKEN secret (injected
+#                                 TOKEN-FREE URL + the GIT_TOKEN secret (injected
 #                                 at runtime, never persisted in any config artifact),
 #                                 e.g. https://git.host/org/instance-data.git — matching
 #                                 svc-web-artifact's design-overlay pull. A URL with
 #                                 embedded creds still works (backward compatible).
 #                                 Optional "#<ref>" suffix pins a branch/tag/SHA
 #                                 (default: the remote default branch).
-#   FORGEJO_TOKEN                 read token used when the URL is token-free (secret
+#   GIT_TOKEN                 read token used when the URL is token-free (secret
 #                                 env; never logged).
 #   AISHA_DB_URL                  injected by the entrypoint (normalized).
 #
@@ -86,7 +86,7 @@ esac
 REDACTED=$(printf "%s" "$URL" | sed -E 's|(://)[^@/]+@|\1***@|')
 
 # Auth: if the URL carries NO credentials (token-free, no userinfo) but the
-# FORGEJO_TOKEN secret is set, inject it at RUNTIME for the clone only — matching
+# GIT_TOKEN secret is set, inject it at RUNTIME for the clone only — matching
 # svc-web-artifact/Dockerfile's design-overlay pull. The token is never persisted
 # (AISHA_INSTANCE_DATA_GIT_URL stays token-free in every config artifact) nor
 # logged (REDACTED is derived from the token-free URL). A URL that already embeds
@@ -95,8 +95,8 @@ CLONE_URL="$URL"
 case "$URL" in
   *"@"*) : ;;                       # already has userinfo -> use verbatim
   https://*)
-    if [ -n "${FORGEJO_TOKEN:-}" ]; then
-      CLONE_URL="https://${FORGEJO_TOKEN}@${URL#https://}"
+    if [ -n "${GIT_TOKEN:-}" ]; then
+      CLONE_URL="https://${GIT_TOKEN}@${URL#https://}"
     fi
     ;;
 esac

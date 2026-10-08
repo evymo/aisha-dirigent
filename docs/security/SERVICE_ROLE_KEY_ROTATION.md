@@ -94,7 +94,7 @@ The token remains in history and on the GitHub mirror. After rotation (which mak
 the old token worthless), scrub it so scanners stop flagging it:
 
 ```bash
-# Forgejo is canonical (origin); coordinate a force-update + re-mirror.
+# git server is canonical (origin); coordinate a force-update + re-mirror.
 git filter-repo --replace-text <(printf '%s==>REDACTED-ROTATED\n' \
   'bm0yshgJ-kbz2HPNakc3iIUH6YvY6DQeo5T6Eo79cB4')
 ```

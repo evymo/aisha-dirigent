@@ -17,7 +17,7 @@
  *   - Router/Composer (route_task, compose_context, validate_compliance)
  *   - Dirigent tools (moderate_flow, evaluate_tests, assess_quality, suggest_next_step, estimate_effort, check_pr_compliance)
  *   - Delivery (transition_delivery_status, get_delivery_timeline, get_allowed_transitions, manage_story_environment, get_story_environments)
- *   - Admin Bridge (admin_list_services, admin_health_check, admin_nocodb_*, admin_langfuse_traces, admin_log_action, admin_n8n_workflows, admin_forgejo_git)
+ *   - Admin Bridge (admin_list_services, admin_health_check, admin_nocodb_*, admin_langfuse_traces, admin_log_action, admin_n8n_workflows, admin_github_git)
  *   - Public Chat (get_public_chat_channel_config, list_public_chat_channels)
  *   - Design (get_design_profile, upsert_design_profile)
  *   - RAG (search_ragnarok)

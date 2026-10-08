@@ -42,7 +42,7 @@ ARG SOURCE_ADAPTER_OVERLAY_REF=
 ARG SOURCE_ADAPTER_OVERLAY_PATH=source-adapters
 # ⛔ CACHEBUST — bez něj se overlay nasadí jednou a už nikdy (viz Dockerfile.keycloak).
 ARG SOURCE_ADAPTER_OVERLAY_CACHEBUST=
-RUN --mount=type=secret,id=forgejo_token,required=false \
+RUN --mount=type=secret,id=git_token,required=false \
     mkdir -p /adapters && \
     if [ -z "$SOURCE_ADAPTER_OVERLAY_GIT_URL" ]; then \
       echo "[source-adapters] přeskočeno (SOURCE_ADAPTER_OVERLAY_GIT_URL nenastaveno) — instance overlay nedeklaruje"; \
@@ -52,8 +52,8 @@ RUN --mount=type=secret,id=forgejo_token,required=false \
         echo "[source-adapters]        BuildKit by klon zakešoval a nasadil adaptéry z PRVNÍHO buildu — tiše." >&2; exit 1; }; \
       apk add --no-cache git >/dev/null || { echo "[source-adapters] CHYBA: git se nenainstaloval" >&2; exit 1; }; \
       URL="$SOURCE_ADAPTER_OVERLAY_GIT_URL"; \
-      FORGEJO_TOKEN="$(cat /run/secrets/forgejo_token 2>/dev/null || true)"; \
-      case "$URL" in *@*) : ;; https://*) [ -n "$FORGEJO_TOKEN" ] && URL="https://${FORGEJO_TOKEN}@${URL#https://}" ;; esac; \
+      GIT_TOKEN="$(cat /run/secrets/git_token 2>/dev/null || true)"; \
+      case "$URL" in *@*) : ;; https://*) [ -n "$GIT_TOKEN" ] && URL="https://${GIT_TOKEN}@${URL#https://}" ;; esac; \
       git clone --quiet --depth 1 ${SOURCE_ADAPTER_OVERLAY_REF:+--branch "$SOURCE_ADAPTER_OVERLAY_REF"} "$URL" /tmp/overlay \
         || { echo "[source-adapters] CHYBA: klon instančního repa selhal" >&2; exit 1; }; \
       if [ -d "/tmp/overlay/${SOURCE_ADAPTER_OVERLAY_PATH}" ]; then \

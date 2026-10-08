@@ -5,7 +5,7 @@
  * SAFETY CONTRACT: a branch/worktree is removed ONLY when its work is provably in main, by one of
  * three DERIVED signals (no maintained allow-list):
  *   1. literal merge        — `git branch --merged origin/main`
- *   2. merged Forgejo PR     — a closed+merged PR whose head ref is this branch (squash/rebase merges)
+ *   2. merged GitHub PR      — a closed+merged PR whose head ref is this branch (squash/rebase merges)
  *   3. content already in main — main matches the branch on EVERY file the branch's own commits
  *      touched (catches work squash-merged under a DIFFERENT head-ref name, which signals 1+2 miss).
  * Anything else is FLAGGED and NEVER deleted, so unintegrated work is never lost. Protected always:
@@ -15,12 +15,13 @@
  *   node scripts/cleanup-worktrees-branches.mjs            # dry-run (default) — lists SAFE vs FLAGGED
  *   node scripts/cleanup-worktrees-branches.mjs --apply    # actually remove the SAFE items
  *
- * No shell is used (execFileSync with arg arrays — no command injection). The Forgejo token
- * (FORGEJO_API_TOKEN in .env-prod-backup) is read and sent only as an Authorization header via the
- * built-in fetch — never on a command line, never printed.
+ * No shell is used (execFileSync with arg arrays — no command injection). The GitHub token
+ * (GITHUB_TOKEN, read through the canonical config chain) is sent only as an Authorization header
+ * via the built-in fetch — never on a command line, never printed. The repository is the declared
+ * GITHUB_REPOSITORY (never guessed); without it signal 2 is skipped, never pointed elsewhere.
  */
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readConfigKey } from './lib/config-env-files.mjs';
 
 const APPLY = process.argv.includes('--apply');
 const git = (args, opts = {}) => execFileSync('git', args, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'], ...opts }).toString();
@@ -38,35 +39,30 @@ const literalMerged = new Set(
   git(['branch', '--merged', MAIN]).split('\n').map((s) => s.replace(/^[*+ ]+/, '').trim()).filter(Boolean),
 );
 
-// --- signal 2: a MERGED Forgejo PR whose head ref is this branch (squash/rebase merges) ---
+// --- signal 2: a MERGED GitHub PR whose head ref is this branch (squash/rebase merges) ---
 const mergedPrBranches = new Set();
 try {
-  const token = (readFileSync(`${repoRoot}/.env-prod-backup`, 'utf8').match(/^FORGEJO_API_TOKEN=(.+)$/m)?.[1] ?? '')
-    .replace(/["']/g, '').trim();
-  if (!token) {
-    console.warn('⚠ no FORGEJO_API_TOKEN in .env-prod-backup — relying on literal + content signals only.');
+  const config = (key) => String(process.env[key] || readConfigKey(key) || '').replace(/["']/g, '').trim();
+  const token = config('GITHUB_TOKEN');
+  const repository = config('GITHUB_REPOSITORY').replace(/\.git$/, '');
+  // Public GitHub API unless GitHub Enterprise is declared (https://<host>/api/v3).
+  const apiBase = (config('GITHUB_API_URL') || 'https://api.github.com').replace(/\/+$/, '');
+  if (!token || !/^[A-Za-z0-9][A-Za-z0-9-]*\/[A-Za-z0-9_.-]+$/.test(repository)) {
+    console.warn('⚠ GITHUB_TOKEN / GITHUB_REPOSITORY not configured — relying on literal + content signals only.');
   } else {
-    // Derive the Forgejo API base from the origin remote — no hardcoded forge host in shipping
-    // code (the no-hardcoded-deployment-config gate forbids literal forge hosts); the configured
-    // remote IS the source of truth for where this repo lives.
-    const remote = tryGit(['remote', 'get-url', 'origin']).trim();
-    const rm = remote.match(/^(https?:\/\/[^/]+)\/(.+?)(?:\.git)?$/);
-    if (!rm) {
-      console.warn('⚠ origin remote is not an HTTP(S) forge URL — relying on literal + content signals.');
-    } else {
-      const api = `${rm[1]}/api/v1/repos/${rm[2]}/pulls`;
-      for (let page = 1; page <= 30; page++) {
-        const res = await fetch(`${api}?state=closed&limit=50&page=${page}`, { headers: { Authorization: `token ${token}` }, signal: AbortSignal.timeout(15000) });
-        if (!res.ok) { console.warn(`⚠ Forgejo PR list HTTP ${res.status} — relying on literal + content signals.`); break; }
-        const prs = await res.json();
-        if (!Array.isArray(prs) || prs.length === 0) break;
-        for (const pr of prs) if (pr.merged_at && pr.head?.ref) mergedPrBranches.add(pr.head.ref);
-      }
-      console.log(`Forgejo: ${mergedPrBranches.size} merged-PR head branches detected.`);
+    const api = `${apiBase}/repos/${repository}/pulls`;
+    const headers = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+    for (let page = 1; page <= 30; page++) {
+      const res = await fetch(`${api}?state=closed&per_page=50&page=${page}`, { headers, signal: AbortSignal.timeout(15000) });
+      if (!res.ok) { console.warn(`⚠ GitHub PR list HTTP ${res.status} — relying on literal + content signals.`); break; }
+      const prs = await res.json();
+      if (!Array.isArray(prs) || prs.length === 0) break;
+      for (const pr of prs) if (pr.merged_at && pr.head?.ref) mergedPrBranches.add(pr.head.ref);
     }
+    console.log(`GitHub: ${mergedPrBranches.size} merged-PR head branches detected.`);
   }
 } catch (e) {
-  console.warn(`⚠ Forgejo PR-state check skipped (${e.message}) — relying on literal + content signals.`);
+  console.warn(`⚠ GitHub PR-state check skipped (${e.message}) — relying on literal + content signals.`);
 }
 
 // --- signal 3: CONTENT already in main (squash-merge under a different head ref) ---

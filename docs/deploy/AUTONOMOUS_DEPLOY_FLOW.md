@@ -39,7 +39,7 @@ Vše ostatní je autonomní.
                                  │
                                  ▼
                           ┌─────────────┐
-                          │   Forgejo   │
+                          │   GitHub    │
                           │   webhook   │ → POST /webhook/coolify-deploy
                           └──────┬──────┘
                                  │
@@ -321,7 +321,7 @@ analyzer), re-enable je v jednom commitu.
 ### Phase 3 — fix proposer
 - [ ] WF_FIX_PROPOSER (LLM-driven patch generation)
 - [ ] Exec sandbox recipes pro common issue patterns
-- [ ] Auto-PR creation v Forgejo (operator merge gate)
+- [ ] Auto-PR creation na GitHubu (operator merge gate)
 
 ### Phase 4 — real-time stack adaptation
 - [ ] n8n cron analyzers (Sentry/Langfuse/ClickHouse)

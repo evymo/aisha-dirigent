@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# coolify-deploy-init.sh — Multi-stack Coolify deployment + Forgejo CI/CD setup
+# coolify-deploy-init.sh — Multi-stack Coolify deployment + GitHub CI secrets setup
 # ==============================================================================
 #
-# Automatizuje setup VŠECH 4 Coolify stacků a Forgejo CI/CD:
+# Automatizuje setup VŠECH 4 Coolify stacků a (volitelně) CI secrets na GitHubu:
 #
 #   Stack       Compose file                         Popis
 #   ─────────── ──────────────────────────────────── ──────────────────────────
@@ -16,13 +16,16 @@
 # Pro každý stack:
 #   1. Najde existující Coolify aplikaci (nebo požádá o UUID)
 #   2. Nastaví env vars v Coolify (idempotentně — POST, fallback PATCH)
-#   3. Pro web stack: nastaví COOLIFY_WEBHOOK_URL v Forgejo
+#   3. Pro web stack: nastaví CI secret COOLIFY_WEBHOOK_URL v repu na GitHubu
+#      (gh CLI; jen s GITHUB_REPOSITORY + GITHUB_TOKEN — jinak se krok přeskočí
+#      a vypíše se, co nastavit ručně)
 #
 # Prerekvizity:
 #   - jq nainstalován (brew install jq / apt install jq)
 #   - curl nainstalován
 #   - Coolify API token (Settings → API Tokens v Coolify UI)
-#   - Forgejo API token (Settings → Applications v Forgejo UI)
+#   - volitelně: GITHUB_REPOSITORY (owner/repo) + GITHUB_TOKEN (fine-grained token
+#     s právem zapisovat Actions secrets) + gh CLI — pro CI secrets a self-tooling n8n
 #
 # Použití:
 #   # Všechny stacky (default):
@@ -33,7 +36,7 @@
 #   bash scripts/coolify-deploy-init.sh --stack core,langfuse
 #
 #   # S tokeny jako env vars:
-#   COOLIFY_API_TOKEN=xxx FORGEJO_API_TOKEN=xxx bash scripts/coolify-deploy-init.sh
+#   COOLIFY_API_TOKEN=xxx GITHUB_REPOSITORY=org/repo GITHUB_TOKEN=xxx bash scripts/coolify-deploy-init.sh
 #
 #   # Dry run (jen ukáže co by udělal):
 #   DRY_RUN=1 bash scripts/coolify-deploy-init.sh
@@ -120,56 +123,34 @@ banner() { echo -e "\n${CYAN}═══ $* ═══${NC}"; }
 
 # ── Konfigurace ───────────────────────────────────────────────────────────────
 COOLIFY_URL="${COOLIFY_URL:-}"
-# Iter 22h (May 2026): derive FORGEJO_URL from FORGEJO_DOMAIN if not explicitly
-# set — same fallback chain as coolify-story-init.sh line 62-72. Operator's
-# config/domains.env (or .example fallback) provides FORGEJO_DOMAIN; cold-start
-# script sources that file before invoking us.
-# The canonical chain comes FIRST, before deriving from FORGEJO_DOMAIN.
+# GitHub (repo kódu + CI) je VOLITELNÝ: bez GITHUB_REPOSITORY / GITHUB_TOKEN se
+# Coolify nastaví celé a jen CI secrets (a GitHub API pro self-tooling n8n) se
+# přeskočí — s hláškou, co nastavit ručně, ne potichu.
 #
-# FORGEJO_DOMAIN is a DERIVED topology name — on a profile with an internal TLD
-# it resolves to repo.<internal_tld>, which is a zone the git host does not live
-# in and DNS does not answer for. The operator's real Forgejo URL was sitting in
-# .env.coolify all along (`FORGEJO_URL=https://repo.<real-host>`), but this
-# script never read that file, so an unset shell variable fell straight through
-# to the internal derivation and post-wipe deploy-init died on
-# "Nelze se připojit k Forgejo API" pointing at a host that cannot exist.
-#
-# Derivation stays as the last resort for installs that genuinely host Forgejo
-# inside their own zone.
+# Hodnoty se HLEDAJÍ v kanonickém řetězci (.env.coolify, .env-prod-backup, …),
+# ne jen v prostředí shellu: operátorská pověření v .env.coolify leží, a skript,
+# který je nečte, se pak ptá na něco, co má celou dobu na disku.
 # shellcheck source=scripts/lib/coolify-credentials.sh
-if [ -z "${FORGEJO_URL:-}" ] && [ -f "${ROOT:-$(dirname "$0")/..}/scripts/lib/coolify-credentials.sh" ]; then
+if [ -f "${ROOT:-$(dirname "$0")/..}/scripts/lib/coolify-credentials.sh" ]; then
   . "${ROOT:-$(dirname "$0")/..}/scripts/lib/coolify-credentials.sh"
-  FORGEJO_URL="$(config_env_key FORGEJO_URL 2>/dev/null || true)"
+  [ -n "${GITHUB_REPOSITORY:-}" ] || GITHUB_REPOSITORY="$(config_env_key GITHUB_REPOSITORY 2>/dev/null || true)"
+  [ -n "${GITHUB_API_URL:-}" ] || GITHUB_API_URL="$(config_env_key GITHUB_API_URL 2>/dev/null || true)"
 fi
-if [ -z "${FORGEJO_URL:-}" ] && [ -n "${FORGEJO_DOMAIN:-}" ]; then
-  FORGEJO_URL="https://${FORGEJO_DOMAIN}"
-fi
-FORGEJO_URL="${FORGEJO_URL:?FORGEJO_URL required (set FORGEJO_DOMAIN in config/domains.env or FORGEJO_URL in .env-prod-backup)}"
-# Canonicalize operator inputs at the boundary. Existing environments may use
-# FORGEJO_REPO=aisha/evymo-ai-orchestrator while newer ones split owner/repo.
-# Without normalization the API path becomes /repos/aisha/aisha/repo and CI
-# secrets are never updated. A trailing slash on FORGEJO_URL caused the same
-# duplication in user-facing clone links.
-normalize_forgejo_coordinates() {
-  FORGEJO_URL="${FORGEJO_URL%/}"
-  local repo_path=""
-  if [[ "${FORGEJO_REPO:-}" == */* ]]; then
-    repo_path="${FORGEJO_REPO#/}"
-  elif [ -z "${FORGEJO_REPO:-}" ] && [ -n "${FORGEJO_REPO_PATH:-}" ]; then
-    repo_path="${FORGEJO_REPO_PATH#/}"
+# Kanonizace na hranici: `owner/repo`, bez `.git` a okrajových lomítek. Tvar,
+# který owner/repo NENÍ, je chyba deklarace — repo se NEHÁDÁ (dosazené repo by
+# zapsalo CI secrets do cizího repozitáře). Prázdné = nenakonfigurováno.
+normalize_github_coordinates() {
+  GITHUB_API_URL="${GITHUB_API_URL:-}"
+  GITHUB_API_URL="${GITHUB_API_URL%/}"
+  local repo="${GITHUB_REPOSITORY:-}"
+  repo="${repo#/}"
+  repo="${repo%/}"
+  repo="${repo%.git}"
+  if [ -n "$repo" ] && [[ ! "$repo" =~ ^[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+$ ]]; then
+    err "GITHUB_REPOSITORY='${GITHUB_REPOSITORY}' nemá tvar owner/repo — oprav deklaraci (repo se nehádá)."
+    exit 1
   fi
-  if [ -n "$repo_path" ]; then
-    repo_path="${repo_path%.git}"
-    # An owner-qualified repository is a complete coordinate and therefore
-    # wins over a stale separately-exported owner.
-    FORGEJO_OWNER="${repo_path%%/*}"
-    FORGEJO_REPO="${repo_path##*/}"
-  fi
-  # ⛔ ŽÁDNÝ FALLBACK (2026-08-24). Nad tímhle řádkem se OWNER odvozuje z remote;
-  # když se to nepovede, nesmí se dosadit donor — ukazoval by na cizí repo.
-  FORGEJO_OWNER="${FORGEJO_OWNER:?FORGEJO_OWNER se nepodařilo odvodit z git remote — deklaruj ho}"
-  FORGEJO_REPO="${FORGEJO_REPO:-$(basename "${PWD}")}"
-  FORGEJO_REPO="${FORGEJO_REPO%.git}"
+  GITHUB_REPOSITORY="$repo"
 }
 
 # ── Stack definitions (bash 3 compatible — no associative arrays) ─────────────
@@ -865,7 +846,7 @@ fi
 
 # Run only after every configuration layer has been loaded; earlier
 # normalization would be overwritten by the second .env.coolify pass above.
-normalize_forgejo_coordinates
+normalize_github_coordinates
 
 load_topology_env() {
   local derive_script="$PROJECT_ROOT/scripts/lib/derive-domains.mjs"
@@ -1033,31 +1014,21 @@ if [ -z "$COOLIFY_API_TOKEN" ]; then
 fi
 ok "Coolify API token"
 
-# Pověření se HLEDÁ v kanonickém řetězci, teprve pak se na něj ptáme člověka.
-# Cold-start zapisuje token pod jménem `FORGEJO_TOKEN`, kdežto tenhle skript
-# chtěl `FORGEJO_API_TOKEN` — dvě jména pro tutéž věc znamenala, že skript
-# INTERAKTIVNĚ vyzval k zadání tokenu, který měl celou dobu na disku, a
-# neinteraktivní běh (`NON_INTERACTIVE=1`, cron, agent) na tom skončil.
-# Týž postup, jakým se pár řádků výš resolvuje FORGEJO_URL.
+# GitHub token se HLEDÁ v kanonickém řetězci; interaktivně se na něj NEPTÁME —
+# je volitelný a neinteraktivní běh (`NON_INTERACTIVE=1`, cron, agent) by na
+# výzvě skončil. Bez něj se CI secrets a GitHub API pro n8n přeskočí (nahlas).
 # shellcheck source=scripts/lib/coolify-credentials.sh
-if [ -z "${FORGEJO_API_TOKEN:-}" ] && [ -f "${PROJECT_ROOT}/scripts/lib/coolify-credentials.sh" ]; then
+if [ -z "${GITHUB_TOKEN:-}" ] && [ -f "${PROJECT_ROOT}/scripts/lib/coolify-credentials.sh" ]; then
   . "${PROJECT_ROOT}/scripts/lib/coolify-credentials.sh"
-  FORGEJO_API_TOKEN="$(config_env_key FORGEJO_API_TOKEN FORGEJO_TOKEN 2>/dev/null || true)"
+  GITHUB_TOKEN="$(config_env_key GITHUB_TOKEN 2>/dev/null || true)"
 fi
-
-if [ -z "${FORGEJO_API_TOKEN:-}" ]; then
-  echo ""
-  info "Forgejo API token: ${FORGEJO_URL} → Settings → Applications → Manage Access Tokens"
-  echo -n "  Forgejo API token: "
-  read -r FORGEJO_API_TOKEN
-  echo ""
+# shellcheck source=scripts/lib/github-ci-secret.sh
+. "${PROJECT_ROOT}/scripts/lib/github-ci-secret.sh"
+if github_ci_configured; then
+  ok "GitHub: ${GITHUB_REPOSITORY} (token ${#GITHUB_TOKEN} znaků)"
+else
+  warn "GitHub nenakonfigurován (GITHUB_REPOSITORY / GITHUB_TOKEN) — CI secrets a GitHub API pro self-tooling n8n se přeskočí"
 fi
-
-if [ -z "$FORGEJO_API_TOKEN" ]; then
-  err "FORGEJO_API_TOKEN není nastaven. Bez něj nelze pokračovat."
-  exit 1
-fi
-ok "Forgejo API token"
 
 # ── Helper funkce ─────────────────────────────────────────────────────────────
 
@@ -1131,24 +1102,18 @@ coolify_list_apps() {
   coolify_api GET "/applications" 2>/dev/null | tr -d '\000-\037'
 }
 
-forgejo_api() {
+# GitHub REST API (jen čtení — ověření přístupu k repu). Secrets zapisuje
+# lib/github-ci-secret.sh přes gh (šifrování hodnoty klíčem repa).
+# GITHUB_API_URL dodává kontrakt env-doktora (veřejné API; GHE ho přepíše) —
+# tady se nedosazuje, chybějící hodnota selže nahlas u kontroly níž.
+github_api() {
   local method="$1"
   local endpoint="$2"
-  local data="${3:-}"
-
-  local args=(
-    -s -S --max-time 30
-    -X "$method"
-    -H "Authorization: token $FORGEJO_API_TOKEN"
-    -H "Accept: application/json"
-    -H "Content-Type: application/json"
-  )
-
-  if [ -n "$data" ]; then
-    args+=(-d "$data")
-  fi
-
-  curl "${args[@]}" "${FORGEJO_URL}/api/v1${endpoint}"
+  curl -s -S --max-time 30 -X "$method" \
+    -H "Authorization: Bearer $GITHUB_TOKEN" \
+    -H "Accept: application/vnd.github+json" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    "${GITHUB_API_URL}${endpoint}"
 }
 
 # ------------------------------------------------------------------------------
@@ -1646,15 +1611,23 @@ else
   ok "Coolify API (${COOLIFY_URL})"
 fi
 
-# Test Forgejo API
-FORGEJO_CHECK=$(forgejo_api GET "/user" 2>/dev/null || echo '{"error": true}')
-FORGEJO_USER=$(echo "$FORGEJO_CHECK" | jq -r '.login // empty' 2>/dev/null || true)
-if [ -n "$FORGEJO_USER" ]; then
-  ok "Forgejo API (${FORGEJO_URL}) — přihlášen jako ${FORGEJO_USER}"
-else
-  err "Nelze se připojit k Forgejo API na ${FORGEJO_URL}"
-  err "Zkontroluj URL a API token."
-  exit 1
+# Test GitHub API — jen když je GitHub deklarovaný. Deklarovaný a nedostupný
+# (špatný token, repo, GHE adresa) je chyba konfigurace → fail, ne tiché přeskočení.
+if github_ci_configured; then
+  if [ -z "${GITHUB_API_URL}" ]; then
+    err "GITHUB_API_URL není nastavené — dodává ho kontrakt env-doktora (veřejné API api.github.com,"
+    err "  GitHub Enterprise https://<host>/api/v3). Spusť env-doktora nebo ho deklaruj v .env-prod-backup."
+    exit 1
+  fi
+  GITHUB_CHECK=$(github_api GET "/repos/${GITHUB_REPOSITORY}" 2>/dev/null || echo '{}')
+  GITHUB_REPO_SEEN=$(echo "$GITHUB_CHECK" | jq -r '.full_name // empty' 2>/dev/null || true)
+  if [ -n "$GITHUB_REPO_SEEN" ]; then
+    ok "GitHub API (${GITHUB_API_URL}) — repo ${GITHUB_REPO_SEEN} dostupné"
+  else
+    err "GitHub API nevidí repo ${GITHUB_REPOSITORY} (${GITHUB_API_URL})"
+    err "Zkontroluj GITHUB_REPOSITORY, GITHUB_TOKEN (práva na repo) a GITHUB_API_URL."
+    exit 1
+  fi
 fi
 
 # Domény se v tomhle skriptu nastavují až dole, ale čekat se má TADY: fronta
@@ -1748,7 +1721,7 @@ for stack in $SELECTED_STACKS; do
       echo ""
       info "Vytvoř v Coolify UI:"
       info "  1. ${COOLIFY_URL} → New Resource → Docker Compose"
-      info "  2. Repository: ${FORGEJO_URL}/${FORGEJO_OWNER}/${FORGEJO_REPO}.git"
+      info "  2. Repository: git repo se stackem (GIT_BASE_URL/<owner>/<repo>.git)"
       info "  3. Branch: main"
       info "  4. Compose: $(stack_compose "$stack")"
       echo ""
@@ -1888,8 +1861,8 @@ for stack in $SELECTED_STACKS; do
       set_coolify_env_if "$local_uuid" "AISHA_IMPLEMENTATION_HOOK" "${AISHA_IMPLEMENTATION_HOOK:-scripts/deploy/instance-data-hook.sh}"
       set_coolify_env_if "$local_uuid" "AISHA_TENANT_HOOK"         "${AISHA_TENANT_HOOK:-}"
       # Private instance overlay clone URL (migrate hook). Loaded from
-      # .env.coolify above (cold-start derives it from FORGEJO creds via
-      # generate-secrets.mjs). _if: empty = community install → key stays
+      # .env.coolify above (operator-declared, generate-secrets.mjs adds GIT_TOKEN
+      # to a token-free URL). _if: empty = community install → key stays
       # absent/empty in Coolify → compose default `${VAR:-}` → hook no-op.
       set_coolify_env_if "$local_uuid" "AISHA_INSTANCE_DATA_GIT_URL" "${AISHA_INSTANCE_DATA_GIT_URL:-}"
 
@@ -2434,22 +2407,21 @@ for stack in $SELECTED_STACKS; do
 
       # ── Self-tooling loop (WF_AISHA_TOOLING_*) — push the workflow-expected env
       #    names, each DERIVED from a canonical cold-start var (no hardcoding). The
-      #    n8n/worker compose passes them through as ${VAR:-}. Anthropic + Forgejo
+      #    n8n/worker compose passes them through as ${VAR:-}. Anthropic + GitHub
       #    are soft (operator BYOK): if absent the self-tooling workflows stay idle,
       #    the rest of n8n is unaffected. ──
       set_coolify_env    "$local_uuid" "AISHA_POSTGREST_URL"           "${AISHA_API_URL}"
       # PostgREST service key: the committer reuses the already-wired AISHA_SERVICE_KEY
-      # (no separate plaintext secret). ANTHROPIC_API_KEY + FORGEJO_API_TOKEN below are
+      # (no separate plaintext secret). ANTHROPIC_API_KEY + GITHUB_TOKEN below are
       # bootstrap-only — read once by the transient n8n-workflow-init to mint encrypted
       # n8n credentials; the long-running n8n/n8n-worker never receive them.
       set_coolify_env_if "$local_uuid" "N8N_WEBHOOK_URL"               "${N8N_WEBHOOK_URL:-}"
       set_coolify_env_if "$local_uuid" "ANTHROPIC_API_KEY"             "${ANTHROPIC_API_KEY:-}"
       set_coolify_env_if "$local_uuid" "ANTHROPIC_API_URL"             "${ANTHROPIC_API_URL:-}"
-      set_coolify_env_if "$local_uuid" "FORGEJO_API_URL"               "${FORGEJO_API_URL:-${FORGEJO_URL:-}}"
-      set_coolify_env_if "$local_uuid" "FORGEJO_OWNER"                 "${FORGEJO_OWNER:-}"
-      set_coolify_env_if "$local_uuid" "FORGEJO_REPO"                  "${FORGEJO_REPO:-}"
-      set_coolify_env_if "$local_uuid" "FORGEJO_API_TOKEN"             "${FORGEJO_API_TOKEN:-}"
-      set_coolify_env_if "$local_uuid" "FORGEJO_DEFAULT_ASSIGNEE"      "${FORGEJO_DEFAULT_ASSIGNEE:-admin}"
+      set_coolify_env_if "$local_uuid" "GITHUB_API_URL"                "${GITHUB_API_URL:-}"
+      set_coolify_env_if "$local_uuid" "GITHUB_REPOSITORY"             "${GITHUB_REPOSITORY:-}"
+      set_coolify_env_if "$local_uuid" "GITHUB_TOKEN"                  "${GITHUB_TOKEN:-}"
+      set_coolify_env_if "$local_uuid" "GITHUB_DEFAULT_ASSIGNEE"       "${GITHUB_DEFAULT_ASSIGNEE:-}"
       set_coolify_env "$local_uuid" "RABBITMQ_USER"                    "${RABBITMQ_USER}"
       set_coolify_env "$local_uuid" "RABBITMQ_PASS"                    "${RABBITMQ_PASS}"
       set_coolify_env "$local_uuid" "RABBITMQ_HOST"                    "${RABBITMQ_HOST}"
@@ -2954,7 +2926,7 @@ if [ "$SET_BUILD_SERVER" = "1" ]; then
 fi
 
 # ══════════════════════════════════════════════════════════════════════════════
-# WEBHOOK SETUP (pouze pro Web stack — CI/CD z Forgejo)
+# WEBHOOK SETUP (pouze pro Web stack — CI na GitHubu volá Coolify webhook)
 # ══════════════════════════════════════════════════════════════════════════════
 
 WEBHOOK_URL=""
@@ -2986,59 +2958,33 @@ if [ -n "$UUID_WEB" ]; then
     warn "Coolify Web app vrátila HTTP ${HTTP_CODE} — zkontroluj UUID"
   fi
 
-  # Set Forgejo secret
-  if [ -n "$WEBHOOK_URL" ]; then
-    step "Forgejo secret — COOLIFY_WEBHOOK_URL"
-
+  # CI secrets na GitHubu (COOLIFY_WEBHOOK_URL + COOLIFY_TOKEN pro webhook).
+  # Nastavení dělá lib/github-ci-secret.sh (gh, hodnota přes STDIN, nikdy do logu).
+  for _ci_secret in COOLIFY_WEBHOOK_URL COOLIFY_TOKEN; do
+    case "$_ci_secret" in
+      COOLIFY_WEBHOOK_URL) _ci_value="$WEBHOOK_URL" ;;
+      COOLIFY_TOKEN)       _ci_value="$COOLIFY_API_TOKEN" ;;
+    esac
+    [ -n "$_ci_value" ] || continue
+    step "CI secret (GitHub) — ${_ci_secret}"
     if [ "$DRY_RUN" = "1" ]; then
-      info "[DRY RUN] would set Forgejo secret COOLIFY_WEBHOOK_URL (value redacted)"
-    else
-      info "Nastavuji secret v Forgejo repo: ${FORGEJO_OWNER}/${FORGEJO_REPO}"
-
-      SECRET_PAYLOAD=$(jq -n --arg data "$WEBHOOK_URL" '{ data: $data }')
-
-      SECRET_RESULT=$(forgejo_api PUT \
-        "/repos/${FORGEJO_OWNER}/${FORGEJO_REPO}/actions/secrets/COOLIFY_WEBHOOK_URL" \
-        "$SECRET_PAYLOAD" 2>/dev/null || echo '{"error": true}')
-
-      MSG=$(echo "$SECRET_RESULT" | jq -r '.message // empty' 2>/dev/null || true)
-      if [ -z "$MSG" ] || [ "$MSG" = "null" ]; then
-        ok "COOLIFY_WEBHOOK_URL secret nastaven v Forgejo"
-      else
-        err "Chyba při nastavení Forgejo secret: ${MSG}"
-        info "Nastav manuálně: ${FORGEJO_URL}/${FORGEJO_OWNER}/${FORGEJO_REPO}/settings/actions/secrets"
-      fi
+      info "[DRY RUN] would set GitHub CI secret ${_ci_secret} (value redacted)"
+      continue
     fi
-  fi
-
-  # Set Forgejo COOLIFY_TOKEN secret (auth for Coolify webhook)
-  if [ -n "$COOLIFY_API_TOKEN" ]; then
-    step "Forgejo secret — COOLIFY_TOKEN"
-
-    if [ "$DRY_RUN" = "1" ]; then
-      info "[DRY RUN] would set Forgejo secret COOLIFY_TOKEN (value redacted)"
-    else
-      info "Nastavuji COOLIFY_TOKEN secret v Forgejo repo: ${FORGEJO_OWNER}/${FORGEJO_REPO}"
-
-      TOKEN_PAYLOAD=$(jq -n --arg data "$COOLIFY_API_TOKEN" '{ data: $data }')
-
-      TOKEN_RESULT=$(forgejo_api PUT \
-        "/repos/${FORGEJO_OWNER}/${FORGEJO_REPO}/actions/secrets/COOLIFY_TOKEN" \
-        "$TOKEN_PAYLOAD" 2>/dev/null || echo '{"error": true}')
-
-      TOKEN_MSG=$(echo "$TOKEN_RESULT" | jq -r '.message // empty' 2>/dev/null || true)
-      if [ -z "$TOKEN_MSG" ] || [ "$TOKEN_MSG" = "null" ]; then
-        ok "COOLIFY_TOKEN secret nastaven v Forgejo"
-      else
-        err "Chyba při nastavení COOLIFY_TOKEN Forgejo secret: ${TOKEN_MSG}"
-        info "Nastav manuálně: ${FORGEJO_URL}/${FORGEJO_OWNER}/${FORGEJO_REPO}/settings/actions/secrets"
-      fi
-    fi
-  fi
+    _gh_rc=0
+    github_ci_secret_set "$_ci_secret" "$_ci_value" || _gh_rc=$?
+    case "$_gh_rc" in
+      0) ok "${_ci_secret} secret nastaven v ${GITHUB_REPOSITORY}" ;;
+      2) warn "${_ci_secret}: GitHub nenakonfigurován — nastav ho ručně v repu (Settings → Secrets and variables → Actions)" ;;
+      *) err "${_ci_secret}: $(github_ci_secret_reason "$_gh_rc")"
+         info "Nastav manuálně v ${GITHUB_REPOSITORY}: Settings → Secrets and variables → Actions" ;;
+    esac
+  done
+  unset _ci_secret _ci_value _gh_rc
 else
   if echo "$SELECTED_STACKS" | grep -qw "web"; then
     warn "Webhook URL není znám — web stack nemá UUID"
-    info "Nastav COOLIFY_WEBHOOK_URL manuálně: ${FORGEJO_URL}/${FORGEJO_OWNER}/${FORGEJO_REPO}/settings/actions/secrets"
+    info "Nastav CI secret COOLIFY_WEBHOOK_URL manuálně v repu na GitHubu: Settings → Secrets and variables → Actions"
   fi
 fi
 
@@ -3052,7 +2998,7 @@ echo "┌───────────────────────�
 echo "│               EVYMO Multi-Stack Deploy Init — Výsledek             │"
 echo "├─────────────────────────────────────────────────────────────────────┤"
 printf "│  Coolify:  %-56s │\n" "${COOLIFY_URL}"
-printf "│  Forgejo:  %-56s │\n" "${FORGEJO_URL}/${FORGEJO_OWNER}/${FORGEJO_REPO}"
+printf "│  GitHub:   %-56s │\n" "${GITHUB_REPOSITORY}"
 echo "├─────────────────────────────────────────────────────────────────────┤"
 
 for stack in $ALL_STACKS; do
@@ -3093,7 +3039,7 @@ for stack in $SELECTED_STACKS; do
 done
 
 if [ -n "$UUID_WEB" ]; then
-  echo "  → Push na main → Forgejo CI → Coolify auto-deploy (Web)"
+  echo "  → Push na main → GitHub CI → Coolify auto-deploy (Web)"
 fi
 if [ -n "$UUID_CORE" ]; then
   echo "  → Coolify UI: Deploy/Redeploy Core stack"

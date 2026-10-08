@@ -184,14 +184,14 @@ function genHex(bytes = 32) {
   return randomBytes(bytes).toString("hex");
 }
 
-// Canonical chain, not process.env alone: the operator's real Forgejo URL lives
+// Canonical chain, not process.env alone: the operator's real git host URL lives
 // in .env.coolify, and reading only the shell meant the heal pass wrote an EMPTY
 // value OVER the good one — after which deploy-init fell through to deriving
 // repo.<internal_tld>, a host that does not exist.
 // Order: shell -> canonical chain -> the git remote we actually push to.
 // The remote is the most honest source: it is the host this checkout provably
 // talks to. Needed as a real fallback, not decoration — a heal pass can rewrite
-// .env.coolify with an EMPTY FORGEJO_URL, and once that happens the chain has
+// .env.coolify with an EMPTY GIT_BASE_URL, and once that happens the chain has
 // nothing left to offer while the correct host is sitting in `git remote`.
 // Remotes to interrogate, discovered rather than named. An earlier version hard-coded
 // one adoption's remote name ahead of `origin`, which only works in that fork's
@@ -225,22 +225,11 @@ const remoteUrl = (remote) => {
   }
 };
 
-const FORGEJO_URL_DEFAULT = (() => {
-  const direct = process.env.FORGEJO_URL || readConfigKey("FORGEJO_URL");
+const GIT_BASE_URL_DEFAULT = (() => {
+  const direct = process.env.GIT_BASE_URL || readConfigKey("GIT_BASE_URL");
   if (direct) return direct;
   for (const remote of GIT_REMOTES) {
     const m = remoteUrl(remote).match(/^(https?:\/\/[^/]+)/);
-    if (m) return m[1];
-  }
-  return "";
-})();
-// <owner>/<repo> of the remote this checkout actually pushes to.
-const FORGEJO_REPO_DEFAULT = (() => {
-  if (process.env.FORGEJO_REPO) return process.env.FORGEJO_REPO;
-  const fromFile = readConfigKey("FORGEJO_REPO");
-  if (fromFile) return fromFile;
-  for (const remote of GIT_REMOTES) {
-    const m = remoteUrl(remote).match(/[:/]([^/]+\/[^/]+?)(?:\.git)?$/);
     if (m) return m[1];
   }
   return "";
@@ -757,7 +746,7 @@ const CONTRACT = [
   ["AISHA_MIGRATE_DEBUG_HOLD", "static", "false"],
   // Private instance overlay clone URL (migrate hook + KC instance clients).
   // Cold-start derives it (generate-secrets.mjs: vault > process env > existing
-  // > FORGEJO_API_TOKEN+FORGEJO_URL > empty); the doctor cannot derive it but
+  // > empty; GIT_TOKEN tokenizes a token-free URL); the doctor cannot derive it but
   // keeps the key PRESENT so the per-app sync intersection (.env.coolify ∩
   // compose ${VAR} refs) still carries it to aisha-core. Empty = community
   // install → instance-data-hook.sh no-ops (valid, not an error).
@@ -774,9 +763,9 @@ const CONTRACT = [
   ["SOURCE_ADAPTER_OVERLAY_REF", "derived", deklarovanyOverlayRepo()?.ref ?? ""],
 
   // ── svc-web-artifact — branded design overlay (private aisha-guru-web) ─────
-  // CLEAN url (no token; the svc-web-artifact build adds FORGEJO_TOKEN at clone,
-  // #425). generate-secrets derives it from FORGEJO_URL; .env-prod-backup
-  // override wins; empty = OSS install → committed placeholder + domains/default.
+  // CLEAN url (no token; the svc-web-artifact build adds GIT_TOKEN at clone via
+  // the BuildKit secret git_token). Operator-declared in .env-prod-backup (never
+  // derived); empty = OSS install → committed placeholder + domains/default.
   // On aisha-core all envs normalize to build-time, so it reaches the build ARG
   // that drives the overlay into domains/templates/<AISHA_SEED_DOMAIN>/.
   ["AISHA_WEB_DESIGN_GIT_URL", "placeholder"],
@@ -1067,6 +1056,10 @@ const CONTRACT = [
   // (deklarace `zdroj`, 2026-09-24). Vydává ho správce registru, ne generátor —
   // `external`. Prázdný = doplnění ze zdroje, který token chce, selže nahlas.
   ["ZARIZENI_ZDROJ_TOKEN", "external"],
+  // Původ registru, na který se ZARIZENI_ZDROJ_TOKEN přikládá (storage-auth
+  // lib/registr-zdroj.ts). Deklaruje ho operátor spolu s tokenem — `external`;
+  // prázdný = doplnění ze zdroje selže nahlas („původ registru není nastavený“).
+  ["ZARIZENI_ZDROJ_PUVOD", "external"],
   // Roster operátorů je PII a vydává ho správa uživatelů, ne generátor tajemství.
   // `external` = doctor ho očekává, ale nevymýšlí; prázdný znamená, že dveře
   // nenastartují a řeknou, co chybí.
@@ -1584,13 +1577,20 @@ const CONTRACT = [
   ["TELEGRAM_API_ID", "external"],
   ["TELEGRAM_API_HASH", "external"],
   ["TELEGRAM_BOT_TOKEN", "external"],
-  ["FORGEJO_URL", "static", FORGEJO_URL_DEFAULT],
-  // DERIVED from this checkout's own remote, never a literal. A hardcoded donor
-  // path is indistinguishable from correct on the donor and silently wrong on
-  // every fork: Coolify clones whatever this says, so a fork would have deployed
-  // the DONOR's source. Same blind spot as a hardcoded `aisha-` app prefix.
-  ["FORGEJO_REPO", "static", FORGEJO_REPO_DEFAULT],
-  ["FORGEJO_TOKEN", "external"],
+  // Git host Coolify clones the stack from (story-init, doctor phase G). DERIVED
+  // from this checkout's own remote host when not declared, never a literal.
+  ["GIT_BASE_URL", "static", GIT_BASE_URL_DEFAULT],
+  // Token for cloning PRIVATE git repos (overlays via BuildKit secret git_token).
+  ["GIT_TOKEN", "external"],
+  // GitHub REST API — gateway dev-patch, n8n self-tooling, deploy-init CI secrets.
+  // The public API is the default; GitHub Enterprise overrides it in .env-prod-backup.
+  ["GITHUB_API_URL", "static", "https://api.github.com"],
+  // ⛔ GITHUB_REPOSITORY is an operator DECLARATION, never derived from the git
+  // remote: a fresh clone of the public repository would derive the PLATFORM
+  // OWNER's repo and every PR/commit/CI secret would land there. Empty = the
+  // GitHub features report "not configured".
+  ["GITHUB_REPOSITORY", "external"],
+  ["GITHUB_TOKEN", "external"],
   ["COOLIFY_URL", "required-static", COOLIFY_URL_VALUE],
   ["COOLIFY_BASE_URL", "alias", "COOLIFY_URL"],
   ["COOLIFY_API_KEY", "external"],

@@ -115,7 +115,7 @@ Realm konfigurace: `keycloak/aisha-realm.json` (auto-import při prvním startu 
 ### Web app (doporučený setup)
 
 1. Vytvořit nový projekt → **Docker Compose**
-2. Source: `git.id3a.cz` (Forgejo)
+2. Source: git repo (`GIT_BASE_URL/<owner>/<repo>.git`)
 3. Docker Compose file: `docker-compose.coolify-prebuilt.yml`
 4. Set environment variables (viz níže)
 5. Nastavit webhook pro auto-deploy
@@ -123,7 +123,7 @@ Realm konfigurace: `keycloak/aisha-realm.json` (auto-import při prvním startu 
 ### Supabase stack (separátní projekt)
 
 1. Vytvořit nový projekt → **Docker Compose**
-2. Source: `git.id3a.cz` (Forgejo) nebo ruční paste
+2. Source: git repo (`GIT_BASE_URL/<owner>/<repo>.git`) nebo ruční paste
 3. Docker Compose file: `docker-compose.coolify.yml`
 4. Set ALL environment variables (175+ vars)
 5. Deploy manuálně
@@ -162,7 +162,8 @@ Fixes (in order):
 CI/CD pipeline běží na GitHub Actions (hostované runnery). Nasazení je opt-in: deploy
 úlohy běží jen v repu s proměnnou `APP_NAME_PREFIX` a nasazují přes Coolify API.
 
-Nastavit v repu → Settings → Secrets and variables → Actions:
+Nastavit v repu → Settings → Secrets and variables → Actions (nebo `npm run deploy:init` s
+`GITHUB_REPOSITORY` + `GITHUB_TOKEN`):
 
 - `APP_NAME_PREFIX` (variable), `COOLIFY_URL` a `COOLIFY_API_TOKEN` (secrets)
 

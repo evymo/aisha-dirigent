@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { AishaPostgrestApi } from '../credentials/AishaPostgrestApi.credentials';
 import { AishaMcpApi } from '../credentials/AishaMcpApi.credentials';
+import { AishaGitHubApi } from '../credentials/AishaGitHubApi.credentials';
 
 describe('Credentials', () => {
 	// Renamed from the legacy aishaSupabaseApi after the Supabase→PostgREST
@@ -46,6 +47,29 @@ describe('Credentials', () => {
 			const cred = new AishaMcpApi();
 			const scopeField = cred.properties.find((p) => p.name === 'scope');
 			expect(scopeField?.type).toBe('options');
+		});
+	});
+
+	describe('AishaGitHubApi', () => {
+		it('should have correct credential name', () => {
+			const cred = new AishaGitHubApi();
+			expect(cred.name).toBe('aishaGitHubApi');
+			expect(cred.displayName).toBe('AISHA GitHub API');
+		});
+
+		it('should have apiUrl (public API default) and a password apiToken', () => {
+			const cred = new AishaGitHubApi();
+			const apiUrl = cred.properties.find((p) => p.name === 'apiUrl');
+			const apiToken = cred.properties.find((p) => p.name === 'apiToken');
+			expect(apiUrl?.default).toBe('https://api.github.com');
+			expect(apiUrl?.required).toBe(true);
+			expect(apiToken?.typeOptions?.password).toBe(true);
+			expect(apiToken?.required).toBe(true);
+		});
+
+		it('does not carry a repository (no default repo — workflows pass owner/repo)', () => {
+			const cred = new AishaGitHubApi();
+			expect(cred.properties.map((p) => p.name)).toEqual(['apiUrl', 'apiToken']);
 		});
 	});
 });

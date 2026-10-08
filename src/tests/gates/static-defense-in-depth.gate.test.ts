@@ -149,7 +149,7 @@ const LAYERS: DefenseLayer[] = [
   },
   {
     id: 'static-defense-committer-flow',
-    description: 'Aisha-autonomous commit-back loop: DB publish → n8n webhook → Forgejo branch + YAML regen + auto-PR',
+    description: 'Aisha-autonomous commit-back loop: DB publish → n8n webhook → GitHub branch + YAML regen + auto-PR',
     phase: 10,
     gateFile: 'src/tests/gates/static-defense-committer-flow.gate.test.ts',
     artifacts: [

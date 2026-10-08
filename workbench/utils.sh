@@ -10,9 +10,10 @@ export ASSETS_REPOSITORY="aisha/aisha-workbench"
 export GH_REPO_PATH="aisha/aisha-workbench"
 export QUALITY="stable"
 
-# Forgejo-based registry (not GitHub). Set FORGEJO_BASE_URL in env before calling.
-export FORGEJO_BASE_URL="${FORGEJO_BASE_URL:?FORGEJO_BASE_URL must be set (e.g. https://repo.example.com)}"
-export RELEASE_REPO="${FORGEJO_BASE_URL}/aisha/aisha-workbench"
+# Release repository (issues, wiki, checksums, release downloads) — the FULL URL
+# of the workbench release repo on your git host. product.json gets it through
+# envsubst. No default: the address is a property of the installation, not code.
+export RELEASE_REPO="${RELEASE_REPO:?RELEASE_REPO must be set (full URL of the workbench release repo, e.g. https://github.com/<org>/aisha-workbench)}"
 
 # Upstream VSCodium ref to build from
 # Update this when adopting a new VS Code version

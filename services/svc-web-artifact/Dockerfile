@@ -18,19 +18,19 @@ COPY . .
 
 # ── Branded design overlay (build-time, OSS-boundary-safe) ───────────────────
 # When the operator supplies a private design repo (Coolify build-time envs
-# AISHA_WEB_DESIGN_GIT_URL + AISHA_SEED_DOMAIN + FORGEJO_TOKEN), clone it into
+# AISHA_WEB_DESIGN_GIT_URL + AISHA_SEED_DOMAIN + GIT_TOKEN), clone it into
 # domains/templates/<AISHA_SEED_DOMAIN>/ so the runtime /seed-default ingests it
 # into web_pages. Public/OSS builds leave these unset → the committed placeholder
 # stays and domains/default/ is the homepage.
 #
-# FORGEJO_TOKEN arrives as a BuildKit secret, NOT as a build ARG.
+# GIT_TOKEN arrives as a BuildKit secret, NOT as a build ARG.
 #
 # This comment used to claim the token was safe because it is consumed only in
 # THIS build stage and the runtime stage never declares the ARG. Under a plain
 # `docker build` that reasoning holds. Under Coolify it does NOT:
 # `modify_dockerfiles_for_compose()` injects `ARG <KEY>` after EVERY `FROM`,
 # including the runtime one, which re-introduces the declaration and lets the
-# value be recorded. Measured 2026-08-15 on this very image — FORGEJO_TOKEN was
+# value be recorded. Measured 2026-08-15 on this very image — GIT_TOKEN was
 # present in `docker history` of the FINAL image, exactly where the old comment
 # said it could not be. A defence built on the shape of the Dockerfile does not
 # survive something that rewrites that shape at deploy time.
@@ -74,11 +74,11 @@ ARG AISHA_WEB_DESIGN_CACHEBUST=
 # set): a misconfig (missing SEED_DOMAIN/TOKEN) or a clone failure must abort the
 # build, NOT silently ship the placeholder (2026-06-30: the design never
 # propagated and the silent WARN hid it). URL empty = community install → skip.
-RUN --mount=type=secret,id=forgejo_token,required=false \
-    FORGEJO_TOKEN="$(cat /run/secrets/forgejo_token 2>/dev/null || true)"; \
+RUN --mount=type=secret,id=git_token,required=false \
+    GIT_TOKEN="$(cat /run/secrets/git_token 2>/dev/null || true)"; \
     if [ -n "$AISHA_WEB_DESIGN_GIT_URL" ]; then \
-      if [ -z "$AISHA_SEED_DOMAIN" ] || [ -z "$FORGEJO_TOKEN" ]; then \
-        echo "[design-overlay] FATAL: AISHA_WEB_DESIGN_GIT_URL set but AISHA_SEED_DOMAIN/FORGEJO_TOKEN empty — cannot ingest the branded design" >&2; exit 1; \
+      if [ -z "$AISHA_SEED_DOMAIN" ] || [ -z "$GIT_TOKEN" ]; then \
+        echo "[design-overlay] FATAL: AISHA_WEB_DESIGN_GIT_URL set but AISHA_SEED_DOMAIN/GIT_TOKEN empty — cannot ingest the branded design" >&2; exit 1; \
       fi; \
       if [ -z "$AISHA_WEB_DESIGN_CACHEBUST" ]; then \
         echo "[design-overlay] FATAL: AISHA_WEB_DESIGN_GIT_URL set but AISHA_WEB_DESIGN_CACHEBUST empty — BuildKit would reuse the cached clone and ship the design from the FIRST build, silently. Pass the design repo commit SHA or a timestamp." >&2; exit 1; \
@@ -88,18 +88,18 @@ RUN --mount=type=secret,id=forgejo_token,required=false \
       # a znovu 2026-09-21 na povrchu, kde týž tvar vyrobil token ve čtyřech
       # obrazech. Obrana postavená na tvaru Dockerfilu neobstojí: Coolify vkládá
       # `ARG <KEY>` za KAŽDÝ `FROM`, takže i běhový stage hodnotu znovu deklaruje.
-      # Token patří výhradně do BuildKit secretu forgejo_token, který se níž
+      # Token patří výhradně do BuildKit secretu git_token, který se níž
       # vkládá do adresy klonu. Sesterské stráže: deploy/surface-host/Dockerfile,
       # Dockerfile.svc-source-broker, Dockerfile.keycloak.
       AUTORITA="${AISHA_WEB_DESIGN_GIT_URL#https://}"; AUTORITA="${AUTORITA%%/*}"; \
       case "$AUTORITA" in *@*) \
         echo "[design-overlay] FATAL: AISHA_WEB_DESIGN_GIT_URL nese pověření v URL (URL se nevypisuje)." >&2; \
-        echo "                 Build arg se zapisuje do docker history — token patří do BuildKit secretu forgejo_token." >&2; \
+        echo "                 Build arg se zapisuje do docker history — token patří do BuildKit secretu git_token." >&2; \
         exit 1 ;; \
       esac; \
       apk add --no-cache git >/dev/null 2>&1 || true; \
       DEST="domains/templates/${AISHA_SEED_DOMAIN}"; TMP=/tmp/_design; \
-      if git clone --depth 1 "https://${FORGEJO_TOKEN}@${AISHA_WEB_DESIGN_GIT_URL#https://}" "$TMP"; then \
+      if git clone --depth 1 "https://${GIT_TOKEN}@${AISHA_WEB_DESIGN_GIT_URL#https://}" "$TMP"; then \
         rm -rf "$TMP/.git"; \
         if [ -n "$AISHA_WEB_DESIGN_SUBDIR" ]; then \
           if [ ! -d "$TMP/$AISHA_WEB_DESIGN_SUBDIR" ]; then \

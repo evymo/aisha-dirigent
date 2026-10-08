@@ -7,16 +7,17 @@
 #
 #   1. Generate fresh stack-internal secrets → .env.coolify
 #      (preserves 3rd-party keys from .env-prod-backup: OPENAI, ANTHROPIC,
-#       GOOGLE, SENTRY, STRIPE, GITHUB_TOKEN, FORGEJO_API_TOKEN, etc.)
+#       GOOGLE, SENTRY, STRIPE, GITHUB_TOKEN, GIT_TOKEN, etc.)
 #   2. Create 11 Coolify applications via story-init (POST /applications/public)
-#   3. Set env vars + Forgejo webhook via deploy-init
+#   3. Set env vars (+ optional GitHub CI secrets for the deploy webhook) via deploy-init
 #   4. Trigger first deploy on each app (POST /restart)
 #   5. Verify all apps healthy
 #
 # Prerequisites:
 #   - jq, curl, openssl, python3
 #   - age (REQUIRED for --wipe: the off-machine encrypted vault backup)
-#   - .env-prod-backup with COOLIFY_API_TOKEN, FORGEJO_API_TOKEN
+#   - .env-prod-backup with COOLIFY_API_TOKEN (GIT_TOKEN when any declared git
+#     repo — code or overlay — is private)
 #   - All AISHA Coolify apps DELETED (verify with `coolify-status` script)
 #
 # Usage:
@@ -843,14 +844,19 @@ COOLIFY_API_TOKEN="$(config_env_key COOLIFY_API_TOKEN COOLIFY_API_KEY)"
 COOLIFY_URL="$(config_env_key COOLIFY_URL COOLIFY_BASE_URL)"
 # Both spellings of each credential are populated from the SAME resolution.
 # The toolchain carries two names for one value (COOLIFY_API_TOKEN /
-# COOLIFY_API_KEY, FORGEJO_API_TOKEN / FORGEJO_TOKEN) and later steps read
+# COOLIFY_API_KEY) and later steps read
 # whichever they were written against — step 2 checks COOLIFY_API_KEY, this
 # block used to set only *_TOKEN, and the run died 1000 lines later with
 # "COOLIFY_API_KEY prázdný" while the token was resolved and present.
 # Filling both here means no consumer has to know which spelling it got.
 export COOLIFY_API_TOKEN COOLIFY_API_KEY="$COOLIFY_API_TOKEN"
-FORGEJO_TOKEN="$(config_env_key FORGEJO_TOKEN FORGEJO_API_TOKEN)"
-export FORGEJO_TOKEN FORGEJO_API_TOKEN="$FORGEJO_TOKEN"
+# GIT_TOKEN = token pro klon SOUKROMÝCH git repozitářů (kód v Coolify, instanční
+# overlaye; do buildů jde BuildKit secretem git_token). GITHUB_TOKEN = GitHub REST
+# API (self-tooling PR, dev-patch, CI secrets v deploy-init). Dvě role, dvě jména —
+# operátor smí oběma dát tentýž token.
+GIT_TOKEN="$(config_env_key GIT_TOKEN)"
+GITHUB_TOKEN="$(config_env_key GITHUB_TOKEN)"
+export GIT_TOKEN GITHUB_TOKEN
 
 # VERDACCIO_TOKEN is needed BOTH as build-arg for 13 services that pull
 # @aisha/security from npm.${INTERNAL_TLD} AND as a literal heredoc expansion in
@@ -877,9 +883,9 @@ case "$COOLIFY_URL" in
   *) err "COOLIFY_URL must be an absolute http(s) URL, got: $COOLIFY_URL"; exit 1 ;;
 esac
 
-ok "Loaded tokens (COOLIFY: ${#COOLIFY_API_TOKEN}ch, FORGEJO: ${#FORGEJO_API_TOKEN}ch)"
+ok "Loaded tokens (COOLIFY: ${#COOLIFY_API_TOKEN}ch, GIT: ${#GIT_TOKEN}ch, GITHUB: ${#GITHUB_TOKEN}ch)"
 
-export COOLIFY_API_TOKEN FORGEJO_API_TOKEN COOLIFY_URL
+export COOLIFY_API_TOKEN COOLIFY_URL
 export COOLIFY_BASE_URL="${COOLIFY_BASE_URL:-$COOLIFY_URL}"
 
 for required_target_key in \
@@ -1589,7 +1595,7 @@ step "0. PREFLIGHT DOCTOR (cold-start-doctor.sh)"
 # ─────────────────────────────────────────────────────────────────────────────
 # Read-only check všech preflight gates (env vars, files, manifest, API conn.).
 # Bez něj cold-start může selhat až ve step 5 s nejasnou chybou. Doctor odhalí
-# missing FORGEJO_TOKEN / COOLIFY_API_KEY / config drift v 5 sekundách.
+# missing GIT_TOKEN / COOLIFY_API_KEY / config drift v 5 sekundách.
 #
 # --skip-doctor je dovoleno pro emergency runs, ale ne doporučeno.
 
@@ -2247,7 +2253,7 @@ backup_env_value() {
 # Keep the vault as a FALLBACK (an operator may legitimately pin them there),
 # but never let an empty read clobber an already-resolved credential.
 COOLIFY_API_KEY="${COOLIFY_API_KEY:-$(backup_env_value COOLIFY_API_TOKEN)}"
-FORGEJO_TOKEN="${FORGEJO_TOKEN:-$(backup_env_value FORGEJO_API_TOKEN)}"
+GIT_TOKEN="${GIT_TOKEN:-$(backup_env_value GIT_TOKEN)}"
 
 # Generátor BIP39 mnemonic (24 words, 256-bit entropy) — Cosmos validator identity.
 # Používá node + bip39 npm balek (instalace on-demand do node_modules pokud chybí).
@@ -2343,7 +2349,6 @@ else
     --stack-exists="$SKIP_CREATE" \
     --netbird-mgmt-host="${NETBIRD_MGMT_HOST:-}" \
     --mesh-tld="${MESH_TLD:-}" \
-    --forgejo-org="${AISHA_FORGEJO_ORG:-${APP_NAME_PREFIX:-${AISHA_STORY:-}}}" \
     --nocodb-admin-email="${_nocodb_admin}") || {
     err "generate-secrets.mjs failed — cannot proceed without secrets"
     exit 1
@@ -2351,7 +2356,7 @@ else
   unset _strength_floor _nocodb_admin
   eval "$_gen_tmp"
   unset _gen_tmp
-  # COOLIFY_API_KEY a FORGEJO_TOKEN jsou aliasy z .env-prod-backup
+  # COOLIFY_API_KEY je alias z .env-prod-backup
   # (nastaveno výše před PRESERVE_STATEFUL_SECRETS blokem). Pouze warn pokud chybí.
   if [ -z "$COOLIFY_API_KEY" ]; then
     err "COOLIFY_API_KEY prázdný — bez něj nelze volat Coolify API. Doplň do .env-prod-backup nebo exportuj před spuštěním."
@@ -2362,10 +2367,17 @@ else
   # the load-from-env block, before require_loaded_env). COOLIFY_PROJECT_UUID +
   # COOLIFY_SERVER_UUID_* are already populated here.
 
-  if [ -z "$FORGEJO_TOKEN" ]; then
-    err "FORGEJO_TOKEN prázdný — Coolify by sice apps vytvořil, ale git clone selže (401 unauthorized) → docker_compose_raw zůstane null → wave deploy selže s nejasnou chybou."
-    err "  Doplň FORGEJO_API_TOKEN do .env-prod-backup nebo exportuj FORGEJO_TOKEN před spuštěním."
-    exit 1
+  # GIT_TOKEN je povinný jen tam, kde se klonuje SOUKROMÉ repo. Veřejný kód na
+  # GitHubu Coolify naklonuje i bez něj; deklarovaný instanční overlay je ale
+  # soukromý z podstaty (KB, operátoři) — bez tokenu klon selže (401) až v buildu
+  # nebo v migrate hooku, s nejasnou chybou. Proto: overlay deklarovaný → fail.
+  if [ -z "$GIT_TOKEN" ]; then
+    if [ -n "${AISHA_INSTANCE_DATA_GIT_URL:-}${AISHA_WEB_DESIGN_GIT_URL:-}${KC_THEME_OVERLAY_GIT_URL:-}" ]; then
+      err "GIT_TOKEN prázdný, ale instance deklaruje soukromý overlay (AISHA_INSTANCE_DATA_GIT_URL / AISHA_WEB_DESIGN_GIT_URL / KC_THEME_OVERLAY_GIT_URL) — klon selže (401) → build/migrate padne s nejasnou chybou."
+      err "  Doplň GIT_TOKEN do .env-prod-backup nebo exportuj GIT_TOKEN před spuštěním."
+      exit 1
+    fi
+    warn "GIT_TOKEN prázdný — klonovat půjdou jen veřejná repa (kód stacku musí být veřejný)."
   fi
 
   if [ "$PRESERVE_STATEFUL_SECRETS" = "1" ] && [ -f "$ENV_COOLIFY" ]; then
@@ -2656,7 +2668,7 @@ PLATFORM_ADMIN_PASSWORD=${PLATFORM_ADMIN_PASSWORD:-}
 #                         + configure-realms.sh instance KC clients. Value comes
 #                         from the eval'd generate-secrets output (priority:
 #                         .env-prod-backup > process env > existing .env.coolify
-#                         > derived from FORGEJO_API_TOKEN+FORGEJO_URL > empty).
+#                         > empty; GIT_TOKEN se doplní do URL bez pověření).
 #                         MUST be written here — without this line the derived
 #                         URL existed only as an unexported shell var, never
 #                         reached .env.coolify, and sync-envs (payload =
@@ -2979,7 +2991,7 @@ RABBITMQ_PASS=${RABBITMQ_PASS}
 #  TELEGRAM_API_HASH / TELEGRAM_API_ID → https://my.telegram.org/apps (Telegram bot integration)
 #  TELEGRAM_BOT_TOKEN                → @BotFather na Telegramu → /newbot
 #  COOLIFY_API_KEY                   → automaticky alias z COOLIFY_API_TOKEN v .env-prod-backup
-#  FORGEJO_TOKEN                     → automaticky alias z FORGEJO_API_TOKEN v .env-prod-backup
+#  GIT_TOKEN                         → token pro klon soukromých repozitářů (overlaye, kód); BuildKit secret git_token
 #  MINIO_ROOT_USER_OLD / _PASSWORD_OLD → automaticky se naplní při rotation flow (NEVYPLŇOVAT ručně)
 #  COSMOS_SIGNER_MNEMONIC            → AUTOMATICKY VYGENEROVÁN (BIP39, 24 slov) — NIKDY NEPŘEPISUJ!
 # ─────────────────────────────────────────────────────────────────────────────
@@ -3000,9 +3012,9 @@ TELEGRAM_API_ID=${TELEGRAM_API_ID}
 TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
 MATRIX_BRIDGE_PROFILES=${MATRIX_BRIDGE_PROFILES}
 
-# ── Coolify + Forgejo API aliases (admin app + git push) ───────────────────────
+# ── Coolify API alias (admin app) + git klon token (BuildKit secret git_token) ──
 COOLIFY_API_KEY=${COOLIFY_API_KEY}
-FORGEJO_TOKEN=${FORGEJO_TOKEN}
+GIT_TOKEN=${GIT_TOKEN}
 
 # ── Domains (sourced from config/domains.env — single source of truth) ───────
 # Zone TLDs (operator SoT via .env-prod-backup; resolver self-heals *_DOMAIN)
@@ -3760,7 +3772,7 @@ HEADER
     'NETBIRD_API_TOKEN'
     'TELEGRAM_(API_HASH|API_ID|BOT_TOKEN)'
     'COOLIFY_(API_KEY|API_TOKEN|URL|BASE_URL|PROJECT_UUID|SERVER_UUID_(FRONTEND|BACKEND|EXPERIMENTAL|BUILD))'
-    'FORGEJO_TOKEN'
+    'GIT_TOKEN'
     'APP_DOMAIN'
     'API_DOMAIN'
     'STUDIO_DOMAIN'
@@ -3852,9 +3864,9 @@ HEADER
     # ⛔ BEZ POVERENI (namereno 2026-09-13): URL instancniho repa nese
     # `oauth2:<token>@` a SURFACE_OVERLAY_GIT_URL je BUILD ARG povrchu -- tedy
     # zapis do `docker history` naporad. Token do buildu jde BuildKit secretem
-    # forgejo_token (docker-compose.coolify-extranet.yml), tataz draha jako
+    # git_token (docker-compose.coolify-extranet.yml), tataz draha jako
     # svc-web-artifact. Dockerfile povrchu URL s poverenim odmitne; host-side
-    # `overlay-cachebust.sh` si token doplni z FORGEJO_TOKEN sam.
+    # `overlay-cachebust.sh` si token doplni z GIT_TOKEN sam.
     printf 'SURFACE_OVERLAY_GIT_URL=%s\n' "$(printf '%s' "$IDATA_URL" | sed -E 's|^([A-Za-z][A-Za-z0-9+.-]*://)[^@/]*@|\1|')" >> "$TMP_ENV"
     printf 'SURFACE_OVERLAY_PATH=%s\n' "$SURFACE_OVERLAY_PATH" >> "$TMP_ENV"
     # Vydat VZDY (i prazdny): heredoc uz tenhle klic nevydava, takze prazdna
@@ -3929,7 +3941,7 @@ HEADER
     grep -E "^[A-Z][A-Z0-9_]+=" "$ENV_PROD_BACKUP" 2>/dev/null \
     | grep -vE "$REGEN_KEYS" \
     | grep -vE "^(API_DOMAIN_PUBLIC|MCP_DOMAIN|DIRIGENT_DOMAIN|AUTH_DOMAIN|KEYCLOAK_PUBLIC_DOMAIN|AUTH_PUBLIC_DOMAIN|KEYCLOAK_DOMAIN_PUBLIC|KEYCLOAK_DOMAIN_DIRECT|AUTH_DOMAIN_PUBLIC|PUBLIC_TLD|INTERNAL_TLD|MESH_TLD|PKI_BRIDGE_DOMAIN|GATEWAY_DOMAIN|COMPANION_DOMAIN|OAUTH2_COOKIE_DOMAINS|OAUTH2_COOKIE_DOMAINS_FRONTEND|OAUTH2_WHITELIST_DOMAINS|MESH_ENABLED|MCP_UPSTREAM|API_UPSTREAM|DIRIGENT_UPSTREAM|AUTH_UPSTREAM|MCP_UPSTREAM_PUBLIC|API_UPSTREAM_PUBLIC|DIRIGENT_UPSTREAM_PUBLIC|AUTH_UPSTREAM_PUBLIC|MCP_UPSTREAM_MESH|API_UPSTREAM_MESH|DIRIGENT_UPSTREAM_MESH|AUTH_UPSTREAM_MESH|LIVE_DOMAIN|LIVE_DOMAIN_PUBLIC|LIVE_UPSTREAM|LIVE_UPSTREAM_PUBLIC|LIVE_UPSTREAM_MESH|GATEWAY_DOMAIN_PUBLIC|GATEWAY_UPSTREAM|GATEWAY_UPSTREAM_PUBLIC|GATEWAY_UPSTREAM_MESH|COMPANION_DOMAIN_PUBLIC|COMPANION_UPSTREAM|COMPANION_UPSTREAM_PUBLIC|COMPANION_UPSTREAM_MESH|INGEST_DOMAIN_PUBLIC|INGEST_UPSTREAM|POTOK_DOMAIN_PUBLIC|POTOK_UPSTREAM)=" \
-    | grep -vE "^(COOLIFY_API_TOKEN|FORGEJO_API_TOKEN)="
+    | grep -vE "^(COOLIFY_API_TOKEN)="
   } | awk -F= 'NR == FNR { zapsano[$1] = 1; next }
                ($1 in zapsano) { next }
                { if (!($1 in radek)) poradi[++n] = $1; radek[$1] = $0 }
@@ -4124,7 +4136,7 @@ else
     exit 1
   fi
 
-  # Prázdná odpověď NENÍ shoda — buď větev neexistuje, nebo je Forgejo nedostupné.
+  # Prázdná odpověď NENÍ shoda — buď větev neexistuje, nebo je git hosting nedostupný.
   # Obojí znamená, že nevím, co Coolify postaví; číst to jako „v pořádku" je
   # přesně ta vada, kterou tenhle krok zavírá.
   _head_vzdal="$(git -C "$REPO_ROOT" ls-remote origin "refs/heads/${_deploy_branch}" 2>/dev/null | awk 'NR==1 { print $1 }')"

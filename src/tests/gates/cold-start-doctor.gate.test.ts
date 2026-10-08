@@ -89,8 +89,8 @@ function prostrediDoktora(extraEnv: Record<string, string> = {}): Record<string,
     // Strip credentials so test is reproducible (CI shouldn't have them anyway)
     COOLIFY_API_KEY: "",
     COOLIFY_API_TOKEN: "",
-    FORGEJO_TOKEN: "",
-    FORGEJO_API_TOKEN: "",
+    GIT_TOKEN: "",
+    GITHUB_TOKEN: "",
     COOLIFY_URL: "",
     COOLIFY_SERVER_UUID_FRONTEND: "",
     COOLIFY_SERVER_UUID_BACKEND: "",
@@ -203,7 +203,7 @@ describe("cold-start-doctor.sh — smoke gate", () => {
     // Tight match na alias annotation — pokud někdo refaktoruje formát, test
     // upozorní (záměrně). `.*` by skrylo regresi typu "COOLIFY_API_KEY foo bar empty".
     expect(r.stdout).toMatch(/COOLIFY_API_KEY \(alias COOLIFY_API_TOKEN\) empty/);
-    expect(r.stdout).toMatch(/FORGEJO_TOKEN empty/);
+    expect(r.stdout).toMatch(/GIT_TOKEN empty/);
     expect(r.stdout).toMatch(/COOLIFY_URL not set/);
     // Server identity is DYNAMIC: cold-start auto-discovers per-slot UUIDs from
     // Coolify /servers by matching ${SLOT}_HOSTNAME (generate-coolify-context.mjs

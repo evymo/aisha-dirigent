@@ -92,7 +92,7 @@ echo "── Step 2: Applying AISHA branding..."
 #     (VSCodium's prepare_vscode.sh does: jq -s '.[0] * .[1]' vscode/product.json ../product.json)
 #     So our fields win for any conflicts.
 envsubst < "${SCRIPT_DIR}/product.json" > "${VSCODIUM_DIR}/product.json"
-echo "   Replaced vscodium/product.json (envsubst: FORGEJO_BASE_URL, INTERNAL_TLD, PUBLIC_TLD)"
+echo "   Replaced vscodium/product.json (envsubst: RELEASE_REPO, INTERNAL_TLD, PUBLIC_TLD)"
 
 # 2b) Patch dev/build.sh — it hard-codes APP_NAME/BINARY_NAME/ORG_NAME
 #     We need our values to flow through the entire build.

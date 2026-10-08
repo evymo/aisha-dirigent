@@ -56,7 +56,7 @@ use the `allowed_tools` / `denied_tools` arrays to control access.
 | `admin_nocodb_manage` | `admin.write` | Create/update/delete NocoDB records | ✅ admin |
 | `admin_langfuse_traces` | `admin.read` | Query LLM traces from Langfuse | ✅ admin |
 | `admin_n8n_workflows` | `admin.write` | Manage n8n workflows (list, deploy, activate, drift check) | ✅ admin |
-| `admin_forgejo_git` | `admin.write` | Git operations on Forgejo (branch, commit, PR, merge) | ✅ admin |
+| `admin_github_git` | `admin.write` | Git operations on GitHub (branch, commit, PR, merge) | ✅ admin |
 | `admin_appsmith` | `admin.write` | Manage Appsmith dashboards | ✅ admin |
 | `admin_appsmith_manage` | `admin.read` | Read-only Appsmith dashboard operations | ✅ admin |
 

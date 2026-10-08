@@ -3,7 +3,7 @@
 -- Popis: State transition pro tooling proposal. Validates approval_status enum.
 --        Při 'approved' nastavuje approved_at + approved_by. Při 'committed'
 --        nastavuje committed_sha + committed_at. Loguje do audit_journal.
--- Volá: WF_APPROVAL_GATE callback, WF_AISHA_TOOLING_COMMITTER po Forgejo merge
+-- Volá: WF_APPROVAL_GATE callback, WF_AISHA_TOOLING_COMMITTER po GitHub PR commitu
 -- Auth: service_role nebo admin/staff
 -- ============================================================================
 

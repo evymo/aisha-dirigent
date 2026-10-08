@@ -35,7 +35,7 @@ Poznamka: pred push do main musi projit gates a build.
 
 ## Step 3: One-Time Deploy Bootstrap
 
-Toto je jednorazove nastaveni napojeni Forgejo -> Coolify:
+Toto je jednorazove nastaveni napojeni CI (GitHub) -> Coolify:
 
 ```bash
 npm run deploy:init
@@ -45,7 +45,7 @@ Co to dela:
 
 1. najde/nebo sparuje Coolify web stack
 2. nastavi required env vars
-3. nastavi Forgejo secret `COOLIFY_WEBHOOK_URL`
+3. nastavi CI secret `COOLIFY_WEBHOOK_URL` v repu na GitHubu (volitelne, s `GITHUB_REPOSITORY` + `GITHUB_TOKEN`)
 
 Detailni postup je v [COOLIFY_SETUP.md](COOLIFY_SETUP.md).
 

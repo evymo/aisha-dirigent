@@ -25,7 +25,7 @@ GitHub Actions (ubuntu-latest)
                          ▼ webhook
 ┌────────────────────────────────────────────────────────┐
 │                    Coolify                              │
-│ 6. Pull kód z git repozitáře                          │
+│ 6. Pull kód z git repa (GIT_BASE_URL)                  │
 │ 7. Build: docker-compose.coolify-prebuilt.yml          │
 │    a) migrate service → DB migrace                     │
 │    b) web service → Dockerfile.web → nginx SPA         │
@@ -52,8 +52,8 @@ Supabase stack (`docker-compose.coolify.yml`) je deploynutý **separátně** a m
 # Všechny 4 stacky (interaktivně se zeptá na API tokeny):
 npm run deploy:init
 
-# S tokeny jako env vars:
-COOLIFY_API_TOKEN=xxx FORGEJO_API_TOKEN=xxx npm run deploy:init
+# S tokeny jako env vars (GitHub část je volitelná):
+COOLIFY_API_TOKEN=xxx GITHUB_REPOSITORY=org/repo GITHUB_TOKEN=xxx npm run deploy:init
 
 # Konkrétní stack(y):
 bash scripts/coolify-deploy-init.sh --stack web
@@ -67,7 +67,8 @@ Skript `scripts/coolify-deploy-init.sh` automaticky pro **každý stack**:
 
 1. Najde existující Coolify aplikaci (nebo řekne jak ji vytvořit)
 2. Nastaví per-stack env vars v Coolify (build + runtime)
-3. Pro Web stack: nastaví `COOLIFY_WEBHOOK_URL` secret v Forgejo
+3. Pro Web stack: nastaví CI secrets `COOLIFY_WEBHOOK_URL` + `COOLIFY_TOKEN` v repu na GitHubu
+   (`gh secret set`; jen s `GITHUB_REPOSITORY` + `GITHUB_TOKEN`, jinak vypíše, co nastavit ručně)
 
 **4 stacky:**
 
@@ -83,8 +84,8 @@ Všechny hodnoty zná z `.env` / `.env.coolify` / self-hosted defaults.
 **Prerekvizity:**
 
 - `jq` nainstalován (`brew install jq`)
-- Coolify API token: `https://frontend.id3a.cz` → Settings → API Tokens
-- Forgejo API token: `https://git.id3a.cz` → Settings → Applications
+- Coolify API token: `https://<coolify-host>` → Settings → API Tokens
+- volitelně GitHub: `GITHUB_REPOSITORY` + fine-grained `GITHUB_TOKEN` (Actions secrets write) + `gh` CLI
 
 ---
 
@@ -93,25 +94,24 @@ Všechny hodnoty zná z `.env` / `.env.coolify` / self-hosted defaults.
 #### 1. Vytvořit Coolify projekt
 
 1. V Coolify vytvoř nový projekt → **Docker Compose**
-2. Source: Git repository z `git.id3a.cz` (Forgejo)
+2. Source: Git repository (`GIT_BASE_URL/<owner>/<repo>.git`)
 3. Docker Compose file: `docker-compose.coolify-prebuilt.yml`
 4. Branch: `main`
 5. Nastav webhook (viz níže)
 
-#### 2. Nastavit Forgejo jako source v Coolify
+#### 2. Git source v Coolify
 
-1. Coolify → Settings → Git Providers → Add Forgejo
-2. URL: `https://git.id3a.cz`
-3. Vygeneruj API token v Forgejo (Settings → Applications → Access Tokens)
-4. Přidej token do Coolify
+1. Veřejné repo: stačí URL (`GIT_BASE_URL/<owner>/<repo>.git`)
+2. Soukromé repo: token s read přístupem (`GIT_TOKEN`) — `coolify-story-init.sh` ho vloží do URL
+   (`https://aisha:<token>@…`), do logu jde jen maskovaná podoba
 
 #### 3. Nastavit Deploy Webhook
 
 1. V Coolify projektu jdi do **Webhooks / Settings → Deploy**
 2. Vytvoř nový deploy webhook → zkopíruj URL
-3. V Forgejo repo nastav secret (Settings → Secrets):
+3. V repu na GitHubu nastav CI secret (Settings → Secrets and variables → Actions):
    ```
-   COOLIFY_WEBHOOK_URL=https://frontend.id3a.cz/api/v1/deploy?uuid=<APP_UUID>&force=false
+   COOLIFY_WEBHOOK_URL=https://<coolify-host>/api/v1/deploy?uuid=<APP_UUID>&force=false
    ```
 
 #### 4. Environment Variables v Coolify
@@ -139,7 +139,8 @@ Build proměnné se injektují do `docker build --build-arg`. Runtime se předaj
 
 ## Secrets a proměnné CI
 
-Nastavit v GitHubu: repo **Settings → Secrets and variables → Actions**.
+Nastavit v GitHubu: repo **Settings → Secrets and variables → Actions** (nebo automaticky přes
+`npm run deploy:init` s `GITHUB_REPOSITORY` + `GITHUB_TOKEN`).
 Úplný seznam (co CI čte, odkud a zda je povinné) vede `scripts/lib/ci-kontrakt.mjs`
 a tabulka v [CICD.md](CICD.md#opt-in-nasazení).
 

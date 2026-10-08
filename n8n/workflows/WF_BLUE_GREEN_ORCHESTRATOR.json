@@ -76,13 +76,28 @@
     },
     {
       "parameters": {
-        "url": "__REMAP__FORGEJO_URL/aisha/evymo-ai-orchestrator/raw/main/coolify/manifests/aisha.manifest",
+        "url": "={{ $env.GITHUB_API_URL }}/repos/{{ $env.GITHUB_REPOSITORY }}/contents/coolify/manifests/aisha.manifest?ref=main",
         "options": {
           "response": {
             "response": {
               "responseFormat": "text"
             }
           }
+        },
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github.raw+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
         }
       },
       "id": "fetch-manifest",
@@ -92,7 +107,13 @@
       "position": [
         800,
         200
-      ]
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "GitHub API"
+        }
+      }
     },
     {
       "parameters": {

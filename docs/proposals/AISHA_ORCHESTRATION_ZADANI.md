@@ -266,7 +266,7 @@ Overlay sinks (žádné nové tabulky): `story_entries(entry_type='self_eval_ver
 
 1. `[missing]` **`close_story` event/driver** — fíruje při uzavření story (StoryLoop `partner_stories` closure).
 2. `[missing]` **HermesAdapter** (`runtime='hermes'`) + runtime service za enum slotem.
-3. `[missing]` **Hermes driver:** closed-story → agregace learnings (`fn_search_learnings`) → syntéza `agent_spec` → `publish_agent`. Mirror self-tooling observer→factory→commit loop (`AISHA_SELF_TOOLING.md`), ale výstupní rail je `publish_agent`/`install_agent_as_story`, ne Forgejo committer.
+3. `[missing]` **Hermes driver:** closed-story → agregace learnings (`fn_search_learnings`) → syntéza `agent_spec` → `publish_agent`. Mirror self-tooling observer→factory→commit loop (`AISHA_SELF_TOOLING.md`), ale výstupní rail je `publish_agent`/`install_agent_as_story`, ne git server committer.
 
 ### 5.3 Advisory-only invariant — load-bearing
 
@@ -431,7 +431,7 @@ Každý jako testovatelný gate (rozšířit existující suite):
 
 ### Stále otevřené pro ownera
 - **Q2 (external-CLI cost blind spot):** claude-cli / další CLI spends mimo per-node metering. Návrh: pre-flight estimate v admission + `cli_slug`-aware budget gate (§3.6). Potvrdit přístup.
-- **Q6 (OWASP CI surface):** supply-chain controls cituje `.github/workflows` (mirror-only) — přesunout na `.forgejo/` canonical, jinak nemusí běžet.
+- **Q6 (OWASP CI surface):** supply-chain controls cituje `.github/workflows` (mirror-only) — přesunout na `.github/` canonical, jinak nemusí běžet.
 - **Q7 (governance paths drift):** GOVERNANCE_INDEX enforce points jmenují `supabase/sql` — reconcile na `aisha/db/sql` + rpcService/rpcUser před wiring evaluatorů.
 
 ### Stale-claim warnings (docs vs verified)

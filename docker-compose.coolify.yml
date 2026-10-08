@@ -405,9 +405,12 @@ services:
       AI_CHAT_SERVICE_URL: http://${APP_NAME_PREFIX:?identita instance}-svc-ai-chat:3011
       COOLIFY_API_KEY: ${COOLIFY_API_KEY:-}
       COOLIFY_BASE_URL: ${COOLIFY_BASE_URL:-}
-      FORGEJO_URL: ${FORGEJO_URL:-}
-      FORGEJO_TOKEN: ${FORGEJO_TOKEN:-}
-      FORGEJO_REPO: ${FORGEJO_REPO:-}
+      # dev-patch (routes/dev-patch.ts) commituje přes GitHub REST API. Prázdné
+      # GITHUB_REPOSITORY/GITHUB_TOKEN = funkce hlásí „not configured", nic nezapíše;
+      # prázdné GITHUB_API_URL = veřejné API (GHE ho přepíše).
+      GITHUB_API_URL: ${GITHUB_API_URL:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_REPOSITORY: ${GITHUB_REPOSITORY:-}
       NODE_EXTRA_CA_CERTS: /certs/pki/aisha-ca-bundle.pem
     volumes:
       - pki-certs:/certs/pki:ro
@@ -615,7 +618,7 @@ services:
         AISHA_WEB_DESIGN_CACHEBUST: ${AISHA_WEB_DESIGN_CACHEBUST:-}
         AISHA_SEED_DOMAIN: ${AISHA_SEED_DOMAIN:-}
       secrets:
-        - forgejo_token
+        - git_token
     container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-svc-web-artifact
     expose:
       - "3030"
@@ -790,8 +793,8 @@ services:
       start_period: 30s
 
 secrets:
-  forgejo_token:
-    environment: FORGEJO_TOKEN
+  git_token:
+    environment: GIT_TOKEN
   sentry_auth_token:
     environment: SENTRY_AUTH_TOKEN
 

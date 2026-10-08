@@ -26,7 +26,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Validate webhook input + extract proposal_id\n//\n// Trigger: po WF_APPROVAL_GATE 'approved' callback s { proposal_id, approved_by }\n//\n// Output: payload pro Forgejo branch + commit + PR creation\n\nconst body = $input.first().json.body || $input.first().json;\nconst proposalId = body.proposal_id;\nconst approvedBy = body.approved_by;\n\nif (!proposalId) throw new Error('proposal_id required');\n\nreturn [{\n  json: {\n    proposal_id: proposalId,\n    approved_by: approvedBy || null,\n    branch_name: `aisha/tooling/${proposalId}`,\n    requested_at: new Date().toISOString(),\n  },\n}];"
+        "jsCode": "// Validate webhook input + extract proposal_id\n//\n// Trigger: po WF_APPROVAL_GATE 'approved' callback s { proposal_id, approved_by }\n//\n// Output: payload pro GitHub branch + commit + PR creation\n\n// ⛔ GitHub cíl se NEHÁDÁ: bez deklarovaného GITHUB_REPOSITORY (owner/repo) a\n// https GITHUB_API_URL workflow odmítne commitovat — dosazené repo by zapisovalo\n// do cizího repozitáře.\nconst githubRepository = String($env.GITHUB_REPOSITORY || '').trim();\nif (!/^[A-Za-z0-9][A-Za-z0-9-]*\\/[A-Za-z0-9_.-]+$/.test(githubRepository)) {\n  throw new Error('GITHUB_REPOSITORY not configured (owner/repo) — refusing to commit to a guessed repository');\n}\nif (!String($env.GITHUB_API_URL || '').startsWith('https://')) {\n  throw new Error('GITHUB_API_URL not configured (https)');\n}\n\nconst body = $input.first().json.body || $input.first().json;\nconst proposalId = body.proposal_id;\nconst approvedBy = body.approved_by;\n\nif (!proposalId) throw new Error('proposal_id required');\n\nreturn [{\n  json: {\n    proposal_id: proposalId,\n    approved_by: approvedBy || null,\n    branch_name: `aisha/tooling/${proposalId}`,\n    requested_at: new Date().toISOString(),\n  },\n}];"
       },
       "id": "validate-input",
       "name": "Validate Input",
@@ -65,7 +65,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Governance guard: resolve the proposal directly by id (no dependency on the\n// pending-only RPC) and enforce that ONLY an 'approved' proposal may be committed.\n//\n// The human approval gate lives here: a proposal must have been moved to\n// approval_status='approved' by an admin (update_tooling_proposal_status) before\n// this committer will create a Forgejo branch/file/PR. Any other status aborts.\n\nconst proposalId = $('Validate Input').item.json.proposal_id;\nconst rows = $('Fetch Artifact Content').item.json;\nconst row = Array.isArray(rows) ? rows[0] : (rows && rows[0]);\n\nif (!row) {\n  throw new Error(`Proposal ${proposalId} not found in aisha_tooling_proposals`);\n}\nif (row.approval_status !== 'approved') {\n  throw new Error(\n    `Proposal ${proposalId} has status '${row.approval_status}', expected 'approved' \\u2014 only approved proposals may be committed`\n  );\n}\n\nreturn [{\n  json: {\n    ...$('Validate Input').item.json,\n    proposal_meta: row,\n  },\n}];"
+        "jsCode": "// Governance guard: resolve the proposal directly by id (no dependency on the\n// pending-only RPC) and enforce that ONLY an 'approved' proposal may be committed.\n//\n// The human approval gate lives here: a proposal must have been moved to\n// approval_status='approved' by an admin (update_tooling_proposal_status) before\n// this committer will create a GitHub branch/file/PR. Any other status aborts.\n\nconst proposalId = $('Validate Input').item.json.proposal_id;\nconst rows = $('Fetch Artifact Content').item.json;\nconst row = Array.isArray(rows) ? rows[0] : (rows && rows[0]);\n\nif (!row) {\n  throw new Error(`Proposal ${proposalId} not found in aisha_tooling_proposals`);\n}\nif (row.approval_status !== 'approved') {\n  throw new Error(\n    `Proposal ${proposalId} has status '${row.approval_status}', expected 'approved' \\u2014 only approved proposals may be committed`\n  );\n}\n\nreturn [{\n  json: {\n    ...$('Validate Input').item.json,\n    proposal_meta: row,\n  },\n}];"
       },
       "id": "guard-approved",
       "name": "Guard Approved",
@@ -78,13 +78,59 @@
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/branches",
+        "method": "GET",
+        "url": "={{ $env.GITHUB_API_URL }}/repos/{{ $env.GITHUB_REPOSITORY }}/git/ref/heads/main",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "get-base-branch",
+      "name": "Get Base Branch",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "GitHub API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GITHUB_API_URL }}/repos/{{ $env.GITHUB_REPOSITORY }}/git/refs",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
             {
               "name": "Content-Type",
               "value": "application/json"
@@ -93,14 +139,14 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"new_branch_name\": \"{{ $('Validate Input').item.json.branch_name }}\",\n  \"old_branch_name\": \"main\"\n}",
+        "jsonBody": "={\n  \"ref\": \"refs/heads/{{ $('Validate Input').item.json.branch_name }}\",\n  \"sha\": \"{{ $('Get Base Branch').item.json.object.sha }}\"\n}",
         "options": {
           "timeout": 15000
         },
         "alwaysOutputData": true
       },
       "id": "create-branch",
-      "name": "Create Forgejo Branch",
+      "name": "Create GitHub Branch",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
@@ -110,19 +156,27 @@
       "credentials": {
         "httpHeaderAuth": {
           "id": "__REMAP__",
-          "name": "Forgejo API"
+          "name": "GitHub API"
         }
       }
     },
     {
       "parameters": {
-        "method": "POST",
-        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/contents/{{ $('Fetch Artifact Content').item.json[0].artifact_path }}",
+        "method": "PUT",
+        "url": "={{ $env.GITHUB_API_URL }}/repos/{{ $env.GITHUB_REPOSITORY }}/contents/{{ $('Fetch Artifact Content').item.json[0].artifact_path }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
             {
               "name": "Content-Type",
               "value": "application/json"
@@ -131,7 +185,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"branch\": \"{{ $('Validate Input').item.json.branch_name }}\",\n  \"new_branch\": \"{{ $('Validate Input').item.json.branch_name }}\",\n  \"message\": \"feat(aisha-tooling): {{ $('Fetch Artifact Content').item.json[0].proposal_kind }} {{ $('Fetch Artifact Content').item.json[0].artifact_name }}\\n\\nProposed by AISHA tooling factory.\\n\\nProposal ID: {{ $('Validate Input').item.json.proposal_id }}\\nApproved by: {{ $('Validate Input').item.json.approved_by }}\\n\\nCo-authored-by: AISHA <noreply@{{ $env?.PUBLIC_TLD || '' }}>\",\n  \"content\": \"{{ Buffer.from($('Fetch Artifact Content').item.json[0].artifact_content).toString('base64') }}\"\n}",
+        "jsonBody": "={\n  \"branch\": \"{{ $('Validate Input').item.json.branch_name }}\",\n  \"message\": \"feat(aisha-tooling): {{ $('Fetch Artifact Content').item.json[0].proposal_kind }} {{ $('Fetch Artifact Content').item.json[0].artifact_name }}\\n\\nProposed by AISHA tooling factory.\\n\\nProposal ID: {{ $('Validate Input').item.json.proposal_id }}\\nApproved by: {{ $('Validate Input').item.json.approved_by }}\\n\\nCo-authored-by: AISHA <noreply@{{ $env?.PUBLIC_TLD || '' }}>\",\n  \"content\": \"{{ Buffer.from($('Fetch Artifact Content').item.json[0].artifact_content).toString('base64') }}\"\n}",
         "options": {
           "timeout": 15000
         }
@@ -147,7 +201,7 @@
       "credentials": {
         "httpHeaderAuth": {
           "id": "__REMAP__",
-          "name": "Forgejo API"
+          "name": "GitHub API"
         }
       }
     },
@@ -186,12 +240,24 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/contents/.claude/settings.json?ref={{ $('Validate Input').item.json.branch_name }}",
+        "url": "={{ $env.GITHUB_API_URL }}/repos/{{ $env.GITHUB_REPOSITORY }}/contents/.claude/settings.json?ref={{ $('Validate Input').item.json.branch_name }}",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
-        "sendHeaders": false,
+        "sendHeaders": true,
         "options": {
           "timeout": 15000
+        },
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            }
+          ]
         }
       },
       "id": "read-settings",
@@ -205,13 +271,13 @@
       "credentials": {
         "httpHeaderAuth": {
           "id": "__REMAP__",
-          "name": "Forgejo API"
+          "name": "GitHub API"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "// Hook-kind proposals need a SECOND artifact beyond the .sh file.\n//\n// Writing only `.claude/hooks/<name>.sh` is inert — Claude Code only fires a hook\n// that is also registered in `.claude/settings.json` (an event entry with a matcher\n// + a command pointing at the script). This node reads the branch's current\n// settings.json (from the Forgejo contents GET), idempotently merges in the new\n// hook entry, and re-encodes it base64 for the follow-up commit.\n//\n// Event + matcher resolution (most specific wins):\n//   1. metadata.settings_patch  { event, matcher, command }  (factory-rendered patch)\n//   2. metadata.hook_event / metadata.hook_matcher\n//   3. trigger_pattern.event / trigger_pattern.matcher\n//   4. default: PreToolUse on Edit|Write|MultiEdit\n\nconst settingsResp = $input.first().json; // Forgejo contents API GET response\nconst sha = settingsResp.sha;\nconst raw = Buffer.from(settingsResp.content || '', 'base64').toString('utf-8');\n\nlet settings;\ntry {\n  settings = JSON.parse(raw);\n} catch (e) {\n  throw new Error('.claude/settings.json on branch is not valid JSON: ' + e.message);\n}\n\nconst meta = $('Fetch Artifact Content').item.json[0];\nconst proposalId = $('Validate Input').item.json.proposal_id;\nconst artifactPath = meta.artifact_path; // e.g. .claude/hooks/prevent-x.sh\nconst triggerPattern = meta.trigger_pattern || {};\nconst metadata = meta.metadata || {};\n\nconst VALID_EVENTS = [\n  'PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification',\n  'Stop', 'SubagentStop', 'SessionStart', 'SessionEnd', 'PreCompact',\n];\n\nconst patch = (metadata && typeof metadata.settings_patch === 'object' && metadata.settings_patch) || {};\nlet event = patch.event || metadata.hook_event || triggerPattern.event || 'PreToolUse';\nif (!VALID_EVENTS.includes(event)) event = 'PreToolUse';\nconst matcher = patch.matcher || metadata.hook_matcher || triggerPattern.matcher || 'Edit|Write|MultiEdit';\nconst command = patch.command || ('${CLAUDE_PROJECT_DIR}/' + artifactPath);\n\n// Idempotent merge — never double-add the same command under the same matcher.\nsettings.hooks = settings.hooks || {};\nconst eventArr = settings.hooks[event] = settings.hooks[event] || [];\nlet group = eventArr.find((g) => g && g.matcher === matcher);\nconst newHook = {\n  type: 'command',\n  command,\n  _aisha: { kind: 'self-tooling', managed: true, proposal_id: proposalId },\n};\nlet changed = false;\nif (!group) {\n  eventArr.push({ matcher, hooks: [newHook] });\n  changed = true;\n} else {\n  group.hooks = group.hooks || [];\n  if (!group.hooks.some((h) => h && h.command === command)) {\n    group.hooks.push(newHook);\n    changed = true;\n  }\n}\n\nconst merged = JSON.stringify(settings, null, 2) + '\\n';\n\nreturn [{\n  json: {\n    settings_sha: sha,\n    settings_content_base64: Buffer.from(merged).toString('base64'),\n    settings_changed: changed,\n    hook_event: event,\n    hook_matcher: matcher,\n    hook_command: command,\n  },\n}];"
+        "jsCode": "// Hook-kind proposals need a SECOND artifact beyond the .sh file.\n//\n// Writing only `.claude/hooks/<name>.sh` is inert — Claude Code only fires a hook\n// that is also registered in `.claude/settings.json` (an event entry with a matcher\n// + a command pointing at the script). This node reads the branch's current\n// settings.json (from the GitHub contents GET), idempotently merges in the new\n// hook entry, and re-encodes it base64 for the follow-up commit.\n//\n// Event + matcher resolution (most specific wins):\n//   1. metadata.settings_patch  { event, matcher, command }  (factory-rendered patch)\n//   2. metadata.hook_event / metadata.hook_matcher\n//   3. trigger_pattern.event / trigger_pattern.matcher\n//   4. default: PreToolUse on Edit|Write|MultiEdit\n\nconst settingsResp = $input.first().json; // GitHub contents API GET response\nconst sha = settingsResp.sha;\nconst raw = Buffer.from(settingsResp.content || '', 'base64').toString('utf-8');\n\nlet settings;\ntry {\n  settings = JSON.parse(raw);\n} catch (e) {\n  throw new Error('.claude/settings.json on branch is not valid JSON: ' + e.message);\n}\n\nconst meta = $('Fetch Artifact Content').item.json[0];\nconst proposalId = $('Validate Input').item.json.proposal_id;\nconst artifactPath = meta.artifact_path; // e.g. .claude/hooks/prevent-x.sh\nconst triggerPattern = meta.trigger_pattern || {};\nconst metadata = meta.metadata || {};\n\nconst VALID_EVENTS = [\n  'PreToolUse', 'PostToolUse', 'UserPromptSubmit', 'Notification',\n  'Stop', 'SubagentStop', 'SessionStart', 'SessionEnd', 'PreCompact',\n];\n\nconst patch = (metadata && typeof metadata.settings_patch === 'object' && metadata.settings_patch) || {};\nlet event = patch.event || metadata.hook_event || triggerPattern.event || 'PreToolUse';\nif (!VALID_EVENTS.includes(event)) event = 'PreToolUse';\nconst matcher = patch.matcher || metadata.hook_matcher || triggerPattern.matcher || 'Edit|Write|MultiEdit';\nconst command = patch.command || ('${CLAUDE_PROJECT_DIR}/' + artifactPath);\n\n// Idempotent merge — never double-add the same command under the same matcher.\nsettings.hooks = settings.hooks || {};\nconst eventArr = settings.hooks[event] = settings.hooks[event] || [];\nlet group = eventArr.find((g) => g && g.matcher === matcher);\nconst newHook = {\n  type: 'command',\n  command,\n  _aisha: { kind: 'self-tooling', managed: true, proposal_id: proposalId },\n};\nlet changed = false;\nif (!group) {\n  eventArr.push({ matcher, hooks: [newHook] });\n  changed = true;\n} else {\n  group.hooks = group.hooks || [];\n  if (!group.hooks.some((h) => h && h.command === command)) {\n    group.hooks.push(newHook);\n    changed = true;\n  }\n}\n\nconst merged = JSON.stringify(settings, null, 2) + '\\n';\n\nreturn [{\n  json: {\n    settings_sha: sha,\n    settings_content_base64: Buffer.from(merged).toString('base64'),\n    settings_changed: changed,\n    hook_event: event,\n    hook_matcher: matcher,\n    hook_command: command,\n  },\n}];"
       },
       "id": "merge-hook-entry",
       "name": "Merge Hook Entry",
@@ -225,12 +291,20 @@
     {
       "parameters": {
         "method": "PUT",
-        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/contents/.claude/settings.json",
+        "url": "={{ $env.GITHUB_API_URL }}/repos/{{ $env.GITHUB_REPOSITORY }}/contents/.claude/settings.json",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
             {
               "name": "Content-Type",
               "value": "application/json"
@@ -255,19 +329,27 @@
       "credentials": {
         "httpHeaderAuth": {
           "id": "__REMAP__",
-          "name": "Forgejo API"
+          "name": "GitHub API"
         }
       }
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.FORGEJO_API_URL }}/repos/{{ $env.FORGEJO_OWNER }}/{{ $env.FORGEJO_REPO }}/pulls",
+        "url": "={{ $env.GITHUB_API_URL }}/repos/{{ $env.GITHUB_REPOSITORY }}/pulls",
         "authentication": "genericCredentialType",
         "genericAuthType": "httpHeaderAuth",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
             {
               "name": "Content-Type",
               "value": "application/json"
@@ -276,7 +358,7 @@
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\n  \"title\": \"AISHA tooling: {{ $('Fetch Artifact Content').item.json[0].proposal_kind }} {{ $('Fetch Artifact Content').item.json[0].artifact_name }}\",\n  \"body\": \"AISHA navrhuje nový **{{ $('Fetch Artifact Content').item.json[0].proposal_kind }}** artifact.\\n\\n## Path\\n`{{ $('Fetch Artifact Content').item.json[0].artifact_path }}`\\n\\n## Trigger pattern\\nViz `aisha_tooling_proposals.id = {{ $('Validate Input').item.json.proposal_id }}`\\n\\n## Approval\\nSchváleno admin user_id: `{{ $('Validate Input').item.json.approved_by }}`\\n\\n---\\n\\n_Auto-generated PR via WF_AISHA_TOOLING_COMMITTER_\",\n  \"head\": \"{{ $('Validate Input').item.json.branch_name }}\",\n  \"base\": \"main\",\n  \"assignees\": [{{ JSON.stringify($env.FORGEJO_DEFAULT_ASSIGNEE || 'admin') }}]\n}",
+        "jsonBody": "={\n  \"title\": \"AISHA tooling: {{ $('Fetch Artifact Content').item.json[0].proposal_kind }} {{ $('Fetch Artifact Content').item.json[0].artifact_name }}\",\n  \"body\": \"AISHA navrhuje nový **{{ $('Fetch Artifact Content').item.json[0].proposal_kind }}** artifact.\\n\\n## Path\\n`{{ $('Fetch Artifact Content').item.json[0].artifact_path }}`\\n\\n## Trigger pattern\\nViz `aisha_tooling_proposals.id = {{ $('Validate Input').item.json.proposal_id }}`\\n\\n## Approval\\nSchváleno admin user_id: `{{ $('Validate Input').item.json.approved_by }}`\\n\\n---\\n\\n_Auto-generated PR via WF_AISHA_TOOLING_COMMITTER_\",\n  \"head\": \"{{ $('Validate Input').item.json.branch_name }}\",\n  \"base\": \"main\"\n}",
         "options": {
           "timeout": 15000
         }
@@ -292,9 +374,55 @@
       "credentials": {
         "httpHeaderAuth": {
           "id": "__REMAP__",
-          "name": "Forgejo API"
+          "name": "GitHub API"
         }
       }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.GITHUB_API_URL }}/repos/{{ $env.GITHUB_REPOSITORY }}/issues/{{ $('Create Pull Request').item.json.number }}/assignees",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            },
+            {
+              "name": "X-GitHub-Api-Version",
+              "value": "2022-11-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ assignees: String($env.GITHUB_DEFAULT_ASSIGNEE || '').split(',').map((s) => s.trim()).filter(Boolean) }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "assign-pr",
+      "name": "Assign PR",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2620,
+        520
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "__REMAP__",
+          "name": "GitHub API"
+        }
+      },
+      "onError": "continueRegularOutput"
     },
     {
       "parameters": {
@@ -406,18 +534,7 @@
       "main": [
         [
           {
-            "node": "Create Forgejo Branch",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Create Forgejo Branch": {
-      "main": [
-        [
-          {
-            "node": "Write Artifact File",
+            "node": "Get Base Branch",
             "type": "main",
             "index": 0
           }
@@ -490,7 +607,7 @@
       "main": [
         [
           {
-            "node": "Mark Proposal Committed",
+            "node": "Assign PR",
             "type": "main",
             "index": 0
           }
@@ -513,6 +630,39 @@
         [
           {
             "node": "Respond OK",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Base Branch": {
+      "main": [
+        [
+          {
+            "node": "Create GitHub Branch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create GitHub Branch": {
+      "main": [
+        [
+          {
+            "node": "Write Artifact File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign PR": {
+      "main": [
+        [
+          {
+            "node": "Mark Proposal Committed",
             "type": "main",
             "index": 0
           }

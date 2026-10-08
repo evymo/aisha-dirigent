@@ -1,7 +1,7 @@
 /**
  * MCP Knowledge Server — Admin Tools E2E Tests
  *
- * Tests the admin_forgejo_git and admin_appsmith MCP tools
+ * Tests the admin_github_git and admin_appsmith MCP tools
  * via JSON-RPC 2.0 protocol against the local edge function.
  *
  * These tests verify:
@@ -106,7 +106,7 @@ test.describe("MCP Knowledge Server — Protocol", () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 test.describe("MCP Tools Registration", () => {
-  test("tools/list includes admin_forgejo_git", async ({ request }) => {
+  test("tools/list includes admin_github_git", async ({ request }) => {
     const { status, body } = await mcpCall(request, "tools/list", {});
 
     expect(status).toBe(200);
@@ -116,7 +116,7 @@ test.describe("MCP Tools Registration", () => {
     const toolNames = body.result.tools.map(
       (t: { name: string }) => t.name,
     );
-    expect(toolNames).toContain("admin_forgejo_git");
+    expect(toolNames).toContain("admin_github_git");
   });
 
   test("tools/list includes admin_appsmith", async ({ request }) => {
@@ -130,11 +130,11 @@ test.describe("MCP Tools Registration", () => {
     expect(toolNames).toContain("admin_appsmith");
   });
 
-  test("admin_forgejo_git has required input schema", async ({ request }) => {
+  test("admin_github_git has required input schema", async ({ request }) => {
     const { body } = await mcpCall(request, "tools/list", {});
 
     const tool = body.result.tools.find(
-      (t: { name: string }) => t.name === "admin_forgejo_git",
+      (t: { name: string }) => t.name === "admin_github_git",
     );
     expect(tool).toBeDefined();
     expect(tool.inputSchema).toBeDefined();
@@ -154,15 +154,15 @@ test.describe("MCP Tools Registration", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Admin Forgejo Git — Tool Calls
+// Admin GitHub Git — Tool Calls
 // ═══════════════════════════════════════════════════════════════════════════════
 
-test.describe("admin_forgejo_git — Tool Calls", () => {
+test.describe("admin_github_git — Tool Calls", () => {
   test("list_repos operation returns result or credential error", async ({
     request,
   }) => {
     const { status, body } = await mcpCall(request, "tools/call", {
-      name: "admin_forgejo_git",
+      name: "admin_github_git",
       arguments: { operation: "list_repos" },
     });
 
@@ -184,7 +184,7 @@ test.describe("admin_forgejo_git — Tool Calls", () => {
 
   test("unknown operation returns error", async ({ request }) => {
     const { status, body } = await mcpCall(request, "tools/call", {
-      name: "admin_forgejo_git",
+      name: "admin_github_git",
       arguments: { operation: "nonexistent_op" },
     });
 
@@ -195,7 +195,7 @@ test.describe("admin_forgejo_git — Tool Calls", () => {
 
   test("get_file requires repo and path parameters", async ({ request }) => {
     const { status, body } = await mcpCall(request, "tools/call", {
-      name: "admin_forgejo_git",
+      name: "admin_github_git",
       arguments: { operation: "get_file" },
     });
 

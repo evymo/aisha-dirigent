@@ -38,7 +38,7 @@ somebody else's surface, which is the exact failure this stack was added to end:
 the pipeline used to resolve a hardcoded `aisha-core` and deploy another
 instance's app.
 
-## `SURFACE_OVERLAY_*` v `build.args` a `secrets: forgejo_token`
+## `SURFACE_OVERLAY_*` v `build.args` a `secrets: git_token`
 
 ⛔ NAMĚŘENO 2026-09-13 (log Coolify nasazení extranetu): build.args
 nesly jen `SHELL_APP`, `INSTANCE_DIR` a `REGISTRY_PROXY`. Dockerfile povrchu se
@@ -52,11 +52,11 @@ doručí ji jen `build.args`. Proto jsou tu výslovně, stejně jako
 install), a Dockerfile pak staví proti `INSTANCE_DIR`.
 
 **Pověření nikdy v URL.** URL instančního repa nesla `oauth2:<token>@`
-(naměřeno 2026-09-13 — token shodný s `FORGEJO_TOKEN`). Build arg končí
+(naměřeno 2026-09-13 — token shodný s `GIT_TOKEN`). Build arg končí
 v `docker history` napořád, proto cold-start vydává `SURFACE_OVERLAY_GIT_URL`
-BEZ pověření a token jde BuildKit secretem `forgejo_token` — tatáž dráha jako
+BEZ pověření a token jde BuildKit secretem `git_token` — tatáž dráha jako
 u `svc-web-artifact` a `Dockerfile.keycloak`. Dockerfile URL s pověřením
-odmítne. `FORGEJO_TOKEN` nesmí být build-time (hlídá
+odmítne. `GIT_TOKEN` nesmí být build-time (hlídá
 `build-time-mnozina-vsech-compose`, invariant 3) a do aplikace ho doručí
 `coolify-sync-envs.sh` jako čtvrtý odvozený zdroj (klíče `secrets:
 <id>: environment:`).

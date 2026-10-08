@@ -58,7 +58,7 @@ describe('stažení balíčku ze zdroje', () => {
   it('⛔ bez nastaveného původu registru se nestahuje nic (nejde ověřit, kam token smí)', async () => {
     const u = `${REGISTR}/x.apk`;
     const { f, volani } = sit({ [u]: { status: 200, telo: 'APK' } });
-    await expect(vytvorStahovani({ puvod: '', token: 'tajny', limitMs: 5000 }, f)(u)).rejects.toThrow(/FORGEJO_URL/);
+    await expect(vytvorStahovani({ puvod: '', token: 'tajny', limitMs: 5000 }, f)(u)).rejects.toThrow(/ZARIZENI_ZDROJ_PUVOD/);
     expect(volani).toEqual([]);
   });
 

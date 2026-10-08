@@ -18,7 +18,7 @@ services:
         KC_THEME_OVERLAY_PATH: ${KC_THEME_OVERLAY_PATH:-keycloak/themes}
         KC_THEME_OVERLAY_CACHEBUST: ${KC_THEME_OVERLAY_CACHEBUST:-}
       secrets: &kc-build-secrets
-        - forgejo_token
+        - git_token
     container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-keycloak
     command: ["start", "--import-realm", "--optimized"]
     cpus: ${KEYCLOAK_CPUS:-1.0}
@@ -174,8 +174,8 @@ services:
       - "coolify.managed=true"
 
 secrets:
-  forgejo_token:
-    environment: FORGEJO_TOKEN
+  git_token:
+    environment: GIT_TOKEN
 
 networks:
   internal:

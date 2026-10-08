@@ -270,9 +270,9 @@ describe("AISHA Self-Tooling — Spec doc", () => {
     expect(md).toMatch(/command/i);
   });
 
-  test("spec describes Forgejo committer flow (PR-based)", () => {
+  test("spec describes GitHub committer flow (PR-based)", () => {
     const md = readSafe(SELF_TOOLING_SPEC);
-    expect(md).toMatch(/forgejo/i);
+    expect(md).toMatch(/github/i);
     expect(md).toMatch(/pull request|PR/);
   });
 
@@ -555,10 +555,12 @@ describe("AISHA Self-Tooling — Factory + Committer workflows", () => {
     ).toMatch(/p_metadata[\s\S]*?settings_patch/);
   });
 
-  test("committer creates Forgejo branch + file + PR and marks committed", () => {
+  test("committer creates GitHub branch + file + PR and marks committed", () => {
     expect(existsSync(TOOLING_COMMITTER_WF)).toBe(true);
     const txt = readSafe(TOOLING_COMMITTER_WF);
-    expect(txt).toMatch(/\/branches/);
+    // GitHub: branch = ref created from the base branch head SHA.
+    expect(txt).toMatch(/\/git\/ref\/heads\/main/);
+    expect(txt).toMatch(/\/git\/refs/);
     expect(txt).toMatch(/\/contents\//);
     expect(txt).toMatch(/\/pulls/);
     expect(txt).toMatch(/update_tooling_proposal_status/);
@@ -634,7 +636,7 @@ describe("AISHA Self-Tooling — Factory + Committer workflows", () => {
       expect(put, "no PUT to .claude/settings.json (the second commit)").toBeDefined();
       const body = String((put?.parameters as { jsonBody?: string })?.jsonBody ?? "");
       // Second commit lands on the SAME aisha/tooling/<id> branch and carries the
-      // existing blob sha required by Forgejo's update-file API.
+      // existing blob sha required by GitHub's contents API for an update.
       expect(body, "settings PUT must target the proposal branch").toMatch(/branch_name/);
       expect(body, "settings PUT must send the existing file sha (update, not create)").toMatch(
         /settings_sha|"sha"/
@@ -705,7 +707,7 @@ describe("AISHA Self-Tooling — Admin approval UI render", () => {
 });
 
 // ─── 9. Activation wiring — credential-based, no plaintext secrets in long-running n8n ────
-// The 5 workflows activate fully automatically on cold-start. SECRETS (Forgejo
+// The 5 workflows activate fully automatically on cold-start. SECRETS (GitHub
 // token, Anthropic key, PostgREST service key) are NOT plaintext $env in the
 // always-on n8n/n8n-worker — they live in the ENCRYPTED n8n credential store,
 // minted by deploy-workflows from values read ONCE in the transient
@@ -718,7 +720,7 @@ const DEPLOY_INIT = join(ROOT, "scripts/coolify-deploy-init.sh");
 const DEPLOY_WORKFLOWS = join(ROOT, "scripts/deploy-workflows.mjs");
 const ALL_TOOLING_WF = [...FACTORY_WORKFLOWS, TOOLING_COMMITTER_WF, TOOLING_OBSERVER_WF];
 // Secrets that MUST be credential-based, never plaintext $env in the workflows:
-const CREDENTIAL_SECRETS = ["FORGEJO_API_TOKEN", "ANTHROPIC_API_KEY"];
+const CREDENTIAL_SECRETS = ["GITHUB_TOKEN", "ANTHROPIC_API_KEY"];
 
 describe("AISHA Self-Tooling — Activation wiring (credentials, no long-running plaintext secrets)", () => {
   // 1. Workflows must NOT read credential secrets from $env — encrypted n8n credentials.
@@ -739,9 +741,9 @@ describe("AISHA Self-Tooling — Activation wiring (credentials, no long-running
     }
   });
 
-  test("committer uses the 'Forgejo API' n8n credential", () => {
-    expect(readSafe(TOOLING_COMMITTER_WF), "committer must reference the Forgejo API credential").toMatch(
-      /"Forgejo API"/
+  test("committer uses the 'GitHub API' n8n credential", () => {
+    expect(readSafe(TOOLING_COMMITTER_WF), "committer must reference the GitHub API credential").toMatch(
+      /"GitHub API"/
     );
   });
 
@@ -768,7 +770,7 @@ describe("AISHA Self-Tooling — Activation wiring (credentials, no long-running
   test("self-tooling credentials have ONE creator: provision-credentials; deploy-workflows creates none", () => {
     const provision = readSafe(join(ROOT, "scripts/n8n/provision-credentials.mjs"));
     expect(provision).toMatch(/name:\s*"AISHA PostgREST",\s*type:\s*"aishaPostgrestApi"/);
-    expect(provision).toMatch(/name:\s*"Forgejo API",\s*type:\s*"httpHeaderAuth"/);
+    expect(provision).toMatch(/name:\s*"GitHub API",\s*type:\s*"httpHeaderAuth"/);
     expect(provision).toMatch(/name:\s*"Anthropic API",\s*type:\s*"httpHeaderAuth"/);
     const deploy = readSafe(DEPLOY_WORKFLOWS);
     expect(deploy, "deploy-workflows nesmí pověření zakládat").not.toMatch(/n8nApi\(\s*["'`]\/credentials/);
@@ -785,7 +787,7 @@ describe("AISHA Self-Tooling — Activation wiring (credentials, no long-running
 
   test("n8n-workflow-init carries the bootstrap secrets to mint the credentials", () => {
     const initBlock = readSafe(N8N_COMPOSE).split("n8n-workflow-init:")[1] ?? "";
-    expect(initBlock).toMatch(/-\s*FORGEJO_API_TOKEN=/);
+    expect(initBlock).toMatch(/-\s*GITHUB_TOKEN=/);
     expect(initBlock).toMatch(/-\s*ANTHROPIC_API_KEY=/);
   });
 
@@ -795,7 +797,7 @@ describe("AISHA Self-Tooling — Activation wiring (credentials, no long-running
     // z API_UPSTREAM_MESH (naměřeno 2026-09-17 — https://${API_DOMAIN} v meshi
     // nikdo neobsluhuje). Každý výskyt proměnné musí být CELÝ jedna interpolace.
     const compose = readSafe(N8N_COMPOSE);
-    for (const v of ["AISHA_POSTGREST_URL", "FORGEJO_API_URL", "N8N_WEBHOOK_URL"]) {
+    for (const v of ["AISHA_POSTGREST_URL", "GITHUB_API_URL", "GITHUB_REPOSITORY", "N8N_WEBHOOK_URL"]) {
       const hodnoty = [...compose.matchAll(new RegExp(`^\\s*-\\s*${v}=(.*)$`, "gm"))].map((m) => m[1].trim());
       expect(hodnoty.length, `${v}: compose ji žádné službě nepředává`).toBeGreaterThan(0);
       for (const h of hodnoty) expect(h, `${v}=${h}`).toMatch(/^\$\{[A-Z0-9_]+(:[-?][^}]*)?\}$/);
@@ -805,8 +807,9 @@ describe("AISHA Self-Tooling — Activation wiring (credentials, no long-running
   test("orchestration block pushes canonical sources (parameter-derived, not hardcoded)", () => {
     const sh = readSafe(DEPLOY_INIT);
     expect(sh).toMatch(/AISHA_POSTGREST_URL.*AISHA_API_URL/);
-    expect(sh).toMatch(/set_coolify_env_if.*FORGEJO_API_TOKEN/);
-    expect(sh).toMatch(/set_coolify_env_if.*FORGEJO_API_URL/);
+    expect(sh).toMatch(/set_coolify_env_if.*GITHUB_TOKEN/);
+    expect(sh).toMatch(/set_coolify_env_if.*GITHUB_API_URL/);
+    expect(sh).toMatch(/set_coolify_env_if.*GITHUB_REPOSITORY/);
     expect(sh).not.toMatch(/"AISHA_POSTGREST_URL"\s+"https?:/);
   });
 });

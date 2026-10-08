@@ -11,8 +11,8 @@
  * Měří se VLASTNOST (tip větve je/není předkem upstreamu), ne stáří. Měřítko se
  * vybírá podle URL remote, ne podle jména (`upstream` může ukazovat na mezifork).
  *
- * ⛔ NAMĚŘENO 2026-09-25 (<fork>): první verze brala upstream i z FORGEJO_REPO.
- * To je ale repo, ZE KTERÉHO Coolify staví — u forku fork sám. Samostatný doktor
+ * ⛔ NAMĚŘENO 2026-09-25 (<fork>): první verze brala upstream i z proměnné repa
+ * kódu instance (dnes GITHUB_REPOSITORY). To je ale repo, ZE KTERÉHO Coolify staví — u forku fork sám. Samostatný doktor
  * ho v prostředí neměl a vyšel správně; uvnitř cold-startu, který env načítá, by
  * měřil odchylku proti vlastnímu `main`. Test (5) to drží.
  *
@@ -126,12 +126,12 @@ describe("deploy větev mimo main musí nést důvod", () => {
     expect(mer(repo(), manifest("branch: nasazeni/x\n")).verdikt).toMatch(/^FAIL .*NEZMĚŘENO.*není deklarované/);
   });
 
-  it("5) FORGEJO_REPO (fork, ze kterého Coolify staví) NENÍ měřítko", () => {
+  it("5) GITHUB_REPOSITORY (fork, ze kterého Coolify staví) NENÍ měřítko", () => {
     // S manifestem se měří proti upstreamu, ne proti forku z prostředí.
-    const s = mer(repo(), manifest(NESE), { FORGEJO_REPO: "aisha/testfork-orchestrator" });
+    const s = mer(repo(), manifest(NESE), { GITHUB_REPOSITORY: "acme/testfork-orchestrator" });
     expect(s.verdikt).toMatch(/^WARN .*proti zdroj\/main/);
     // A sám o sobě upstream nedeklaruje.
-    const bez = mer(repo(), manifest("branch: nasazeni/x\n"), { FORGEJO_REPO: "aisha/testfork-orchestrator" });
+    const bez = mer(repo(), manifest("branch: nasazeni/x\n"), { GITHUB_REPOSITORY: "acme/testfork-orchestrator" });
     expect(bez.verdikt).toMatch(/^FAIL .*NEZMĚŘENO/);
   });
 

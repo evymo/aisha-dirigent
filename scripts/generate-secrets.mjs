@@ -1016,85 +1016,51 @@ emit('INGEST_DROP_SECRET_KEY',    pg('INGEST_DROP_SECRET_KEY',    () => secret(3
 
 // ── Instance overlay (private KB seed layer) ────────────────────────────────
 // Applied at deploy by scripts/deploy/instance-data-hook.sh (migrate container).
-// Derived from the Forgejo token the cold-start already requires — an internal
-// stack credential, never operator-typed. Operators/forks override by setting
-// AISHA_INSTANCE_DATA_GIT_URL directly in .env-prod-backup (preserve wins);
-// empty (no token) = community install, hook no-ops.
+// The URL comes ONLY from the operator's config (AISHA_INSTANCE_DATA_GIT_URL in
+// .env-prod-backup / env; preserve wins) — never derived from a forge host + org
+// naming convention: a derived address of a SHARED host names a repo that does
+// not exist (401/404) and the ENTIRE overlay silently drops. Empty = community
+// install, hook no-ops.
 {
   // Self-heal JSON-escaped slashes: a value copy-pasted from a raw Coolify API
   // dump arrives as `https:\/\/oauth2:…` (PHP json_encode escapes `/` as `\/`).
   // git would treat that as a relative path → overlay silently never clones.
   const unescapeJsonSlashes = (value) => String(value ?? '').replace(/\\\//g, '/');
-  const forgejoToken = preservedValue('FORGEJO_API_TOKEN', '');
-  // No default host — the repo is template-only (no-hardcoded-deployment-config
-  // gate); both values come from .env-prod-backup. Missing either = no overlay.
-  const forgejoBase = unescapeJsonSlashes(preservedValue('FORGEJO_URL', '')).replace(/\/+$/, '');
-  // Per-instance Forgejo org + overlay repo names, so a FORK derives its OWN
-  // overlay repos instead of the donor's aisha/aisha-* (which 401/404s and
-  // silently drops the entire overlay — KB, operators, branded web). Defaults
-  // keep the upstream aisha.guru instance byte-identical: org resolves from the
-  // deploy namespace (APP_NAME_PREFIX / AISHA_STORY), 'aisha' as the final
-  // fallback; repos follow the <org>-instance-data / <org>-guru-web convention.
-  // A fork overrides via AISHA_FORGEJO_ORG / AISHA_*_REPO, or a full *_GIT_URL.
-  // ⛔ ŽÁDNÝ FALLBACK (majitel, 2026-08-24). Do té doby tu stálo `?? 'aisha'` jako
-  // „poslední záchrana" — jenže tahle hodnota rozhoduje, ze KTERÉ Forgejo organizace
-  // se stáhne instanční overlay (KB, operátoři, brandovaný web). Dosazený donor
-  // vrátí 401/404 a overlay TIŠE VYPADNE: instance naběhne, jen bude cizí.
-  // Org je vlastnost PROJEKTU, ne výchozí hodnota.
-  const forgejoOrgRaw = getArg('forgejo-org') ?? process.env.AISHA_FORGEJO_ORG ?? deployPrefix;
-  // `--print-keys` vypisuje jen JMÉNA spravovaných klíčů — žádnou instanci
-  // neoslovuje, takže na něm identitu vyžadovat nesmíme (existující rozlišení
-  // `emitsInstanceDeclaration`, ne nové).
-  if (emitsInstanceDeclaration && (!forgejoOrgRaw || !String(forgejoOrgRaw).trim())) {
-    throw new Error(
-      'Forgejo organizaci nelze určit — odmítám dosadit donora. Deklaruj AISHA_FORGEJO_ORG ' +
-      '(nebo APP_NAME_PREFIX / AISHA_STORY, ze kterých se odvodí), případně --forgejo-org.',
-    );
-  }
-  const forgejoOrg = String(forgejoOrgRaw).trim().replace(/^\/+|\/+$/g, '');
-  const instanceRepo = (process.env.AISHA_INSTANCE_DATA_REPO || `${forgejoOrg}-instance-data`).trim();
-  const designRepo   = (process.env.AISHA_WEB_DESIGN_REPO   || `${forgejoOrg}-guru-web`).trim();
-  const derived = (forgejoToken && forgejoBase)
-    ? `${forgejoBase.replace('://', `://oauth2:${forgejoToken}@`)}/${forgejoOrg}/${instanceRepo}.git#main`
-    : '';
-  // Tokenize the RESOLVED url. A fork/instance overlay (or .env-prod-backup)
-  // redirects the repo — e.g. a private <instance>-instance-data — but is
-  // committed token-LESS (no-hardcoded-deployment-config gate). Since it is
-  // `set -a`-sourced into process.env, it preserve-wins over the tokened
-  // `derived`; without re-applying the token here the private clone 401s in
-  // instance-data-hook.sh and the ENTIRE instance overlay (KB, operators, seed)
-  // silently never applies. Inject oauth2:<token>@ only when the url has
-  // scheme+host but no userinfo and we hold a Forgejo token.
-  const resolvedInstanceUrl = unescapeJsonSlashes(preservedValue('AISHA_INSTANCE_DATA_GIT_URL', derived));
+  // GIT_TOKEN = operator credential for cloning PRIVATE git repos (any host).
+  const gitToken = preservedValue('GIT_TOKEN', '');
+  // Tokenize the RESOLVED url. The operator declares the overlay token-LESS
+  // (no-hardcoded-deployment-config gate; the same URL also feeds build ARGs),
+  // but the migrate container has no BuildKit secret — without the token here
+  // the private clone 401s in instance-data-hook.sh and the ENTIRE instance
+  // overlay (KB, operators, seed) silently never applies. Inject
+  // oauth2:<token>@ only when the url has scheme+host but no userinfo and we
+  // hold a git token (`oauth2:` works as the username on GitHub, GitLab and
+  // Gitea-compatible hosts alike).
+  const resolvedInstanceUrl = unescapeJsonSlashes(preservedValue('AISHA_INSTANCE_DATA_GIT_URL', ''));
   const tokenizedInstanceUrl =
-    forgejoToken && /:\/\/[^/@]+\//.test(resolvedInstanceUrl) && !/:\/\/[^/@]+@/.test(resolvedInstanceUrl)
-      ? resolvedInstanceUrl.replace('://', `://oauth2:${forgejoToken}@`)
+    gitToken && /:\/\/[^/@]+\//.test(resolvedInstanceUrl) && !/:\/\/[^/@]+@/.test(resolvedInstanceUrl)
+      ? resolvedInstanceUrl.replace('://', `://oauth2:${gitToken}@`)
       : resolvedInstanceUrl;
   emit('AISHA_INSTANCE_DATA_GIT_URL', tokenizedInstanceUrl);
 
-  // Branded web design (private aisha-guru-web). CLEAN url — NO embedded token:
-  // svc-web-artifact's build adds FORGEJO_TOKEN at clone time (build ARG, #425)
-  // and ingests it into domains/templates/${AISHA_SEED_DOMAIN}/ → /seed-default
-  // → web_pages. Operator override via .env-prod-backup wins; empty (no
-  // FORGEJO_URL) = community install → committed placeholder + domains/default.
-  const derivedDesign = forgejoBase ? `${forgejoBase}/${forgejoOrg}/${designRepo}.git` : '';
+  // Branded web design (private design repo). CLEAN url — NO embedded token:
+  // svc-web-artifact's build adds GIT_TOKEN at clone time (BuildKit secret
+  // git_token) and ingests it into domains/templates/${AISHA_SEED_DOMAIN}/ →
+  // /seed-default → web_pages. Operator-declared only; empty = community
+  // install → committed placeholder + domains/default.
   // ⛔ VYPNUTO SE MUSÍ DÁT DEKLAROVAT (2026-09-19, naměřeno na jednom z forků).
-  // Komentář výš slibuje „empty = community install", jenže prázdno nastane JEN
-  // u instance, která Forgejo nemá: `derivedDesign` se jinak vždycky odvodí
-  // z konvence `<org>-guru-web` a `firstNonEmpty` prázdnou deklaraci zahodí.
-  // Fork, jehož org tu konvenci nenaplňuje, tedy NEMĚL JAK říct „žádný overlay":
-  // odvodilo se `<fork>/<fork>-guru-web`, repo neexistuje (404),
-  // `overlay-cachebust.sh` nepřečetl HEAD, CACHEBUST zůstal prázdný a fail-loud
-  // pojistka v svc-web-artifact/Dockerfile build ZABILA — `core` nešel nasadit
-  // a s ním stála celá vlna 3 a 15 navazujících aplikací.
-  // Táž třída jako FORGEJO_DOMAIN: jméno SDÍLENÉ infrastruktury odvozené
-  // per-instanci vyrobí adresu, která neexistuje. Léčba je deklarace, ne lepší
-  // odvození — a sentinel je tu proto, že prázdnou hodnotu tenhle kanál neunese.
-  // Tvar `<věc>-disabled.invalid` je zavedený idiom (ingest-, extranet-,
-  // gateway-, live-, companion-, potok-, mesh-router-, apex-redirect-,
-  // keycloak-alias-). `.invalid` je RFC 2606 TLD, takže se nikdy nerozřeší.
+  // Dřív se adresa odvozovala z konvence `<org>-guru-web` a prázdná deklarace se
+  // zahodila, takže fork NEMĚL JAK říct „žádný overlay": odvodilo se repo, které
+  // neexistuje (404), `overlay-cachebust.sh` nepřečetl HEAD, CACHEBUST zůstal
+  // prázdný a fail-loud pojistka v svc-web-artifact/Dockerfile build ZABILA —
+  // `core` nešel nasadit a s ním stála celá vlna 3 a 15 navazujících aplikací.
+  // Odvození je pryč (léčba je deklarace, ne lepší odvození); sentinel zůstává
+  // pro deklarace, které ho už nesou. Tvar `<věc>-disabled.invalid` je zavedený
+  // idiom (ingest-, extranet-, gateway-, live-, companion-, potok-, mesh-router-,
+  // apex-redirect-, keycloak-alias-). `.invalid` je RFC 2606 TLD, takže se nikdy
+  // nerozřeší.
   const DESIGN_VYPNUTO = 'design-disabled.invalid';
-  const deklarovanyDesign = preservedValue('AISHA_WEB_DESIGN_GIT_URL', derivedDesign);
+  const deklarovanyDesign = preservedValue('AISHA_WEB_DESIGN_GIT_URL', '');
   const designVypnut = deklarovanyDesign.trim() === DESIGN_VYPNUTO;
   emit('AISHA_WEB_DESIGN_GIT_URL',
     designVypnut ? '' : unescapeJsonSlashes(deklarovanyDesign));

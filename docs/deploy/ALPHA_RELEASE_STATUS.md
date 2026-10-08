@@ -2,7 +2,7 @@
 
 > **Tag:** `v0.9.0-alpha.1`
 > **Date:** 2026-06-05
-> **Repo:** `repo.id3a.cz/aisha/evymo-ai-orchestrator`
+> **Repo:** `git.example.com/<org>/aisha-orchestrator`
 
 ---
 
@@ -86,7 +86,7 @@ layering model.
 - i18n content SQL seed parity (consents, kpis, questionnaires and all platform namespaces) is now strictly enforced and green. Missing locale sources for kpis (en/cs) were completed as SoT JSON; seeds are always derived via `npm run i18n:content:build`. Full `npm run i18n:check` passes with 0 errors.
 - Marketplace RLS + audit reviewed in full context (SoT tables + rls/*.sql + policies + audited RPC naming convention + partner_profiles indirection + public read for active pricing/ratings where appropriate for alpha trust surfaces). Matches enterprise source onboarding contract expectations for partner/user_provided data.
 - Public alpha user surfaces (/guild, marketplace redirect, SpecialistGuildSection + ProjectConfigurator on index, booking entry points, legal/consent pages) confirmed public via MarketingShell, no premature auth walls, with prefetch and i18n content now in sync.
-- Lint: 0 errors. Build: successful. Gate test failures observed in this analysis session are exclusively git-command artifacts (worktreeconfig extension in the analysis environment); real Forgejo CI with clean git checkouts passes the full suite (including no-committed-secrets, legacy-domains, insight-patches, etc.).
+- Lint: 0 errors. Build: successful. Gate test failures observed in this analysis session are exclusively git-command artifacts (worktreeconfig extension in the analysis environment); real CI with clean git checkouts passes the full suite (including no-committed-secrets, legacy-domains, insight-patches, etc.).
 - All changes followed SOLID, separation of concerns, RPC-only, generated-artifact (never hand-edit seeds), and AGENTS PR checklist principles. No hotfixes or simplifications.
 
 ---

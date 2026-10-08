@@ -14,7 +14,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Prepare context for dev_patch agent\nconst input = $input.item.json;\n\nconst chatInput = [\n  `[DEV_PATCH AGENT] Task: ${input.task_kind}`,\n  `Run ID: ${input.run_id}`,\n  input.story_id ? `Story ID: ${input.story_id}` : null,\n  `Risk Profile: ${input.risk_profile}`,\n  `Context Profile: ${input.context_profile}`,\n  '',\n  'Previous pipeline results:',\n  JSON.stringify(input.previous_results || [], null, 2),\n  '',\n  'Instructions:',\n  '1. Search knowledge base for relevant patterns and rules',\n  '2. Analyze the task and propose code changes',\n  '3. Generate a patch (file changes) following project conventions',\n  '4. Create a branch on Forgejo and commit changes',\n  '5. Return: { branch, files_modified, patch_summary }'\n].filter(Boolean).join('\\n');\n\nreturn {\n  json: {\n    chatInput,\n    run_id: input.run_id,\n    story_id: input.story_id,\n    task_kind: input.task_kind,\n    agent_slug: 'dev_patch',\n    session_id: `dev-patch-${input.run_id}`\n  }\n};"
+        "jsCode": "// Prepare context for dev_patch agent\nconst input = $input.item.json;\n\nconst chatInput = [\n  `[DEV_PATCH AGENT] Task: ${input.task_kind}`,\n  `Run ID: ${input.run_id}`,\n  input.story_id ? `Story ID: ${input.story_id}` : null,\n  `Risk Profile: ${input.risk_profile}`,\n  `Context Profile: ${input.context_profile}`,\n  '',\n  'Previous pipeline results:',\n  JSON.stringify(input.previous_results || [], null, 2),\n  '',\n  'Instructions:',\n  '1. Search knowledge base for relevant patterns and rules',\n  '2. Analyze the task and propose code changes',\n  '3. Generate a patch (file changes) following project conventions',\n  '4. Create a branch on GitHub and commit changes',\n  '5. Return: { branch, files_modified, patch_summary }'\n].filter(Boolean).join('\\n');\n\nreturn {\n  json: {\n    chatInput,\n    run_id: input.run_id,\n    story_id: input.story_id,\n    task_kind: input.task_kind,\n    agent_slug: 'dev_patch',\n    session_id: `dev-patch-${input.run_id}`\n  }\n};"
       },
       "id": "dp-prepare",
       "name": "Prepare Dev Context",
@@ -28,7 +28,7 @@
     {
       "parameters": {
         "options": {
-          "systemMessage": "You are the **dev_patch** agent in the AISHA pipeline. Your role is to generate code patches.\n\nYou have access to:\n- Knowledge base (search_knowledge) for project patterns and rules\n- Compliance validation (validate_compliance) to pre-check changes\n- Forgejo admin bridge for branch/commit operations\n\nRules:\n- Follow RPC-only pattern (no .from().select())\n- All UI text via i18n t() function\n- No any types, use proper TypeScript types\n- Zod validation on all API responses\n- SECURITY DEFINER for anon functions\n- Audit journal for sensitive operations\n\nAlways explain what you changed and why.",
+          "systemMessage": "You are the **dev_patch** agent in the AISHA pipeline. Your role is to generate code patches.\n\nYou have access to:\n- Knowledge base (search_knowledge) for project patterns and rules\n- Compliance validation (validate_compliance) to pre-check changes\n- GitHub admin bridge for branch/commit operations\n\nRules:\n- Follow RPC-only pattern (no .from().select())\n- All UI text via i18n t() function\n- No any types, use proper TypeScript types\n- Zod validation on all API responses\n- SECURITY DEFINER for anon functions\n- Audit journal for sensitive operations\n\nAlways explain what you changed and why.",
           "maxIterations": 10
         }
       },
@@ -110,9 +110,12 @@
     },
     {
       "parameters": {
-        "operation": "createBranch",
+        "service": "github",
+        "operation": "create_branch",
+        "repoOwner": "={{ ($env.GITHUB_REPOSITORY || '').split('/')[0] || '' }}",
+        "repoName": "={{ ($env.GITHUB_REPOSITORY || '').split('/')[1] || '' }}",
         "branchName": "={{ 'aisha/dev-patch-' + $json.run_id?.substring(0, 8) }}",
-        "options": {}
+        "baseBranch": "main"
       },
       "id": "dp-create-branch",
       "name": "Create Branch",
@@ -123,9 +126,9 @@
         300
       ],
       "credentials": {
-        "aishaForgejoApi": {
+        "aishaGitHubApi": {
           "id": "__REMAP__",
-          "name": "Forgejo API"
+          "name": "GitHub API"
         }
       },
       "onError": "continueRegularOutput"

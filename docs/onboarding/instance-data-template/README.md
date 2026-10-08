@@ -16,16 +16,15 @@ the stack at the overlay with a single variable and cold-start does the rest.
 
 ## 1. Create your overlay repo
 
-Copy the contents of this directory into a new **private** git repo. By
-convention cold-start derives the overlay URL from your Forgejo org and a
-`-instance-data` suffix (see §4), so the natural name is:
+Copy the contents of this directory into a new **private** git repo on your
+git host. The name is up to you — the stack only knows the URL you declare
+(§4); nothing is derived from an org or naming convention. A natural choice:
 
 ```
-<your-forgejo-org>/<your-forgejo-org>-instance-data
+<your-org>/<your-org>-instance-data
 ```
 
-e.g. org `acme` → `acme/acme-instance-data`. Any URL works if you set it
-explicitly (§4) — the naming convention only matters if you rely on derivation.
+e.g. org `acme` → `acme/acme-instance-data`.
 
 ## 2. Repo layout (the file contract)
 
@@ -90,16 +89,17 @@ cold-start reconstructs your instance from the platform repo + this overlay.
 The stack reads one variable:
 
 ```bash
-AISHA_INSTANCE_DATA_GIT_URL=https://<user>:<token>@<forgejo-host>/<org>/<org>-instance-data.git#main
+AISHA_INSTANCE_DATA_GIT_URL=https://<git-host>/<org>/<org>-instance-data.git#main
+GIT_TOKEN=<read token for the private repo>
 ```
 
 - The `#main` suffix pins a branch/tag/SHA (optional; defaults to the repo default).
-- The clone URL carries a token — it is **redacted in every log line**. Keep it
-  out of the public repo; supply it via `.env-prod-backup` / your environment.
-- **Derivation:** if you don't set it, `scripts/generate-secrets.mjs` derives it
-  from `AISHA_FORGEJO_ORG` (→ `APP_NAME_PREFIX` → `AISHA_STORY`) + the
-  `-instance-data` suffix, using `FORGEJO_URL` + `FORGEJO_API_TOKEN`. Set it
-  explicitly to override the convention.
+- Declare the URL **token-free**; cold-start adds `GIT_TOKEN` for the clone
+  (`oauth2:<token>@…`) and builds get it through the BuildKit secret `git_token`.
+  Any credential is **redacted in every log line**. Keep tokens out of the public
+  repo; supply them via `.env-prod-backup` / your environment.
+- **No derivation:** unset = community install, no overlay. The URL is never
+  guessed from an org or naming convention.
 
 ## 5. Lifecycle
 

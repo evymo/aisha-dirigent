@@ -25,7 +25,7 @@ describe('AishaAdminBridge', () => {
 		const node = new AishaAdminBridge();
 		const serviceProp = node.description.properties.find((p) => p.name === 'service');
 		const options = (serviceProp as { options?: Array<{ value: string }> })?.options ?? [];
-		expect(options.map((o) => o.value)).toEqual(['nocodb', 'langfuse', 'forgejo', 'appsmith', 'health']);
+		expect(options.map((o) => o.value)).toEqual(['nocodb', 'langfuse', 'github', 'appsmith', 'health']);
 	});
 
 	it('should have NocoDB operations', () => {
@@ -443,13 +443,13 @@ describe('AishaAdminBridge', () => {
 				.mockResolvedValueOnce(mockFetchResponse([
 					{ service_name: 'nocodb', base_url: 'https://nocodb.test.local' },
 					{ service_name: 'langfuse', base_url: 'https://langfuse.test.local' },
-					{ service_name: 'forgejo', base_url: 'https://forgejo.test.local' },
+					{ service_name: 'github', base_url: 'https://api.github.test' },
 					{ service_name: 'appsmith', base_url: 'https://appsmith.test.local' },
 					{ service_name: 'n8n', base_url: 'https://n8n.test.local' },
 				]))
 				.mockResolvedValueOnce(mockFetchResponse({ status: 'ok' }))  // nocodb
 				.mockResolvedValueOnce(mockFetchResponse({ status: 'ok' }))  // langfuse
-				.mockResolvedValueOnce(mockFetchResponse({ status: 'ok' }))  // forgejo
+				.mockResolvedValueOnce(mockFetchResponse({ status: 'ok' }))  // github
 				.mockResolvedValueOnce(mockFetchResponse({ status: 'ok' }))  // appsmith
 				.mockResolvedValueOnce(mockFetchResponse({ status: 'ok' })); // n8n
 
@@ -727,38 +727,57 @@ describe('AishaAdminBridge', () => {
 	});
 
 	// ═══════════════════════════════════════════════════════════════════════
-	// Forgejo Operations
+	// GitHub Operations (GitHub REST API)
 	// ═══════════════════════════════════════════════════════════════════════
 
-	describe('Forgejo operations', () => {
-		const forgejoCredentials = {
-			aishaForgejoApi: {
-				baseUrl: 'https://git.test.local',
-				apiToken: 'test-forgejo-token',
+	describe('GitHub operations', () => {
+		const githubCredentials = {
+			aishaGitHubApi: {
+				apiUrl: 'https://api.github.test',
+				apiToken: 'test-github-token',
 			},
 		};
+		const REPO = 'https://api.github.test/repos/acme/platform';
 
-		it('should have correct Forgejo operations', () => {
+		it('should have correct GitHub operations', () => {
 			const node = new AishaAdminBridge();
 			const opProps = node.description.properties.filter((p) => p.name === 'operation');
-			const forgejoOp = opProps.find((p) =>
-				(p.displayOptions as { show?: Record<string, string[]> })?.show?.service?.includes('forgejo'),
+			const githubOp = opProps.find((p) =>
+				(p.displayOptions as { show?: Record<string, string[]> })?.show?.service?.includes('github'),
 			);
-			const options = (forgejoOp as { options?: Array<{ value: string }> })?.options ?? [];
+			const options = (githubOp as { options?: Array<{ value: string }> })?.options ?? [];
 			const values = options.map((o) => o.value);
-			expect(values).toEqual(['list_repos', 'create_branch', 'commit_file', 'create_pr', 'get_diff', 'merge_pr']);
+			expect(values).toEqual([
+				'list_repos',
+				'create_branch',
+				'delete_branch',
+				'commit_file',
+				'commit_files',
+				'create_pr',
+				'get_diff',
+				'merge_pr',
+				'set_commit_status',
+			]);
 		});
 
-		it('should list repositories', async () => {
+		it('should require aishaGitHubApi credentials for GitHub', () => {
+			const node = new AishaAdminBridge();
+			const cred = node.description.credentials?.find((c) => c.name === 'aishaGitHubApi');
+			expect(cred).toBeDefined();
+			expect(cred?.displayOptions?.show?.service).toEqual(['github']);
+		});
+
+		it('should search repositories with GitHub auth headers', async () => {
 			fetchMock.mockResolvedValue(mockFetchResponse({
-				data: [{ id: 1, full_name: 'evymo/aisha-dirigent' }],
+				total_count: 1,
+				items: [{ id: 1, full_name: 'acme/platform' }],
 			}));
 
 			const ctx = createMockExecuteFunctions({
-				service: 'forgejo',
+				service: 'github',
 				operation: 'list_repos',
 				repoSearchQuery: 'aisha',
-				credentials: forgejoCredentials,
+				credentials: githubCredentials,
 			});
 
 			const node = new AishaAdminBridge();
@@ -767,26 +786,71 @@ describe('AishaAdminBridge', () => {
 			expect(result[0][0].json.success).toBe(true);
 			expect(result[0][0].json.operation).toBe('list_repos');
 			expect(fetchMock).toHaveBeenCalledWith(
-				expect.stringContaining('/repos/search?q=aisha'),
+				'https://api.github.test/search/repositories?q=aisha&per_page=50',
 				expect.objectContaining({
 					headers: expect.objectContaining({
-						Authorization: 'token test-forgejo-token',
+						Authorization: 'Bearer test-github-token',
+						Accept: 'application/vnd.github+json',
 					}),
 				}),
 			);
 		});
 
-		it('should create a branch', async () => {
-			fetchMock.mockResolvedValue(mockFetchResponse({ name: 'aisha/fix-i18n' }));
+		it('should list the authenticated user repositories without a query', async () => {
+			fetchMock.mockResolvedValue(mockFetchResponse([{ id: 1, full_name: 'acme/platform' }]));
 
 			const ctx = createMockExecuteFunctions({
-				service: 'forgejo',
+				service: 'github',
+				operation: 'list_repos',
+				credentials: githubCredentials,
+			});
+
+			const node = new AishaAdminBridge();
+			await node.execute.call(ctx);
+
+			expect(fetchMock).toHaveBeenCalledWith('https://api.github.test/user/repos?per_page=50', expect.anything());
+		});
+
+		it('should create a branch from the base branch head SHA', async () => {
+			fetchMock
+				.mockResolvedValueOnce(mockFetchResponse({ object: { sha: 'base-sha' } }))
+				.mockResolvedValueOnce(mockFetchResponse({ ref: 'refs/heads/aisha/fix-i18n' }));
+
+			const ctx = createMockExecuteFunctions({
+				service: 'github',
 				operation: 'create_branch',
-				repoOwner: 'aisha',
-				repoName: 'dirigent',
+				repoOwner: 'acme',
+				repoName: 'platform',
 				branchName: 'aisha/fix-i18n',
 				baseBranch: 'main',
-				credentials: forgejoCredentials,
+				credentials: githubCredentials,
+			});
+
+			const node = new AishaAdminBridge();
+			const result = await node.execute.call(ctx);
+
+			expect(result[0][0].json.success).toBe(true);
+			expect(fetchMock).toHaveBeenNthCalledWith(1, `${REPO}/git/ref/heads/main`, expect.anything());
+			expect(fetchMock).toHaveBeenNthCalledWith(
+				2,
+				`${REPO}/git/refs`,
+				expect.objectContaining({
+					method: 'POST',
+					body: JSON.stringify({ ref: 'refs/heads/aisha/fix-i18n', sha: 'base-sha' }),
+				}),
+			);
+		});
+
+		it('should delete a branch ref', async () => {
+			fetchMock.mockResolvedValue({ ok: true, status: 204, text: async () => '' } as unknown as Response);
+
+			const ctx = createMockExecuteFunctions({
+				service: 'github',
+				operation: 'delete_branch',
+				repoOwner: 'acme',
+				repoName: 'platform',
+				branchName: 'aisha/abandoned',
+				credentials: githubCredentials,
 			});
 
 			const node = new AishaAdminBridge();
@@ -794,59 +858,152 @@ describe('AishaAdminBridge', () => {
 
 			expect(result[0][0].json.success).toBe(true);
 			expect(fetchMock).toHaveBeenCalledWith(
-				'https://git.test.local/api/v1/repos/aisha/dirigent/branches',
-				expect.objectContaining({
-					method: 'POST',
-					body: JSON.stringify({
-						new_branch_name: 'aisha/fix-i18n',
-						old_branch_name: 'main',
-					}),
-				}),
+				`${REPO}/git/refs/heads/aisha/abandoned`,
+				expect.objectContaining({ method: 'DELETE' }),
 			);
 		});
 
-		it('should commit a new file', async () => {
+		it('should commit a new file with PUT and no sha', async () => {
 			// First fetch: file lookup (404 = new file)
 			fetchMock
-				.mockRejectedValueOnce(new Error('not found'))
-				.mockResolvedValueOnce(mockFetchResponse({ content: { sha: 'abc123' } }));
+				.mockResolvedValueOnce(mockFetchResponse({ message: 'Not Found' }, false))
+				.mockResolvedValueOnce(mockFetchResponse({ content: { sha: 'abc123' }, commit: { sha: 'c1' } }));
 
 			const ctx = createMockExecuteFunctions({
-				service: 'forgejo',
+				service: 'github',
 				operation: 'commit_file',
-				repoOwner: 'aisha',
-				repoName: 'dirigent',
+				repoOwner: 'acme',
+				repoName: 'platform',
 				branchName: 'aisha/fix-i18n',
 				filePath: 'src/i18n/segments/cs/core.json',
 				fileContent: '{"key": "value"}',
 				commitMessage: 'fix: add key',
-				credentials: forgejoCredentials,
+				credentials: githubCredentials,
 			});
 
 			const node = new AishaAdminBridge();
 			const result = await node.execute.call(ctx);
 
 			expect(result[0][0].json.success).toBe(true);
-			// Second call should be POST (new file)
-			expect(fetchMock).toHaveBeenCalledWith(
-				expect.stringContaining('/contents/src/i18n/segments/cs/core.json'),
-				expect.objectContaining({ method: 'POST' }),
+			expect(fetchMock).toHaveBeenNthCalledWith(
+				1,
+				`${REPO}/contents/src/i18n/segments/cs/core.json?ref=aisha%2Ffix-i18n`,
+				expect.anything(),
 			);
+			const [url, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+			expect(url).toBe(`${REPO}/contents/src/i18n/segments/cs/core.json`);
+			expect(init.method).toBe('PUT');
+			expect(JSON.parse(String(init.body))).toEqual({
+				content: Buffer.from('{"key": "value"}', 'utf-8').toString('base64'),
+				message: 'fix: add key',
+				branch: 'aisha/fix-i18n',
+			});
+		});
+
+		it('should update an existing file with its blob sha', async () => {
+			fetchMock
+				.mockResolvedValueOnce(mockFetchResponse({ sha: 'old-blob' }))
+				.mockResolvedValueOnce(mockFetchResponse({ commit: { sha: 'c2' } }));
+
+			const ctx = createMockExecuteFunctions({
+				service: 'github',
+				operation: 'commit_file',
+				repoOwner: 'acme',
+				repoName: 'platform',
+				branchName: 'main',
+				filePath: 'README.md',
+				fileContent: 'x',
+				commitMessage: 'docs: x',
+				credentials: githubCredentials,
+			});
+
+			const node = new AishaAdminBridge();
+			await node.execute.call(ctx);
+
+			const [, init] = fetchMock.mock.calls[1] as [string, RequestInit];
+			expect(JSON.parse(String(init.body)).sha).toBe('old-blob');
+		});
+
+		it('should commit several files in one commit on the default branch', async () => {
+			fetchMock
+				.mockResolvedValueOnce(mockFetchResponse({ default_branch: 'main' }))
+				.mockResolvedValueOnce(mockFetchResponse({ object: { sha: 'parent-sha' } }))
+				.mockResolvedValueOnce(mockFetchResponse({ sha: 'parent-sha', tree: { sha: 'base-tree' } }))
+				.mockResolvedValueOnce(mockFetchResponse({ sha: 'new-tree' }))
+				.mockResolvedValueOnce(mockFetchResponse({ sha: 'new-commit', html_url: 'https://github.test/c' }))
+				.mockResolvedValueOnce(mockFetchResponse({ ref: 'refs/heads/main' }));
+
+			const ctx = createMockExecuteFunctions({
+				service: 'github',
+				operation: 'commit_files',
+				repoOwner: 'acme',
+				repoName: 'platform',
+				files: { 'CLAUDE.md': '# rules', '.cursorrules': 'rules' },
+				commitMessage: 'chore(ide): regenerate',
+				credentials: githubCredentials,
+			});
+
+			const node = new AishaAdminBridge();
+			const result = await node.execute.call(ctx);
+
+			const json = result[0][0].json as { success: boolean; result: { branch: string; files: string[] } };
+			expect(json.success).toBe(true);
+			expect(json.result.branch).toBe('main');
+			expect(json.result.files).toEqual(['CLAUDE.md', '.cursorrules']);
+			const calls = fetchMock.mock.calls as Array<[string, RequestInit]>;
+			expect(calls.map(([u, i]) => `${i?.method ?? 'GET'} ${u}`)).toEqual([
+				`GET ${REPO}`,
+				`GET ${REPO}/git/ref/heads/main`,
+				`GET ${REPO}/git/commits/parent-sha`,
+				`POST ${REPO}/git/trees`,
+				`POST ${REPO}/git/commits`,
+				`PATCH ${REPO}/git/refs/heads/main`,
+			]);
+			expect(JSON.parse(String(calls[3][1].body))).toEqual({
+				base_tree: 'base-tree',
+				tree: [
+					{ path: 'CLAUDE.md', mode: '100644', type: 'blob', content: '# rules' },
+					{ path: '.cursorrules', mode: '100644', type: 'blob', content: 'rules' },
+				],
+			});
+			expect(JSON.parse(String(calls[4][1].body))).toEqual({
+				message: 'chore(ide): regenerate',
+				tree: 'new-tree',
+				parents: ['parent-sha'],
+			});
+			expect(JSON.parse(String(calls[5][1].body))).toEqual({ sha: 'new-commit' });
+		});
+
+		it('should reject commit_files with a path traversal', async () => {
+			const ctx = createMockExecuteFunctions({
+				service: 'github',
+				operation: 'commit_files',
+				repoOwner: 'acme',
+				repoName: 'platform',
+				targetBranch: 'main',
+				files: JSON.stringify({ '../etc/passwd': 'x' }),
+				commitMessage: 'x',
+				credentials: githubCredentials,
+			});
+
+			const node = new AishaAdminBridge();
+			await expect(node.execute.call(ctx)).rejects.toThrow('path traversal');
+			expect(fetchMock).not.toHaveBeenCalled();
 		});
 
 		it('should create a pull request', async () => {
 			fetchMock.mockResolvedValue(mockFetchResponse({ number: 42, title: '[Aisha] Fix' }));
 
 			const ctx = createMockExecuteFunctions({
-				service: 'forgejo',
+				service: 'github',
 				operation: 'create_pr',
-				repoOwner: 'aisha',
-				repoName: 'dirigent',
+				repoOwner: 'acme',
+				repoName: 'platform',
 				prTitle: '[Aisha] Fix missing translation',
 				prBody: 'Automated fix',
 				headBranch: 'aisha/fix-i18n',
 				baseBranch: 'main',
-				credentials: forgejoCredentials,
+				credentials: githubCredentials,
 			});
 
 			const node = new AishaAdminBridge();
@@ -854,10 +1011,15 @@ describe('AishaAdminBridge', () => {
 
 			expect(result[0][0].json.success).toBe(true);
 			expect(fetchMock).toHaveBeenCalledWith(
-				'https://git.test.local/api/v1/repos/aisha/dirigent/pulls',
+				`${REPO}/pulls`,
 				expect.objectContaining({
 					method: 'POST',
-					body: expect.stringContaining('[Aisha] Fix missing translation'),
+					body: JSON.stringify({
+						title: '[Aisha] Fix missing translation',
+						body: 'Automated fix',
+						head: 'aisha/fix-i18n',
+						base: 'main',
+					}),
 				}),
 			);
 		});
@@ -866,35 +1028,32 @@ describe('AishaAdminBridge', () => {
 			fetchMock.mockResolvedValue(mockFetchResponse([{ filename: 'src/hooks/useTest.ts' }]));
 
 			const ctx = createMockExecuteFunctions({
-				service: 'forgejo',
+				service: 'github',
 				operation: 'get_diff',
-				repoOwner: 'aisha',
-				repoName: 'dirigent',
+				repoOwner: 'acme',
+				repoName: 'platform',
 				prNumber: 42,
-				credentials: forgejoCredentials,
+				credentials: githubCredentials,
 			});
 
 			const node = new AishaAdminBridge();
 			const result = await node.execute.call(ctx);
 
 			expect(result[0][0].json.success).toBe(true);
-			expect(fetchMock).toHaveBeenCalledWith(
-				'https://git.test.local/api/v1/repos/aisha/dirigent/pulls/42/files',
-				expect.anything(),
-			);
+			expect(fetchMock).toHaveBeenCalledWith(`${REPO}/pulls/42/files`, expect.anything());
 		});
 
-		it('should merge a PR', async () => {
+		it('should merge a PR with PUT and merge_method', async () => {
 			fetchMock.mockResolvedValue(mockFetchResponse({ merged: true }));
 
 			const ctx = createMockExecuteFunctions({
-				service: 'forgejo',
+				service: 'github',
 				operation: 'merge_pr',
-				repoOwner: 'aisha',
-				repoName: 'dirigent',
+				repoOwner: 'acme',
+				repoName: 'platform',
 				prNumber: 42,
 				mergeMethod: 'squash',
-				credentials: forgejoCredentials,
+				credentials: githubCredentials,
 			});
 
 			const node = new AishaAdminBridge();
@@ -902,22 +1061,95 @@ describe('AishaAdminBridge', () => {
 
 			expect(result[0][0].json.success).toBe(true);
 			expect(fetchMock).toHaveBeenCalledWith(
-				'https://git.test.local/api/v1/repos/aisha/dirigent/pulls/42/merge',
+				`${REPO}/pulls/42/merge`,
 				expect.objectContaining({
-					method: 'POST',
-					body: JSON.stringify({ Do: 'squash' }),
+					method: 'PUT',
+					body: JSON.stringify({ merge_method: 'squash' }),
 				}),
 			);
 		});
 
-		it('should handle Forgejo API error', async () => {
+		it('should set a commit status', async () => {
+			fetchMock.mockResolvedValue(mockFetchResponse({ state: 'failure' }));
+
+			const ctx = createMockExecuteFunctions({
+				service: 'github',
+				operation: 'set_commit_status',
+				repoOwner: 'acme',
+				repoName: 'platform',
+				commitSha: 'abc123',
+				statusState: 'failure',
+				statusContext: 'aitg/pr-gate',
+				statusDescription: 'AITG high+ failures',
+				credentials: githubCredentials,
+			});
+
+			const node = new AishaAdminBridge();
+			const result = await node.execute.call(ctx);
+
+			expect(result[0][0].json.success).toBe(true);
+			expect(fetchMock).toHaveBeenCalledWith(
+				`${REPO}/statuses/abc123`,
+				expect.objectContaining({
+					method: 'POST',
+					body: JSON.stringify({ state: 'failure', context: 'aitg/pr-gate', description: 'AITG high+ failures' }),
+				}),
+			);
+		});
+
+		it('should reject an invalid commit status state', async () => {
+			const ctx = createMockExecuteFunctions({
+				service: 'github',
+				operation: 'set_commit_status',
+				repoOwner: 'acme',
+				repoName: 'platform',
+				commitSha: 'abc123',
+				statusState: 'green',
+				statusContext: 'x',
+				credentials: githubCredentials,
+			});
+
+			const node = new AishaAdminBridge();
+			await expect(node.execute.call(ctx)).rejects.toThrow('invalid state');
+			expect(fetchMock).not.toHaveBeenCalled();
+		});
+
+		it('fails closed when the repository is not configured (no default repo)', async () => {
+			const ctx = createMockExecuteFunctions({
+				service: 'github',
+				operation: 'create_pr',
+				repoOwner: '',
+				repoName: '',
+				prTitle: 'x',
+				headBranch: 'x',
+				credentials: githubCredentials,
+			});
+
+			const node = new AishaAdminBridge();
+			await expect(node.execute.call(ctx)).rejects.toThrow('GitHub repository not configured');
+			expect(fetchMock).not.toHaveBeenCalled();
+		});
+
+		it('should refuse a non-https API URL (token would travel in clear text)', async () => {
+			const ctx = createMockExecuteFunctions({
+				service: 'github',
+				operation: 'list_repos',
+				credentials: { aishaGitHubApi: { apiUrl: 'http://api.github.test', apiToken: 't' } },
+			});
+
+			const node = new AishaAdminBridge();
+			await expect(node.execute.call(ctx)).rejects.toThrow('must use https');
+			expect(fetchMock).not.toHaveBeenCalled();
+		});
+
+		it('should handle GitHub API error', async () => {
 			fetchMock.mockResolvedValue(mockFetchResponse({ message: 'Not Found' }, false));
 
 			const ctx = createMockExecuteFunctions({
-				service: 'forgejo',
+				service: 'github',
 				operation: 'list_repos',
 				repoSearchQuery: 'nonexistent',
-				credentials: forgejoCredentials,
+				credentials: githubCredentials,
 				continueOnFail: true,
 			});
 
@@ -927,15 +1159,15 @@ describe('AishaAdminBridge', () => {
 			expect(result[0][0].json.error).toBeDefined();
 		});
 
-		it('should throw for unknown Forgejo operation', async () => {
+		it('should throw for unknown GitHub operation', async () => {
 			const ctx = createMockExecuteFunctions({
-				service: 'forgejo',
+				service: 'github',
 				operation: 'bad_op',
-				credentials: forgejoCredentials,
+				credentials: githubCredentials,
 			});
 
 			const node = new AishaAdminBridge();
-			await expect(node.execute.call(ctx)).rejects.toThrow('Unknown Forgejo operation');
+			await expect(node.execute.call(ctx)).rejects.toThrow('Unknown GitHub operation');
 		});
 	});
 });

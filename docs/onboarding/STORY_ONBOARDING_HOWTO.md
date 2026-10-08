@@ -93,7 +93,7 @@ INSERT INTO partner_stories (
   ARRAY['typescript','react','...'],
   'low|medium|high',
   ARRAY['domain1','domain2'],
-  'https://forgejo.example.com/org/repo', 'main',
+  'https://git.example.com/org/repo', 'main',
   '{"summary":"...","goals":[...],"constraints":[...],"success_criteria":[...]}'::jsonb
 );
 ```
