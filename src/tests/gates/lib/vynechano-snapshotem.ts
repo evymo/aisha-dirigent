@@ -3,10 +3,11 @@
  *
  * Veřejné zrcadlo (github.com/evymo/aisha-orchestrator) vzniká ze stromu
  * upstreamu přes scripts/release/public-snapshot.mjs a `config/public-snapshot.exclude`
- * z něj vyřazuje cesty. Rozhodnutí majitele 2026-10-03: na GitHubu nic neběží,
- * takže `.github/workflows/` a `.github/dependabot.yml` zůstávají jen v upstreamu.
- * Brány, které ty soubory čtou (podpis kontejnerů, SBOM, deploy lane, Dependabot),
- * ve veřejném klonu NEMAJÍ CO MĚŘIT.
+ * z něj vyřazuje cesty. Do 2026-10-08 (rozhodnutí majitele 2026-10-03: na GitHubu
+ * nic neběží) vyřazoval `.github/workflows/` i `.github/dependabot.yml`; od přesunu CI
+ * na GitHub Actions snapshot workflow nese a vyřazení platí pro Dependabot. Co přesně
+ * vyřazuje, říká jen ten soubor. Brány, které vyřazené soubory čtou (podpis kontejnerů,
+ * SBOM, deploy lane, Dependabot), ve veřejném klonu NEMAJÍ CO MĚŘIT.
  *
  * ⛔ TŘI ODPOVĚDI, NE DVĚ — týž princip jako `stack-nesmi-znat-jmeno-instance`:
  *   · soubor ve stromu je            → brána měří (upstream, nebo CI přibylo na GitHubu)
