@@ -107,8 +107,33 @@ section "Story Intra Provisioning ($MODE)"
 # ─── Appsmith API helpers ─────────────────────────────────────
 # Appsmith CE uses cookie-based auth (CSRF token + session cookie).
 # We login once and reuse the session for all API calls.
+#
+# ⛔ NAMĚŘENO 2026-10-08 proti appsmith-ce v1.71 (lokální stack): přihlášení
+# JSONem na /api/v1/login vrací 401 — endpoint bere jen FORMULÁŘ (302, při
+# chybě `?error=true`) a potřebuje XSRF cookie z /api/v1/users/me. A na čerstvé
+# instanci (cold-start, wipe) první admin vůbec neexistuje, takže import
+# nikdy neproběhl. Postup odpovídá docs/deploy/APPSMITH.md.
 COOKIE_JAR="$(mktemp)"
 trap 'rm -f "$COOKIE_JAR"' EXIT
+APPSMITH_XSRF=""
+
+_appsmith_xsrf() {
+  curl -s -o /dev/null -c "$COOKIE_JAR" -b "$COOKIE_JAR" "${APPSMITH_URL}/api/v1/users/me" || true
+  APPSMITH_XSRF=$(awk '$6 == "XSRF-TOKEN" {print $7}' "$COOKIE_JAR" | tail -1)
+}
+
+# Formulářové přihlášení; úspěch měří identita relace, ne přesměrování.
+_appsmith_form_login() {
+  local email="$1" password="$2" location
+  _appsmith_xsrf
+  location=$(curl -s -o /dev/null -w '%{redirect_url}' -c "$COOKIE_JAR" -b "$COOKIE_JAR" \
+    -X POST "${APPSMITH_URL}/api/v1/login" \
+    -H "X-XSRF-TOKEN: ${APPSMITH_XSRF}" -H "Origin: ${APPSMITH_URL}" \
+    --data-urlencode "username=${email}" --data-urlencode "password=${password}") || return 1
+  [[ -n "$location" && "$location" != *"error="* ]] || return 1
+  curl -s -b "$COOKIE_JAR" -H "X-XSRF-TOKEN: ${APPSMITH_XSRF}" "${APPSMITH_URL}/api/v1/users/me" \
+    | grep -q "\"email\":\"${email}\""
+}
 
 appsmith_login() {
   local email="${APPSMITH_ADMIN_EMAIL:?APPSMITH_ADMIN_EMAIL required}"
@@ -119,17 +144,30 @@ appsmith_login() {
     return 1
   fi
 
-  local response
-  response=$(curl -sf -c "$COOKIE_JAR" -b "$COOKIE_JAR" \
-    -X POST "${APPSMITH_URL}/api/v1/login" \
-    -H "Content-Type: application/json" \
-    -d "{\"email\":\"${email}\",\"password\":\"${password}\"}" 2>/dev/null || echo '{"errorCode":"FAIL"}')
-
-  if grep -q '"errorCode"' <<< "$response"; then
-    fail "Appsmith login failed: $(echo "$response" | grep -o '"message":"[^"]*"' | head -1)"
-    return 1
+  if _appsmith_form_login "$email" "$password"; then
+    ok "Logged into Appsmith as ${email}"
+    return 0
   fi
-  ok "Logged into Appsmith as ${email}"
+
+  # Čerstvá instance: první admin ještě neexistuje. /api/v1/users/super projde
+  # JEN na instanci bez uživatelů — na existující Appsmith ho odmítne sám.
+  # Bez hlavičky Origin vrací 400 až PO založení uživatele (bez hesla, neaktivní),
+  # a takový uživatel pak další založení blokuje — proto se posílá vždy.
+  info "Appsmith login failed — trying first-admin bootstrap (succeeds only on an instance without users)"
+  _appsmith_xsrf
+  local code
+  code=$(curl -s -o /dev/null -w '%{http_code}' -c "$COOKIE_JAR" -b "$COOKIE_JAR" \
+    -X POST "${APPSMITH_URL}/api/v1/users/super" \
+    -H "X-Requested-By: Appsmith" -H "X-XSRF-TOKEN: ${APPSMITH_XSRF}" -H "Origin: ${APPSMITH_URL}" \
+    --data-urlencode "name=AISHA Admin" --data-urlencode "email=${email}" \
+    --data-urlencode "password=${password}" \
+    --data-urlencode "allowCollectingAnonymousData=false" --data-urlencode "signupForNewsletter=false")
+  if _appsmith_form_login "$email" "$password"; then
+    ok "Created the first Appsmith admin ${email} and logged in"
+    return 0
+  fi
+  fail "Appsmith login failed for ${email} (form login rejected; first-admin bootstrap HTTP ${code} — the instance already has users with a different password?)"
+  return 1
 }
 
 appsmith_api() {
@@ -137,9 +175,13 @@ appsmith_api() {
   local path="$2"
   local data="${3:-}"
 
-  local args=(-sf -b "$COOKIE_JAR" -c "$COOKIE_JAR")
+  # Bez -f: tělo chyby se vrátí a volající ho čte (`.responseMeta`). S -f a `set -e`
+  # skript při první HTTP chybě tiše skončil (naměřeno u datasource kroku).
+  local args=(-s -b "$COOKIE_JAR" -c "$COOKIE_JAR")
   args+=(-X "$method")
   args+=(-H "Content-Type: application/json")
+  args+=(-H "X-Requested-By: Appsmith")
+  [[ -n "$APPSMITH_XSRF" ]] && args+=(-H "X-XSRF-TOKEN: ${APPSMITH_XSRF}")
   [[ -n "$data" ]] && args+=(-d "$data")
 
   curl "${args[@]}" "${APPSMITH_URL}${path}" 2>/dev/null
@@ -219,17 +261,17 @@ appsmith_login || exit 1
 
 # Step 1: Create workspace
 section "Create Workspace"
-EXISTING_WS=$(appsmith_api GET "/api/v1/workspaces" | \
-  grep -o '"id":"[^"]*","userPermissions"[^}]*"name":"'"${WORKSPACE_NAME}"'"' | \
-  grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+# Seznam workspace je /workspaces/home — GET /workspaces vrací 405 (v1.71), takže
+# existující workspace se nikdy nenašel a každý běh zakládal další.
+EXISTING_WS=$(appsmith_api GET "/api/v1/workspaces/home" | \
+  jq -r --arg n "$WORKSPACE_NAME" '[.data[]? | select(.name == $n)][0].id // empty' 2>/dev/null || true)
 
 if [[ -n "$EXISTING_WS" ]]; then
   skip "Workspace '${WORKSPACE_NAME}' already exists (id=${EXISTING_WS})"
   WORKSPACE_ID="$EXISTING_WS"
 else
-  WS_RESPONSE=$(appsmith_api POST "/api/v1/workspaces" \
-    "{\"name\":\"${WORKSPACE_NAME}\"}")
-  WORKSPACE_ID=$(echo "$WS_RESPONSE" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+  WS_RESPONSE=$(appsmith_api POST "/api/v1/workspaces" "$(jq -cn --arg n "$WORKSPACE_NAME" '{name: $n}')")
+  WORKSPACE_ID=$(echo "$WS_RESPONSE" | jq -r '.data.id // empty' 2>/dev/null || true)
   if [[ -n "$WORKSPACE_ID" ]]; then
     ok "Created workspace '${WORKSPACE_NAME}' (id=${WORKSPACE_ID})"
   else
@@ -241,6 +283,8 @@ fi
 # Step 2: Create datasources
 section "Create Datasources"
 
+REST_PLUGIN_ID=""
+
 create_rest_datasource() {
   local name="$1"
   local url="$2"
@@ -249,36 +293,40 @@ create_rest_datasource() {
   # Check if datasource already exists
   local existing
   existing=$(appsmith_api GET "/api/v1/datasources?workspaceId=${WORKSPACE_ID}" | \
-    grep -o '"id":"[^"]*"[^}]*"name":"'"${name}"'"' | \
-    grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+    jq -r --arg n "$name" '[.data[]? | select(.name == $n)][0].id // empty' 2>/dev/null || true)
 
   if [[ -n "$existing" ]]; then
     skip "Datasource '${name}' already exists (id=${existing})"
     return 0
   fi
 
-  local body
-  body=$(cat <<EOF
-{
-  "name": "${name}",
-  "workspaceId": "${WORKSPACE_ID}",
-  "pluginId": "restapi-plugin",
-  "datasourceConfiguration": {
-    "url": "${url}",
-    "headers": ${headers}
-  }
-}
-EOF
-)
+  # pluginId je ID pluginu ve workspace, ne jméno balíčku (`restapi-plugin` → 400).
+  if [[ -z "$REST_PLUGIN_ID" ]]; then
+    REST_PLUGIN_ID=$(appsmith_api GET "/api/v1/plugins?workspaceId=${WORKSPACE_ID}" | \
+      jq -r '[.data[]? | select(.packageName == "restapi-plugin")][0].id // empty' 2>/dev/null || true)
+  fi
+  if [[ -z "$REST_PLUGIN_ID" ]]; then
+    warn "REST API plugin not found in the workspace — cannot create datasource '${name}'"
+    return 0
+  fi
 
-  local response
+  # Appsmith ≥1.9 (prostředí): konfigurace patří pod datasourceStorages; CE má
+  # jediné prostředí `unused_env`. Starý tvar (datasourceConfiguration na kořeni)
+  # vrací 400 „Please enter a valid parameter datasource" (naměřeno v1.71).
+  local body
+  body=$(jq -cn --arg name "$name" --arg ws "$WORKSPACE_ID" --arg plugin "$REST_PLUGIN_ID" \
+    --arg url "$url" --argjson headers "$headers" \
+    '{name: $name, workspaceId: $ws, pluginId: $plugin,
+      datasourceStorages: {unused_env: {environmentId: "unused_env",
+        datasourceConfiguration: {url: $url, headers: $headers}}}}')
+
+  local response ds_id
   response=$(appsmith_api POST "/api/v1/datasources" "$body")
-  local ds_id
-  ds_id=$(echo "$response" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+  ds_id=$(echo "$response" | jq -r '.data.id // empty' 2>/dev/null || true)
   if [[ -n "$ds_id" ]]; then
     ok "Created datasource '${name}' (id=${ds_id})"
   else
-    warn "Failed to create datasource '${name}'"
+    warn "Failed to create datasource '${name}': $(echo "$response" | jq -r '.responseMeta.error.message // .responseMeta.message // "no response"' 2>/dev/null)"
   fi
 }
 
@@ -312,7 +360,7 @@ reconnect_datasources() {
   local import_response="$2"
 
   local unconfigured
-  unconfigured=$(echo "$import_response" | grep -o '"unConfiguredDatasourceList":\[[^]]*\]' || true)
+  unconfigured=$(echo "$import_response" | jq -r '.data.unConfiguredDatasourceList[]?.name // empty' 2>/dev/null || true)
   if [[ -z "$unconfigured" ]]; then
     skip "No unconfigured datasources to reconnect (appId=${app_id})"
     return 0
@@ -326,8 +374,7 @@ reconnect_datasources() {
   while IFS= read -r name; do
     [[ -n "$name" ]] || continue
     ds_id=$(echo "$ws_datasources" | \
-      grep -o '"id":"[^"]*"[^}]*"name":"'"${name}"'"' | \
-      grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+      jq -r --arg n "$name" '[.data[]? | select(.name == $n)][0].id // empty' 2>/dev/null || true)
     if [[ -z "$ds_id" ]]; then
       warn "  reconnect: no workspace datasource named '${name}'"
       continue
@@ -338,7 +385,7 @@ reconnect_datasources() {
       "{\"name\":\"${name}\"}" >/dev/null 2>&1; then
       reconnected=$((reconnected + 1))
     fi
-  done <<< "$(echo "$unconfigured" | grep -o '"name":"[^"]*"' | cut -d'"' -f4)"
+  done <<< "$unconfigured"
 
   ok "Reconnected ${reconnected} datasource(s) (appId=${app_id})"
 }
@@ -347,7 +394,8 @@ reconnect_datasources() {
 section "Import Templates"
 if [[ -d "$TEMPLATES_DIR" ]]; then
   # Snapshot existing apps in the workspace ONCE for the existence guard.
-  EXISTING_APPS_JSON=$(appsmith_api GET "/api/v1/applications?workspaceId=${WORKSPACE_ID}" || echo '')
+  # Seznam aplikací workspace je /applications/home (v1.71).
+  EXISTING_APPS_JSON=$(appsmith_api GET "/api/v1/applications/home?workspaceId=${WORKSPACE_ID}" || echo '')
 
   for tpl in "$TEMPLATES_DIR"/*.template.json; do
     [[ -f "$tpl" ]] || continue
@@ -355,15 +403,14 @@ if [[ -d "$TEMPLATES_DIR" ]]; then
 
     # The app name the import will create = exportedApplication.name in the
     # template (fall back to the template filename).
-    APP_NAME=$(grep -o '"name":"[^"]*"' "$tpl" | head -1 | cut -d'"' -f4)
+    APP_NAME=$(jq -r '.exportedApplication.name // empty' "$tpl" 2>/dev/null || true)
     APP_NAME="${APP_NAME:-$TPL_NAME}"
 
     # (2a) Application existence guard — is an app with this name already in the
     # workspace? If so we UPDATE it in place (import with ?applicationId=…) rather
     # than POSTing a fresh import, so a second run creates ZERO duplicate apps.
     EXISTING_APP=$(echo "$EXISTING_APPS_JSON" | \
-      grep -o '"id":"[^"]*"[^}]*"name":"'"${APP_NAME}"'"' | \
-      grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
+      jq -r --arg n "$APP_NAME" '[.data[]? | select(.name == $n)][0].id // empty' 2>/dev/null || true)
 
     local_import_url="${APPSMITH_URL}/api/v1/applications/import/${WORKSPACE_ID}"
     if [[ -n "$EXISTING_APP" ]]; then
@@ -374,16 +421,18 @@ if [[ -d "$TEMPLATES_DIR" ]]; then
     fi
 
     # Appsmith import is via multipart form upload.
-    IMPORT_RESPONSE=$(curl -sf -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
-      -X POST "${local_import_url}" \
-      -F "file=@${tpl};type=application/json" 2>/dev/null || echo '{"errorCode":"FAIL"}')
+    import_headers=(-H "X-Requested-By: Appsmith")
+    [[ -n "$APPSMITH_XSRF" ]] && import_headers+=(-H "X-XSRF-TOKEN: ${APPSMITH_XSRF}")
+    IMPORT_RESPONSE=$(curl -s -b "$COOKIE_JAR" -c "$COOKIE_JAR" \
+      -X POST "${local_import_url}" "${import_headers[@]}" \
+      -F "file=@${tpl};type=application/json" 2>/dev/null || echo '{}')
 
-    if grep -q '"errorCode"' <<< "$IMPORT_RESPONSE"; then
-      warn "Failed to import ${TPL_NAME}: $(echo "$IMPORT_RESPONSE" | grep -o '"message":"[^"]*"' | head -1)"
+    if [[ "$(echo "$IMPORT_RESPONSE" | jq -r '.responseMeta.success // false' 2>/dev/null)" != "true" ]]; then
+      warn "Failed to import ${TPL_NAME}: $(echo "$IMPORT_RESPONSE" | jq -r '.responseMeta.error.message // .responseMeta.message // "no response"' 2>/dev/null)"
       continue
     fi
 
-    APP_ID=$(echo "$IMPORT_RESPONSE" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+    APP_ID=$(echo "$IMPORT_RESPONSE" | jq -r '.data.application.id // .data.id // empty' 2>/dev/null || true)
     APP_ID="${APP_ID:-$EXISTING_APP}"
     ok "Imported ${TPL_NAME} (appId=${APP_ID})"
 
