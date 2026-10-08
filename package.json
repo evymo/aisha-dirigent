@@ -190,6 +190,7 @@
     "sso:provision:local": "bash scripts/provision-sso.sh --local",
     "sso:provision:prod": "bash scripts/provision-sso.sh --prod",
     "sso:check": "bash scripts/provision-sso.sh --check",
+    "aisha:connect": "node scripts/aisha-connect/cli.mjs",
     "dirigent:bootstrap": "node scripts/dirigent/bootstrap-config.mjs",
     "dirigent:bootstrap:mcp": "node scripts/dirigent/bootstrap-config.mjs --write-mcp",
     "dirigent:source-pack": "node scripts/dirigent/generate-source-pack.mjs",
