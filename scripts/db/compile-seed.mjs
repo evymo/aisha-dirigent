@@ -28,7 +28,7 @@ const args = process.argv.slice(2);
 // for local development + test stacks (warmup:local defaults to it). Distinct
 // from 'demo' (public demo data) — the dev layer holds neutral test reference
 // data (a few stories, a default spend policy) with no demo-partner FKs.
-const VALID_PROFILES = ["platform", "empty", "dev", "demo", "implementation", "instance", "full"];
+const VALID_PROFILES = ["platform", "empty", "template", "dev", "demo", "implementation", "instance", "full"];
 
 function argValue(name) {
   const eq = args.find((arg) => arg.startsWith(`${name}=`));
@@ -39,7 +39,9 @@ function argValue(name) {
 }
 
 function normalizeProfile(value) {
-  return value === "empty" ? "platform" : value;
+  // `template` = lokální „šablona" (local-warmup --seed-profile template): čistá
+  // platforma, obsah webu dodá šablona přes AISHA_SEED_DOMAIN.
+  return value === "empty" || value === "template" ? "platform" : value;
 }
 
 const requestedProfile =
@@ -106,7 +108,7 @@ Usage:
 
 Options:
   --profile P             Seed profile:
-                            platform | empty = platform core + platform translations
+                            platform | empty | template = platform core + platform translations
                             dev        = platform + dev fixtures (local dev/test)
                             demo       = platform + public demo data
                             implementation = platform + selected implementation
@@ -290,9 +292,13 @@ function compileSeed() {
   const fileSize = (fs.statSync(outputFile).size / 1024).toFixed(1);
   console.log(`   Output: ${path.relative(PROJECT_ROOT, outputFile)} (${fileSize} KB)`);
 
-  const seedSqlPath = path.join(PROJECT_ROOT, "aisha/db/seed.sql");
-  fs.writeFileSync(seedSqlPath, compiledContent);
-  console.log(`   Synced: ${path.relative(PROJECT_ROOT, seedSqlPath)}`);
+  // seed.sql je zrcadlo VÝCHOZÍHO výstupu. Explicitní --output (migrate v
+  // kontejneru, kde je aisha/db jen pro čtení) zakommitovaný soubor nemění.
+  if (path.resolve(outputFile) === path.resolve(DEFAULT_OUTPUT)) {
+    const seedSqlPath = path.join(PROJECT_ROOT, "aisha/db/seed.sql");
+    fs.writeFileSync(seedSqlPath, compiledContent);
+    console.log(`   Synced: ${path.relative(PROJECT_ROOT, seedSqlPath)}`);
+  }
 
   return outputFile;
 }

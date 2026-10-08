@@ -346,18 +346,23 @@ if [ "$MIGRATE_EXIT" = "0" ]; then
   #
   # ⭐ Nejistota o tom, ČÍ data se sypou, je STOP. Neseedovat je vratné;
   # naseedovat cizí obsah do produkční databáze ne.
+  # Výstup mimo aisha/db: lokální stack ho připojuje z pracovního stromu jen pro
+  # čtení a zakommitovaný seed.compiled.sql se nesmí přepisovat. db:seed čte
+  # právě tenhle soubor (AISHA_SEED_FILE).
+  SEED_OUT="${AISHA_SEED_FILE:-/tmp/aisha-seed.compiled.sql}"
   if ! node scripts/db/compile-seed.mjs \
     --profile="$SEED_PROFILE" \
-    --implementation="$SEED_IMPLEMENTATION" >>"$MIGRATE_OUT" 2>&1; then
+    --implementation="$SEED_IMPLEMENTATION" \
+    --output="$SEED_OUT" >>"$MIGRATE_OUT" 2>&1; then
     log "FATAL: compile-seed selhal (profile=$SEED_PROFILE implementation=$SEED_IMPLEMENTATION)."
     log "       NEPOKRAČUJU: zakommitovaný seed.compiled.sql je profil 'demo' bez"
-    log "       implementace — jeho použití by do téhle databáze naselo CIZÍ obsah."
+    log "       implementace — do téhle databáze by nasypal CIZÍ obsah."
     log "       Oprav kompilaci; neseedovaná DB je vratný stav, cizí data ne."
     exit 3
   fi
 
-  log "Running: npm run db:seed"
-  npm run db:seed >>"$MIGRATE_OUT" 2>&1
+  log "Running: npm run db:seed ($SEED_OUT)"
+  AISHA_SEED_FILE="$SEED_OUT" npm run db:seed >>"$MIGRATE_OUT" 2>&1
   SEED_EXIT=$?
   log "npm run db:seed exit=$SEED_EXIT"
   FINAL_EXIT=$SEED_EXIT

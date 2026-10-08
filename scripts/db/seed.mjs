@@ -97,9 +97,17 @@ const isLocal = process.argv.includes("--local");
 // It reads AISHA_LOCAL_DB_URL (default: postgresql://postgres:postgres@127.0.0.1:57422/postgres).
 // Set AISHA_LOCAL_DB_URL to switch to the local-warmup stack (port 54322).
 
-// Find the best seed file
+// Find the best seed file. AISHA_SEED_FILE = explicitně zkompilovaný seed
+// (migrate entrypoint ho kompiluje mimo aisha/db, které smí být jen pro čtení).
 let sourceSeedPath;
-if (existsSync(COMPILED_SEED)) {
+const explicitSeed = process.env.AISHA_SEED_FILE;
+if (explicitSeed) {
+  if (!existsSync(explicitSeed)) {
+    console.error(`❌ AISHA_SEED_FILE=${explicitSeed} neexistuje`);
+    process.exit(1);
+  }
+  sourceSeedPath = explicitSeed;
+} else if (existsSync(COMPILED_SEED)) {
   sourceSeedPath = COMPILED_SEED;
 } else if (existsSync(SEED_FILE)) {
   sourceSeedPath = SEED_FILE;
