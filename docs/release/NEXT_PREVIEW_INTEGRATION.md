@@ -112,6 +112,11 @@ n8n/OpenClaw volaly API na `https://api.<LOCAL_TLD>` → generátor ho lokálně
 Výsledek: Synapse, svc-matrix, Element Call healthy; n8n → API 200; ověření 56 kontrol. Element Web
 v tomhle sandboxu padá na chybějící IPv6 (`listen [::]:80`) — omezení prostředí.
 
+**Admin stack** (NocoDB, Appsmith, oauth2-proxy, intranet gateway) spuštěný a healthy;
+oauth2-proxy přesměrují na host-facing Keycloak. Provisioning Story Intra nikdy nefungoval (JSON
+přihlášení, chybějící první admin, `GET /workspaces` 405, starý tvar datasource) → opraven, dva běhy
+ověřily idempotenci. `stack-health.sh --local`: 8/8 změřených zdravých. Ověření 64 kontrol.
+
 Známé, neopravené (kandidáti na samostatné úkoly):
 
 - **Langfuse a OpenClaw** lokálně nedokončí přihlášení (server-side OIDC discovery) —
@@ -121,8 +126,12 @@ Známé, neopravené (kandidáti na samostatné úkoly):
 - **OpenClaw → `POST /mcp`** dojde na gateway, ale ta vrací 404 — ověřit, kam má `/mcp` v produkci vést.
 - **Produkce:** blok gateway v compose nepředává `KEYCLOAK_DOMAIN_PUBLIC` ani `APP_CONFIG_*` →
   `keycloak_url` v app-config bude prázdný; ověřit na nasazené instanci.
-- **maestro** `/health/ready` = 503 při plném CPU (necitlivý `cpu_checker` shodí celkový stav).
-- **Admin stack** (Appsmith 5,6 GB, NocoDB) v tomto běhu nespuštěn kvůli místu na disku.
+- **maestro** `/health/ready` = 503, kdykoli selže i NEBLOKUJÍCÍ checker (`cpu_checker` při plném
+  CPU, `disk_checker` při plném disku — naměřeno `blocking: false`, a přesto `status: failed`).
+  Maestro je z upstreamu `insight`; oprava patří do `aisha/insight-patches/`.
+- **Šablona Story Intra** (`appsmith/templates/story-intra.template.json`) není export Appsmith (chybí
+  `pageList` aj.) — import selže; provisioning ostatní (admin, workspace, datasource) už zvládne.
+  Šablonu je potřeba vyexportovat ze skutečné instance, nebo ji generovat builderem.
 
 Navazující úkoly z odstranění privátní forge:
 
