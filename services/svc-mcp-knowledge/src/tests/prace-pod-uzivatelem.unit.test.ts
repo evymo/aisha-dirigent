@@ -163,6 +163,25 @@ describe('pracovní nástroje MCP pod identitou uživatele (F9)', () => {
     expect(JSON.stringify(response)).not.toContain(TAJNY_TEXT);
   });
 
+  it('model registry preserves caller identity for its SQL admin/staff guard', async () => {
+    rpcUserClaimsMock.mockResolvedValue([{ model_id: 'test-model' }]);
+    const response = await zavolej('get_model_registry', { available_only: false });
+    expect(response.error).toBeUndefined();
+    expect(volaniPodUzivatelem(claimsSPribehem)).toEqual([{
+      fn: 'get_model_registry_admin',
+      parametry: { p_available_only: false, p_eval_status: null, p_provider: null },
+      claims: claimsSPribehem,
+    }]);
+    expect(JSON.parse(response.result!.content[0].text)).toEqual([{ model_id: 'test-model' }]);
+  });
+
+  it('model registry denial never retries under a service identity', async () => {
+    rpcUserClaimsMock.mockRejectedValue(new PostgRESTError('Admin or staff role required', 403, { code: '42501' }));
+    const response = await zavolej('get_model_registry', {});
+    expect(response.error ?? response.result?.isError).toBeTruthy();
+    expect(volaniPodUzivatelem()).toHaveLength(1);
+  });
+
   it('my_next_steps: get_my_workflow_steps identitou uživatele s výchozími hodnotami', async () => {
     rpcUserClaimsMock.mockResolvedValue([{ step_id: KROK, step_name: 'Revize' }]);
     const { result } = await zavolej('my_next_steps', {});

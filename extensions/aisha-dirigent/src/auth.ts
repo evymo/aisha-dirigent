@@ -45,6 +45,7 @@ export interface AuthState {
 }
 
 let secrets: vscode.SecretStorage | null = null;
+let extensionContext: vscode.ExtensionContext | null = null;
 let cachedState: AuthState = {
   accessToken: null,
   refreshToken: null,
@@ -69,6 +70,7 @@ export const onAuthStateChanged = authChangeEmitter.event;
  */
 export async function initAuth(context: vscode.ExtensionContext): Promise<AuthState> {
   secrets = context.secrets;
+  extensionContext = context;
 
   // Restore persisted tokens
   const [accessToken, refreshToken, userId, email, storedClientId] = await Promise.all([
@@ -391,7 +393,12 @@ function generatePkce(): { verifier: string; challenge: string } {
 }
 
 async function resolveOAuthCallbackUri(): Promise<vscode.Uri> {
-  const rawCallbackUri = vscode.Uri.parse(`${vscode.env.uriScheme}://aisha.aisha-dirigent/did-authenticate`);
+  if (!extensionContext) {
+    throw new Error("Authentication module has not been initialized");
+  }
+  const rawCallbackUri = vscode.Uri.parse(
+    `${vscode.env.uriScheme}://${extensionContext.extension.id}/did-authenticate`,
+  );
   if (vscode.env.uiKind === vscode.UIKind.Desktop) {
     return rawCallbackUri;
   }
@@ -404,7 +411,7 @@ async function resolveOAuthCallbackUri(): Promise<vscode.Uri> {
  *
  * 1. Generate PKCE verifier + challenge and random CSRF state
  * 2. Open browser to Keycloak authorization endpoint
- * 3. VS Code URI handler fires when browser redirects to vscode://aisha.aisha-dirigent/did-authenticate
+ * 3. VS Code URI handler fires when browser redirects to vscode://<extension.id>/did-authenticate
  * 4. Validate CSRF state, exchange code for tokens
  */
 export async function loginWithPkce(options?: AuthFlowOptions): Promise<boolean> {

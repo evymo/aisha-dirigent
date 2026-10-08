@@ -188,8 +188,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(registerLiveSessionPush());
 
   // ── OAuth URI Handler (PKCE callback) ─────
-  // Handles vscode://aisha.aisha-dirigent/did-authenticate?code=...&state=...
-  // registered in KC aisha-app redirectUris as vscode://aisha.aisha-dirigent/did-authenticate
+  // Handles vscode://<context.extension.id>/did-authenticate?code=...&state=...
+  // The installed publisher/name callback must be registered in KC aisha-app redirectUris.
   context.subscriptions.push(
     vscode.window.registerUriHandler({
       handleUri(uri: vscode.Uri): void {

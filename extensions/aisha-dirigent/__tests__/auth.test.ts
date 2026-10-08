@@ -144,7 +144,11 @@ describe("auth.ts", () => {
       // that won't come in the test. We assert on the side-effect (browser
       // open with PKCE authorize URL) which happens synchronously before
       // the await on the progress notification.
-      const { login } = await import("../src/auth");
+      const { login, initAuth } = await import("../src/auth");
+      await initAuth({
+        extension: { id: "evymo.aisha-dirigent" },
+        secrets: { get: async () => undefined },
+      } as never);
       void login({ skipStoryPick: true });
 
       // Yield event loop once so the openExternal call settles.
@@ -160,6 +164,47 @@ describe("auth.ts", () => {
       expect(openedHref).not.toContain("/auth/device");
       expect(openedHref).toContain("response_type=code");
       expect(openedHref).toContain("code_challenge_method=S256");
+      expect(new URL(openedHref).searchParams.get("redirect_uri")).toBe(
+        "vscode://evymo.aisha-dirigent/did-authenticate",
+      );
+    });
+
+    it("exchanges a dispatched callback using the installed extension identity and PKCE verifier", async () => {
+      vi.resetModules();
+      mockConfig.keycloakUrl = KC_URL;
+      const vscode = await import("vscode");
+      const openSpy = vi.spyOn(vscode.env, "openExternal").mockResolvedValue(true);
+      const store = new Map<string, string>();
+      const auth = await import("../src/auth");
+      await auth.initAuth({
+        extension: { id: "another-publisher.aisha-dirigent" },
+        secrets: {
+          get: async (key: string) => store.get(key),
+          store: async (key: string, value: string) => { store.set(key, value); },
+        },
+      } as never);
+      const token = fakeJwt({ sub: "test-user", email: "test@example.com" });
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({
+        access_token: token, id_token: token, refresh_token: "test-refresh",
+      }) });
+      const pending = auth.login({ skipStoryPick: true });
+      await Promise.resolve();
+      await Promise.resolve();
+      const url = new URL(openSpy.mock.calls[0][0].toString());
+      const redirect = url.searchParams.get("redirect_uri");
+      expect(redirect).toBe("vscode://another-publisher.aisha-dirigent/did-authenticate");
+      auth.resolvePendingOAuthCallback({ query: new URLSearchParams({
+        state: url.searchParams.get("state")!, code: "test-code",
+      }).toString() } as never);
+      expect(await pending).toBe(true);
+      const exchange = mockFetch.mock.calls[0][1].body as URLSearchParams;
+      expect(exchange.get("redirect_uri")).toBe(redirect);
+      expect(exchange.get("code")).toBe("test-code");
+      const { createHash } = await import("node:crypto");
+      expect(createHash("sha256").update(exchange.get("code_verifier")!).digest("base64url"))
+        .toBe(url.searchParams.get("code_challenge"));
+      expect(auth.getAuthState().isAuthenticated).toBe(true);
+      expect(store.get("aisha.dirigent.clientId")).toBe("aisha-app");
     });
 
     it("shows error when Keycloak URL is missing", async () => {
@@ -450,6 +495,7 @@ describe("auth.ts", () => {
         secrets: mockSecrets,
         subscriptions: [],
         extensionUri: { fsPath: "/test" },
+        extension: { id: "evymo.aisha-dirigent" },
         globalState: { get: () => undefined, update: async () => {} },
         workspaceState: { get: () => undefined, update: async () => {} },
       };

@@ -678,13 +678,13 @@ async function callTool(name: string, rawArgs: Record<string, unknown>, auth: Mc
       });
     }
     case 'get_model_registry': {
-      // Gateway-facing alias → existing get_model_registry_admin RPC.
+      // The SQL checks is_admin_or_staff() for auth.uid(); preserve the verified caller.
       const a = K.get_model_registry.parse(rawArgs);
-      return rpcService('get_model_registry_admin', {
+      return rpcUserClaims('get_model_registry_admin', {
         p_available_only: a.available_only,
         p_eval_status: a.eval_status || null,
         p_provider: a.provider || null,
-      });
+      }, auth.user.claims);
     }
 
     default:

@@ -105,6 +105,18 @@ describe("Extension Architecture", () => {
       expect(bootstrap).toContain("profiles[profileName].orchestrationUrl = config.orchestration_url");
     });
 
+    it("declares redirects for the actual published extension identity in both realm and reconciliation", () => {
+      const manifest = JSON.parse(readRoot("extensions/aisha-dirigent/package.json"));
+      const realm = JSON.parse(readRoot("keycloak/aisha-realm.json"));
+      const client = (realm.clients ?? []).find((candidate: { clientId?: string }) => candidate.clientId === "aisha-app");
+      const reconciliation = readRoot("scripts/keycloak/sync-aisha-app-redirects.mjs");
+      for (const scheme of ["vscode", "vscode-insiders", "cursor", "vscodium"]) {
+        const callback = `${scheme}://${manifest.publisher}.${manifest.name}/did-authenticate`;
+        expect(client?.redirectUris).toContain(callback);
+        expect(reconciliation).toContain(callback);
+      }
+    });
+
     it("Keycloak aisha-app accepts VS Code PKCE callback variants", () => {
       const realm = JSON.parse(readRoot("keycloak/aisha-realm.json"));
       const client = (realm.clients ?? []).find((candidate: { clientId?: string }) => candidate.clientId === "aisha-app");
