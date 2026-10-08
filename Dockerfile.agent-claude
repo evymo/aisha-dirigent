@@ -12,7 +12,7 @@
 # Auth + LLM routing are injected at run time (E5): ANTHROPIC_BASE_URL→gateway
 # (cost governance) + ANTHROPIC_API_KEY, or a read-only ~/.claude subscription
 # credential mount. This image bakes NO secrets.
-# Pull through the AISHA registry cache (cache.aisha.guru) — REGISTRY_PROXY is
+# Pull through your registry cache (e.g. the repo's registry stack) — REGISTRY_PROXY is
 # injected at build time; empty = direct docker.io (matches the other Dockerfiles).
 ARG REGISTRY_PROXY=
 FROM ${REGISTRY_PROXY}library/node:22-bookworm-slim

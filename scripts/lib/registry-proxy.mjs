@@ -43,7 +43,7 @@ export function registryProxyBuildArgs(env = process.env) {
  * `image:` piny šly přímo na Docker Hub (6/6 obrazů, 23/23 pinů bez prefixu).
  *
  * @param {string} imageVersionsText obsah config/image-versions.env
- * @returns {string} např. "cache.aisha.guru/"
+ * @returns {string} např. "localhost:5001/"
  */
 export function domovRegistryProxy(imageVersionsText) {
   const m = String(imageVersionsText).match(/^REGISTRY_PROXY=\$\{REGISTRY_PROXY-([^}]*)\}\s*$/m);

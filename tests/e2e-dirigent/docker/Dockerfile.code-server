@@ -9,10 +9,10 @@
 # code-server 4.121.0 ships VS Code 1.121.0 — matches extension's
 # "engines": { "vscode": "^1.99.0" } constraint (1.96.4 in older
 # code-server tags fails the engine check at install time).
-# Per-fork pull-through cache host — defaults to evymo's value. Forks
-# override via `--build-arg REGISTRY_DOMAIN=...` to route through their cache.
-ARG REGISTRY_DOMAIN=cache.aisha.guru
-FROM ${REGISTRY_DOMAIN}/codercom/code-server:4.121.0
+# Pull-through cache prefix (trailing slash). Override via `--build-arg REGISTRY_PROXY=<cache-host>/` to route through your cache
+# (empty = direct docker.io).
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}codercom/code-server:4.121.0
 
 USER root
 
