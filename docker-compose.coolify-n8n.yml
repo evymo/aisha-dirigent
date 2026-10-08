@@ -176,12 +176,17 @@ services:
       n8n-redis:
         condition: service_healthy
     networks:
+      # `-n8n--main` je cíl mesh trasy 5678 (derivace ho skládá z container_name,
+      # který Coolify přepisuje) — nést ho musí TATO služba. Do 2026-10-08 ho nesl
+      # n8n-worker, takže trasa na n8n odpovídala workerem.
       internal:
         aliases:
           - ${APP_NAME_PREFIX:?identita instance}-n8n
+          - ${APP_NAME_PREFIX:?identita instance}-n8n--main
       mesh-dns:
         aliases:
           - ${APP_NAME_PREFIX:?identita instance}-n8n
+          - ${APP_NAME_PREFIX:?identita instance}-n8n--main
     dns:
       - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
     dns_search:
@@ -253,10 +258,10 @@ services:
     networks:
       internal:
         aliases:
-          - ${APP_NAME_PREFIX:?identita instance}-n8n--main
+          - ${APP_NAME_PREFIX:?identita instance}-n8n--worker
       mesh-dns:
         aliases:
-          - ${APP_NAME_PREFIX:?identita instance}-n8n--main
+          - ${APP_NAME_PREFIX:?identita instance}-n8n--worker
     dns:
       - ${NETBIRD_DNS_IP:?required — generate-secrets derives it from MESH_DNS_RESOLVER_IP; coolify-sync-envs delivers it}
     dns_search:
