@@ -169,28 +169,33 @@ describe("story-service.ts", () => {
       });
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ success: true }),
-      });
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
         json: async () => [created],
       });
 
       const result = await createStory({ title: "New Project", summary: "A test project" });
 
-      expect(mockFetch).toHaveBeenCalledTimes(3);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
       const [url, opts] = mockFetch.mock.calls[0];
-      expect(url).toBe("http://127.0.0.1:57421/rest/v1/rpc/create_story_audited");
+      expect(url).toBe("http://127.0.0.1:57421/rest/v1/rpc/create_project_story_audited");
       expect(opts.method).toBe("POST");
       const body = JSON.parse(opts.body);
       expect(body).toEqual({
-        p_study_id: null,
         p_title: "New Project",
-        p_user_id: "user-123",
+        p_summary: "A test project",
+        p_goals: [],
+        p_constraints: [],
       });
-      const previewBody = JSON.parse(mockFetch.mock.calls[1][1].body);
-      expect(previewBody.p_project_preview.summary).toBe("A test project");
       expect(result).toEqual(created);
+    });
+
+    it("preserves the study workflow for study stories", async () => {
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => "study-story" });
+      mockFetch.mockResolvedValueOnce({ ok: true, json: async () => [{ id: "study-story" }] });
+      await createStory({ title: "Study case", study_id: "study-1" });
+      expect(mockFetch.mock.calls[0][0]).toMatch(/\/create_story_audited$/);
+      expect(JSON.parse(mockFetch.mock.calls[0][1].body)).toEqual({
+        p_title: "Study case", p_study_id: "study-1", p_user_id: "user-123",
+      });
     });
 
     it("returns null on backend error", async () => {

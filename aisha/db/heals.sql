@@ -12547,3 +12547,11 @@ SELECT public.migrate_legacy_openai_key_to_credential() AS stary_klic_openai;
 NOTIFY pgrst, 'reload schema';
 
 -- <<< smycka-schopnosti-f2-f4
+
+-- Work project onboarding, 2026-10-08: additive upgrade; existing study/consent ACLs retained.
+\ir sql/functions/can_manage_project_story.sql
+\ir sql/functions/create_project_story_audited.sql
+\ir sql/functions/detect_project_context_from_analysis.sql
+\ir sql/functions/recommend_ruleset_for_story.sql
+\ir sql/functions/create_story_ruleset.sql
+\ir sql/functions/update_story_project_preview.sql

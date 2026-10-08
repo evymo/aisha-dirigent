@@ -138,13 +138,19 @@ export async function createStory(params: CreateStoryParams): Promise<Story | nu
   const auth = getAuthState();
   if (!auth.userId) return null;
 
+  const isStudyStory = Boolean(params.study_id);
   const result = await authenticatedFetch<string>(
-    `${getBaseUrl()}/rest/v1/rpc/create_story_audited`,
+    `${getBaseUrl()}/rest/v1/rpc/${isStudyStory ? 'create_story_audited' : 'create_project_story_audited'}`,
     {
-      body: {
+      body: isStudyStory ? {
         p_study_id: params.study_id ?? null,
         p_title: params.title,
         p_user_id: auth.userId,
+      } : {
+        p_title: params.title,
+        p_summary: params.summary ?? "",
+        p_goals: params.goals ?? [],
+        p_constraints: params.constraints ?? [],
       },
     },
   );
@@ -152,7 +158,7 @@ export async function createStory(params: CreateStoryParams): Promise<Story | nu
   if (!result.ok) return null;
 
   const storyId = result.data;
-  if (params.summary || params.goals || params.constraints) {
+  if (isStudyStory && (params.summary || params.goals || params.constraints)) {
     await authenticatedFetch<unknown>(
       `${getBaseUrl()}/rest/v1/rpc/update_story_project_preview`,
       {

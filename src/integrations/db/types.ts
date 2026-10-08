@@ -30491,6 +30491,17 @@ export type Database = {
         }
         Returns: string
       }
+      add_story_knowledge_audited: {
+        Args: {
+          p_ai_context_tags?: string[]
+          p_body_markdown: string
+          p_item_type?: string
+          p_story_id: string
+          p_summary?: string
+          p_title: string
+        }
+        Returns: string
+      }
       add_story_participant_audited: {
         Args: { p_role?: string; p_story_id: string; p_target_user_id: string }
         Returns: Json
@@ -31660,6 +31671,10 @@ export type Database = {
         Returns: boolean
       }
       can_invite_to_study: { Args: { p_study_id: string }; Returns: boolean }
+      can_manage_project_story: {
+        Args: { p_story_id: string }
+        Returns: boolean
+      }
       can_receive_reward: {
         Args: { p_action_type: string; p_token_type: string; p_user_id: string }
         Returns: Json
@@ -32977,6 +32992,15 @@ export type Database = {
         }
         Returns: string
       }
+      create_project_story_audited: {
+        Args: {
+          p_constraints?: string[]
+          p_goals?: string[]
+          p_summary?: string
+          p_title: string
+        }
+        Returns: string
+      }
       create_pulse_beat_audited: {
         Args: {
           p_assigned_to_user_id?: string
@@ -34004,6 +34028,10 @@ export type Database = {
         Args: { p_source_id: string; p_source_table: string }
         Returns: Json
       }
+      fn_capability_replay_admin: {
+        Args: { p_proposal_id: string }
+        Returns: Json
+      }
       fn_capture_learning: {
         Args: {
           p_agent_slug?: string
@@ -34745,6 +34773,10 @@ export type Database = {
           p_query_embedding?: string
           p_user_id?: string
         }
+        Returns: Json
+      }
+      fn_spawn_capability_run_admin: {
+        Args: { p_proposal_id: string }
         Returns: Json
       }
       fn_spawn_claude_cli_run: {
@@ -44589,6 +44621,16 @@ export type Database = {
       }
       request_account_deletion: {
         Args: { p_feedback?: string; p_reason?: string }
+        Returns: Json
+      }
+      request_capability_audited: {
+        Args: {
+          p_capability: string
+          p_question: string
+          p_reason?: string
+          p_run_id?: string
+          p_story_id?: string
+        }
         Returns: Json
       }
       request_data_sharing_consent: {

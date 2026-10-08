@@ -60,6 +60,13 @@ describe("token klienta MCP patří jen serveru MCP", () => {
     expect(klient!.optionalClientScopes).toEqual([]);
   });
 
+  it.each(['aisha-app', 'aisha-dirigent-device'])('Dirigent login through %s retains its API identity and has explicit MCP audience', (clientId) => {
+    const client = REALM.clients.find(c => c.clientId === clientId);
+    const audiences = client?.protocolMappers?.filter(m => m.protocolMapper === 'oidc-audience-mapper');
+    expect(audiences?.some(m => m.config?.['included.custom.audience'] === AUDIENCE && m.config?.['access.token.claim'] === 'true')).toBe(true);
+    expect(client?.fullScopeAllowed).toBe(true);
+  });
+
   it("scopeMappings nesou každou roli, kterou /mcp vyhodnocuje, a jsou to role realmu", () => {
     const auth = cti("services/svc-mcp-knowledge/src/auth.ts");
     const teloAdmin = /export function isAdminOrStaff[\s\S]*?\n}/.exec(auth)?.[0] ?? "";

@@ -1,5 +1,5 @@
 {
-  "activeProfile": "id3a",
+  "activeProfile": "aisha",
   "profiles": {
     "local": {
       "supabaseUrl": "",
@@ -12,11 +12,12 @@
     "aisha": {
       "supabaseUrl": "https://api.aisha.guru",
       "aishaUrl": "https://api.aisha.guru",
+      "mcpUrl": "https://api.aisha.guru/functions/v1/mcp-knowledge-server",
       "modelEndpoint": "https://ask.aisha.guru"
     }
   },
   "expertiseLevel": "expert",
-  "storyId": "0db00000-0000-4000-8000-000000000001",
+  "storyId": "",
   "contextProfile": "repo",
   "autonomyMode": "hybrid",
   "routerCoach": {

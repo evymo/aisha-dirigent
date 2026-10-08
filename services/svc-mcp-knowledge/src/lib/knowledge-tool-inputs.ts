@@ -69,6 +69,28 @@ export const KNOWLEDGE_TOOL_INPUTS = {
   get_story_context: z.object({
     story_id: z.string().default('').describe('Story id (uuid) the caller has access to.'),
   }),
+  detect_project_context_from_analysis: z.object({
+    story_id: z.guid().describe('Writable project story id.'),
+    analysis: z.object({
+      tech_stack: z.array(z.string().min(1).max(100)).max(64).optional(),
+      domain: z.array(z.string().min(1).max(100)).max(64).optional(),
+      risk_profile: z.enum(['low', 'medium', 'high']).optional(),
+      repo_url: z.url().max(2000).optional(),
+      repo_provider: z.string().max(100).optional(),
+      default_branch: z.string().min(1).max(255).optional(),
+    }).describe('Detected project metadata; updates only provided fields.'),
+  }),
+  recommend_ruleset_for_story: z.object({
+    story_id: z.guid().describe('Project story whose visible expert rules to recommend.'),
+  }),
+  create_story_ruleset: z.object({
+    story_id: z.guid().describe('Writable project story id.'),
+    rule_ids: z.array(z.guid()).min(1).max(100).describe('Visible published rule ids to pin.'),
+    context_profile: z.string().min(1).max(100).default('repo_plus_rules').describe('Context profile slug.'),
+  }),
+  generate_copilot_instructions: z.object({
+    story_id: z.guid().describe('Accessible story whose pinned instructions to generate.'),
+  }),
   // ── Práce pod identitou uživatele (F9: tři lidé ve třech IDE řízení AISHOU) ──
   // Autorizaci dělá RPC podle auth.uid() z ověřeného tokenu — nástroj nic nepovoluje sám.
   my_next_steps: z.object({

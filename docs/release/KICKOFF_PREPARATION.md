@@ -1,6 +1,7 @@
 # Kickoff preparation — session handoff, 8 October 2026
 
-This is a preparation checkpoint for continuation, not a deployment or a public release.
+This is a preparation checkpoint for continuation. Narrow live OAuth configuration was
+updated as recorded below; application code and database changes have not been deployed.
 Target: `evymo/aisha-orchestrator`, PR against its existing `main`. The GitHub repository's
 history and merged fixes remain the base; upstream commits are transferred as reviewed
 file changes, without importing upstream history.
@@ -72,10 +73,11 @@ file changes, without importing upstream history.
   `claude-entrypoint.unit.test.ts`, `run-auth.unit.test.ts`.
 - MCP tests: `prace-pod-uzivatelem.unit.test.ts` and `tool-input-schemas.unit.test.ts`.
 
-No production deployment, invitation, live rehearsal, trainer run or visibility change has
-been performed by this preparation session.
+No application deployment, database mutation, invitation, completed human login, live
+rehearsal, trainer run or visibility change has been performed by this preparation session.
+The additive Keycloak client/mapper changes below are the only live configuration writes.
 
-## Validation record at checkpoint
+## Historical validation record at the first checkpoint
 
 These runs measured a changing preparation tree; they are evidence of their stated scope,
 not a green merge verdict for the final commit. Re-run the full suites after convergence.
@@ -95,7 +97,7 @@ not a green merge verdict for the final commit. Re-run the full suites after con
 | Full gates, both lanes | 10,168 passed, 21 failed, 55 skipped; NOT a green verdict |
 | Snapshot check | No forbidden paths/tokens/operator data/test IP literals found in measured text; 159 binary files and 20 lockfiles unscanned by this check. Submodule pointers match the GitHub base |
 
-### Start here next session
+### Historical continuation list (superseded by the current status below)
 
 1. Refresh the final generated DB types for web and mobile using the disposable-DB generator
    (`npm run db:types:refresh:throwaway`), then check exposed RPC coverage.
@@ -124,3 +126,141 @@ Full gate-run failing files (captured before the last SQL/seed corrections):
 - `src/tests/gates/vyber-bran-je-fail-closed.gate.test.ts`
 - `src/tests/gates/zadny-fallback-nad-identitou.gate.test.ts`
 - `src/tests/gates/znalosti-viditelnost-kazda-cesta.gate.test.ts`
+
+
+## Current task: user login, MCP and new projects
+
+The operator's latest instruction is to enable AISHA MCP and let users log in and use
+AISHA Dirigent for new projects. The earlier default-story kickoff remains available;
+new work projects have their own caller-owned stories. Medical study/consent creation
+continues through its existing RPC and authorization path.
+
+### Implemented and measured
+
+- Dirigent creates work projects through `create_project_story_audited`, with identity
+  derived exclusively from the verified caller. Summary/goals/constraints, owner
+  participation and audit are written atomically. First-time subjects use the existing
+  JIT user provisioning hook. Input is bounded; anonymous and foreign users are denied.
+- The project owner can update project context/preview, recommend visible expert rules
+  and pin published visible rules. Existing staff/admin and study consent restrictions
+  are preserved. `heals.sql` includes the canonical SQL sources for upgrades without
+  resetting data; cold-start baseline and web/mobile types are regenerated.
+- MCP exposes `detect_project_context_from_analysis`, `recommend_ruleset_for_story`,
+  `create_story_ruleset` and `generate_copilot_instructions`. Calls use verified user
+  claims, strict schemas and the existing story-binding check for delegated tokens.
+- The Dirigent template now selects the existing `aisha` API profile by default and
+  leaves `storyId` empty. Select an accessible story or create a project in the wizard;
+  do not point unrelated repositories at a single hardcoded story. Keycloak URL is
+  derived by the existing config resolver from API origin and realm configuration.
+- The F8 credential dependency is explicitly mocked in two existing ai-chat test
+  fixtures, so their P2 knowledge/identity assertions exercise the intended production
+  path. Production credential behavior and test expectations are unchanged.
+- `scripts/keycloak/sync-mcp-login.mjs` reconciles only the dedicated MCP public PKCE
+  client, its declared role scopes and missing MCP audience mappers on the two existing
+  Dirigent login clients. Default mode is read-only; `--apply` performs additive writes.
+  Existing login client roles, redirects, secrets and unrelated mappers are preserved.
+
+### Live evidence and remaining deployment boundary
+
+Verified on 8 October 2026 through scoped Coolify/Keycloak APIs and public endpoints:
+
+- API health, web landing and Keycloak OIDC discovery respond successfully; the
+  orchestration web redirects to its existing Keycloak client. These probes do not
+  prove a complete human login or new-project workflow.
+- Latest successful core and Keycloak application deployments are
+  `0f992f64777f48c35704fcf3913d16db21a22bc4`. The application still serves the older
+  gateway/tool set; this preparation branch has not been deployed.
+- The missing dedicated `aisha-mcp-client` was created with public PKCE S256,
+  restricted scopes and its declared localhost callback URLs. MCP audience mappers
+  were added to `aisha-app` and `aisha-dirigent-device`. A second sync dry-run returned
+  no actions, confirming idempotency against the live configuration.
+- Core's live client allowlist still omits `aisha-mcp-client`. An unauthenticated MCP
+  initialize request currently receives 401 without the required OAuth discovery
+  challenge. The new gateway handling, project SQL and MCP tools must reach core
+  before claiming the end-to-end scenario is enabled.
+- Realm self-registration is currently enabled, but SMTP is unconfigured. Invitation
+  delivery and a human login were not verified. Collaborator contact identities are
+  still pending; do not invent accounts or copy the private operator roster here.
+
+### Exact next-session steps
+
+1. Resolve the remaining full gate failures recorded below; preserve the existing
+   invariants. Review the final branch before any application deployment or merge.
+2. Confirm private instance-data/operator identities and effective production settings.
+   Use the canonical environment resolver and deployment plan; never publish the
+   operator overlay, environment values or credentials to this repository.
+3. Inspect OAuth reconciliation, then apply only displayed missing configuration:
+
+   ```sh
+   KEYCLOAK_URL=<instance-auth-origin> node scripts/keycloak/sync-mcp-login.mjs \
+     --dry-run --config-root=<private-operator-config-root>
+   # Only when the displayed changes are intended:
+   KEYCLOAK_URL=<instance-auth-origin> node scripts/keycloak/sync-mcp-login.mjs \
+     --apply --config-root=<private-operator-config-root>
+   ```
+
+4. Deploy the reviewed core change through the existing deployment workflow, preserving
+   the current database and running its canonical migrations/heals. Verify the effective
+   allowed-client list includes the dedicated MCP client, public OAuth resource discovery,
+   and the MCP 401 challenge before testing authenticated calls. Do not reset the DB.
+5. Build/install the prepared Dirigent extension from source (`npm ci`, `npm run compile`,
+   and the installed `vsce package --no-dependencies` inside `extensions/aisha-dirigent`).
+   Open a new repository, copy the template into its `.aisha/dirigent.json` (or configure
+   equivalent settings), and use `aisha.dirigent.connect`. The `aisha` profile derives its
+   Keycloak URL; use `aisha.dirigent.loginWithPkce` for browser login. Then create
+   its work project and run `@aisha` / onboarding. Verify rules are visible to that user
+   and a second user cannot read or mutate their project.
+6. Connect an OAuth-capable MCP client to the API's existing
+   `/functions/v1/mcp-knowledge-server` route using the declared client/callback settings.
+   Verify initialize, tools/list and a caller-scoped tool with an actual human token.
+   An admin API token, a health probe or an anonymous tools listing is not that evidence.
+7. Record login, project creation, rule pinning and IDE/MCP evidence. Keep the PR in draft
+   until the full checks and the intended live scenarios have passed.
+
+### Current validation (8 October 2026)
+
+| Check | Result |
+|---|---|
+| Full root unit tests | 6,582 passed; 0 failed; 1,217 environment-dependent skips |
+| Full services/packages/plugins | 53 suites passed in the post-F8 full run; the remaining ai-chat suite passed after fixture repair (752 tests, 48 environment-dependent skips) |
+| MCP service | 321 passed, 5 environment-dependent skips; TypeScript build passed |
+| Dirigent extension | 326 passed; TypeScript and compile passed; local VSIX packaged |
+| New project DB runtime | 11 passed on fresh isolated PostgreSQL 18, with migrations/heals; no production DB access |
+| OAuth sync + public snapshot scripts | 26 passed |
+| Targeted config, MCP and generated DB type gates | 41 passed across 9 files after repairs |
+| Web | Build and TypeScript passed |
+| Lint / i18n | 0 errors / 0 blocking findings; existing warnings/copy findings remain |
+| Full gates, both lanes | 10,183 passed; 12 failed; 55 skipped. Heavy lane green; light lane blocked |
+
+A local VSIX was produced for the operator, but has not been published to the marketplace.
+The source is sufficient to rebuild it; no binary or private operator configuration is
+required in the public repository.
+
+### Remaining full gate failures in the final preparation tree
+
+- `src/tests/gates/brick4-locale-ingestion.gate.test.ts`
+- `src/tests/gates/comms-wiring-consistency.gate.test.ts`
+- `src/tests/gates/drahy-bran-manifest.gate.test.ts`
+- `src/tests/gates/nasazeni-drzene-aplikace.gate.test.ts`
+- `src/tests/gates/rag-locale-foundation.gate.test.ts`
+- `src/tests/gates/silent-degradation.gate.test.ts`
+- `src/tests/gates/sluzba-cte-compose-deklaruje.gate.test.ts`
+- `src/tests/gates/stack-nesmi-znat-jmeno-instance.gate.test.ts`
+- `src/tests/gates/vyber-bran-je-fail-closed.gate.test.ts`
+- `src/tests/gates/zadny-fallback-nad-identitou.gate.test.ts`
+- `src/tests/gates/znalosti-viditelnost-kazda-cesta.gate.test.ts`
+- `src/tests/gates/aitg/aitg-app-04-input-leakage.gate.test.ts`
+
+The measured findings include missing capability replay consumption, locale RPC signature
+expectations, gate-lane/class selection, an obsolete excluded-workflow exception, snapshot
+scanner error handling, runner environment/fallback declarations, submodule workspace
+visibility and the knowledge writer's explicit security class. The Stripe customer-portal
+route also needs its existing caller-identity guard reconciled with the session-boundary
+check. Re-measure each against its source and preserve the intended behavior; do not add
+blanket allowlists or skip the failed assertions to declare deployment readiness.
+
+The final public-tree scan found no forbidden paths, operator roster, private environment,
+credential tokens, private-key bodies or hardcoded test IPs in its measured scope. It scanned
+13,216 tree entries and explicitly left 159 binary files and 20 lockfiles unscanned. All four
+submodule pointers match the GitHub base. This scan is a scoped safeguard, not a general
+security audit or an application readiness verdict.

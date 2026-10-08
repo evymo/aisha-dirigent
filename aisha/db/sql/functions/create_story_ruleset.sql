@@ -19,7 +19,7 @@ DECLARE
   v_rule_count int := 0;
 BEGIN
   -- Authorization: must be admin/staff or story owner
-  IF NOT public.is_admin_or_staff() THEN
+  IF NOT public.is_admin_or_staff() AND NOT public.can_manage_project_story(p_story_id) THEN
     IF NOT EXISTS (
       SELECT 1 FROM public.partner_stories
       WHERE id = p_story_id AND partner_id = auth.uid()

@@ -119,6 +119,10 @@ const TOOL_DEFINITIONS: ToolDefinition[] = [
   tool('match_experts', 'Find experts matching an expertise area or context tags.'),
   tool('get_agent_knowledge', 'Load knowledge bindings for an AISHA agent slug.'),
   tool('get_story_context', 'Load a story context bundle by story id.'),
+  tool('detect_project_context_from_analysis', 'Update project metadata for a writable story under your identity.'),
+  tool('recommend_ruleset_for_story', 'Recommend visible expert rules for your project metadata.'),
+  tool('create_story_ruleset', 'Pin visible published expert rules to a writable project story.'),
+  tool('generate_copilot_instructions', 'Generate Markdown instructions from an accessible story and its pinned rules.'),
   // ── Práce pod identitou uživatele (F9) — co mám dělat, hotovo, průběh do příběhu ──
   tool('my_next_steps', 'List the workflow steps assigned to you (your next work), newest runs first. Runs under your identity.'),
   tool('complete_step', 'Mark one of your workflow steps as done, with an optional note and structured result. Returns {ok, error?} from the workflow engine.'),
@@ -180,6 +184,10 @@ const AUTHENTICATED_TOOLS = new Set<string>([
   'get_agent_knowledge',
   'validate_compliance',
   'get_story_context',
+  'detect_project_context_from_analysis',
+  'recommend_ruleset_for_story',
+  'create_story_ruleset',
+  'generate_copilot_instructions',
   'my_next_steps',
   'complete_step',
   'report_progress',
@@ -457,6 +465,30 @@ async function callTool(name: string, rawArgs: Record<string, unknown>, auth: Mc
   // typovaný vstup — čtení mimo schéma chytí tsc (brána mcp-nastroj-schema-ze-zdroje).
   const K = KNOWLEDGE_TOOL_INPUTS;
   switch (name) {
+    case 'detect_project_context_from_analysis': {
+      const a = K.detect_project_context_from_analysis.parse(rawArgs);
+      return rpcUserClaims('detect_project_context_from_analysis', {
+        p_story_id: writeStoryId(auth, a.story_id, true), p_analysis: a.analysis,
+      }, auth.user.claims);
+    }
+    case 'recommend_ruleset_for_story': {
+      const a = K.recommend_ruleset_for_story.parse(rawArgs);
+      return rpcUserClaims('recommend_ruleset_for_story', {
+        p_story_id: writeStoryId(auth, a.story_id, true),
+      }, auth.user.claims);
+    }
+    case 'create_story_ruleset': {
+      const a = K.create_story_ruleset.parse(rawArgs);
+      return rpcUserClaims('create_story_ruleset', {
+        p_story_id: writeStoryId(auth, a.story_id, true), p_rule_ids: a.rule_ids, p_context_profile: a.context_profile,
+      }, auth.user.claims);
+    }
+    case 'generate_copilot_instructions': {
+      const a = K.generate_copilot_instructions.parse(rawArgs);
+      return rpcUserClaims('generate_copilot_instructions', {
+        p_story_id: writeStoryId(auth, a.story_id, true),
+      }, auth.user.claims);
+    }
     case 'search_knowledge': {
       // Expertní pravidla podle viditelnosti PRO TOHO, kdo se ptá: publikum je `sub` z ověřeného tokenu,
       // nikdy argument klienta (bez publika by služba hledala jako anonym — jen `public`).

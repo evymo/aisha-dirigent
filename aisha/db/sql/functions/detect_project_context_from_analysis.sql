@@ -22,7 +22,7 @@ DECLARE
   v_updated int := 0;
 BEGIN
   -- Authorization: admin/staff or story owner
-  IF NOT is_admin_or_staff() THEN
+  IF NOT is_admin_or_staff() AND NOT public.can_manage_project_story(p_story_id) THEN
     IF NOT EXISTS (
       SELECT 1 FROM partner_stories
       WHERE id = p_story_id AND partner_id = auth.uid()

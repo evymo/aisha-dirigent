@@ -21747,7 +21747,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
 
 
 -- =============================================================================
--- FUNCTIONS (1871)
+-- FUNCTIONS (1873)
 -- =============================================================================
 
 
@@ -25681,6 +25681,28 @@ $$;
 REVOKE ALL ON FUNCTION calculate_revenue_split_audited(uuid) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION calculate_revenue_split_audited(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION calculate_revenue_split_audited(uuid) TO service_role;
+
+
+-- -----------------------------------------------------------------------------
+-- File: aisha/db/sql/functions/can_manage_project_story.sql
+-- -----------------------------------------------------------------------------
+
+-- Function: public.can_manage_project_story
+-- Purpose: Caller-only ownership predicate for work-project onboarding.
+-- Security: SECURITY DEFINER; does not disclose other users' participation.
+CREATE OR REPLACE FUNCTION public.can_manage_project_story(p_story_id uuid)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+  SELECT EXISTS (
+    SELECT 1 FROM public.partner_stories
+    WHERE id = p_story_id AND user_id = auth.uid()
+      AND origin = 'project' AND partner_id IS NULL AND study_id IS NULL
+  );
+$function$;
+REVOKE ALL ON FUNCTION public.can_manage_project_story(uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.can_manage_project_story(uuid) TO authenticated;
 
 
 -- -----------------------------------------------------------------------------
@@ -61008,7 +61030,7 @@ DECLARE
   v_updated int := 0;
 BEGIN
   -- Authorization: admin/staff or story owner
-  IF NOT is_admin_or_staff() THEN
+  IF NOT is_admin_or_staff() AND NOT public.can_manage_project_story(p_story_id) THEN
     IF NOT EXISTS (
       SELECT 1 FROM partner_stories
       WHERE id = p_story_id AND partner_id = auth.uid()
@@ -91491,7 +91513,7 @@ DECLARE
   v_rule_count int := 0;
 BEGIN
   -- Authorization: must be admin/staff or story owner
-  IF NOT public.is_admin_or_staff() THEN
+  IF NOT public.is_admin_or_staff() AND NOT public.can_manage_project_story(p_story_id) THEN
     IF NOT EXISTS (
       SELECT 1 FROM public.partner_stories
       WHERE id = p_story_id AND partner_id = auth.uid()
@@ -107150,7 +107172,7 @@ DECLARE
   v_result jsonb;
 BEGIN
   -- Authorization: admin/staff or story owner
-  IF NOT is_admin_or_staff() THEN
+  IF NOT is_admin_or_staff() AND NOT public.can_manage_project_story(p_story_id) THEN
     IF NOT EXISTS (
       SELECT 1 FROM partner_stories
       WHERE id = p_story_id AND partner_id = auth.uid()
@@ -132362,7 +132384,7 @@ DECLARE
   v_rows_updated int := 0;
 BEGIN
   -- Authorization: must be admin/staff or story owner
-  IF NOT public.is_admin_or_staff() THEN
+  IF NOT public.is_admin_or_staff() AND NOT public.can_manage_project_story(p_story_id) THEN
     IF NOT EXISTS (
       SELECT 1
       FROM public.partner_stories
@@ -146478,6 +146500,65 @@ $function$
 -- Permissions
 REVOKE ALL ON FUNCTION public.create_production_workflow_template_admin(p_description text, p_name text, p_product_id uuid, p_workflow_data jsonb, p_workflow_steps jsonb) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.create_production_workflow_template_admin(p_description text, p_name text, p_product_id uuid, p_workflow_data jsonb, p_workflow_steps jsonb) TO authenticated;
+
+
+-- -----------------------------------------------------------------------------
+-- File: aisha/db/sql/functions/create_project_story_audited.sql
+-- -----------------------------------------------------------------------------
+
+-- Function: public.create_project_story_audited
+-- Purpose: Create a caller-owned work project, outside the study/consent workflow.
+-- Security: SECURITY DEFINER; caller identity only; authenticated grant; audited.
+CREATE OR REPLACE FUNCTION public.create_project_story_audited(
+  p_title text,
+  p_summary text DEFAULT '',
+  p_goals text[] DEFAULT '{}',
+  p_constraints text[] DEFAULT '{}'
+)
+RETURNS uuid
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_caller uuid := auth.uid();
+  v_story uuid;
+BEGIN
+  IF v_caller IS NULL THEN
+    RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '42501';
+  END IF;
+  IF p_title IS NULL OR length(trim(p_title)) NOT BETWEEN 1 AND 200
+    OR p_summary IS NULL OR length(p_summary) > 8000
+    OR p_goals IS NULL OR p_constraints IS NULL
+    OR COALESCE(array_ndims(p_goals), 1) > 1 OR COALESCE(array_ndims(p_constraints), 1) > 1
+    OR cardinality(p_goals) > 50 OR cardinality(p_constraints) > 50
+    OR EXISTS (SELECT 1 FROM unnest(p_goals || p_constraints) AS value
+      WHERE value IS NULL OR length(trim(value)) NOT BETWEEN 1 AND 1000) THEN
+    RAISE EXCEPTION 'Invalid project input' USING ERRCODE = '22023';
+  END IF;
+
+  PERFORM public.ensure_current_user();
+  INSERT INTO public.partner_stories (user_id, title, status, origin, project_preview)
+  VALUES (v_caller, trim(p_title), 'active', 'project', jsonb_build_object(
+    'summary', p_summary, 'goals', to_jsonb(p_goals), 'constraints', to_jsonb(p_constraints),
+    'success_criteria', '[]'::jsonb, 'meta', '{}'::jsonb
+  )) RETURNING id INTO v_story;
+  -- The owner can read through the existing participant RLS and write through existing ACLs.
+  INSERT INTO public.story_participants (story_id, user_id, role)
+  VALUES (v_story, v_caller, 'owner');
+
+  PERFORM public.write_audit_journal(
+    p_action_type := 'create', p_area := 'system',
+    p_details := jsonb_build_object('story_id', v_story, 'owner_id', v_caller),
+    p_entity_type := 'partner_stories', p_severity := 'notice',
+    p_summary := 'User created work project', p_tags := ARRAY['project', 'story', 'create'], p_user_id := v_caller
+  );
+  RETURN v_story;
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.create_project_story_audited(text, text, text[], text[]) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.create_project_story_audited(text, text, text[], text[]) FROM anon;
+GRANT EXECUTE ON FUNCTION public.create_project_story_audited(text, text, text[], text[]) TO authenticated;
 
 
 -- -----------------------------------------------------------------------------

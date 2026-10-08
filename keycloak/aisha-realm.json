@@ -69,7 +69,10 @@
   "scopeMappings": [
     {
       "client": "aisha-mcp-client",
-      "roles": ["admin", "staff"]
+      "roles": [
+        "admin",
+        "staff"
+      ]
     }
   ],
   "clients": [
@@ -170,6 +173,16 @@
           "protocolMapper": "oidc-audience-mapper",
           "config": {
             "included.custom.audience": "aisha-app",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience-mcp-server",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "aisha-mcp-knowledge",
             "id.token.claim": "false",
             "access.token.claim": "true"
           }
@@ -740,6 +753,16 @@
             "id.token.claim": "true",
             "access.token.claim": "true",
             "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "audience-mcp-server",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "aisha-mcp-knowledge",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
           }
         }
       ]

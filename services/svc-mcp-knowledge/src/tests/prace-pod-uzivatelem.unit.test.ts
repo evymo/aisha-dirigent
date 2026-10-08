@@ -258,6 +258,30 @@ describe('pracovní nástroje MCP pod identitou uživatele (F9)', () => {
     expect(result!.structuredContent).toMatchObject({ error: 'invalid_input', tool: 'report_progress' });
   });
 
+  it.each([
+    ['detect_project_context_from_analysis', { analysis: { tech_stack: ['typescript'] } }],
+    ['recommend_ruleset_for_story', {}],
+    ['create_story_ruleset', { rule_ids: [KROK] }],
+    ['generate_copilot_instructions', {}],
+  ])('%s uses caller claims and honours the token story boundary', async (name, args) => {
+    rpcUserClaimsMock.mockResolvedValue({ success: true });
+    const listed = await posli('tools/list');
+    expect(listed.result?.tools?.map(t => t.name)).toContain(name);
+    await zavolej(name, { ...args, story_id: PRIBEH_TOKENU });
+    expect(rpcUserClaimsMock).toHaveBeenCalledWith(name, expect.objectContaining({ p_story_id: PRIBEH_TOKENU }), claimsSPribehem);
+    expect(rpcServiceMock).not.toHaveBeenCalled();
+    rpcUserClaimsMock.mockClear();
+    const other = await zavolej(name, { ...args, story_id: JINY_PRIBEH });
+    expect(rpcUserClaimsMock).not.toHaveBeenCalled();
+    expect(other.result?.isError ?? other.error).toBeTruthy();
+  });
+
+  it('invalid project analysis is rejected before RPC', async () => {
+    const response = await zavolej('detect_project_context_from_analysis', { story_id: PRIBEH_TOKENU, analysis: { tech_stack: 'typescript' } });
+    expect(rpcUserClaimsMock).not.toHaveBeenCalled();
+    expect(response.result?.isError ?? response.error).toBeTruthy();
+  });
+
   it('report_progress s prázdným textem RPC nezavolá', async () => {
     const odpoved = await zavolej('report_progress', { content: '   ' });
     expect(rpcUserClaimsMock).not.toHaveBeenCalled();

@@ -2255,6 +2255,7 @@ export type Database = {
           can_write: boolean
           consecutive_failure_count: number
           created_at: string
+          credential_env_var: string | null
           display_name: string
           id: string
           is_enabled: boolean
@@ -2275,6 +2276,7 @@ export type Database = {
           can_write?: boolean
           consecutive_failure_count?: number
           created_at?: string
+          credential_env_var?: string | null
           display_name: string
           id?: string
           is_enabled?: boolean
@@ -2295,6 +2297,7 @@ export type Database = {
           can_write?: boolean
           consecutive_failure_count?: number
           created_at?: string
+          credential_env_var?: string | null
           display_name?: string
           id?: string
           is_enabled?: boolean
@@ -30491,6 +30494,17 @@ export type Database = {
         }
         Returns: string
       }
+      add_story_knowledge_audited: {
+        Args: {
+          p_ai_context_tags?: string[]
+          p_body_markdown: string
+          p_item_type?: string
+          p_story_id: string
+          p_summary?: string
+          p_title: string
+        }
+        Returns: string
+      }
       add_story_participant_audited: {
         Args: { p_role?: string; p_story_id: string; p_target_user_id: string }
         Returns: Json
@@ -31660,6 +31674,10 @@ export type Database = {
         Returns: boolean
       }
       can_invite_to_study: { Args: { p_study_id: string }; Returns: boolean }
+      can_manage_project_story: {
+        Args: { p_story_id: string }
+        Returns: boolean
+      }
       can_receive_reward: {
         Args: { p_action_type: string; p_token_type: string; p_user_id: string }
         Returns: Json
@@ -32977,6 +32995,15 @@ export type Database = {
         }
         Returns: string
       }
+      create_project_story_audited: {
+        Args: {
+          p_constraints?: string[]
+          p_goals?: string[]
+          p_summary?: string
+          p_title: string
+        }
+        Returns: string
+      }
       create_pulse_beat_audited: {
         Args: {
           p_assigned_to_user_id?: string
@@ -33536,6 +33563,10 @@ export type Database = {
         Args: { p_id: string }
         Returns: boolean
       }
+      delete_provider_credential_admin: {
+        Args: { p_env_var: string }
+        Returns: Json
+      }
       delete_question_block_admin: { Args: { p_id: string }; Returns: boolean }
       delete_questionnaire_admin: { Args: { p_id: string }; Returns: boolean }
       delete_story_knowledge_item_audited: {
@@ -33998,6 +34029,10 @@ export type Database = {
       }
       fn_build_ragnarok_document: {
         Args: { p_source_id: string; p_source_table: string }
+        Returns: Json
+      }
+      fn_capability_replay_admin: {
+        Args: { p_proposal_id: string }
         Returns: Json
       }
       fn_capture_learning: {
@@ -34741,6 +34776,10 @@ export type Database = {
           p_query_embedding?: string
           p_user_id?: string
         }
+        Returns: Json
+      }
+      fn_spawn_capability_run_admin: {
+        Args: { p_proposal_id: string }
         Returns: Json
       }
       fn_spawn_claude_cli_run: {
@@ -40172,6 +40211,24 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_provider_credential_catalog: {
+        Args: never
+        Returns: {
+          env_var: string
+          is_set: boolean
+          source: string
+          updated_at: string
+          updated_by: string
+          used_by: Json
+        }[]
+      }
+      get_provider_credentials: {
+        Args: { p_env_vars: string[] }
+        Returns: {
+          env_var: string
+          value: string
+        }[]
+      }
       get_provider_registry_admin: {
         Args: { p_backend_kind?: string; p_enabled_only?: boolean }
         Returns: {
@@ -43960,6 +44017,7 @@ export type Database = {
         Returns: Json
       }
       migrate_app_secrets_to_vault: { Args: never; Returns: number }
+      migrate_legacy_openai_key_to_credential: { Args: never; Returns: string }
       mint_production_tokens_on_release: {
         Args: { p_batch_id?: string }
         Returns: Json
@@ -44142,6 +44200,21 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      provider_credential_catalog: {
+        Args: never
+        Returns: {
+          env_var: string
+          used_by: Json
+        }[]
+      }
+      provider_credential_check_value: {
+        Args: { p_value: string }
+        Returns: undefined
+      }
+      provider_credential_require: {
+        Args: { p_env_var: string }
+        Returns: string
       }
       publish_agent: { Args: { p_plugin_id: string }; Returns: Json }
       publish_expert_rule: { Args: { p_rule_id: string }; Returns: Json }
@@ -44551,6 +44624,16 @@ export type Database = {
       }
       request_account_deletion: {
         Args: { p_feedback?: string; p_reason?: string }
+        Returns: Json
+      }
+      request_capability_audited: {
+        Args: {
+          p_capability: string
+          p_question: string
+          p_reason?: string
+          p_run_id?: string
+          p_story_id?: string
+        }
         Returns: Json
       }
       request_data_sharing_consent: {
@@ -45196,6 +45279,14 @@ export type Database = {
       }
       set_production_workflow_template_default_admin: {
         Args: { p_id: string }
+        Returns: boolean
+      }
+      set_provider_credential_admin: {
+        Args: { p_env_var: string; p_value: string }
+        Returns: Json
+      }
+      set_provider_credential_if_absent: {
+        Args: { p_env_var: string; p_value: string }
         Returns: boolean
       }
       set_session_memory: {
