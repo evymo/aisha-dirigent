@@ -103,19 +103,25 @@ přechodném PGRST002 po migraci.
 **Změna s dopadem na produkci (ověřit na nasazení):** alias `<prefix>-n8n--main` — cíl mesh trasy
 5678 — nesl `n8n-worker`, ne hlavní `n8n`; přesunut na hlavní službu (`docker-compose.coolify-n8n.yml`).
 
+**Třetí kolo (po restartu hostitele):** DB po nečistém vypnutí zůstala `unhealthy` (re-applier hesel
+čekal jen 60 s) → čeká, dokud postmaster žije. `stack-health.sh --local` měřil starý stack (porty
+5173/8080, jména `aisha-*`) → čte `.env.local.dev`. Synapse: `matrix-config-init` nedostával
+`KEYCLOAK_REALM` (issuer `…/realms/` — **i produkce**) a Synapse dělal discovery → `discover: false`
+s explicitními endpointy z compose; varování generátoru o discovery spotřebitelích nic nenacházelo.
+n8n/OpenClaw volaly API na `https://api.<LOCAL_TLD>` → generátor ho lokálně přepíše na mesh jméno API.
+Výsledek: Synapse, svc-matrix, Element Call healthy; n8n → API 200; ověření 56 kontrol. Element Web
+v tomhle sandboxu padá na chybějící IPv6 (`listen [::]:80`) — omezení prostředí.
+
 Známé, neopravené (kandidáti na samostatné úkoly):
 
-- **Synapse** lokálně padá na OIDC discovery (`auth.localhost`) — zdokumentované ❌ v
-  [LOCAL_WARMUP_OIDC_SUPPORT.md](../LOCAL_WARMUP_OIDC_SUPPORT.md); varování generátoru se ale
-  nevypíše (`scripts/lib/oidc-consumer-support.mjs` hledá stará jména kontejnerů `aisha-*`).
-- **`scripts/stack-health.sh --local`** kontroluje web na `:5173` a hledá kontejnery podle starých
-  jmen (Keycloak/n8n/Langfuse hlásí „absent") — táž třída jako výše.
+- **Langfuse a OpenClaw** lokálně nedokončí přihlášení (server-side OIDC discovery) —
+  [LOCAL_WARMUP_OIDC_SUPPORT.md](../LOCAL_WARMUP_OIDC_SUPPORT.md); generátor to teď hlásí.
+- **Synapse:** startuje a nabízí SSO; celé přihlášení v prohlížeči ale potřebuje dosažitelný
+  `public_baseurl` (`https://…`) — lokálně bez Traefiku ne.
+- **OpenClaw → `POST /mcp`** dojde na gateway, ale ta vrací 404 — ověřit, kam má `/mcp` v produkci vést.
 - **Produkce:** blok gateway v compose nepředává `KEYCLOAK_DOMAIN_PUBLIC` ani `APP_CONFIG_*` →
   `keycloak_url` v app-config bude prázdný; ověřit na nasazené instanci.
 - **maestro** `/health/ready` = 503 při plném CPU (necitlivý `cpu_checker` shodí celkový stav).
-- **n8n lokálně volá AISHA API na `https://api.<LOCAL_TLD>`** (mesh vypnutá → veřejný tvar), který
-  uvnitř Docker sítě nikdo nepřeloží — workflowy, které z n8n volají API, lokálně neprojdou. Táž třída
-  jako Synapse (veřejná jména uvnitř kontejnerů).
 - **Admin stack** (Appsmith 5,6 GB, NocoDB) v tomto běhu nespuštěn kvůli místu na disku.
 
 Navazující úkoly z odstranění privátní forge:
