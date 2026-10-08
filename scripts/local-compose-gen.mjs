@@ -49,6 +49,7 @@ import { findDiscoveryConsumersInStack, DISCOVERY_OIDC_CONSUMERS } from "./lib/o
 import { validateLocalStackEnv, CRITICAL_ENV_KEYS } from "./lib/local-env-assertions.mjs";
 import { buildTopology, containerNameFrom } from "./lib/derive-domains.mjs";
 import { neutralizeMeshRouteForLocal } from "./lib/local-mesh-route.mjs";
+import { rewritePublicApiUrlsInEnv } from "./lib/local-api-upstream.mjs";
 
 // Defensive guard for direct `node scripts/local-compose-gen.mjs` invocations on
 // a stale Node (the warmup wrapper also checks). The repo pins Node 22 (.nvmrc);
@@ -881,6 +882,11 @@ function transformForLocal(doc) {
     // Domain rewriting in environment values (OAuth redirects, etc.)
     if (svc.environment) {
       svc.environment = rewriteDomainsInEnv(svc.environment);
+      // Serverová volání na veřejnou tvář API → mesh jméno API (scripts/lib/local-api-upstream.mjs).
+      svc.environment = rewritePublicApiUrlsInEnv(svc.environment, {
+        apiDomain: devEnvDefaults.API_DOMAIN,
+        apiUpstream: devEnvDefaults.API_UPSTREAM_MESH,
+      });
     }
     if (Array.isArray(svc.command)) {
       svc.command = svc.command.map(c => rewriteDomainStr(c));
