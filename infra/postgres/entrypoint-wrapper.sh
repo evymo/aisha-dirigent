@@ -161,7 +161,7 @@ EOSQL
 chown postgres:postgres "$REAPPLY_SQL" 2>/dev/null || true
 chmod 600 "$REAPPLY_SQL" 2>/dev/null || true
 
-# Background re-applier — waits up to ~60s for postmaster, then runs ALTER ROLEs.
+# Background re-applier — waits for postmaster for as long as it lives, then runs ALTER ROLEs.
 # Uses local socket auth (peer/trust on the postgres superuser via /var/run/postgresql),
 # bypassing whatever stale TCP password may be in pg_authid for that role.
 #
@@ -174,8 +174,11 @@ chmod 600 "$REAPPLY_SQL" 2>/dev/null || true
 # healthcheck marked db healthy. (See migrate.mjs/seed.mjs retry loops —
 # they were workarounds for this exact race; with this verify step the
 # race window is sealed at the source.)
+PG_PID=$$   # `exec` níž udělá z tohoto procesu postmaster (docker-entrypoint → postgres)
 (
-    for i in $(seq 1 30); do
+    i=0
+    while :; do
+        i=$((i + 1))
         if pg_isready -h /var/run/postgresql -U postgres -d postgres -q 2>/dev/null; then
             echo "postgres: postmaster ready (attempt $i) — running ALTER ROLE re-apply…"
             if psql -h /var/run/postgresql -U postgres -d postgres \
@@ -223,10 +226,17 @@ chmod 600 "$REAPPLY_SQL" 2>/dev/null || true
                 exit 1
             fi
         fi
+        # ⛔ Pevný strop (dřív 60 s) nestačil: po nečistém vypnutí dělá postmaster
+        # crash recovery a pgBackRest dohání archiv WAL. Naměřeno 2026-10-08 na
+        # lokálním stacku po restartu hostitele: start trval přes minutu, sentinel
+        # se nezapsal a DB zůstala `unhealthy` až do ručního restartu kontejneru.
+        # Čeká se proto, dokud postmaster ŽIJE; když skončí, skončí i kontejner.
+        if ! kill -0 "$PG_PID" 2>/dev/null; then
+            echo "postgres: postmaster skončil dřív, než přijal spojení (pokus $i) — sentinel NOT touched." >&2
+            exit 1
+        fi
         sleep 2
     done
-    echo "postgres: postmaster did not become ready within 60s — sentinel NOT touched." >&2
-    exit 1
 ) &
 
 # Delegate to standard entrypoint (which starts postmaster).

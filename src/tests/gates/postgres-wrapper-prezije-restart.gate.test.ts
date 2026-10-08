@@ -159,3 +159,85 @@ describe("Postgres wrapper přežije restart po nedoběhlém startu (brána)", (
     expect(`${prazdny.stdout}${prazdny.stderr}`).not.toContain("ENTRYPOINT-START");
   });
 });
+
+// ⛔ NAMĚŘENO 2026-10-08 na lokálním stacku po restartu hostitele: po nečistém
+// vypnutí dělal postmaster crash recovery a pgBackRest doháněl archiv WAL, start
+// trval přes minutu. Re-applier měl pevný strop 30 pokusů (60 s), sentinel se
+// nezapsal a DB zůstala `unhealthy`, dokud ji někdo ručně nerestartoval.
+// Měří se CHOVÁNÍ skutečného wrapperu: čeká, dokud postmaster žije, a když
+// postmaster skončí, re-applier skončí nahlas (ne tiše po časovém stropu).
+describe("Postgres wrapper počká na pomalý start postmasteru (brána)", () => {
+  const koren = mkdtempSync(join(tmpdir(), "aisha-pg-pomaly-"));
+  const data = join(koren, "pgdata");
+  const nastroje = join(koren, "bin");
+  const pocitadlo = join(koren, "pg_isready.pocet");
+  const reapply = join(koren, "reapply.hotovo");
+  afterAll(() => rmSync(koren, { recursive: true, force: true }));
+
+  function atrapa(jmeno: string, telo: string) {
+    writeFileSync(join(nastroje, jmeno), `#!/bin/sh\n${telo}\n`, { mode: 0o755 });
+  }
+  function spust() {
+    return spawnSync("bash", [WRAPPER, "postgres"], {
+      env: {
+        PATH: `${nastroje}:${process.env.PATH}`,
+        PG_MAJOR: "17",
+        PGDATA: data,
+        POSTGRES_PASSWORD: "zkusebni-heslo-brany",
+        VAULT_ENCRYPTION_KEY: ["atrapa", "trezor"].join("-"),
+        COLUMN_ENCRYPTION_KEY: ["atrapa", "sloupce"].join("-"),
+        AISHA_KLICE_DIR: join(koren, "klice"),
+      },
+      encoding: "utf8",
+      timeout: 30_000,
+    });
+  }
+  function priprav({ pripravenPoPokusu }: { pripravenPoPokusu: number }) {
+    spawnSync("mkdir", ["-p", data, nastroje]);
+    writeFileSync(join(data, "PG_VERSION"), "17\n");
+    rmSync(pocitadlo, { force: true });
+    rmSync(reapply, { force: true });
+    // pg_isready odpoví „připraven" až po N neúspěšných pokusech (crash recovery).
+    atrapa(
+      "pg_isready",
+      `n=$(cat "${pocitadlo}" 2>/dev/null || echo 0); n=$((n + 1)); echo "$n" > "${pocitadlo}"; [ "$n" -gt ${pripravenPoPokusu} ]`,
+    );
+    atrapa(
+      "psql",
+      [
+        'prev=""',
+        'for a in "$@"; do',
+        `  if [ "$prev" = "-f" ]; then : > "${reapply}"; fi`,
+        '  if [ "$a" = "SELECT 1" ]; then echo 1; fi',
+        '  prev="$a"',
+        "done",
+        "exit 0",
+      ].join("\n"),
+    );
+    atrapa("sleep", "exit 0");
+    atrapa("chown", "exit 0");
+  }
+
+  test("re-applier čeká i za dřívější strop 30 pokusů, dokud postmaster žije", () => {
+    priprav({ pripravenPoPokusu: 45 });
+    // „Postmaster" žije, dokud re-applier nedoběhne (nejvýš ~10 s).
+    atrapa(
+      "docker-entrypoint.sh",
+      `k=0; while [ ! -f "${reapply}" ] && [ "$k" -lt 200 ]; do /bin/sleep 0.05; k=$((k + 1)); done; echo "ENTRYPOINT-START"; exit 0`,
+    );
+    const beh = spust();
+    const vystup = `${beh.stdout}${beh.stderr}`;
+    expect(existsSync(reapply), `re-applier to vzdal před připraveným postmasterem:\n${vystup}`).toBe(true);
+    expect(vystup).toContain("postmaster ready (attempt 46)");
+    expect(beh.status).toBe(0);
+  });
+
+  test("když postmaster skončí dřív, než přijme spojení, re-applier to řekne a sentinel nezapíše", () => {
+    priprav({ pripravenPoPokusu: 1_000_000 });
+    atrapa("docker-entrypoint.sh", 'echo "ENTRYPOINT-START"; exit 0');
+    const beh = spust();
+    const vystup = `${beh.stdout}${beh.stderr}`;
+    expect(vystup).toContain("postmaster skončil dřív, než přijal spojení");
+    expect(existsSync(reapply)).toBe(false);
+  });
+});
