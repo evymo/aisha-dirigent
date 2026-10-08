@@ -84,6 +84,36 @@ const localTopoEnv = (() => {
   return env;
 })();
 
+// Mesh jména lokálně překládá Docker alias, který generátor přidává z TÉŽE
+// topologie s mesh (scripts/local-compose-gen.mjs, addMeshAliases). Veřejný tvar
+// (`api.<LOCAL_TLD>`) uvnitř sítě nikdo nepřeloží — naměřeno 2026-10-08:
+// n8n-workflow-init psal verdikt na `http://api.local:3001` → `fetch failed`.
+// Selže-li derivace, hodnota chybí a compose (`:?`) to řekne nahlas.
+const localMeshTopoEnv = (() => {
+  const env = {};
+  try {
+    for (const line of formatShellExports(buildTopology({ profileId: "local-dev", meshEnabled: true })).split("\n")) {
+      const eq = line.startsWith("#") ? -1 : line.indexOf("=");
+      if (eq > 0) env[line.slice(0, eq)] = line.slice(eq + 1);
+    }
+  } catch (err) {
+    console.warn(`[local-presets] derive-domains(local-dev, mesh) failed; mesh upstreams underived: ${err.message}`);
+  }
+  return env;
+})();
+
+/**
+ * Hostitel cíle TCP mesh trasy pro daný port z exportu `*_MESH_TCP_ROUTES`
+ * (`port|host:port;…`). Chybí-li, vrací "" — compose (`:?`) to řekne nahlas.
+ */
+export function cilTcpTrasy(trasy, port) {
+  for (const trasa of String(trasy ?? "").replace(/^'|'$/g, "").split(";")) {
+    const [p, cil] = trasa.split("|");
+    if (Number(p) === port && cil) return cil.split(":")[0];
+  }
+  return "";
+}
+
 // ── Local hostnames — ONE rule, ONE place ──────────────────────────────────
 // Every compose-label *_DOMAIN below = `<service subdomain>.${LOCAL_TLD}`, where
 // LOCAL_TLD is the local-dev profile's TLD (from the resolver, not a literal) and
@@ -661,7 +691,9 @@ export const devEnvDefaults = {
   KC_ALLOWED_CLIENTS: "aisha-app,aisha-dirigent-device",
   WS_JWT_AUDIENCE: "aisha-app",
   KC_ADMIN_CLIENT_ID: "aisha-user-admin",
-  N8N_BOOTSTRAP_OWNER_EMAIL: `n8n-owner@${LOCAL_TLD}`,
+  // n8n odmítne adresu bez tečky v doméně („Invalid email") — lokální TLD je
+  // holé `local`, proto doména služby (`n8n.<LOCAL_TLD>`), ne holé TLD.
+  N8N_BOOTSTRAP_OWNER_EMAIL: `n8n-owner@${ld("n8n")}`,
   AISHA_DB_IMAGE: "aisha-db-pg18:local",
   POSTGRES_MAJOR: "18",
   // Exec stack: lokální hostitelské cesty, derivované z identity dev instance.
@@ -737,7 +769,12 @@ export const devEnvDefaults = {
   RABBITMQ_DEFAULT_PASS: "dev_rabbitmq_password",
   RABBITMQ_USER: "rabbitmq",
   RABBITMQ_PASS: "dev_rabbitmq_password",
-  RABBITMQ_HOST: "backend--integration--rabbitmq",
+  // Produkce jde na mesh jméno z katalogu a sidecar integration-mesh-tcp ho
+  // rozvede na CÍL TCP trasy. Lokálně TCP mesh není, takže rovnou na ten cíl —
+  // vzatý z TÉŽE derivace (INTEGRATION_MESH_TCP_ROUTES), ne složený ručně.
+  // Literál `backend--integration--rabbitmq` nikdo nenesl — naměřeno 2026-10-08:
+  // aktivace workflowů s RabbitMQ „ENOTFOUND".
+  RABBITMQ_HOST: cilTcpTrasy(localMeshTopoEnv.INTEGRATION_MESH_TCP_ROUTES, 5672),
   RABBITMQ_PORT: "5672",
 
   // ── PKI ──
@@ -842,10 +879,11 @@ export const devEnvDefaults = {
   // ale compose hodnotu vyžaduje (:?) — držíme stejný tvar jako produkce.
   NETBIRD_PEER_CIDR,
   // Totéž pro n8n (docker-compose.coolify-n8n.yml, 2026-09-14): mesh vypnutá, takže
-  // entrypoint routu nestaví a API volá `https://${API_DOMAIN}`. Lane se lokálně
-  // nepoužije, compose ji ale vyžaduje (:?) — tvar jako derivace (http + port).
+  // entrypoint routu nestaví a API volá `https://${API_DOMAIN}`. Mesh lane ale
+  // čte n8n-workflow-init napřímo (AISHA_POSTGREST_URL) — proto mesh jméno
+  // z topologie, které lokálně překládá Docker alias (localMeshTopoEnv výš).
   MESH_ENABLED: "false",
-  API_UPSTREAM_MESH: `http://${ld("api")}:3001`,
+  API_UPSTREAM_MESH: localMeshTopoEnv.API_UPSTREAM_MESH,
   // Seznam našich prvků pro chůzi `x-forwarded-for`. Lokálně mesh není, ale
   // tvar držíme shodný s produkcí — a hlavně se hodnota ODVOZUJE, takže se
   // dev a produkce nemůžou rozejít. (Právě rozchod dvou kódových výchozích
