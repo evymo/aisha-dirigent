@@ -2,7 +2,8 @@
 
 This is a preparation checkpoint for continuation. Narrow live OAuth configuration was
 updated as recorded below; application code and database changes have not been deployed.
-Target: `evymo/aisha-orchestrator`, PR against its existing `main`. The GitHub repository's
+Target: `evymo/aisha-dirigent`, PR #3 against its existing `main` (renamed from
+`evymo/aisha-orchestrator`; the original URL redirects). The GitHub repository's
 history and merged fixes remain the base; upstream commits are transferred as reviewed
 file changes, without importing upstream history.
 
@@ -230,8 +231,8 @@ Verified on 8 October 2026 through scoped Coolify/Keycloak APIs and public endpo
 |---|---|
 | Full root unit tests | 6,582 passed; 0 failed; 1,217 environment-dependent skips |
 | Full services/packages/plugins | 53 suites passed in the post-F8 full run; the remaining ai-chat suite passed after fixture repair (752 tests, 48 environment-dependent skips) |
-| MCP service | 321 passed, 5 environment-dependent skips; TypeScript build passed |
-| Dirigent extension | 326 passed; TypeScript and compile passed; local VSIX packaged |
+| MCP service | 323 passed, 5 environment-dependent skips; TypeScript build passed |
+| Dirigent extension | 327 passed; TypeScript and compile passed; local VSIX packaged |
 | New project DB runtime | 11 passed on fresh isolated PostgreSQL 18, with migrations/heals; no production DB access |
 | OAuth sync + public snapshot scripts | 26 passed |
 | Targeted config, MCP and generated DB type gates | 41 passed across 9 files after repairs |
@@ -292,11 +293,89 @@ MCP tools use authenticated caller RPCs and their database authorization.
 ### Operator confirmation: direct Keycloak login is sufficient for the current task
 
 On 8 October 2026 the operator reported a successful login using their existing account
-through Keycloak. This is human-reported evidence; the agent has not independently
-repeated the authenticated browser flow. Do not treat login as proof of project creation,
+through Keycloak. This initial report was subsequently verified independently as recorded below.
+Do not treat login as proof of project creation,
 MCP tool execution or the other colleagues' effective permissions.
 
 The operator reported problems with Apple ID and Google ID sign-in, and explicitly
 accepted direct Keycloak login for the current scope. Defer those external identity
 provider repairs. No Apple/Google client configuration or live user roles were changed
 by this update. The remaining core/MCP deployment and gate work above is unchanged.
+
+
+### Independent developer-workstation verification (8 October 2026)
+
+This round used the operator's real online Keycloak session, not an admin API token,
+service-role credential or an anonymous request. No private account identifiers,
+tokens, authorization codes, project titles or response contents are included here.
+
+| Path | Observed result |
+|---|---|
+| Browser | Direct Keycloak login reaches the authenticated `/admin/warmup` view |
+| Developer PKCE session | `aisha-app`, S256, `openid profile email`; token contains the MCP audience |
+| MCP protocol | `initialize` and `tools/list` return HTTP 200; live server 2.2.0 exposes 40 tools |
+| Actual MCP tools | `get_expertise_areas`, `search_knowledge` and read-only `admin_health_check` succeed |
+| Caller API | `get_my_stories_audited` returns HTTP 200 and five accessible stories |
+| Installed VS Code Dirigent | `evymo.aisha-dirigent` 0.7.0 selects AISHA Cloud in the isolated preparation worktree; device-code login completes, the extension displays the authenticated account and its project picker |
+| MCP from VS Code | Refresh AI Models reaches MCP but returns a JSON-RPC error; a matching direct probe identifies `get_model_registry_admin`: `Admin or staff role required` |
+| Model-registry identity isolation | The caller's roles RPC confirms admin/staff; the same registry RPC called with the caller token succeeds (HTTP 200, 221 rows). The MCP alias uses a service identity |
+| Claude CLI OAuth | CLI 2.1.294 discovers the root resource metadata, but authorization fails with `invalid_scope` for its requested `openid email profile offline_access` |
+| Claude CLI MCP transport | Existing restricted/strict isolated run reports only `aisha-readonly` with `status: connected` in its initialization trace, using the temporary online bearer token |
+| Claude agent execution | That run stops at the account's weekly usage limit; zero tools called, zero model cost |
+| New project tools | `my_next_steps` and `detect_project_context_from_analysis` are absent from the live older tool set; their end-to-end deployment scenario remains unverified |
+
+The installed VS Code extension and the prepared source had hardcoded the old callback
+publisher (`aisha.aisha-dirigent`) while the installed identity is `evymo.aisha-dirigent`.
+The preparation source now derives the callback from `ExtensionContext.extension.id`.
+Realm declaration and the existing additive redirect reconciliation include the current
+publisher's exact callbacks for VS Code, Insiders, Cursor and VSCodium, preserving every
+legacy callback. An OAuth callback/exchange regression test checks the actual identity,
+matching redirect and S256 verifier. A gate checks declared callbacks against the package
+publisher/name. All 327 extension tests, type checking, compilation and VSIX packaging
+pass after this repair. The repaired VSIX is prepared locally; it is not installed or
+published. The new redirect entries have not been applied live in this verification round.
+
+The preparation worktree has an ignored `.aisha/dirigent.local.json` selecting AISHA Cloud;
+the original shared worktree's local backend settings were preserved. Existing device-code
+login provides a verified current login path while PKCE callback repair awaits installation
+and live redirect reconciliation. The model-registry alias is now repaired in the preparation source to use
+`rpcUserClaims` with the verified caller. The SQL `is_admin_or_staff()` guard is unchanged;
+no live role grants were needed. Tests cover the caller identity and failure without a
+service-role fallback. All 323 MCP service tests pass (5 environment-dependent skips),
+and the service builds. This repair is not deployed; re-test the actual VS Code command
+after the reviewed core rollout. DB roles and token-only admin tool visibility still
+require separate verification as recorded above.
+
+The dedicated MCP client intentionally has no optional scopes. Claude CLI asks for
+`offline_access`, which the live client rejects. Pinning only the three ordinary scopes
+must not be presented as a verified solution. Resolve client scope/session-duration policy
+before enabling long-lived access, then re-test the real CLI login. Core's missing MCP
+client allowlist entry, path-specific protected-resource metadata (404) and missing 401
+challenge also remain to be deployed; CLI root-metadata fallback does not prove compliance.
+The account usage limit independently blocks the final Claude agent/tool-call rehearsal.
+
+Next session should install the reviewed callback repair and reconcile its exact redirects,
+deploy and re-test the model-registry caller repair, resolve and re-test Claude OAuth, deploy the
+reviewed project/MCP changes through the existing workflow, and complete one real project
+creation and caller-scoped IDE tool run. Preserve the recorded full gate failures above.
+
+The auth/extension/realm targeted gate run passed all 89 tests in three files. The initial
+full gate re-run was interrupted after sandbox fixture-listener/timeouts; the unrestricted
+local-fixture re-run completed with 10,036 passed, 13 failed and 55 skipped; heavy lane
+is green. Twelve failures are the previously recorded source/convergence findings.
+The extra instance-identity failure came from the temporary ignored IDE profile
+explicitly spelling the realm. That profile now uses the existing Keycloak derivation;
+the instance-identity gate and service-security gate passed in a follow-up run (79 tests).
+Those sandbox timeouts are not a source regression verdict. No gate assertions or
+classifications were weakened.
+
+The final unrestricted root unit re-run produced a separate JSON report: 6,582 passed,
+0 failed, 1,217 environment-dependent skips (434 passed files, 184 skipped). The earlier
+sandbox run reached per-file output but did not produce a final verdict and was stopped;
+it is not counted as an additional successful run.
+
+Before claiming the model tree/chat UI complete, also reconcile its response contract:
+the MCP alias returns the RPC row array, whereas `refreshModelsTree` and `/models`
+currently read a `{ models: [...] }` object and `extractJson` only recognizes object text.
+The identity repair addresses the reproduced permission error. The model display path
+still needs an additive compatible adapter and a real post-deployment UI check.
