@@ -5,7 +5,7 @@ import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { guardOptions } = vi.hoisted(() => {
-  process.env.INTERNAL_API_KEY = 'internal-key-fixture';
+  process.env.INTERNAL_API_KEY = 'svc-key-fixture';
   return { guardOptions: [] as Array<Record<string, unknown>> };
 });
 
@@ -59,7 +59,7 @@ async function buildApp(): Promise<FastifyInstance> {
   return app;
 }
 
-async function post(app: FastifyInstance, authorization = 'Bearer internal-key-fixture') {
+async function post(app: FastifyInstance, authorization = 'Bearer svc-key-fixture') {
   return app.inject({
     headers: { authorization },
     method: 'POST',
