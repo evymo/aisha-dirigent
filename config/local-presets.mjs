@@ -322,7 +322,8 @@ export const hostPorts = Object.fromEntries([
   svc("noco", { 8085: 8085 }),
   svc("appsmith", { 8090: 8090 }),
   svc("pgadmin", { 5050: 5050 }),
-  svc("keycloak", { 8180: 8180 }),
+  // (Žádný holý `keycloak` záznam: přesnou shodou se jménem služby přebíjel
+  //  vystavený `aisha-keycloak` (80→8180) a Keycloak pak lokálně neměl host port.)
   svc("frontend--n8n--auth", { 4180: 5681 }),
 
   // ── integration (Ragnarok RAG + Elasticsearch + RabbitMQ) ──────────────
@@ -501,6 +502,9 @@ const D64 = "dev_secret_64chars__padding_padding_padding_padding_padding_padding
 // 39 bytes (misnamed), which makes the proxies crash-loop ("cookie_secret must be 16,
 // 24, or 32 bytes ... but is 39"). D32C is exactly 32. Used for every *_COOKIE_SECRET.
 const D32C = D32.slice(0, 32);
+// Langfuse v3 validuje ENCRYPTION_KEY jako 256 bitů = PŘESNĚ 64 hex znaků; textová
+// D64 ho shodí při startu (ZodError → health 500 → závislé služby nenaběhnou).
+const D64HEX = "de7".padEnd(64, "0");
 
 // A REAL service-role JWT (HS256, signed with the dev JWT secret D32). verifyServiceRole in
 // the svc-* services HS256-verifies the POSTGREST_SERVICE_TOKEN, so the LOCAL token must be a
@@ -620,7 +624,7 @@ export const devEnvDefaults = {
   ANON_KEY: "dev-anon-key",
   SERVICE_ROLE_KEY: mintDevServiceJwt(D32),
   VAULT_ENCRYPTION_KEY: D64,
-  AISHA_DB_URL: "postgresql://aisha_admin:dev_postgres_password@aisha-db:5432/postgres",
+  AISHA_DB_URL: `postgresql://aisha_admin:dev_postgres_password@${INSTANCE_PREFIX}-db:5432/postgres`,
   AISHA_SERVICE_KEY: mintDevServiceJwt(D32),
 
   // ── App-specific DB passwords ──
@@ -776,7 +780,7 @@ export const devEnvDefaults = {
   // ── Langfuse ──
   LANGFUSE_NEXTAUTH_SECRET: D32,
   LANGFUSE_SALT: "dev_langfuse_salt",
-  LANGFUSE_ENCRYPTION_KEY: D64,
+  LANGFUSE_ENCRYPTION_KEY: D64HEX,
   LANGFUSE_PUBLIC_KEY: "pk-lf-dev-public-key-0000000000000000",
   LANGFUSE_SECRET_KEY: "sk-lf-dev-secret-key-0000000000000000",
   LANGFUSE_OIDC_SECRET: D32,
@@ -1075,8 +1079,10 @@ export const devEnvDefaults = {
   INTERNAL_TLD: "internal.localhost",
   MESH_TLD: "mesh.localhost",
   COOLIFY_URL: "http://localhost",       // mirror COOLIFY_BASE_URL
-  // n8n app DB connection (n8n role on aisha-db; pairs with N8N_DB_PASSWORD)
-  N8N_DB_HOST: "aisha-db",
+  // n8n app DB connection (n8n role on the shared DB; pairs with N8N_DB_PASSWORD).
+  // Jméno se skládá z identity (alias `<prefix>-db`) — literál `aisha-db` lokálně
+  // neexistuje a n8n config-init čekal na DB donekonečna.
+  N8N_DB_HOST: `${INSTANCE_PREFIX}-db`,
   N8N_DB_NAME: "postgres",
   N8N_DB_PORT: "5432",
   N8N_DB_USER: "n8n_app",
