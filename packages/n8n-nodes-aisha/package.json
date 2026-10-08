@@ -52,7 +52,7 @@
       "dist/credentials/AishaMcpApi.credentials.js",
       "dist/credentials/AishaNocoDbApi.credentials.js",
       "dist/credentials/AishaLangfuseApi.credentials.js",
-      "dist/credentials/AishaForgejoApi.credentials.js",
+      "dist/credentials/AishaGitHubApi.credentials.js",
       "dist/credentials/AishaAppsmithApi.credentials.js"
     ],
     "nodes": [

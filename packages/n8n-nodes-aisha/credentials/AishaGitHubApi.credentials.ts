@@ -4,27 +4,33 @@ import type {
 } from 'n8n-workflow';
 
 /**
- * Forgejo API credential.
+ * GitHub REST API credential.
  *
- * Stores the Forgejo base URL + API token for Aisha's Git
- * operations (branches, commits, pull requests).
+ * Stores the GitHub REST API base URL + token for Aisha's Git operations
+ * (branches, commits, pull requests, commit statuses) in AishaAdminBridge.
  *
- * @see https://forgejo.org/docs/latest/developer/api-usage/
+ * The API URL defaults to the public GitHub API; GitHub Enterprise Server
+ * overrides it with `https://<host>/api/v3`. The repository itself is NOT part
+ * of the credential — workflows pass owner/repo explicitly (from
+ * `GITHUB_REPOSITORY`), and the node fails closed when it is empty.
+ *
+ * @see https://docs.github.com/en/rest
  */
-export class AishaForgejoApi implements ICredentialType {
-	name = 'aishaForgejoApi';
-	displayName = 'AISHA Forgejo API';
-	documentationUrl = 'https://forgejo.org/docs/latest/developer/api-usage/';
+export class AishaGitHubApi implements ICredentialType {
+	name = 'aishaGitHubApi';
+	displayName = 'AISHA GitHub API';
+	documentationUrl = 'https://docs.github.com/en/rest';
 	icon = 'file:../nodes/AishaAdminBridge/aisha.svg' as const;
 
 	properties: INodeProperties[] = [
 		{
-			displayName: 'Forgejo Base URL',
-			name: 'baseUrl',
+			displayName: 'API URL',
+			name: 'apiUrl',
 			type: 'string',
-			default: '',
-			placeholder: 'https://git.id3a.cz',
-			description: 'Base URL of the Forgejo instance (without /api/v1)',
+			default: 'https://api.github.com',
+			placeholder: 'https://api.github.com',
+			description:
+				'GitHub REST API base URL. Public GitHub: https://api.github.com; GitHub Enterprise Server: https://<host>/api/v3',
 			required: true,
 		},
 		{
@@ -33,7 +39,8 @@ export class AishaForgejoApi implements ICredentialType {
 			type: 'string',
 			typeOptions: { password: true },
 			default: '',
-			description: 'Forgejo personal access token (Settings → Applications → Access Tokens)',
+			description:
+				'GitHub token (fine-grained personal access token or GitHub App installation token) with contents, pull requests and commit statuses access to the repository',
 			required: true,
 		},
 	];

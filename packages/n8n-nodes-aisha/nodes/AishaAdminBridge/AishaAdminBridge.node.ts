@@ -13,7 +13,7 @@ import { fetchWithTimeout } from '../_shared/fetchWithTimeout';
  * AishaAdminBridge — Aisha's autonomous admin interface node.
  *
  * Provides unified access to NocoDB (table management, CRUD, views),
- * Langfuse (traces, sessions, scores, metrics), and Forgejo (Git ops)
+ * Langfuse (traces, sessions, scores, metrics), and GitHub (Git ops)
  * so Aisha can self-manage internal admin panels without React UI.
  *
  * @example
@@ -23,8 +23,8 @@ import { fetchWithTimeout } from '../_shared/fetchWithTimeout';
  * // Langfuse: Get trace summary
  * operation: 'langfuse_get_traces'
  *
- * // Forgejo: Create a PR
- * operation: 'forgejo_create_pr'
+ * // GitHub: Create a PR
+ * service: 'github', operation: 'create_pr'
  */
 export class AishaAdminBridge implements INodeType {
 	description: INodeTypeDescription = {
@@ -34,7 +34,7 @@ export class AishaAdminBridge implements INodeType {
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{ $parameter["service"] + ": " + $parameter["operation"] }}',
-		description: 'Aisha Admin Bridge — NocoDB + Langfuse + Forgejo + Appsmith operations',
+		description: 'Aisha Admin Bridge — NocoDB + Langfuse + GitHub + Appsmith operations',
 		defaults: {
 			name: 'Admin Bridge',
 		},
@@ -52,9 +52,9 @@ export class AishaAdminBridge implements INodeType {
 				displayOptions: { show: { service: ['langfuse'] } },
 			},
 			{
-				name: 'aishaForgejoApi',
+				name: 'aishaGitHubApi',
 				required: false,
-				displayOptions: { show: { service: ['forgejo'] } },
+				displayOptions: { show: { service: ['github'] } },
 			},
 			{
 				name: 'aishaAppsmithApi',
@@ -85,9 +85,9 @@ export class AishaAdminBridge implements INodeType {
 						description: 'LLM observability and tracing operations',
 					},
 					{
-						name: 'Forgejo',
-						value: 'forgejo',
-						description: 'Git operations — branches, commits, pull requests',
+						name: 'GitHub',
+						value: 'github',
+						description: 'Git operations — branches, commits, pull requests, commit statuses',
 					},
 					{
 						name: 'Appsmith',
@@ -216,14 +216,14 @@ export class AishaAdminBridge implements INodeType {
 			},
 
 			// ═══════════════════════════════════════════════════════════════
-			// Forgejo Operations
+			// GitHub Operations
 			// ═══════════════════════════════════════════════════════════════
 			{
 				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				noDataExpression: true,
-				displayOptions: { show: { service: ['forgejo'] } },
+				displayOptions: { show: { service: ['github'] } },
 				options: [
 					{
 						name: 'List Repos',
@@ -234,14 +234,26 @@ export class AishaAdminBridge implements INodeType {
 					{
 						name: 'Create Branch',
 						value: 'create_branch',
-						description: 'Create a new branch from a base reference',
+						description: 'Create a new branch from a base branch',
 						action: 'Create a Git branch',
+					},
+					{
+						name: 'Delete Branch',
+						value: 'delete_branch',
+						description: 'Delete a branch (e.g. roll back an abandoned proposal)',
+						action: 'Delete a Git branch',
 					},
 					{
 						name: 'Commit File',
 						value: 'commit_file',
 						description: 'Create or update a file with a commit',
 						action: 'Commit a file change',
+					},
+					{
+						name: 'Commit Files',
+						value: 'commit_files',
+						description: 'Create or update several files in one commit',
+						action: 'Commit several file changes',
 					},
 					{
 						name: 'Create PR',
@@ -261,12 +273,18 @@ export class AishaAdminBridge implements INodeType {
 						description: 'Merge a pull request',
 						action: 'Merge a pull request',
 					},
+					{
+						name: 'Set Commit Status',
+						value: 'set_commit_status',
+						description: 'Report a status check (e.g. a PR gate verdict) on a commit',
+						action: 'Set a commit status',
+					},
 				],
 				default: 'list_repos',
 			},
 
 			// ═══════════════════════════════════════════════════════════════
-			// Forgejo Parameters
+			// GitHub Parameters
 			// ═══════════════════════════════════════════════════════════════
 			{
 				displayName: 'Repository Owner',
@@ -274,13 +292,23 @@ export class AishaAdminBridge implements INodeType {
 				type: 'string',
 				displayOptions: {
 					show: {
-						service: ['forgejo'],
-						operation: ['create_branch', 'commit_file', 'create_pr', 'get_diff', 'merge_pr'],
+						service: ['github'],
+						operation: [
+							'create_branch',
+							'delete_branch',
+							'commit_file',
+							'commit_files',
+							'create_pr',
+							'get_diff',
+							'merge_pr',
+							'set_commit_status',
+						],
 					},
 				},
 				default: '',
-				placeholder: 'aisha',
-				description: 'Repository owner (org or user)',
+				placeholder: 'acme',
+				description:
+					'Repository owner (org or user). Workflows derive it from GITHUB_REPOSITORY; empty fails closed (no default repository).',
 				required: true,
 			},
 			{
@@ -289,13 +317,22 @@ export class AishaAdminBridge implements INodeType {
 				type: 'string',
 				displayOptions: {
 					show: {
-						service: ['forgejo'],
-						operation: ['create_branch', 'commit_file', 'create_pr', 'get_diff', 'merge_pr'],
+						service: ['github'],
+						operation: [
+							'create_branch',
+							'delete_branch',
+							'commit_file',
+							'commit_files',
+							'create_pr',
+							'get_diff',
+							'merge_pr',
+							'set_commit_status',
+						],
 					},
 				},
 				default: '',
-				placeholder: 'aisha-dirigent',
-				description: 'Repository name',
+				placeholder: 'aisha-orchestrator',
+				description: 'Repository name. Workflows derive it from GITHUB_REPOSITORY; empty fails closed.',
 				required: true,
 			},
 			{
@@ -304,14 +341,28 @@ export class AishaAdminBridge implements INodeType {
 				type: 'string',
 				displayOptions: {
 					show: {
-						service: ['forgejo'],
-						operation: ['create_branch', 'commit_file'],
+						service: ['github'],
+						operation: ['create_branch', 'delete_branch', 'commit_file'],
 					},
 				},
 				default: '',
 				placeholder: 'aisha/fix-translation',
-				description: 'Name of the branch to create or commit to',
+				description: 'Name of the branch to create, delete or commit to',
 				required: true,
+			},
+			{
+				displayName: 'Target Branch',
+				name: 'targetBranch',
+				type: 'string',
+				displayOptions: {
+					show: {
+						service: ['github'],
+						operation: ['commit_files'],
+					},
+				},
+				default: '',
+				placeholder: 'main',
+				description: 'Branch to commit to; empty = the repository default branch',
 			},
 			{
 				displayName: 'Base Branch',
@@ -319,7 +370,7 @@ export class AishaAdminBridge implements INodeType {
 				type: 'string',
 				displayOptions: {
 					show: {
-						service: ['forgejo'],
+						service: ['github'],
 						operation: ['create_branch', 'create_pr'],
 					},
 				},
@@ -332,7 +383,7 @@ export class AishaAdminBridge implements INodeType {
 				type: 'string',
 				displayOptions: {
 					show: {
-						service: ['forgejo'],
+						service: ['github'],
 						operation: ['commit_file'],
 					},
 				},
@@ -348,7 +399,7 @@ export class AishaAdminBridge implements INodeType {
 				typeOptions: { rows: 10 },
 				displayOptions: {
 					show: {
-						service: ['forgejo'],
+						service: ['github'],
 						operation: ['commit_file'],
 					},
 				},
@@ -357,13 +408,28 @@ export class AishaAdminBridge implements INodeType {
 				required: true,
 			},
 			{
+				displayName: 'Files',
+				name: 'files',
+				type: 'json',
+				displayOptions: {
+					show: {
+						service: ['github'],
+						operation: ['commit_files'],
+					},
+				},
+				default: '{}',
+				description:
+					'Object mapping repository paths to UTF-8 file contents, e.g. {"CLAUDE.md": "…", ".cursorrules": "…"}',
+				required: true,
+			},
+			{
 				displayName: 'Commit Message',
 				name: 'commitMessage',
 				type: 'string',
 				displayOptions: {
 					show: {
-						service: ['forgejo'],
-						operation: ['commit_file'],
+						service: ['github'],
+						operation: ['commit_file', 'commit_files'],
 					},
 				},
 				default: '',
@@ -377,7 +443,7 @@ export class AishaAdminBridge implements INodeType {
 				type: 'string',
 				displayOptions: {
 					show: {
-						service: ['forgejo'],
+						service: ['github'],
 						operation: ['create_pr'],
 					},
 				},
@@ -393,7 +459,7 @@ export class AishaAdminBridge implements INodeType {
 				typeOptions: { rows: 5 },
 				displayOptions: {
 					show: {
-						service: ['forgejo'],
+						service: ['github'],
 						operation: ['create_pr'],
 					},
 				},
@@ -406,7 +472,7 @@ export class AishaAdminBridge implements INodeType {
 				type: 'string',
 				displayOptions: {
 					show: {
-						service: ['forgejo'],
+						service: ['github'],
 						operation: ['create_pr'],
 					},
 				},
@@ -421,7 +487,7 @@ export class AishaAdminBridge implements INodeType {
 				type: 'number',
 				displayOptions: {
 					show: {
-						service: ['forgejo'],
+						service: ['github'],
 						operation: ['get_diff', 'merge_pr'],
 					},
 				},
@@ -435,7 +501,7 @@ export class AishaAdminBridge implements INodeType {
 				type: 'options',
 				displayOptions: {
 					show: {
-						service: ['forgejo'],
+						service: ['github'],
 						operation: ['merge_pr'],
 					},
 				},
@@ -448,20 +514,93 @@ export class AishaAdminBridge implements INodeType {
 				description: 'How to merge the PR',
 			},
 			{
+				displayName: 'Commit SHA',
+				name: 'commitSha',
+				type: 'string',
+				displayOptions: {
+					show: {
+						service: ['github'],
+						operation: ['set_commit_status'],
+					},
+				},
+				default: '',
+				description: 'Commit the status is reported on (e.g. the PR head SHA)',
+				required: true,
+			},
+			{
+				displayName: 'Status State',
+				name: 'statusState',
+				type: 'options',
+				displayOptions: {
+					show: {
+						service: ['github'],
+						operation: ['set_commit_status'],
+					},
+				},
+				options: [
+					{ name: 'Error', value: 'error' },
+					{ name: 'Failure', value: 'failure' },
+					{ name: 'Pending', value: 'pending' },
+					{ name: 'Success', value: 'success' },
+				],
+				default: 'pending',
+				description: 'Status reported to the commit',
+			},
+			{
+				displayName: 'Status Context',
+				name: 'statusContext',
+				type: 'string',
+				displayOptions: {
+					show: {
+						service: ['github'],
+						operation: ['set_commit_status'],
+					},
+				},
+				default: '',
+				placeholder: 'aitg/pr-gate',
+				description: 'Status check name (branch protection can require it)',
+				required: true,
+			},
+			{
+				displayName: 'Status Description',
+				name: 'statusDescription',
+				type: 'string',
+				displayOptions: {
+					show: {
+						service: ['github'],
+						operation: ['set_commit_status'],
+					},
+				},
+				default: '',
+				description: 'Short human-readable description of the status',
+			},
+			{
+				displayName: 'Status Target URL',
+				name: 'statusTargetUrl',
+				type: 'string',
+				displayOptions: {
+					show: {
+						service: ['github'],
+						operation: ['set_commit_status'],
+					},
+				},
+				default: '',
+				description: 'Optional link with details (shown next to the status check)',
+			},
+			{
 				displayName: 'Search Query',
 				name: 'repoSearchQuery',
 				type: 'string',
 				displayOptions: {
 					show: {
-						service: ['forgejo'],
+						service: ['github'],
 						operation: ['list_repos'],
 					},
 				},
 				default: '',
 				placeholder: 'aisha',
-				description: 'Search query for repository names',
+				description: 'Search query for repository names; empty = repositories of the authenticated user',
 			},
-
 			// ═══════════════════════════════════════════════════════════════
 			// Appsmith Operations
 			// ═══════════════════════════════════════════════════════════════
@@ -807,7 +946,7 @@ export class AishaAdminBridge implements INodeType {
 				},
 				default: '',
 				placeholder: 'nocodb',
-				description: 'Service name to check (nocodb, langfuse, n8n)',
+				description: 'Service name to check (nocodb, langfuse, github, appsmith, n8n)',
 				required: true,
 			},
 		],
@@ -828,8 +967,8 @@ export class AishaAdminBridge implements INodeType {
 					result = await executeNocoDBOps(this, i, operation);
 				} else if (service === 'langfuse') {
 					result = await executeLangfuseOps(this, i, operation);
-				} else if (service === 'forgejo') {
-					result = await executeForgejoOps(this, i, operation);
+				} else if (service === 'github') {
+					result = await executeGitHubOps(this, i, operation);
 				} else if (service === 'appsmith') {
 					result = await executeAppsmithOps(this, i, operation);
 				} else if (service === 'health') {
@@ -1184,7 +1323,7 @@ async function executeHealthCheckOps(
 	const services: Array<{ name: string; url: string; healthPath: string }> = [
 		{ name: 'nocodb', url: '', healthPath: '/api/v1/health' },
 		{ name: 'langfuse', url: '', healthPath: '/api/public/health' },
-		{ name: 'forgejo', url: '', healthPath: '/api/v1/version' },
+		{ name: 'github', url: '', healthPath: '/zen' },
 		{ name: 'appsmith', url: '', healthPath: '/api/v1/users/me' },
 		{ name: 'n8n', url: '', healthPath: '/healthz' },
 	];
@@ -1242,10 +1381,10 @@ async function executeHealthCheckOps(
 	}
 
 	try {
-		const fgCredentials = await ctx.getCredentials('aishaForgejoApi', itemIndex);
-		const fgSvc = services.find((s) => s.name === 'forgejo');
-		if (fgSvc && !fgSvc.url) {
-			fgSvc.url = (fgCredentials.baseUrl as string).replace(/\/$/, '');
+		const ghCredentials = await ctx.getCredentials('aishaGitHubApi', itemIndex);
+		const ghSvc = services.find((s) => s.name === 'github');
+		if (ghSvc && !ghSvc.url) {
+			ghSvc.url = (ghCredentials.apiUrl as string).replace(/\/$/, '');
 		}
 	} catch {
 		// credential not configured for this user — optional, skip URL override
@@ -1322,62 +1461,127 @@ async function checkServiceHealthOps(svc: {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// Forgejo Git operations
+// GitHub Git operations (GitHub REST API)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-async function executeForgejoOps(
+/** Operations that act on one repository (need repoOwner + repoName). */
+const GITHUB_REPO_OPERATIONS = new Set([
+	'create_branch',
+	'delete_branch',
+	'commit_file',
+	'commit_files',
+	'create_pr',
+	'get_diff',
+	'merge_pr',
+	'set_commit_status',
+]);
+
+const GITHUB_STATUS_STATES = new Set(['error', 'failure', 'pending', 'success']);
+
+/** Encode a path or ref segment by segment, so `/` stays a separator. */
+function encodeGitHubPath(path: string): string {
+	return path
+		.split('/')
+		.filter((segment) => segment !== '')
+		.map((segment) => encodeURIComponent(segment))
+		.join('/');
+}
+
+/** `files` parameter (JSON string or object) → [path, content] pairs. */
+function parseGitHubFiles(raw: unknown): Array<[string, string]> {
+	const value = typeof raw === 'string' ? (JSON.parse(raw || '{}') as unknown) : raw;
+	if (!value || typeof value !== 'object' || Array.isArray(value)) {
+		throw new Error('files must be an object mapping repository paths to file contents');
+	}
+	const entries = Object.entries(value as Record<string, unknown>);
+	for (const [path, content] of entries) {
+		if (typeof content !== 'string') throw new Error(`files["${path}"] must be a string`);
+		if (path.split('/').includes('..')) throw new Error(`files["${path}"]: path traversal`);
+	}
+	return entries as Array<[string, string]>;
+}
+
+async function executeGitHubOps(
 	ctx: IExecuteFunctions,
 	itemIndex: number,
 	operation: string,
 ): Promise<Record<string, unknown>> {
-	const credentials = await ctx.getCredentials('aishaForgejoApi', itemIndex);
-	const baseUrl = requireCredString(credentials, 'baseUrl', ctx.getNode()).replace(/\/$/, '');
-	const apiToken = requireCredString(credentials, 'apiToken', ctx.getNode());
-	const apiBase = `${baseUrl}/api/v1`;
+	if (operation !== 'list_repos' && !GITHUB_REPO_OPERATIONS.has(operation)) {
+		throw new NodeOperationError(ctx.getNode(), `Unknown GitHub operation: ${operation}`, {
+			itemIndex,
+		});
+	}
 
-	async function forgejoFetch(
-		path: string,
-		method: string = 'GET',
-		body?: Record<string, unknown>,
-	): Promise<Record<string, unknown>> {
+	const credentials = await ctx.getCredentials('aishaGitHubApi', itemIndex);
+	const apiUrl = requireCredString(credentials, 'apiUrl', ctx.getNode()).replace(/\/+$/, '');
+	const apiToken = requireCredString(credentials, 'apiToken', ctx.getNode());
+	if (!apiUrl.startsWith('https://')) {
+		throw new NodeOperationError(ctx.getNode(), 'GitHub API URL must use https', { itemIndex });
+	}
+
+	async function githubFetch(path: string, method: string = 'GET', body?: Record<string, unknown>): Promise<unknown> {
 		const opts: RequestInit = {
 			method,
 			headers: {
-				Authorization: `token ${apiToken}`,
+				Authorization: `Bearer ${apiToken}`,
+				Accept: 'application/vnd.github+json',
+				'X-GitHub-Api-Version': '2022-11-28',
 				'Content-Type': 'application/json',
-				Accept: 'application/json',
+				'User-Agent': 'n8n-nodes-aisha',
 			},
 		};
 		if (body) opts.body = JSON.stringify(body);
-		const resp = await fetchWithTimeout(`${apiBase}${path}`, opts);
+		const resp = await fetchWithTimeout(`${apiUrl}${path}`, opts);
 		const text = await resp.text();
 		if (!resp.ok) {
-			throw new NodeOperationError(
-				ctx.getNode(),
-				`Forgejo ${method} ${path} → ${resp.status}: ${text}`,
-				{ itemIndex },
-			);
+			throw new NodeOperationError(ctx.getNode(), `GitHub ${method} ${path} → ${resp.status}: ${text}`, {
+				itemIndex,
+			});
 		}
-		return text ? (JSON.parse(text) as Record<string, unknown>) : { success: true };
+		return text ? (JSON.parse(text) as unknown) : { success: true };
 	}
 
 	if (operation === 'list_repos') {
 		const query = ctx.getNodeParameter('repoSearchQuery', itemIndex, '') as string;
-		const qs = query ? `?q=${encodeURIComponent(query)}&limit=50` : '?limit=50';
-		const data = await forgejoFetch(`/repos/search${qs}`);
+		const data = query
+			? await githubFetch(`/search/repositories?q=${encodeURIComponent(query)}&per_page=50`)
+			: await githubFetch('/user/repos?per_page=50');
 		return { success: true, operation, result: data };
 	}
 
-	const owner = ctx.getNodeParameter('repoOwner', itemIndex) as string;
-	const repo = ctx.getNodeParameter('repoName', itemIndex) as string;
+	// ⛔ No default repository: an empty owner/repo would otherwise address
+	// someone else's repository. Workflows derive both from GITHUB_REPOSITORY.
+	const owner = String(ctx.getNodeParameter('repoOwner', itemIndex, '') ?? '').trim();
+	const repo = String(ctx.getNodeParameter('repoName', itemIndex, '') ?? '').trim();
+	if (!owner || !repo) {
+		throw new NodeOperationError(
+			ctx.getNode(),
+			'GitHub repository not configured: repoOwner/repoName are empty (set GITHUB_REPOSITORY=owner/repo)',
+			{ itemIndex },
+		);
+	}
+	const repoPath = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`;
 
 	if (operation === 'create_branch') {
 		const branchName = ctx.getNodeParameter('branchName', itemIndex) as string;
 		const baseBranch = ctx.getNodeParameter('baseBranch', itemIndex, 'main') as string;
-		const result = await forgejoFetch(`/repos/${owner}/${repo}/branches`, 'POST', {
-			new_branch_name: branchName,
-			old_branch_name: baseBranch,
+		const base = (await githubFetch(`${repoPath}/git/ref/heads/${encodeGitHubPath(baseBranch)}`)) as {
+			object?: { sha?: string };
+		};
+		const sha = base.object?.sha;
+		if (!sha) {
+			throw new NodeOperationError(ctx.getNode(), `Base branch ${baseBranch} has no commit SHA`, { itemIndex });
+		}
+		const result = await githubFetch(`${repoPath}/git/refs`, 'POST', {
+			ref: `refs/heads/${branchName}`,
+			sha,
 		});
+		return { success: true, operation, result };
+	}
+
+	if (operation === 'delete_branch') {
+		const branchName = ctx.getNodeParameter('branchName', itemIndex) as string;
+		const result = await githubFetch(`${repoPath}/git/refs/heads/${encodeGitHubPath(branchName)}`, 'DELETE');
 		return { success: true, operation, result };
 	}
 
@@ -1386,14 +1590,15 @@ async function executeForgejoOps(
 		const filePath = ctx.getNodeParameter('filePath', itemIndex) as string;
 		const fileContent = ctx.getNodeParameter('fileContent', itemIndex) as string;
 		const commitMessage = ctx.getNodeParameter('commitMessage', itemIndex) as string;
+		const contentsPath = `${repoPath}/contents/${encodeGitHubPath(filePath)}`;
 
-		// Check if file exists to decide create vs update
+		// Existing file → its blob sha is required for the update (PUT without sha = create).
 		let sha: string | undefined;
 		try {
-			const existing = await forgejoFetch(
-				`/repos/${owner}/${repo}/contents/${filePath}?ref=${encodeURIComponent(branchName)}`,
-			);
-			sha = existing.sha as string;
+			const existing = (await githubFetch(`${contentsPath}?ref=${encodeURIComponent(branchName)}`)) as {
+				sha?: string;
+			};
+			sha = existing.sha;
 		} catch {
 			// File doesn't exist — will create
 		}
@@ -1405,13 +1610,58 @@ async function executeForgejoOps(
 		};
 		if (sha) body.sha = sha;
 
-		const method = sha ? 'PUT' : 'POST';
-		const result = await forgejoFetch(
-			`/repos/${owner}/${repo}/contents/${filePath}`,
-			method,
-			body,
-		);
+		const result = await githubFetch(contentsPath, 'PUT', body);
 		return { success: true, operation, result };
+	}
+
+	if (operation === 'commit_files') {
+		const commitMessage = ctx.getNodeParameter('commitMessage', itemIndex) as string;
+		let files: Array<[string, string]>;
+		try {
+			files = parseGitHubFiles(ctx.getNodeParameter('files', itemIndex, '{}'));
+		} catch (e) {
+			throw new NodeOperationError(ctx.getNode(), (e as Error).message, { itemIndex });
+		}
+		if (files.length === 0) {
+			throw new NodeOperationError(ctx.getNode(), 'commit_files: no files to commit', { itemIndex });
+		}
+
+		let branch = String(ctx.getNodeParameter('targetBranch', itemIndex, '') ?? '').trim();
+		if (!branch) {
+			const info = (await githubFetch(repoPath)) as { default_branch?: string };
+			branch = info.default_branch ?? '';
+			if (!branch) {
+				throw new NodeOperationError(ctx.getNode(), `Repository ${owner}/${repo} has no default branch`, {
+					itemIndex,
+				});
+			}
+		}
+		const refPath = `${repoPath}/git/refs/heads/${encodeGitHubPath(branch)}`;
+		const head = (await githubFetch(`${repoPath}/git/ref/heads/${encodeGitHubPath(branch)}`)) as {
+			object?: { sha?: string };
+		};
+		const parentSha = head.object?.sha;
+		const parent = parentSha
+			? ((await githubFetch(`${repoPath}/git/commits/${parentSha}`)) as { tree?: { sha?: string } })
+			: {};
+		if (!parentSha || !parent.tree?.sha) {
+			throw new NodeOperationError(ctx.getNode(), `Branch ${branch} has no head commit`, { itemIndex });
+		}
+		const tree = (await githubFetch(`${repoPath}/git/trees`, 'POST', {
+			base_tree: parent.tree.sha,
+			tree: files.map(([path, content]) => ({ path, mode: '100644', type: 'blob', content })),
+		})) as { sha?: string };
+		const commit = (await githubFetch(`${repoPath}/git/commits`, 'POST', {
+			message: commitMessage,
+			tree: tree.sha,
+			parents: [parentSha],
+		})) as { sha?: string; html_url?: string };
+		await githubFetch(refPath, 'PATCH', { sha: commit.sha });
+		return {
+			success: true,
+			operation,
+			result: { branch, commit, files: files.map(([path]) => path) },
+		};
 	}
 
 	if (operation === 'create_pr') {
@@ -1419,7 +1669,7 @@ async function executeForgejoOps(
 		const prBody = ctx.getNodeParameter('prBody', itemIndex, '') as string;
 		const headBranch = ctx.getNodeParameter('headBranch', itemIndex) as string;
 		const baseBranch = ctx.getNodeParameter('baseBranch', itemIndex, 'main') as string;
-		const result = await forgejoFetch(`/repos/${owner}/${repo}/pulls`, 'POST', {
+		const result = await githubFetch(`${repoPath}/pulls`, 'POST', {
 			title: prTitle,
 			body: prBody,
 			head: headBranch,
@@ -1430,22 +1680,37 @@ async function executeForgejoOps(
 
 	if (operation === 'get_diff') {
 		const prNumber = ctx.getNodeParameter('prNumber', itemIndex) as number;
-		const result = await forgejoFetch(`/repos/${owner}/${repo}/pulls/${prNumber}/files`);
+		const result = await githubFetch(`${repoPath}/pulls/${prNumber}/files`);
 		return { success: true, operation, result };
 	}
 
 	if (operation === 'merge_pr') {
 		const prNumber = ctx.getNodeParameter('prNumber', itemIndex) as number;
 		const mergeMethod = ctx.getNodeParameter('mergeMethod', itemIndex, 'squash') as string;
-		const result = await forgejoFetch(`/repos/${owner}/${repo}/pulls/${prNumber}/merge`, 'POST', {
-			Do: mergeMethod,
+		const result = await githubFetch(`${repoPath}/pulls/${prNumber}/merge`, 'PUT', {
+			merge_method: mergeMethod,
 		});
 		return { success: true, operation, result };
 	}
 
-	throw new NodeOperationError(ctx.getNode(), `Unknown Forgejo operation: ${operation}`, {
-		itemIndex,
-	});
+	// set_commit_status (the only remaining entry of GITHUB_REPO_OPERATIONS)
+	const commitSha = String(ctx.getNodeParameter('commitSha', itemIndex, '') ?? '').trim();
+	const state = ctx.getNodeParameter('statusState', itemIndex, 'pending') as string;
+	if (!commitSha) {
+		throw new NodeOperationError(ctx.getNode(), 'set_commit_status: commitSha is empty', { itemIndex });
+	}
+	if (!GITHUB_STATUS_STATES.has(state)) {
+		throw new NodeOperationError(ctx.getNode(), `set_commit_status: invalid state ${state}`, { itemIndex });
+	}
+	const statusBody: Record<string, unknown> = {
+		state,
+		context: ctx.getNodeParameter('statusContext', itemIndex) as string,
+		description: ctx.getNodeParameter('statusDescription', itemIndex, '') as string,
+	};
+	const targetUrl = String(ctx.getNodeParameter('statusTargetUrl', itemIndex, '') ?? '').trim();
+	if (targetUrl) statusBody.target_url = targetUrl;
+	const result = await githubFetch(`${repoPath}/statuses/${encodeURIComponent(commitSha)}`, 'POST', statusBody);
+	return { success: true, operation, result };
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
