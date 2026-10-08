@@ -23,6 +23,10 @@
 // This is a TECHNOLOGY property (not derivable from compose alone — e.g. svc-matrix
 // also carries KEYCLOAK_ISSUER but fetches JWKS explicitly via KEYCLOAK_URL, so it
 // is NOT discovery-only), hence a small curated registry.
+//
+// What is affected is a HUMAN browser login into the service's own UI. AISHA itself
+// never logs in there: it talks to Langfuse with project API keys and to OpenClaw
+// with a bearer key — both work under local-warmup.
 // =============================================================================
 
 /**
@@ -36,11 +40,15 @@
  * Matrix Synapse is NOT here any more: its config uses `discover: false` with
  * explicit endpoints (coolify/synapse/homeserver.yaml), which the local resolver
  * rewrites like any other explicit consumer.
+ *
+ * OpenClaw is NOT here either: svc-openclaw has no OIDC at all — every route
+ * except /health takes `Authorization: Bearer $OPENCLAW_API_KEY`
+ * (services/svc-openclaw/src/server.ts). The `AUTH_OIDC_*` it is handed in
+ * compose is read by nothing (measured 2026-10-08).
  */
 export const DISCOVERY_OIDC_CONSUMERS = {
-  langfuse: "Langfuse (NextAuth Keycloak provider — server-side discovery)",
-  "llm-gateway": "LLM Gateway (server-side OIDC discovery)",
-  openclaw: "OpenClaw (server-side OIDC discovery)",
+  langfuse: "Langfuse UI sign-in for operators (NextAuth Keycloak provider — server-side discovery); AISHA → Langfuse uses API keys and is unaffected",
+  "llm-gateway": "LLM Gateway dashboard SSO, if the image uses AUTH_OIDC_* (server-side discovery); API traffic uses keys and is unaffected",
 };
 
 /**

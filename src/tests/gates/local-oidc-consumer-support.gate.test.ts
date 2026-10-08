@@ -3,11 +3,12 @@
  *
  * The model-driven resolver (PR #336) makes EXPLICIT-endpoint OIDC consumers work
  * locally (gateway/svc-* via KC_ISSUER+KC_JWKS_URL; oauth2-proxy via SKIP_DISCOVERY
- * + explicit URLs; svc-matrix via KEYCLOAK_URL). DISCOVERY-based consumers
- * (Langfuse/llm-gateway/openclaw NextAuth, Matrix Synapse) cannot complete login
- * under local-warmup's no-Traefik/no-/etc/hosts model — a fundamental single-host
- * constraint, codified here as a registry + a non-fatal generator warning + a doc,
- * so the boundary is explicit rather than a silent failure.
+ * + explicit URLs; svc-matrix via KEYCLOAK_URL; Synapse via `discover: false`).
+ * DISCOVERY-based consumers (the Langfuse UI's NextAuth, llm-gateway's dashboard)
+ * cannot complete a BROWSER login under local-warmup's no-Traefik/no-/etc/hosts
+ * model — a fundamental single-host constraint, codified here as a registry + a
+ * non-fatal generator warning + a doc, so the boundary is explicit rather than a
+ * silent failure. AISHA's own traffic to them (API keys, bearer) is not affected.
  */
 import { describe, expect, test } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
@@ -22,11 +23,30 @@ const read = (rel: string): string => readFileSync(join(ROOT, rel), "utf-8");
 
 describe("Local-warmup OIDC consumer support boundary", () => {
   test("registry lists the known discovery-only consumers with reasons", () => {
-    for (const sluzba of ["langfuse", "llm-gateway", "openclaw"]) {
+    for (const sluzba of ["langfuse", "llm-gateway"]) {
       expect(DISCOVERY_OIDC_CONSUMERS[sluzba], `${sluzba} must be registered with a reason`).toBeTruthy();
     }
     // Synapse bere explicitní endpointy (discover: false) — není discovery spotřebitel.
     expect(DISCOVERY_OIDC_CONSUMERS["synapse"]).toBeUndefined();
+    // OpenClaw OIDC nemá vůbec: každá trasa kromě /health chce Bearer OPENCLAW_API_KEY.
+    expect(DISCOVERY_OIDC_CONSUMERS["openclaw"]).toBeUndefined();
+  });
+
+  test("OpenClaw daemon authenticates with its API key, not OIDC — so it is no discovery consumer", () => {
+    const server = read("services/svc-openclaw/src/server.ts");
+    expect(server).toMatch(/OPENCLAW_API_KEY|openclawApiKey|apiKey/);
+    const src = ["server.ts", "config.ts"].map((f) => read(`services/svc-openclaw/src/${f}`)).join("\n");
+    expect(src, "if svc-openclaw starts reading AUTH_OIDC_*, it belongs back in the registry").not.toMatch(/AUTH_OIDC_/);
+  });
+
+  test("Langfuse: realm allows the callback of the provider compose configures", () => {
+    const compose = read("docker-compose.coolify-langfuse.yml");
+    const realm = JSON.parse(read("keycloak/aisha-realm.json"));
+    const langfuse = realm.clients.find((c: { clientId: string }) => c.clientId === "langfuse");
+    // NextAuth: provider `keycloak` (AUTH_KEYCLOAK_*) → /api/auth/callback/keycloak,
+    // `custom` (AUTH_CUSTOM_*) → /api/auth/callback/custom.
+    const provider = /AUTH_KEYCLOAK_CLIENT_ID/.test(compose) ? "keycloak" : "custom";
+    expect(langfuse.redirectUris).toContain(`https://\${LANGFUSE_DOMAIN}/api/auth/callback/${provider}`);
   });
 
   test("findDiscoveryConsumersInStack matches container_names of ANY instance identity, ignores explicit-endpoint ones", () => {
@@ -37,14 +57,14 @@ describe("Local-warmup OIDC consumer support boundary", () => {
       services: {
         langfuse: { container_name: "zkouska-langfuse" },
         langfuseGw: { container_name: "zkouska-langfuse-gateway" }, // jiná služba → not flagged
-        openclaw: { container_name: "zkouska-openclaw" },
+        openclaw: { container_name: "zkouska-openclaw" }, // bearer key, no OIDC → not flagged
         openclawAuth: { container_name: "zkouska-openclaw-auth" }, // oauth2-proxy, explicit → not flagged
         gateway: { container_name: "zkouska-gateway" }, // explicit endpoints → not flagged
         matrix: { container_name: "zkouska-svc-matrix" }, // explicit JWKS via KEYCLOAK_URL → not flagged
         synapse: { container_name: "zkouska-synapse" }, // discover: false + explicit endpoints → not flagged
       },
     };
-    expect(findDiscoveryConsumersInStack(doc)).toEqual(["zkouska-langfuse", "zkouska-openclaw"]);
+    expect(findDiscoveryConsumersInStack(doc)).toEqual(["zkouska-langfuse"]);
     expect(findDiscoveryConsumersInStack({ services: {} })).toEqual([]);
   });
 

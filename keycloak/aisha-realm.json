@@ -302,7 +302,7 @@
     {
       "clientId": "langfuse",
       "name": "Langfuse Observability",
-      "description": "OIDC SSO for Langfuse v3 (via AUTH_CUSTOM_* env vars)",
+      "description": "OIDC SSO for the Langfuse v3 UI (operators only; AISHA services use project API keys). Compose uses AUTH_KEYCLOAK_* -> callback /api/auth/callback/keycloak; /custom kept for AUTH_CUSTOM_* setups",
       "enabled": true,
       "protocol": "openid-connect",
       "publicClient": false,
@@ -313,7 +313,9 @@
       "authorizationServicesEnabled": false,
       "fullScopeAllowed": true,
       "redirectUris": [
+        "https://${LANGFUSE_DOMAIN}/api/auth/callback/keycloak",
         "https://${LANGFUSE_DOMAIN}/api/auth/callback/custom",
+        "http://localhost:3100/api/auth/callback/keycloak",
         "http://localhost:3100/api/auth/callback/custom"
       ],
       "webOrigins": [

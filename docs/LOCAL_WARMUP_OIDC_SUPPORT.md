@@ -16,11 +16,27 @@ docker DNS. The model-driven Keycloak resolver
 | oauth2-proxy admin/monitoring UIs (`nocodb-auth`, `appsmith-auth`, `intranet-auth`, `pgadmin-auth`, `n8n--auth`, …) | `OAUTH2_PROXY_SKIP_OIDC_DISCOVERY=true` + explicit endpoints | ✅ redirect to Keycloak works (host-facing `authorize`, verified 2026-10-08 for nocodb/appsmith/intranet). The UIs themselves are not published to the host locally (port hygiene) and their `redirect_uri` is `https://<service>.<LOCAL_TLD>`, so the browser round-trip needs the Traefik/e2e stack |
 | `svc-matrix` | `KEYCLOAK_ISSUER` (iss) + `KEYCLOAK_URL` (in-network JWKS) | ✅ works |
 | **Matrix Synapse** (`synapse`) | `oidc_providers` with `discover: false` + explicit `issuer` / `authorization_endpoint` / `token_endpoint` / `userinfo_endpoint` / `jwks_uri` (composed in `docker-compose.coolify-matrix.yml`, rewritten by the resolver like any explicit consumer) | ✅ starts (healthy) and offers SSO via `oidc-keycloak` (since 2026-10-08; before that it ran discovery at startup and crashed). The browser SSO round-trip still needs Synapse's `public_baseurl` (`https://…`) to be reachable — Traefik/e2e stack |
-| **Langfuse** (`langfuse`) | NextAuth Keycloak provider — server-side discovery | ❌ login can't complete |
-| **LLM Gateway** (`llm-gateway`) / **OpenClaw** (`openclaw`) | server-side OIDC discovery | ❌ |
+| **Langfuse UI** (`langfuse`) | NextAuth Keycloak provider — server-side discovery | ❌ browser sign-in to the UI can't complete (the UI is not published to the host locally anyway). AISHA → Langfuse uses project API keys: ✅ |
+| **LLM Gateway dashboard** (`llm-gateway`) | `AUTH_OIDC_*` → server-side discovery, if the image uses it (external image, no realm client) | ❌ for the dashboard; API traffic uses keys: ✅. Not in any local preset |
+| **OpenClaw** (`openclaw`) | no OIDC — every route except `/health` takes `Authorization: Bearer $OPENCLAW_API_KEY` | ✅ (service-to-service only, no UI) |
 
 Container names carry the instance identity (`<APP_NAME_PREFIX>-<service>`, locally
 `local-<service>`); the generator's warning matches on the service suffix.
+
+## Langfuse and OpenClaw are internal services
+
+AISHA never logs into Langfuse or OpenClaw as a user. It authenticates service-to-service:
+
+- **Langfuse**: project public + secret key (svc-ai-chat tracer, llm-gateway exporter,
+  OTLP, n8n credential `AishaLangfuseApi`, Appsmith REST datasource).
+- **OpenClaw**: `OPENCLAW_API_KEY` bearer from svc-ai-chat (`/api/openclaw/*` bridge)
+  and n8n. The daemon has no UI and no OIDC.
+
+So under local-warmup nothing AISHA does depends on a browser login to either. The only
+human entry points are operator tools on a deployed instance: the Grafana
+"Open in Langfuse" link (`LANGFUSE_PUBLIC_URL`), the admin portal's Langfuse tab and the
+Appsmith ops iframe. Those use Langfuse's Keycloak SSO, or its init admin's
+email + password, which stays enabled.
 
 ## Why discovery consumers can't work here
 
