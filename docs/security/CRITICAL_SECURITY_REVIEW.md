@@ -4,7 +4,7 @@
 **Autor:** GitHub Copilot (Security Audit)
 **Status:** 🔴 CRITICAL ISSUES FOUND
 
-Tento dokument obsahuje výsledky "maximálně kritického" bezpečnostního auditu aplikace Platform. Audit se zaměřil na ochranu sensitive data (sensitive data), integritu API a soulad s compliance standardy.
+Tento dokument obsahuje výsledky "maximálně kritického" bezpečnostního auditu aplikace Platform. Audit se zaměřil na ochranu sensitive data, integritu API a soulad s compliance standardy.
 
 ---
 

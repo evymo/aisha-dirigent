@@ -41321,7 +41321,7 @@ BEGIN
   INSERT INTO audit_journal (user_id, action, metadata)
   VALUES (
     auth.uid(),
-    'sensitive data_READ',
+    'SENSITIVE_DATA_READ',
     jsonb_build_object(
       'area', 'partner',
       'severity', 'info',
@@ -69437,7 +69437,7 @@ BEGIN
   INSERT INTO audit_journal (user_id, action, metadata)
   VALUES (
     auth.uid(),
-    'sensitive data_READ',
+    'SENSITIVE_DATA_READ',
     jsonb_build_object(
       'area', 'longevity_score',
       'severity', 'info',
@@ -71780,7 +71780,7 @@ BEGIN
       jsonb_build_object('participant_count', v_participant_count, 'threshold', 5, 'function', 'get_study_cohort_lab_trends')
     );
     
-    RAISE EXCEPTION 'Cohort size too small for aggregate statistics (n=%). Minimum 5 participants required for compliance compliance.', v_participant_count;
+    RAISE EXCEPTION 'Cohort size too small for aggregate statistics (n=%). Minimum 5 participants required for compliance.', v_participant_count;
   END IF;
 
   -- Return trends, also filtering out individual months with small participant counts
@@ -71851,7 +71851,7 @@ BEGIN
         jsonb_build_object('participant_count', v_participant_count, 'threshold', 5)
       );
       
-      RAISE EXCEPTION 'Cohort size too small for aggregate statistics (n=%). Minimum 5 participants required for compliance compliance.', v_participant_count;
+      RAISE EXCEPTION 'Cohort size too small for aggregate statistics (n=%). Minimum 5 participants required for compliance.', v_participant_count;
     END IF;
   END IF;
 
@@ -71967,7 +71967,7 @@ BEGIN
       jsonb_build_object('participant_count', v_participant_count, 'threshold', 5, 'function', 'get_study_cohort_trends')
     );
     
-    RAISE EXCEPTION 'Cohort size too small for aggregate statistics (n=%). Minimum 5 participants required for compliance compliance.', v_participant_count;
+    RAISE EXCEPTION 'Cohort size too small for aggregate statistics (n=%). Minimum 5 participants required for compliance.', v_participant_count;
   END IF;
 
   -- Return trends, also filtering out individual weeks with small participant counts
@@ -86386,7 +86386,7 @@ BEGIN
   INSERT INTO audit_journal (user_id, action, metadata)
   VALUES (
     auth.uid(),
-    'sensitive data_READ',
+    'SENSITIVE_DATA_READ',
     jsonb_build_object(
       'area', 'longevity_score',
       'severity', 'info',
@@ -117698,7 +117698,7 @@ BEGIN
   INSERT INTO audit_journal (user_id, action, metadata)
   VALUES (
     auth.uid(),
-    'sensitive data_WRITE',
+    'SENSITIVE_DATA_WRITE',
     jsonb_build_object(
       'area', 'longevity_score',
       'severity', 'info',

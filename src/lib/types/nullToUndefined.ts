@@ -4,7 +4,7 @@
  * Supabase generates types with `| null` for nullable columns.
  * These utilities help work with null values consistently.
  * 
- * sensitive dataLOSOPHY: We keep `| null` from Supabase as-is instead of converting to undefined.
+ * PHILOSOPHY: We keep `| null` from Supabase as-is instead of converting to undefined.
  * This is cleaner and avoids unnecessary transformations.
  * 
  * @module lib/types/nullToUndefined

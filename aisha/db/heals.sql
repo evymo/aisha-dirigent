@@ -11830,3 +11830,19 @@ REVOKE TRUNCATE, REFERENCES, TRIGGER ON ALL TABLES IN SCHEMA storage FROM authen
 ALTER DEFAULT PRIVILEGES IN SCHEMA public
   REVOKE TRUNCATE, REFERENCES, TRIGGER ON TABLES FROM authenticated;
 
+-- ⛔ Redakce „PHI → sensitive data" rozbila identifikátor akce v auditu (2026-10-08).
+-- Hromadné nahrazení textu přepsalo i hodnotu, kterou funkce zapisují do
+-- audit_journal.action: 'PHI_READ' → 'sensitive data_READ' (s mezerou), a v hláškách
+-- kohortních funkcí zdvojilo „compliance compliance". Akce je teď
+-- SENSITIVE_DATA_READ / SENSITIVE_DATA_WRITE (v kódu ji nikdo nefiltruje — ověřeno
+-- git grepem). Soubory dosud v heals nebyly, takže běžící DB měly verzi z cold startu.
+-- Idempotentní: CREATE OR REPLACE s vlastním REVOKE/GRANT.
+\ir sql/functions/get_consented_users_longevity_scores.sql
+\ir sql/functions/get_longevity_score_audited.sql
+\ir sql/functions/get_longevity_score_history_audited.sql
+\ir sql/functions/submit_longevity_assessment_audited.sql
+\ir sql/functions/get_study_cohort_lab_trends.sql
+\ir sql/functions/get_study_cohort_statistics.sql
+\ir sql/functions/get_study_cohort_trends.sql
+
+NOTIFY pgrst, 'reload schema';

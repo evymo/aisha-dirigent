@@ -30,7 +30,7 @@ Platform je production výzkumná platforma zaměřená na imunologické studie 
 | Aspekt | Popis |
 |--------|-------|
 | **Účel** | Moderní sociální síť pro zdraví & wellness s integrovanými výzkumnými studiemi |
-| **Data** | Reálná sensitive data (sensitive data) od skutečných uživatelů |
+| **Data** | Reálná sensitive data od skutečných uživatelů |
 | **Prostředí** | Produkce s reálnými uživateli a citlivými medicínskými daty |
 | **Uživatelé** | Veřejně přístupná aplikace pro běžné uživatele, výzkumníky a zdravotnické profesionály |
 | **Standard** | State-of-the-art best practices vyžadovány pro veškerý kód |
@@ -890,7 +890,7 @@ const queryClient = new QueryClient({
 
 - [ ] Všechny testy prochází (`npm run test:run`)
 - [ ] Žádné TypeScript chyby (`npx tsc --noEmit`)
-- [ ] Žádné console.log s sensitive-data
+- [ ] Žádné console.log s citlivými daty
 - [ ] RLS enabled na všech nových tabulkách
 - [ ] Migration soubory otestovány lokálně
 - [ ] Environment variables dokumentovány

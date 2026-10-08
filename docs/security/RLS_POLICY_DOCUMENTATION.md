@@ -28,7 +28,7 @@
 
 ### Overview
 
-Platform implements a comprehensive Row Level Security (RLS) strategy in PostgreSQL/Supabase to protect sensitive sensitive data (sensitive data) and ensure compliance compliance. The system uses:
+Platform implements a comprehensive Row Level Security (RLS) strategy in PostgreSQL/Supabase to protect sensitive data and ensure compliance. The system uses:
 
 - **Role-Based Access Control (RBAC)** with 5 primary roles
 - **Dynamic Permission System** mapping roles to fine-grained permissions

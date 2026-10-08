@@ -16,7 +16,7 @@
 
 ## 📋 Přehled
 
-Platform je produkční production platforma zaměřená na **reInvented Immunology** — inovativní přístup k imunologickému výzkumu. Platforma umožňuje:
+Platform je produkční platforma zaměřená na **reInvented Immunology** — inovativní přístup k imunologickému výzkumu. Platforma umožňuje:
 
 - 🔬 **Výzkumné studie** — Správa a účast v klinických studiích
 - 📊 **Health tracking** — Denní sledování zdravotního stavu (check-ins)

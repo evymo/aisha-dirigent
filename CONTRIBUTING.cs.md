@@ -19,11 +19,11 @@
 
 ## ⚠️ Kritický Kontext
 
-**Toto je PRODUKČNÍ production aplikace s reálnými sensitive data daty.**
+**Toto je PRODUKČNÍ aplikace s reálnými citlivými daty.**
 
 | Aspekt | Hodnota |
 |--------|---------|
-| **Data** | Reálná sensitive data (sensitive data) |
+| **Data** | Reálná sensitive data |
 | **Prostředí** | Produkce s aktivními uživateli |
 | **Compliance** | compliance, SOC 2, OWASP Top 10 |
 | **Kvalita** | Nejvyšší standard, žádné kompromisy |
@@ -153,7 +153,7 @@ console.error(\`Failed for user \${email}:\`, error);
 
 ## 🔒 Security Standards
 
-### sensitive data (sensitive data)
+### sensitive data
 
 **sensitive data zahrnuje:** jména, emaily, data narození, adresy, SSN, zdravotní záznamy, IP adresy, biometrická data
 
@@ -277,7 +277,7 @@ export function useMyFeature() {
 
 \`\`\`tsx
 <ErrorBoundary fallback={<ErrorFallback />}>
-  <sensitive dataComponent />
+  <SensitiveDataComponent />
 </ErrorBoundary>
 \`\`\`
 

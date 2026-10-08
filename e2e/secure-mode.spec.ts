@@ -4,7 +4,7 @@
  * Tests the sensitive data password gate flow required for accessing sensitive health data.
  * Covers: secure mode activation, timeout, re-authentication, audit logging.
  *
- * sensitive data (sensitive data) requires additional verification for compliance compliance.
+ * sensitive data requires additional verification for compliance.
  */
 
 import { test, expect } from "@playwright/test";

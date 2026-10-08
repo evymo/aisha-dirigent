@@ -44,7 +44,7 @@ BEGIN
       jsonb_build_object('participant_count', v_participant_count, 'threshold', 5, 'function', 'get_study_cohort_trends')
     );
     
-    RAISE EXCEPTION 'Cohort size too small for aggregate statistics (n=%). Minimum 5 participants required for compliance compliance.', v_participant_count;
+    RAISE EXCEPTION 'Cohort size too small for aggregate statistics (n=%). Minimum 5 participants required for compliance.', v_participant_count;
   END IF;
 
   -- Return trends, also filtering out individual weeks with small participant counts

@@ -4,7 +4,7 @@ Tento dokument je určený jako „shared memory“ pro AI asistenty a pro konzi
 
 ## Knowledge (Custom Knowledge)
 
-Tento repozitář je produkční production aplikace pracující s sensitive-data. Klíčové pilíře:
+Tento repozitář je produkční aplikace pracující s citlivými daty. Klíčové pilíře:
 
 - Frontend: React + TypeScript + Vite, routing přes `react-router-dom`, data fetching přes `@tanstack/react-query`.
 - Backend: Supabase (Postgres + RPC + Edge Functions + Storage). Preferovaný přístup k datům je „RPC-only“ (zejména pro sensitive-data) a auditovatelný tok.

@@ -1,6 +1,6 @@
 # E2E testování (Playwright)
 
-Tento projekt je produkční production aplikace. E2E testy musí běžet proti **lokální Supabase** (ne proti produkci) a nesmí obsahovat ani ukládat sensitive-data.
+Tento projekt je produkční aplikace. E2E testy musí běžet proti **lokální Supabase** (ne proti produkci) a nesmí obsahovat ani ukládat sensitive-data.
 
 ## Rychlý start (lokálně)
 
