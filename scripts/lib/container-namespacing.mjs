@@ -69,7 +69,31 @@ function withLocalAlias(net, orig) {
   if (net && typeof net === "object") {
     const existing = net[LOCAL_NET] && typeof net[LOCAL_NET] === "object" ? net[LOCAL_NET] : {};
     const aliases = Array.isArray(existing.aliases) ? existing.aliases : [];
-    return { ...net, [LOCAL_NET]: { ...existing, aliases: [...aliases, orig] } };
+    return { ...net, [LOCAL_NET]: { ...existing, aliases: [...new Set([...aliases, orig])] } };
   }
   return { [LOCAL_NET]: { aliases: [orig] } };
+}
+
+/**
+ * Collapse a service's `networks` onto the single local network while KEEPING the
+ * aliases the source compose declares on any of its networks. Pure.
+ *
+ * WHY — the prod compose names some services only through a declared alias, e.g.
+ * n8n--main answers as `<prefix>-n8n` (internal + mesh-dns nets), which is where the
+ * workflow init's N8N_REST_URL points. Collapsing to `{ [local]: null }` dropped that
+ * alias: the init then waited forever for a host nobody answered (measured
+ * 2026-10-08 on a running local stack — `ENOTFOUND local-n8n`).
+ *
+ * @param {string[] | Record<string, {aliases?: string[]} | null> | undefined} networks
+ * @param {string} [localNet]
+ */
+export function collapseToLocalNetwork(networks, localNet = LOCAL_NET) {
+  if (Array.isArray(networks)) return [localNet];
+  if (!networks || typeof networks !== "object") return networks;
+  const aliases = [
+    ...new Set(
+      Object.values(networks).flatMap((n) => (n && Array.isArray(n.aliases) ? n.aliases : [])),
+    ),
+  ];
+  return { [localNet]: aliases.length ? { aliases } : null };
 }

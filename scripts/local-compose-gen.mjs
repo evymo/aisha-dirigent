@@ -43,6 +43,7 @@ import { applyHostClientAuthFix, KC_CONTAINER } from "./lib/kc-host-auth.mjs";
 import { parseUnsetVarWarnings } from "./lib/env-completeness.mjs";
 import { nedorucene, popisNedorucenych, povinneSouboru } from "./lib/povinne-promenne.mjs";
 import { namespaceContainerNames } from "./lib/container-namespacing.mjs";
+import { collapseToLocalNetwork } from "./lib/container-namespacing.mjs";
 import { LOCAL_STACK, LOCAL_STACK_PREFIX } from "./lib/local-stack-name.mjs";
 import { findDiscoveryConsumersInStack, DISCOVERY_OIDC_CONSUMERS } from "./lib/oidc-consumer-support.mjs";
 import { validateLocalStackEnv, CRITICAL_ENV_KEYS } from "./lib/local-env-assertions.mjs";
@@ -844,8 +845,9 @@ function transformForLocal(doc) {
       // exclusive). Drop any that docker-compose-config may have normalized in.
       delete svc.networks;
     } else if (svc.networks) {
-      // Normal services: route to the local bridge and keep in-network DNS working.
-      svc.networks = Array.isArray(svc.networks) ? [LOCAL_STACK] : { [LOCAL_STACK]: null };
+      // Normal services: route to the local bridge and keep in-network DNS working —
+      // including the aliases the source declares (n8n--main answers as <prefix>-n8n).
+      svc.networks = collapseToLocalNetwork(svc.networks, LOCAL_STACK);
     }
 
     // Drop Coolify-specific labels
