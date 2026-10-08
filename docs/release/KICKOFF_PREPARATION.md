@@ -74,8 +74,9 @@ file changes, without importing upstream history.
   `claude-entrypoint.unit.test.ts`, `run-auth.unit.test.ts`.
 - MCP tests: `prace-pod-uzivatelem.unit.test.ts` and `tool-input-schemas.unit.test.ts`.
 
-No application deployment, database mutation, invitation, completed human login, live
-rehearsal, trainer run or visibility change has been performed by this preparation session.
+No application deployment, database mutation, invitation, live rehearsal, trainer run or
+visibility change has been performed by this preparation session. The operator later
+confirmed successful direct Keycloak login; see the update below.
 The additive Keycloak client/mapper changes below are the only live configuration writes.
 
 ## Historical validation record at the first checkpoint
@@ -180,7 +181,8 @@ Verified on 8 October 2026 through scoped Coolify/Keycloak APIs and public endpo
   challenge. The new gateway handling, project SQL and MCP tools must reach core
   before claiming the end-to-end scenario is enabled.
 - Realm self-registration is currently enabled, but SMTP is unconfigured. Invitation
-  delivery and a human login were not verified. Per the operator's latest decision, new
+  delivery and a human login were not verified in the initial audit. The operator has
+  since confirmed successful direct Keycloak login (report below). Per the operator's latest decision, new
   kickoff users register/sign in themselves and are then promoted to `admin` through
   AISHA administration. No account invitation or role elevation was performed here.
 
@@ -285,3 +287,16 @@ verified token roles; this RPC does not modify Keycloak realm roles. Include eff
 application access and MCP admin-tool visibility in the live role verification rather
 than assuming a DB role grant also changes an existing OAuth token. Project onboarding
 MCP tools use authenticated caller RPCs and their database authorization.
+
+
+### Operator confirmation: direct Keycloak login is sufficient for the current task
+
+On 8 October 2026 the operator reported a successful login using their existing account
+through Keycloak. This is human-reported evidence; the agent has not independently
+repeated the authenticated browser flow. Do not treat login as proof of project creation,
+MCP tool execution or the other colleagues' effective permissions.
+
+The operator reported problems with Apple ID and Google ID sign-in, and explicitly
+accepted direct Keycloak login for the current scope. Defer those external identity
+provider repairs. No Apple/Google client configuration or live user roles were changed
+by this update. The remaining core/MCP deployment and gate work above is unchanged.
