@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * aisha-deps-update.mjs — Forgejo-native dependency updater.
+ * aisha-deps-update.mjs — self-hosted dependency updater (Dependabot replacement).
  *
- * Replaces .github/dependabot.yml (Dependabot never ran on the primary forge;
- * the hand-maintained directory list there also drifted — 11 packages,
- * 6 services, the extension and the plugin-exec shim were never covered).
+ * Replaces .github/dependabot.yml (its hand-maintained directory list drifted —
+ * 11 packages, 6 services, the extension and the plugin-exec shim were never
+ * covered).
  *
  * Mirrors the aisha-packages-publish.mjs etalon: zero-dep Node ESM, DRY_RUN /
- * APPLY env switches plumbed from workflow_dispatch booleans, Forgejo API via
- * `Authorization: token`, audit beacon via log_integration_action, exit codes
- * 0 (ok) / 1 (failure) / 2 (misconfiguration).
+ * APPLY env switches plumbed from workflow_dispatch booleans, GitHub REST API
+ * (repository = GITHUB_REPOSITORY, no default), audit beacon via
+ * log_integration_action, exit codes 0 (ok) / 1 (failure) / 2 (misconfiguration).
  *
  * What it does, per update target (root workspace + every standalone
  * package-lock.json root, discovered — not hand-listed):
@@ -22,14 +22,14 @@
  *   3. group by policy (production/development), respecting maxOpenPrs
  *   4. DRY RUN (default): print the plan, exit 0
  *   5. APPLY=1: per group — branch off baseBranch, `npm install pkg@<range>`
- *      + lockfile regen, commit, push, open an idempotent Forgejo PR
+ *      + lockfile regen, commit, push, open an idempotent pull request
  *      (existing open PR with the same head branch → updated, not duplicated)
  *
  * Internal @aisha/* / @evymo/* packages are never bumped here — they version
  * through aisha-packages-publish. The updater instead REPORTS consumers that
- * resolve an older published version than the workspace source (the Verdaccio
- * chicken-and-egg documented at ci.yml npm-audit-services) so the sequence is:
- * merge package bump → publish → re-run updater.
+ * resolve an older published version than the workspace source (the private
+ * registry chicken-and-egg documented at supply-chain.yml npm-audit-services)
+ * so the sequence is: merge package bump → publish → re-run updater.
  *
  * Usage:
  *   node scripts/aisha-deps-update.mjs                 # dry-run plan
@@ -39,9 +39,10 @@
  * Env:
  *   APPLY=1            actually branch/commit/push/PR (default: dry-run)
  *   TARGET_FILTER      substring filter on target paths
- *   FORGEJO_API_TOKEN  required for APPLY (PR creation)
- *   FORGEJO_URL        default https://repo.id3a.cz
- *   FORGEJO_REPO       default aisha/evymo-ai-orchestrator
+ *   GITHUB_REPOSITORY  owner/repo — required for APPLY (set by Actions; no default)
+ *   GITHUB_TOKEN       required for APPLY (PR creation; GH_TOKEN also accepted)
+ *   GITHUB_API_URL     REST base — required for APPLY (set by Actions; locally e.g.
+ *                      https://api.github.com, GitHub Enterprise https://<host>/api/v3)
  *   AISHA_GATEWAY_URL + POSTGREST_SERVICE_TOKEN  optional audit beacon
  *
  * @module
@@ -51,6 +52,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDirectRun } from "./lib/cli-entry.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -58,13 +60,20 @@ const POLICY_PATH = path.join(ROOT, "config", "deps-policy.json");
 
 const APPLY = process.env.APPLY === "1";
 const TARGET_FILTER = process.env.TARGET_FILTER || "";
-// Forge base URL — env-driven, NO hardcoded host (no-hardcoded-deployment-config
-// gate). In Forgejo Actions GITHUB_SERVER_URL points at the forge; locally
-// FORGEJO_URL comes from .env-prod-backup. Empty is fine for dry-run (no PR API
-// calls); APPLY mode asserts it below.
-const FORGEJO_URL = (process.env.FORGEJO_URL || process.env.GITHUB_SERVER_URL || "").replace(/\/+$/, "");
-const FORGEJO_REPO = process.env.FORGEJO_REPO || process.env.GITHUB_REPOSITORY || "aisha/evymo-ai-orchestrator";
-const FORGEJO_TOKEN = process.env.FORGEJO_API_TOKEN || "";
+
+/**
+ * Kam se PR zakládají — jen z prostředí, NIC se nedosazuje (ani adresa API:
+ * dosazená adresa by u GitHub Enterprise tiše mířila jinam —
+ * zadny-fallback-nad-identitou). Repo bez deklarace by byl odhad, a odhad tady
+ * znamená PR do cizího repa. Dry-run API nepotřebuje; APPLY ověří všechno.
+ */
+export function cilZProstredi(env = process.env) {
+  return {
+    api: (env.GITHUB_API_URL || "").replace(/\/+$/, ""),
+    repo: env.GITHUB_REPOSITORY || "",
+    token: env.GITHUB_TOKEN || env.GH_TOKEN || "",
+  };
+}
 
 // ── logging (mirrors aisha-packages-publish) ────────────────────────────────
 const C = { reset: "\x1b[0m", red: "\x1b[31m", green: "\x1b[32m", yellow: "\x1b[33m", cyan: "\x1b[36m" };
@@ -79,10 +88,16 @@ function fail(code, msg) {
 }
 
 // ── policy ──────────────────────────────────────────────────────────────────
-if (!existsSync(POLICY_PATH)) fail(2, `policy file missing: ${POLICY_PATH}`);
-const policy = JSON.parse(readFileSync(POLICY_PATH, "utf8"));
-const EXCLUDES = policy.targets?.excludePathPatterns ?? [];
-const INTERNAL_SCOPES = policy.internalScopes ?? ["@aisha", "@evymo"];
+// Read lazily (main), so the PR helpers below are importable by tests.
+let policy = {};
+let EXCLUDES = [];
+let INTERNAL_SCOPES = ["@aisha", "@evymo"];
+function loadPolicy() {
+  if (!existsSync(POLICY_PATH)) fail(2, `policy file missing: ${POLICY_PATH}`);
+  policy = JSON.parse(readFileSync(POLICY_PATH, "utf8"));
+  EXCLUDES = policy.targets?.excludePathPatterns ?? [];
+  INTERNAL_SCOPES = policy.internalScopes ?? ["@aisha", "@evymo"];
+}
 
 // ── target discovery: root + standalone lockfile roots ─────────────────────
 function discoverTargets() {
@@ -164,14 +179,19 @@ function planTarget(dir) {
   return { dir, updates, internalDrift, auditTotals: audit?.metadata?.vulnerabilities ?? null };
 }
 
-// ── Forgejo API (zero-dep fetch) ────────────────────────────────────────────
-async function forgejo(method, endpoint, body) {
-  const res = await fetch(`${FORGEJO_URL}/api/v1${endpoint}`, {
+// ── GitHub REST API (zero-dep fetch) ──────────────────────────────────────
+/**
+ * One REST call. Returns `{ status, json }`; a non-JSON body is `json: null`
+ * (logged), never a throw — the caller decides what a status means.
+ */
+export async function githubApi({ api, token, f = fetch }, method, endpoint, body) {
+  const res = await f(`${api}${endpoint}`, {
     method,
     headers: {
-      Authorization: `token ${FORGEJO_TOKEN}`,
+      Authorization: `Bearer ${token}`,
+      Accept: "application/vnd.github+json",
+      "X-GitHub-Api-Version": "2022-11-28",
       "Content-Type": "application/json",
-      Accept: "application/json",
     },
     body: body ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(30_000),
@@ -179,11 +199,35 @@ async function forgejo(method, endpoint, body) {
   const text = await res.text();
   let json = null;
   try {
-    json = JSON.parse(text);
+    json = text ? JSON.parse(text) : null;
   } catch {
     console.warn(`[deps-update:warn] non-JSON response from ${endpoint} (HTTP ${res.status})`);
   }
   return { status: res.status, json };
+}
+
+/**
+ * Idempotent PR: an open PR whose head is `branch` gets its body refreshed;
+ * otherwise a new PR is opened. Returns `{ pr, updated? }` or `{ pr: null, error }`.
+ */
+export async function upsertPullRequest(cil, { branch, base, title, body }) {
+  const [owner] = cil.repo.split("/");
+  const q = new URLSearchParams({ state: "open", head: `${owner}:${branch}`, per_page: "100" });
+  const existing = await githubApi(cil, "GET", `/repos/${cil.repo}/pulls?${q}`);
+  if (existing.status >= 300 || !Array.isArray(existing.json)) {
+    return { pr: null, error: `PR lookup failed (${existing.status})` };
+  }
+  const open = existing.json.find((p) => p?.head?.ref === branch);
+  if (open) {
+    const upd = await githubApi(cil, "PATCH", `/repos/${cil.repo}/pulls/${open.number}`, { body });
+    if (upd.status >= 300) return { pr: null, error: `PR #${open.number} update failed (${upd.status})` };
+    return { pr: open.number, updated: true };
+  }
+  const created = await githubApi(cil, "POST", `/repos/${cil.repo}/pulls`, { title, head: branch, base, body });
+  if (created.status >= 300 || !created.json?.number) {
+    return { pr: null, error: `PR creation failed (${created.status}): ${JSON.stringify(created.json)?.slice(0, 200)}` };
+  }
+  return { pr: created.json.number };
 }
 
 // ── apply: branch → install → commit → push → PR ───────────────────────────
@@ -205,7 +249,7 @@ function assertSafeSpec(name, version) {
   }
 }
 
-async function applyGroup(target, group, items) {
+async function applyGroup(cil, target, group, items) {
   const slug = `${target.dir === "." ? "root" : target.dir.replace(/[^a-z0-9]+/gi, "-")}-${group}`;
   const branch = `${policy.branchPrefix ?? "deps/"}${slug}`;
   const base = policy.baseBranch ?? "main";
@@ -227,13 +271,11 @@ async function applyGroup(target, group, items) {
     run("git", ["add", ...manifests]);
     const title = `chore(deps): ${group} updates for ${target.dir === "." ? "root workspace" : target.dir} (${items.length})`;
     const lines = items.map((u) => `- ${u.name}: ${u.current} → ${u.target} (${u.type}${u.group === "security" ? ", security" : ""})`);
-    run("git", ["commit", "-m", title, "-m", lines.join("\n"), "-m", "Co-Authored-By: aisha-deps-update <noreply@evymo.com>"]);
+    // Author = the git identity of the run (github-actions[bot] in CI) — no
+    // address of any particular instance is baked in.
+    run("git", ["commit", "-m", title, "-m", lines.join("\n")]);
     run("git", ["push", "-f", "origin", branch]);
 
-    // Idempotent PR: reuse an existing open PR for the same head branch.
-    const owner = FORGEJO_REPO.split("/")[0];
-    const existing = await forgejo("GET", `/repos/${FORGEJO_REPO}/pulls?state=open&limit=50`);
-    const open = (existing.json ?? []).find((p) => p?.head?.ref === branch);
     const body = [
       `Automated dependency updates (${group}) for \`${target.dir}\`.`,
       "",
@@ -242,20 +284,13 @@ async function applyGroup(target, group, items) {
       "Policy: config/deps-policy.json (minor+patch only; majors are bespoke PRs).",
       "Runbook: docs/security/DEPS_UPDATE_RUNBOOK.md",
     ].join("\n");
-    if (open) {
-      await forgejo("PATCH", `/repos/${FORGEJO_REPO}/pulls/${open.number}`, { body });
-      log("ok", `PR #${open.number} updated (${branch})`);
-      return { branch, pr: open.number, updated: true };
-    }
-    const created = await forgejo("POST", `/repos/${FORGEJO_REPO}/pulls`, {
-      title, head: branch, base, body, labels: undefined,
-    });
-    if (created.status >= 300 || !created.json?.number) {
-      log("error", `PR creation failed (${created.status}): ${JSON.stringify(created.json)?.slice(0, 200)}`);
+    const r = await upsertPullRequest(cil, { branch, base, title, body });
+    if (r.error) {
+      log("error", r.error);
       return { branch, pr: null, error: true };
     }
-    log("ok", `PR #${created.json.number} opened (${branch})`);
-    return { branch, pr: created.json.number };
+    log("ok", `PR #${r.pr} ${r.updated ? "updated" : "opened"} (${branch})`);
+    return { branch, pr: r.pr, updated: r.updated };
   } finally {
     run("git", ["checkout", "-"]);
   }
@@ -271,7 +306,7 @@ async function beacon(action, detail, status) {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: tok, Authorization: `Bearer ${tok}` },
       body: JSON.stringify({
-        p_service_name: "forgejo",
+        p_service_name: "github",
         p_action: action,
         p_action_detail: detail,
         p_status: status,
@@ -286,11 +321,14 @@ async function beacon(action, detail, status) {
 
 // ── main ────────────────────────────────────────────────────────────────────
 async function main() {
+  loadPolicy();
+  const cil = cilZProstredi();
   const targets = discoverTargets();
   if (targets.length === 0) fail(2, "no update targets discovered");
   log("info", `${targets.length} target(s): ${targets.join(", ")}`);
-  if (APPLY && !FORGEJO_TOKEN) fail(2, "APPLY=1 requires FORGEJO_API_TOKEN");
-  if (APPLY && !FORGEJO_URL) fail(2, "APPLY=1 requires FORGEJO_URL (or GITHUB_SERVER_URL in CI) — no hardcoded forge host");
+  if (APPLY && !cil.token) fail(2, "APPLY=1 requires GITHUB_TOKEN (or GH_TOKEN)");
+  if (APPLY && !cil.api) fail(2, "APPLY=1 requires GITHUB_API_URL (set by Actions; locally e.g. https://api.github.com)");
+  if (APPLY && !/^[^/\s]+\/[^/\s]+$/.test(cil.repo)) fail(2, "APPLY=1 requires GITHUB_REPOSITORY=<owner>/<repo> — no repository is assumed");
 
   const plans = [];
   for (const dir of targets) {
@@ -323,7 +361,7 @@ async function main() {
           log("warn", `maxOpenPrs (${policy.maxOpenPrs}) reached — remaining groups deferred to the next sweep`);
           break;
         }
-        prResults.push(await applyGroup(plan, group, items));
+        prResults.push(await applyGroup(cil, plan, group, items));
       }
     }
     for (const d of plan.internalDrift) {
@@ -346,4 +384,6 @@ async function main() {
   if (prResults.some((r) => r.error)) process.exit(1);
 }
 
-main().catch((err) => fail(1, err.stack || String(err)));
+if (isDirectRun(import.meta.url)) {
+  main().catch((err) => fail(1, err.stack || String(err)));
+}
