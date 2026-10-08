@@ -317,7 +317,15 @@ if [ "$MIGRATE_EXIT" = "0" ]; then
   # nasypou do databáze — dosazená cizí implementace by do instanční DB naseedovala
   # cizí obsah, a to je horší než neseedovat vůbec.
   SEED_IMPLEMENTATION="${AISHA_IMPLEMENTATION:-${AISHA_STORY:-${STORY:-}}}"
-  if [ -z "$SEED_IMPLEMENTATION" ]; then
+  # Implementaci potřebují JEN profily, které implementační vrstvu skládají
+  # (scripts/db/compile-seed.mjs includesImplementation). platform/dev/demo ji
+  # nečtou — lokální stack (AISHA_SEED_PROFILE=dev) by jinak padal na exit 2,
+  # přestože žádná cizí data nehrozí.
+  case "$SEED_PROFILE" in
+    implementation|instance|full) SEED_NEEDS_IMPLEMENTATION=1 ;;
+    *) SEED_NEEDS_IMPLEMENTATION=0 ;;
+  esac
+  if [ "$SEED_NEEDS_IMPLEMENTATION" = "1" ] && [ -z "$SEED_IMPLEMENTATION" ]; then
     log "FATAL: AISHA_IMPLEMENTATION/AISHA_STORY nejsou nastavené — nevím, ČÍ instanční seed mám sestavit."
     log "       Dosazení výchozí hodnoty by naseedovalo data jiné instance. Nastav AISHA_IMPLEMENTATION."
     exit 2
@@ -364,13 +372,22 @@ fi
 # in-cluster alias http://llm-gateway:4000/v1. When the deploy supplies the
 # DERIVED AISHA_LLM_GATEWAY_URL (an internal/mesh domain — NEVER the public API
 # gateway), point the registry row at it so the resolver dispatches to the real
-# gateway. Idempotent; never touches is_enabled. The aisha.guru guard is a
-# fail-safe: that host is the API gateway (a DIFFERENT service) — pointing the
-# llm_gateway provider at it is exactly the bug this reconcile prevents.
+# gateway. Idempotent; never touches is_enabled. The public-zone guard is a
+# fail-safe: anything under the instance's PUBLIC_TLD is the public API gateway
+# plane (a DIFFERENT service; the LLM gateway lives on the internal plane,
+# gateway.backend.<INTERNAL_TLD>) — pointing the llm_gateway provider at it is
+# exactly the bug this reconcile prevents. No PUBLIC_TLD (local stack) = no guard.
 if [ "$FINAL_EXIT" = "0" ] && [ -n "${AISHA_LLM_GATEWAY_URL:-}" ]; then
   GW_EP="${AISHA_LLM_GATEWAY_URL%/}/v1"
-  case "$GW_EP" in
-    *aisha.guru*) log "WARN llm-gateway reconcile SKIPPED — AISHA_LLM_GATEWAY_URL looks like the public API gateway ($GW_EP)";;
+  GW_HOST="${GW_EP#*://}"; GW_HOST="${GW_HOST%%[/:]*}"
+  PUBLIC_ZONE="${PUBLIC_TLD:-//no-public-tld//}"
+  GW_IS_PUBLIC=0
+  case "$GW_HOST" in
+    *.backend.*) ;;  # internal plane — even when INTERNAL_TLD sits under PUBLIC_TLD
+    "$PUBLIC_ZONE"|*."$PUBLIC_ZONE") GW_IS_PUBLIC=1 ;;
+  esac
+  case "$GW_IS_PUBLIC" in
+    1) log "WARN llm-gateway reconcile SKIPPED — AISHA_LLM_GATEWAY_URL looks like the public API gateway ($GW_EP)";;
     *) psql "$DB_URL" -v ON_ERROR_STOP=0 -c \
          "UPDATE public.ai_provider_registry SET endpoint_url = '$GW_EP', updated_at = now() WHERE slug = 'llm-gateway' AND endpoint_url IS DISTINCT FROM '$GW_EP';" \
          >>"$MIGRATE_OUT" 2>&1 && log "Reconciled llm-gateway endpoint -> $GW_EP";;

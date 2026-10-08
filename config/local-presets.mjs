@@ -780,7 +780,7 @@ export const devEnvDefaults = {
   LANGFUSE_PUBLIC_KEY: "pk-lf-dev-public-key-0000000000000000",
   LANGFUSE_SECRET_KEY: "sk-lf-dev-secret-key-0000000000000000",
   LANGFUSE_OIDC_SECRET: D32,
-  LANGFUSE_ADMIN_EMAIL: "admin@aisha.guru",
+  LANGFUSE_ADMIN_EMAIL: "admin@example.com",
   LANGFUSE_ADMIN_PASSWORD: "dev_langfuse_admin",
   LANGFUSE_HOST: `http://${INSTANCE_PREFIX}-langfuse-gateway:8080`,
 
@@ -870,7 +870,7 @@ export const devEnvDefaults = {
   MONIKER: "aisha-local-validator",
 
   // ── PgAdmin ──
-  PGADMIN_EMAIL: "admin@aisha.guru",
+  PGADMIN_EMAIL: "admin@example.com",
   PGADMIN_PASSWORD: "dev_pgadmin_password",
 
   // ── PostgREST ──
@@ -1093,7 +1093,7 @@ export const devEnvDefaults = {
   OAUTH2_PROXY_COOKIE_SECRET: D32C,
   APPSMITH_INTRANET_OIDC_SECRET: D32,
   NB_MANAGEMENT_URL: "https://netbird.mesh.local:33073",  // mesh out-of-scope locally; sensible placeholder
-  NOCODB_ADMIN_EMAIL: "admin@aisha.guru",
+  NOCODB_ADMIN_EMAIL: "admin@example.com",
   NOCODB_ADMIN_PASSWORD: "dev_nocodb_admin",
   // Required since the :? fail-fast conversion of coolify.yml secrets —
   // local-compose-gen runs `docker compose config`, which hard-fails on
@@ -1101,7 +1101,7 @@ export const devEnvDefaults = {
   INTRANET_API_KEY: "dev_intranet_api_key",
   // Token dvojice dveře ↔ brána pro roster schválených tabletů (/internal/knock/roster).
   KNOCK_ROSTER_TOKEN: "dev_knock_roster_token",
-  APPSMITH_ADMIN_EMAIL: "admin@aisha.guru",
+  APPSMITH_ADMIN_EMAIL: "admin@example.com",
   APPSMITH_ADMIN_PASSWORD: "dev_appsmith_admin",
   KRONOS_API_KEY: "",                    // external; intentionally empty (declared, not silent)
   // insight's shared Config (packages/insight/common/common/config.py) declares
