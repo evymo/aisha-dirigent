@@ -47,6 +47,7 @@ import { LOCAL_STACK, LOCAL_STACK_PREFIX } from "./lib/local-stack-name.mjs";
 import { findDiscoveryConsumersInStack, DISCOVERY_OIDC_CONSUMERS } from "./lib/oidc-consumer-support.mjs";
 import { validateLocalStackEnv, CRITICAL_ENV_KEYS } from "./lib/local-env-assertions.mjs";
 import { buildTopology, containerNameFrom } from "./lib/derive-domains.mjs";
+import { neutralizeMeshRouteForLocal } from "./lib/local-mesh-route.mjs";
 
 // Defensive guard for direct `node scripts/local-compose-gen.mjs` invocations on
 // a stale Node (the warmup wrapper also checks). The repo pins Node 22 (.nvmrc);
@@ -833,6 +834,10 @@ function transformForLocal(doc) {
     }
 
     delete svc.deploy;
+
+    // Lokálně není NetBird mesh: nepodmíněná mesh routa v entrypointu a DNS na
+    // mesh resolver by službu shodily (scripts/lib/local-mesh-route.mjs).
+    neutralizeMeshRouteForLocal(svc, { meshDnsIp: devEnvDefaults.NETBIRD_DNS_IP });
 
     // Domain rewriting in environment values (OAuth redirects, etc.)
     if (svc.environment) {
