@@ -38,7 +38,7 @@ import { join, relative } from "node:path";
 /** Kořen stromu: jinak cwd. Přepsání slouží k předvedení červené nad starším stromem. */
 const ROOT = process.env.AISHA_BRANA_KOREN || process.cwd();
 
-const KORENY = ["infra", "scripts", "services", "packages", "docker", "config", "aisha/db/sql", "aisha/db/heals.sql", ".forgejo", ".github"];
+const KORENY = ["infra", "scripts", "services", "packages", "docker", "config", "aisha/db/sql", "aisha/db/heals.sql", ".github"];
 const PRIPONY = /\.(sh|bash|ya?ml|mjs|cjs|js|ts|sql|conf|env|lib)$|(^|\/)Dockerfile[^/]*$/;
 const VYNECH = /(^|\/)(node_modules|dist|build|coverage|\.git)(\/|$)|(^|\/)(tests?|__tests__)(\/|$)|\.(test|spec)\.[cm]?[jt]s$|\.md$/;
 

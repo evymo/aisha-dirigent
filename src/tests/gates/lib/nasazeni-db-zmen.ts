@@ -22,7 +22,7 @@ import { vyhodnotit, type Hodnota } from "./ci-vyraz";
 type Uloha = { name?: string; if?: string; needs?: string[] | string };
 
 export function nactiWorkflow(root: string): Record<string, Uloha> {
-  return (yaml.load(readFileSync(join(root, ".forgejo/workflows/ci.yml"), "utf8")) as { jobs: Record<string, Uloha> }).jobs;
+  return (yaml.load(readFileSync(join(root, ".github/workflows/ci.yml"), "utf8")) as { jobs: Record<string, Uloha> }).jobs;
 }
 
 function vsechnyAppky(root: string): string[] {

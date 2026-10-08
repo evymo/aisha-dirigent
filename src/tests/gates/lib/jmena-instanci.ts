@@ -129,7 +129,7 @@ export async function jmenaInstanci(root: string = ROOT): Promise<string[]> {
  *      řekl, PROČ nic nestáhl (secret chybí, API vrátilo jiný kód než 200,
  *      síť). Důvod se přebírá doslova; bez něj by se tady hádalo.
  *   1. soubor `AISHA_FORK_REGISTRY` — v CI ho stáhne SAMOSTATNÝ krok
- *      (.forgejo/workflows/ci.yml, „Registr forků"), který má token a spouští
+ *      (.github/workflows/ci.yml, „Registr forků"), který má token a spouští
  *      jen curl. Token se do procesu testů NEDÁVÁ: tenhle job běží kód z PR
  *      a plný token organizace by z něj šel vynést.
  *   2. token v prostředí (`REPO_API_TOKEN` / `FORGEJO_API_TOKEN`), nebo
@@ -189,7 +189,7 @@ export function jmenoZPrefixu(prefix: unknown): string {
  * byl by to `staging` — prostředí, ne instance).
  *
  * ⚠️ DRUHÝ DOMOV TÉHOŽ PRAVIDLA je jq filtr `JQ_JMENO_Z_PROFILU` v kroku CI
- * „Registr forků" (.forgejo/workflows/ci.yml) — krok běží s tokenem a repo kód
+ * „Registr forků" (.github/workflows/ci.yml) — krok běží s tokenem a repo kód
  * spouštět nesmí. Sonda v bráně oba domovy srovnává nad touž fixturou.
  */
 export function jmenoZProfilu(profil: unknown): string {

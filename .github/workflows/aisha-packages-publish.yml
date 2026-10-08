@@ -32,7 +32,7 @@ on:
       # Re-run if the publish runner itself changes (so a bug fix in the runner
       # picks up packages that should have already been published but weren't).
       - 'scripts/aisha-packages-publish.mjs'
-      - '.forgejo/workflows/aisha-packages-publish.yml'
+      - '.github/workflows/aisha-packages-publish.yml'
   workflow_dispatch:
     inputs:
       dry_run:

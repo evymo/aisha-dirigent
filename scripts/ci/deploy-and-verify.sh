@@ -141,7 +141,7 @@ CO S TÍM — jedno ze dvou:
   (a) doplnit tajemství COOLIFY_API_TOKEN + COOLIFY_URL do nastavení repozitáře
       (Forgejo → Settings → Actions → Secrets); pak se nasazuje automaticky;
   (b) pokud se tahle instalace nasazuje VÝHRADNĚ ručně, vypnout deploy úlohy
-      v .forgejo/workflows/ci.yml — ať pipeline nepředstírá krok, který nedělá.
+      v .github/workflows/ci.yml — ať pipeline nepředstírá krok, který nedělá.
 Ruční cesta zůstává: node scripts/aisha-redeploy.mjs --only=<app>
 NAPOVEDA
   exit 1

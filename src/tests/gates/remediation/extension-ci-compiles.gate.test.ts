@@ -11,7 +11,7 @@
  *
  * The VS Code extension `extensions/aisha-dirigent` is bundled by esbuild via
  * `npm run compile` (package.json). It has NO `build` script. The
- * `test-extension` job in .forgejo/workflows/ci.yml ran
+ * `test-extension` job in .github/workflows/ci.yml ran
  * `npm run build --if-present` — a no-op — so the extension bundle was never
  * compiled or verified in CI.
  *
@@ -37,7 +37,7 @@ import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
 
 const REPO_ROOT = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "../../../..");
-const CI_YML = path.join(REPO_ROOT, ".forgejo/workflows/ci.yml");
+const CI_YML = path.join(REPO_ROOT, ".github/workflows/ci.yml");
 
 /** Steps whose intent is to produce a build artifact. */
 const BUILD_SCRIPT_NAMES = new Set(["build", "compile"]);

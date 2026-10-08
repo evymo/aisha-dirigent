@@ -80,7 +80,7 @@ describe("postgres: major verze je parametr", () => {
     // Kořen, který veřejný snapshot nevozí (`.github/workflows/`), se neprochází —
     // v tomhle stromu není; upstream ho má a měří. Chybějící kořen BEZ důvodu
     // dál padá na ENOENT (vada, ne snapshot).
-    for (const kořen of [".forgejo/workflows", ".github/workflows", "scripts"]) {
+    for (const kořen of [".github/workflows", "scripts"]) {
       if (duvodVynechanoSnapshotem(`${kořen}/`) === null) projdi(kořen);
     }
     const volani: string[] = [];

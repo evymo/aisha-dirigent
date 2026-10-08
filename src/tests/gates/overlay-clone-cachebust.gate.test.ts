@@ -176,7 +176,7 @@ describe("každá cesta nasazení obnovuje cachebust před buildem", () => {
   });
 
   it("ruční deploy.yml ho volá dál", () => {
-    expect(bezKomentaru(readFileSync(join(ROOT, ".forgejo/workflows/deploy.yml"), "utf8"))).toContain(
+    expect(bezKomentaru(readFileSync(join(ROOT, ".github/workflows/deploy.yml"), "utf8"))).toContain(
       "scripts/deploy/refresh-overlay-cachebust.sh",
     );
   });
@@ -184,7 +184,7 @@ describe("každá cesta nasazení obnovuje cachebust před buildem", () => {
   it("ruční deploy.yml má oba skripty cachebustu v řídkém checkoutu (jinak volání tiše nenajde soubor)", () => {
     // NAMĚŘENO 2026-09-23 (run 51695): „bash: scripts/deploy/refresh-overlay-cachebust.sh:
     // No such file or directory" → jen ::warning:: a nasazení pokračovalo se starým cachebustem.
-    const dy = readFileSync(join(ROOT, ".forgejo/workflows/deploy.yml"), "utf8");
+    const dy = readFileSync(join(ROOT, ".github/workflows/deploy.yml"), "utf8");
     const blok = /sparse-checkout: \|\n((?: {12}\S.*\n)+)/.exec(dy)?.[1] ?? "";
     expect({
       refresh: blok.includes("scripts/deploy/refresh-overlay-cachebust.sh"),
@@ -193,13 +193,13 @@ describe("každá cesta nasazení obnovuje cachebust před buildem", () => {
   });
 
   it("žádná cesta nespouští nasazení GETem — Coolify na GET vrací 405 a nenasadí nic", () => {
-    const cesty = [".forgejo/workflows/deploy.yml", ".forgejo/workflows/ci.yml", "scripts/ci/deploy-and-verify.sh"];
+    const cesty = [".github/workflows/deploy.yml", ".github/workflows/ci.yml", "scripts/ci/deploy-and-verify.sh"];
     const get = cesty.filter((c) => /-X\s+GET\s+"[^"]*\/api\/v1\/deploy\?/.test(bezKomentaru(readFileSync(join(ROOT, c), "utf8"))));
     expect(get).toEqual([]);
   });
 
   it("úlohy, které stahují deploy-and-verify.sh řídce, stahují i oba skripty cachebustu", () => {
-    const ci = readFileSync(join(ROOT, ".forgejo/workflows/ci.yml"), "utf8");
+    const ci = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
     const bloky = [...ci.matchAll(/sparse-checkout: \|\n((?: {12}\S.*\n)+)/g)].map((m) => m[1]);
     const sDeployem = bloky.filter((b) => b.includes("scripts/ci/deploy-and-verify.sh"));
     expect(sDeployem.length).toBeGreaterThan(0);
@@ -242,7 +242,7 @@ describe("cachebust mluví pravdu a má čím číst HEAD", () => {
   it("každá úloha, která nasazuje přes deploy-and-verify / vlny / refresh, dostává FORGEJO_TOKEN", () => {
     const bezTokenu: string[] = [];
     let nasazujicich = 0;
-    for (const wf of [".forgejo/workflows/ci.yml", ".forgejo/workflows/deploy.yml"]) {
+    for (const wf of [".github/workflows/ci.yml", ".github/workflows/deploy.yml"]) {
       for (const u of ulohy(readFileSync(join(ROOT, wf), "utf8"))) {
         const kod = bezKomentaru(u.telo);
         const nasazuje =
@@ -260,7 +260,7 @@ describe("cachebust mluví pravdu a má čím číst HEAD", () => {
   it("ruční deploy.yml rozliší kód 3 (NEDOKÁZÁNO) od chyby zadání — nesplývají v jedné větě", () => {
     // Recenze aisha-team 2026-09-24: `|| echo "::warning::…nepodařilo obnovit"` dávalo
     // kódu 1 (chybí COOLIFY_API_TOKEN/BASE_URL = konfigurace k opravě) i kódu 3 TUTÉŽ větu.
-    const kod = bezKomentaru(readFileSync(join(ROOT, ".forgejo/workflows/deploy.yml"), "utf8"));
+    const kod = bezKomentaru(readFileSync(join(ROOT, ".github/workflows/deploy.yml"), "utf8"));
     const blok = /case "\$CB_RC" in([\s\S]*?)esac/.exec(kod)?.[1] ?? "";
     expect({
       tri: /^\s*3\)\s*echo "::warning title=cachebust NEDOKÁZÁN::/m.test(blok),

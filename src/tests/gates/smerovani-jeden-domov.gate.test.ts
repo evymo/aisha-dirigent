@@ -31,7 +31,7 @@ import { envWithoutGitLocation } from "../../../scripts/lib/git-worktree-health.
 const ROOT = join(__dirname, "../../..");
 const SMEROVAC = join(ROOT, "scripts/ci/zmenene-cesty.sh");
 const VYBER = join(ROOT, "scripts/ci/prepush-vyber.sh");
-const CI = join(ROOT, ".forgejo/workflows/ci.yml");
+const CI = join(ROOT, ".github/workflows/ci.yml");
 const HOOK = join(ROOT, ".husky/pre-push");
 
 /** Spustí směrovač nad seznamem cest; vrací příznaky + návratový kód. */
@@ -103,6 +103,14 @@ describe("směrovač na kontrolních vzorcích", () => {
     expect(rc).toBe(0);
     expect(p.docs_only).toBe("true");
     expect(Object.entries(p).filter(([k, v]) => k !== "docs_only" && v === "true"), "dokumentace nesmí spustit žádnou dráhu").toEqual([]);
+  });
+
+  it("změna workflow v .github/workflows/ NENÍ dokumentace: ci_change=true, docs_only=false", () => {
+    const { rc, p } = smeruj(".github/workflows/ci.yml\n");
+    expect(rc).toBe(0);
+    expect(p).toMatchObject({ ci_change: "true", docs_only: "false" });
+    // Šablona PR v .github/ dokumentací zůstává.
+    expect(smeruj(".github/PULL_REQUEST_TEMPLATE/cve-response.md\n").p.docs_only).toBe("true");
   });
 
   it("prázdný seznam = záchranná síť: bezpečnostní dráhy svítí, nic se nepřeskočí", () => {

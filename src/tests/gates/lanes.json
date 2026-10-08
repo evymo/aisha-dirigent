@@ -297,7 +297,7 @@
         "scripts/aisha-redeploy.mjs",
         "scripts/deploy/**",
         "scripts/ci/**",
-        ".forgejo/workflows/**"
+        ".github/workflows/**"
       ],
       "brany": [
         "zmena-sluzby-dosahne-na-svuj-stack",

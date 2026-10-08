@@ -56,7 +56,7 @@ const LAYERS: DefenseLayer[] = [
     phase: 1,
     gateFile: 'src/tests/gates/sbom-coverage.gate.test.ts',
     artifacts: [
-      '.forgejo/workflows/ci.yml',
+      '.github/workflows/supply-chain.yml',
       '.github/workflows/container-signing.yml',
     ],
   },
@@ -66,7 +66,7 @@ const LAYERS: DefenseLayer[] = [
     phase: 2,
     gateFile: 'src/tests/gates/semgrep-sast.gate.test.ts',
     artifacts: [
-      '.forgejo/workflows/ci.yml',
+      '.github/workflows/ci.yml',
       '.semgrep/aisha-rules.yml',
     ],
   },
@@ -254,20 +254,20 @@ describe('Static defense-in-depth umbrella gate', () => {
     expect(vyrazenoVzorem('.github/dependabot.yml', vzory)).toBe(true);
     expect(vyrazenoVzorem('.github/workflowsX/a.yml', vzory)).toBe(false);
     expect(vyrazenoVzorem('foo/a.yml', vzory)).toBe(false); // glob se NEvykládá → brána padá, nemlčí
-    expect(vyrazenoVzorem('.forgejo/workflows/ci.yml', vzory)).toBe(false);
+    expect(vyrazenoVzorem('.ci/workflows/ci.yml', vzory)).toBe(false);
 
     const koren = mkdtempSync(join(tmpdir(), 'snapshot-sonda-'));
     try {
       mkdirSync(join(koren, 'config'), { recursive: true });
       writeFileSync(join(koren, SNAPSHOT_EXCLUDE), '.github/workflows/\n');
-      mkdirSync(join(koren, '.forgejo/workflows'), { recursive: true });
-      writeFileSync(join(koren, '.forgejo/workflows/ci.yml'), 'on: push\n');
+      mkdirSync(join(koren, '.ci/workflows'), { recursive: true });
+      writeFileSync(join(koren, '.ci/workflows/ci.yml'), 'on: push\n');
       // soubor je → měří se
-      expect(duvodVynechanoSnapshotem('.forgejo/workflows/ci.yml', koren)).toBeNull();
+      expect(duvodVynechanoSnapshotem('.ci/workflows/ci.yml', koren)).toBeNull();
       // chybí a snapshot ho vyřazuje → důvod pro skip
       expect(duvodVynechanoSnapshotem('.github/workflows/deploy.yml', koren)).toMatch(/veřejný snapshot nevozí/);
       // chybí BEZ důvodu → null, brána má padnout
-      expect(duvodVynechanoSnapshotem('.forgejo/workflows/deploy.yml', koren)).toBeNull();
+      expect(duvodVynechanoSnapshotem('.ci/workflows/deploy.yml', koren)).toBeNull();
     } finally {
       rmSync(koren, { recursive: true, force: true });
     }

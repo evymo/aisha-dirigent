@@ -3,7 +3,7 @@
  *
  * WHY (2026-07-25). The Forgejo runner on soren is registered instance-wide: it
  * serves 14 repositories across two orgs at capacity 2. Every repository that
- * adopts this platform inherits `.forgejo/workflows/supply-chain.yml` verbatim,
+ * adopts this platform inherits `.github/workflows/supply-chain.yml` verbatim,
  * so ONE unconditional nightly cron meant N repositories firing the same ~60-job
  * matrix into 2 slots in the same minute. Measured in the runner log, not
  * assumed: a sibling repo started at 01:17:40 UTC — on our cron.
@@ -23,7 +23,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parse } from 'yaml';
 
-const WORKFLOW = resolve(process.cwd(), '.forgejo/workflows/supply-chain.yml');
+const WORKFLOW = resolve(process.cwd(), '.github/workflows/supply-chain.yml');
 const GATE_JOB = 'lane-gate';
 
 const raw = readFileSync(WORKFLOW, 'utf8');

@@ -33,12 +33,12 @@ import { isTrackedService } from './lib/tracked-services';
 import { duvodVynechanoSnapshotem } from './lib/vynechano-snapshotem';
 
 const ROOT = process.cwd();
-// CI/CD runs on Forgejo (self-hosted); the GitHub mirror is cost-only. The
-// dependency-security workflow (npm-audit + SBOM + Trivy) was relocated from
-// .github/ to .forgejo/ (2026-05-30) — the sbom job + matrix are preserved
-// verbatim, so per-service SBOM coverage is still enforced here. container-signing
-// is release/tag-time (cosign attestation) and stays on the GitHub side (manual).
-const DEP_SEC_WORKFLOW = resolve(ROOT, '.forgejo/workflows/supply-chain.yml');
+// CI/CD runs on GitHub Actions (.github/workflows/, GitHub-hosted runners). The
+// dependency-security lane (npm-audit + SBOM + Trivy) lives in supply-chain.yml —
+// the sbom job + matrix are preserved verbatim, so per-service SBOM coverage is
+// still enforced here. container-signing is release/tag-time (cosign
+// attestation) and is not part of this tree (see DUVOD_PODPIS below).
+const DEP_SEC_WORKFLOW = resolve(ROOT, '.github/workflows/supply-chain.yml');
 const CONTAINER_SIGN_WORKFLOW = resolve(ROOT, '.github/workflows/container-signing.yml');
 // Veřejný snapshot podpisový workflow nevozí (config/public-snapshot.exclude) —
 // tam se testy nad ním PŘESKOČÍ s důvodem; v upstreamu měří. Viz lib/vynechano-snapshotem.

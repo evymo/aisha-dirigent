@@ -36,7 +36,7 @@ import { parse as parseYaml } from "yaml";
  * ci.yml a čeká, že brána zčervená.
  */
 const ROOT = join(__dirname, "../../..");
-const CI_PATH = join(ROOT, ".forgejo/workflows/ci.yml");
+const CI_PATH = join(ROOT, ".github/workflows/ci.yml");
 const CI_TEXT = readFileSync(CI_PATH, "utf8");
 // Směrování podle cest je od 2026-09-25 JEDEN DOMOV mimo ci.yml (volá ho CI i pre-push hook).
 const SMEROVANI_PATH = join(ROOT, "scripts/ci/zmenene-cesty.sh");

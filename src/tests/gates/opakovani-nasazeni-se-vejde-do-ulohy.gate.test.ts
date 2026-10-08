@@ -30,7 +30,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const ROOT = join(__dirname, "../../..");
-const CI = readFileSync(join(ROOT, ".forgejo/workflows/ci.yml"), "utf8");
+const CI = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
 const SKRIPT = readFileSync(join(ROOT, "scripts/ci/deploy-and-verify.sh"), "utf8");
 const MODUL = "scripts/lib/nasazeni-prechodna-chyba.mjs";
 

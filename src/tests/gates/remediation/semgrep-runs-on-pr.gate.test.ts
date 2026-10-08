@@ -1,7 +1,7 @@
 /**
  * SEC-02 — Semgrep SAST must actually run on push/PR (executable spec).
  *
- * CONTRACT: the Semgrep SAST job in .forgejo/workflows/ci.yml must be
+ * CONTRACT: the Semgrep SAST job in .github/workflows/ci.yml must be
  * PR-eligible. Its `if:` condition must NOT be solely gated behind
  * `workflow_dispatch` (+ run_supply_chain == 'yes'), which would mean the
  * SAST scan NEVER runs on a pull_request or push — the exact state that makes
@@ -32,7 +32,7 @@ import { resolve } from 'node:path';
 import { parse } from 'yaml';
 
 const ROOT = process.cwd();
-const CI_WORKFLOW = resolve(ROOT, '.forgejo/workflows/ci.yml');
+const CI_WORKFLOW = resolve(ROOT, '.github/workflows/ci.yml');
 
 /**
  * Locate the Semgrep SAST job in the parsed workflow. The finding targets the
@@ -71,7 +71,7 @@ describe('SEC-02 — Semgrep SAST job runs on PR (not workflow_dispatch-only)', 
 
   test('ci.yml has a Semgrep SAST job', () => {
     const found = findSemgrepJob(doc.jobs ?? {});
-    expect(found, 'expected a `semgrep` (Semgrep SAST) job in .forgejo/workflows/ci.yml').not.toBeNull();
+    expect(found, 'expected a `semgrep` (Semgrep SAST) job in .github/workflows/ci.yml').not.toBeNull();
   });
 
   test('the workflow triggers on pull_request (baseline sanity)', () => {

@@ -11,7 +11,7 @@
  *
  * ⭐ Brána SPOUŠTÍ skutečný detektor (scripts/aisha-changed-apps.mjs) v dočasném
  * repu se skutečným manifestem a compose soubory, jeho `deploy_apps` dosadí do
- * SKUTEČNÝCH podmínek úloh z .forgejo/workflows/ci.yml a vyhodnotí je
+ * SKUTEČNÝCH podmínek úloh z .github/workflows/ci.yml a vyhodnotí je
  * (lib/ci-vyraz). Hrubé příznaky nastaví na NEJHORŠÍ případ (`true`), takže
  * relevance na nich záviset nesmí; testovací úlohy jsou zelené.
  */
@@ -24,7 +24,7 @@ import yaml from "js-yaml";
 import { vyhodnotit, type Hodnota } from "./lib/ci-vyraz";
 
 const ROOT = process.cwd();
-const WF = yaml.load(readFileSync(join(ROOT, ".forgejo/workflows/ci.yml"), "utf8")) as {
+const WF = yaml.load(readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8")) as {
   jobs: Record<string, { if?: string }>;
 };
 const CISTE_PROSTREDI = { PATH: process.env.PATH ?? "", HOME: tmpdir(), GIT_CONFIG_NOSYSTEM: "1" };

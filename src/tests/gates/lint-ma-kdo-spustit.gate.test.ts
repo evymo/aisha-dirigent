@@ -101,7 +101,7 @@ export function adresareKdeCIlintuje(zdrojeWorkflow: string[]): Set<string> {
 }
 
 function zdrojeWorkflow(): string[] {
-  return execFileSync("git", ["ls-files", ".forgejo/workflows/*.yml", ".forgejo/workflows/*.yaml"], {
+  return execFileSync("git", ["ls-files", ".github/workflows/*.yml", ".github/workflows/*.yaml"], {
     cwd: ROOT,
     encoding: "utf-8",
   })
@@ -168,7 +168,7 @@ jobs:
 
     expect(
       osirele,
-      "balíček má `npm run lint`, ale žádná úloha v `.forgejo/workflows/` ho v jeho\n" +
+      "balíček má `npm run lint`, ale žádná úloha v `.github/workflows/` ho v jeho\n" +
         "adresáři nespouští. Nespuštěný linter neplatí — a co hůř, zneplatní i to, co\n" +
         "v kódu STOJÍ: `eslint-disable` na pravidlo, které nikdo nezapnul, je jen komentář.\n\n" +
         "CO S TÍM: do úlohy, která ten balíček už staví, přidej krok\n" +

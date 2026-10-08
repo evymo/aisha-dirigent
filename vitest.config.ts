@@ -11,7 +11,7 @@ export default defineConfig({
     // CI on the memory-limited self-hosted runner sets VITEST_MAX_WORKERS=1
     // and shards test:run (see ci.yml "Web: Tests"):
     // the default 2 jsdom workers peak at ~2 GB and OOM-kill mid-suite (#279).
-    // Local dev keeps 2 (faster). See .forgejo/workflows/ci.yml "Web: Tests".
+    // Local dev keeps 2 (faster). See .github/workflows/ci.yml "Web: Tests".
     maxWorkers: process.env.VITEST_MAX_WORKERS ? Number(process.env.VITEST_MAX_WORKERS) : 2,
     hookTimeout: 30000,
     testTimeout: 180000,

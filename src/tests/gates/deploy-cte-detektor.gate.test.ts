@@ -34,7 +34,7 @@ import { join } from "node:path";
 import yaml from "js-yaml";
 
 const ROOT = process.cwd();
-const CESTA = join(ROOT, ".forgejo/workflows/ci.yml");
+const CESTA = join(ROOT, ".github/workflows/ci.yml");
 const TEXT = readFileSync(CESTA, "utf8");
 const WF = yaml.load(TEXT) as { jobs: Record<string, { if?: string; name?: string }> };
 

@@ -30,7 +30,7 @@ import { join } from "node:path";
 import yaml from "js-yaml";
 
 const ROOT = process.cwd();
-const CI = join(ROOT, ".forgejo/workflows/ci.yml");
+const CI = join(ROOT, ".github/workflows/ci.yml");
 
 type Step = { name?: string; run?: string; id?: string };
 type Job = { name?: string; if?: string; needs?: string[] | string; steps?: Step[] };

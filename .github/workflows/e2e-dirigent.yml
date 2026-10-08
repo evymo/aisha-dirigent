@@ -39,7 +39,7 @@ on:
       - "scripts/ide-adapters/**"
       - "services/svc-ai-chat/src/routes/dirigent-supervisor.ts"
       - "tests/e2e-dirigent/**"
-      - ".forgejo/workflows/e2e-dirigent.yml"
+      - ".github/workflows/e2e-dirigent.yml"
   pull_request:
     branches: [main]
     paths:
@@ -48,7 +48,7 @@ on:
       - "scripts/ide-adapters/**"
       - "services/svc-ai-chat/src/routes/dirigent-supervisor.ts"
       - "tests/e2e-dirigent/**"
-      - ".forgejo/workflows/e2e-dirigent.yml"
+      - ".github/workflows/e2e-dirigent.yml"
 
 concurrency:
   group: e2e-dirigent-${{ github.ref }}

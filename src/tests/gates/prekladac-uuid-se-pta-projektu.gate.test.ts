@@ -62,7 +62,7 @@ type Workflow = { env?: Record<string, unknown>; jobs?: Record<string, Job> };
 /** Workflow soubory — univerzum čtené z disku, ne seznam. */
 function workflowy(): string[] {
   const out: string[] = [];
-  for (const dir of [".forgejo/workflows", ".github/workflows"]) {
+  for (const dir of [".github/workflows"]) {
     if (!existsSync(join(ROOT, dir))) continue;
     for (const f of readdirSync(join(ROOT, dir))) if (/\.ya?ml$/.test(f)) out.push(`${dir}/${f}`);
   }

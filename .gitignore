@@ -59,15 +59,11 @@ config/tenant.json
 # never in the public OSS tree (no code references them).
 src/assets/eko-*.jpg
 src/assets/rakusanovi.jpg
-# .forgejo/ runner state + cached secrets stay out of git, but the workflows
-# subtree IS source-controlled — pipelines live in git so review applies to
-# them like any code. Same pattern as .claude/{commands,skills,...} below.
-# Note: cannot say `.forgejo` then negate `!.forgejo/workflows/` — git stops
-# recursing into excluded directories, so children can't be re-included.
-# Instead, ignore only specific subpaths.
-.forgejo/runner-cache/
-.forgejo/secrets/
-.forgejo/.runner
+# Local runs of the GitHub Actions workflows (nektos/act) read secrets from
+# `.secrets` and runner settings from `.actrc` — never commit them. The
+# workflows themselves (.github/workflows/) ARE source-controlled.
+.secrets
+.actrc
 
 # Local warmup generated artifacts
 docker-compose.local.generated.json

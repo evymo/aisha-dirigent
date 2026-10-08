@@ -18,7 +18,7 @@ import * as path from "path";
 import { spustiSePriGovernance, ulohyNasazujiciDbZmeny, zavisiNaGovernance } from "./lib/nasazeni-db-zmen";
 
 const ROOT = process.cwd();
-const CI_YML = path.join(ROOT, ".forgejo/workflows/ci.yml");
+const CI_YML = path.join(ROOT, ".github/workflows/ci.yml");
 const N8N_WORKFLOWS_DIR = path.join(ROOT, "n8n/workflows");
 
 // ---------------------------------------------------------------------------
@@ -27,7 +27,7 @@ const N8N_WORKFLOWS_DIR = path.join(ROOT, "n8n/workflows");
 describe("CI/CD Governance Gate", () => {
   describe("Forgejo CI workflow exists and is valid YAML", () => {
     it("ci.yml exists", () => {
-      expect(fs.existsSync(CI_YML), "Chybí .forgejo/workflows/ci.yml").toBe(true);
+      expect(fs.existsSync(CI_YML), "Chybí .github/workflows/ci.yml").toBe(true);
     });
 
     it("ci.yml is non-empty", () => {

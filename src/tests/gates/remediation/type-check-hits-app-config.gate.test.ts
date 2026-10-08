@@ -13,7 +13,7 @@
  * Two enforcement surfaces:
  *   1. package.json `type-check` (consumed transitively by `typecheck:repo`)
  *      must be `tsc --noEmit -p tsconfig.app.json`.
- *   2. .forgejo/workflows/ci.yml — any TypeScript step that runs `tsc --noEmit`
+ *   2. .github/workflows/ci.yml — any TypeScript step that runs `tsc --noEmit`
  *      at the REPO ROOT (i.e. in a job with no `working-directory` override, so
  *      it resolves the root tsconfig.json no-op) must pass
  *      `-p tsconfig.app.json`. Jobs that set a `working-directory` (n8n nodes,
@@ -74,7 +74,7 @@ describe("type-check targets the real app tsconfig (not the files:[] no-op)", ()
   });
 
   test("every repo-root `tsc --noEmit` step in ci.yml passes -p tsconfig.app.json", () => {
-    const CI = ".forgejo/workflows/ci.yml";
+    const CI = ".github/workflows/ci.yml";
     const yaml = read(CI);
     const lines = yaml.split("\n");
 

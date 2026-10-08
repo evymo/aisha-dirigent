@@ -21,7 +21,7 @@ import yaml from "js-yaml";
 import { dirname, join, normalize } from "node:path";
 
 const ROOT = process.cwd();
-const WORKFLOWY = [".forgejo/workflows/ci.yml", ".forgejo/workflows/deploy.yml"];
+const WORKFLOWY = [".github/workflows/ci.yml", ".github/workflows/deploy.yml"];
 
 /** Relativní specifikátory importů v jednom souboru (bez komentářových řádků). */
 export function relativniImporty(zdroj: string): string[] {

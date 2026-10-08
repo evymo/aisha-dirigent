@@ -23,10 +23,10 @@ import { readFileSync, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const ROOT = process.cwd();
-// CI/CD runs on Forgejo (self-hosted); the GitHub mirror is cost-only. The SAST
-// workflow was relocated from .github/ to .forgejo/ (2026-05-30) — content
-// unchanged, so every integrity assertion below still enforces the full ruleset.
-const SEMGREP_WORKFLOW = resolve(ROOT, '.forgejo/workflows/ci.yml');
+// CI/CD runs on GitHub Actions (.github/workflows/). The SAST job lives in
+// ci.yml (folded in 2026-05-30, content unchanged), so every integrity
+// assertion below still enforces the full ruleset.
+const SEMGREP_WORKFLOW = resolve(ROOT, '.github/workflows/ci.yml');
 const SEMGREP_RULES = resolve(ROOT, '.semgrep/aisha-rules.yml');
 
 const REQUIRED_REGISTRY_RULES = [

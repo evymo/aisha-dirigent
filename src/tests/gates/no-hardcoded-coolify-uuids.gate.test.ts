@@ -12,7 +12,7 @@
  *
  * What this gate catches:
  *   1. References to `secrets.COOLIFY_UUID_*` in deploy workflows
- *      (.github/workflows/, .forgejo/workflows/).
+ *      (.github/workflows/).
  *   2. `process.env.COOLIFY_UUID_*` reads with hardcoded fallback literals.
  *   3. Missing shared resolver scripts.
  *
@@ -42,7 +42,7 @@ function walk(dir: string): string[] {
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name === "node_modules" || entry.name === "dist") continue;
-    if (entry.name.startsWith(".") && entry.name !== ".github" && entry.name !== ".forgejo") continue;
+    if (entry.name.startsWith(".") && entry.name !== ".github") continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) out.push(...walk(full));
     else if (EXTS.has(path.extname(entry.name))) out.push(full);
@@ -61,7 +61,7 @@ function relPath(abs: string): string {
 describe("No hardcoded Coolify UUIDs", () => {
   it("deploy workflows do NOT reference secrets.COOLIFY_UUID_*", () => {
     const offenders: string[] = [];
-    for (const dir of [".github/workflows", ".forgejo/workflows"]) {
+    for (const dir of [".github/workflows"]) {
       const files = walk(path.join(ROOT, dir));
       for (const f of files) {
         const content = fs.readFileSync(f, "utf-8");
@@ -117,16 +117,11 @@ describe("No hardcoded Coolify UUIDs", () => {
     expect(mjsResolver).toMatch(/export\s+async\s+function\s+resolveAllAishaUuids\b/);
   });
 
-  it("deploy.yml invokes the shared resolver (GitHub mirror)", () => {
+  it("deploy.yml invokes the shared resolver", () => {
+    // The manual deploy lane lives in this tree (one workflow home since the
+    // CI moved to .github/workflows/) — a missing file is a finding, not a skip.
     const wf = ".github/workflows/deploy.yml";
-    if (!fs.existsSync(path.join(ROOT, wf))) return;
-    const content = readRel(wf);
-    expect(content).toMatch(/scripts\/lib\/coolify-resolve-uuid\.sh/);
-  });
-
-  it("deploy.yml invokes the shared resolver (Forgejo primary)", () => {
-    const wf = ".forgejo/workflows/deploy.yml";
-    if (!fs.existsSync(path.join(ROOT, wf))) return;
+    expect(fs.existsSync(path.join(ROOT, wf)), `${wf} chybí`).toBe(true);
     const content = readRel(wf);
     expect(content).toMatch(/scripts\/lib\/coolify-resolve-uuid\.sh/);
   });

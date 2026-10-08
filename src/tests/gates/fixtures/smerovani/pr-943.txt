@@ -1,5 +1,5 @@
-.forgejo/workflows/ci.yml
-.forgejo/workflows/mobile-android.yml
+.github/workflows/ci.yml
+.github/workflows/mobile-android.yml
 .gitignore
 .gitleaks.toml
 Dockerfile.plugin-publish-init

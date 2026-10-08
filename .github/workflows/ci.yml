@@ -15,7 +15,7 @@
 #   VS Code extension — test-extension (manual marketplace publish)
 #   infra per-stack   — deploy without CI (Coolify rebuild)
 #
-# Manual deploy: use .forgejo/workflows/deploy.yml (workflow_dispatch)
+# Manual deploy: use .github/workflows/deploy.yml (workflow_dispatch)
 # =============================================================================
 
 name: CI/CD

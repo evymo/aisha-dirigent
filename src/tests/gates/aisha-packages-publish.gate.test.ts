@@ -28,7 +28,7 @@ const SERVICES_ROOT = resolve(ROOT, 'services');
 const RUNNER = resolve(ROOT, 'scripts/aisha-packages-publish.mjs');
 const VERSION_CHECK = resolve(ROOT, 'scripts/aisha-packages-version-check.mjs');
 const PRE_COMMIT_HOOK = resolve(ROOT, '.husky/pre-commit');
-const WORKFLOW = resolve(ROOT, '.forgejo/workflows/aisha-packages-publish.yml');
+const WORKFLOW = resolve(ROOT, '.github/workflows/aisha-packages-publish.yml');
 
 // Packages consumed by services via "@aisha/<name>": "*" — Verdaccio MUST have these
 // for those services to install successfully outside of an installed-state-cached env.
@@ -99,7 +99,7 @@ describe('AISHA packages auto-publish — runner + workflow', () => {
 
 describe('AISHA packages auto-publish — Forgejo workflow', () => {
   test('workflow file exists at canonical path', () => {
-    expect(existsSync(WORKFLOW), '.forgejo/workflows/aisha-packages-publish.yml missing').toBe(true);
+    expect(existsSync(WORKFLOW), '.github/workflows/aisha-packages-publish.yml missing').toBe(true);
   });
 
   test('workflow YAML parses cleanly', () => {

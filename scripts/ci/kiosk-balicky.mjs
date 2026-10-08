@@ -24,7 +24,7 @@
  *    verzi, ke které artefakt patří. Identitu, výbavu ani podpis nemění; ty
  *    patří člověku.
  *
- * Příkazy (volá je .forgejo/workflows/kiosk-balicky.yml):
+ * Příkazy (volá je .github/workflows/kiosk-balicky.yml):
  *   plan      --data <adresář dat instance>    co postavit / deklarovat
  *   zverejni  --data <…> (--balicek <b> | --druh kiosk-admin) --apk <soubor>
  *                                               PUT do registru

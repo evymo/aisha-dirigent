@@ -8,7 +8,7 @@ on:
       - 'packages/acs-contracts/**'
       - 'packages/acs-sdk/**'
       - 'scripts/acs/**'
-      - '.forgejo/workflows/acs-contracts.yml'
+      - '.github/workflows/acs-contracts.yml'
   pull_request:
     paths:
       - 'packages/acs-contracts/**'

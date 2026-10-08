@@ -183,12 +183,12 @@ if [ -n "$CHANGED" ]; then
   # --- n8n Workflow changes ---
   grep -qE '^n8n/workflows/' <<< "$CHANGED" && N8N_WORKFLOW=true || N8N_WORKFLOW=false
 
-  # ⛔ ZMĚNA BRÁNY MUSÍ BRÁNU SPUSTIT. Do 2026-08-06 na `.forgejo/workflows/`
+  # ⛔ ZMĚNA BRÁNY MUSÍ BRÁNU SPUSTIT. Do 2026-08-06 na `.github/workflows/`
   # nekoukal ŽÁDNÝ detektor, takže úprava lane nespustila tu samou lane — PR #140
   # měnil bránu nad overlayem a ta se na něm PŘESKOČILA (`success | Has been
   # skipped`). Tenhle skript je od 2026-09-25 součást téže brány: jeho změna musí
   # spustit totéž, co změna ci.yml.
-  grep -qE '^(\.forgejo/workflows/|scripts/ci/zmenene-cesty\.sh$)' <<< "$CHANGED" && CI_CHANGE=true || CI_CHANGE=false
+  grep -qE '^(\.github/workflows/|scripts/ci/zmenene-cesty\.sh$)' <<< "$CHANGED" && CI_CHANGE=true || CI_CHANGE=false
 
   # --- Security-sensitive changes ---
   grep -qE '^(supabase/functions/|src/lib/security/|docker-compose\.coolify.*\.yml$|aisha/db/sql/functions/)' <<< "$CHANGED" && SECURITY_CHANGE=true || SECURITY_CHANGE=false
@@ -198,9 +198,9 @@ if [ -n "$CHANGED" ]; then
   # v `mobile-app/`, ale na ROZLOŽITELNOSTI VAZBY mezi aplikací a sdíleným balíkem
   # (`@aisha/knock-protocol`). Seznam balíků NENÍ vymyšlený tady: bere se
   # z `extraNodeModules` v `mobile-app/metro.config.js`; že oba seznamy sedí,
-  # hlídá brána mobil-bundle-univerzum. `.forgejo/workflows/` z principu výš:
+  # hlídá brána mobil-bundle-univerzum. `.github/workflows/` z principu výš:
   # ZMĚNA BRÁNY MUSÍ BRÁNU SPUSTIT.
-  grep -qE '^(mobile-app/|packages/(api-core|knock-protocol|extranet-sdk)/|packages/extranet-sdk$|\.forgejo/workflows/)' <<< "$CHANGED" && MOBILE_APP=true || MOBILE_APP=false
+  grep -qE '^(mobile-app/|packages/(api-core|knock-protocol|extranet-sdk)/|packages/extranet-sdk$|\.github/workflows/)' <<< "$CHANGED" && MOBILE_APP=true || MOBILE_APP=false
 
   # --- Cosmos Go chain ---
   grep -qE '^cosmos/' <<< "$CHANGED" && COSMOS=true || COSMOS=false
@@ -237,7 +237,9 @@ if [ -n "$CHANGED" ]; then
   grep -qE '^(apps/|packages/surface-blocks/|packages/extranet-sdk/|packages/extranet-sdk$|packages/design-language/|deploy/surface-host/|instances/|docker-compose\.coolify-extranet\.yml$|scripts/surfaces-build-all\.sh$|package-lock\.json$)' <<< "$CHANGED" && SURFACES=true || SURFACES=false
 
   # --- Docs only (skip everything) ---
-  NON_DOC=$(grep -vE '^(docs/|\.github/|README\.md|CONTRIBUTING\.md|AGENTS\.md|CLAUDE\.md|RULES\.md|FEEDBACK\.md|FINAL-DRAFT\.md|aisha-story\.md|dirigent-plugin\.md|idea-full-implmentation-orchestrator\.md|security_and_test_analysis\.md|\.aisha/)' <<< "$CHANGED" || true)
+  # `.github/` je dokumentace JEN mimo `workflows/` — od přesunu CI do
+  # `.github/workflows/` je tamní změna změnou pipeline (ci_change), ne textu.
+  NON_DOC=$(grep -vE '^(docs/|\.github/(PULL_REQUEST_TEMPLATE/|ISSUE_TEMPLATE/|agents/|copilot-instructions\.md$)|README\.md|CONTRIBUTING\.md|AGENTS\.md|CLAUDE\.md|RULES\.md|FEEDBACK\.md|FINAL-DRAFT\.md|aisha-story\.md|dirigent-plugin\.md|idea-full-implmentation-orchestrator\.md|security_and_test_analysis\.md|\.aisha/)' <<< "$CHANGED" || true)
   [ -z "$NON_DOC" ] && DOCS_ONLY=true || DOCS_ONLY=false
 fi
 

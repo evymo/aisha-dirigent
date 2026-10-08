@@ -2,7 +2,7 @@
  * Brána: výběr dotčených bran ZUŽUJE, a co nezná, to nezamlčí
  *
  * ⛔ PROČ ORÁKULUM A NE ČTENÍ KÓDU: táž třída mapy (změněné cesty → co spustit)
- * se v `.forgejo/workflows/ci.yml` zdokumentovaně spletla TŘIKRÁT — chyběly
+ * se v `.github/workflows/ci.yml` zdokumentovaně spletla TŘIKRÁT — chyběly
  * `apps/`, pak `docker-compose*.yml` + `config/`, pak `packages/`. Pokaždé to
  * znamenalo, že „zelená znamenala NEMĚŘENO“: PR svítil zeleně s osmi běhy
  * z dvaceti sedmi. Mapa, kterou nikdo nespouští proti skutečným změnám, je

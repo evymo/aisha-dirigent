@@ -48,7 +48,7 @@
  * filtr adresářů `scripts|src|docs|deploy|keycloak|infra|config` + kořenové
  * compose/Dockerfile nechal MIMO měření 10 nálezů dosavadních jmen — mimo jiné
  * `services/gateway/src/server.ts` (jméno instance v komentáři generické brány),
- * `mobile-app/`, `plugins/`, `.forgejo/workflows/ci.yml`, `.claude/skills/`.
+ * `mobile-app/`, `plugins/`, `.github/workflows/ci.yml`, `.claude/skills/`.
  * A `services/gateway/src/routes/public.ts` nesl jméno instance v KÓDU
  * (`source: '<fork>-api'`, hlášky logu) — generická brána, která hlásí, čí je.
  * Univerzum je proto CELÝ sledovaný strom (`git ls-files`) bez submodulů
@@ -177,7 +177,7 @@ export function workspacyBezZdroje(lock: unknown, jeVeStromu: (cesta: string) =>
 
 /** jq filtr kroku CI „Registr forků" — druhý domov pravidla `jmenoZProfilu`, čte se z ci.yml, ne opisuje. */
 function jqFiltrZCi(): string | null {
-  const ci = readFileSync(join(ROOT, ".forgejo/workflows/ci.yml"), "utf8");
+  const ci = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
   return ci.match(/JQ_JMENO_Z_PROFILU='([^']+)'/)?.[1] ?? null;
 }
 
@@ -306,7 +306,7 @@ describe("kód stacku nesmí znát jméno konkrétní instance", () => {
   it.skipIf(!jqDostupne)(
     `negativní sonda: jq filtr kroku CI „Registr forků" dává totéž jako jmenoZProfilu${jqDostupne ? "" : " — NEZMĚŘENO: jq není v PATH"}`,
     () => {
-      expect(JQ, "v .forgejo/workflows/ci.yml chybí JQ_JMENO_Z_PROFILU='…' — pravidlo má mít dva sladěné domovy, ne jeden").toBeTruthy();
+      expect(JQ, "v .github/workflows/ci.yml chybí JQ_JMENO_Z_PROFILU='…' — pravidlo má mít dva sladěné domovy, ne jeden").toBeTruthy();
       for (const [profil, jmeno] of PROFILY_FIXTURA) {
         const zJq = execFileSync("jq", ["-r", JQ as string], { input: JSON.stringify(profil ?? null), encoding: "utf-8" }).trim();
         expect(zJq, `jq nad ${JSON.stringify(profil)}`).toBe(jmeno);

@@ -25,7 +25,7 @@ import { join } from "node:path";
 import { parse } from "yaml";
 
 const ROOT = process.cwd();
-const CI = join(ROOT, ".forgejo/workflows/ci.yml");
+const CI = join(ROOT, ".github/workflows/ci.yml");
 const VERDIKT = "pr-verdikt";
 
 interface Uloha {

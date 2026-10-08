@@ -320,7 +320,7 @@ async function hlavni(argv) {
 }
 
 export function nactiWorkflow(koren = REPO_ROOT) {
-  const dir = join(koren, ".forgejo", "workflows");
+  const dir = join(koren, ".github", "workflows");
   return readdirSync(dir)
     .filter((f) => /\.ya?ml$/.test(f))
     .map((f) => ({ soubor: f, text: readFileSync(join(dir, f), "utf8") }));

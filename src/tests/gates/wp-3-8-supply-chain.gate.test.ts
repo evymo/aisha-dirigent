@@ -22,7 +22,7 @@ const WORKFLOW = path.join(
   ROOT,
   // Relocated to Forgejo (2026-05-30): CI/CD runs on self-hosted infra; the
   // GitHub mirror is cost-only. SBOM + MinIO-mirror content preserved verbatim.
-  '.forgejo/workflows/supply-chain.yml',
+  '.github/workflows/supply-chain.yml',
 );
 const IMAGE_VERSIONS = path.join(ROOT, 'config/image-versions.env');
 const TRIVYIGNORE = path.join(ROOT, '.trivyignore');

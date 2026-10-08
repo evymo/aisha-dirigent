@@ -84,7 +84,7 @@ docker compose down
 
 ### CI (Forgejo Actions — pure-Node tier only)
 
-`.forgejo/workflows/e2e-dirigent.yml` runs a **pure-Node subset** of this
+`.github/workflows/e2e-dirigent.yml` runs a **pure-Node subset** of this
 suite — boots the mock backend in-process (no Docker), runs the CLI
 hook + relay specs against it. Target wall time: < 5 min.
 
