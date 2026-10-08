@@ -24,7 +24,7 @@
 #
 # Argumenty:
 #   $1  URL overlay repa (smí obsahovat token; ve výpisu se maskuje). Https URL
-#       BEZ přihlašovacích údajů si token vezme z FORGEJO_TOKEN — stejně jako
+#       BEZ přihlašovacích údajů si token vezme z GIT_TOKEN — stejně jako
 #       build, který ho dostává secretem (Dockerfile.keycloak, …svc-source-broker).
 #   $2  ref (větev/tag), volitelně — bez něj výchozí větev vzdáleného repa
 #
@@ -56,12 +56,12 @@ REDACTED=$(printf '%s' "$URL" | sed -E 's|(://)[^@/]+@|\1***@|')
 # se pak bez tokenu nepřečte a cachebust by vyšel prázdný — build na něm padá.
 case "$URL" in
   *://*@*) : ;;
-  https://*) [ -n "${FORGEJO_TOKEN:-}" ] && URL="https://${FORGEJO_TOKEN}@${URL#https://}" ;;
+  https://*) [ -n "${GIT_TOKEN:-}" ] && URL="https://${GIT_TOKEN}@${URL#https://}" ;;
 esac
 
 # ⛔ `ls-remote` MIMO pracovní adresář. NAMĚŘENO 2026-09-25 (CI běh 1528, Deploy: Core):
 # `actions/checkout` zapíše do LOKÁLNÍ konfigurace workspace
-# `http.https://<forgejo>/.extraheader: AUTHORIZATION: basic <token běhu>` — token platí
+# `http.https://<git-host>/.extraheader: AUTHORIZATION: basic <token běhu>` — token platí
 # jen pro repo běhu. Git tu hlavičku pošle i na overlay repo a přebije token v URL:
 # `could not read Password … terminal prompts disabled`, přestože token v URL platí
 # (lokálně totéž prošlo). `-C` do neutrálního adresáře + bez GIT_DIR/GIT_WORK_TREE
@@ -88,7 +88,7 @@ if [ -z "$SHA" ]; then
   # Důvod od gitu, s maskovaným tokenem (v URL i holý) — bez něj se hádá.
   if [ -s "$ERRF" ]; then
     sed -E 's|(://)[^@/]+@|\1***@|g' "$ERRF" \
-      | if [ -n "${FORGEJO_TOKEN:-}" ]; then sed "s|${FORGEJO_TOKEN}|***|g"; else cat; fi \
+      | if [ -n "${GIT_TOKEN:-}" ]; then sed "s|${GIT_TOKEN}|***|g"; else cat; fi \
       | sed -n '1,5s/^/  git: /p' >&2
   fi
   exit 1

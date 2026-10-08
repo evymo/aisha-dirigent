@@ -59,9 +59,9 @@ describe("keycloak theme overlay", () => {
     expect(stage).toMatch(/KC_THEME_OVERLAY_PATH[\s\S]*?exit 1/);
   });
 
-  it("FORGEJO_TOKEN nesmí do běhového stage (docker history by ho vydal)", () => {
+  it("GIT_TOKEN nesmí do běhového stage (docker history by ho vydal)", () => {
     const lastFrom = dockerfile.lastIndexOf("FROM ");
-    expect(dockerfile.slice(lastFrom)).not.toContain("FORGEJO_TOKEN");
+    expect(dockerfile.slice(lastFrom)).not.toContain("GIT_TOKEN");
   });
 
   it("klon overlaye má cachebust — jinak se nasadí jednou a už nikdy", () => {

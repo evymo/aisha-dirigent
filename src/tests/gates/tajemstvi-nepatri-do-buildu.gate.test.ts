@@ -77,9 +77,9 @@ describe("brána: tajemství nepatří do buildu", () => {
   });
 
   it("BuildKit secret NIKDY není build-time — jinak je #920 bez účinku", () => {
-    // ⛔ NAMĚŘENO 2026-08-16: #920 přesunul FORGEJO_TOKEN a SENTRY_AUTH_TOKEN
+    // ⛔ NAMĚŘENO 2026-08-16: #920 přesunul GIT_TOKEN a SENTRY_AUTH_TOKEN
     // na `--mount=type=secret`, ale env metadata zůstala nedotčená:
-    //     FORGEJO_TOKEN      core, keycloak → build-time (větev `else true`)
+    //     GIT_TOKEN      core, keycloak → build-time (větev `else true`)
     //     SENTRY_AUTH_TOKEN  core           → build-time (větev `else true`)
     //     SENTRY_AUTH_TOKEN  edge           → build-time (ruční seznam!)
     // Coolify jim tedy DÁL vkládal `ARG` za každý `FROM` a předával je jako

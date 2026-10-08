@@ -2,7 +2,7 @@
  * Brána: refresh-overlay-cachebust.sh MLUVÍ PRAVDU — chování, ne text.
  *
  * ⛔ NAMĚŘENO 2026-09-24 (CI běh 51874, riq main 3e0886282): deploy joby neměly
- * FORGEJO_TOKEN, `git ls-remote` soukromého overlay repa selhal, skript vypsal
+ * GIT_TOKEN, `git ls-remote` soukromého overlay repa selhal, skript vypsal
  * warning — a skončil 0 (smyčka v rouře = podskořepina, neúspěch jen `continue`).
  * Souhrn deploy-and-verify z toho udělal „PROVEDENO" a core i extranet se
  * postavily z KEŠOVANÉHO overlaye.
@@ -54,7 +54,7 @@ echo "fatal: Authentication failed for '$u'" >&2; exit 128
       PATH: `${tmp}:${process.env.PATH}`,
       COOLIFY_API_TOKEN: "t",
       COOLIFY_BASE_URL: "https://coolify.example.invalid",
-      FORGEJO_TOKEN: o.token,
+      GIT_TOKEN: o.token,
       ENVY_JSON: o.envyJson ?? "",
     };
     const r = spawnSync("bash", ["scripts/deploy/refresh-overlay-cachebust.sh", "uuid-x", "extranet"], {

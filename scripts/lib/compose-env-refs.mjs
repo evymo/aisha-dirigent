@@ -106,7 +106,7 @@ export function referenceCompose(text, jmenoSouboru = "compose") {
   // `secrets: <jméno>: environment: VAR` — compose tu proměnnou čte z prostředí
   // stejně jako `${VAR}`, jen ne interpolací, takže ji průchod hodnotami nevidí.
   //
-  // ⛔ NAMĚŘENO 2026-09-14: FORGEJO_TOKEN (build secret overlaye Keycloaku
+  // ⛔ NAMĚŘENO 2026-09-14: GIT_TOKEN (build secret overlaye Keycloaku
   // i zdrojových adaptérů brokeru) neměla v Coolify ani jedna z těch aplikací —
   // sync doručuje jen klíče, které tahle funkce vrátí. Klon soukromého overlaye
   // pak selže a fail-closed build spadne.

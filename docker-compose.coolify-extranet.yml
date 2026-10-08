@@ -20,7 +20,7 @@ services:
         SURFACE_OVERLAY_REF: ${SURFACE_OVERLAY_REF:-}
         SURFACE_OVERLAY_CACHEBUST: ${SURFACE_OVERLAY_CACHEBUST:-}
       secrets:
-        - forgejo_token
+        - git_token
     restart: unless-stopped
     expose:
       - "8080"
@@ -229,8 +229,8 @@ services:
       start_period: 30s
 
 secrets:
-  forgejo_token:
-    environment: FORGEJO_TOKEN
+  git_token:
+    environment: GIT_TOKEN
 
 volumes:
   pki-certs:

@@ -4,7 +4,7 @@
  *
  * ⛔ NAMĚŘENO 2026-08-18, stav před touto branou:
  *
- *     FORGEJO_TOKEN        secret ✓   build-time allowlist ✗   → chráněno
+ *     GIT_TOKEN        secret ✓   build-time allowlist ✗   → chráněno
  *     SENTRY_AUTH_TOKEN    secret ✓   build-time allowlist ✓   → ÚNIK
  *
  * `Dockerfile.web:180` čte `SENTRY_AUTH_TOKEN` přes `--mount=type=secret` —
@@ -16,7 +16,7 @@
  * Není to hypotéza. Sesterské měření 2026-08-15 na `svc-web-artifact`:
  * přes build ARG **2 výskyty** hodnoty v `docker history`, přes secret **0**.
  * Komentář u `secrets:` v docker-compose.coolify-keycloak.yml tu podmínku
- * dokonce vyslovuje („Coolify musí mít FORGEJO_TOKEN označený jako
+ * dokonce vyslovuje („Coolify musí mít GIT_TOKEN označený jako
  * runtime-only, jinak ho pošle jako `--build-arg` navíc a únik se vrátí") —
  * jen ji do té doby nic neměřilo. U jednoho klíče se to dodrželo, u druhého ne.
  * Prosa, kterou nikdo neměří, je přání.

@@ -50,7 +50,7 @@
 # starý overlay; tichý starý overlay je ale to nejhorší ze všech tří.
 #
 # ⛔ „NAHLAS" MUSÍ BÝT I V NÁVRATOVÉM KÓDU, ne jen ve warningu. NAMĚŘENO
-# 2026-09-24 (CI běh 51874, <fork> main 3e0886282): deploy joby neměly FORGEJO_TOKEN,
+# 2026-09-24 (CI běh 51874, <fork> main 3e0886282): deploy joby neměly GIT_TOKEN,
 # `git ls-remote` soukromého overlay repa selhal, skript vypsal warning — a skončil
 # 0, protože smyčka běžela v rouře (podskořepina) a každý neúspěch byl jen
 # `continue`. Volající (`deploy-and-verify.sh`) to podle kódu 0 shrnul jako
@@ -143,9 +143,9 @@ while IFS='|' read -r st bust url_key ref_key what; do
 
   # Odvozená URL overlaye je bez tokenu (jde do build ARGu). Token pro čtení HEAD
   # je tentýž, který build dostává secretem — z prostředí, jinak z appky.
-  TOKEN="${FORGEJO_TOKEN:-$(_env_value FORGEJO_TOKEN)}"
+  TOKEN="${GIT_TOKEN:-$(_env_value GIT_TOKEN)}"
   # stderr pomocníka NEzahazovat: nese důvod od gitu (token maskovaný) — `2>/dev/null` ho schoval (2026-09-25).
-  if ! SHA="$(FORGEJO_TOKEN="$TOKEN" sh "${HERE}/overlay-cachebust.sh" "$URL" "$REF")"; then
+  if ! SHA="$(GIT_TOKEN="$TOKEN" sh "${HERE}/overlay-cachebust.sh" "$URL" "$REF")"; then
     echo "::warning::${bust}: HEAD overlay repa se nepodařilo přečíst — build '${STACK}' použije KEŠOVANÝ klon a nasadí ${what} v podobě z prvního buildu" >&2
     NEDOKAZANO="${NEDOKAZANO} ${bust}(HEAD)"
     continue

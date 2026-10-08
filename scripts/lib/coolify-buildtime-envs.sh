@@ -34,7 +34,7 @@ coolify_buildtime_key_regex() {
   # `Dockerfile.web:180` ho čte přes `--mount=type=secret` — tedy cestou, která
   # se do vrstev ani do historie nezapisuje. Build-time příznak tu ochranu RUŠIL:
   # Coolify tutéž hodnotu poslal navíc jako `--build-arg`. Dvě cesty pro jednu
-  # hodnotu, rozhoduje ta slabší. U sesterského FORGEJO_TOKENu se to dodrželo,
+  # hodnotu, rozhoduje ta slabší. U sesterského GIT_TOKENu se to dodrželo,
   # tady ne — a rozdíl nikdo neměřil. Dnes ano: brána
   # src/tests/gates/secret-nesmi-cestovat-i-jako-build-arg.gate.test.ts odvozuje
   # množinu chráněných klíčů z `--mount=type=secret` + `secrets:` mapování, takže
@@ -215,7 +215,7 @@ coolify_is_web_build_app() {
 # odvození obě odchylky NAŠLO dřív, než je někdo opravil ručně.
 #
 # `secrets: X: environment: NAME` se ZÁMĚRNĚ nepočítá: tak dnes chodí
-# FORGEJO_TOKEN a SENTRY_AUTH_TOKEN a #920 je měřením prohlásil za runtime-only.
+# GIT_TOKEN a SENTRY_AUTH_TOKEN a #920 je měřením prohlásil za runtime-only.
 #
 # $1 = cesta k compose (relativně k repu), $2 = JSON pole envů z API
 # Tiskne jména klíčů, jedno na řádek. Prázdný výstup = nepodařilo se odvodit.
@@ -345,13 +345,13 @@ coolify_dockerfile_arg_keys() {
 # ─────────────────────────────────────────────────────────────────────────────
 # CO SE DORUČUJE JAKO BUILDKIT SECRET, NESMÍ BÝT BUILD-TIME. NIKDY.
 #
-# ⛔ NAMĚŘENO 2026-08-16: PR #920 přesunul `FORGEJO_TOKEN` a `SENTRY_AUTH_TOKEN`
+# ⛔ NAMĚŘENO 2026-08-16: PR #920 přesunul `GIT_TOKEN` a `SENTRY_AUTH_TOKEN`
 # z build argů na `--mount=type=secret`, protože build arg končí v metadatech
 # obrazu a `docker history` ho vydá napořád. Jenže env metadata zůstala
 # nedotčená, takže Coolify ty hodnoty DÁL posílá jako `--build-arg` a vkládá
 # `ARG <KEY>` za každý `FROM`:
 #
-#     FORGEJO_TOKEN      core, keycloak → build-time (větev `else true`)
+#     GIT_TOKEN      core, keycloak → build-time (větev `else true`)
 #     SENTRY_AUTH_TOKEN  core           → build-time (větev `else true`)
 #     SENTRY_AUTH_TOKEN  edge           → build-time (ruční seznam)
 #
@@ -490,7 +490,7 @@ coolify_normalize_buildtime_envs() {
       # bez odůvodnění — a protože Coolify vede pro každý klíč SAMOSTATNÝ řádek
       # pro produkci a pro preview, srovnala se jen půlka. Naměřeno 2026-09-02 na
       # <fork>-core: po normalizaci zbylo 228 build-time záznamů, z toho 172
-      # preview — včetně SENTRY_AUTH_TOKENu a FORGEJO_TOKENu, které mají produkční
+      # preview — včetně SENTRY_AUTH_TOKENu a GIT_TOKENu, které mají produkční
       # řádek `false` a preview `true`. Preview build je build jako každý jiný:
       # zapeče `--build-arg` do `docker history` úplně stejně.
       | . as $env

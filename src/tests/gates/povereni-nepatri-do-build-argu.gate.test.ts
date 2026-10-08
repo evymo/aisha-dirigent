@@ -3,7 +3,7 @@
  * kde se na to zrovna přišlo.
  *
  * ⛔ NAMĚŘENO DVAKRÁT, SE STEJNÝM ZÁVĚREM:
- *   2026-08-15 — FORGEJO_TOKEN v `docker history` KONEČNÉHO obrazu svc-web-artifactu.
+ *   2026-08-15 — GIT_TOKEN v `docker history` KONEČNÉHO obrazu svc-web-artifactu.
  *   2026-09-21 — táž vada u povrchu: `*_GIT_URL` s pověřením v URL se zapsalo do
  *                historie ČTYŘ obrazů (extranet ×2, pki-init ×2) ze 175 na hostiteli.
  *
@@ -62,7 +62,7 @@ describe("pověření nepatří do build argu", () => {
         "Doplň stráž podle deploy/surface-host/Dockerfile:\n" +
         '  AUTORITA="${<KLIC>#https://}"; AUTORITA="${AUTORITA%%/*}"; \\\n' +
         '  case "$AUTORITA" in *@*) echo "FATAL: <KLIC> nese pověření v URL" >&2; exit 1 ;; esac; \\\n' +
-        "Token patří do BuildKit secretu (--mount=type=secret,id=forgejo_token).",
+        "Token patří do BuildKit secretu (--mount=type=secret,id=git_token).",
     ).toEqual([]);
   });
 

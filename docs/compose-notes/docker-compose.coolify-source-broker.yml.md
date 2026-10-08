@@ -40,14 +40,14 @@ was therefore never built. Coolify injects the platform build ARGs into
 the Dockerfile itself (42 of them, across both stages), exactly as it
 does for the sibling optional stacks, none of which declare `args:`.
 
-### `args:` + `secrets: [forgejo_token]` (2026-09-14)
+### `args:` + `secrets: [git_token]` (2026-09-14)
 
 `args:` is back, and this time it carries values: the three
 `SOURCE_ADAPTER_OVERLAY_*` build ARGs of the `source-adapters` stage, which
 clones the instance overlay and builds the source adapters it declares in
 `source-adapters/<name>/`. Same shape as `docker-compose.coolify-keycloak.yml`
 (theme overlay): explicit args without nested interpolation (Coolify cannot
-render it), the token through the `forgejo_token` BuildKit secret, never a
+render it), the token through the `git_token` BuildKit secret, never a
 build ARG.
 
 URL and ref are derived by env-doctor from `AISHA_INSTANCE_DATA_GIT_URL`

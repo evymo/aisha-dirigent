@@ -538,9 +538,9 @@ build_app_payload() {
   # union: compose ${VAR} reference + ARG deklarace z build Dockerfiles
   # (build-arg konzumace není v compose textu videt — viz coolify-app-vars.sh)
   # + klíče BuildKit secretů (`secrets: <id>: environment: KLIC`).
-  # ⛔ NAMĚŘENO 2026-09-13: čtvrtý zdroj chyběl. `environment: FORGEJO_TOKEN`
+  # ⛔ NAMĚŘENO 2026-09-13: čtvrtý zdroj chyběl. `environment: GIT_TOKEN`
   # není `${…}` reference, takže ho filtr nepustil — core ho dostával jen
-  # náhodou (runtime `FORGEJO_TOKEN: ${FORGEJO_TOKEN:-}` u jiné služby téhož
+  # náhodou (runtime `GIT_TOKEN: ${GIT_TOKEN:-}` u jiné služby téhož
   # compose), keycloak a extranet vůbec. Secret pak byl při buildu prázdný
   # a klon privátního overlaye selhal (nebo se téma tiše nepřevzalo). Příznak
   # build-time dostat nesmí — to hlídá coolify_normalize_buildtime_envs.

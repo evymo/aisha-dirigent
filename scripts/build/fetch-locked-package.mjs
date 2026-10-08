@@ -47,7 +47,7 @@
  * HTTP 200 bez tokenu). Kdyby se to změnilo, build spadne na 401 s hláškou —
  * ne potichu. Token se sem NEMÁ dodávat jako build arg: zapsal by se do
  * `docker history`. Správná cesta by byla `--mount=type=secret`, jak to dělá
- * `forgejo_token` v tomtéž Dockerfilu.
+ * `git_token` v tomtéž Dockerfilu.
  *
  * Použití:
  *   node scripts/build/fetch-locked-package.mjs [--bez-externich-importu] \
@@ -153,7 +153,7 @@ async function stahniOverenyArchiv(zaznam) {
         (odpoved.status === 401 || odpoved.status === 403
           ? "  Registr začal vyžadovat pověření. NEPŘIDÁVEJ token jako build arg —\n" +
             "  zapsal by se do `docker history`. Použij `--mount=type=secret`, jak to\n" +
-            "  v témž Dockerfilu dělá `forgejo_token`."
+            "  v témž Dockerfilu dělá `git_token`."
           : "  Registr je nedostupný, nebo ta verze zmizela."),
     );
   }
