@@ -26,8 +26,8 @@
      tato větev dává `AISHA_MCP_URL` s výchozím localhost a GitHub místo privátní forge. Ponechat
      text z PR #3, hodnotu `AISHA_MCP_URL` z této větve.
    - Odstranění privátní forge sahá do ~270 souborů; po merge PR #3 přeměřit
-     `git grep -in forgejo` — PR #3 mění `.forgejo/workflows/supply-chain.yml` a
-     `obrazy-jdou-stahnout.yml`; jejich změny přenést do `.github/workflows/`.
+     zbylé odkazy na privátní forge (`git grep -in` na její jméno) — PR #3 mění v jejím adresáři workflow
+     `supply-chain.yml` a `obrazy-jdou-stahnout.yml`; jejich změny přenést do `.github/workflows/`.
 3. **Pak teprve vydání** (§4).
 
 ## 3. Rozhodnutí vlastníka (blokují preview)
@@ -107,12 +107,9 @@ Navazující úkoly z odstranění privátní forge:
   stromu nikdy nebylo — `config/public-snapshot.exclude` ho uvádí, aby brány `sbom-coverage`,
   `owasp-orchestrator-adoption` a `static-defense-in-depth` hlásily NEZMĚŘENO s důvodem místo pádu.
   Přenést jako opt-in dráhu GitHub Actions (cosign keyless přes OIDC) a řádek z exclude smazat.
-- `ci-kontrakt`: `GIT_TOKEN` je zatím `"externi"`; po sloučení runtime části (env-doctor kontrakt
-  s `GIT_TOKEN`) přepnout na `{trezor:"GIT_TOKEN"}`.
-- `scripts/coolify-server-onboard.sh` má ještě krok instalace runneru; názvy env pověření n8n
-  nesou staré pojmenování — viz `git grep -in forgejo` po sloučení.
-- Komentář v `coolify-compose-compliance.gate.test.ts` cituje `docs/deploy/CICD.md:75` — vysvětlení
-  ARG_MAX je teď v sekci Troubleshooting.
+- Archiv `trash/legacy-archive/edge-functions-reference/` (nespouštěný referenční kód, z něhož čtou
+  kontraktní testy) je převedený na GitHub REST API (`admin_github_git`, dev-patch, drift workflow) —
+  neověřený proti živému GitHubu; živá služba `svc-mcp-knowledge` admin nástroje zatím neregistruje.
 
 Omezení prostředí, ve kterém se ověřovalo (nejsou to vady repa): odchozí TLS přes proxy s vlastní
 CA (základní obrazy dočasně s CA), limit Docker Hubu (mirror), `nofile` 20 000 (ClickHouse chce
