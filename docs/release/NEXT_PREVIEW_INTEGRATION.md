@@ -81,13 +81,27 @@ Výsledek na běžícím stacku:
 - Keycloak OIDC discovery `http://127.0.0.1:8180/realms/aisha` 200;
 - MCP přes `http://localhost:3001/functions/v1/mcp-knowledge-server`: bez tokenu 401; s tokenem
   povoleného klienta `aisha-dirigent-device` `initialize` 200, `tools/list` 16 nástrojů, `tools/call` OK;
-- web SPA `:8083` 200; migrace + seed (`template` → platforma) exit 0; 48 kontejnerů běží / init doběhl.
+- web SPA `:8083` 200; migrace + seed (`template` → platforma) exit 0.
+
+**Znovu ověřeno po sloučení odstranění privátní forge** (gateway, migrate, n8n init/uzly přestavěné,
+compose přegenerovaný): totéž zelené + migrace na EXISTUJÍCÍ DB zkonvergovala CHECK zdroje událostí
+na `git_webhook`; n8n bootstrap `success` — vlastník, API klíč, 9 pověření, 94 workflowů (72 aktivních,
+0 selhání); publikace pluginů 4/4. Až teprve tady se ukázalo, že n8n init lokálně **nikdy nedoběhl**
+(první běh ho počítal jako „běží" — čekal na hostitele, který neexistoval).
 
 Opravené vady lokálního stacku (každá shodila část stacku): build secrets v generátoru; mesh routa
 v entrypointech (lokálně není NetBird); `AISHA_SEED_PROFILE` nedocházel do migrate + seed se psal
 do read-only `aisha/db` + profil `template` neznámý; `svc-plugin-system` bez `KEYCLOAK_URL/REALM`
 v compose (**i produkce**); n8n DB host `aisha-db`; neplatný klíč Langfuse v3; Keycloak bez host
-portu; `KC_CONTAINER`/porty/realm s literálem `aisha-*` místo identity; gateway bez `PUBLIC_URL`.
+portu; `KC_CONTAINER`/porty/realm s literálem `aisha-*` místo identity; gateway bez `PUBLIC_URL`;
+generátor zahazoval síťové aliasy deklarované ve zdroji (n8n init neviděl `<prefix>-n8n`); e-mail
+vlastníka n8n bez tečky v doméně (n8n ho odmítne — a bootstrap to hlásil jako „vlastník už existuje");
+`API_UPSTREAM_MESH` lokálně na jméno, které v síti není; `RABBITMQ_HOST` zastaralý literál; `env.mjs`
+vyžadoval `COOLIFY_URL` při importu → doručení workflowů padalo; publikace pluginů padala na
+přechodném PGRST002 po migraci.
+
+**Změna s dopadem na produkci (ověřit na nasazení):** alias `<prefix>-n8n--main` — cíl mesh trasy
+5678 — nesl `n8n-worker`, ne hlavní `n8n`; přesunut na hlavní službu (`docker-compose.coolify-n8n.yml`).
 
 Známé, neopravené (kandidáti na samostatné úkoly):
 
@@ -99,6 +113,9 @@ Známé, neopravené (kandidáti na samostatné úkoly):
 - **Produkce:** blok gateway v compose nepředává `KEYCLOAK_DOMAIN_PUBLIC` ani `APP_CONFIG_*` →
   `keycloak_url` v app-config bude prázdný; ověřit na nasazené instanci.
 - **maestro** `/health/ready` = 503 při plném CPU (necitlivý `cpu_checker` shodí celkový stav).
+- **n8n lokálně volá AISHA API na `https://api.<LOCAL_TLD>`** (mesh vypnutá → veřejný tvar), který
+  uvnitř Docker sítě nikdo nepřeloží — workflowy, které z n8n volají API, lokálně neprojdou. Táž třída
+  jako Synapse (veřejná jména uvnitř kontejnerů).
 - **Admin stack** (Appsmith 5,6 GB, NocoDB) v tomto běhu nespuštěn kvůli místu na disku.
 
 Navazující úkoly z odstranění privátní forge:
