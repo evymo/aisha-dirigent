@@ -85,7 +85,11 @@ npm run db:status:local
 ```
 Chceš vidět `<instance> story ruleset bound with N rules`, **ne** `<instance> ruleset binding SKIPPED`.
 
-> Preset gotchas: OIDC discovery consumery (Langfuse, LLM Gateway, OpenClaw login, Matrix) na local-warmup **nedokončí login** (bez Traefiku) — viz [LOCAL_WARMUP_OIDC_SUPPORT.md](../LOCAL_WARMUP_OIDC_SUPPORT.md); pro ně použij e2e/full Traefik stack. Appsmith (Spring Boot + Mongo) startuje pomalu — pomalý Appsmith ≠ failnutý bring-up. n8n healthcheck čti na `127.0.0.1:5678/healthz` (ne `localhost` kvůli IPv6).
+> Preset gotchas: přihlášení člověka do UI Langfuse (a dashboardu LLM Gateway) na local-warmup **nedokončí login** (server-side OIDC discovery bez Traefiku); AISHA s nimi mluví přes API klíče a to funguje — viz [LOCAL_WARMUP_OIDC_SUPPORT.md](../LOCAL_WARMUP_OIDC_SUPPORT.md). OpenClaw OIDC nemá (jen bearer klíč). Pro UI použij e2e/full Traefik stack.
+>
+> Napojení nástrojů (Claude Code MCP, Dirigent, skripty) na běžící stack nebo jinou instanci: `npm run aisha:connect -- login`, pak v repu `init` a `validate` — viz [AISHA_CONNECT.md](../integrations/AISHA_CONNECT.md).
+>
+> Appsmith (Spring Boot + Mongo) startuje pomalu — pomalý Appsmith ≠ failnutý bring-up. n8n healthcheck čti na `127.0.0.1:5678/healthz` (ne `localhost` kvůli IPv6).
 
 ---
 

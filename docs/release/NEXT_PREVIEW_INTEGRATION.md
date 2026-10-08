@@ -119,8 +119,6 @@ ověřily idempotenci. `stack-health.sh --local`: 8/8 změřených zdravých. Ov
 
 Známé, neopravené (kandidáti na samostatné úkoly):
 
-- **Langfuse a OpenClaw** lokálně nedokončí přihlášení (server-side OIDC discovery) —
-  [LOCAL_WARMUP_OIDC_SUPPORT.md](../LOCAL_WARMUP_OIDC_SUPPORT.md); generátor to teď hlásí.
 - **Synapse:** startuje a nabízí SSO; celé přihlášení v prohlížeči ale potřebuje dosažitelný
   `public_baseurl` (`https://…`) — lokálně bez Traefiku ne.
 - **OpenClaw → `POST /mcp`** dojde na gateway, ale ta vrací 404 — ověřit, kam má `/mcp` v produkci vést.
@@ -142,6 +140,68 @@ Navazující úkoly z odstranění privátní forge:
 - Archiv `trash/legacy-archive/edge-functions-reference/` (nespouštěný referenční kód, z něhož čtou
   kontraktní testy) je převedený na GitHub REST API (`admin_github_git`, dev-patch, drift workflow) —
   neověřený proti živému GitHubu; živá služba `svc-mcp-knowledge` admin nástroje zatím neregistruje.
+
+## 6. Napojení lokálních nástrojů na instanci (`aisha-connect`)
+
+Nový nástroj [`scripts/aisha-connect/cli.mjs`](../integrations/AISHA_CONNECT.md)
+(`npm run aisha:connect`) napojí Claude Code (MCP), rozšíření Dirigent a skripty na libovolnou
+instanci: lokální stack (výchozí), self-hosted, nebo oficiální `https://api.aisha.guru` (jen
+opt-in přes `--url`). Přihlášení probíhá přes Keycloak device flow, tokeny jsou mimo repo
+(0600) a obnovují se. `init` zapojí jakékoli repo, `validate` ověří řetěz konec-konců.
+
+Ověřeno 2026-10-08:
+
+- **lokálně, celý řetěz:** device flow proti lokálnímu Keycloaku (reálné potvrzení v přihlašovací
+  stránce), `validate` 10/10. Claude Code se přes `headersHelper` připojil k MCP
+  (`claude mcp get` → `√ Connected`). Ověřeny i refresh, `exec` a `logout` s revokací;
+- **aisha.guru bez účtu:** discovery a všech 5 kontrol před přihlášením zelené, `mcp-oauth-client`
+  zelený (`aisha-mcp-client` přijímá `http://localhost:59876/callback`), device flow se
+  na živém realmu spustí;
+- testy: `scripts/aisha-connect/__tests__` 32/32 (falešná instance v procesu, bez sítě).
+
+**Pro kolegu:**
+
+1. Přihlásit se skutečným účtem: `npm run aisha:connect -- login --url https://api.aisha.guru`,
+   potom `validate`. Čekáno: vše zelené, `token-claims` ukáže `aud aisha-mcp-knowledge`
+   (mapper z PR #3 je podle PR na živém realmu už nasazený).
+2. Po sloučení s PR #3: konflikt v `.mcp.json` vyřešit jako
+   `"url": "${AISHA_MCP_URL:-http://localhost:3001/functions/v1/mcp-knowledge-server}"` + blok
+   `oauth` z PR #3. Výchozí localhost zůstane, nativní OAuth taky. Helper z `aisha-connect init`
+   žije v local scope a nekoliduje.
+3. Rozhodnutí vlastníka realmu: povolit klientovi `aisha-dirigent-device` scope `offline_access`?
+   Dnes ho Keycloak tiše zahodí, takže session CLI končí po 30 min nečinnosti nebo nejpozději
+   po 10 h. `login --offline` na to upozorní.
+
+## 7. Langfuse a OpenClaw — interní služby (nález 2026-10-08)
+
+AISHA s nimi mluví jen service-to-service: Langfuse přes API klíče projektu, OpenClaw přes
+bearer `OPENCLAW_API_KEY`. Lokálně na přihlášení člověka nezávisí nic. Varování generátoru a
+[LOCAL_WARMUP_OIDC_SUPPORT.md](../LOCAL_WARMUP_OIDC_SUPPORT.md) to teď říkají přesně:
+OpenClaw z registru vypadl, protože OIDC vůbec nemá, a u Langfuse jde jen o UI pro operátory.
+
+Opraveno v této větvi:
+
+- **SSO do UI Langfuse:** compose nastavuje provider `AUTH_KEYCLOAK_*` (callback
+  `/api/auth/callback/keycloak`), ale realm povoloval jen `/custom`. Realm teď povoluje oba a brána
+  `local-oidc-consumer-support` hlídá shodu. ⚠️ **Na existujícím realmu** to realm-sync
+  nezkonverguje (sjednocuje jen secrets a service accounts). Jednorázově doplnit klientovi
+  `langfuse` redirect `https://<LANGFUSE_DOMAIN>/api/auth/callback/keycloak` (admin konzole nebo
+  `kcadm.sh update clients/<id> -r aisha -s 'redirectUris=[…]'`).
+
+K rozhodnutí vlastníka (změna produkční topologie, proto neprovedeno):
+
+- **`openclaw-auth`** (oauth2-proxy, veřejná tvář `companion.<PUBLIC_TLD>`) hlídá démona bez UI.
+  Démon chce `Authorization: Bearer $OPENCLAW_API_KEY`, proxy předává jen
+  `X-Forwarded-Access-Token`, takže přihlášený člověk dostane 401 na každé `/api/*`. Doporučení:
+  veřejnou tvář zrušit (`config/services.json` `public_face`, trasa edge-proxy,
+  `scripts/lib/derive-domains.mjs`, klient realmu `openclaw-proxy`, `provision-sso.sh`).
+- **Mrtvé `AUTH_OIDC_*`** v `docker-compose.coolify-openclaw.yml` (svc-openclaw je nečte, přesto
+  vyžaduje secret `OPENCLAW_OIDC_SECRET` přes `:?`) a v `docker-compose.coolify-llm-gateway.yml`
+  (realm nemá klienta). Odstranit i s položkami v kontraktu secrets.
+- **`LANGFUSE_PUBLIC_URL`** negeneruje žádný skript. Odkaz Grafany „Open in Langfuse" je bez něj
+  `/trace/<id>`, dokud ho operátor nenastaví.
+- `scripts/setup.sh` vypisuje přihlášení Langfuse `admin@example.com / admin123`, presety mají
+  `dev_langfuse_admin` (neověřeno, které platí pro cestu `setup.sh`).
 
 Omezení prostředí, ve kterém se ověřovalo (nejsou to vady repa): odchozí TLS přes proxy s vlastní
 CA (základní obrazy dočasně s CA), limit Docker Hubu (mirror), `nofile` 20 000 (ClickHouse chce
