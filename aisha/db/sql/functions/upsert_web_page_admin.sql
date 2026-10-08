@@ -9,8 +9,8 @@ CREATE OR REPLACE FUNCTION public.upsert_web_page_admin(
   p_slug text DEFAULT NULL,
   p_title_key text DEFAULT NULL,
   p_description_key text DEFAULT NULL,
-  p_status text DEFAULT 'draft',
-  p_sort_order integer DEFAULT 0,
+  p_status text DEFAULT NULL,
+  p_sort_order integer DEFAULT NULL,
   p_og_image_url text DEFAULT NULL,
   p_branding_profile_id uuid DEFAULT NULL
 )

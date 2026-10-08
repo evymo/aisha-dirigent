@@ -1,10 +1,10 @@
 /**
  * Runtime block definitions for the AISHA Story Canvas editor.
  *
- * 14 blocks: hero-slides, news-list, contact-form, discussion-thread,
+ * 15 blocks: hero-slides, news-list, contact-form, discussion-thread,
  * archive-preview, knowledge-preview, faq-accordion, product-catalog,
  * news-browser, knowledge-browser, archive-browser, studies-browser,
- * guild-directory, aisha-pruvodce.
+ * guild-directory, aisha-pruvodce, app-banner.
  *
  * Each entry produces a `data-runtime-block` placeholder in canvas_html.
  */
@@ -20,6 +20,7 @@ import {
   Newspaper,
   Scroll,
   ShoppingBag,
+  Smartphone,
   Swords,
 } from "lucide-react";
 import type { RuntimeBlockDefinition, RuntimeConfigField } from "./blockRegistry.types";
@@ -269,6 +270,25 @@ export const RUNTIME_BLOCK_DEFINITIONS: RuntimeBlockDefinition[] = [
         <div style="font-size:2rem;margin-bottom:8px;">&#129517;</div>
         <p style="font-family:var(--sc-font-family);font-weight:700;font-size:1.1rem;margin:0;">AISHA Pr\u016fvodce (Runtime Block)</p>
         <p style="color:var(--sc-text-subtle);font-size:0.85rem;margin-top:4px;">13-slide first-visit guide + 5-question quiz &mdash; rendered at page view time</p>
+      </div>
+    </div>`,
+  },
+  {
+    blockType: "app-banner",
+    category: "web",
+    descriptionKey: "builder.blocks.app-banner.description",
+    icon: Smartphone,
+    nameKey: "builder.blocks.app-banner.title",
+    configFields: [
+      { name: "iosUrl", type: "text", labelKey: "builder.runtime.iosUrl", defaultValue: "" },
+      { name: "androidUrl", type: "text", labelKey: "builder.runtime.androidUrl", defaultValue: "" },
+      { name: "dismissible", type: "checkbox", labelKey: "builder.runtime.dismissible", defaultValue: true },
+    ],
+    editorHtml: `<div data-runtime-block="app-banner" data-block-config='{"iosUrl":"","androidUrl":"","dismissible":true}' style="min-height:120px;background:linear-gradient(135deg,var(--sc-ink) 0%,var(--sc-surface-dark) 100%);color:var(--sc-white);display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;border:2px dashed var(--sc-brand);border-radius:8px;">
+      <div>
+        <div style="font-size:2rem;margin-bottom:8px;">&#128241;</div>
+        <p style="font-family:var(--sc-font-family);font-weight:700;font-size:1.1rem;margin:0;">Get our app (Runtime Block)</p>
+        <p style="color:var(--sc-text-subtle);font-size:0.85rem;margin-top:4px;">iPhone &rarr; App Store, Android &rarr; Google Play, computer &rarr; both &mdash; rendered at page view time</p>
       </div>
     </div>`,
   },

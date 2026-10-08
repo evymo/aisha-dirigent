@@ -483,18 +483,20 @@ describe('li-driver — kontext z identity, ne z balíčku', () => {
     }
   });
 
-  it('pokrytí vektory měří PLATFORMA (živý model, po třídách); selhání měření balíček neshodí', async () => {
+  it('pokrytí vektory měří PLATFORMA (živá identita z fn_ziva_identita_v1, po třídách); selhání měření balíček neshodí', async () => {
     writeBundle(base, 'k-12', { 'kb_artifact.jsonl': KB_ROZDELENY });
     const zakladni = kbKlient([]);
     const pg = {
       volani: zakladni.volani,
       query: async (text: string, params?: unknown[]) => {
-        if (text.includes('fn_resolve_embedding_model_for_space')) {
+        if (text.includes('fn_ziva_identita_v1')) {
           zakladni.volani.push(text);
+          // identita přichází z DB celá (formát + sha) — měření si ji neskládá samo
+          expect(text).not.toContain('gguf');
           return { rows: [
-            { model: 'bge-m3-embedding', pin: 'ab', trida: 'contract', useku: 10, zivy: 1,
+            { model: 'bge-m3-embedding', identita: 'pytorch:ab', trida: 'contract', useku: 10, zivy: 1,
               stary_runtime: 2, jiny_model: 3, nad_limitem: 1, bez_vektoru: 3 },
-            { model: 'bge-m3-embedding', pin: 'ab', trida: 'invoice', useku: 5, zivy: 5,
+            { model: 'bge-m3-embedding', identita: 'pytorch:ab', trida: 'invoice', useku: 5, zivy: 5,
               stary_runtime: 0, jiny_model: 0, nad_limitem: 0, bez_vektoru: 0 },
           ] };
         }
@@ -503,7 +505,7 @@ describe('li-driver — kontext z identity, ne z balíčku', () => {
     } as unknown as Parameters<typeof ingestBundle>[0];
     const c = await ingestBundle(pg, discoverBundles(base)[0]!, log);
     expect(c.pokryti).toEqual({
-      model: 'bge-m3-embedding', identita: 'gguf:ab', export_id: 'k-12',
+      model: 'bge-m3-embedding', identita: 'pytorch:ab', export_id: 'k-12',
       useku: 15, zivy: 6, stary_runtime: 2, jiny_model: 3, nad_limitem: 1, bez_vektoru: 3,
       tridy: {
         contract: { useku: 10, zivy: 1, stary_runtime: 2, jiny_model: 3, nad_limitem: 1, bez_vektoru: 3 },
@@ -513,7 +515,7 @@ describe('li-driver — kontext z identity, ne z balíčku', () => {
     // měření spadne → null, balíček projde
     const spadle = {
       query: async (text: string, params?: unknown[]) => {
-        if (text.includes('fn_resolve_embedding_model_for_space')) throw new Error('timeout');
+        if (text.includes('fn_ziva_identita_v1')) throw new Error('timeout');
         return (kbKlient([]) as unknown as { query: (t: string, p?: unknown[]) => Promise<unknown> }).query(text, params);
       },
     } as unknown as Parameters<typeof ingestBundle>[0];

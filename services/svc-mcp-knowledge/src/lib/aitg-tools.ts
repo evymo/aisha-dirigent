@@ -18,17 +18,38 @@
  * so every autonomous action is traceable.
  */
 
-import { z } from 'zod';
+import type { z } from 'zod/v4';
 import {
   classifyPromptInjection,
   classifyToxicity,
   detectCanary,
   hallucinationGroundedness,
-  aitgTestIdSchema,
 } from '@aisha/aitg';
 import { createSsrfGuard, parseHostAllowlist, createSafeLogger } from '@aisha/security';
 import type { JWTPayload } from 'jose';
 import { rpcUserClaims } from '../postgrest.js';
+import {
+  AITG_TOOL_INPUTS,
+  runTestSchema,
+  coverageSchema,
+  trustScoreSchema,
+  findingsSchema,
+  remediationSchema,
+  waiverSchema,
+  classifySchema,
+  healthSummarySchema,
+  observeTrendSchema,
+  recordReflectionSchema,
+  proposePayloadSchema,
+  nextInQueueSchema,
+  driftDetectSchema,
+  autoCloseSchema,
+  listAutomationsSchema,
+  getAutomationSchema,
+  triggerAutomationSchema,
+  updateAutomationSchema,
+  recordAutomationRunSchema,
+} from './aitg-tool-inputs.js';
 import { config } from '../config.js';
 
 const log = createSafeLogger('aitg-mcp');
@@ -49,116 +70,6 @@ function tryHost(url: string): string {
     return 'svc-aitg-probes';
   }
 }
-
-// ── input schemas ───────────────────────────────────────────────────────────
-const runTestSchema = z.object({
-  testId: z.enum([
-    'AITG-APP-01',
-    'AITG-APP-02',
-    'AITG-APP-03',
-    'AITG-APP-05',
-    'AITG-APP-08',
-    'AITG-APP-09',
-    'AITG-APP-10',
-    'AITG-APP-11',
-    'AITG-APP-12',
-    'AITG-DAT-02',
-  ]),
-  payload: z.string().min(1),
-  model: z.string().optional(),
-  triggeredBy: z.enum(['pr-gate', 'nightly', 'manual', 'sentinel', 'self']).default('self'),
-});
-
-const coverageSchema = z.object({
-  windowDays: z.number().int().min(1).max(365).default(30),
-});
-
-const trustScoreSchema = coverageSchema;
-
-const findingsSchema = z.object({
-  minSeverity: z.enum(['info', 'low', 'medium', 'high', 'critical']).default('medium'),
-  limit: z.number().int().min(1).max(500).default(50),
-});
-
-const remediationSchema = z.object({
-  findingId: z.string().uuid(),
-  proposal: z.string().min(20),
-  proposedBy: z.string().default('aisha'),
-});
-
-const waiverSchema = z.object({
-  testId: aitgTestIdSchema,
-  scope: z.record(z.unknown()),
-  justification: z.string().min(20),
-  expiresAt: z.string().datetime(),
-});
-
-const classifySchema = z.object({
-  classifier: z.enum(['prompt_injection', 'toxicity', 'canary', 'hallucination']),
-  text: z.string().min(1),
-  canary: z.string().optional(),
-  golden: z.string().optional(),
-});
-
-// ── continuous-loop schemas ─────────────────────────────────────────────────
-const healthSummarySchema = z.object({
-  windowHours: z.number().int().min(1).max(720).default(24),
-});
-
-const observeTrendSchema = z.object({
-  limit: z.number().int().min(1).max(180).default(14),
-  generatedBy: z.string().default('aisha'),
-});
-
-const recordReflectionSchema = z.object({
-  summary: z.string().min(10),
-  proposedActions: z.array(z.unknown()).default([]),
-  generatedBy: z.string().default('aisha'),
-});
-
-const proposePayloadSchema = z.object({
-  testId: aitgTestIdSchema,
-  payload: z.record(z.unknown()),
-  expectedBlock: z.string().min(1),
-  justification: z.string().min(20),
-  tags: z.array(z.string()).default([]),
-  proposedBy: z.string().default('aisha'),
-});
-
-const nextInQueueSchema = z.object({
-  limit: z.number().int().min(1).max(50).default(5),
-});
-
-const driftDetectSchema = z.object({
-  windowHours: z.number().int().min(1).max(168).default(24),
-  minRuns: z.number().int().min(1).default(5),
-  dropThresholdPp: z.number().min(0).max(1).default(0.1),
-});
-
-const autoCloseSchema = z.object({
-  requiredConsecutivePasses: z.number().int().min(1).max(20).default(3),
-});
-
-// ── automation-control schemas ──────────────────────────────────────────────
-const automationIdSchema = z.string().regex(/^[a-z][a-z0-9_]+$/, 'AITG_INVALID_AUTOMATION_ID');
-const listAutomationsSchema = z.object({});
-const getAutomationSchema = z.object({ automationId: automationIdSchema });
-const triggerAutomationSchema = z.object({
-  automationId: automationIdSchema,
-  initiator: z.string().default('aisha'),
-});
-const updateAutomationSchema = z.object({
-  automationId: automationIdSchema,
-  mode: z.enum(['automated', 'manual', 'disabled']).optional(),
-  scheduleCron: z.string().nullable().optional(),
-  scheduleIntervalMinutes: z.number().int().min(1).max(1440).nullable().optional(),
-  parameters: z.record(z.unknown()).optional(),
-});
-const recordAutomationRunSchema = z.object({
-  automationId: automationIdSchema,
-  status: z.enum(['success', 'failed', 'skipped', 'running']),
-  details: z.record(z.unknown()).default({}),
-});
 
 // ── dispatch ────────────────────────────────────────────────────────────────
 export async function aitgDispatch(
@@ -185,6 +96,7 @@ export async function aitgDispatch(
     }
     case 'vehicle_dq_status': {
       // No args — latest AITG-DAT-5x (vehicle-registry) run per check + catalog rollup.
+      AITG_TOOL_INPUTS.vehicle_dq_status.parse(rawArgs);
       return rpcUserClaims('vehicle_dq_status', {}, claims);
     }
     case 'aitg_list_open_findings': {

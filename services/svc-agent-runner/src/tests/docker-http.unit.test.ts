@@ -20,7 +20,7 @@ beforeAll(async () => {
   server = http.createServer((req, res) => {
     if (req.url === '/v1.45/networks') {
       // Dva kusy bez Content-Length → Node pošle `Transfer-Encoding: chunked`,
-      // přesně jako Docker Engine 29.7.2 na riq (2026-09-30).
+      // přesně jako Docker Engine 29.7.2 na instanci (2026-09-30).
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.write('[{"Name":"bridge"},');
       res.end('{"Name":"aisha-exec-net"}]');
@@ -44,7 +44,7 @@ beforeAll(async () => {
     if (req.method === 'POST' && req.url === '/v1.45/containers/ok/start') { res.writeHead(204); res.end(); return; }
     if (req.method === 'POST' && req.url === '/v1.45/containers/bezi/start') { res.writeHead(304); res.end(); return; }
     if (req.method === 'POST' && req.url === '/v1.45/containers/spatne/start') {
-      // Tvar odpovědi Dockeru, když síť v EndpointsConfig neexistuje (riq 2026-09-30).
+      // Tvar odpovědi Dockeru, když síť v EndpointsConfig neexistuje (instance 2026-09-30).
       res.writeHead(404, { 'Content-Type': 'application/json' });
       res.end('{"message":"network aisha-network not found"}');
       return;
@@ -61,7 +61,7 @@ afterAll(async () => {
 });
 
 describe('dockerJSON / dockerRequest nad unixovým socketem', () => {
-  it('odpověď po kusech (chunked) se přečte jako JSON — naměřená vada z riq', async () => {
+  it('odpověď po kusech (chunked) se přečte jako JSON — naměřená vada z instance', async () => {
     const nets = await dockerJSON<Array<{ Name: string }>>('GET', '/v1.45/networks');
     expect(nets.map((n) => n.Name)).toEqual(['bridge', 'aisha-exec-net']);
   });

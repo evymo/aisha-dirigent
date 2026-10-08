@@ -67,10 +67,27 @@ const ROW_INDEPENDENT_AUTHZ = ['is_admin_or_staff', 'is_service_role', 'has_role
  * a NAD NÍM opravné commity). Zůstane, co větev skutečně napsala: vlastní práce
  * a řešení konfliktů. Bez merge v rozsahu se nemění nic.
  */
-function changedFiles(): string[] {
-  const git = (args: string[]): string =>
-    execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+type Git = (args: string[]) => string;
+const radky = (s: string): string[] =>
+  s
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
 
+/**
+ * ⛔ MĚŘÍ SE PRACOVNÍ STROM, ne jen commitnutý rozdíl (naměřeno 2026-10-04).
+ * Seznam se bral z `git diff <základ>...HEAD` — tedy jen z toho, co už je
+ * COMMITNUTÉ. Úpravu v pracovním stromu brána neviděla: commit zapojil do heals
+ * dva soubory se zbytečným DROP téže signatury, celá sada bran před commitem
+ * byla zelená a spadla až v dalším kroku — nad commitem, který už existoval.
+ * Brána, která vadu ukáže až po commitu, ji neukáže tomu, kdo ji může levně
+ * opravit.
+ *
+ * Proto: základ proti pracovnímu stromu (`git diff <základ>` = commity větve
+ * + připravené + nepřipravené úpravy) a k tomu nesledované soubory, které
+ * `git diff` nevidí. V CI (čistý checkout) vyjde totéž co dřív.
+ */
+function changedFiles(git: Git): string[] {
   /**
    * Přitečené větve: druzí (a další) rodiče KAŽDÉHO merge commitu v rozsahu.
    * Nestačí koukat na HEAD — sync větev typicky nese merge a NAD NÍM opravné
@@ -79,40 +96,30 @@ function changedFiles(): string[] {
    */
   const mergedInRefs = (range: string): string[] => {
     try {
-      return git(['rev-list', '--parents', '--merges', range])
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean)
-        .flatMap((line) => line.split(/\s+/).slice(2)); // [commit, p1, p2…] → p2…
+      return radky(git(['rev-list', '--parents', '--merges', range])).flatMap((line) => line.split(/\s+/).slice(2)); // [commit, p1, p2…] → p2…
     } catch {
       return [];
     }
   };
 
-  /** Soubory, které se od dané větve NELIŠÍ = přitekly s merge, nejsou zdejší. */
+  /** Soubory, které se od dané větve NELIŠÍ = přitekly s merge, nejsou zdejší. Porovnává se pracovní strom. */
   const authoredAgainst = (files: string[], ref: string): string[] => {
-    const differs = new Set(
-      git(['diff', '--name-only', '--diff-filter=d', `${ref}..HEAD`])
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean),
-    );
+    const differs = new Set(radky(git(['diff', '--name-only', '--diff-filter=d', ref])));
     return files.filter((f) => differs.has(f));
   };
 
   for (const base of ['origin/main', 'main', 'HEAD~1']) {
     try {
       const mergeBase = base === 'HEAD~1' ? base : git(['merge-base', base, 'HEAD']).trim();
-      let files = git(['diff', '--name-only', '--diff-filter=d', `${mergeBase}...HEAD`])
-        .split('\n')
-        .map((l) => l.trim())
-        .filter(Boolean);
+      let files = radky(git(['diff', '--name-only', '--diff-filter=d', mergeBase]));
 
       // Nech jen to, co se liší od všech přitečených větví — tj. co tu vzniklo.
       for (const ref of mergedInRefs(`${mergeBase}..HEAD`)) {
         files = authoredAgainst(files, ref);
       }
-      return files;
+      // Nový soubor, který ještě nikdo nepřidal (`git add`), v žádném diffu není.
+      const untracked = radky(git(['ls-files', '--others', '--exclude-standard', '--', POLICIES_DIR, INDEXES_DIR, FUNCTIONS_DIR]));
+      return [...new Set([...files, ...untracked])];
     } catch {
       // zkus další základ
     }
@@ -120,7 +127,9 @@ function changedFiles(): string[] {
   return [];
 }
 
-const CHANGED = changedFiles();
+const gitVeStromu: Git = (args) =>
+  execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+const CHANGED = changedFiles(gitVeStromu);
 /**
  * Změněné `.sql` v adresáři — BEZ SMAZANÝCH.
  *
@@ -364,4 +373,62 @@ describe('Cast v join podmínce potřebuje funkční index', () => {
       ).toEqual([]);
     });
   }
+});
+
+// ───────────────────────────────────────────────────────────────────────────────
+// Měřák sám: seznam změněných souborů bere PRACOVNÍ strom. Git je podstrčený —
+// odpovídá jen na volání, která měřák smí udělat; cokoli jiného je chyba.
+// ───────────────────────────────────────────────────────────────────────────────
+describe('měřák: seznam změněných souborů bere pracovní strom', () => {
+  const NESLEDOVANE = `ls-files --others --exclude-standard -- ${POLICIES_DIR} ${INDEXES_DIR} ${FUNCTIONS_DIR}`;
+  const podstrceny = (odpovedi: Record<string, string>): Git => (args) => {
+    const k = args.join(' ');
+    if (!(k in odpovedi)) throw new Error(`neočekávané volání gitu: ${k}`);
+    return odpovedi[k];
+  };
+  const F = (jmeno: string) => `${FUNCTIONS_DIR}/${jmeno}.sql`;
+
+  test('commitnuté, rozpracované i nesledované soubory jsou v měření', () => {
+    const git = podstrceny({
+      'merge-base origin/main HEAD': 'zaklad\n',
+      'diff --name-only --diff-filter=d zaklad': `${F('commitnuta')}\n${F('rozpracovana')}\n`,
+      'rev-list --parents --merges zaklad..HEAD': '',
+      [NESLEDOVANE]: `${F('nova')}\n`,
+    });
+    expect(changedFiles(git)).toEqual([F('commitnuta'), F('rozpracovana'), F('nova')]);
+  });
+
+  test('rozdíl jen z commitů (`základ...HEAD`) měřák nevolá — pracovní strom by neviděl', () => {
+    // Podstrčený git umí JEN starý tvar. Měřák ho použít nesmí: žádný základ se mu nepovede a vrátí prázdno.
+    const git = podstrceny({
+      'merge-base origin/main HEAD': 'zaklad\n',
+      'diff --name-only --diff-filter=d zaklad...HEAD': `${F('commitnuta')}\n`,
+      'rev-list --parents --merges zaklad..HEAD': '',
+      [NESLEDOVANE]: '',
+    });
+    expect(changedFiles(git)).toEqual([]);
+  });
+
+  test('soubor shodný s přitečenou větví se nepočítá; jeho rozpracovaná úprava a nesledovaný soubor ano', () => {
+    const zaklad = {
+      'merge-base origin/main HEAD': 'zaklad\n',
+      'diff --name-only --diff-filter=d zaklad': `${F('pritekla')}\n${F('zdejsi')}\n`,
+      'rev-list --parents --merges zaklad..HEAD': 'merge rodic1 rodic2\n',
+      [NESLEDOVANE]: `${F('nova')}\n`,
+    };
+    // `pritekla` se od druhého rodiče neliší → není zdejší.
+    expect(changedFiles(podstrceny({ ...zaklad, 'diff --name-only --diff-filter=d rodic2': `${F('zdejsi')}\n` }))).toEqual([F('zdejsi'), F('nova')]);
+    // Jakmile ji někdo v pracovním stromu upraví, od druhého rodiče se liší → měří se.
+    expect(changedFiles(podstrceny({ ...zaklad, 'diff --name-only --diff-filter=d rodic2': `${F('pritekla')}\n${F('zdejsi')}\n` }))).toEqual([F('pritekla'), F('zdejsi'), F('nova')]);
+  });
+
+  test('bez origin/main zkusí další základ', () => {
+    const git = podstrceny({
+      'merge-base main HEAD': 'zaklad\n',
+      'diff --name-only --diff-filter=d zaklad': `${F('commitnuta')}\n`,
+      'rev-list --parents --merges zaklad..HEAD': '',
+      [NESLEDOVANE]: '',
+    });
+    expect(changedFiles(git)).toEqual([F('commitnuta')]);
+  });
 });

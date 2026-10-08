@@ -43,6 +43,8 @@ services:
         else
           echo "[docker-sock] $$S není socket — backend docker nebude mít přístup"
         fi
+        mkdir -p /var/lib/agent-runs
+        chown node:node /var/lib/agent-runs
         exec su-exec node node dist/server.js
     # ⛔ ALIAS S IDENTITOU přebíjí seznam sítí ze sdílené kotvy. Cíl mesh trasy
     # se skládá jako `<prefix>-<služba>`, jenže Coolify `container_name`
@@ -61,6 +63,8 @@ services:
           - ${APP_NAME_PREFIX:?identita instance}-svc-agent-runner
     depends_on:
       plugin-exec-tag:
+        condition: service_completed_successfully
+      agent-claude-tag:
         condition: service_completed_successfully
     build:
       context: .
@@ -82,28 +86,25 @@ services:
       PLUGIN_SYSTEM_URL: ${PLUGIN_SYSTEM_URL}
       PLUGIN_BROKER_URL: ${PLUGIN_BROKER_URL}
       BROKER_TOKEN_SECRET: ${BROKER_TOKEN_SECRET}
+      BROKER_PROXY_ALIAS: ${APP_NAME_PREFIX:?identita instance — alias v exec síti ji MUSÍ nést}-plugin-broker
+      BROKER_PROXY_PORT: "3031"
 
       RUNNER_BACKEND: ${RUNNER_BACKEND:-kata}
       DOCKER_SOCKET: /var/run/docker.sock
       DOCKER_API_VERSION: ${DOCKER_API_VERSION:-v1.46}
-      DOCKER_EXEC_NETWORK: ${APP_NAME_PREFIX:?identita instance — síť na sdíleném hostiteli ji MUSÍ nést}-exec-net
+      DOCKER_EXEC_NETWORK: ${APP_NAME_PREFIX:?identita instance — síť na sdíleném hostiteli ji MUSÍ nést}-exec-runs
+      EXEC_PIDS_LIMIT: ${EXEC_PIDS_LIMIT:-}
+      CLAUDE_PIDS_LIMIT: ${CLAUDE_PIDS_LIMIT:-}
+      EXEC_RUN_USER: ${EXEC_RUN_USER:-}
+      CLAUDE_RUN_USER: ${CLAUDE_RUN_USER:-}
       KATA_GRPC_ENDPOINT: ${KATA_DEFAULT_RUNTIME}
       EXEC_MEMORY_LIMIT: ${EXEC_MEMORY_LIMIT:-2g}
-      MAX_CONCURRENT_CLAUDE_RUNS: ${MAX_CONCURRENT_CLAUDE_RUNS:-3}
+      MAX_CONCURRENT_CLAUDE_RUNS: ${MAX_CONCURRENT_CLAUDE_RUNS:-1}
       EXEC_CPU_QUOTA: ${EXEC_CPU_QUOTA:-200000}
       EXEC_CPU_PERIOD: ${EXEC_CPU_PERIOD:-100000}
       DEFAULT_TIMEOUT_MS: ${DEFAULT_TIMEOUT_MS:-60000}
       MAX_TIMEOUT_MS: ${MAX_TIMEOUT_MS:-600000}
 
-      NETBIRD_ENABLED: ${NETBIRD_ENABLED:-true}
-      NETBIRD_API_URL: ${NETBIRD_API_URL}
-      NETBIRD_AUTH_SCHEME: ${NETBIRD_AUTH_SCHEME:-Bearer}
-      NETBIRD_API_TOKEN: ${NETBIRD_API_TOKEN:-}
-      NETBIRD_KEYCLOAK_CLIENT_ID: netbird-backend
-      NETBIRD_KEYCLOAK_CLIENT_SECRET: ${NETBIRD_MGMT_SECRET}
-      NETBIRD_SANDBOX_GROUP: ${NETBIRD_SANDBOX_GROUP}
-
-      AISHA_DB_URL: ${AISHA_DB_URL}
       POSTGREST_URL: ${POSTGREST_URL}
       POSTGREST_SERVICE_TOKEN: ${POSTGREST_SERVICE_TOKEN}
 
@@ -112,9 +113,7 @@ services:
       NODE_EXTRA_CA_CERTS: /certs/pki/aisha-ca-bundle.pem
 
       CLAUDE_POLL_ENABLED: ${CLAUDE_POLL_ENABLED:-false}
-      AGENT_RUNS_DIR: ${AGENT_RUNS_DIR:?AGENT_RUNS_DIR must be delivered by cold-start env (generate-secrets derives the instance-scoped host path)}
-      AGENT_REPO_PATH: ${AGENT_REPO_PATH:?AGENT_REPO_PATH must be delivered by cold-start env (generate-secrets derives the instance-scoped host path)}
-      AGENT_CLAUDE_IMAGE: ${AGENT_CLAUDE_IMAGE:-}
+      AGENT_CLAUDE_IMAGE: ${AGENT_CLAUDE_IMAGE:-aisha/agent-claude:v1}
       CLAUDE_CLI_TIMEOUT_MS: ${CLAUDE_CLI_TIMEOUT_MS:-3600000}
       AGENT_GATEWAY_URL: ${AGENT_GATEWAY_URL:-}
       AGENT_MCP_TOKEN: ${AGENT_MCP_TOKEN:-}
@@ -130,11 +129,11 @@ services:
       AGENT_GIT_PUSH: ${AGENT_GIT_PUSH:-0}
       AGENT_GIT_REMOTE: ${AGENT_GIT_REMOTE:-}
       AGENT_GIT_TOKEN: ${AGENT_GIT_TOKEN:-}
+      NPM_REGISTRY_URL: ${NPM_REGISTRY_URL:-}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:rw
       - ./config/pki:/certs/pki:ro
-      - /var/lib/aisha/agent-runs:/var/lib/aisha/agent-runs:rw
-      - /srv/aisha/base-repo:/srv/aisha/base-repo:ro
+      - agent-runs:/var/lib/agent-runs:rw
     healthcheck:
       <<: *svc-healthcheck
       test:
@@ -175,6 +174,58 @@ services:
       SLUZBA: plugin-exec-image
       APLIKACE: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-exec
       CIL: aisha/plugin-exec:v1
+    entrypoint:
+      - sh
+      - -euc
+      - |
+        KONT="$$(docker ps -q --filter label=com.docker.compose.service="$$SLUZBA" --filter label=coolify.resourceName="$$APLIKACE" | head -1)"
+        [ -n "$$KONT" ] || { echo "kontejner sluzby $$SLUZBA v $$APLIKACE nenalezen" >&2; exit 1; }
+        ID="$$(docker inspect -f '{{.Image}}' "$$KONT")"
+        [ -n "$$ID" ] || { echo "prazdne ID obrazu pro $$KONT" >&2; exit 1; }
+        docker tag "$$ID" "$$CIL"
+        docker image inspect "$$CIL" >/dev/null
+        echo "$$CIL -> $$ID"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+    healthcheck:
+      disable: true
+    networks:
+      - internal
+    labels:
+      - "coolify.managed=true"
+
+  # Proza: docs/compose-notes/docker-compose.coolify-exec.yml.md
+  agent-claude-image:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent-claude
+      labels:
+        coolify.managed: "true"
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-agent-claude-image
+    restart: unless-stopped
+    entrypoint: ["sh", "-c", "sleep infinity"]
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    networks:
+      - internal
+    labels:
+      - "coolify.managed=true"
+
+  # Proza: docs/compose-notes/docker-compose.coolify-exec.yml.md
+  agent-claude-tag:
+    image: ${IMAGE_DOCKER_CLI:?obraz docker CLI — bez něj nevznikne stabilní jméno sandboxu}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-agent-claude-tag
+    restart: "no"
+    depends_on:
+      agent-claude-image:
+        condition: service_started
+    environment:
+      SLUZBA: agent-claude-image
+      APLIKACE: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-exec
+      CIL: aisha/agent-claude:v1
     entrypoint:
       - sh
       - -euc
@@ -299,9 +350,7 @@ services:
       retries: 8
     restart: unless-stopped
     networks:
-      internal:
-        aliases:
-          - ${APP_NAME_PREFIX:?identita instance}-svc-model
+      - internal
 
   exec-mesh-ingress:
     # Mesh komponenta — bez meshe nemá co dělat. Profil "mesh" zapíná
@@ -378,6 +427,8 @@ services:
       start_period: 30s
 
 volumes:
+  agent-runs:
+    name: ${APP_NAME_PREFIX:?identita instance}_agent-runs
   pki-certs:
     name: ${APP_NAME_PREFIX:?}_exec-pki-certs
   netbird-exec-data-v3:

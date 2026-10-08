@@ -487,6 +487,16 @@ BEGIN
     FOR v_ki_item IN SELECT value FROM jsonb_array_elements(v_manifest->'knowledge_items') AS value
     LOOP
       v_slug := v_ki_item->>'slug';
+      -- Vyhrazené zdroje znalostí ('platform_knowledge', 'instance_knowledge') zapisuje JEN
+      -- seed z repozitáře. Balíček je nedůvěryhodný vstup (story-sync ho importuje i pod
+      -- service klíčem): vyhrazený typ v něm je ODMÍTNUTÍ celého importu s pojmenovanou
+      -- příčinou, ne tiché přemapování. Zasazený řádek by obsadil slug, který platforma
+      -- přidá později, a seed by při dalším nasazení selhal.
+      IF v_ki_item->'metadata'->>'source_type' = ANY (ARRAY['platform_knowledge'::text, 'instance_knowledge'::text]) THEN
+        RAISE EXCEPTION 'import_story_bundle: knowledge item "%" carries reserved source_type % (written only by the repository seed) — import refused',
+          COALESCE(v_slug, '(no slug)'), v_ki_item->'metadata'->>'source_type'
+          USING ERRCODE = '22023';
+      END IF;
       IF v_slug IS NULL OR v_slug = '' THEN
         -- Items without a slug cannot be idempotently matched — skip
         v_skipped_knowledge_items := v_skipped_knowledge_items + 1;

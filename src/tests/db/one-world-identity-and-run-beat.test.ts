@@ -38,6 +38,17 @@ SELECT set_config('request.jwt.claims', '{"sub":"${sub}","role":"authenticated"}
 }
 
 /**
+ * ⛔ Operátorské pohledy `audience_admin_*_v` běží s právy VLASTNÍKA (mimo RLS
+ * podkladu) a od 2026-10-07 (fix/pohledy-a-edge-jen-opravneni) je klientská role
+ * přímo nečte — jen služba a DEFINER blokové funkce get_audience_view_*_block se
+ * stráží is_admin_or_staff. Pohledy nemají filtr podle volajícího, takže obsah,
+ * který tu test tvrdí (registr, fronta), je pro službu stejný jako dřív pro
+ * operátora. Čtení obalí `asService`, za ním se identita operátora vrací.
+ */
+const asService = `SET LOCAL ROLE service_role;
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);`;
+
+/**
  * Takty KROKŮ vlastní dávky (`b` = story_pulse_beats). ⭐ Sondy čtou takt přes
  * krok SVÉHO běhu, ne jako „první/poslední otevřený v DB": ROLLBACK izoluje
  * zápisy, ne čtení — v souběhu (jedna sdílená throwaway DB) vidí každý příkaz,
@@ -92,6 +103,7 @@ SELECT 'noacc_bound=' || (public.twin_for_account('${NOACC}') IS NOT NULL)::text
 -- nečte (od 2026-10-04 bez grantu pro authenticated — čtou se přes DEFINER bloky).
 RESET ROLE;
 -- 6. registr nese oboje: entitu s účtem i bez něj, a nikdo nezmizel
+${asService}
 SELECT 'reg_with_account=' || count(*) AS out FROM public.audience_admin_twin_directory_v
  WHERE user_id = '${SUBJ}' AND twin_id IS NOT NULL;
 SELECT 'reg_colleague=' || count(*) AS out FROM public.audience_admin_twin_directory_v
@@ -128,6 +140,7 @@ FROM public.story_pulse_beats b WHERE b.status = 'open' AND ${FOLLOWUP_BEATS} OR
 -- (fronta jako vlastník — viz pozn. u registru výš)
 RESET ROLE;
 -- fronta ho vidí a umí ho zařadit do koše
+${asService}
 SELECT 'queue=' || q.bucket || '/' || (q.actor_user_id = '${SUBJ}')::text || '/' || q.beat_type AS out
 FROM public.audience_admin_followup_queue_v q
 WHERE q.task_id IN (SELECT b.id FROM public.story_pulse_beats b WHERE ${FOLLOWUP_BEATS})
@@ -151,7 +164,7 @@ ORDER BY se.created_at DESC LIMIT 1;
 -- fronta je prázdná, práce je hotová
 -- ⭐ NAD SVÝM SUBJEKTEM: globální počet platí jen v prázdné databázi a v souběhu
 -- (jedna sdílená throwaway DB) měří cizí práci.
-RESET ROLE;
+${asService}
 SELECT 'queue_empty=' || (count(*) = 0)::text AS out FROM public.audience_admin_followup_queue_v
  WHERE actor_user_id = '${SUBJ}';
 ${asUser(OP)}

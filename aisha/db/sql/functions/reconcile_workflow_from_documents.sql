@@ -57,7 +57,11 @@ begin
   -- Aktuální pravda dokladu z registru. `max` proto, že týž doklad může být
   -- v registru vícekrát (duplicity ze dvou generací ingestu) — a stačí, když
   -- ho JEDNA kopie hlásí jako uzavřený: uzavřenost se odvolat nedá.
-  create temporary table if not exists _pravda_dokladu on commit drop as
+  -- Dočasná tabulka se zakládá VŽDY znovu a čte se jen jako pg_temp.<jméno>.
+  -- `IF NOT EXISTS` by převzalo tabulku, kterou si volající založil v relaci
+  -- předem — s jeho řádky a spouštěmi, které by běžely právy vlastníka funkce.
+  drop table if exists pg_temp._pravda_dokladu;
+  create temporary table _pravda_dokladu on commit drop as
   select r.fields->'dn_number'->>'value' as dl,
          max(r.fields->'settled'->>'value') as settled
   from public.li_source_registry r
@@ -66,12 +70,12 @@ begin
 
   select count(*) into v_kandidatu
   from public.production_workflow_steps s
-  join _pravda_dokladu d on d.dl = s.input_data->>'dl_number'
+  join pg_temp._pravda_dokladu d on d.dl = s.input_data->>'dl_number'
   where s.status = 'pending' and d.settled = 'True';
 
   select count(*) into v_bez_udaje
   from public.production_workflow_steps s
-  left join _pravda_dokladu d on d.dl = s.input_data->>'dl_number'
+  left join pg_temp._pravda_dokladu d on d.dl = s.input_data->>'dl_number'
   where s.status = 'pending' and coalesce(d.settled, '') <> 'True'
     and coalesce(d.settled, '') <> 'False';
 
@@ -85,7 +89,7 @@ begin
                          || jsonb_build_object('uzavreno_srovnanim', true,
                                                'zdroj', 'li_source_registry.settled',
                                                'kdy', now())
-     from _pravda_dokladu d
+     from pg_temp._pravda_dokladu d
      where d.dl = s.input_data->>'dl_number'
        and s.status = 'pending'
        and d.settled = 'True';

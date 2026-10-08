@@ -26,16 +26,29 @@
  * také vlastní, musí být množina klíčů overlaye NADMNOŽINOU platformní. Hodnoty
  * se nekontrolují — ty se přepisovat MAJÍ, o to overlay jde.
  *
- * Bez `AISHA_INSTANCE_CONFIG_DIR` nemá co měřit a řekne to nahlas místo tiché
- * zelené; v CI ho `AISHA_OVERLAY_REQUIRED=1` povyšuje na povinný.
+ * Bez overlaye nemá co měřit a řekne to nahlas (NEMĚŘENO, přeskočený test) místo
+ * tiché zelené; `AISHA_OVERLAY_REQUIRED=1` povyšuje na povinný OVERLAY, ne vlastní
+ * hlášky.
+ *
+ * ⛔ OVERLAY BEZ VLASTNÍCH HLÁŠEK JE PLATNÝ TVAR (naměřeno 2026-10-03). Do té doby
+ * brána pod vynucením padala na „overlay nevlastní žádný soubor hlášek — měřila nad
+ * prázdnem": instance, která jede na výchozích textech platformy, by měla lane
+ * overlay-gates červenou. Jenže taková instance nemá co ztratit — platformní soubor
+ * zůstává celý. Řekne se to VIDITELNĚ a test se přeskočí.
+ *
+ * Že měřidlo není slepé, se proto neměří na overlayi instance, ale na vzorovém:
+ * úplná kopie platformního souboru projde, kopie se ztraceným klíčem zčervená.
+ * Vzor se staví Z PLATFORMNÍHO SOUBORU při běhu — kopie uložená v repu by zastarala
+ * s prvním novým klíčem a kotva by hlídala sama sebe.
  *
  * Spouští se přes: npm run test:gates
  */
 
 import { describe, expect, test } from "vitest";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join, relative } from "node:path";
-import { overlayDir, overlayRequired } from "../../../scripts/lib/instance-overlay.mjs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, relative } from "node:path";
+import { overlayDirOrRequired } from "../../../scripts/lib/instance-overlay.mjs";
 
 const ROOT = process.cwd();
 const PLATFORM_THEMES = join(ROOT, "keycloak", "themes");
@@ -67,48 +80,46 @@ function keysOf(file: string): Set<string> {
   return keys;
 }
 
+/**
+ * Platforma × overlay: kolik platformních souborů hlášek overlay TAKÉ vlastní a
+ * které platformní klíče v nich chybí (`soubor: klíč`).
+ */
+export function ztraceneKlice(platformFiles: string[], overlayDir: string): { porovnano: number; chybi: string[] } {
+  const chybi: string[] = [];
+  let porovnano = 0;
+  for (const pf of platformFiles) {
+    const rel = relative(ROOT, pf);
+    const of_ = join(overlayDir, rel);
+    if (!existsSync(of_)) continue; // overlay soubor nevlastní → platformní zůstává
+    porovnano++;
+    const overlayKeys = keysOf(of_);
+    for (const k of [...keysOf(pf)].filter((k) => !overlayKeys.has(k)).sort()) {
+      chybi.push(`${rel}: ${k}`);
+    }
+  }
+  return { porovnano, chybi };
+}
+
 describe("Instanční overlay nesmí ztratit platformní klíč tématu (gate)", () => {
-  test("overlay, který vlastní soubor hlášek, nese všechny platformní klíče", () => {
+  test("overlay, který vlastní soubor hlášek, nese všechny platformní klíče", (ctx) => {
     const platformFiles = platformMessageFiles();
     expect(
       platformFiles.length,
       "pod keycloak/themes nejsou žádné .properties — přesunulo se téma?",
     ).toBeGreaterThan(0);
 
-    const dir = overlayDir();
+    // Chybí-li overlay a je vynucený, vyhodí to už dveře (vada zapojení, ne stav světa).
+    const dir = overlayDirOrRequired("overlay-tema-neztrati-klice");
     if (!dir) {
-      const zprava =
-        "overlay-tema-neztrati-klice: AISHA_INSTANCE_CONFIG_DIR není nastaven — " +
-        `NEPROHLÉDNUTO ${platformFiles.length} platformních souborů hlášek. ` +
-        "Prázdná množina není čistý strom.";
-      if (overlayRequired()) throw new Error(zprava);
-      console.warn(zprava);
-      expect(true).toBe(true);
+      console.warn(
+        "[overlay-tema] bez overlaye — " +
+          `NEPROHLÉDNUTO ${platformFiles.length} platformních souborů hlášek. Prázdná množina není čistý strom.`,
+      );
+      ctx.skip();
       return;
     }
 
-    const chybi: string[] = [];
-    let porovnano = 0;
-    for (const pf of platformFiles) {
-      const rel = relative(ROOT, pf);
-      const of_ = join(dir, rel);
-      if (!existsSync(of_)) continue;   // overlay soubor nevlastní → platformní zůstává
-      porovnano++;
-      const overlayKeys = keysOf(of_);
-      for (const k of [...keysOf(pf)].filter((k) => !overlayKeys.has(k)).sort()) {
-        chybi.push(`${rel}: ${k}`);
-      }
-    }
-
-    // Overlay, který nevlastní ANI JEDEN soubor hlášek, znamená, že brána
-    // proběhla nad prázdnem — to je vada měřidla, ne důkaz pořádku.
-    if (overlayRequired()) {
-      expect(
-        porovnano,
-        "overlay je vynucený, ale nevlastní žádný soubor hlášek — brána měřila nad prázdnem",
-      ).toBeGreaterThan(0);
-    }
-
+    const { porovnano, chybi } = ztraceneKlice(platformFiles, dir);
     expect(
       chybi,
       "Instanční overlay nahrazuje soubor CELÝ, takže tyhle platformní klíče by po " +
@@ -117,5 +128,50 @@ describe("Instanční overlay nesmí ztratit platformní klíč tématu (gate)",
       "\n\nDoplň je do instančního souboru (hodnotu si instance zvolí sama), " +
       "nebo ať overlay ten soubor nevlastní.",
     ).toEqual([]);
+
+    if (porovnano === 0) {
+      console.warn(
+        "[overlay-tema] overlay nevlastní žádný soubor hlášek (instance jede na výchozích textech) — " +
+          `není co ztratit; NEMĚŘENO ${platformFiles.length} platformních souborů`,
+      );
+      ctx.skip();
+    }
+  });
+});
+
+describe("měřidlo ztracených klíčů nad vzorovým overlayem (kotva a mutace)", () => {
+  /** Vzorový overlay v dočasném adresáři souboru testů (uklízí ho setupFiles). */
+  const vzor = (uprav: (radky: string[]) => string[]) => {
+    const pf = platformMessageFiles().find((f) => keysOf(f).size >= 2);
+    expect(pf, "žádný platformní soubor hlášek s ≥ 2 klíči — vzor nemá z čeho vzniknout").toBeTruthy();
+    const dir = mkdtempSync(join(tmpdir(), "overlay-vzor-"));
+    const cil = join(dir, relative(ROOT, pf!));
+    mkdirSync(dirname(cil), { recursive: true });
+    writeFileSync(cil, uprav(readFileSync(pf!, "utf8").split("\n")).join("\n"));
+    return { dir, rel: relative(ROOT, pf!), klice: [...keysOf(pf!)] };
+  };
+
+  test("kladná kotva: overlay s úplným souborem hlášek se MĚŘÍ a nic neztrácí", () => {
+    const { dir } = vzor((r) => r);
+    expect(ztraceneKlice(platformMessageFiles(), dir)).toEqual({ porovnano: 1, chybi: [] });
+  });
+
+  test("mutace: overlay s hláškami a ztraceným klíčem je červený", () => {
+    let ztraceny = "";
+    const { dir, rel } = vzor((radky) => {
+      const i = radky.findIndex((l) => {
+        const s = l.trim();
+        return s !== "" && !s.startsWith("#") && !s.startsWith("!") && s.indexOf("=") > 0;
+      });
+      ztraceny = radky[i].slice(0, radky[i].indexOf("=")).trim();
+      return radky.filter((_, j) => j !== i);
+    });
+    expect(ztraceneKlice(platformMessageFiles(), dir)).toEqual({ porovnano: 1, chybi: [`${rel}: ${ztraceny}`] });
+  });
+
+  test("overlay bez hlášek: nic se neporovná a nic se neztrácí", () => {
+    const dir = mkdtempSync(join(tmpdir(), "overlay-vzor-"));
+    mkdirSync(join(dir, "profiles"), { recursive: true });
+    expect(ztraceneKlice(platformMessageFiles(), dir)).toEqual({ porovnano: 0, chybi: [] });
   });
 });

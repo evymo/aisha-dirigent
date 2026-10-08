@@ -66,6 +66,12 @@
       }
     ]
   },
+  "scopeMappings": [
+    {
+      "client": "aisha-mcp-client",
+      "roles": ["admin", "staff"]
+    }
+  ],
   "clients": [
     {
       "clientId": "aisha-app",
@@ -723,6 +729,69 @@
         "oauth2.device.polling.interval": "5"
       },
       "protocolMappers": [
+        {
+          "name": "realm-role-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "multivalued": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "aisha-mcp-client",
+      "name": "AISHA MCP Client",
+      "description": "Public client for MCP clients (IDE, CLI): browser login, authorization code + PKCE S256, loopback redirect only",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "authorizationServicesEnabled": false,
+      "fullScopeAllowed": false,
+      "redirectUris": [
+        "http://localhost:59876/callback",
+        "http://127.0.0.1:59876/callback"
+      ],
+      "webOrigins": [],
+      "defaultClientScopes": [
+        "openid",
+        "email",
+        "profile"
+      ],
+      "optionalClientScopes": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-mcp-server",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.custom.audience": "aisha-mcp-knowledge",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "subject-mapper",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "config": {
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        },
         {
           "name": "realm-role-mapper",
           "protocol": "openid-connect",

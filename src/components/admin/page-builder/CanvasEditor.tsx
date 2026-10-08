@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import GjsEditor, { Canvas } from "@grapesjs/react";
@@ -22,6 +22,7 @@ import { extractI18nFromCanvas } from "@/lib/builder/extractI18nFromCanvas";
 import { useGrapesJSi18n } from "@/lib/builder/useGrapesJSi18n";
 import { getPageEditorConfig } from "@/lib/builder/editorConfig";
 import { EditorSidebar } from "@/components/admin/page-builder/EditorSidebar";
+import { GalerieVEditoru } from "@/components/admin/page-builder/GalerieVEditoru";
 import { ctiLocalePlatna } from "@/lib/builder/canvasLocale";
 import { zajistiI18nKlice } from "@/lib/builder/klicePlatna";
 import { useVyskaPlatna } from "@/lib/builder/vyskaPlatna";
@@ -74,6 +75,13 @@ export interface CanvasSavePayload {
   canvasHtml: string;
   canvasCss: string;
   publish: boolean;
+  /**
+   * Uložení při ODCHODU editoru (dopsání rozběhnutého autosave při odmontování).
+   * Obal ho smí zahodit, když editor odmontovává ZÁMĚRNĚ, aby obsah nahradil
+   * (zahození konceptu, obnova verze, šablona) — jinak by odcházející plátno
+   * zahazovaný obsah zase uložilo (2026-10-02).
+   */
+  priOdchodu?: boolean;
 }
 
 export interface CanvasEditorProps {
@@ -116,11 +124,6 @@ export interface CanvasEditorProps {
   onEditorReady?: (editor: Editor) => void;
   /** Auto-save on canvas change (default true). */
   autoSave?: boolean;
-  /**
-   * Adresy už nahraných obrázků (galerie médií) — objeví se ve správci obrázků
-   * editoru, aby autor nemusel totéž nahrávat podruhé (2026-09-24).
-   */
-  existingAssets?: string[];
 }
 
 /**
@@ -148,7 +151,6 @@ export function CanvasEditor({
   onError,
   onEditorReady,
   autoSave = true,
-  existingAssets,
 }: CanvasEditorProps) {
   const { t } = useTranslation();
   const { toast } = useToast();
@@ -164,7 +166,7 @@ export function CanvasEditor({
   useGrapesJSi18n(editorRef.current);
 
   const handleSave = useCallback(
-    async (publish = false, automaticke = false) => {
+    async (publish = false, automaticke = false, priOdchodu = false) => {
       const editor = editorRef.current;
       if (!editor) return;
 
@@ -201,6 +203,7 @@ export function CanvasEditor({
           canvasHtml: html ?? "",
           canvasCss: cssKUlozeni,
           publish,
+          priOdchodu,
         });
 
         // Překlady: jen při RUČNÍM uložení a jen pod locale, ve které plátno
@@ -265,8 +268,30 @@ export function CanvasEditor({
     autoSaveTimerRef.current = setTimeout(() => void handleSave(false, true), AUTO_SAVE_DELAY_MS);
   }, [autoSave, handleSave]);
 
-  useEffect(() => () => {
-    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+  // ⛔ ODMONTOVÁNÍ NESMÍ ZAHODIT ROZBĚHNUTÝ AUTOSAVE (2026-10-01). Dřív se tu
+  // odpočet jen zrušil — navigace, odhlášení nebo cokoli, co editor odmontuje,
+  // tak zahodilo posledních až AUTO_SAVE_DELAY_MS rozepsané práce. Odpočet se
+  // vyřídí hned. useLayoutEffect: jeho úklid běží dřív, než @grapesjs/react
+  // (pasivní efekt) editor zničí, takže handleSave ještě přečte obsah plátna
+  // (čte ho synchronně před prvním await). Ref drží NEJNOVĚJŠÍ handleSave —
+  // úklid efektu bez závislostí by jinak volal ten z prvního vykreslení.
+  const handleSaveRef = useRef(handleSave);
+  useEffect(() => {
+    handleSaveRef.current = handleSave;
+  }, [handleSave]);
+  // Posluchač změn se v editoru registruje JEDNOU (onEditor), proto volá odpočet
+  // přes ref — jinak by autosave navždy ukládal stav z prvního vykreslení
+  // (např. nastavení stránky) a pozdější úpravu by vrátil.
+  const scheduleAutoSaveRef = useRef(scheduleAutoSave);
+  useEffect(() => {
+    scheduleAutoSaveRef.current = scheduleAutoSave;
+  }, [scheduleAutoSave]);
+  useLayoutEffect(() => () => {
+    const odpocet = autoSaveTimerRef.current;
+    if (!odpocet) return;
+    clearTimeout(odpocet);
+    autoSaveTimerRef.current = null;
+    void handleSaveRef.current(false, true, true);
   }, []);
 
   // Odchod ze záložky (přepnutí, zavření notebooku) nesmí čekat na prodlevu:
@@ -313,13 +338,9 @@ export function CanvasEditor({
       // uložení pozná, jestli se CSS v editoru vůbec změnilo (viz handleSave).
       cssPoNacteniRef.current = editor.getCss() ?? "";
 
-      if (existingAssets && existingAssets.length > 0) {
-        editor.AssetManager.add(existingAssets.map((src) => ({ src })));
-      }
-
-      editor.on("change:changesCount", () => scheduleAutoSave());
+      editor.on("change:changesCount", () => scheduleAutoSaveRef.current());
     },
-    [canvasData, canvasHtml, canvasCss, existingAssets, onEditorReady, scheduleAutoSave, t],
+    [canvasData, canvasHtml, canvasCss, onEditorReady, t],
   );
 
   const changeDevice = (device: "Desktop" | "Tablet" | "Mobile") => {
@@ -406,6 +427,7 @@ export function CanvasEditor({
         >
           <Canvas className="flex-1 min-w-0" />
           <EditorSidebar />
+          <GalerieVEditoru />
         </GjsEditor>
       </div>
     </div>

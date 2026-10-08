@@ -1,0 +1,15 @@
+{
+  "$komentar": "VĚDOMĚ VEŘEJNÉ AKCE SECURITY DEFINER dispečerů (p_action) — akce, kterou smí zavolat KAŽDÝ, komu funkce dává EXECUTE, a výsledek nezávisí na tom, kdo se ptá. Čte ji brána definer-dispecer-autorizuje-kazdou-akci. Každá položka je rozhodnutí s důvodem (veřejná data, žádná cizí osoba, žádný zápis). Zápisová akce sem nepatří nikdy. Položka akce, která zmizela nebo dostala stráž, se musí smazat (brána to hlídá).",
+  "funkce": {
+    "edge_app_versions": {
+      "get_platform": "Verze mobilní aplikace pro platformu (min/latest verze, údržba, odkaz do obchodu) — veřejný údaj, který aplikace potřebuje i před přihlášením; jen čtení, žádná osoba."
+    },
+    "edge_public_partners_directory": {
+      "count_visible": "Počet viditelných partnerů veřejného adresáře (partner_profiles_public, filtr is_visible) — veřejný údaj; jen čtení, žádná cizí aktivita.",
+      "get_partners": "Výpis veřejného adresáře partnerů z projekce partner_profiles_public (jen veřejné sloupce, bez kontaktů) — účel funkce; jen čtení."
+    },
+    "edge_subscriptions": {
+      "get_package_by_id": "Katalog AKTIVNÍCH balíčků předplatného (název, cena, Stripe price id) — veřejná nabídka, kterou klient zobrazuje před nákupem; jen čtení, žádná osoba."
+    }
+  }
+}

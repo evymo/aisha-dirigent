@@ -1,0 +1,78 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify-accel-embed-1.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+x-aisha-povinne-za-behu: [ACCEL_OWNER_PREFIX, ACCEL_EMBED_1_REPO, ACCEL_EMBED_1_REVIZE, ACCEL_EMBED_1_SOUBOR_VAH, ACCEL_EMBED_1_FORMAT_VAH, ACCEL_EMBED_1_SHA256, ACCEL_EMBED_1_PODIL_GPU, ACCEL_EMBED_1_MAX_MODEL_LEN, ACCEL_JADRO_API_KEY]
+services:
+  accel-embed-1:
+    image: ${IMAGE_VLLM:?pinned vLLM image (digest)}
+    container_name: ${ACCEL_OWNER_PREFIX}-accel-embed-1
+    restart: unless-stopped
+    devices: ["nvidia.com/gpu=all"]
+    shm_size: 2g
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ulimits:
+      core: 0
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        for k in ACCEL_EMBED_1_REPO ACCEL_EMBED_1_REVIZE ACCEL_EMBED_1_SOUBOR_VAH ACCEL_EMBED_1_FORMAT_VAH ACCEL_EMBED_1_SHA256 ACCEL_EMBED_1_PODIL_GPU ACCEL_EMBED_1_MAX_MODEL_LEN VLLM_API_KEY; do
+          [ -n "$$(printenv "$$k" || true)" ] || { echo "[accel-embed-1] FATAL: $$k nedeklarováno" >&2; exit 1; }
+        done
+        vahy="/vahy/$$(printf '%s' "$$ACCEL_EMBED_1_REPO" | sed 's#/#--#g')@$$ACCEL_EMBED_1_REVIZE"
+        [ -s "$$vahy/aisha-identita.json" ] || { echo "[accel-embed-1] FATAL: $$vahy bez změřené identity" >&2; exit 1; }
+        python3 - "$$vahy" <<'PREMER'
+        import hashlib, json, os, pathlib, sys
+        d = pathlib.Path(sys.argv[1])
+        e = {k: os.environ["ACCEL_EMBED_1_" + k] for k in ("REVIZE", "SOUBOR_VAH", "FORMAT_VAH", "SHA256")}
+        if json.loads((d / "aisha-identita.json").read_text()) != {"format": e["FORMAT_VAH"], "sha256": e["SHA256"], "revize": e["REVIZE"]}:
+            sys.exit("[accel-embed-1] FATAL: identita vah neodpovídá deklaraci uzlu")
+        if e["FORMAT_VAH"] == "pytorch" and any(d.glob("*.safetensors")):
+            sys.exit("[accel-embed-1] FATAL: adresář nese safetensors — vLLM by nahrál jiný artefakt, než deklarace jmenuje")
+        h = hashlib.sha256()
+        with open(d / e["SOUBOR_VAH"], "rb") as f:
+            for b in iter(lambda: f.read(1 << 20), b""): h.update(b)
+        if h.hexdigest() != e["SHA256"]:
+            sys.exit(f"[accel-embed-1] FATAL: NESHODA vah: deklarováno {e['SHA256']}, změřeno {h.hexdigest()}")
+        print(f"[accel-embed-1] váhy přeměřeny ({e['FORMAT_VAH']}:{e['SHA256']})")
+        PREMER
+        exec vllm serve "$$vahy" --runner pooling --served-model-name embed-1 --dtype float16 \
+          --max-model-len "$$ACCEL_EMBED_1_MAX_MODEL_LEN" --gpu-memory-utilization "$$ACCEL_EMBED_1_PODIL_GPU" \
+          --no-enable-prefix-caching --host 0.0.0.0 --port 8000
+    environment:
+      ACCEL_EMBED_1_REPO: ${ACCEL_EMBED_1_REPO}
+      ACCEL_EMBED_1_REVIZE: ${ACCEL_EMBED_1_REVIZE}
+      ACCEL_EMBED_1_SOUBOR_VAH: ${ACCEL_EMBED_1_SOUBOR_VAH}
+      ACCEL_EMBED_1_FORMAT_VAH: ${ACCEL_EMBED_1_FORMAT_VAH}
+      ACCEL_EMBED_1_SHA256: ${ACCEL_EMBED_1_SHA256}
+      ACCEL_EMBED_1_PODIL_GPU: ${ACCEL_EMBED_1_PODIL_GPU}
+      ACCEL_EMBED_1_MAX_MODEL_LEN: ${ACCEL_EMBED_1_MAX_MODEL_LEN}
+      VLLM_API_KEY: ${ACCEL_JADRO_API_KEY}
+      HF_HUB_OFFLINE: "1"
+    volumes:
+      - vahy:/vahy:ro
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 600s
+      retries: 3
+    networks:
+      jadro:
+        aliases:
+          - ${ACCEL_OWNER_PREFIX}-accel-embed-1
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=false"
+
+networks:
+  jadro:
+    external: true
+    name: ${ACCEL_OWNER_PREFIX}-accel-jadro
+
+volumes:
+  vahy:
+    external: true
+    name: ${ACCEL_OWNER_PREFIX}-accel-vahy

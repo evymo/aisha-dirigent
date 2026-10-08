@@ -1,6 +1,6 @@
 {
   "name": "@aisha/llm-dispatch",
-  "version": "0.2.8",
+  "version": "0.3.0",
   "license": "Elastic-2.0",
   "description": "Multi-provider LLM dispatch — the BackendRegistry + per-provider InferenceBackend implementations (OpenAI, Gemini native generateContent, Anthropic /v1/messages, vLLM/Ollama, llm-gateway, maestro). Shared so every service that resolves a backend via aisha_resolve_clow_backend dispatches to the NATIVE provider protocol with one import, instead of blindly POSTing /chat/completions.",
   "type": "module",

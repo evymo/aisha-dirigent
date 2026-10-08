@@ -93,7 +93,7 @@ INSERT INTO public.ai_provider_registry
   (slug, display_name, backend_kind, endpoint_url, auth_env_var,
    supports_tool_use, supports_vision, supports_batch, cost_class, is_enabled, notes)
 VALUES
-  ('vllm-local', 'Lokální model (svc-model, OpenAI-kompat)', 'local_vllm', NULL, NULL,
+  ('vllm-local', 'Lokální model (svc-model, OpenAI-kompat)', 'local_vllm', NULL, 'VLLM_API_KEY',
    false, true, false, 'budget', false,
    'Lokální OpenAI-kompat serving instance (svc-model, llama.cpp). Stav a adresu ODVOZUJE migrate z VLLM_GENERATION_URL (scripts/deploy/reconcile-local-model-provider.sql); bez provisionovaného svc-model zůstává vypnutý. Které modely obsluhuje, určuje discovery z živého /v1/models.')
 ON CONFLICT (slug) DO UPDATE

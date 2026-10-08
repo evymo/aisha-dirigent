@@ -26,6 +26,7 @@ import { scoreEvalRun, type RetrievedChunk } from '../lib/rag-eval-judges.js';
 import { resolveRagBackend, summarizeForAudit, type ResolvedBackend } from '../lib/capability-resolver.js';
 import { embedQueryWithBackend, resolveEmbeddingBackendForSpace, type EmbeddingBackend } from '../lib/embed-query-in-space.js';
 import { scoreRetrieval } from '../lib/rag-retrieval-metrics.js';
+import { overIdentituDotazu } from '../lib/knowledge-search-unavailable.js';
 
 /** One per-(context_profile, language) row from fn_compare_rag_embedding_models. */
 interface EmbeddingComparisonRow {
@@ -86,8 +87,17 @@ function buildAnswerUserPrompt(question: string, chunks: RetrievedChunk[]): stri
   return `Context:\n${ctx || '(no context retrieved)'}\n\nQuestion:\n${question}\n\nAnswer:`;
 }
 
+/**
+ * PRO KOHO vyhodnocení měří vyhledání. Route je služební (noční běh) a publikum hledání neposílá:
+ * měří se tedy korpus, který hledání vydá čtení BEZ IDENTITY — jen viditelnost `public`, bez `members`,
+ * bez `guild` a bez vrstvy mozku s jinou viditelností. Na instanci s neveřejným obsahem to NENÍ celý korpus;
+ * hodnota jde do odpovědi, do logu i do záznamu běhu, aby ta mez nebyla tichá.
+ */
+const RETRIEVAL_AUDIENCE = 'none:public-corpus';
+
 interface RunSummary {
   batch_id: string;
+  retrieval_audience: string;
   embedding_model: string;
   llm_model: string;
   judge_model: string;
@@ -208,6 +218,7 @@ export async function ragEvalRoutes(app: FastifyInstance): Promise<void> {
 
     const failures: Array<{ golden_slug: string; reason: string }> = [];
     let scored = 0;
+    req.log.info({ retrieval_audience: RETRIEVAL_AUDIENCE }, 'rag_eval: retrieval is measured without an audience — public corpus only');
 
     // ── Step 2: score each golden record sequentially ────────────────────
     //   Sequential not parallel: token/cost control + provider rate limits.
@@ -216,7 +227,12 @@ export async function ragEvalRoutes(app: FastifyInstance): Promise<void> {
       try {
         // 2a. Embed the question with the CANDIDATE model in its native space (honest) via the
         //     shared embed-query-in-space seam (same code path the prod search route uses).
-        const embedded = await embedQueryWithBackend(embModel, row.question);
+        // Eval sady otázek = dávka, ne interaktivní dotaz.
+        const embedded = await embedQueryWithBackend(embModel, row.question, 'davka');
+        // P2: v3 srovnává jen s vektory DEKLAROVANÉ identity vah modelu; identitu, kterou lane
+        // ohlásila k vektoru otázky, ověří služba proti deklaraci PŘED hledáním (nesouhlas = výjimka,
+        // ne skóre). Kandidát bez deklarace vah se změřit nedá — eval selže nahlas, nemíchá runtime.
+        await overIdentituDotazu(embedded);
 
         // 2b. Retrieve top-N chunks in the MATCHING vector space via mcp_search_knowledge_v3
         //     (wires in the previously-dead v3 v1/v2 dispatch). v1 ⇒ embedding vector(1024);
@@ -314,6 +330,7 @@ export async function ragEvalRoutes(app: FastifyInstance): Promise<void> {
             // Brick 1c: rank-aware retrieval metrics (the embedding-model selection signal).
             rag_space: embModel.rag_space,
             retrieval: retrievalMetrics,
+            retrieval_audience: RETRIEVAL_AUDIENCE,
           },
           p_retrieved_chunk_ids: chunks.map((c) => c.id),
           p_scores: {
@@ -348,6 +365,7 @@ export async function ragEvalRoutes(app: FastifyInstance): Promise<void> {
 
     const summary: RunSummary = {
       batch_id: batchId,
+      retrieval_audience: RETRIEVAL_AUDIENCE,
       embedding_model: embeddingModel,
       llm_model: llmModel,
       judge_model: judgeModel,

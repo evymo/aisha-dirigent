@@ -32,6 +32,7 @@ BEGIN
       3 AS relevance_score
     FROM expert_rule_subscriptions ers
     JOIN expert_rules er ON er.id = ers.rule_id AND er.status = 'published'
+      AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, v_caller_id)
     JOIN partner_profiles pp ON pp.id = er.author_partner_id
     WHERE ers.user_id = v_caller_id AND ers.is_active = true
 
@@ -51,7 +52,7 @@ BEGIN
     FROM expert_rules er
     JOIN partner_profiles pp ON pp.id = er.author_partner_id
     WHERE er.status = 'published'
-      AND er.visibility IN ('public', 'members')
+      AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, v_caller_id)
       AND er.ai_context_tags && p_context_tags
       AND NOT EXISTS (
         SELECT 1 FROM expert_rule_subscriptions ers2

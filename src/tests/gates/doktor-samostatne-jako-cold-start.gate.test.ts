@@ -33,6 +33,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, test } from "vitest";
+import { envDoktorDokoncil } from "./_env-doktor-dokoncil";
 
 const ROOT = path.resolve(__dirname, "../../..");
 const DOCTOR = path.join(ROOT, "scripts/aisha-env-doctor.mjs");
@@ -111,7 +112,9 @@ function podColdStartem(): { trezor: Map<string, string>; status: number; vystup
   const d = beh([process.execPath, DERIVE, "--shell"], prostredi());
   expect(d.status, `derive-domains --shell selhal:\n${d.vystup.slice(-800)}`).toBe(0);
   writeFileSync(topo, d.vystup.split("\n").filter((l) => /^([A-Z_][A-Z0-9_]*=|#)/.test(l)).join("\n") + "\n");
-  const skript = `set -a; . "${topo}"; . config/domains.env; . "${topo}"; set +a; exec "${process.execPath}" "${DOCTOR}"`;
+  // Cold-start (od 2026-10-05) exportuje, jaký doménový overlay si vyžádal — bez obalu
+  // žádný, tedy prázdně. Env-doktor tím pod cold-startem WEB_FQDNS ZNÁ (založí ho).
+  const skript = `set -a; . "${topo}"; . config/domains.env; . "${topo}"; set +a; export DOMAINS_OVERLAY_REQUESTED=""; exec "${process.execPath}" "${DOCTOR}"`;
   const r = beh(["bash", "--noprofile", "--norc", "-c", skript], prostredi({ ENV_FILE: soubor }));
   return { trezor: cti(soubor), ...r };
 }
@@ -132,8 +135,15 @@ describe("brána: env-doktor samostatně = pod cold-startem", () => {
     const a1 = samostatne();
     const a2 = samostatne();
     const b = podColdStartem();
-    expect(a1.status, `samostatný běh selhal:\n${a1.vystup.slice(-1200)}`).toBe(0);
+    expect(envDoktorDokoncil(a1.status), `samostatný běh selhal:\n${a1.vystup.slice(-1200)}`).toBe(true);
     expect(b.status, `běh pod cold-startem selhal:\n${b.vystup.slice(-1200)}`).toBe(0);
+    // ⭐ JEDINÝ ZÁMĚRNÝ ROZDÍL: WEB_FQDNS zakládá jen cold-start (výslovný požadavek na
+    // doménový overlay). Samostatně ho doktor NEZNÁ a nezapíše — prázdný by doktoru domén
+    // řekl „jedna značka" (revize 27d6f3f5e). Měří ho redeploy-zna-domeny-webu.
+    expect(a1.trezor.has("WEB_FQDNS"), "samostatný běh založil WEB_FQDNS bez cold-startu").toBe(false);
+    expect(b.trezor.get("WEB_FQDNS"), "pod cold-startem se WEB_FQDNS nezaložil").toBe("");
+    a1.trezor.delete("WEB_FQDNS");
+    b.trezor.delete("WEB_FQDNS");
 
     // Kontrolní vzorek — jinak by prázdný trezor prošel „bez rozdílu".
     expect(a1.trezor.size, "doktor nic nezapsal — brána by měřila nic").toBeGreaterThan(100);
@@ -155,7 +165,7 @@ describe("brána: env-doktor samostatně = pod cold-startem", () => {
 
   test("po jednom apply --report --strict nehlásí nic z TŘÍDY (nerozvinutá šablona, URL bez hostu, prázdný alias)", () => {
     const soubor = novyTrezor();
-    expect(beh([process.execPath, DOCTOR], prostredi({ ENV_FILE: soubor })).status).toBe(0);
+    expect(envDoktorDokoncil(beh([process.execPath, DOCTOR], prostredi({ ENV_FILE: soubor })).status)).toBe(true);
     const r = beh([process.execPath, DOCTOR, "--report", "--strict", "--no-external"], prostredi({ ENV_FILE: soubor }));
     // Zbylá selhání strict (JWT klíče, COOLIFY_URL…) doplňují jiné nástroje — nad
     // čistým trezorem samotný doktor strict projít nemůže a tahle brána to netvrdí.
@@ -167,7 +177,7 @@ describe("brána: env-doktor samostatně = pod cold-startem", () => {
   test("přítomný a PRÁZDNÝ alias (šablona external-secrets.required.env) se doplní z cíle", () => {
     const soubor = novyTrezor("VITE_WEB_PUSH_VAPID_PUBLIC_KEY=\n");
     const r = beh([process.execPath, DOCTOR], prostredi({ ENV_FILE: soubor }));
-    expect(r.status, r.vystup.slice(-1200)).toBe(0);
+    expect(envDoktorDokoncil(r.status), r.vystup.slice(-1200)).toBe(true);
     const t = cti(soubor);
     expect(t.get("WEB_PUSH_VAPID_PUBLIC_KEY") ?? "", "cíl aliasu se nevygeneroval").not.toBe("");
     expect(t.get("VITE_WEB_PUSH_VAPID_PUBLIC_KEY")).toBe(t.get("WEB_PUSH_VAPID_PUBLIC_KEY"));
@@ -183,7 +193,7 @@ describe("brána: env-doktor samostatně = pod cold-startem", () => {
     const r = beh([process.execPath, DOCTOR], env);
     const t = cti(soubor);
     // Apply bez --strict klíč jen nezapíše a jmenuje (stráž #1094); --strict na tom padá.
-    expect(r.status, r.vystup.slice(-1200)).toBe(0);
+    expect(envDoktorDokoncil(r.status), r.vystup.slice(-1200)).toBe(true);
     expect(r.vystup).toMatch(/NEROZVINUTÁ ŠABLONA[\s\S]*✗ OAUTH2_COOKIE_DOMAINS/);
     expect(t.has("OAUTH2_COOKIE_DOMAINS"), "doslovná hodnota se zapsala").toBe(false);
     expect(t.size, "jeden vadný klíč nesmí zablokovat zápis ostatních").toBeGreaterThan(100);
@@ -204,7 +214,7 @@ describe("brána: dom() nečte referenční derivaci", () => {
     return { ...r, trezor: cti(soubor) };
   }
   function ocekavejNeslozeno(b: ReturnType<typeof behBez>, cizi: string) {
-    expect(b.status, b.vystup.slice(-1200)).toBe(0);
+    expect(envDoktorDokoncil(b.status), b.vystup.slice(-1200)).toBe(true);
     expect(b.trezor.size, "doktor nic nezapsal — vzorek by měřil nic").toBeGreaterThan(100);
     expect(b.trezor.get("APP_DOMAIN") ?? "", "APP_DOMAIN z referenční derivace").toBe("");
     // Výchozí hodnota ani složenina se z prázdné domény nesloží — stráž je jmenuje.

@@ -11,9 +11,10 @@
  * The tool does four things, in order, and stops at the first failure:
  *   1. resolve the source tree (a revision, or the working tree through a temporary index),
  *   2. remove the paths listed in config/public-snapshot.exclude,
- *   3. CHECK the resulting tree — forbidden paths, private-key bodies, service_role tokens,
- *      Coolify API tokens, home-directory paths, public IPv4 addresses, free-mail addresses.
- *      The checks are not an allowlist of known findings: every pattern must be absent.
+ *   3. CHECK the resulting tree — forbidden paths, submodule pointers that were not rewritten,
+ *      private-key bodies, service_role tokens (payload decoded), Coolify and provider tokens,
+ *      home-directory paths, public IPv4 addresses, free-mail addresses — and report what was NOT
+ *      scanned. The checks are not an allowlist of known findings: every pattern must be absent.
  *   4. create the orphan commit and, only with --push, force-push it to <remote>/<branch>
  *      (optionally deleting every other branch on that remote first) — after checking that the
  *      remote does not keep refs a forced push cannot remove.
@@ -30,6 +31,10 @@
  * --push refuses a remote that keeps refs outside refs/heads/ (pull-request refs): a forced push cannot
  * remove them and they keep earlier history fetchable. --accept-retained-refs overrides that for a
  * PRIVATE staging repository only.
+ *
+ * --push also names every head it REPLACES. The forge keeps a replaced commit readable by its id and
+ * lists the id in the repository's activity log, so a repository is publishable only if every head it
+ * was ever given is — the tool can show the one it is about to replace, not the ones before it.
  *
  * Process documentation: docs/release/PUBLIC_PREVIEW.md
  * Tests: scripts/release/public-snapshot.test.mjs
@@ -181,33 +186,50 @@ export function buildPublishedTree(root, tree, patterns, gitlinks = {}) {
 }
 
 // ── 3. checks ───────────────────────────────────────────────────────────────
+//
+// Reviewed 2026-10-03 by the aisha-team council (d8): the first version of these checks missed 20 of
+// 21 probed shapes. The service_role rule matched no real JWT at all (copied from a gitleaks rule
+// that expects two dots AFTER the payload), key bodies were recognised only at exactly 64 characters
+// per line, an address at the end of a sentence or second in a list was not seen, and what was skipped
+// was not reported — "=0" read as "measured, nothing" where part of the tree was never measured.
+// Every check below is exercised by a test that BUILDS its input (a signed-shape token, a key body),
+// never by a hand-written string shaped after the regex.
 
 /** Paths that must never be in a public tree — by NAME, before any content is read. */
 export const FORBIDDEN_PATHS = [
   { id: "prod-users-seed", re: /(^|\/)00_prod_users[^/]*\.sql$/i },
   { id: "real-env-file", re: /(^|\/)\.env(\.[^/]*)?$/, unless: /\.example$/ },
   { id: "prod-env-backup", re: /(^|\/)\.env-prod-backup/ },
-  { id: "private-key-file", re: /\.(pem|key|p12|pfx|jks|keystore|ppk)$/i, unless: /(^|\/)config\/pki\/[^/]*-ca-bundle\.pem$|(^|\/)[^/]*\.pub\.pem$|OFL\.txt$/ },
+  { id: "private-key-file", re: /\.(pem|key|p12|pfx|jks|keystore|ppk)$|(^|\/)id_(rsa|dsa|ecdsa|ed25519)$/i, unless: /(^|\/)config\/pki\/[^/]*-ca-bundle\.pem$|(^|\/)[^/]*\.pub\.pem$|OFL\.txt$/ },
   { id: "operator-roster", re: /(^|\/)config\/operators\.json$/ },
   { id: "tenant-sentinels", re: /(^|\/)config\/tenant\.json$/ },
+  { id: "dev-code-sentinels", re: /(^|\/)config\/dev-codes\.json$/ },
 ];
 
 /** Test fixtures are fiction by definition: a path or address inside a test exercises a parser, it does not point anywhere. */
 const FIXTURE_FILE = /(^|\/)(e2e|__tests__)\/|(^|\/)src\/tests\/|\.(test|spec)\.[cm]?[jt]sx?$/;
 
+/** Lockfiles are excluded BY NAME (integrity hashes and version strings are noise), not by `*.lock`. */
+const LOCKFILE_NAMES = ["package-lock.json", "npm-shrinkwrap.json", "yarn.lock", "pnpm-lock.yaml", "bun.lock", "bun.lockb",
+  "deno.lock", "Pipfile.lock", "poetry.lock", "uv.lock", "Cargo.lock", "composer.lock", "Gemfile.lock", "go.sum"];
+const SCAN_PATHSPEC = LOCKFILE_NAMES.map((n) => `:(exclude,glob)**/${n}`);
+const isLockfile = (p) => LOCKFILE_NAMES.includes(p.split("/").pop());
+
+/** Accounts a container image or a CI runner creates — a path under them names nobody. */
+const GENERIC_ACCOUNTS = ["node", "app", "user", "users", "username", "runner", "ubuntu", "debian", "coder", "agent", "deno", "bun",
+  "pkiadm", "openxpki", "postgres", "git", "dev", "vscode", "nonroot", "appuser", "keycloak", "n8n", "nextjs", "www-data", "linuxbrew"];
+
 /** Line-oriented content patterns searched with `git grep -P` over the published tree. */
 export const CONTENT_CHECKS = [
-  { id: "service-role-jwt", pattern: "eyJyb2xlIjoic2VydmljZV9yb2xl[A-Za-z0-9_-]*\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]{20,}" },
   { id: "coolify-api-token", pattern: "(?<![A-Za-z0-9])[0-9]+\\|[A-Za-z0-9]{40,}" },
-  // Placeholder user names the repository's own `no-developer-account-codes` gate treats as fiction
-  // are still reported here when they sit OUTSIDE a test: a published runbook must not say /Users/anyone.
+  // Token shapes of the forges and providers this project talks to. A third party's token is still a token:
+  // the fork of an upstream project carried upstream's deploy token and nothing here knew its shape.
+  { id: "provider-token", pattern: "(?<![A-Za-z0-9_-])(gldt-[A-Za-z0-9_-]{20,}|glpat-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,}|AKIA[0-9A-Z]{16}|xox[baprs]-[A-Za-z0-9-]{20,}|AIza[0-9A-Za-z_-]{35}|npm_[A-Za-z0-9]{36}|sk-(proj-|ant-)?[A-Za-z0-9_-]{40,})" },
+  // Placeholder user names are still reported when they sit OUTSIDE a test: a published runbook must not say /Users/anyone.
   { id: "home-directory-path", pattern: "/Users/[A-Za-z][A-Za-z0-9._-]*/", skip: FIXTURE_FILE },
-  {
-    id: "freemail-address",
-    pattern: "[A-Za-z0-9._%+-]+@(gmail|googlemail|seznam|centrum|yahoo|hotmail|outlook|icloud|protonmail)\\.(com|cz|net)",
-    // + demo web templates, documentation examples and UI dictionaries (placeholders like your@email.com).
-    skip: new RegExp(`${FIXTURE_FILE.source}|(^|/)(domains/templates|docs)/|(^|/)i18n/`),
-  },
+  { id: "home-directory-path", pattern: `/home/(?!(?:${GENERIC_ACCOUNTS.join("|")})/)[a-z_][a-z0-9._-]*/`, skip: FIXTURE_FILE },
+  // The dot may be escaped: a personal address written inside a regular expression is the same address.
+  { id: "freemail-address", pattern: "[A-Za-z0-9._%+-]+@(gmail|googlemail|seznam|centrum|yahoo|hotmail|outlook|icloud|protonmail)\\\\?\\.(com|cz|net)", skip: FIXTURE_FILE },
 ];
 
 /**
@@ -238,11 +260,48 @@ function isFictionalIPv4(ip) {
   return ip.split(".").every((o) => Number(o) <= 12);
 }
 
-const SCAN_PATHSPEC = [":(exclude,glob)**/package-lock.json", ":(exclude,glob)**/*.lock", ":(exclude,glob)**/*.lockb"];
+/**
+ * EVERY address on a line, with boundaries that let an address end a sentence (`… 198.51.100.7.`), sit
+ * second in a list (`a,b`) or lead a host name (`a.b.c.d.nip.io`), and still reject a longer dotted
+ * number (a version or an OID such as 1.3.6.1.4.1).
+ */
+const IPV4_IN_LINE = /(?<![0-9.])((?:\d{1,3}\.){3}\d{1,3})(?![0-9])(?!\.\d)/g;
 
-export function checkPublishedTree(root, tree) {
+/**
+ * A private-key BODY: the header followed — across a newline, CRLF, YAML indentation, or the literal
+ * `\n` of a JSON string — by at least forty base64 characters. A header alone is code that parses PEM.
+ * Covers PEM at 64 and 76 columns, OpenSSH keys (70), encrypted legacy PEM with its header lines, and
+ * a service-account JSON that carries the key on one line.
+ */
+const KEY_BODY = /-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----(?:\\r|\\n|\s)*(?:[A-Za-z-]+: [^\n\\]*(?:\\r|\\n|\s)+)*[A-Za-z0-9+/=]{40,}/;
+
+/** `<tree>:<path>:<line>:<rest>` → { path, line, rest } (git grep -n over a tree object). */
+function parseGrepLine(tree, line) {
+  const s = line.startsWith(`${tree}:`) ? line.slice(tree.length + 1) : line;
+  const m = /^(.*?):(\d+):(.*)$/.exec(s);
+  return m ? { path: m[1], line: Number(m[2]), rest: m[3] } : null;
+}
+const stripTreePrefix = (tree, line) => (line.startsWith(`${tree}:`) ? line.slice(tree.length + 1) : line);
+
+/** Submodule pointers of a tree: [{ path, commit }]. */
+export function gitlinksOf(root, tree) {
+  return git(root, ["ls-tree", "-r", tree]).split("\n").filter((l) => l.startsWith("160000 "))
+    .map((l) => { const [meta, p] = l.split("\t"); return { path: p, commit: meta.split(" ")[2] }; });
+}
+
+/**
+ * Check the published tree. `publicGitlinks` lists the submodule paths whose pointer was rewritten to
+ * a public snapshot commit; any OTHER pointer still names an upstream commit nobody outside can
+ * resolve — or tempts someone to "fix" it by publishing the submodule with its history.
+ */
+export function checkPublishedTree(root, tree, { publicGitlinks = [] } = {}) {
   const findings = [];
-  const paths = git(root, ["ls-tree", "-r", "-z", "--name-only", tree]).split("\0").filter(Boolean);
+  const entries = git(root, ["ls-tree", "-r", "-l", "-z", tree]).split("\0").filter(Boolean).map((e) => {
+    const [meta, p] = e.split("\t");
+    const [mode, , , size] = meta.split(/\s+/);
+    return { path: p, mode, size: size === "-" ? 0 : Number(size) };
+  });
+  const paths = entries.map((e) => e.path);
 
   for (const p of paths) {
     for (const rule of FORBIDDEN_PATHS) {
@@ -250,42 +309,65 @@ export function checkPublishedTree(root, tree) {
     }
   }
 
-  // Private-key BODIES: header line AND a base64 body line in the same file (a header alone is code
-  // that parses PEM, a body alone is any base64 blob; both together is a key).
-  const headerFiles = new Set(gitGrep(root, ["grep", "-I", "-l", "-E", "-e", "BEGIN (RSA |EC |OPENSSH |ENCRYPTED |DSA )?PRIVATE KEY", tree, "--", ...SCAN_PATHSPEC]).split("\n").filter(Boolean).map(stripTree));
-  if (headerFiles.size) {
-    const bodyFiles = gitGrep(root, ["grep", "-I", "-l", "-E", "-e", "^[A-Za-z0-9+/=]{64}$", tree, "--", ...SCAN_PATHSPEC]).split("\n").filter(Boolean).map(stripTree);
-    for (const f of bodyFiles) if (headerFiles.has(f)) findings.push({ check: "private-key-body", path: f });
+  const rewritten = new Set(publicGitlinks);
+  for (const g of gitlinksOf(root, tree)) {
+    if (!rewritten.has(g.path)) findings.push({ check: "submodule-pointer-not-public", path: g.path, value: g.commit });
+  }
+
+  // Private-key bodies — judged on the FILE, because a body may follow its header on another line.
+  const headerFiles = gitGrep(root, ["grep", "-I", "-l", "-E", "-e", "BEGIN ([A-Z0-9]+ )*PRIVATE KEY", tree, "--", ...SCAN_PATHSPEC])
+    .split("\n").filter(Boolean).map((l) => stripTreePrefix(tree, l));
+  for (const f of headerFiles) {
+    if (KEY_BODY.test(git(root, ["show", `${tree}:${f}`]))) findings.push({ check: "private-key-body", path: f });
+  }
+
+  // service_role tokens — the role lives in the PAYLOAD (middle segment), in any position among the claims.
+  // The payload is decoded; a regex over base64 cannot see a claim that is not first.
+  const jwtHits = gitGrep(root, ["grep", "-I", "-n", "-o", "-E", "-e", "eyJ[A-Za-z0-9_-]{8,}\\.eyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{16,}", tree, "--", ...SCAN_PATHSPEC])
+    .split("\n").filter(Boolean);
+  for (const h of jwtHits) {
+    const m = parseGrepLine(tree, h);
+    if (!m) continue;
+    let payload = null;
+    try { payload = JSON.parse(Buffer.from(m.rest.split(".")[1], "base64url").toString("utf8")); } catch { /* not a JWT payload */ }
+    if (payload && payload.role === "service_role") findings.push({ check: "service-role-jwt", path: m.path, line: m.line });
   }
 
   for (const c of CONTENT_CHECKS) {
     const hits = gitGrep(root, ["grep", "-I", "-n", "-P", "-e", c.pattern, tree, "--", ...SCAN_PATHSPEC]).split("\n").filter(Boolean);
     for (const h of hits) {
-      const [file, line] = stripTree(h).split(":");
-      if (c.skip && c.skip.test(file)) continue;
-      findings.push({ check: c.id, path: file, line: Number(line) });
+      const m = parseGrepLine(tree, h);
+      if (!m || (c.skip && c.skip.test(m.path))) continue;
+      findings.push({ check: c.id, path: m.path, line: m.line });
     }
   }
 
-  const ipHits = gitGrep(root, ["grep", "-I", "-n", "-o", "-E", "-e", "(^|[^0-9.])([0-9]{1,3}\\.){3}[0-9]{1,3}([^0-9.]|$)", tree, "--", ...SCAN_PATHSPEC]).split("\n").filter(Boolean);
+  const ipHits = gitGrep(root, ["grep", "-I", "-n", "-E", "-e", "([0-9]{1,3}\\.){3}[0-9]{1,3}", tree, "--", ...SCAN_PATHSPEC]).split("\n").filter(Boolean);
   for (const h of ipHits) {
-    const m = /^(.*?):(\d+):(.*)$/.exec(stripTree(h));
+    const m = parseGrepLine(tree, h);
     if (!m) continue;
-    const ip = (m[3].match(/([0-9]{1,3}\.){3}[0-9]{1,3}/) || [""])[0];
-    const octets = ip.split(".").map(Number);
-    if (octets.length !== 4 || octets.some((o) => o > 255)) continue; // version strings like 1.2.3.400
-    if (isFictionalIPv4(ip)) continue;
-    findings.push({ check: "public-ipv4", path: m[1], line: Number(m[2]), value: ip });
+    for (const x of m.rest.matchAll(IPV4_IN_LINE)) {
+      const ip = x[1];
+      if (ip.split(".").some((o) => Number(o) > 255)) continue; // not an address
+      if (isFictionalIPv4(ip)) continue;
+      findings.push({ check: "public-ipv4", path: m.path, line: m.line, value: ip });
+    }
   }
+
+  // What was NOT measured is part of the verdict: binary files (git grep -I skips them without a word)
+  // and lockfiles. "=0" must not read as "measured, nothing" for a part of the tree nobody looked at.
+  const text = new Set(gitGrep(root, ["grep", "-I", "-l", "-e", "", tree]).split("\n").filter(Boolean).map((l) => stripTreePrefix(tree, l)));
+  const blobs = entries.filter((e) => e.mode !== "160000");
+  const unscanned = {
+    binary: blobs.filter((e) => e.size > 0 && !text.has(e.path)).length,
+    lockfiles: blobs.filter((e) => isLockfile(e.path)).length,
+  };
 
   const summary = {};
-  for (const id of [...FORBIDDEN_PATHS.map((r) => r.id), "private-key-body", ...CONTENT_CHECKS.map((c) => c.id), "public-ipv4"]) summary[id] = 0;
+  for (const id of [...new Set(FORBIDDEN_PATHS.map((r) => r.id)), "submodule-pointer-not-public", "private-key-body", "service-role-jwt",
+    ...new Set(CONTENT_CHECKS.map((c) => c.id)), "public-ipv4"]) summary[id] = 0;
   for (const f of findings) summary[f.check] = (summary[f.check] ?? 0) + 1;
-  return { ok: findings.length === 0, findings, summary, fileCount: paths.length };
-
-  function stripTree(line) {
-    return line.startsWith(`${tree}:`) ? line.slice(tree.length + 1) : line;
-  }
+  return { ok: findings.length === 0, findings, summary, fileCount: paths.length, unscanned };
 }
 
 // ── 4. commit + push ────────────────────────────────────────────────────────
@@ -301,6 +383,7 @@ export function composeMessage({ label, source, published, checks, trailers }) {
     `Excluded from the snapshot: ${published.excluded.length ? published.excluded.join(", ") : "(none)"}`,
     ...(published.gitlinks?.length ? [`Submodule pointers rewritten to public snapshots: ${published.gitlinks.map((g) => `${g.path} ${g.from.slice(0, 12)} -> ${g.to}`).join(", ")}`] : []),
     `Checks: ${Object.entries(checks.summary).map(([k, v]) => `${k}=${v}`).join(" ")}`,
+    `Not scanned: ${checks.unscanned.binary} binary file(s), ${checks.unscanned.lockfiles} lockfile(s)`,
   ];
   if (trailers.length) lines.push("", ...trailers);
   return lines.join("\n") + "\n";
@@ -333,6 +416,23 @@ export function retainedRefs(root, remote) {
 }
 
 /**
+ * Heads a push REPLACES — and the forge keeps. A forced update removes the ref, not the commit: measured
+ * 2026-10-04 on the staging repository, the first upload of a preview still answered the forge's commit
+ * API by its id after `main` had been force-pushed twice, and the repository's activity log lists that
+ * id for every reader. So a repository may become public only if EVERY head it was ever given may. The
+ * tool sees the head it is about to replace (and the branches it is about to delete); it cannot see the
+ * heads before them — that is why staging and the public repository are two repositories.
+ */
+export function replacedHeads(root, remote, { branch = "main", pruneRemoteBranches = false } = {}) {
+  return git(root, ["ls-remote", "--heads", remote])
+    .split("\n")
+    .filter(Boolean)
+    .map((l) => l.split("\t"))
+    .map(([commit, ref]) => ({ commit, branch: ref.replace(/^refs\/heads\//, "") }))
+    .filter((h) => h.branch === branch || pruneRemoteBranches);
+}
+
+/**
  * `git push` with its output STREAMED to the caller. A push runs the repository's pre-push hook, and the
  * hook's output is the only place that says why a push was refused; captured output is dropped together
  * with the exception (measured 2026-10-03: 34 minutes of suite, then one line "failed to push some refs").
@@ -362,9 +462,9 @@ export function snapshot(root, opts) {
   const excludeFile = path.join(root, opts.excludeFile ?? DEFAULT_EXCLUDE_FILE);
   const patterns = existsSync(excludeFile) ? parseExcludes(readFileSync(excludeFile, "utf8")) : [];
   const published = buildPublishedTree(root, source.tree, patterns, opts.gitlinks ?? {});
-  const checks = checkPublishedTree(root, published.tree);
+  const checks = checkPublishedTree(root, published.tree, { publicGitlinks: published.gitlinks.map((g) => g.path) });
   const message = composeMessage({ label: opts.label ?? "public snapshot", source, published, checks, trailers: opts.trailers ?? [] });
-  const result = { source, published, checks, message, commit: null, pushed: null, retained: [], refused: null };
+  const result = { source, published, checks, message, commit: null, pushed: null, retained: [], replaced: [], refused: null };
   if (!checks.ok) return result;
   // Before the dry-run return: a plan that says "would push" to a remote the real run refuses is a lie.
   if (opts.push) {
@@ -373,6 +473,7 @@ export function snapshot(root, opts) {
       result.refused = `remote '${opts.push}' keeps ${result.retained.length} ref(s) outside refs/heads/ (e.g. ${result.retained[0]}) that a forced push cannot remove`;
       return result;
     }
+    result.replaced = replacedHeads(root, opts.push, { branch: opts.branch ?? "main", pruneRemoteBranches: !!opts.pruneRemoteBranches });
   }
   if (opts.dryRun) return result;
   result.commit = createOrphanCommit(root, published.tree, message);
@@ -429,6 +530,7 @@ function main() {
   console.log(`excluded ${r.published.excluded.length ? r.published.excluded.join(", ") : "(none)"}`);
   for (const g of r.published.gitlinks ?? []) console.log(`gitlink  ${g.path} ${g.from.slice(0, 12)} -> ${g.to}`);
   console.log(`checks   ${Object.entries(r.checks.summary).map(([k, v]) => `${k}=${v}`).join(" ")}`);
+  console.log(`unscanned ${r.checks.unscanned.binary} binary file(s), ${r.checks.unscanned.lockfiles} lockfile(s) — not measured`);
   if (!r.checks.ok) {
     for (const f of r.checks.findings.slice(0, 50)) console.error(`  ✗ ${f.check}: ${f.path}${f.line ? `:${f.line}` : ""}${f.value ? ` (${f.value})` : ""}`);
     if (r.checks.findings.length > 50) console.error(`  … ${r.checks.findings.length - 50} more`);
@@ -442,6 +544,7 @@ function main() {
     console.error("  recreate it, or ask the forge to purge them). For a PRIVATE staging push add --accept-retained-refs.");
     return 3;
   }
+  for (const h of r.replaced) console.log(`WARNING  replaces ${h.branch} ${h.commit} — the forge keeps that commit readable by its id; this repository may become public only if that head may`);
   if (opts.dryRun) {
     console.log("dry-run  no commit created, nothing pushed");
     return 0;

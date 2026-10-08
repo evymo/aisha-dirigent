@@ -3,6 +3,13 @@
 -- Step:  Step 7.3 (Hippocampus explainability panel)
 -- Used by: src/hooks/useRunGraphContext.ts → src/components/chat/ExplainabilityPanel.tsx
 -- Migration: aisha/db/migrations/20260520050000_run_graph_context.sql
+-- Viditelnost (2026-10-05): výchozí uzel z GLOBÁLNÍ položky jen s viditelností, kterou volajícímu dává
+-- jeden domov (public.knowledge_visibility_searchable); správa vidí vše. Do 2026-10-05 se viditelnost
+-- nečetla — štítek uzlu (název) soukromé položky citované během dostal kdokoli, kdo id běhu znal.
+-- Výchozí uzel z položky PŘÍBĚHU běhu jen podle pravidel příběhu (vlastník, účastník, správa); ve výchozím
+-- příběhu instance navíc podle domova viditelnosti (do 2026-10-05 bez viditelnosti — revize, B2).
+-- Přístup k BĚHU (níž) výchozí příběh dál otevírá každému: běh je sdílený, jeho položky ne.
+-- Cílové uzly grafu hlídá fn_graph_multihop (izolace grafu je samostatná práce — tady jen výchozí uzly).
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION public.fn_get_run_graph_context(
@@ -24,7 +31,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 STABLE
 AS $$
 DECLARE
@@ -33,6 +40,12 @@ DECLARE
   v_profile_slug  text;
   v_eff_depth     integer;
   v_eff_per_seed  integer;
+  -- viditelnost globálních položek pro volajícího (bez identity jen `public`)
+  v_in_guild      boolean := public.knowledge_audience_in_guild(auth.uid());
+  v_is_admin      boolean := COALESCE(public.is_admin_or_staff(auth.uid()), false);
+  -- smí volající položky příběhu běhu (vlastník, účastník) a je to výchozí příběh instance
+  v_pribeh_plny   boolean := false;
+  v_pribeh_vychozi boolean := false;
 BEGIN
   IF auth.uid() IS NULL AND current_setting('role', true) != 'service_role' THEN
     RAISE EXCEPTION 'Not authenticated' USING ERRCODE = '22023';
@@ -71,6 +84,15 @@ BEGIN
     END IF;
   END IF;
 
+  SELECT (ps.user_id = auth.uid())
+           OR EXISTS (SELECT 1 FROM public.story_participants sp WHERE sp.story_id = ps.id AND sp.user_id = auth.uid()),
+         ps.is_stack_default
+    INTO v_pribeh_plny, v_pribeh_vychozi
+    FROM public.partner_stories ps
+   WHERE ps.id = v_story_id;
+  v_pribeh_plny := COALESCE(v_pribeh_plny, false);
+  v_pribeh_vychozi := COALESCE(v_pribeh_vychozi, false);
+
   SELECT COALESCE(p_depth,    cp.graph_depth,    2),
          COALESCE(p_per_seed, cp.graph_per_seed, 10)
     INTO v_eff_depth, v_eff_per_seed
@@ -96,6 +118,17 @@ BEGIN
         ON gn.source_table = 'knowledge_items'
        AND gn.source_id = ki.id
      WHERE kc.id = ANY(v_chunk_ids)
+       -- Výchozí uzel jen od položky, kterou smí vydat i citace běhu: aktivní, v čitelném stavu,
+       -- globální nebo z příběhu běhu (štítek uzlu nese název položky).
+       AND ki.status = 'active'
+       AND public.knowledge_state_readable(ki.quarantine_status)
+       AND (
+         (ki.story_id IS NULL
+          AND (v_is_admin OR public.knowledge_visibility_searchable(ki.visibility, auth.uid() IS NOT NULL, v_in_guild)))
+         OR (ki.story_id = v_story_id
+             AND (v_is_admin OR v_pribeh_plny
+                  OR (v_pribeh_vychozi AND public.knowledge_visibility_searchable(ki.visibility, auth.uid() IS NOT NULL, v_in_guild))))
+       )
      ORDER BY gn.id,
               (gn.story_id IS NOT DISTINCT FROM v_story_id) DESC,
               gn.created_at ASC
@@ -112,11 +145,15 @@ BEGIN
       ) h
      WHERE h.depth > 0
   )
-  SELECT seed_id, seed_type, seed_label,
-         target_id, target_type, target_label,
-         hops.depth, cumulative_confidence, last_relationship, path
+  -- Sloupce VŽDY s aliasem: seed_label, target_label, depth, cumulative_confidence, last_relationship
+  -- a path jsou zároveň výstupní parametry (RETURNS TABLE) a bez kvalifikace je PL/pgSQL odmítne
+  -- jako nejednoznačná (42702). Do 2026-10-04 byl kvalifikovaný jen `hops.depth` — funkce tak
+  -- spadla pokaždé, když běh nějaké citace měl (bez citací se vrací dřív).
+  SELECT hops.seed_id, hops.seed_type, hops.seed_label,
+         hops.target_id, hops.target_type, hops.target_label,
+         hops.depth, hops.cumulative_confidence, hops.last_relationship, hops.path
     FROM hops
-   ORDER BY cumulative_confidence DESC NULLS LAST, hops.depth ASC, target_label ASC;
+   ORDER BY hops.cumulative_confidence DESC NULLS LAST, hops.depth ASC, hops.target_label ASC;
 END;
 $$;
 

@@ -11,6 +11,9 @@
 --            20260405133819 (Phase E: query-based rule relevance filtering),
 --            20260603002713 (Step 7.3: graph_context retrieval layer — seeds from
 --                            kb_retrieval, walks fn_graph_multihop; enabled on RAG profiles)
+-- Přístup (2026-10-06): p_run_id jen s přístupem žadatele k běhu (fn_user_can_read_run) — vrstva
+--            `memory` dřív četla trace libovolného běhu; vrstva project_context jen s příběhem.
+--            Měří src/tests/db/pribeh-a-beh-cteni-podle-id.runtime.test.ts.
 
 -- Drop the legacy 5-arg signature so the requester-scoped 6-arg version below is
 -- the ONLY overload. Without this, an upgrade-in-place would leave both — and a
@@ -29,7 +32,7 @@ CREATE OR REPLACE FUNCTION public.compose_context(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public', 'extensions'
+SET search_path TO 'pg_catalog', 'public', 'extensions', 'pg_temp'
 AS $function$
 DECLARE
   v_profile RECORD;
@@ -46,6 +49,7 @@ DECLARE
   v_layer text;
   v_user_id uuid;
   v_requester uuid;
+  v_run_readable boolean := false;
   -- Phase A: project scoping variables
   v_story_domain text[];
   v_story_tech_stack text[];
@@ -67,8 +71,17 @@ BEGIN
   -- p_requester_id. Unlike a permissive `p_requester_id IS NOT NULL` skip, a NULL identity on
   -- a story-scoped call is REFUSED — a genuine background job passes an explicit system
   -- principal as p_requester_id rather than relying on a silent service-role bypass.
+  --
+  -- PRO KOHO se skládá (vzor hledání v2/v3, 2026-10-05): jmenovat žadatele (p_requester_id) smí jen
+  -- služba; přihlášený volající je připnutý na sebe. Do 2026-10-05 tu stálo COALESCE(p_requester_id,
+  -- auth.uid()) i pro přihlášeného — předáním cizího p_requester_id (třeba správce) prošel kontrolou
+  -- příběhu za někoho jiného. Žadatel se počítá i BEZ příběhu: podle něj se měří viditelnost znalostí
+  -- ve vrstvách kb_retrieval, governance_context a psyche_context (bez žadatele jen `public`).
+  v_requester := CASE
+    WHEN public.get_jwt_role() = 'service_role' THEN COALESCE(p_requester_id, auth.uid())
+    ELSE auth.uid()
+  END;
   IF p_story_id IS NOT NULL THEN
-    v_requester := COALESCE(p_requester_id, auth.uid());
     IF v_requester IS NULL THEN
       RAISE EXCEPTION 'compose_context: p_requester_id required for a story-scoped composition'
         USING ERRCODE = '42501';
@@ -79,6 +92,25 @@ BEGIN
       OR EXISTS (SELECT 1 FROM public.story_participants sp WHERE sp.story_id = p_story_id AND sp.user_id = v_requester)
     ) THEN
       RAISE EXCEPTION 'Access denied to story %', p_story_id USING ERRCODE = '42501';
+    END IF;
+  END IF;
+
+  -- ── BĚH: p_run_id jen s přístupem k běhu (2026-10-06) ──────────────────────────
+  -- ⛔ Naměřeno 2026-10-05 (revize nad mainem 8b7637acc): vrstva `memory` četla ai_trace_events
+  -- LIBOVOLNÉHO p_run_id bez kontroly běhu — kdokoli přihlášený dostal události cizího běhu
+  -- (typ, stav, operace, agent) a skládání mu navíc zapsalo context_compose do trace cizího běhu.
+  -- Kdo smí běh číst, má jeden domov: public.fn_user_can_read_run (správa, vlastník a účastník
+  -- příběhu běhu, výchozí příběh instance). Ptá se ZA žadatele: přihlášený = on sám, služba za
+  -- toho, koho jmenuje. Služba bez žadatele je strojová lane a smí vše. Kontrola běží po kontrole
+  -- příběhu (ta má vlastní chybu pro službu bez žadatele) a PŘED vrstvami i zápisem do trace.
+  IF p_run_id IS NOT NULL THEN
+    IF v_requester IS NULL THEN
+      v_run_readable := public.is_service_role();
+    ELSE
+      v_run_readable := COALESCE(public.fn_user_can_read_run(v_requester, p_run_id), false);
+    END IF;
+    IF NOT v_run_readable THEN
+      RAISE EXCEPTION 'Access denied to run %', p_run_id USING ERRCODE = '42501';
     END IF;
   END IF;
 
@@ -117,8 +149,10 @@ BEGIN
 
     CASE v_layer
       WHEN 'project_context' THEN
-        IF (v_profile.layers->'project_context'->>'enabled')::boolean THEN
-          SELECT mcp_get_story_context(p_story_id) INTO v_project_ctx;
+        -- Jen s příběhem (jako project_preview): mcp_get_story_context bez přístupu k příběhu odmítá
+        -- (42501) a skládání bez příběhu do svazku dřív vkládalo jen {"error": "Story not found"}.
+        IF (v_profile.layers->'project_context'->>'enabled')::boolean AND p_story_id IS NOT NULL THEN
+          SELECT public.mcp_get_story_context(p_story_id) INTO v_project_ctx;
           v_bundle := v_bundle || jsonb_build_object('project_context', v_project_ctx);
           v_tokens_used := v_tokens_used + 500;
         END IF;
@@ -203,6 +237,8 @@ BEGIN
                 FROM expert_rules er
                 WHERE er.id = ANY(sr.rule_ids)
                   AND er.status = 'published'
+                  -- viditelnost pravidel pro žadatele (bez žadatele jen `public`)
+                  AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, v_requester)
                 ORDER BY relevance_score DESC, er.slug
                 LIMIT COALESCE((v_profile.layers->'ruleset'->>'max_rules')::int, 20)
               ) scored
@@ -247,7 +283,7 @@ BEGIN
               ))
               FROM (
                 SELECT jsonb_array_elements(
-                  mcp_search_knowledge_v2(
+                  public.mcp_search_knowledge_v2(
                     p_query_embedding := NULL,  -- No embedding in compose_context (text-only search)
                     p_query_text := p_query,
                     p_context_tags := v_project_tags,
@@ -330,7 +366,8 @@ BEGIN
         -- TAO: governance_context — philosophical foundation, risk/escalation decisions
         IF v_layer = 'governance_context' THEN
           SELECT jsonb_build_object(
-            'tao_principles', fn_get_tao_principles()
+            -- viditelnost zásad pro žadatele (bez žadatele jen `public`)
+            'tao_principles', public.fn_get_tao_principles(p_audience_user_id := v_requester)
           ) INTO v_governance_ctx;
 
           IF v_governance_ctx IS NOT NULL AND
@@ -345,7 +382,8 @@ BEGIN
         -- Unconditional: personality shapes EVERY response, not just governance.
         IF v_layer = 'psyche_context' THEN
           SELECT jsonb_build_object(
-            'psyche_traits', fn_get_psyche_traits()
+            -- viditelnost rysů pro žadatele (bez žadatele jen `public`)
+            'psyche_traits', public.fn_get_psyche_traits(p_audience_user_id := v_requester)
           ) INTO v_psyche_ctx;
 
           IF v_psyche_ctx IS NOT NULL AND
@@ -378,13 +416,15 @@ BEGIN
                 JOIN knowledge_chunks kc ON kc.id = ke.chunk_id
                 JOIN knowledge_items ki ON ki.id = kc.knowledge_item_id
                 WHERE lower(kc.chunk_text) LIKE '%' || lower(p_query) || '%'
+                  -- Náhradní embedding dotazu jen z úryvku položky v čitelném stavu.
+                  AND public.knowledge_state_readable(ki.quarantine_status)
                 LIMIT 1;
               EXCEPTION WHEN OTHERS THEN
                 v_query_embedding := NULL;
               END;
 
               IF v_query_embedding IS NOT NULL THEN
-                v_learnings_ctx := fn_search_learnings(
+                v_learnings_ctx := public.fn_search_learnings(
                   p_query_embedding := v_query_embedding,
                   p_story_id := p_story_id,
                   p_agent_slug := COALESCE(p_agent_slug, 'aisha'),
@@ -501,6 +541,6 @@ END;
 $function$;
 
 -- Permissions
-REVOKE ALL ON FUNCTION public.compose_context(uuid, text, uuid, text, text, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.compose_context(uuid, text, uuid, text, text, uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.compose_context(uuid, text, uuid, text, text, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.compose_context(uuid, text, uuid, text, text, uuid) TO service_role;

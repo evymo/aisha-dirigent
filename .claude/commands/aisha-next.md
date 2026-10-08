@@ -1,34 +1,40 @@
 # AISHA Next Step
 
-Suggest what to do next based on current project context.
+Pick the next piece of work from AISHA and report back when it is done. Your work comes from the
+workflow engine, not from guessing: every tool below runs under YOUR identity (the MCP login of
+this IDE) and only shows or changes what you are allowed to.
 
 ## Arguments: $ARGUMENTS
 
 ## Instructions
 
-1. **Gather context**:
-   - Read `.aisha/story.json` for active story/project context
-   - Run `git branch --show-current` and `git status --short`
-   - Run `git log --oneline -5` for recent commits
-   - Check for uncommitted changes
+1. **Pull your work** — call the MCP tool `my_next_steps` (server `aisha-knowledge`).
+   - Default: open steps of the last 30 days. Pass `status` / `days` / `include_closed` only when
+     `$ARGUMENTS` asks for it.
+   - If the tool returns `error: "unauthenticated"` or the server needs a login, tell the user to
+     run `/mcp` and log in to `aisha-knowledge`. Do not work around the login.
 
-2. **Consult MCP KB**: Use `suggest_next_step` tool with:
-   - Current branch name
-   - Recent commit messages
-   - Story ID (if available)
-   - Any additional context from `$ARGUMENTS`
+2. **Load the story** — read `.aisha/story.json` for the active story id. Call `get_story_context`
+   with that `story_id` (the stack default story works too). Use its entries as the context of
+   the step: decisions, blockers, what others already reported.
 
-3. **Analyze state**:
-   - Are there uncommitted changes that need tests?
-   - Are there failing tests? (`npm run test:run` exit code)
-   - Is the build passing? (`npm run build` exit code)
-   - Are migrations registered? (`npm run db:status:local`)
+3. **Choose one step** and say which one and why (assigned to you, oldest, blocks others). If
+   `my_next_steps` is empty, say so and suggest asking the story owner for work — do not invent
+   a task.
 
-4. **Suggest priority actions**:
-   - If tests failing → fix tests first
-   - If build failing → fix build
-   - If unregistered migrations → register
-   - If clean state → suggest next feature/fix from story context
-   - If no story → suggest setting one via `/aisha-story`
+4. **Do the step** in this repository the usual way (branch, tests, gates).
 
-5. **Report**: Ordered list of recommended next actions with rationale.
+5. **Report back** — both, in this order:
+   - `report_progress` with a short `content` of what was done (`kind: "status_update"`), or
+     `kind: "blocker"` when you are stuck, `"milestone"` when a deliverable is done,
+     `"architecture_decision"` for a decision others must know. It writes into the story from
+     `.aisha/story.json` (pass `story_id`) or the story bound to your token.
+   - `complete_step` with the `step_id`, a one-line `notes` and, if useful, `output_data`
+     (e.g. `{ "branch": "...", "commit": "..." }`). Use `has_deviation: true` when the step was
+     done differently than planned and say how in `notes`.
+   Read the result: `complete_step` returns `{ ok, error? }`; `ok: false` means the step is not
+   yours or not open — report that to the user instead of retrying.
+
+6. **Errors** come as `{ error: <code>, incident }` (`forbidden`, `not_found`, `invalid_input`,
+   `unauthenticated`, `failed`). Give the user the code and the incident id; the details are in the
+   service log under that incident.

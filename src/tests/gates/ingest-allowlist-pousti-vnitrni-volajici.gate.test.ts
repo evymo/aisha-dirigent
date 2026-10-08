@@ -38,6 +38,7 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RESOLVER_ENV_INPUTS } from "../../../scripts/lib/derive-domains.mjs";
+import { envDoktorDokoncil } from "./_env-doktor-dokoncil";
 
 const ROOT = process.cwd();
 const ENV = join(ROOT, ".env.coolify");
@@ -136,7 +137,7 @@ describe("Host allowlist ingestu pouští vnitřního volajícího", () => {
 
     test("stará hodnota bez vnitřního jména → doktor ho doplní", () => {
       const { r, hodnota } = doktor("testfork");
-      expect(r.status, r.stderr.slice(-600)).toBe(0);
+      expect(envDoktorDokoncil(r.status), r.stderr.slice(-600)).toBe(true);
       const chybi = povinneVnitrni("testfork").filter((h) => !polozky(hodnota ?? "").has(h));
       expect(
         chybi,
@@ -148,7 +149,7 @@ describe("Host allowlist ingestu pouští vnitřního volajícího", () => {
 
     test("bez identity se hodnota NEPŘEPÍŠE (`-svc-local-ingest` by byla horší než stará)", () => {
       const { r, hodnota } = doktor(null);
-      expect(r.status, r.stderr.slice(-600)).toBe(0);
+      expect(envDoktorDokoncil(r.status), r.stderr.slice(-600)).toBe(true);
       expect(hodnota).toBe("ingest-disabled.invalid");
     });
   });

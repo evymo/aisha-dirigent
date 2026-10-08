@@ -21,7 +21,14 @@ export default defineConfig({
     // o úroveň výš a setup se hledá v cizím stromě — celá sada pak padá na
     // „Cannot find module …/src/test/setup.ts". Aliasy níž už __dirname
     // používají; tohle byla jediná relativní cesta v konfiguraci.
-    setupFiles: [path.resolve(__dirname, "./src/test/setup.ts")],
+    // Kořen dočasných adresářů běhu: smaže i adresáře souborů, kde neproběhl afterAll
+    // (všechny testy přeskočené). Viz src/test/docasny-adresar-behu.ts.
+    globalSetup: [path.resolve(__dirname, "./src/test/docasny-adresar-behu.ts")],
+    // Úklid dočasných adresářů je PRVNÍ: i setup.ts pak píše do adresáře souboru.
+    setupFiles: [
+      path.resolve(__dirname, "./src/test/docasny-adresar-souboru.ts"),
+      path.resolve(__dirname, "./src/test/setup.ts"),
+    ],
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
     exclude: [
       "src/tests/gates/**/*.gate.test.ts",

@@ -256,8 +256,18 @@ export const authRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
    * create_mcp_token sees auth.uid() = the caller and its least-privilege self-service gate applies
    * (story-access checked, caps enforced, no identity/scope escalation).
    *
-   * Body: { story_id (required), scope?, expires_in_days?, rate_limit_rpm?, rate_limit_daily? }
-   * → 200 { token_id, raw_token, scope, scoped_to_story_id, expires_at, warning }
+   * Body: { story_id (required), scope?, expires_in_days?, rate_limit_rpm?, rate_limit_daily?, allowed_tools? }
+   * → 200 { token_id, raw_token, scope, scoped_to_story_id, expires_at, warning, mcp_warning? }
+   *
+   * ⛔ NAMĚŘENO 2026-10-03 (mapa mezer, nález G21): trasa seznam nástrojů do create_mcp_token
+   * neposílala, takže samoobslužně vydaný token měl `allowed_tools` prázdné — a koncový bod
+   * MCP (svc-mcp-knowledge `/mcp`) token bez seznamu odmítá 403. Funkční token pro klienta MCP
+   * šel vyrobit jen přímým voláním RPC.
+   *
+   * `allowed_tools` (nepovinné) = nástroje MCP, které token smí volat. Je to AUTORIZACE vlastníka
+   * tokenu, ne zvýšení práv: role tokenu zůstává `authenticated` (určuje ji `/mcp`, ne tahle
+   * trasa), takže nástroj pro správce nezpřístupní ani jeho jméno v seznamu.
+   * Token bez seznamu vzniknout smí — slouží Omni /v1 — ale odpověď to řekne v `mcp_warning`.
    */
   app.post('/pats', async (req: FastifyRequest, reply: FastifyReply) => {
     const translated = await translateAuthorizationForPostgrest(req.headers.authorization);
@@ -270,9 +280,14 @@ export const authRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
 
     const body = (req.body ?? {}) as {
       story_id?: string; scope?: string; expires_in_days?: number; rate_limit_rpm?: number; rate_limit_daily?: number;
+      allowed_tools?: unknown;
     };
     if (!body.story_id) {
       return reply.status(400).send({ error: 'invalid_request', message: 'story_id is required — self-service tokens are story-scoped (§8.5)' });
+    }
+    const nastroje = overSeznamNastroju(body.allowed_tools);
+    if (!nastroje.ok) {
+      return reply.status(400).send({ error: 'invalid_request', message: nastroje.duvod });
     }
 
     const rpcRes = await fetch(`${config.postgrestUrl}/rpc/create_mcp_token`, {
@@ -284,6 +299,8 @@ export const authRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
         p_expires_in_days: body.expires_in_days ?? 90,
         p_rate_limit_rpm: body.rate_limit_rpm ?? 60,
         p_rate_limit_daily: body.rate_limit_daily ?? 1000,
+        // Bez seznamu se parametr neposílá vůbec — platí výchozí hodnota funkce (prázdné pole).
+        ...(nastroje.seznam.length > 0 ? { p_allowed_tools: nastroje.seznam } : {}),
       }),
       signal: AbortSignal.timeout(15000),
     }).catch((err: unknown) => {
@@ -298,7 +315,14 @@ export const authRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     if (!rpcRes.ok) {
       return reply.status(rpcRes.status).send(data ?? { error: 'mint_failed' });
     }
-    return reply.send(data);
+    if (nastroje.seznam.length > 0) return reply.send(data);
+    if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+      // create_mcp_token vrací objekt; jiný tvar by upozornění neměl kam nést. Token už vznikl,
+      // takže odpověď se předá beze změny — ale ne potichu.
+      req.log.warn('PAT bez seznamu nástrojů: odpověď create_mcp_token není objekt, upozornění mcp_warning nešlo připojit');
+      return reply.send(data);
+    }
+    return reply.send({ ...data, mcp_warning: UPOZORNENI_TOKEN_BEZ_NASTROJU });
   });
 
   /**
@@ -347,6 +371,48 @@ export const authRoutes: FastifyPluginAsync = async (app: FastifyInstance) => {
     return reply.send({ revoked: true });
   });
 };
+
+/** Jméno nástroje MCP: začíná písmenem, dál písmena, číslice, `_`, `-`, `.`; nejvýš 64 znaků. */
+const VZOR_JMENA_NASTROJE = /^[A-Za-z][A-Za-z0-9_.-]{0,63}$/;
+
+/** Strop počtu nástrojů v jednom tokenu — seznam je výčet, ne skladiště. */
+const NEJVYSE_NASTROJU_V_TOKENU = 64;
+
+const UPOZORNENI_TOKEN_BEZ_NASTROJU =
+  'Token nemá seznam povolených nástrojů (allowed_tools). Koncový bod MCP (/functions/v1/mcp-knowledge-server) ' +
+  'takový token odmítne s 403. Pro klienta MCP vydej token s polem allowed_tools.';
+
+type SeznamNastroju = { ok: true; seznam: string[] } | { ok: false; duvod: string };
+
+/**
+ * Ověří `allowed_tools` z těla požadavku. Chybějící pole a prázdné pole znamenají totéž:
+ * token bez seznamu. Cokoli jiného musí být pole jmen nástrojů — neplatný tvar se ODMÍTNE
+ * s důvodem. Tiché zahození by vydalo token bez seznamu, který `/mcp` odmítne, a volající
+ * by se nedozvěděl proč.
+ */
+export function overSeznamNastroju(hodnota: unknown): SeznamNastroju {
+  if (hodnota === undefined) return { ok: true, seznam: [] };
+  if (!Array.isArray(hodnota)) {
+    return { ok: false, duvod: 'allowed_tools musí být pole jmen nástrojů (řetězců)' };
+  }
+  if (hodnota.length > NEJVYSE_NASTROJU_V_TOKENU) {
+    return { ok: false, duvod: `allowed_tools smí mít nejvýše ${NEJVYSE_NASTROJU_V_TOKENU} položek, přišlo ${hodnota.length}` };
+  }
+  const seznam: string[] = [];
+  for (const [poradi, polozka] of hodnota.entries()) {
+    if (typeof polozka !== 'string' || !VZOR_JMENA_NASTROJE.test(polozka)) {
+      return {
+        ok: false,
+        duvod: `allowed_tools[${poradi}] není jméno nástroje — čeká se neprázdný řetězec podle ${VZOR_JMENA_NASTROJE.source}`,
+      };
+    }
+    if (seznam.includes(polozka)) {
+      return { ok: false, duvod: `allowed_tools obsahuje „${polozka}“ víckrát — každý nástroj jen jednou` };
+    }
+    seznam.push(polozka);
+  }
+  return { ok: true, seznam };
+}
 
 /** Decode a JWT payload without verification. Returns null on parse error. */
 function decodeJwtPayload(token: string | undefined): Record<string, unknown> | null {

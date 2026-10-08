@@ -55,7 +55,9 @@ describe("Verdaccio token auto-mint", () => {
   });
 
   test("publish workflow prefers minting, falls back to the static secret", () => {
-    expect(publishWf).toMatch(/verdaccio-mint-token\.mjs/);
+    // The workflow calls the login script; the script calls the mint.
+    expect(publishWf).toMatch(/scripts\/ci\/registr-prihlaseni\.sh nastav/);
+    expect(read("scripts/ci/registr-prihlaseni.sh")).toMatch(/verdaccio-mint-token\.mjs --check/);
     expect(publishWf).toMatch(/secrets\.VERDACCIO_USER/);
     expect(publishWf).toMatch(/secrets\.VERDACCIO_PASSWORD/);
     // static token still supported as fallback

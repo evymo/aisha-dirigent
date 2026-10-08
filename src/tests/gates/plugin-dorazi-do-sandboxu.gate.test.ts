@@ -34,14 +34,24 @@
  * artefakt a prohlédnou ho parserem `node:vm` v přesně té obálce, kterou
  * použije shim; a členy `ctx` porovnají jako MNOŽINY — co pluginy berou, musí
  * být podmnožinou toho, co shim dává.
+ *
+ * ⛔ 3. GLOBÁLY (naměřeno 2026-10-03 v provozu). Čerstvý `node:vm` kontext nese
+ *    jen intrinsiky jazyka. `AbortSignal`, `URL`, `URLSearchParams`, `setTimeout`
+ *    v něm NEJSOU, dokud je tam shim nedá — a nedával. Každý datový plugin volá
+ *    `AbortSignal.timeout(…)` před prvním dotazem → 24 běhů po sobě skončilo
+ *    „ReferenceError: AbortSignal is not defined“. Brána do té doby artefakt jen
+ *    PARSOVALA, nikdy ho nespustila. Teď ho spustí kontextem, který staví tentýž
+ *    modul jako shim (`sandbox-context.ts`), a navíc porovná známé globály
+ *    hostitele s tím, co shim dává.
  */
 import { describe, expect, test, beforeAll } from "vitest";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, readdirSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { Script } from "node:vm";
+import { Script, createContext, runInContext } from "node:vm";
 import { hostOf } from "../../../scripts/plugins/host.mjs";
+import { sandboxGlobals, SANDBOX_WEB_GLOBALS } from "../../../images/plugin-exec/shim/src/sandbox-context";
 
 const ROOT = process.cwd();
 const PLUGINS = join(ROOT, "plugins");
@@ -173,6 +183,101 @@ describe("plugin dorazí do sandboxu (brána)", () => {
         ).toBe(false);
       }
     }
+  });
+
+  test("artefakt nesahá na globály hostitele, které shim do sandboxu NEDÁVÁ", () => {
+    // Statická půlka: spuštění níž projde jen cesty, které falešná odpověď
+    // otevře. Tady se proto hledá HODNOTOVÉ použití (`new X`, `X.něco`, `X(`)
+    // známých globálů prohlížeče/Node, které kontext shimu nenese.
+    const dava = new Set(Object.keys(SANDBOX_WEB_GLOBALS));
+    const znamé = [
+      "AbortController", "AbortSignal", "URL", "URLSearchParams", "setTimeout", "clearTimeout",
+      "setInterval", "clearInterval", "setImmediate", "queueMicrotask", "fetch", "Headers", "Request",
+      "Response", "FormData", "Blob", "TextEncoder", "TextDecoder", "Buffer", "crypto", "structuredClone",
+      "atob", "btoa", "performance",
+    ];
+    for (const [slug, kod] of artefakty) {
+      const bezKomentaru = kod.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+      const chybi = znamé
+        .filter((g) => !dava.has(g))
+        .filter((g) => new RegExp(`(?:\\bnew\\s+${g}\\b|(?<![\\w.$])${g}\\s*[.(])`).test(bezKomentaru));
+      expect(
+        chybi,
+        `artefakt pluginu ${slug} používá globály, které kontext shimu nenese: ${chybi.join(", ")}\n` +
+          `  shim dává: ${[...dava].sort().join(", ")} (images/plugin-exec/shim/src/sandbox-context.ts)\n` +
+          "Za běhu by to byl ReferenceError uvnitř sandboxu — testy pluginu v Node to nevidí.",
+      ).toEqual([]);
+    }
+  });
+
+  test("⭐ artefakt v kontextu shimu BĚŽÍ — deklarace i každý cron bez chybějícího globálu", async () => {
+    // Dynamická půlka: tentýž kontext jako shim (sandboxGlobals) a táž obálka.
+    // Síť, RPC a úložiště jsou falešné; plugin smí skončit DOMÉNOVOU chybou
+    // (prázdná odpověď není SOAP), ale ne chybou jazyka nad chybějícím jménem.
+    const chybejiciJmeno = (e: unknown): string | null => {
+      const jmeno = (e as { name?: unknown } | null)?.name;
+      const zprava = String((e as { message?: unknown } | null)?.message ?? e);
+      return jmeno === "ReferenceError" || /is not defined/.test(zprava) ? zprava : null;
+    };
+    let behu = 0;
+    for (const [slug, kod] of artefakty) {
+      const m = manifest(slug)!;
+      const schema = (m.config_schema ?? {}) as { required?: string[]; properties?: Record<string, { type?: string }> };
+      const vychozi = ((m.source_spec as { default_config?: Record<string, unknown> } | undefined)?.default_config ?? {});
+      const config: Record<string, unknown> = { ...vychozi };
+      for (const k of schema.required ?? []) {
+        if (config[k] === undefined) config[k] = schema.properties?.[k]?.type === "number" ? 1 : "x";
+      }
+      const akce = ["__declare", ...((m.capabilities as string[] | undefined) ?? []).filter((c) => c.startsWith("cron."))];
+      for (const action of akce) {
+        const ctx = {
+          plugin: { version: String(m.version) },
+          tenant: { id: "t" },
+          config,
+          log: () => {},
+          schedule: () => {},
+          rpc: async () => ({}),
+          llm: async () => "",
+          notify: async () => {},
+          kv: { get: async () => null, set: async () => {}, delete: async () => {} },
+          fetch: async (url: string) =>
+            new Response(/token/.test(String(url)) ? '{"access_token":"t","expires_in":300}' : "[]", {
+              status: 200,
+              headers: { "content-type": "application/json" },
+            }),
+        };
+        const kontext = createContext(sandboxGlobals(ctx, action, {}));
+        let chyba: unknown = null;
+        try {
+          await runInContext(`(async (ctx, action, params) => {\n${kod}\n})(ctx, action, params)`, kontext, {
+            filename: `${slug}.js`,
+          });
+        } catch (e) {
+          chyba = e;
+        }
+        behu++;
+        expect(
+          chybejiciJmeno(chyba),
+          `plugin ${slug}, akce ${action}: v kontextu shimu chybí jméno, které plugin používá.\n` +
+            "Doplň ho do SANDBOX_WEB_GLOBALS (images/plugin-exec/shim/src/sandbox-context.ts), " +
+            "nebo ho z pluginu odstraň — v produkci by každý běh skončil touto chybou.",
+        ).toBeNull();
+      }
+    }
+    expect(behu, "nespustil se ani jeden běh — měřidlo nemá co měřit").toBeGreaterThan(0);
+  }, 120_000);
+
+  test("shim staví kontext TOUTÉŽ funkcí, kterou brána pouští artefakty", () => {
+    // Bez tohohle by brána mohla zůstat zelená nad kontextem, který shim už
+    // nepoužívá (ruční `createContext({ … })` v main.ts) — měřila by vlastní kopii.
+    const main = readFileSync(SHIM_MAIN, "utf8");
+    expect(main, "main.ts nevolá createContext(sandboxGlobals(…)) — kontext shimu a brány se rozešly").toMatch(
+      /createContext\(\s*sandboxGlobals\(/,
+    );
+    expect(
+      (main.match(/createContext\(/g) ?? []).length,
+      "main.ts staví víc než jeden kontext — který z nich brána měří?",
+    ).toBe(1);
   });
 
   test("⭐ co pluginy z ctx BEROU, musí shim DÁVAT", () => {

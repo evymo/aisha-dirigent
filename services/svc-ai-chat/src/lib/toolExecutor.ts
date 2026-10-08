@@ -64,7 +64,7 @@ interface ToolDefinition {
   name: string;
   description: string;
   parameters_schema: Record<string, unknown>;
-  handler_type: "rpc" | "edge_function" | "webhook";
+  handler_type: "rpc" | "edge_function" | "webhook" | "mcp";
   handler_ref: string;
   access_tier_min: string;
   requires_consent: boolean;
@@ -90,7 +90,25 @@ export interface ToolExecutorConfig {
    * vždy — bez ohledu na příznak DYNAMIC_TOOL_SELECTION (SELF_IMPROVEMENT_LOOP.md K-36).
    */
   deniedTools?: readonly string[];
+  /**
+   * Druhý původ nástrojů: MCP server, týž, přes který volá /v1 (K-35). Smí ho sestavit
+   * jen zprostředkovaný token uživatele (lib/chatMcpOrigin.ts); bez něj `null` a MCP
+   * nástroje se nenabídnou ani nespustí.
+   */
+  mcp?: McpToolOrigin | null;
 }
+
+/**
+ * Nástroje MCP pod identitou uživatele. `list` vrací jen to, co uživatel smí (server
+ * filtruje tools/list týmž predikátem jako tools/call), `call` výsledek a zda prošel.
+ */
+export interface McpToolOrigin {
+  list(): Promise<Array<{ name: string; description: string; parameters: Record<string, unknown> }>>;
+  call(name: string, args: Record<string, unknown>): Promise<{ ok: boolean; text: string }>;
+}
+
+/** Odkud nástroj pochází — jedno jméno má právě jeden původ (K-35). */
+type ToolOrigin = "agent_tools" | "mcp";
 
 // ---------------------------------------------------------------------------
 // Access tier ordering (lower index = lower tier)
@@ -229,8 +247,19 @@ export function createToolExecutor(
   // a `agent_catalog.denied_tools` se za běhu nevynucoval vůbec. Teď: povolené je jen to,
   // o co si volající řekl v loadToolsByNames (právo kanálu), minus zákazy. Dokud se nic
   // nenačte, není povolené nic — fail-closed.
+  //
+  // Povolené jméno má navíc právě jeden známý původ (K-35): agent_tools, nebo MCP.
+  // Jméno bez původu (fantom) i jméno v obou (dvojznačné) se nepovolí — nikdy hádat.
   const deniedTools = new Set(config?.deniedTools ?? []);
-  const permittedTools = new Set<string>();
+  const mcp = config?.mcp ?? null;
+  const permittedTools = new Map<string, ToolOrigin>();
+  const mcpDefinitions = new Map<string, ToolDefinition>();
+
+  function mcpDefinition(name: string): ToolDefinition {
+    const tool = mcpDefinitions.get(name);
+    if (!tool) throw new Error(`MCP tool "${name}" was not loaded`);
+    return tool;
+  }
 
   const cache: ToolCache = new Map();
 
@@ -369,6 +398,15 @@ export function createToolExecutor(
         }
       }
 
+      case "mcp": {
+        // Jen sem vede původ „mcp“ z loadToolsByNames, a ten vzniká jen s originem
+        // zprostředkovaným tokenem uživatele — žádná náhrada service klíčem.
+        if (!mcp) throw new Error(`MCP origin unavailable for tool "${tool.name}"`);
+        const result = await mcp.call(tool.handler_ref, args);
+        if (!result.ok) throw new Error(`MCP tool ${tool.handler_ref} failed: ${result.text}`);
+        return result.text;
+      }
+
       default:
         throw new Error(`Unknown handler type: ${tool.handler_type}`);
     }
@@ -420,8 +458,11 @@ export function createToolExecutor(
     }
 
     try {
-      // 1. Resolve tool
-      const tool = await resolveTool(toolCall.name);
+      // 1. Resolve tool — podle původu zjištěného při načtení (K-35): nástroj MCP jen
+      //    z definice, kterou dal MCP; registr agent_tools se pro něj nikdy nedotazuje.
+      const tool = permittedTools.get(toolCall.name) === "mcp"
+        ? mcpDefinition(toolCall.name)
+        : await resolveTool(toolCall.name);
 
       // 2. Check access tier
       if (!meetsAccessTier(accessLevel, tool.access_tier_min)) {
@@ -523,6 +564,7 @@ export function createToolExecutor(
     if (!toolNames.length) return [];
     const includeDeferred = options?.includeDeferred ?? false;
 
+    const mcpTools = await loadMcpDefinitions();
     const results: ToolDefinition[] = [];
     for (const name of toolNames) {
       // Zakázaný nástroj se nenabídne ani nepovolí (K-36).
@@ -530,19 +572,60 @@ export function createToolExecutor(
         log.safeWarn(`[toolExecutor] Tool "${name}" is denied for the routed agent, not loaded`);
         continue;
       }
-      // Právo kanálu: povolené jméno platí i pro odložený nástroj, který se nabídne později.
-      permittedTools.add(name);
+      let registered: ToolDefinition | null = null;
       try {
-        const tool = await resolveTool(name);
-        // Skip deferred tools unless explicitly requested
-        if (!includeDeferred && tool._validated?.shouldDefer) continue;
-        results.push(tool);
+        registered = await resolveTool(name);
       } catch {
-        // Skip tools that can't be resolved — non-blocking
-        log.safeWarn(`[toolExecutor] Tool "${name}" not found, skipping`);
+        registered = null;
       }
+      const fromMcp = mcpTools.get(name) ?? null;
+      // Jméno = jeden původ (K-35). Dvojznačné jméno se nespustí ani jedním původem;
+      // repo to hlídá brána nastroj-ma-jeden-puvod, tady jde o data instance.
+      if (registered && fromMcp) {
+        log.safeWarn(`[toolExecutor] Tool "${name}" exists in agent_tools AND MCP — ambiguous origin, not loaded`);
+        await tracer.event("tool_call", name, "internal", "origin_check", "error", 0, {
+          errorJson: { message: `Tool "${name}" has two origins (agent_tools, mcp)` },
+        });
+        continue;
+      }
+      const tool = registered ?? fromMcp;
+      if (!tool) {
+        log.safeWarn(`[toolExecutor] Tool "${name}" has no known origin (agent_tools, mcp), skipping`);
+        continue;
+      }
+      if (fromMcp) mcpDefinitions.set(name, fromMcp);
+      // Právo kanálu: povolené jméno platí i pro odložený nástroj, který se nabídne později.
+      permittedTools.set(name, registered ? "agent_tools" : "mcp");
+      // Skip deferred tools unless explicitly requested
+      if (!includeDeferred && tool._validated?.shouldDefer) continue;
+      results.push(tool);
     }
     return results;
+  }
+
+  // -------------------------------------------------------------------------
+  // MCP origin (K-35): nástroje, které uživatel na MCP serveru smí. MCP je autorita
+  // svých oprávnění (tools/list i tools/call pod identitou uživatele), proto tu žádný
+  // vlastní stupeň přístupu ani souhlas — ten by byl jen druhá, rozjetá kopie.
+  // -------------------------------------------------------------------------
+  async function loadMcpDefinitions(): Promise<Map<string, ToolDefinition>> {
+    const byName = new Map<string, ToolDefinition>();
+    if (!mcp) return byName;
+    for (const spec of await mcp.list()) {
+      byName.set(spec.name, {
+        id: `mcp:${spec.name}`,
+        name: spec.name,
+        description: spec.description,
+        parameters_schema: spec.parameters,
+        handler_type: "mcp",
+        handler_ref: spec.name,
+        access_tier_min: "none",
+        requires_consent: false,
+        audit_action: null,
+        metadata: { origin: "mcp" },
+      });
+    }
+    return byName;
   }
 
   // -------------------------------------------------------------------------

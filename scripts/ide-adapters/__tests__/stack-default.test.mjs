@@ -160,6 +160,12 @@ describe("generate-ide-instructions --stack-default — CLI guard paths", () => 
     // that satisfies the SoT's declared inputs, not a partial one.
     mkdirSync(path.join(root, "coolify"), { recursive: true });
     cpSync(path.join(REPO_ROOT, "coolify", "servers.json"), path.join(root, "coolify", "servers.json"));
+    // Od 2026-10-04 je deklarovaným vstupem místních presetů i realm: seznam klientů,
+    // kterým místní stack věří (KC_ALLOWED_CLIENTS), se odvozuje z deklarace realmu
+    // (scripts/lib/povoleni-klienti.mjs), ne z ručního výčtu. Bez souboru import
+    // presetů končí ENOENT dřív, než CLI dojde k hlídkám, které se tu měří.
+    mkdirSync(path.join(root, "keycloak"), { recursive: true });
+    cpSync(path.join(REPO_ROOT, "keycloak", "aisha-realm.json"), path.join(root, "keycloak", "aisha-realm.json"));
     for (const [rel, content] of Object.entries(files)) {
       const full = path.join(root, rel);
       mkdirSync(path.dirname(full), { recursive: true });

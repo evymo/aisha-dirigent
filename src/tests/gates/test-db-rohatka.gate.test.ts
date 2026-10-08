@@ -50,7 +50,12 @@ describe("celá test:db v CI s rohatkou", () => {
   });
 
   test("⛔ rohatka NEHRADÍ nasazení a běží jen na PR (jinak částečné nasazení)", () => {
-    for (const nasazeni of ["deploy-koren", "deploy-stacky", "deploy-core", "deploy-edge", "deploy-extranet"]) {
+    // Všechny nasazovací úlohy z workflow (od 2026-10-01 i řetěz stacků po vlnách).
+    const nasazovaci = [...cti(".forgejo/workflows/ci.yml").matchAll(/^ {2}(deploy-[a-z0-9-]+):\s*$/gm)].map((m) => m[1]);
+    expect(nasazovaci, "nasazovací úlohy nenalezeny — měřidlo je slepé").toEqual(
+      expect.arrayContaining(["deploy-koren", "deploy-core", "deploy-zacatek", "deploy-stacky-vlna-7", "deploy-verdikt"]),
+    );
+    for (const nasazeni of nasazovaci) {
       const telo = uloha(nasazeni);
       expect(telo, `úloha ${nasazeni} v ci.yml chybí`).not.toBe("");
       expect(telo, `${nasazeni} nesmí čekat na rohatku ani ji číst v if:`).not.toContain("db-runtime-rohatka");

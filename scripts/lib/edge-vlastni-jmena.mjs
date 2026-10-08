@@ -23,6 +23,7 @@
  * @module
  */
 import { extractHost } from "./fqdn-owners.mjs";
+import { isMeshHost } from "./mesh-host.mjs";
 
 /** Jméno služby, která jména VLASTNÍ — její záznam se nikdy nefiltruje. */
 export const EDGE_PROXY_SLUZBA = "edge-proxy";
@@ -57,26 +58,41 @@ export function isReleaseSentinel(domain) {
   return /\.edge-vlastni\.invalid(?::\d+)?(?:\/.*)?$/i.test(String(domain ?? "").trim());
 }
 
+
 /**
- * Hodnota domény služby bez hostů, které vlastní edge.
+ * Hodnota domény, kterou služba SKUTEČNĚ registruje v Coolify — jeden domov
+ * pravidla pro doktora (coolify-domain-doctor.mjs) i deploy-init
+ * (`domena_pro_coolify` v scripts/coolify-deploy-init.sh).
  *
- *   - `edge-proxy` sám, prázdná množina, nebo žádný host k vyřazení → beze změny
- *   - zbyde aspoň jeden host → jen ti zbylí (pořadí zachováno)
- *   - nezbyde nic → uvolňovací sentinel (viz releaseSentinel)
+ * Vyřadí se:
+ *   - mesh jména (`*.internal`) — obsluhuje je mesh-ingress, ne veřejný Traefik
+ *     (Let's Encrypt pro ně nevydá nikdy a spálí rozpočet ACME, viz mesh-host.mjs);
+ *   - jména, která vlastní edge (EDGE_OWNED_HOSTS) — veřejné jde jen přes edge.
+ *
+ * ⛔ NAMĚŘENO 2026-10-02 (průzkum bočních vstupů): když po vyřazení NEZBYDE NIC,
+ * obě roviny dřív neposlaly NIC — doktor proto, že Coolify prázdný PATCH tiše
+ * ignoruje, deploy-init celou položku přeskočil vzorem `*.internal`. Jenže tím
+ * v Coolify ZŮSTAL starý router: n8n-auth dál registroval veřejné mcp/dirigent
+ * na backendovém Traefiku, mimo edge — a redeploy po fast-forwardu forku by to
+ * nikdy nesrovnal. Uvolňovací sentinel router výslovně ZRUŠÍ.
+ *
+ *   - nic se nevyřadilo            → beze změny
+ *   - zbyde aspoň jeden host       → jen ti zbylí (pořadí zachováno)
+ *   - nezbyde nic                  → uvolňovací sentinel (releaseSentinel)
  */
-export function bezJmenEdge(sluzba, domain, owned, prefix) {
-  if (sluzba === EDGE_PROXY_SLUZBA || !owned || owned.size === 0) return domain;
+export function domenaProCoolify(sluzba, domain, owned, prefix) {
   const hosts = String(domain ?? "")
     .split(",")
     .map((host) => host.trim())
     .filter(Boolean);
-  const zbyva = hosts.filter((host) => !owned.has(extractHost(host)));
+  const vlastniEdge = sluzba === EDGE_PROXY_SLUZBA ? new Set() : (owned ?? new Set());
+  const zbyva = hosts.filter((host) => !isMeshHost(host) && !vlastniEdge.has(extractHost(host)));
   if (zbyva.length === hosts.length) return domain;
   if (zbyva.length > 0) return zbyva.join(",");
   if (!prefix) {
     throw new Error(
-      `bezJmenEdge: ${sluzba} přijde o všechna jména, ale prefix instance chybí — ` +
-        `uvolňovací sentinel bez identity instance by kolidoval s jiným projektem`,
+      `domenaProCoolify: ${sluzba} nemá co registrovat a starý router je třeba uvolnit, ale prefix ` +
+        `instance chybí — uvolňovací sentinel bez identity instance by kolidoval s jiným projektem`,
     );
   }
   return releaseSentinel(sluzba, prefix);

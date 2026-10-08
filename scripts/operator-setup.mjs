@@ -38,6 +38,7 @@ import {
   toJson,
   renderEnvExample,
 } from "./lib/operator-inputs.mjs";
+import { KOD_ENV_DOKTORA_WEB_NEVIM } from "./lib/domenovy-overlay.mjs";
 
 const ROOT = process.cwd();
 const ENV_LOCAL = join(ROOT, ".env.local");
@@ -177,7 +178,18 @@ function runVerify({ deep }) {
   if (existsSync(join(ROOT, doctor))) {
     console.log("• env-doctor (contract completeness) …");
     const r = spawnSync(process.execPath, [doctor], { cwd: ROOT, stdio: "inherit" });
-    ok = ok && r.status === 0;
+    // Kód KOD_ENV_DOKTORA_WEB_NEVIM = env-doktor kontrakt doplnil, jen WEB_FQDNS
+    // (domény webu) nezná. Na instalaci před prvním cold-startem je to vždy —
+    // klíč smí založit jen cold-start (výslovný požadavek na doménový overlay).
+    // Přijímá se PRÁVĚ tenhle kód (jako src/tests/gates/_env-doktor-dokoncil.ts),
+    // jiná nenula (2 = pád doktora) zůstává selháním ověření.
+    if (r.status === KOD_ENV_DOKTORA_WEB_NEVIM) {
+      console.log(
+        "  ℹ env-doctor: WEB_FQDNS (domény webu) zatím neznám — založí ho první cold-start; " +
+          "po cold-startu viz příčina ve výpisu výš.",
+      );
+    }
+    ok = ok && (r.status === 0 || r.status === KOD_ENV_DOKTORA_WEB_NEVIM);
   } else {
     console.log("• env-doctor not found — skipping");
   }

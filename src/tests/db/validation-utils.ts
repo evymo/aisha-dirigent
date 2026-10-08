@@ -715,7 +715,6 @@ export const SINGLE_ROW_RPCS: ReadonlySet<string> = new Set<string>([
   "get_order_review_by_order",
   "get_partner_access_for_edge",
   "get_public_product_by_slug",
-  "get_story_basic_info",
   "get_story_general_matrix_room",
   "get_story_ptt_room",
   "get_study_detail",

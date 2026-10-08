@@ -1,18 +1,30 @@
 -- Function: public.get_expert_rule_detail
--- Arguments: p_rule_slug text
+-- Arguments: p_rule_slug text, p_audience_user_id uuid (jen služba smí jmenovat publikum)
+--
+-- Viditelnost (2026-10-05, revize B1): pravidlo podle public.expert_rule_visible_to pro toho, PRO KOHO
+-- se čte (domov viditelnosti; autor své, správa vše). Do 2026-10-05 funkce filtrovala jen stav —
+-- anonym dostal tělo i pokyny pravidla `private`, `guild` i `members` (změřeno revizí).
+-- Signatura se mění výměnou (přibyl parametr s výchozí hodnotou).
+DROP FUNCTION IF EXISTS public.get_expert_rule_detail(text);
 -- Security: SECURITY DEFINER
 -- Source: Extracted from local DB (source-of-truth sync)
 
-CREATE OR REPLACE FUNCTION public.get_expert_rule_detail(p_rule_slug text)
+CREATE OR REPLACE FUNCTION public.get_expert_rule_detail(p_rule_slug text, p_audience_user_id uuid DEFAULT NULL::uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
- SET search_path TO 'public'
+ SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 AS $function$
 DECLARE
   v_rule record;
   v_result jsonb;
+  v_audience_user uuid;  -- pro koho se čte (služba smí říct; jinak volající sám; bez identity NULL)
 BEGIN
+  v_audience_user := CASE
+    WHEN public.get_jwt_role() = 'service_role' THEN COALESCE(p_audience_user_id, auth.uid())
+    ELSE auth.uid()
+  END;
+
   SELECT er.*, pp.display_name AS author_display_name, pp.avatar_url AS author_avatar_url,
          pp.guild_tier AS author_guild_tier, pp.guild_bio AS author_guild_bio,
          gea.slug AS expertise_area_slug, gea.name_key AS expertise_area_name_key,
@@ -24,8 +36,10 @@ BEGIN
   WHERE er.slug = p_rule_slug
     AND (
       er.status = 'published'
-      OR (er.author_partner_id IN (SELECT id FROM partner_profiles WHERE user_id = auth.uid()))
-    );
+      OR (er.author_partner_id IN (SELECT pp2.id FROM public.partner_profiles pp2 WHERE pp2.user_id = v_audience_user))
+    )
+    -- Viditelnost pro toho, pro koho se čte (autor své, správa vše, ostatní podle domova).
+    AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, v_audience_user);
 
   IF v_rule IS NULL THEN
     RETURN NULL;
@@ -96,7 +110,7 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.get_expert_rule_detail(text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.get_expert_rule_detail(text) TO anon;
-GRANT EXECUTE ON FUNCTION public.get_expert_rule_detail(text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_expert_rule_detail(text) TO service_role;
+REVOKE ALL ON FUNCTION public.get_expert_rule_detail(text, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_expert_rule_detail(text, uuid) TO anon;
+GRANT EXECUTE ON FUNCTION public.get_expert_rule_detail(text, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_expert_rule_detail(text, uuid) TO service_role;

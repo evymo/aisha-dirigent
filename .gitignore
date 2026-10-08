@@ -54,6 +54,9 @@ scripts/seed_*.py
 # only on operator/CI hosts — a committed denylist of real customers would itself
 # disclose them. See config/tenant.json.example + src/tests/gates/lib/tenant-leak-detect.ts.
 config/tenant.json
+# Exact developer/account identifiers for scripts/verify-no-dev-codes.mjs — same reason:
+# a committed denylist of real identifiers is itself the disclosure. See config/dev-codes.json.example.
+config/dev-codes.json
 
 # Private/heritage instance assets — real family/company imagery, local-only,
 # never in the public OSS tree (no code references them).

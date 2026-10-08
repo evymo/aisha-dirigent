@@ -93,7 +93,7 @@ BEGIN
     RETURN jsonb_build_object(
       'data', jsonb_build_object('value', NULL),
       'provenance', jsonb_build_object('source_slug', v_view,
-        'trace_id', 'audience-kpi:bad_column', 'freshness_at', v_now));
+        'trace_id', 'audience-kpi:bad_config', 'freshness_at', v_now));
   END;
 
   RETURN jsonb_build_object(

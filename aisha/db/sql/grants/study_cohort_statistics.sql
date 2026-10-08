@@ -1,9 +1,13 @@
 -- Grants: study_cohort_statistics
 --
--- ⛔ Pohled s právy VLASTNÍKA (souhrny zdraví a laboratoří kohort studií) — mimo RLS podkladu. Do 2026-10-04 měl
--- SELECT pro anon a plné DML pro authenticated, takže šel číst přes /rest/v1/
--- i bez přihlášení. Klient ho přímo nečte (studijní souhrny vydávají DEFINER
--- funkce get_study_cohort_*_secure se strážemi); zůstává jen služba. REVOKE ALL
--- napřed: na běžící DB žijí i granty z ALTER DEFAULT PRIVILEGES.
+-- ⛔ Pohled s právy VLASTNÍKA (bez security_invoker) — čte podklad MIMO jeho RLS
+-- a vydává souhrny stavu a měření kohort. Do 2026-10-06 měl SELECT pro anon a plné DML pro authenticated:
+-- naměřeno na čisté DB main 0f992f647 (baseline + heals) — čitelný přes /rest/v1/
+-- i bez přihlášení. Změřeno 2026-10-06: přímo ho nečte žádný klient v repu (web,
+-- mobil, služby, n8n); čtou ho nanejvýš SECURITY DEFINER funkce se strážemi
+-- (get_study_cohort_*_secure), které běží právy vlastníka — zůstává jen službě.
+-- REVOKE napřed: na běžící DB žijí i granty z dřívějška a z ALTER DEFAULT PRIVILEGES,
+-- které samotný GRANT nezruší. Třídu hlídá
+-- src/tests/db/pohled-s-pravy-vlastnika-bez-klientskeho-grantu.runtime.test.ts.
 REVOKE ALL ON public.study_cohort_statistics FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.study_cohort_statistics TO service_role;

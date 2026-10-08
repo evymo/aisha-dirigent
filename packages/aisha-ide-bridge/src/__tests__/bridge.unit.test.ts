@@ -11,8 +11,8 @@
  * exercised via integration tests against a live svc-ide-context — out
  * of scope for this unit suite.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import { mkdtempSync } from "node:fs";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import {
@@ -36,6 +36,10 @@ const silentLogger: BridgeLogger = {
 let tmpRoot: string;
 beforeEach(() => {
   tmpRoot = mkdtempSync(path.join(os.tmpdir(), "aisha-ide-bridge-test-"));
+});
+// Bez úklidu zůstával adresář po KAŽDÉM testu (naměřeno 2026-10-02: 2 214 v $TMPDIR).
+afterEach(() => {
+  rmSync(tmpRoot, { recursive: true, force: true });
 });
 
 describe("backoffDelayMs", () => {

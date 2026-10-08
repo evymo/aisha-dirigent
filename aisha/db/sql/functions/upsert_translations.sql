@@ -1,7 +1,7 @@
 -- Function: public.upsert_translations
 -- Arguments: p_translations jsonb
 -- Security: service_role nebo admin bez omezení; staff jen obsahové namespacy
---           (web/news/pages/extranet) — viz rozvahu v těle funkce.
+--           (web/news/news-tags/pages/extranet) — viz rozvahu v těle funkce.
 -- Extracted: 2026-01-08T18:28:34+01:00
 
 CREATE OR REPLACE FUNCTION public.upsert_translations(p_translations jsonb)
@@ -33,7 +33,9 @@ DECLARE
     -- (namespace `common`, `notifications`, …). Staff dostává jen namespacy
     -- obsahu, který smí spravovat — web, novinky, stránky, extranet. Všechno
     -- ostatní zůstává adminovi; neznámý namespace se odmítne, nedovolí.
-    v_obsahove_namespacy text[] := ARRAY['web', 'news', 'pages', 'extranet'];
+    -- 'news-tags' (2026-10-02): zobrazované názvy štítků novinek — obsah, který
+    -- správkyně webu spravuje (na instanci), stejně jako texty článků.
+    v_obsahove_namespacy text[] := ARRAY['web', 'news', 'news-tags', 'pages', 'extranet'];
 BEGIN
     v_is_admin := public.has_role(auth.uid(), 'admin');
 

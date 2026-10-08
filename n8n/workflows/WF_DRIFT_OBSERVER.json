@@ -70,7 +70,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Parse drift report from svc-agent-runner exec output.\n// Recipe `system/coolify-drift-check` runs `node scripts/coolify-drift-check.mjs --json`\n// and returns stdout JSON in body.output.\nconst body = $input.first().json.body || $input.first().json;\nconst raw = body.output || body.stdout || '{}';\nlet drift;\ntry {\n  drift = typeof raw === 'string' ? JSON.parse(raw) : raw;\n} catch (e) {\n  return { json: { error: 'failed to parse drift JSON', raw: String(raw).slice(0, 200) } };\n}\n\n// Extract counts\nconst counts = {\n  orphaned: (drift.orphaned || []).length,\n  missing: (drift.missing || []).length,\n  composeDrift: (drift.composeDrift || []).length,\n  serverDrift: (drift.serverDrift || []).length,\n};\nconst total = counts.orphaned + counts.missing + counts.composeDrift + counts.serverDrift;\n\n// Severity classification\nlet severity = 'clean';\nif (counts.orphaned > 0) severity = 'security_concern';\nelse if (counts.serverDrift > 0) severity = 'critical';\nelse if (counts.missing > 0) severity = 'high';\nelse if (counts.composeDrift > 0) severity = 'medium';\n\n// Carry forward trigger context\nconst triggerCtx = $('parse-trigger').first().json;\nreturn { json: { drift, counts, total, severity, ts: new Date().toISOString(), trigger: triggerCtx } };"
+        "jsCode": "// Parse drift report from svc-agent-runner exec output.\n// Recipe `system/coolify-drift-check` runs `node scripts/coolify-drift-check.mjs --json`\n// and returns stdout JSON in body.output.\nconst body = $input.first().json.body || $input.first().json;\nconst raw = body.output ?? body.stdout;\n// Nezměřeno NENÍ čisto: chybějící / prázdný výstup runneru, nečitelný JSON i report bez\n// polí, která drift-check vydává VŽDY (pět polí, každé pole), jsou `nezmereno` s důvodem.\n// Dřív `|| '{}'` udělalo z chybějícího výstupu prázdný report = clean.\nconst nezmereno = (error) => ({ json: { error, raw: String(raw ?? '').slice(0, 200), severity: 'nezmereno', counts: {}, drift: {}, trigger: $('parse-trigger').first().json } });\nif (raw === undefined || raw === null || (typeof raw === 'string' && raw.trim() === '')) return nezmereno('runner nevrátil výstup drift-checku');\nlet drift;\ntry {\n  drift = typeof raw === 'string' ? JSON.parse(raw) : raw;\n} catch (e) {\n  return nezmereno('failed to parse drift JSON');\n}\nconst POLE = ['orphaned', 'missing', 'composeDrift', 'serverDrift', 'serverUnmeasured'];\nif (drift === null || typeof drift !== 'object' || Array.isArray(drift) || !POLE.every((k) => Array.isArray(drift[k]))) return nezmereno('report drift-checku nemá očekávaná pole');\n\n// Extract counts\nconst counts = {\n  orphaned: (drift.orphaned || []).length,\n  missing: (drift.missing || []).length,\n  composeDrift: (drift.composeDrift || []).length,\n  serverDrift: (drift.serverDrift || []).length,\n  serverUnmeasured: (drift.serverUnmeasured || []).length,\n};\nconst total = counts.orphaned + counts.missing + counts.composeDrift + counts.serverDrift;\n\n// Severity classification\nlet severity = 'clean';\nif (counts.orphaned > 0) severity = 'security_concern';\nelse if (counts.serverDrift > 0) severity = 'critical';\nelse if (counts.missing > 0) severity = 'high';\nelse if (counts.composeDrift > 0) severity = 'medium';\n// Nezměřený server aplikace (drift-check: COOLIFY_SERVER_UUID_<slot> chybí, API server neuvádí)\n// NENÍ shoda — jinak by observer hlásil čisto přesně tam, kde drift-check vrací kód 3.\nelse if (counts.serverUnmeasured > 0) severity = 'nezmereno';\n\n// Carry forward trigger context\nconst triggerCtx = $('parse-trigger').first().json;\nreturn { json: { drift, counts, total, severity, ts: new Date().toISOString(), trigger: triggerCtx } };"
       },
       "id": "parse-drift",
       "name": "Parse + classify drift",
@@ -85,7 +85,8 @@
             { "outputKey": "auto_fix", "conditions": { "conditions": [{ "leftValue": "={{ $json.severity }}", "rightValue": "medium", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } },
             { "outputKey": "trigger_create", "conditions": { "conditions": [{ "leftValue": "={{ $json.severity }}", "rightValue": "high", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } },
             { "outputKey": "alert_security", "conditions": { "conditions": [{ "leftValue": "={{ $json.severity }}", "rightValue": "security_concern", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } },
-            { "outputKey": "alert_critical", "conditions": { "conditions": [{ "leftValue": "={{ $json.severity }}", "rightValue": "critical", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } }
+            { "outputKey": "alert_critical", "conditions": { "conditions": [{ "leftValue": "={{ $json.severity }}", "rightValue": "critical", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } },
+            { "outputKey": "alert_unmeasured", "conditions": { "conditions": [{ "leftValue": "={{ $json.severity }}", "rightValue": "nezmereno", "operator": { "type": "string", "operation": "equals" } }], "combinator": "and" } }
           ]
         },
         "fallbackOutput": "extra",
@@ -155,6 +156,16 @@
     },
     {
       "parameters": {
+        "jsCode": "// NEZMĚŘENO: server aplikace nejde porovnat s manifestem (nebo výstup drift-checku\n// nejde přečíst). To NENÍ shoda — drift-check vrací kód 3. Alert operator, nic neopravovat.\nconst d = $input.first().json;\nreturn { json: {\n  action_taken: 'unmeasured_alert',\n  channel: '#aisha-deploy-alerts',\n  severity: 'nezmereno',\n  triggered_by: d.trigger?.reason || 'unspecified',\n  message: d.error\n    ? `drift-check NEZMĚŘEN: ${d.error}`\n    : `${d.counts.serverUnmeasured} app(s): server NEZMĚŘEN — drift-check ho nemá s čím porovnat (COOLIFY_SERVER_UUID_<slot> / API bez serveru); to NENÍ shoda`,\n  unmeasured: d.drift?.serverUnmeasured || [],\n}};"
+      },
+      "id": "alert-unmeasured",
+      "name": "Unmeasured alert (server NEZMĚŘEN)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1400, 625]
+    },
+    {
+      "parameters": {
         "jsCode": "// Clean / extra (no drift) — log only.\nconst d = $input.first().json;\nreturn { json: {\n  action_taken: 'log_only',\n  total: d.total,\n  severity: d.severity,\n  triggered_by: d.trigger?.reason || 'unspecified'\n}};"
       },
       "id": "log-clean",
@@ -186,6 +197,7 @@
         [{ "node": "Re-create missing apps", "type": "main", "index": 0 }],
         [{ "node": "Security alert (orphans)", "type": "main", "index": 0 }],
         [{ "node": "Critical alert (server drift)", "type": "main", "index": 0 }],
+        [{ "node": "Unmeasured alert (server NEZMĚŘEN)", "type": "main", "index": 0 }],
         [{ "node": "Log clean state", "type": "main", "index": 0 }]
       ]
     },
@@ -193,6 +205,7 @@
     "Re-create missing apps":     { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] },
     "Security alert (orphans)":   { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] },
     "Critical alert (server drift)": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] },
+    "Unmeasured alert (server NEZMĚŘEN)": { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] },
     "Log clean state":            { "main": [[{ "node": "Respond", "type": "main", "index": 0 }]] }
   },
   "active": false,

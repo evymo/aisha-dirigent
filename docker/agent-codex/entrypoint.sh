@@ -9,6 +9,15 @@
 set -u
 WORKTREE="${AISHA_WORKTREE:-/work}"
 cd "$WORKTREE" 2>/dev/null || true
+# Git přihlášení pro CELÝ běh jen přes env (GIT_CONFIG_*), nikdy do .git/config:
+# /work je samostatný klon (runner ho klonuje per běh, --filter=blob:none), takže
+# líné dotahování obsahu z historie i závěrečný push jdou na remote a potřebují
+# token. AGENT_GIT_TOKEN dítě dostává od runneru už dnes; tady se jen předá gitu.
+if [ -n "${AGENT_GIT_TOKEN:-}" ]; then
+  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=http.extraHeader
+  export GIT_CONFIG_VALUE_0="Authorization: token ${AGENT_GIT_TOKEN}"
+fi
+export GIT_TERMINAL_PROMPT=0
 export AISHA_AGENT_RUN_ID="${AISHA_RUN_ID:-${AISHA_AGENT_RUN_ID:-}}"
 
 emit() { printf '%s\n' "$1"; }

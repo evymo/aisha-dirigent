@@ -22,7 +22,7 @@
  *      scanForInjection BEFORE chunking + writes via
  *      fn_record_safety_scan_audited when status !== 'clear'
  *   5. Retrieval-side: mcp_search_knowledge_v* filters
- *      quarantine_status NOT IN ('flagged', 'quarantined')
+ *      public.knowledge_state_readable(ki.quarantine_status) — allowlist, not a denylist
  *   6. Audit RPC fn_record_safety_scan_audited writes audit_journal action
  *      'ingestion.safety_scan_completed' (forensic trail)
  *   7. Unit test exists with both attack + benign corpus + edge cases
@@ -134,41 +134,41 @@ describe('Phase 12 WP 3.2 — Ingest route wiring', () => {
 });
 
 describe('Phase 12 WP 3.2 — Retrieval-side quarantine filter', () => {
-  it('mcp_search_knowledge_v3 filters NOT IN (flagged, quarantined)', () => {
-    const v3 = readText(
-      path.join(ROOT, 'aisha/db/sql/functions/mcp_search_knowledge_v3.sql'),
-    );
-    if (v3.length === 0) {
-      // v3 file optional — verify v2 instead
-      const v2 = readText(
-        path.join(ROOT, 'aisha/db/sql/functions/mcp_search_knowledge_v2.sql'),
-      );
-      expect(v2).toMatch(
-        /quarantine_status\s+NOT\s+IN\s*\(\s*['"]flagged['"]\s*,\s*['"]quarantined['"]\s*\)/i,
-      );
-    } else {
-      expect(v3).toMatch(
-        /quarantine_status\s+NOT\s+IN\s*\(\s*['"]flagged['"]\s*,\s*['"]quarantined['"]\s*\)/i,
-      );
+  // The retrieval RPCs call the ONE home of the readable-state allowlist and never list
+  // forbidden states themselves (a denylist passes an unscanned or future state as clean).
+  const ALLOWLIST_CALL = /public\.knowledge_state_readable\(\s*ki\.quarantine_status\s*\)/;
+  const DENYLIST = /quarantine_status\s+NOT\s+IN/i;
+
+  it('mcp_search_knowledge_v2 and v3 both filter by the readable-state allowlist', () => {
+    // BOTH files must exist: a missing (renamed) file is a failure, not a reason to check the other one.
+    for (const name of ['mcp_search_knowledge_v2.sql', 'mcp_search_knowledge_v3.sql']) {
+      const sql = readText(path.join(ROOT, 'aisha/db/sql/functions', name));
+      expect(sql.length, `${name} is missing or empty`).toBeGreaterThan(0);
+      expect(sql, name).toMatch(ALLOWLIST_CALL);
+      expect(sql, `${name} must not fall back to a denylist`).not.toMatch(DENYLIST);
     }
   });
 
-  it('at least one mcp_search RPC applies the quarantine filter (defence in depth)', () => {
-    // Scan every mcp_search_knowledge_v*.sql for the filter clause.
+  it('anchor: the allowlist requirement and the denylist ban both bite on a sample', () => {
+    const good = 'AND public.knowledge_state_readable(ki.quarantine_status)';
+    const old = "AND ki.quarantine_status NOT IN ('flagged', 'quarantined')";
+    expect(good).toMatch(ALLOWLIST_CALL);
+    expect(good).not.toMatch(DENYLIST);
+    expect(old).not.toMatch(ALLOWLIST_CALL);
+    expect(old).toMatch(DENYLIST);
+    // Allowlist call kept and a denylist re-added next to it is still a finding.
+    expect(`${good}\n${old}`).toMatch(DENYLIST);
+  });
+
+  it('every versioned mcp_search RPC applies the readable-state filter', () => {
+    // Scan every mcp_search_knowledge_v*.sql for the filter clause — a new version without it fails.
     const dir = path.join(ROOT, 'aisha/db/sql/functions');
     const matches = fs
       .readdirSync(dir)
       .filter((f) => /^mcp_search_knowledge_v\d+\.sql$/.test(f));
     expect(matches.length).toBeGreaterThan(0);
-    const hits = matches
-      .map((f) => readText(path.join(dir, f)))
-      .filter((src) =>
-        /quarantine_status\s+NOT\s+IN\s*\(\s*['"]flagged['"]\s*,\s*['"]quarantined['"]\s*\)/i.test(src),
-      );
-    expect(
-      hits.length,
-      'at least one mcp_search_knowledge_v* RPC must filter quarantined content',
-    ).toBeGreaterThan(0);
+    const missing = matches.filter((f) => !ALLOWLIST_CALL.test(readText(path.join(dir, f))));
+    expect(missing, 'mcp_search_knowledge_v* RPCs that do not filter by the readable-state allowlist').toEqual([]);
   });
 });
 

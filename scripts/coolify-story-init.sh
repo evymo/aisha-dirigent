@@ -57,8 +57,15 @@ REPO_ROOT_GUESS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # ONE env foundation for the whole toolchain: lib/resolve-domains-env.sh, the same
 # composition aisha-cold-start.sh performs at its "Resolving topology" step and that
 # stack-health.sh / smoke-routing.sh already source —
-#   1. .env-prod-backup (operator)  2. derive-domains.mjs --shell (topology SoT)
+#   1. záloha prostředí běhu — $ENV_PROD_BACKUP, jinak .env-prod-backup v kořeni (operator)
+#   2. derive-domains.mjs --shell (topology SoT)
 #   3. config/domains.env (composite refs expand against the populated env)
+#
+# K bodu 1 (2026-10-04): pod cold-startem je to TÝŽ soubor, který načetl cold-start
+# (exportuje ENV_PROD_BACKUP). Dřív se tu četla napevno záloha z kořene stromu a
+# v ne-produkčním běhu přepsala zděděný projekt Coolify, adresu Forgeja i GIT_BRANCH
+# produkčními hodnotami — tenhle skript pak zakládal jinde a z jiného repozitáře,
+# než jaký krok 2b2 před wipem ověřil.
 #
 # This script used to source only (1) and (3), so it decided WITHOUT the resolver.
 # Two consequences, both measured 2026-08-08 on a fork installation:
@@ -89,6 +96,13 @@ fi
 FORGEJO_TOKEN="${FORGEJO_API_TOKEN:-${FORGEJO_TOKEN:-}}"
 PROJECT_UUID="${COOLIFY_PROJECT_UUID:-}"
 ENVIRONMENT="${COOLIFY_ENVIRONMENT:-}"
+# Větev: S MANIFESTEM ji deklaruje manifest (výklad níž). Co přišlo z prostředí
+# (i ze souboru obsluhy, který si tenhle skript načítá o pár řádků výš) a z --branch,
+# se drží ZVLÁŠŤ — aby šlo s deklarací porovnat, ne ji tiše přebít. Výchozí `main`
+# platí jen pro ruční režim bez manifestu (--repo). Hodnotu z prostředí porovnává
+# vykladač sám (čte GIT_BRANCH); proto se mu níž předává tahle zachycená, ne pracovní.
+GIT_BRANCH_Z_PROSTREDI="${GIT_BRANCH:-}"
+GIT_BRANCH_Z_CLI=""
 GIT_BRANCH="${GIT_BRANCH:-main}"
 DRY_RUN="${DRY_RUN:-0}"
 
@@ -173,25 +187,27 @@ while [ $# -gt 0 ]; do
     --manifest|-m)    MANIFEST_FILE="$2"; shift 2 ;;
     --token|-t)       COOLIFY_TOKEN="$2"; shift 2 ;;
     --project)        PROJECT_UUID="$2"; shift 2 ;;
-    --branch)         GIT_BRANCH="$2"; shift 2 ;;
+    --branch)         GIT_BRANCH_Z_CLI="$2"; GIT_BRANCH="$2"; shift 2 ;;
     --update-registry) UPDATE_REGISTRY=1; shift ;;
     --dry-run|-n)     DRY_RUN=1; shift ;;
     --help|-h)
       echo "Usage: $0 --story NAME --repo owner/repo --app role:server:compose [--app ...] [options]"
       echo ""
       echo "  --story NAME         Story/project name (e.g. acme)"
-      echo "  --repo owner/repo    Forgejo repo path"
+      echo "  --repo owner/repo    Forgejo repo path. S --manifest repozitář DEKLARUJE manifest;"
+      echo "                       jiná hodnota tady je chyba, ne tiché vítězství manifestu."
       echo "  --app SPEC           App spec: role:server:compose_path (repeatable)"
       echo "  --manifest FILE      Read apps from manifest file instead of --app"
       echo "  --token TOKEN        Coolify API token (or COOLIFY_API_TOKEN env)"
       echo "  --project UUID       Coolify project UUID (or COOLIFY_PROJECT_UUID env)"
-      echo "  --branch BRANCH      Git branch (default: main)"
+      echo "  --branch BRANCH      Git branch (default: main). S --manifest větev DEKLARUJE manifest;"
+      echo "                       jiná hodnota tady (nebo GIT_BRANCH v prostředí) je chyba, ne přebití."
       echo "  --update-registry    Update coolify/servers.json with new stacks"
       echo "  --dry-run            Show what would be done without executing"
       echo ""
       echo "App spec format: role:server:docker-compose-path"
       echo "  Example: frontend:frontend:docker-compose.coolify-acme.yml"
-      echo "  Server names: frontend, backend, experimental (must exist in servers.json)"
+      echo "  Server names: sloty z coolify/servers.json (node scripts/lib/sloty-serveru.mjs --umisteni)"
       exit 0 ;;
     *) err "Unknown argument: $1"; exit 1 ;;
   esac
@@ -215,11 +231,70 @@ if [ -n "$MANIFEST_FILE" ]; then
     [ -z "$line" ] && continue
     case "$line" in
       story:*)  [ -z "$STORY_NAME_FROM_CLI" ] && { STORY_NAME="${line#story:}" ; STORY_NAME=$(echo "$STORY_NAME" | xargs); } ;;
-      repo:*)   REPO_PATH="${line#repo:}" ; REPO_PATH=$(echo "$REPO_PATH" | xargs) ;;
-      branch:*) GIT_BRANCH="${line#branch:}" ; GIT_BRANCH=$(echo "$GIT_BRANCH" | xargs) ;;
-      app:*)    APPS+=("${line#app:}") ;;
     esac
   done < "$MANIFEST_FILE"
+
+  # ── Aplikace: JEN ty, které tohle prostředí VLASTNÍ ─────────────────────────
+  # Manifest je inventář instance (jeden pro všechna prostředí). Co je v tomhle
+  # prostředí naše, říká domov vlastnictví (profil prostředí: external_domain) —
+  # externí služba (např. sdílený Keycloak jiné instance) se NEZAKLÁDÁ ani
+  # NESROVNÁVÁ. Řádky `app:` tenhle skript sám nečte (brána vlastnictvi-z-topologie).
+  # shellcheck source=lib/vlastnictvi.sh
+  . "$SCRIPT_DIR/lib/vlastnictvi.sh"
+  if ! vlastnictvi_nacti "$MANIFEST_FILE"; then
+    err "Vlastnictví aplikací v tomhle prostředí nejde určit (důvod výš) — nevím, kterou aplikaci smím založit. Nic jsem nezapsal."
+    exit 1
+  fi
+  info "Vlastnictví aplikací: ${VLASTNICTVI_POPIS}"
+  while IFS=$'\t' read -r _vl_role _vl_slot _vl_compose _vl_volby; do
+    [ -n "$_vl_role" ] || continue
+    APPS+=("${_vl_role}:${_vl_slot}:${_vl_compose}${_vl_volby:+:${_vl_volby}}")
+  done < <(vlastni_aplikace)
+  EXTERNI_PRESKOCENE=()
+  while IFS= read -r _vl_role; do
+    [ -n "$_vl_role" ] || continue
+    EXTERNI_PRESKOCENE+=("$_vl_role")
+  done <<< "$EXTERNI_APLIKACE"
+  unset _vl_role _vl_slot _vl_compose _vl_volby
+
+  # ── Repozitář a větev: JEDEN výklad deklarace ───────────────────────────────
+  # ⛔ NAMĚŘENO 2026-10-03 (nedůvěřivé čtení, nález 1): řádky s repozitářem a větví
+  # tu četl vlastní `case` — jiným pravidlem než krok 2b2 cold-startu a než doktor.
+  # Manifest bez řádku větve + GIT_BRANCH v prostředí (stačí v souboru obsluhy,
+  # který se načítá nahoře) = Coolify staví z větve prostředí, zatímco krok 2b2
+  # porovnal strom s `main` a mohl odhlásit shodu proti větvi, ze které se nestaví.
+  #
+  # Hodnota, kterou sem zapisujeme do Coolify, proto přichází z TÉHOŽ vykladače
+  # a TÉHOŽ režimu jako v kroku 2b2: lib/nasazovany-repozitar.mjs --deklarace.
+  # Shodná hodnota z jiného kanálu projde; liší-li se od deklarace, vykladač skončí
+  # chybou s vysvětlením — větev i repozitář se deklarují v manifestu. Tiše nevyhraje
+  # ani jedna strana a nic se tiše nepřehlédne.
+  #
+  # ⛔ CO TVRDÍ PROSTŘEDÍ, POROVNÁVÁ VYKLADAČ SÁM (recenze 2026-10-04): `--deklarace`
+  # čte GIT_BRANCH ze svého prostředí — stejně v kroku 2b2 cold-startu, tedy PŘED
+  # odloženým wipem (krok 2c). Dokud rozpor znal jen tenhle skript (krok 3), běh
+  # s jinou větví v prostředí spadl až PO wipu. Tady se proto přidává jen to, co má
+  # tenhle skript navíc z příkazové řádky (--branch, --repo).
+  # GIT_BRANCH je tu ale i PRACOVNÍ proměnná (výchozí main, --branch) — vykladač
+  # proto dostane hodnotu, která z prostředí opravdu přišla, ne tu pracovní.
+  # (REPO_PATH tady nese jen to, co přišlo z --repo; manifest ho přepíše až níž.)
+  _dekl_rc=0
+  _dekl="$(FORGEJO_URL="$FORGEJO_URL" GIT_BRANCH="$GIT_BRANCH_Z_PROSTREDI" node "${SCRIPT_DIR}/lib/nasazovany-repozitar.mjs" \
+    --manifest "$MANIFEST_FILE" --deklarace \
+    --tvrdi "branch:--branch=${GIT_BRANCH_Z_CLI}" \
+    --tvrdi "repo:--repo=${REPO_PATH}")" || _dekl_rc=$?
+  if [ "$_dekl_rc" -ne 0 ]; then
+    err "Deklaraci nasazení z manifestu ${MANIFEST_FILE} nejde použít (kód ${_dekl_rc}, důvod výše) — nezakládám naslepo."
+    exit 1
+  fi
+  IFS=$'\t' read -r _dekl_vetev _ _dekl_repo <<< "$_dekl"
+  if [ -z "$_dekl_vetev" ] || [ -z "$_dekl_repo" ]; then
+    err "Výklad deklarace vrátil neúplnou odpověď ('${_dekl}') — nezakládám naslepo."
+    exit 1
+  fi
+  REPO_PATH="$_dekl_repo"
+  GIT_BRANCH="$_dekl_vetev"
+  unset _dekl _dekl_rc _dekl_vetev _dekl_repo
 fi
 
 # ── Validate ──────────────────────────────────────────────────────────────────
@@ -394,7 +469,38 @@ reconcile_app_config() {
   # u starší je to informace, že domény zatím nastavit nepůjde.
   # Ani jedno není FAILURE — čeká se až bariérou v coolify-deploy-init.sh.
   local just_created="${4:-0}"
+  # $5 = slot serveru z manifestu. Na slotu s GPU nasazuje Coolify compose RAW (lib/umisteni-sluzeb.mjs
+  # nasazujeRaw): běžný parser by službám přidal síť aplikace s cestou ven, env_file se všemi
+  # proměnnými aplikace a přepsal jména kontejnerů. Ověřuje se zpětným čtením, ne vírou v PATCH.
+  local slot="${5:-}"
   local local_compose="${PROJECT_ROOT}/${compose_path}"
+
+  if [ -n "$slot" ]; then
+    local raw_rc=0
+    node "$SCRIPT_DIR/lib/sloty-serveru.mjs" --raw "$slot" >/dev/null 2>&1 || raw_rc=$?
+    if [ "$raw_rc" = "0" ]; then
+      coolify_api PATCH "/applications/${uuid}" -d '{"is_raw_compose_deployment_enabled":true}' > /dev/null \
+        || warn "  ${role}: PATCH raw režimu selhal — ověří zpětné čtení níž"
+      local raw_stav=""
+      raw_stav=$(coolify_api GET "/applications/${uuid}" 2>/dev/null \
+        | jq -r 'if (.settings? | type) == "object" and (.settings | has("is_raw_compose_deployment_enabled")) then (.settings.is_raw_compose_deployment_enabled | tostring)
+                 elif has("is_raw_compose_deployment_enabled") then (.is_raw_compose_deployment_enabled | tostring) else "" end' 2>/dev/null) || raw_stav=""
+      case "$raw_stav" in
+        true) ok "  ${role}: slot '${slot}' — Coolify nasazuje compose RAW (ověřeno zpětným čtením)" ;;
+        false)
+          err "  ${role}: slot '${slot}' vyžaduje raw compose, Coolify hlásí is_raw_compose_deployment_enabled=false — NENASAZOVAT"
+          FAILURES+=("${role}:raw-compose-vypnuty")
+          ;;
+        *)
+          warn "  ${role}: raw režim na slotu '${slot}' NEZMĚŘEN (API pole nevrací) — ověř v Coolify ručně před nasazením"
+          FAILURES+=("${role}:raw-compose-nezmereno")
+          ;;
+      esac
+    elif [ "$raw_rc" != "1" ]; then
+      err "  ${role}: slot '${slot}' — nevím, jestli nasazuje raw (registr slotů neodpověděl, kód ${raw_rc})"
+      FAILURES+=("${role}:raw-compose-nezmereno")
+    fi
+  fi
 
   # 1. Git settings + compose location PATCH (soft-fail)
   if coolify_api PATCH "/applications/${uuid}" -d "$(jq -n \
@@ -499,6 +605,31 @@ reconcile_app_config() {
   fi
 }
 
+# ── Deklarované držení: držená aplikace se nezakládá ani nesrovnává ──────────
+# ⛔ ZMĚŘENO ČTENÍM 2026-10-04: smyčka níž každou aplikaci z manifestu buď založí,
+# nebo jí přepíše git_repository / git_branch / docker_compose_location — tedy to,
+# ODKUD a CO Coolify postaví při příštím nasazení. U aplikace, kterou overlay
+# instance deklaruje jako drženou (nasazeni-drzene.json), se nesmí změnit nic.
+# Pravidla a validace: lib/nasazeni-drzene.mjs (čtenář lib/drzeni.sh; prostředí
+# instance už načetl resolve-domains-env.sh výš). Nečitelná nebo neplatná
+# deklarace = STOP před prvním zápisem do Coolify.
+# shellcheck source=lib/drzeni.sh
+. "$SCRIPT_DIR/lib/drzeni.sh"
+# Soubor prostředí běhu (cold-start ho exportuje jako ENV_FILE) — deklarace overlaye
+# může ležet jen v něm (revize cb N3).
+if ! drzeni_nacti "coolify-story-init" "${ENV_FILE:-}"; then
+  err "Deklaraci držení aplikací nejde přečíst nebo je neplatná (důvod výš) — nevím, kterou aplikaci smím založit nebo srovnat. Nic jsem nezapsal."
+  exit 1
+fi
+DRZENE_PRESKOCENE=()
+# Externí služby nahlas (a v souhrnu) — teprve teď je jméno story konečné.
+# (`--app` bez manifestu = výslovný záměr operátora; profil prostředí se nečte.)
+[ -n "$MANIFEST_FILE" ] || info "Vlastnictví aplikací: aplikace zadané ručně (--app) — profil prostředí se nečte, zakládám, co je zadáno."
+for _vl_role in ${EXTERNI_PRESKOCENE[@]+"${EXTERNI_PRESKOCENE[@]}"}; do
+  warn "$(vlastnictvi_hlaska "$_vl_role"). ${STORY_NAME}-${_vl_role} NEZAKLÁDÁM ani NESROVNÁVÁM."
+done
+unset _vl_role
+
 # ── Create applications ──────────────────────────────────────────────────────
 RESULTS=()
 FAILURES=()
@@ -523,6 +654,13 @@ for app_spec in "${APPS[@]}"; do
   # UUID and skips it at deploy time too (the optional-stack contract).
   if provision_gate_skips "$role"; then
     info "  skipping ${STORY_NAME}-${role}: no lane enabled (${GATE_VARS_LAST} unset)"
+    continue
+  fi
+
+  # Držená aplikace: nezakládá se a existující se nesrovnává — a řekne se to.
+  if drzena "$role"; then
+    warn "$(drzeni_hlaska "$role"). ${STORY_NAME}-${role} NEZAKLÁDÁM ani NESROVNÁVÁM (git, compose)."
+    DRZENE_PRESKOCENE+=("$role")
     continue
   fi
 
@@ -622,7 +760,7 @@ for app_spec in "${APPS[@]}"; do
       # git_repository corrupt and docker_compose_raw NULL). Without this,
       # the second cold-start would skip the broken app entirely and the
       # operator would discover the breakage only at deploy time.
-      reconcile_app_config "$existing_uuid" "$role" "$compose_path" 0
+      reconcile_app_config "$existing_uuid" "$role" "$compose_path" 0 "$server"
       RESULTS+=("${role}|${server}|${existing_uuid}|${compose_path}")
       continue
     elif [ "$verify_code" = "404" ]; then
@@ -731,7 +869,7 @@ for app_spec in "${APPS[@]}"; do
 
   # Reconcile git + compose config (idempotent, soft-fails on transient API
   # errors instead of aborting via set -euo pipefail — see helper definition).
-  reconcile_app_config "$uuid" "$role" "$compose_path" 1
+  reconcile_app_config "$uuid" "$role" "$compose_path" 1 "$server"
 
   RESULTS+=("${role}|${server}|${uuid}|${compose_path}")
 done
@@ -746,11 +884,20 @@ for result in "${RESULTS[@]}"; do
   printf "%-15s %-10s %-30s %s\n" "$role" "$server" "$uuid" "$compose"
 done
 
+if [ "${#DRZENE_PRESKOCENE[@]}" -gt 0 ]; then
+  echo ""
+  warn "DRŽENO (${#DRZENE_PRESKOCENE[@]}) — nezaloženo ani nesrovnáno: ${DRZENE_PRESKOCENE[*]} (deklarace v overlayi instance)"
+fi
+if [ -n "${EXTERNI_PRESKOCENE[*]+x}" ] && [ "${#EXTERNI_PRESKOCENE[@]}" -gt 0 ]; then
+  echo ""
+  warn "EXTERNÍ (${#EXTERNI_PRESKOCENE[@]}) — v tomhle prostředí nejsou naše, nezaloženo ani nesrovnáno: ${EXTERNI_PRESKOCENE[*]} (profil prostředí: external_domain)"
+fi
+
 echo ""
 info "Next steps:"
 echo "  1. Set env vars:  scripts/coolify-story-envs.sh --story ${STORY_NAME} --uuid UUID"
 echo "  2. Set Forgejo secrets (COOLIFY_UUID_*) for CI/CD"
-echo "  3. Deploy:        curl -X POST \${COOLIFY_URL}/api/v1/applications/UUID/restart"
+echo "  3. Deploy:        node scripts/aisha-redeploy.mjs --only=<role>   (ctí deklarované držení; holé volání API ne)"
 echo "  4. Update:        coolify/servers.json + scripts/check-infra.mjs"
 
 # ── Forgejo secrets hint ──────────────────────────────────────────────────────
@@ -775,6 +922,28 @@ if [ -n "$FORGEJO_TOKEN" ]; then
       && ok "Forgejo secret: ${secret_name}" \
       || warn "Could not set Forgejo secret: ${secret_name}"
   done
+
+  # Odvoditelné položky CI (adresa overlaye instance, štítek lehké dráhy runneru):
+  # hodnota plyne z deklarace instance a z MĚŘENÍ runnerů, ne z rozhodnutí člověka —
+  # doplní je doktor CI kontraktu; ruční nastavování v UI není (majitel 2026-10-03).
+  # ⛔ Instance s overlayem a BEZ secretu v CI nasazuje bez deklarace držení aplikací
+  #    (fail-open) — proto to patří k založení instance, ne až k prvnímu pádu.
+  if [ -n "$REPO_PATH" ]; then
+    if [ "$DRY_RUN" = "1" ]; then
+      warn "[DRY RUN] Would run: node scripts/lib/ci-kontrakt.mjs --repo ${REPO_PATH} --dopln --potvrzuji ${REPO_PATH}"
+    else
+      # Kód doktora se bere z přiřazení, ne z roury: `grep` bez shody by ho přepsal.
+      _ci_rc=0
+      _ci_out="$(FORGEJO_URL="$FORGEJO_URL" FORGEJO_TOKEN="$FORGEJO_TOKEN" \
+        node "$SCRIPT_DIR/lib/ci-kontrakt.mjs" --repo "$REPO_PATH" --dopln --potvrzuji "$REPO_PATH" 2>&1)" || _ci_rc=$?
+      printf '%s\n' "$_ci_out" | grep -E '^(doplněno|srovnáno|dopln):|✗|NEMĚŘENO' || true
+      case "$_ci_rc" in
+        0|3) ok "CI kontrakt: odvoditelné položky doplněny (${REPO_PATH})" ;;
+        1)   warn "CI kontrakt: po doplnění zůstává nález (řádky ✗ výš) — tajemství z trezoru doplní: node scripts/lib/ci-kontrakt.mjs --repo ${REPO_PATH} --env-file <trezor> --apply --potvrzuji ${REPO_PATH}" ;;
+        *)   warn "CI kontrakt NEMĚŘENO — odvoditelné položky se nedoplnily (Forgejo nečitelné nebo token bez správce repa)" ;;
+      esac
+    fi
+  fi
 fi
 
 # ── Update registry ───────────────────────────────────────────────────────────

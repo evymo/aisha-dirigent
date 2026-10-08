@@ -1,6 +1,13 @@
 -- Function: public.create_web_page_version
 -- Description: Creates a snapshot version of a web page's current state.
--- Security: SECURITY INVOKER, authenticated only, admin/staff check inside
+-- Security: SECURITY DEFINER; admin/staff NEBO service_role (stráž uvnitř).
+--
+-- ⛔ Do 2026-10-02 SECURITY INVOKER — a audit_journal má pro `authenticated`
+--    jen čtecí politiku, takže zápis auditu správci/staffovi padal na RLS (403):
+--    zveřejnění stránky z editoru tiše nevytvořilo verzi, obnova verze a použití
+--    šablony (volají tuhle funkci) selhaly. Jen service_role (seed) prošel —
+--    má BYPASSRLS. Stráž is_admin_or_staff / is_service_role zůstává jediná vstupní brána.
+--    Koncept (kind='draft', version_number 0) se do číslování nepočítá.
 -- Created: 2026-04-14
 
 CREATE OR REPLACE FUNCTION public.create_web_page_version(
@@ -9,7 +16,7 @@ CREATE OR REPLACE FUNCTION public.create_web_page_version(
 )
 RETURNS uuid
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path TO 'public'
 AS $$
 DECLARE
@@ -49,7 +56,7 @@ BEGIN
   SELECT COALESCE(MAX(version_number), 0) + 1
   INTO v_next_version
   FROM public.web_page_versions
-  WHERE page_id = p_page_id;
+  WHERE page_id = p_page_id AND kind <> 'draft';
 
   -- Insert version
   INSERT INTO public.web_page_versions (

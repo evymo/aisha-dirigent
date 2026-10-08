@@ -6,6 +6,12 @@ REST/JSON konektor **Eurowag Telematics customer API** (nástupce Webdispečink 
 ingest (stejně jako Webdispečink, T-cars, Money a AVP). `manifest.json` má
 `source_spec.adapter_entry`, `src/index.ts` běží v sandboxu (crony + capability).
 
+**0.2.2 (2026-10-03): soupis vozidel proti filtru klíče.** API vidí jen objekty, které dodavatel klíči povolil
+(`configuration.filter`; 27. 9. šest vozů, 3. 10. šestnáct), a neumí říct, co leží mimo něj. `cron.sync_fleet` proto
+porovná filtr s tím, co `/vehicles-states` vrátil: počet objektů filtru je v logu běhu, a když se množiny liší, číselník
+zůstane uložený a běh skončí chybou s oběma počty. Oprava takového nesouladu není v kódu — filtr upravuje dodavatel.
+(`…/fe/filters?all=true` je rozhraní webové aplikace Webeye, ne zákaznické API; plugin ho nevolá.)
+
 **0.2.1 (2026-09-28): data doopravdy celá.** Změřeno proti ostrému API: `/drivers`
 i `/trips` stránkují (výchozí 12, max 29) a 0.2.0 četla jen první stránku — 12 z 59
 řidičů a nejvýš 12 jízd na vozidlo za okno. Řidič u jízdy má klíč `id` (0.2.0 četla

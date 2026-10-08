@@ -28,6 +28,7 @@ import { spawn } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDirectRun } from "../lib/cli-entry.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
@@ -200,7 +201,9 @@ async function buildWorkspaceDeps(serviceDirs) {
 const CORE_SERVICES = new Set(["gateway", "storage-auth", "ws-gateway", "event-worker"]);
 
 function discoverServices() {
-  if (!existsSync(SERVICES_DIR)) return [];
+  // Tvar návratu je {withTests, withoutTests} i bez adresáře — holé [] by volající
+  // rozložil na undefined a spadl (repo/forky bez services/).
+  if (!existsSync(SERVICES_DIR)) return { withTests: [], withoutTests: [] };
   const all = readdirSync(SERVICES_DIR)
     .filter((name) => name.startsWith("svc-") || CORE_SERVICES.has(name))
     .map((name) => path.join(SERVICES_DIR, name))
@@ -326,18 +329,71 @@ function runSvcTest(svcDir) {
   });
 }
 
+/**
+ * `--jen <adresář>` (opakovatelně): jen sady TĚCHTO pracovních prostorů — cílený pre-push
+ * (scripts/ci/prepush-cilene.mjs, rozhodnutí majitele 2026-10-05 „plné sady jen v CI").
+ * Objevuje se TÝMŽ predikátem jako celá sada, takže cílený běh nespustí nic, co by celá
+ * sada nespustila. Navíc `extensions/*` s test skriptem: v CI je to vlastní úloha
+ * (Extension: Test), kterou celá test:services nepouští. Adresář bez testů se VYPÍŠE.
+ */
+export function cileneSady(jen) {
+  const rel = (p) => path.relative(REPO_ROOT, p);
+  const chci = new Set(jen.map((d) => d.replace(/\/+$/, "")));
+  const services = discoverServices().withTests.filter((p) => chci.has(rel(p)));
+  const packages = discoverPackages().withTests.filter((p) => chci.has(rel(p)));
+  const plugins = discoverPlugins().withTests.filter((p) => chci.has(rel(p)));
+  const nalezene = new Set([...services, ...packages, ...plugins].map(rel));
+  const rozsireni = [];
+  const bezTestu = [];
+  for (const d of chci) {
+    if (nalezene.has(d)) continue;
+    const abs = path.join(REPO_ROOT, d);
+    if (/^extensions\/[^/]+$/.test(d) && hasTestScript(abs)) rozsireni.push(abs);
+    else bezTestu.push(d);
+  }
+  return { services, packages, plugins, rozsireni, bezTestu };
+}
+
+function hodnotyPrepinace(argv, jmeno) {
+  const out = [];
+  for (let i = 0; i < argv.length; i++) if (argv[i] === jmeno && argv[i + 1]) out.push(argv[++i]);
+  return out;
+}
+
 async function main() {
   const start = Date.now();
+  // Registr známých přepínačů: neznámý (překlep `--jne`, zsh slepené argumenty) by spadl do
+  // VÝCHOZÍHO režimu — celé sady všech služeb — místo aby řekl, že nerozumí.
+  const ZNAME_PREPINACE = new Set(["--jen", "--plugins-only"]);
+  const argv = process.argv.slice(2);
+  const nezname = argv.filter((a, i) => (a.startsWith("-") ? !ZNAME_PREPINACE.has(a) : argv[i - 1] !== "--jen"));
+  if (nezname.length) {
+    console.error(`run-service-tests: neznámý argument ${nezname.join(" ")} (známé: --jen <adresář> (opakovatelně), --plugins-only)`);
+    process.exit(2);
+  }
+  const jen = hodnotyPrepinace(argv, "--jen");
+  if (process.argv.includes("--jen") && jen.length === 0) {
+    console.error("run-service-tests: --jen čeká adresář pracovního prostoru (services/x, packages/x, plugins/x, extensions/x)");
+    process.exit(2);
+  }
   // --plugins-only exists for the pre-push lane: plugin suites are tiny and
   // fully offline, while the 24 service suites are heavy and CI-gated. Without
   // a cheap lane the plugins would stay CI-only, which is how their tests came
   // to never run in the first place.
   const pluginsOnly = process.argv.includes("--plugins-only");
-  const { withTests, withoutTests } = pluginsOnly
-    ? { withTests: [], withoutTests: [] }
-    : discoverServices();
-  const balicky = pluginsOnly ? { withTests: [], withoutTests: [] } : discoverPackages();
-  const plugins = discoverPlugins();
+  const cilene = jen.length > 0 ? cileneSady(jen) : null;
+  if (cilene) {
+    for (const d of cilene.bezTestu) console.log(`${DIM}  ${d}: žádná sada k spuštění (bez test skriptu / testů) — nic se nepřeskočilo${NC}`);
+  }
+  const { withTests, withoutTests } = cilene
+    ? { withTests: cilene.services, withoutTests: [] }
+    : pluginsOnly
+      ? { withTests: [], withoutTests: [] }
+      : discoverServices();
+  const balicky = cilene
+    ? { withTests: [...cilene.packages, ...cilene.rozsireni], withoutTests: [] }
+    : pluginsOnly ? { withTests: [], withoutTests: [] } : discoverPackages();
+  const plugins = cilene ? { withTests: cilene.plugins, withoutTests: [] } : discoverPlugins();
 
   console.log(
     `${YELLOW}━━━ Service + plugin test runner ━━━${NC} ` +
@@ -373,7 +429,7 @@ async function main() {
   }
 
   for (const balicek of balicky.withTests) {
-    const name = `packages/${path.basename(balicek)}`;
+    const name = path.relative(REPO_ROOT, balicek);
     process.stdout.write(`  ${name} ... `);
     const r = await runSvcTest(balicek);
     results.push({ name, ...r });
@@ -412,7 +468,11 @@ async function main() {
   process.exit(failed.length === 0 ? 0 : 1);
 }
 
-main().catch((err) => {
-  console.error("run-service-tests failed:", err);
-  process.exit(1);
-});
+// Spouští se jen jako skript — cileneSady() importuje i plánovač cíleného pre-pushe
+// (isDirectRun z lib/cli-entry.mjs: porovnává soubor, ne zápis cesty).
+if (isDirectRun(import.meta.url)) {
+  main().catch((err) => {
+    console.error("run-service-tests failed:", err);
+    process.exit(1);
+  });
+}

@@ -1,5 +1,5 @@
 import Fastify, { type FastifyError, type FastifyRequest, type FastifyReply } from 'fastify';
-import { applySecurity, pluginRejection } from '@aisha/security';
+import { applySecurity, pluginRejection, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import { config } from './config.js';
@@ -17,7 +17,7 @@ import { spustitPlanovac } from './planovac/smycka.js';
 bootstrapOtel({ serviceName: 'svc-plugin-system' });
 assertBrokerSecretConfigured();
 const app = Fastify({
-  logger: { level: config.logLevel },
+  logger: safeLoggerOptions({ level: config.logLevel }),
   trustProxy: true,
 });
 

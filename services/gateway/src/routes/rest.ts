@@ -3,6 +3,7 @@ import { prodluzNajem } from '../lib/najem-adresy.js';
 import httpProxy from '@fastify/http-proxy';
 import { config } from '../config.js';
 import { translateAuthorizationForPostgrest } from '../auth/postgrest-jwt.js';
+import { redactUrlForLog } from '@aisha/security';
 
 /**
  * /rest/v1/* → PostgREST proxy
@@ -26,9 +27,11 @@ export const restProxy: FastifyPluginAsync = async (app: FastifyInstance) => {
     http2: false,
     proxyPayloads: true,
     preHandler: async (req: FastifyRequest, reply: FastifyReply) => {
-      // Log proxied RPC calls for observability
+      // Log proxied RPC calls for observability. The query string is the
+      // caller's (`?apikey=`, `?access_token=` reach PostgREST that way), so the
+      // URL goes to the log only through redactUrlForLog.
       if (req.url.includes('/rpc/')) {
-        req.log.info({ url: req.url, method: req.method }, 'PostgREST RPC proxy');
+        req.log.info({ url: redactUrlForLog(req.url), method: req.method }, 'PostgREST RPC proxy');
       }
 
       const translated = await translateAuthorizationForPostgrest(req.headers.authorization);

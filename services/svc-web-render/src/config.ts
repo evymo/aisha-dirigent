@@ -34,6 +34,8 @@ export interface WebRenderConfig {
   logLevel: string;
   /** Sdílený service token, kterým se prokazuje volající push endpointu. */
   serviceToken: string;
+  /** Tajemství pro `PUT /shell` (web → web-render), WEB_RENDER_SHELL_TOKEN. */
+  shellToken: string;
 }
 
 function requiredEnv(name: string): string {
@@ -101,5 +103,15 @@ export function loadConfig(): WebRenderConfig {
     // Přegenerování je service-to-service operace; token je fakt o světě,
     // takže se deklaruje a při chybění služba nestartuje.
     serviceToken: requiredEnv("INTRANET_API_KEY"),
+    // Vlastní tajemství JEN pro dvojici web → web-render (PUT /shell, varianta d-ii).
+    // Ne sdílený service token: kdo by ho měl, smí jen vyměnit skořápku.
+    //
+    // ⛔ ZÁMĚRNĚ NE requiredEnv (nález revize d-ii 2026-10-02): token přibyl změnou
+    // kontraktu proměnných, takže ho instance dostane až konvergencí
+    // (`aisha-cold-start.sh --skip-create`). Povinný by mezitím službu shazoval
+    // dokola a Coolify by po limitu restartů aplikaci ZASTAVIL (StopApplication) —
+    // a s ní i servírování už hotových stránek. Bez tokenu proto zápis skořápky
+    // selže ZAVŘENĚ (503) a start to hlasitě ohlásí; čtení běží dál.
+    shellToken: process.env.WEB_RENDER_SHELL_TOKEN ?? "",
   };
 }

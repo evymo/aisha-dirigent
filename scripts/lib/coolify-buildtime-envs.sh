@@ -151,14 +151,15 @@ coolify_buildtime_key_regex() {
   # RUZNE vady se dvema lecbami: druhou resi KEYCLOAK_EXTRA_HOST_ALIAS (sentinel
   # `keycloak-alias-disabled.invalid` pri kolapsu zon), tuhle prvni tenhle klic.
   #
-  # WEB_RENDER_(STATIC|SHELL)_HOST_DIR (2026-09-24): hostitelské cesty, které
-  # edge web montuje jako ZDROJ svazku (výstup rendereru, publikovaná skořápka).
-  # Zdroj svazku se interpoluje při PARSOVÁNÍ — a Coolify parsuje edge compose
-  # jen s build-time.env. Runtime-only klíč dá prázdný zdroj a compose padne
-  # dřív, než se cokoli postaví. Jsou to cesty odvozené z identity instance
-  # (generate-secrets), ne tajemství — build-time bezpečné. Hlídá brána
-  # edge-buildtime-allowlist (třída: každá proměnná ve zdroji svazku edge).
-  printf '%s' '^(VITE_|PUBLIC_SITE_URL$|SENTRY_(URL|ORG|PROJECT)$|GIT_SHA$|VERDACCIO_URL$|IMAGE_|REGISTRY_PROXY$|(MCP|API|AUTH|DIRIGENT)_(DOMAIN(_PUBLIC)?|UPSTREAM_(PUBLIC|MESH))$|EXTRANET_(DOMAIN_PUBLIC|UPSTREAM_PUBLIC|OIDC_SECRET|COOKIE_SECRET)$|MESH_ENABLED$|MATRIX_DOMAIN$|APP_DOMAIN$|KEYCLOAK_(REALM|DOMAIN(_PUBLIC)?|INTERNAL_URL)$|BACKEND_LAN_IP$|NETBIRD_(MESH_HOST|MGMT_HOST|DOMAIN|MESH_PORT|DNS_IP|PEER_CIDR)$|MESH_TLD$|MESH_DNS_NETWORK$|MESH_DNS_SUBNET$|AISHA_DB_IMAGE$|POSTGRES_MAJOR$|MESH_DNS_RESOLVER_IP$|APP_NAME_PREFIX$|SPA_KNOCK_PUBLIC_PORT$|WEB_RENDER_(STATIC|SHELL)_HOST_DIR$|EDGE_ACCESS_RETENTION_DAYS$)'
+  # WEB_RENDER_(STATIC|SHELL)_HOST_DIR tu byly 2026-09-24 až 2026-10-02 jako zdroje
+  # svazků webu; s předáním po síti (d-ii) zmizely ze všech compose.
+  #
+  # WEB_RENDER_SHELL_TOKEN (2026-10-02, d-ii) tu SCHVÁLNĚ NENÍ: compose ho čte holým
+  # `${VAR}`, takže parsování ho nepotřebuje a do buildu (`docker history`) nejde.
+  # Původní `${VAR:?}` ho sem vtahovalo a rohatka build-time tajemství to zastavila.
+  # Fail-fast drží jinde: doručení měří read-back v coolify-sync-envs.sh a
+  # svc-web-render bez tokenu nenaběhne (requiredEnv).
+  printf '%s' '^(VITE_|PUBLIC_SITE_URL$|SENTRY_(URL|ORG|PROJECT)$|GIT_SHA$|VERDACCIO_URL$|IMAGE_|REGISTRY_PROXY$|(MCP|API|AUTH|DIRIGENT)_(DOMAIN(_PUBLIC)?|UPSTREAM_(PUBLIC|MESH))$|EXTRANET_(DOMAIN_PUBLIC|UPSTREAM_PUBLIC|OIDC_SECRET|COOKIE_SECRET)$|MESH_ENABLED$|MATRIX_DOMAIN$|APP_DOMAIN$|KEYCLOAK_(REALM|DOMAIN(_PUBLIC)?|INTERNAL_URL)$|BACKEND_LAN_IP$|NETBIRD_(MESH_HOST|MGMT_HOST|DOMAIN|MESH_PORT|DNS_IP|PEER_CIDR)$|MESH_TLD$|MESH_DNS_NETWORK$|MESH_DNS_SUBNET$|AISHA_DB_IMAGE$|POSTGRES_MAJOR$|MESH_DNS_RESOLVER_IP$|APP_NAME_PREFIX$|SPA_KNOCK_PUBLIC_PORT$|EDGE_ACCESS_RETENTION_DAYS$)'
 }
 
 coolify_is_web_build_app() {

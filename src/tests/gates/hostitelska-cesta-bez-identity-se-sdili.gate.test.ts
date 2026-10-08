@@ -36,6 +36,7 @@
 import { describe, expect, test } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { parse as parseYaml } from "yaml";
 import { rozvinVychoziHodnotu, zdrojeSvazku } from "./lib/zdroje-svazku";
 
 const ROOT = resolve(__dirname, "../../..");
@@ -78,19 +79,11 @@ export function odvozenoZIdentity(promenna: string, generator: string): boolean 
 
 /**
  * Známý dluh — smí jen ubývat. Každá položka je adresář, který si instance na
- * jednom stroji sdílejí (naměřeno 2026-09-23 na varra: exec tří instancí).
- *
- * Zbývá jen exec, a to ZÁMĚRNĚ: runner (svc-agent-runner) používá TUTÉŽ cestu
- * ve svém kontejneru i jako hostitelskou pro dětské kontejnery přes docker.sock
- * (`Binds: [worktree:/work]`), a Coolify `${` v CÍLI svazku odmítá. Per-instance
- * cesta tu proto chce štěpení „cesta v kontejneru / na hostiteli" v kódu
- * runneru — navazující úkol. Proměnné `AGENT_RUNS_DIR` / `AGENT_REPO_PATH` už
- * generátor odvozuje z identity; chybí jen jejich spotřeba ve zdroji svazku.
+ * jednom stroji sdílejí. Od 2026-09-24 PRÁZDNÝ: exec (poslední dvě položky)
+ * pracuje v pevném adresáři kontejneru a hostitelskou cestu instance
+ * (${AGENT_RUNS_DIR}) dává jen dětem v Binds; sdílený base-repo zmizel.
  */
-const DLUH = [
-  "docker-compose.coolify-exec.yml:svc-agent-runner:/srv/aisha/base-repo",
-  "docker-compose.coolify-exec.yml:svc-agent-runner:/var/lib/aisha/agent-runs",
-];
+const DLUH: string[] = [];
 
 describe("doslovná hostitelská cesta k datům se sdílí mezi instancemi", () => {
   const soubory = readdirSync(ROOT).filter((f) => /^docker-compose\.coolify.*\.yml$/.test(f)).sort();
@@ -129,27 +122,67 @@ describe("doslovná hostitelská cesta k datům se sdílí mezi instancemi", () 
     ).toEqual([]);
   });
 
-  test("web a renderer TÉŽE instance sdílejí předrenderování přes tutéž proměnnou identity", () => {
-    // Obnoveno 2026-09-24: web publikuje skořápku do /shell (Dockerfile.web kopíruje
-    // index.html při startu) a servíruje výstup rendereru z /_static (nginx try_files).
-    // Web a renderer jsou DVĚ Coolify aplikace — pojmenovaný svazek by Coolify
-    // přejmenoval podle UUID aplikace, proto hostitelská cesta. Aby se potkaly, musí
-    // obě brát TUTÉŽ proměnnou; jiná proměnná (nebo doslovná cesta) = web servíruje
-    // něco jiného, než renderer vyrobil.
-    const zdroj = (soubor: string, sluzba: string, cil: string): string | undefined => {
-      const obsah = obsahy.find(([f]) => f === soubor)?.[1] ?? "";
-      return zdrojeSvazku(soubor, obsah).find((z) => z.sluzba === sluzba && z.cil === cil)?.zdroj;
-    };
-    const dvojice: Array<[string, string, string]> = [
-      ["výstup rendereru", "/usr/share/nginx/html/_static", "/out"],
-      ["skořápka webu", "/shell", "/shell"],
-    ];
-    for (const [co, cilWebu, cilRendereru] of dvojice) {
-      const web = zdroj("docker-compose.coolify-prebuilt.yml", "web", cilWebu);
-      const renderer = zdroj("docker-compose.coolify-web-render.yml", "svc-web-render", cilRendereru);
-      expect(web, `${co}: web ho nemountuje na ${cilWebu} — předrenderování se nikde nepotká`).toMatch(/^\$\{[A-Z0-9_]+\}$/);
-      expect(web, `${co}: web a renderer mountují RŮZNÉ zdroje`).toBe(renderer);
+  test("web a renderer si předrender předávají PO SÍTI — žádný sdílený zdroj svazku", () => {
+    // ⛔ OTOČENO 2026-10-02 (varianta d-ii, rozhodnutí majitele). Dřív tu stálo „obě
+    // aplikace musí brát TUTÉŽ proměnnou" — jenže Coolify 4.3.16 holý `${VAR}` ve
+    // zdroji převede na svazek KAŽDÉ aplikace zvlášť, takže se nesdílelo nic a web
+    // četl prázdný `_static` (rozbor 2026-09-28). Brána vynucovala nefunkční
+    // mechanismus. Teď: web stránky TÁHNE a skořápku POSÍLÁ přímo MESHEM (vlastní
+    // routa); renderer má výstup i skořápku ve VLASTNÍCH pojmenovaných svazcích.
+    // Měří se vlastnost „mezi aplikacemi nic sdíleného na disku ani relay na sdílené síti".
+    const zdroje = (soubor: string) =>
+      zdrojeSvazku(soubor, obsahy.find(([f]) => f === soubor)?.[1] ?? "");
+    const web = zdroje("docker-compose.coolify-prebuilt.yml").filter((z) => z.sluzba === "web");
+    const renderer = zdroje("docker-compose.coolify-web-render.yml").filter((z) => z.sluzba === "svc-web-render");
+    expect(renderer.length, "kontrolní vzorek: renderer má svazky — brána by měřila prázdno").toBeGreaterThan(0);
+
+    expect(
+      web.filter((z) => z.cil === "/usr/share/nginx/html/_static" || z.cil === "/shell").map((z) => `${z.zdroj} → ${z.cil}`),
+      "web nesmí montovat předrender ani skořápku — předání je po síti (mesh)",
+    ).toEqual([]);
+
+    for (const cil of ["/out", "/shell"]) {
+      const z = renderer.find((x) => x.cil === cil);
+      expect(z, `renderer nemá svazek na ${cil}`).toBeDefined();
+      expect(z!.zdroj, `${cil} rendereru musí být POJMENOVANÝ svazek (per instance konstrukcí), ne cesta ani \${VAR}`)
+        .toMatch(/^[a-z0-9][a-z0-9_-]*$/);
     }
+
+    const spolecne = web.filter((w) => renderer.some((r) => r.zdroj === w.zdroj) && w.zdroj !== "pki-certs").map((w) => w.zdroj);
+    expect(spolecne, "web a renderer jsou dvě Coolify aplikace — týž zdroj svazku v obou se NESDÍLÍ").toEqual([]);
+
+    // ⛔ ŽÁDNÝ RELAY NA SDÍLENÉ SÍTI (nález nezávislé revize 2026-10-02). První tvar
+    // d-ii šel přes posluchač edge-proxy :8091 — edge-proxy je ale i na síti `coolify`
+    // s ostatními nájemníky hostitele: cizí kontejner by měl neověřený vstup do meshe
+    // a jméno `<prefix>-edge-proxy` šlo na sdílené síti přivlastnit (token skořápky,
+    // podvržené HTML). Web proto jde k web-renderu PŘÍMO MESHEM s vlastní routou.
+    const prebuilt = parseYaml(obsahy.find(([f]) => f === "docker-compose.coolify-prebuilt.yml")?.[1] ?? "") as {
+      services?: Record<string, { cap_add?: string[]; environment?: Record<string, string>; networks?: unknown }>;
+    };
+    const webSluzba = prebuilt.services?.web;
+    expect(webSluzba, "kontrolní vzorek: prebuilt nemá službu web — brána by měřila prázdno").toBeDefined();
+    const env = webSluzba!.environment ?? {};
+    expect(String(env.WEB_RENDER_UPSTREAM_MESH ?? ""), "web musí dostat mesh cíl web-renderu z derivace")
+      .toMatch(/^\$\{WEB_RENDER_UPSTREAM_MESH/);
+    for (const k of ["MESH_ENABLED", "NETBIRD_PEER_CIDR", "NETBIRD_DNS_IP"]) {
+      expect(String(env[k] ?? ""), `web potřebuje ${k} pro routu do meshe`).toMatch(new RegExp(`^\\$\\{${k}:\\?`));
+    }
+    expect(webSluzba!.cap_add ?? [], "web bez NET_ADMIN — routa do meshe skončí na Permission denied").toContain("NET_ADMIN");
+    const textPrebuilt = obsahy.find(([f]) => f === "docker-compose.coolify-prebuilt.yml")?.[1] ?? "";
+    expect(textPrebuilt, "relay do web-renderu na edge-proxy (posluchač :8091) se nesmí vrátit")
+      .not.toMatch(/:8091 \{|WEB_RENDER_PROXY/);
+
+    // ⛔ MESH JMÉNO SE NEPŘEKLÁDÁ VESTAVĚNÝM DNS DOCKERU (revize RIQi Detail firmy,
+    // kolo 2, 2026-10-02). 127.0.0.11 dává PŘEDNOST aliasům ze sítí kontejneru —
+    // i ze sdílené `coolify` — takže cizí kontejner s aliasem
+    // `<prefix>-web-render.mesh.<tld>` by návštěvníkům podstrčil vlastní HTML
+    // (naměřeno: s resolverem 127.0.0.11 vrátil web obsah „squattera“). Upstream
+    // i push skořápky se proto ptají PŘÍMO mesh DNS (NETBIRD_DNS_IP).
+    const start = readFileSync(join(ROOT, "docker/web-start.sh"), "utf-8");
+    const skorapka = readFileSync(join(ROOT, "docker/web-skorapka.sh"), "utf-8");
+    expect(start, "upstream web-renderu nesmí jít přes vestavěné DNS Dockeru").not.toMatch(/resolver 127\.0\.0\.11/);
+    expect(start, "upstream web-renderu se musí ptát mesh DNS (NETBIRD_DNS_IP)").toMatch(/dns="\$\{NETBIRD_DNS_IP/);
+    expect(skorapka, "push skořápky musí překládat jméno mesh DNS (`--dns-servers`)").toMatch(/--dns-servers "\$dns"/);
   });
 
   test("hostitelská cesta z proměnné je per instance: generátor ji odvozuje z identity", () => {

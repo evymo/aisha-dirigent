@@ -76,7 +76,9 @@ describe('Step 7.2 graph extraction worker', () => {
         expect(next).toBeGreaterThan(start);
         const section = sql.slice(start, next);
         expect(section).toMatch(/SECURITY DEFINER/);
-        expect(section).toMatch(/SET search_path TO 'public'/);
+        // Tady jen to, že cesta hledání JE připnutá. Její tvar (pg_temp poslední) má jeden
+        // domov — bránu definer-search-path; starý tvar tu vyžadovat nesmí žádná brána.
+        expect(section).toMatch(/SET search_path TO /);
       });
 
       test(`${fn}: REVOKE ALL FROM PUBLIC + GRANT EXECUTE TO service_role`, () => {

@@ -44,9 +44,11 @@ describe('Step 7.3 explainability panel', () => {
 
     test('SECURITY DEFINER + search_path + STABLE preserved', () => {
       const sql = readFileSync(MIG, 'utf-8');
-      const fnSection = sql.split(/CREATE OR REPLACE FUNCTION public\.fn_get_run_graph_context/)[1] ?? '';
+      // Hlavička TÉTO funkce (po `AS $$`), ne zbytek baseline — ten by splnila kterákoli pozdější funkce.
+      // Tvar cesty hlídá domovská brána definer-search-path; tady jen to, že cesta připnutá JE.
+      const fnSection = (sql.split(/CREATE OR REPLACE FUNCTION public\.fn_get_run_graph_context/)[1] ?? '').split(/\nAS \$\$/)[0];
       expect(fnSection).toMatch(/SECURITY DEFINER/);
-      expect(fnSection).toMatch(/SET search_path TO 'public'/);
+      expect(fnSection).toMatch(/SET search_path TO /);
       expect(fnSection).toMatch(/STABLE/);
     });
 

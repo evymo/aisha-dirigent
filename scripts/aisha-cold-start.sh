@@ -58,6 +58,13 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 . "${SCRIPT_DIR}/lib/instance-data-url.sh"
 # shellcheck source=scripts/lib/env-zapis.sh
 . "${SCRIPT_DIR}/lib/env-zapis.sh"
+# Deklarované držení aplikací — čtenář nad jediným domovem (lib/nasazeni-drzene.mjs).
+# shellcheck source=scripts/lib/drzeni.sh
+. "${SCRIPT_DIR}/lib/drzeni.sh"
+# Vlastnictví aplikací manifestu v prostředí — čtenář nad jediným domovem
+# (lib/vlastnictvi-aplikaci.mjs). Řádky `app:` manifestu tenhle skript sám nečte.
+# shellcheck source=scripts/lib/vlastnictvi.sh
+. "${SCRIPT_DIR}/lib/vlastnictvi.sh"
 
 # AISHA_STORY = name of the story being cold-started. Drives:
 #   • manifest path:    coolify/manifests/${STORY}.manifest
@@ -399,8 +406,9 @@ pre_resolve_load_env() {
   for k in COOLIFY_URL COOLIFY_PROJECT_UUID \
            COOLIFY_SERVER_UUID_FRONTEND COOLIFY_SERVER_UUID_BACKEND \
            COOLIFY_SERVER_UUID_EXPERIMENTAL COOLIFY_SERVER_UUID_BUILD \
+           COOLIFY_SERVER_UUID_GPU \
            FRONTEND_HOSTNAME BACKEND_HOSTNAME \
-           EXPERIMENTAL_HOSTNAME BUILD_HOSTNAME \
+           EXPERIMENTAL_HOSTNAME BUILD_HOSTNAME GPU_HOSTNAME \
            AISHA_TARGET_SERVER COOLIFY_PROJECT_NAME \
            PUBLIC_TLD INTERNAL_TLD MESH_TLD \
            OAUTH2_COOKIE_DOMAINS OAUTH2_WHITELIST_DOMAINS \
@@ -421,9 +429,11 @@ pre_resolve_load_env() {
   : "${COOLIFY_PROD_SERVER_UUID_BACKEND:=${COOLIFY_SERVER_UUID_BACKEND:-}}"
   : "${COOLIFY_PROD_SERVER_UUID_EXPERIMENTAL:=${COOLIFY_SERVER_UUID_EXPERIMENTAL:-}}"
   : "${COOLIFY_PROD_SERVER_UUID_BUILD:=${COOLIFY_SERVER_UUID_BUILD:-}}"
+  : "${COOLIFY_PROD_SERVER_UUID_GPU:=${COOLIFY_SERVER_UUID_GPU:-}}"
   export COOLIFY_PROD_URL COOLIFY_PROD_PROJECT_UUID \
          COOLIFY_PROD_SERVER_UUID_FRONTEND COOLIFY_PROD_SERVER_UUID_BACKEND \
-         COOLIFY_PROD_SERVER_UUID_EXPERIMENTAL COOLIFY_PROD_SERVER_UUID_BUILD
+         COOLIFY_PROD_SERVER_UUID_EXPERIMENTAL COOLIFY_PROD_SERVER_UUID_BUILD \
+         COOLIFY_PROD_SERVER_UUID_GPU
 }
 
 resolve_target_env() {
@@ -482,9 +492,6 @@ resolve_target_env() {
   local resolved_url_var="${prefix}URL"
   local resolved_backup_var="${prefix}ENV_BACKUP"
   local resolved_project_var="${prefix}PROJECT_UUID"
-  local resolved_frontend_var="${prefix}SERVER_UUID_FRONTEND"
-  local resolved_backend_var="${prefix}SERVER_UUID_BACKEND"
-  local resolved_experimental_var="${prefix}SERVER_UUID_EXPERIMENTAL"
 
   local resolved_url="${!resolved_url_var:-}"
   [ -n "$resolved_url" ] || { err "${resolved_url_var} is empty — fix config/coolify-environments.env"; exit 1; }
@@ -546,9 +553,18 @@ resolve_target_env() {
     fi
   fi
   export COOLIFY_PROJECT_UUID="${COOLIFY_PROJECT_UUID:-${!resolved_project_var:-}}"
-  export COOLIFY_SERVER_UUID_FRONTEND="${COOLIFY_SERVER_UUID_FRONTEND:-${!resolved_frontend_var:-}}"
-  export COOLIFY_SERVER_UUID_BACKEND="${COOLIFY_SERVER_UUID_BACKEND:-${!resolved_backend_var:-}}"
-  export COOLIFY_SERVER_UUID_EXPERIMENTAL="${COOLIFY_SERVER_UUID_EXPERIMENTAL:-${!resolved_experimental_var:-}}"
+  # UUID serveru z prefixované deklarace prostředí pro KAŽDÝ slot registru
+  # (lib/sloty-serveru.mjs), ne pro opsané tři — build ani gpu tu dřív nebyly.
+  local _sloty _slot _cil _zdroj
+  if ! _sloty="$(node "${REPO_ROOT}/scripts/lib/sloty-serveru.mjs" --vsechny)"; then
+    err "Sloty registru coolify/servers.json nejdou přečíst — nevím, která UUID serverů převzít."
+    exit 1
+  fi
+  for _slot in $_sloty; do
+    _cil="COOLIFY_SERVER_UUID_$(printf '%s' "$_slot" | tr '[:lower:]' '[:upper:]')"
+    _zdroj="${prefix}SERVER_UUID_$(printf '%s' "$_slot" | tr '[:lower:]' '[:upper:]')"
+    export "${_cil}=${!_cil:-${!_zdroj:-}}"
+  done
 }
 
 if [ -n "${ENV_PROD_BACKUP:-}" ] && [ "$ENV_PROD_BACKUP" != "${REPO_ROOT}/.env-prod-backup" ]; then
@@ -646,6 +662,77 @@ for cmd in jq curl openssl python3; do
     exit 1
   fi
 done
+
+# ── DEKLAROVANÉ DRŽENÍ APLIKACÍ: čte se DŘÍV, než běh na cokoli sáhne ────────
+# ⛔ ZMĚŘENO ČTENÍM 2026-10-04: deklaraci držení (overlay instance,
+# nasazeni-drzene.json) ctilo jen nasazení z CI. Tenhle skript ji nečetl vůbec —
+# konvergence existující instance (`--skip-create`) by drženou aplikaci v kroku 3
+# srovnala, v kroku 4 jí doručila env (včetně proměnných, jejichž nepřítomnost
+# dnes její nasazení zastavuje) a v kroku 5 ji přenasadila: odpojení dat na
+# prázdný svazek a spuštění služby, kterou provozovatel zastavil. `--wipe`
+# a `--rewarmup` by ji smazaly i se svazky.
+#
+# Pravidla, validace a text hlášky mají JEDEN domov (lib/nasazeni-drzene.mjs);
+# plniči jsou nástroje, které krok volá (story-init, deploy-init, sync-envs,
+# redeploy) — každý si deklaraci čte sám, takže platí i při ručním spuštění.
+# Tady se čte kvůli tomu, co dělá TENHLE skript (wipe, rewarmup, seed compose,
+# souhrn), a hlavně kvůli STOPu: nečitelná nebo neplatná deklarace = nevíme, co
+# smíme nasadit, a to se má říct před doktorem, ne po polovině nasazení.
+# Instance bez overlaye nebo bez souboru = nic drženo — a řekne se to.
+cs_nacti_drzeni() {
+  # Soubor prostředí výslovně (revize cb N3): deklarace overlaye může ležet jen v něm
+  # (pre_resolve_load_env načítá .env.local a zálohu) — bez něj by čtenář overlay neviděl.
+  if ! drzeni_nacti "aisha-cold-start" "${ENV_COOLIFY:-}"; then
+    err "Deklaraci držení aplikací nejde přečíst nebo je neplatná (důvod výš)."
+    err "  Nevím, co je drženo, takže nevím, co smím nasadit — KONČÍM dřív, než se čehokoli dotknu."
+    err "  „Nic drženo“ by tu bylo fail-open: držená aplikace by se přenasadila a přišla o data."
+    exit 1
+  fi
+  if [ -z "$DRZENI_APLIKACE" ]; then
+    info "Držení aplikací: ${DRZENI_POPIS}"
+    return 0
+  fi
+  warn "Držení aplikací: ${DRZENI_POPIS}"
+  while IFS= read -r _dr_hlaska; do
+    [ -n "$_dr_hlaska" ] || continue
+    warn "  ${_dr_hlaska}. Běh ji nezakládá, nesrovnává, nedoručuje jí env, nenasazuje, nerestartuje ani nemaže."
+  done <<< "$(drzeni_vypis)"
+  unset _dr_hlaska
+}
+cs_nacti_drzeni
+
+# cs_role_aplikace <jméno aplikace v Coolify> — role bez prefixu instance
+# (deklarace držení jmenuje role, Coolify plná jména).
+cs_role_aplikace() { printf '%s' "${1#"${APP_NAME_PREFIX}"-}"; }
+
+# cs_rewarmup_nesmi_drzenou — `--rewarmup` cíl zahodí i se svazky; u držené aplikace
+# je to přesně to, čemu držení brání. Rozpor voleb = STOP, ne tiché vynechání cíle.
+# Totéž EXTERNÍ služba (profil prostředí: external_domain): v tomhle prostředí není naše,
+# a když v projektu přesto zbyla stará aplikace jejího jména (např. `<prefix>-keycloak`
+# z doby, kdy ho prostředí vlastnilo), rewarmup by ji podle jména našel a smazal se svazky
+# (revize integrátora 2026-10-04, bod 1). Úklid takové aplikace je ruční rozhodnutí.
+cs_rewarmup_nesmi_drzenou() {
+  [ -n "$REWARMUP_APPS" ] || return 0
+  local _stary_ifs="$IFS" _cil
+  IFS=','
+  for _cil in $REWARMUP_APPS; do
+    IFS="$_stary_ifs"
+    _cil="$(printf '%s' "$_cil" | tr -d '[:space:]')"
+    if [ -n "$_cil" ] && drzena "$(cs_role_aplikace "$_cil")"; then
+      err "--rewarmup=${_cil}: $(drzeni_hlaska "$(cs_role_aplikace "$_cil")")."
+      err "  Rewarmup by ji zahodil VČETNĚ SVAZKŮ. Držení se ruší v overlayi instance (nasazeni-drzene.json), ne přepínačem."
+      exit 1
+    fi
+    if [ -n "$_cil" ] && externi "$(cs_role_aplikace "$_cil")"; then
+      err "--rewarmup=${_cil}: $(vlastnictvi_hlaska "$(cs_role_aplikace "$_cil")")."
+      err "  Rewarmup by aplikaci tohoto jména zahodil VČETNĚ SVAZKŮ — i kdyby v projektu zbyla, není to cíl rewarmupu."
+      err "  Starou aplikaci odstraň ručně po ověření, čí data nese; vlastnictví se mění v profilu prostředí, ne přepínačem."
+      exit 1
+    fi
+    IFS=','
+  done
+  IFS="$_stary_ifs"
+}
 
 # ── Iter 21 + 22a: deployment-config overlay + interactive prompt ─────────────
 # .env.local + .env-prod-backup essentials were already loaded by
@@ -884,13 +971,18 @@ export COOLIFY_BASE_URL="${COOLIFY_BASE_URL:-$COOLIFY_URL}"
 
 for required_target_key in \
   COOLIFY_PROJECT_UUID \
-  COOLIFY_ENVIRONMENT \
-  COOLIFY_SERVER_UUID_FRONTEND \
-  COOLIFY_SERVER_UUID_BACKEND \
-  COOLIFY_SERVER_UUID_EXPERIMENTAL; do
+  COOLIFY_ENVIRONMENT; do
   load_env_key_if_unset "$required_target_key"
 done
-load_env_key_if_unset COOLIFY_SERVER_UUID_BUILD
+# UUID serverů všech slotů registru (lib/sloty-serveru.mjs) — ne opsaný výčet.
+if ! _sloty_registru="$(node "$REPO_ROOT/scripts/lib/sloty-serveru.mjs" --vsechny)"; then
+  err "Sloty registru coolify/servers.json nejdou přečíst — nevím, která UUID serverů načíst."
+  exit 1
+fi
+for _slot in $_sloty_registru; do
+  load_env_key_if_unset "COOLIFY_SERVER_UUID_$(printf '%s' "$_slot" | tr '[:lower:]' '[:upper:]')"
+done
+unset _slot _sloty_registru
 
 # ── Iter 19: Coolify UUID auto-discovery (project + per-server) ──────────────
 # Runs after .env-prod-backup load + before require_loaded_env checks.
@@ -924,22 +1016,65 @@ if [ -n "${COOLIFY_API_TOKEN:-}" ] && [ -n "${COOLIFY_URL:-}" ]; then
   if [ -n "$_disc_tmp" ]; then
     eval "$_disc_tmp"
   fi
+  # ⛔ ADRESA EDGE MUSÍ DOJÍT DO DĚTÍ (naměřeno 2026-10-06, první konvergence instance
+  # s otevřenou lane modelového meshe, suchý běh). `eval` výstup discovery jen NASTAVÍ
+  # (set -a tu neplatí) — jenže PUBLIC_EDGE_HOST_ADDR čte generate-secrets
+  # (MODEL_MESH_VSTUP_ADDR) i simulace kroku 2 v doktoru, obojí jako DÍTĚ tohohle
+  # shellu. Neexportovaná adresa = prázdný MODEL_MESH_VSTUP_ADDR = compose mostu
+  # a řídicí roviny modelového meshe spadne na `:?` (doktor v kroku 0, ostrý běh v 2b).
+  # V trezoru ta adresa není (je to POZOROVÁNÍ, ne deklarace), takže ji nic jiného
+  # neexportuje. Brána: discovery-dojde-do-deti.
+  if [ -n "${PUBLIC_EDGE_HOST_ADDR:-}" ]; then
+    export PUBLIC_EDGE_HOST_ADDR
+  fi
   unset _disc_tmp _disc_pin _disc_rc
 
 
   # AISHA_TARGET_SERVER override: pin every slot to one server's UUID. Used
   # when the operator wants single-host deploy even though Coolify has more
   # servers available (e.g. testing on frontend before promoting to multi-host).
+  #
+  # „Every slot" = každý slot, který pin smí vzít (lib/sloty-serveru.mjs
+  # --pripnutelne): slot s výslovnou vazbou (has_gpu — GPU uzel i s firewallem
+  # hostitele) se nepřišpendluje nikdy, jeho server musí být deklarovaný zvlášť.
   if [ -n "${AISHA_TARGET_SERVER:-}" ]; then
     _target_upper=$(printf '%s' "$AISHA_TARGET_SERVER" | tr 'a-z' 'A-Z')
     _target_key="COOLIFY_SERVER_UUID_${_target_upper}"
     _target_uuid="${!_target_key:-}"
+    if ! _pripnutelne="$(node "$REPO_ROOT/scripts/lib/sloty-serveru.mjs" --pripnutelne)"; then
+      err "Sloty k přišpendlení nejdou odvodit (coolify/servers.json) — AISHA_TARGET_SERVER nelze uplatnit."
+      exit 1
+    fi
+    # ⛔ CÍL PINU MUSÍ BÝT PŘIPNUTELNÝ (revize accel-1, 10-05). `AISHA_TARGET_SERVER=gpu`
+    # by vzal UUID GPU uzlu a přišpendlil na něj CELÝ hlavní stack (všechny
+    # připnutelné sloty) — přesně to, co výslovná vazba slotu s GPU vylučuje.
+    # Cíl mimo `--pripnutelne` (neznámý slot nebo slot s výslovnou vazbou) = STOP.
+    # AISHA_TARGET_SERVER nese buď jméno SLOTU (frontend…), nebo jméno serveru v Coolify
+    # (interaktivní dotaz výš). STOP tedy jen pro slot registru, který pin nesmí vzít,
+    # a pro cíl, jehož UUID je server takového slotu (GPU uzel pod jiným jménem).
+    _cil_slot="$(printf '%s' "$AISHA_TARGET_SERVER" | tr '[:upper:]' '[:lower:]')"
+    if ! _vsechny_sloty="$(node "$REPO_ROOT/scripts/lib/sloty-serveru.mjs" --vsechny)"; then
+      err "Sloty registru nejdou odvodit (coolify/servers.json) — AISHA_TARGET_SERVER nelze uplatnit."
+      exit 1
+    fi
+    if grep -qx "$_cil_slot" <<< "$_vsechny_sloty" && ! grep -qx "$_cil_slot" <<< "$_pripnutelne"; then
+      err "AISHA_TARGET_SERVER=$AISHA_TARGET_SERVER: slot s výslovnou vazbou (GPU uzel) nejde použít jako cíl jednouzlového pinu — přišpendlil by na něj celý hlavní stack. Připnutelné: $(printf '%s' "$_pripnutelne" | tr '\n' ' ')"
+      exit 1
+    fi
+    for _vazany in $(printf '%s\n' "$_vsechny_sloty" | grep -vxF -f <(printf '%s\n' "$_pripnutelne")); do
+      _vazany_key="COOLIFY_SERVER_UUID_$(printf '%s' "$_vazany" | tr '[:lower:]' '[:upper:]')"
+      if [ -n "$_target_uuid" ] && [ "$_target_uuid" = "${!_vazany_key:-}" ]; then
+        err "AISHA_TARGET_SERVER=$AISHA_TARGET_SERVER míří na server slotu '$_vazany' (výslovná vazba) — celý hlavní stack na GPU uzel nepatří."
+        exit 1
+      fi
+    done
+    unset _cil_slot _vsechny_sloty _vazany _vazany_key
     if [ -n "$_target_uuid" ]; then
-      info "AISHA_TARGET_SERVER=$AISHA_TARGET_SERVER → pinning every slot to UUID ${_target_uuid:0:8}…"
-      export COOLIFY_SERVER_UUID_FRONTEND="$_target_uuid"
-      export COOLIFY_SERVER_UUID_BACKEND="$_target_uuid"
-      export COOLIFY_SERVER_UUID_EXPERIMENTAL="$_target_uuid"
-      export COOLIFY_SERVER_UUID_BUILD="$_target_uuid"
+      info "AISHA_TARGET_SERVER=$AISHA_TARGET_SERVER → pinning slots ($(printf '%s' "$_pripnutelne" | tr '\n' ' ')) to UUID ${_target_uuid:0:8}…"
+      for _slot in $_pripnutelne; do
+        export "COOLIFY_SERVER_UUID_$(printf '%s' "$_slot" | tr '[:lower:]' '[:upper:]')=$_target_uuid"
+      done
+      unset _slot _pripnutelne
     else
       warn "AISHA_TARGET_SERVER=$AISHA_TARGET_SERVER but ${_target_key} is empty — keeping per-slot UUIDs"
     fi
@@ -952,12 +1087,33 @@ fi
 # all slots share one UUID; cloud-multi has them per-server.
 for required_target_key in \
   COOLIFY_PROJECT_UUID \
-  COOLIFY_ENVIRONMENT \
-  COOLIFY_SERVER_UUID_FRONTEND \
-  COOLIFY_SERVER_UUID_BACKEND \
-  COOLIFY_SERVER_UUID_EXPERIMENTAL; do
+  COOLIFY_ENVIRONMENT; do
   require_loaded_env "$required_target_key"
 done
+# Akcelerační vrstva (GPU uzel): přepínače lane vrstvy (accel-hostfw, accel-vstup, accel-embed-<n>)
+# plynou z deklarace uzlu v datech instance — načíst DŘÍV, než se odvodí sloty v provozu, jinak by
+# první cold-start s novou deklarací GPU slot nevyžadoval. Vadná deklarace = STOP.
+# shellcheck source=lib/accel-vrstva-env.sh
+. "$REPO_ROOT/scripts/lib/accel-vrstva-env.sh"
+nacti_env_vrstvy_accel "$REPO_ROOT" || {
+  err "Deklaraci GPU uzlu (accel/uzel.json v datech instance) nejde vyložit — STOP dřív, než se cokoli nasadí."
+  exit 1
+}
+# „Every slot" = každý slot V PROVOZU (lib/sloty-serveru.mjs: slot hostí aspoň
+# jednu katalogovou službu s otevřenou lane), ne opsaný výčet. Povinné sloty
+# vycházejí tytéž jako dřív; volitelný slot (GPU uzel `gpu`) se vyžaduje až když
+# na něj instance něco nasazuje — lane vrstvy z deklarace uzlu (firewall hostitele,
+# vstup lane, sloty enginů; accel-vrstva-env.sh výš), nebo přepis umístění
+# v profilu (model forku) — a pak fail-closed TADY, ne až u zakládání aplikace.
+# Nezměřený seznam je STOP: prázdná smyčka by nevyžadovala nic.
+if ! _sloty_v_provozu="$(node "$REPO_ROOT/scripts/lib/sloty-serveru.mjs" --v-provozu --profil "${AISHA_PROFILE:-}")"; then
+  err "Sloty v provozu NEODVOZENY (coolify/servers.json + config/services.json) — nevím, které servery vyžadovat."
+  exit 1
+fi
+for _slot in $_sloty_v_provozu; do
+  require_loaded_env "COOLIFY_SERVER_UUID_$(printf '%s' "$_slot" | tr '[:lower:]' '[:upper:]')"
+done
+unset _slot _sloty_v_provozu
 
 # Discovery, zálohy i .env.local už proběhly — ne-produkční běh musí pořád mířit
 # na svůj připnutý projekt. Hned tady, dřív než se z projektu cokoli čte.
@@ -1033,7 +1189,10 @@ inherit_live_topology_flags
 # je v tuhle chvíli ještě prázdný — rozklad na soubor se proto dělá až v místě
 # použití, kde už checkout existuje. (Naměřeno při psaní téhle opravy: rozklad
 # na tomhle řádku overlay v instance-data nikdy nenašel a tiše propadl na repo.)
-DOMAINS_OVERLAY_REQUESTED="${DOMAINS_FILE:-}"
+# ⭐ EXPORTUJE SE (2026-10-05): env-doktor (krok 4) z něj čte deklaraci domén webu
+# (WEB_FQDNS → odvozený klíč .env.coolify) přes TENTÝŽ rozklad jako níž
+# (scripts/lib/domenovy-overlay.mjs) — prázdná hodnota = overlay nežádán.
+export DOMAINS_OVERLAY_REQUESTED="${DOMAINS_FILE:-}"
 
 DOMAINS_FILE="${REPO_ROOT}/config/domains.env"
 if [ ! -f "$DOMAINS_FILE" ]; then
@@ -1057,6 +1216,32 @@ if [ -z "${AISHA_PROFILE:-}" ]; then
   err "  jiné servery, jiná organizace — a nic by přitom nespadlo."
   exit 1
 fi
+
+# ── VLASTNICTVÍ APLIKACÍ V TOMHLE PROSTŘEDÍ ───────────────────────────────────
+# Manifest je INVENTÁŘ instance (jeden pro všechna prostředí); co je v TOMHLE
+# prostředí naše, říká efektivní profil: služba s `external_domain` běží jinde
+# (např. sdílený Keycloak jiné instance) — nezakládá se, nenasazuje, nesrovnává,
+# nemaže a nikdy se do ní neimportuje realm. Dřív o Keycloaku rozhodoval
+# `grep '^app: *keycloak:'` nad manifestem, takže prostředí s cizím Keycloakem by
+# ho „vlastnilo“. Odpověď má JEDEN domov (lib/vlastnictvi-aplikaci.mjs); tady se
+# čte jednou, nahlas, a „nevím“ = konec dřív, než se čehokoli dotkneme.
+cs_nacti_vlastnictvi() {
+  if ! vlastnictvi_nacti "$MANIFEST"; then
+    err "Vlastnictví aplikací v tomhle prostředí nejde určit (důvod výš)."
+    err "  Nevím, co je tu naše, takže nevím, co smím zakládat, nasazovat a mazat — KONČÍM."
+    exit 1
+  fi
+  info "Vlastnictví aplikací: ${VLASTNICTVI_POPIS}"
+  while IFS= read -r _vl_hlaska; do
+    [ -n "$_vl_hlaska" ] || continue
+    warn "  ${_vl_hlaska}. Běh ji nezakládá, nesrovnává, nenasazuje, nemaže a realm do ní neimportuje."
+  done <<< "$(vlastnictvi_vypis)"
+  unset _vl_hlaska
+}
+# Volá se AŽ ZA rozkladem domén prostředí (blok topologie níž): profil může adresu externí
+# služby deklarovat proměnnou (`external_domain: "${VAR}"`), kterou dodává teprve soubor
+# domén z overlaye instance. Načteno dřív = proměnná ještě nenastavená = „nevím“
+# (revize integrátora 2026-10-04 — dřív se tu „nevím“ tiše četlo jako „vlastní“).
 
 
 if [ "$AISHA_PROFILE" != "legacy" ]; then
@@ -1130,20 +1315,28 @@ if [ "$AISHA_PROFILE" != "legacy" ]; then
   # (`_fetch_instance_overlay` výš), takže `AISHA_INSTANCE_CONFIG_DIR` míří na
   # checkout. Hledá se ve dvou domovech, v tomhle pořadí: instance-data (kam
   # instanční deklarace PATŘÍ — viz derive-domains.mjs:251), teprve pak repo.
+  # Rozklad má JEDEN domov: scripts/lib/domenovy-overlay.mjs (`--soubor`) — týž,
+  # kterým env-doktor overlay najde i mimo cold-start (redeploy). Kód 3 =
+  # nenalezeno; jiný nenulový kód = selhání nástroje, ne „overlay není".
   DOMAINS_OVERLAY_FILE=""
   if [ -n "${DOMAINS_OVERLAY_REQUESTED:-}" ]; then
-    for _dov_base in "${AISHA_INSTANCE_CONFIG_DIR:-}" "$REPO_ROOT"; do
-      [ -n "$_dov_base" ] || continue
-      case "$DOMAINS_OVERLAY_REQUESTED" in
-        /*) _dov_try="$DOMAINS_OVERLAY_REQUESTED" ;;
-        *)  _dov_try="${_dov_base}/${DOMAINS_OVERLAY_REQUESTED}" ;;
-      esac
-      if [ -f "$_dov_try" ]; then DOMAINS_OVERLAY_FILE="$_dov_try"; break; fi
-    done
-    if [ -z "$DOMAINS_OVERLAY_FILE" ]; then
-      warn "  Domain overlay '${DOMAINS_OVERLAY_REQUESTED}' requested but not found (instance-data ani repo) — instance domains will NOT be applied"
+    _dov_rc=0
+    DOMAINS_OVERLAY_FILE="$(node "${REPO_ROOT}/scripts/lib/domenovy-overlay.mjs" --soubor "$DOMAINS_OVERLAY_REQUESTED")" || _dov_rc=$?
+    if [ "$_dov_rc" -ne 0 ] && [ "$_dov_rc" -ne 3 ]; then
+      err "  Rozklad doménového overlaye '${DOMAINS_OVERLAY_REQUESTED}' selhal (kód ${_dov_rc}) — NEPOKRAČUJU"
+      exit 1
     fi
-    unset _dov_base _dov_try
+    # ⛔ VYŽÁDANÝ A NENALEZENÝ OVERLAY = KONEC (revize 2026-10-05, bod D). Dřív tu
+    # bylo jen varování a běh pokračoval s doménami ze šablony: WEB_FQDNS ze shellu
+    # pak byl PRÁZDNÝ („jedna značka") a krok 4 (doktor domén --apply) by web zúžil
+    # a smazal routy značek. Bez deklarace instance se nepokračuje.
+    if [ -z "$DOMAINS_OVERLAY_FILE" ]; then
+      err "  Domain overlay '${DOMAINS_OVERLAY_REQUESTED}' requested but not found (instance-data ani repo) — instance domains would NOT be applied"
+      err "  NEPOKRAČUJU: bez doménového overlaye by krok 4 zapsal domény ze šablony (web jen s APP_DOMAIN) a smazal routy značek."
+      err "  Zpřístupni overlay instance (AISHA_INSTANCE_DATA_GIT_URL / AISHA_INSTANCE_CONFIG_DIR) nebo oprav COOLIFY_<ENV>_DOMAINS_FILE."
+      exit 1
+    fi
+    unset _dov_rc
   fi
 
   if [ -n "${DOMAINS_OVERLAY_FILE:-}" ]; then
@@ -1244,6 +1437,8 @@ else
   set +a
   ok "Loaded domain contract from config/domains.env (APP=${APP_DOMAIN}, API=${API_DOMAIN}, STUDIO=${STUDIO_DOMAIN}, NOCODB=${NOCODB_DOMAIN})"
 fi
+# Vlastnictví aplikací — teď, když je profil i soubor domén prostředí rozložený (viz výš).
+cs_nacti_vlastnictvi
 
 # ── Verdaccio publish token — auto-mint from stored credentials ──────────────
 # The static VERDACCIO_TOKEN read above from .env-prod-backup is a Verdaccio JWT
@@ -1309,6 +1504,8 @@ fi
 # Provenance patří k odpovědi: u wipe rozhoduje, čí aplikace se smažou, a
 # „odkud to víme" je pak stejně důležité jako sama hodnota.
 ok "Using app-name prefix: ${APP_NAME_PREFIX}-* (story \"${STORY}\"; deklarováno v: ${AISHA_IDENTITY_SOURCE:-prostředí/.env.coolify})"
+# Rozporné volby padají hned, jak je znám prefix (jména v --rewarmup jsou plná).
+cs_rewarmup_nesmi_drzenou
 
 # ── Zámek běhu — klíčovaný IDENTITOU INSTANCE, ne strojem ─────────────────────
 #
@@ -1407,6 +1604,7 @@ export COOLIFY_SERVER_UUID_FRONTEND
 export COOLIFY_SERVER_UUID_BACKEND
 export COOLIFY_SERVER_UUID_EXPERIMENTAL
 export COOLIFY_SERVER_UUID_BUILD="${COOLIFY_SERVER_UUID_BUILD:-}"
+export COOLIFY_SERVER_UUID_GPU="${COOLIFY_SERVER_UUID_GPU:-}"
 export COOLIFY_PROJECT_UUID
 export COOLIFY_ENVIRONMENT
 
@@ -1560,13 +1758,8 @@ coolify_app_healthy() {
 # instance — týž zdroj, podle kterého ji story-init založil.
 aplikace_podle_compose() {
   local compose="$1" role
-  role="$(awk -v c="$compose" '
-    /^app:/ {
-      sub(/^app:[[:space:]]*/, "")
-      split($0, pole, ":")
-      gsub(/[[:space:]]/, "", pole[1]); gsub(/[[:space:]]/, "", pole[3])
-      if (pole[3] == c) { print pole[1]; exit }
-    }' "$MANIFEST")"
+  # Jen VLASTNÍ aplikace (domov vlastnictví): na externí službu se nečeká.
+  role="$(awk -F'\t' -v c="$compose" '$3 == c { print $1; exit }' <<< "$(vlastni_aplikace)")"
   [ -n "$role" ] || return 1
   printf '%s-%s' "$APP_NAME_PREFIX" "$role"
 }
@@ -1584,6 +1777,17 @@ aplikace_podle_compose() {
 # POTOK_ENABLED are set, otherwise their UUIDs stay empty and deploy-init skips.
 STACKS="core keycloak web extranet langfuse admin n8n matrix livekit pki ledger integration llm-gateway openclaw source-broker local-ingest potok"
 
+# Odpovídá TENHLE běh za sdílený server (typ proxy v Coolify, proxy běžící na uzlu)?
+# Jen produkční běh naostro: server je společný všem projektům na něm, ne-produkční
+# běh ani dry-run ho měnit nesmí. JEDNA odpověď pro všechna místa — krok 4c podle ní
+# zapisuje typ proxy (`coolify-server-proxy.mjs --apply`) a rozhoduje, jestli rozdíl
+# nebo NEMĚŘENO končí nedokončeně, nebo varováním (proxy_serveru_krok_verdikt),
+# závěrečné ověření podle ní měří kontejner proxy na uzlu (overeni_proxy_na_uzlu)
+# a krok 0 podle ní říká doktorovi, co tenhle běh se serverem dělá
+# (`--predlet-cold-startu=srovna|nemeni`).
+# Víc kopií podmínky by se rozešlo: doktor by sliboval ověření, které se nespustí.
+cs_beh_odpovida_za_sdileny_server() { [ "$DRY_RUN" != "1" ] && cs_je_prod_env; }
+
 # ─────────────────────────────────────────────────────────────────────────────
 step "0. PREFLIGHT DOCTOR (cold-start-doctor.sh)"
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1595,9 +1799,11 @@ step "0. PREFLIGHT DOCTOR (cold-start-doctor.sh)"
 
 if [ "$SKIP_DOCTOR" = "1" ]; then
   warn "Skipped doctor (--skip-doctor) — letíš naslepo, dobře si rozmysli"
-elif [ "$DRY_RUN" = "1" ]; then
-  info "[DRY RUN] Would run: bash scripts/cold-start-doctor.sh"
 else
+  # ⛔ SUCHÝ BĚH DOKTORA SPOUŠTÍ (2026-10-03). Dřív tu pro --dry-run stálo jen „Would run“ —
+  # jenže doktor je jen čtení a právě jeho fatální nálezy (fáze D compose, odmítnutá
+  # tajemství) ostrý běh zastaví. Suchý běh, který je nevidí, hlásil zelenou nad během,
+  # který pak v okně nasazení spadl.
   if [ -x "${REPO_ROOT}/scripts/cold-start-doctor.sh" ]; then
     info "Running cold-start-doctor.sh (preflight readiness check)..."
     # ZÁMĚR BĚHU SE PŘEDÁVÁ. Bez něj doktor blokoval `--wipe` kvůli dvěma
@@ -1605,8 +1811,18 @@ else
     # (smaže všechny aplikace projektu, manifest založí jednu). Fail-closed na
     # podmínku, kterou právě spuštěná operace ruší. Kolize s CIZÍM nájemníkem
     # zůstává blokující i s wipem — tam náš wipe nesahá.
+    # Totéž pro SDÍLENÝ SERVER: jeho stav (typ proxy ve fázi F, kontejner proxy
+    # na uzlu ve fázi V) nesmí v předletu zastavit žádný cold-start — produkční běh
+    # ho teprve srovná a na konci ověří, ne-produkční ho měnit nesmí. Doktor se
+    # proto VŽDY dozví, že jde o předlet cold-startu, a co tenhle běh se serverem
+    # dělá; nálezy pak hlásí jako hlasité varování (samostatný doktor: FAIL).
     _doctor_args=()
     [ "$WIPE" = "1" ] && _doctor_args+=(--wipe-planned)
+    if cs_beh_odpovida_za_sdileny_server; then _doctor_args+=(--predlet-cold-startu=srovna); else _doctor_args+=(--predlet-cold-startu=nemeni); fi
+    # Konvergence existujícího stacku: doktor ověří, že krok 2 vyrobí všechna tajemství.
+    [ "$SKIP_CREATE" = "1" ] && _doctor_args+=(--stack-exists)
+    # Plánovaný rewarmup: přesun jmenovaných aplikací na jiný server provede sám.
+    [ -n "${REWARMUP_APPS:-}" ] && _doctor_args+=("--rewarmup-planned=${REWARMUP_APPS}")
     set +e
     bash "${REPO_ROOT}/scripts/cold-start-doctor.sh" ${_doctor_args[@]+"${_doctor_args[@]}"}
     DOCTOR_RC=$?
@@ -1614,13 +1830,34 @@ else
     case "$DOCTOR_RC" in
       0) ok "Doctor: READY" ;;
       2) warn "Doctor: READY with warnings — pokračuju, ale prohlédni si výpis výš" ;;
-      *) err "Doctor reported FATAL issues (exit $DOCTOR_RC) — opravu před spuštěním cold-startu."
-         err "  Bypass: bash scripts/aisha-cold-start.sh --skip-doctor"
-         exit 1 ;;
+      *) if [ "$DRY_RUN" = "1" ]; then
+           nedokonceno "Doctor: FATAL (exit $DOCTOR_RC) — ostrý běh by tady skončil (výpis výš)"
+         else
+           err "Doctor reported FATAL issues (exit $DOCTOR_RC) — opravu před spuštěním cold-startu."
+           err "  Bypass: bash scripts/aisha-cold-start.sh --skip-doctor"
+           exit 1
+         fi ;;
     esac
   else
     warn "scripts/cold-start-doctor.sh nenalezen nebo není executable — skipping preflight"
   fi
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+step "0b. BALÍČKY, KTERÉ SKRIPTY COLD-STARTU IMPORTUJÍ SESTAVENÉ"
+# ─────────────────────────────────────────────────────────────────────────────
+# ⛔ NAMĚŘENO 2026-10-03 (konvergence instance forku, krok 4): knock-provision → knock-roster.mjs
+# importuje packages/knock-protocol/dist. dist je gitignorovaný a cold-start ho
+# nikdy nesestavoval — v čerstvém (konvergenčním) stromu dveře padly; ve starém
+# by tiše běžel ZASTARALÝ. Sestavuje se proto VŽDY a před prvním skriptem;
+# seznam se odvozuje z importů skriptů (lib/balicky-pro-skripty.mjs).
+if [ "$DRY_RUN" = "1" ]; then
+  warn "[DRY RUN] Would build: $(node "${REPO_ROOT}/scripts/lib/balicky-pro-skripty.mjs" --seznam 2>&1 | tr '\n' ' ')"
+elif node "${REPO_ROOT}/scripts/lib/balicky-pro-skripty.mjs" --sestav; then
+  ok "Balíčky pro skripty sestavené z tohoto stromu"
+else
+  err "Sestavení balíčků pro skripty selhalo (výpis výše) — skripty cold-startu by je neměly, nebo staré."
+  exit 1
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1898,6 +2135,19 @@ wipe_orphan_apps() {
     [ -z "$uuid" ] && continue
     # PRESERVE guard — belt-and-braces on top of the project scope.
     printf '%s\n' "$name" | grep -qiE "$PRESERVED_APPS_REGEX" && continue
+    # DRŽENÁ aplikace se NEMAŽE: wipe by ji zahodil i se svazky — tedy přesně ta
+    # ztráta dat, které držení brání. Zůstává, jak je (i se svým starým env);
+    # zbytek projektu se smaže.
+    if drzena "$(cs_role_aplikace "$name")"; then
+      warn "wipe_orphan_apps: $(drzeni_hlaska "$(cs_role_aplikace "$name")"). NEMAŽU ji ani její svazky (${uuid}); nová tajemství platformy NEDOSTANE."
+      continue
+    fi
+    # EXTERNÍ služba (profil prostředí: external_domain) není v tomhle prostředí naše —
+    # nikdy kandidát ke smazání, ani když aplikace jejího jména v projektu je.
+    if externi "$(cs_role_aplikace "$name")"; then
+      warn "wipe_orphan_apps: $(vlastnictvi_hlaska "$(cs_role_aplikace "$name")"). NEMAŽU ${name} (${uuid})."
+      continue
+    fi
     _names+=("$name")
     _uuids+=("$uuid")
   done <<< "$scoped"
@@ -2125,6 +2375,38 @@ fi
 step "2. GENERATE FRESH SECRETS"
 # ─────────────────────────────────────────────────────────────────────────────
 
+# ── Konvergence existující instance: trezor nesmí být starší než živý stack ──
+# ⛔ NAMĚŘENO 2026-10-04 (předlet forku nad W1): krok 2 bere spravovaná tajemství
+# z trezoru a krok 4 je pošle do Coolify. Hodnota změněná v Coolify po poslední
+# záloze (rotace, ruční oprava) se tak TIŠE přetočí zpátky — u hesla DB nebo
+# šifrovacího klíče proti datům, která už nesou tu novou. Zpětná synchronizace
+# (coolify-pull-envs.mjs) běží jen před wipem; konvergence ji neměla vůbec.
+# Proto tady KONTROLA (nic nezapisuje): rozchod i „nevím“ = STOP před prvním zápisem.
+# Srovnání je vědomý krok obsluhy (převzít živé hodnoty, nebo vysvětlit rozdíl),
+# ne tichý zásah nástroje.
+if [ "$SKIP_CREATE" = "1" ]; then
+  info "Trezor × živý stack (spravovaná tajemství, jen otisky)…"
+  _zive_log="$(mktemp)"
+  _zive_rc=0
+  node "${REPO_ROOT}/scripts/coolify-pull-envs.mjs" --check --out="$ENV_PROD_BACKUP" >"$_zive_log" 2>&1 || _zive_rc=$?
+  sed 's/^/      /' "$_zive_log"
+  rm -f "$_zive_log"
+  case "$_zive_rc" in
+    0) ok "  Trezor odpovídá živým hodnotám spravovaných tajemství" ;;
+    3)
+      err "STOP: trezor ($ENV_PROD_BACKUP) neodpovídá živému stacku — krok 2 by tajemství výš přetočil."
+      err "  Živé hodnoty převezmi do trezoru: node scripts/coolify-pull-envs.mjs --out=\"$ENV_PROD_BACKUP\""
+      err "  (před zásahem uloží .pred-reverse-sync), nebo rozdíl vysvětli — a spusť konvergenci znovu."
+      exit 1
+      ;;
+    *)
+      err "STOP: shodu trezoru se živým stackem nejde změřit (kód ${_zive_rc}) — bez ní konvergenci nespouštím."
+      exit 1
+      ;;
+  esac
+  unset _zive_log _zive_rc
+fi
+
 # Helper: generate base64 secret of N bytes
 gen_secret() {
   # URL-safe base64 secret. Retry pokud první znak je `-` — řada CLI nástrojů
@@ -2335,12 +2617,26 @@ else
     err "  účet, na který se nikdo nedostane, a NIC by přitom nespadlo."
     exit 1
   fi
+  # Modelový mesh forku (varianta C): tajemství NETBIRD_MODEL_* jsou stavová jen tam, kde
+  # stack modelového meshe UŽ STOJÍ. Lanu vykládá derivace (MODEL_MESH ze zdrojované
+  # topologie: slot, nebo "" = zavřená); existenci stacku MĚŘÍ Coolify — aplikace
+  # netbird-model podle manifestu. Nezměřeno = prázdné → generate-secrets fail-closed.
+  _mm_stack=""
+  if [ -n "${MODEL_MESH:-}" ] && [ "$SKIP_CREATE" = "1" ]; then
+    if _mm_app="$(aplikace_podle_compose docker-compose.coolify-netbird-model.yml)" \
+       && _mm_apps="$(coolify_scoped_apps "^${_mm_app}\$")"; then
+      if [ -n "$_mm_apps" ]; then _mm_stack=1; else _mm_stack=0; fi
+    else
+      warn "Modelový mesh: aplikaci netbird-model nešlo změřit (manifest/Coolify) — tajemství NETBIRD_MODEL_* zůstávají stavová (fail-closed)"
+    fi
+  fi
   _gen_tmp=$(node "$REPO_ROOT/scripts/generate-secrets.mjs" \
     --env-coolify="${ENV_COOLIFY:-}" \
     --env-backup="${ENV_PROD_BACKUP:-}" \
     --preserve="${PRESERVE_STATEFUL_SECRETS:-1}" \
     --strength-floor="$_strength_floor" \
     --stack-exists="$SKIP_CREATE" \
+    --model-mesh-stack-exists="$_mm_stack" \
     --netbird-mgmt-host="${NETBIRD_MGMT_HOST:-}" \
     --mesh-tld="${MESH_TLD:-}" \
     --forgejo-org="${AISHA_FORGEJO_ORG:-${APP_NAME_PREFIX:-${AISHA_STORY:-}}}" \
@@ -2348,7 +2644,7 @@ else
     err "generate-secrets.mjs failed — cannot proceed without secrets"
     exit 1
   }
-  unset _strength_floor _nocodb_admin
+  unset _strength_floor _nocodb_admin _mm_stack _mm_app _mm_apps
   eval "$_gen_tmp"
   unset _gen_tmp
   # COOLIFY_API_KEY a FORGEJO_TOKEN jsou aliasy z .env-prod-backup
@@ -2409,6 +2705,13 @@ if [ "$DRY_RUN" = "0" ]; then
   # volá TÝŽ `_fetch_instance_overlay`, ne svoji kopii.
   if [ -z "${AISHA_INSTANCE_CONFIG_DIR:-}" ]; then
     _fetch_instance_overlay
+    # Overlay dorazil až teď (deklarace vznikla během běhu) → deklarace držení se
+    # čte ZNOVU: první čtení řeklo „nic drženo“ o instanci, jejíž overlay ještě neznalo.
+    if [ -n "${AISHA_INSTANCE_CONFIG_DIR:-}" ]; then
+      cs_nacti_drzeni
+      # Totéž vlastnictví: profil prostředí bydlí v overlayi, který dorazil až teď.
+      cs_nacti_vlastnictvi
+    fi
   fi
   if [ -n "${AISHA_INSTANCE_CONFIG_DIR:-}" ] && [ -f "${AISHA_INSTANCE_CONFIG_DIR}/operators.json" ]; then
     OPERATORS_COMPACT="$(_roster_json "${AISHA_INSTANCE_CONFIG_DIR}/operators.json")"
@@ -2571,7 +2874,7 @@ if [ "$DRY_RUN" = "0" ]; then
   # uvnitř heredocu shodila expanzi, `cat` nezapsal NIC a `.env.coolify` vzniklo
   # prázdné. Táž třída jako PKI_BRIDGE_URL o pár řádků výš, jen řešená na špatném
   # místě: co je podmíněné manifestem, patří PŘED heredoc, ne dovnitř.
-  if grep -qE '^app: *llm-gateway:' "$MANIFEST" 2>/dev/null; then
+  if vlastni llm-gateway; then
     INSIGHT_OPENAI_ENDPOINT="${INSIGHT_OPENAI_ENDPOINT:-https://${LLM_GATEWAY_DOMAIN:?LLM_GATEWAY_DOMAIN chybi, ale manifest llm-gateway nasazuje — INSIGHT_OPENAI_ENDPOINT z ni odvozuje adresu LLM brany}/v1}"
   else
     [ -z "${LLM_GATEWAY_DOMAIN:-}" ] && [ -n "${INSIGHT_OPENAI_ENDPOINT:-}" ] \
@@ -2579,6 +2882,14 @@ if [ "$DRY_RUN" = "0" ]; then
     LLM_GATEWAY_DOMAIN="${LLM_GATEWAY_DOMAIN:-}"
     INSIGHT_OPENAI_ENDPOINT="${INSIGHT_OPENAI_ENDPOINT:-}"
   fi
+
+  # Akcelerační vrstva (GPU uzel): ACCEL_* z deklarace uzlu (lib/accel-vrstva-env.sh →
+  # derive-accel-uzel.mjs, týž domov jako env-doktor). Znovu TADY, protože záloha prostředí
+  # obsluhy se výš načítá s přepisem: odvozená hodnota musí vyhrát nad zastaralou ze zálohy.
+  nacti_env_vrstvy_accel "$REPO_ROOT" || {
+    err "Vrstvu bez platné deklarace GPU uzlu nenasazuji: sítě, enginy i klíče nájemců plynou jen z ní."
+    exit 1
+  }
 
   BUNDLE_CONSUMER_ROLES="$(node "$REPO_ROOT/scripts/lib/derive-bundle-consumers.mjs")" || {
     err "Nepodarilo se odvodit konzumenty CA bundlu z katalogu."
@@ -2724,6 +3035,83 @@ POTOK_ENABLED=${POTOK_ENABLED:-}
 # Prázdné = instance extranet nenasazuje; služba se pak neprovisionuje
 # a edge dostane .invalid sentinel místo veřejného hostu.
 EXTRANET_ENABLED=${EXTRANET_ENABLED:-}
+# Akcelerační vrstva (GPU uzel): VŠECHNO odvozeno z deklarace uzlu výš (derive-accel-uzel.mjs,
+# jeden domov i pro env-doktora). Prázdné = instance vrstvu nevlastní; lane accel-hostfw,
+# accel-vstup a accel-embed-<n> se pak nezakládají (provision_when_env).
+ACCEL_OWNER_PREFIX=${ACCEL_OWNER_PREFIX:-}
+ACCEL_FW_NODE_OWNER=${ACCEL_FW_NODE_OWNER:-}
+ACCEL_FW_MODE=${ACCEL_FW_MODE:-}
+ACCEL_FW_SSH=${ACCEL_FW_SSH:-}
+ACCEL_FW_ADMIN_CIDRS=${ACCEL_FW_ADMIN_CIDRS:-}
+ACCEL_FW_CONFIRM_S=${ACCEL_FW_CONFIRM_S:-}
+ACCEL_FW_INTERVAL_S=${ACCEL_FW_INTERVAL_S:-}
+ACCEL_FW_UDP_MESH_PORT=${ACCEL_FW_UDP_MESH_PORT:-}
+ACCEL_JADRO_PODSIT=${ACCEL_JADRO_PODSIT:-}
+ACCEL_JADRO_VSTUP_IP=${ACCEL_JADRO_VSTUP_IP:-}
+ACCEL_NAJEMCE_1=${ACCEL_NAJEMCE_1:-}
+ACCEL_NAJEMCE_1_PODSIT=${ACCEL_NAJEMCE_1_PODSIT:-}
+ACCEL_NAJEMCE_1_ROZSAH=${ACCEL_NAJEMCE_1_ROZSAH:-}
+ACCEL_NAJEMCE_1_IP=${ACCEL_NAJEMCE_1_IP:-}
+ACCEL_NAJEMCE_2=${ACCEL_NAJEMCE_2:-}
+ACCEL_NAJEMCE_2_PODSIT=${ACCEL_NAJEMCE_2_PODSIT:-}
+ACCEL_NAJEMCE_2_ROZSAH=${ACCEL_NAJEMCE_2_ROZSAH:-}
+ACCEL_NAJEMCE_2_IP=${ACCEL_NAJEMCE_2_IP:-}
+ACCEL_NAJEMCE_3=${ACCEL_NAJEMCE_3:-}
+ACCEL_NAJEMCE_3_PODSIT=${ACCEL_NAJEMCE_3_PODSIT:-}
+ACCEL_NAJEMCE_3_ROZSAH=${ACCEL_NAJEMCE_3_ROZSAH:-}
+ACCEL_NAJEMCE_3_IP=${ACCEL_NAJEMCE_3_IP:-}
+ACCEL_NAJEMCE_4=${ACCEL_NAJEMCE_4:-}
+ACCEL_NAJEMCE_4_PODSIT=${ACCEL_NAJEMCE_4_PODSIT:-}
+ACCEL_NAJEMCE_4_ROZSAH=${ACCEL_NAJEMCE_4_ROZSAH:-}
+ACCEL_NAJEMCE_4_IP=${ACCEL_NAJEMCE_4_IP:-}
+ACCEL_NAJEMCE_5=${ACCEL_NAJEMCE_5:-}
+ACCEL_NAJEMCE_5_PODSIT=${ACCEL_NAJEMCE_5_PODSIT:-}
+ACCEL_NAJEMCE_5_ROZSAH=${ACCEL_NAJEMCE_5_ROZSAH:-}
+ACCEL_NAJEMCE_5_IP=${ACCEL_NAJEMCE_5_IP:-}
+ACCEL_NAJEMCE_6=${ACCEL_NAJEMCE_6:-}
+ACCEL_NAJEMCE_6_PODSIT=${ACCEL_NAJEMCE_6_PODSIT:-}
+ACCEL_NAJEMCE_6_ROZSAH=${ACCEL_NAJEMCE_6_ROZSAH:-}
+ACCEL_NAJEMCE_6_IP=${ACCEL_NAJEMCE_6_IP:-}
+ACCEL_NAJEMCE_7=${ACCEL_NAJEMCE_7:-}
+ACCEL_NAJEMCE_7_PODSIT=${ACCEL_NAJEMCE_7_PODSIT:-}
+ACCEL_NAJEMCE_7_ROZSAH=${ACCEL_NAJEMCE_7_ROZSAH:-}
+ACCEL_NAJEMCE_7_IP=${ACCEL_NAJEMCE_7_IP:-}
+ACCEL_NAJEMCE_8=${ACCEL_NAJEMCE_8:-}
+ACCEL_NAJEMCE_8_PODSIT=${ACCEL_NAJEMCE_8_PODSIT:-}
+ACCEL_NAJEMCE_8_ROZSAH=${ACCEL_NAJEMCE_8_ROZSAH:-}
+ACCEL_NAJEMCE_8_IP=${ACCEL_NAJEMCE_8_IP:-}
+ACCEL_EMBED_1_REPO=${ACCEL_EMBED_1_REPO:-}
+ACCEL_EMBED_1_REVIZE=${ACCEL_EMBED_1_REVIZE:-}
+ACCEL_EMBED_1_SOUBOR_VAH=${ACCEL_EMBED_1_SOUBOR_VAH:-}
+ACCEL_EMBED_1_FORMAT_VAH=${ACCEL_EMBED_1_FORMAT_VAH:-}
+ACCEL_EMBED_1_SHA256=${ACCEL_EMBED_1_SHA256:-}
+ACCEL_EMBED_1_MAX_MODEL_LEN=${ACCEL_EMBED_1_MAX_MODEL_LEN:-}
+ACCEL_EMBED_1_PODIL_GPU=${ACCEL_EMBED_1_PODIL_GPU:-}
+ACCEL_EMBED_2_REPO=${ACCEL_EMBED_2_REPO:-}
+ACCEL_EMBED_2_REVIZE=${ACCEL_EMBED_2_REVIZE:-}
+ACCEL_EMBED_2_SOUBOR_VAH=${ACCEL_EMBED_2_SOUBOR_VAH:-}
+ACCEL_EMBED_2_FORMAT_VAH=${ACCEL_EMBED_2_FORMAT_VAH:-}
+ACCEL_EMBED_2_SHA256=${ACCEL_EMBED_2_SHA256:-}
+ACCEL_EMBED_2_MAX_MODEL_LEN=${ACCEL_EMBED_2_MAX_MODEL_LEN:-}
+ACCEL_EMBED_2_PODIL_GPU=${ACCEL_EMBED_2_PODIL_GPU:-}
+ACCEL_CHAT_1_REPO=${ACCEL_CHAT_1_REPO:-}
+ACCEL_CHAT_1_REVIZE=${ACCEL_CHAT_1_REVIZE:-}
+ACCEL_CHAT_1_SOUBOR_VAH=${ACCEL_CHAT_1_SOUBOR_VAH:-}
+ACCEL_CHAT_1_FORMAT_VAH=${ACCEL_CHAT_1_FORMAT_VAH:-}
+ACCEL_CHAT_1_SHA256=${ACCEL_CHAT_1_SHA256:-}
+ACCEL_CHAT_1_MAX_MODEL_LEN=${ACCEL_CHAT_1_MAX_MODEL_LEN:-}
+ACCEL_CHAT_1_PODIL_GPU=${ACCEL_CHAT_1_PODIL_GPU:-}
+ACCEL_CHAT_1_MAX_LORAS=${ACCEL_CHAT_1_MAX_LORAS:-}
+ACCEL_CHAT_1_MAX_LORA_RANK=${ACCEL_CHAT_1_MAX_LORA_RANK:-}
+ACCEL_VAHY_B64=${ACCEL_VAHY_B64:-}
+ACCEL_DEKLARACE_B64=${ACCEL_DEKLARACE_B64:-}
+# Port SSH do CI VM na hostiteli uzlu, nebo výslovné slovo zadna (žádná CI VM) — vstup
+# obsluhy z trezoru pro vnější sondu doktora; prázdné = sonda hlásí NEZMĚŘENO.
+ACCEL_CI_VM_SSH_PORT=${ACCEL_CI_VM_SSH_PORT:-}
+# Modelový mesh forku (varianta C) — lane NEDEKLARUJE operátor: odvozuje ji topologie
+# (derive-domains, model forku na slotu s has_gpu). Tady se jen přenese do .env.coolify,
+# aby ji story-init a env sync viděly stejně jako ostatní lane. Prázdné = bez meshe.
+MODEL_MESH=${MODEL_MESH:-}
 # Brána extranetu: 1 = veřejný provoz smí JEN přes oauth2-proxy (služba
 # extranet-auth v edge stacku), takže nepřihlášený nedostane ani JS bundle.
 # Výchozí 1, protože otevřený povrch nemá být tichá výchozí hodnota — kdo ho
@@ -2886,6 +3274,25 @@ NETBIRD_API_URL=${NETBIRD_API_URL}
 NETBIRD_AUTH_SCHEME=${NETBIRD_AUTH_SCHEME}
 NETBIRD_SANDBOX_GROUP=${NETBIRD_SANDBOX_GROUP}
 NETBIRD_DNS_IP=${NETBIRD_DNS_IP}
+
+# ── Modelový mesh forku (varianta C): druhá instance stacku NetBird ─────────
+# Jména vydá topologie jen s MODEL_MESH (jinak prázdná); tajemství vydá
+# generate-secrets vždy (jako u hlavní instance) — bez meshe je nikdo nečte.
+NETBIRD_MODEL_DOMAIN=${NETBIRD_MODEL_DOMAIN:-}
+NETBIRD_MODEL_DNS_DOMAIN=${NETBIRD_MODEL_DNS_DOMAIN:-}
+MODEL_MESH_MANAGEMENT_URL=${MODEL_MESH_MANAGEMENT_URL:-}
+MODEL_MESH_MOST_PEER=${MODEL_MESH_MOST_PEER:-}
+MODEL_MESH_GPU_PEER=${MODEL_MESH_GPU_PEER:-}
+MODEL_MESH_PORT=${MODEL_MESH_PORT:-}
+# Vlastník GPU uzlu, v jehož prostoru jmen je síť nájemce (<vlastník>-lane-<prefix>; profil lane_gpu.vlastnik).
+LANE_VLASTNIK=${LANE_VLASTNIK:-}
+NETBIRD_MODEL_OIDC_CLIENT_ID=${NETBIRD_MODEL_OIDC_CLIENT_ID}
+NETBIRD_MODEL_OIDC_SECRET=${NETBIRD_MODEL_OIDC_SECRET}
+NETBIRD_MODEL_MGMT_SECRET=${NETBIRD_MODEL_MGMT_SECRET}
+NETBIRD_MODEL_RELAY_SECRET=${NETBIRD_MODEL_RELAY_SECRET}
+NETBIRD_MODEL_DATASTORE_ENC_KEY=${NETBIRD_MODEL_DATASTORE_ENC_KEY}
+NETBIRD_MODEL_DB_PASSWORD=${NETBIRD_MODEL_DB_PASSWORD}
+NETBIRD_MODEL_BOOTSTRAP_SECRET=${NETBIRD_MODEL_BOOTSTRAP_SECRET}
 # Rozsah peerů (CGNAT). Edge-proxy si přes něj staví routu do mesh přes
 # mesh-router — bez ní vnitřní jméno sice přeloží, ale nemá kudy jít.
 NETBIRD_PEER_CIDR=${NETBIRD_PEER_CIDR}
@@ -2896,7 +3303,6 @@ MESH_DNS_NETWORK=${MESH_DNS_NETWORK}
 OIDC_APP_CLIENT_ID=${OIDC_APP_CLIENT_ID}
 WS_JWT_AUDIENCE=${WS_JWT_AUDIENCE}
 KC_ADMIN_CLIENT_ID=${KC_ADMIN_CLIENT_ID}
-AGENT_REPO_PATH=${AGENT_REPO_PATH}
 AGENT_RUNS_DIR=${AGENT_RUNS_DIR}
 N8N_BOOTSTRAP_OWNER_EMAIL=${N8N_BOOTSTRAP_OWNER_EMAIL}
 AISHA_DB_IMAGE=${AISHA_DB_IMAGE}
@@ -2911,6 +3317,7 @@ NETSEG_FRONTEND_SUBNET=${NETSEG_FRONTEND_SUBNET}
 NETSEG_BACKEND_SUBNET=${NETSEG_BACKEND_SUBNET}
 NETSEG_DATA_SUBNET=${NETSEG_DATA_SUBNET}
 NETBIRD_MGMT_HOST=${NETBIRD_MGMT_HOST}
+MODEL_MESH_VSTUP_ADDR=${MODEL_MESH_VSTUP_ADDR}
 NETBIRD_MESH_HOST=${NETBIRD_MESH_HOST}
 # Per-instance mesh isolation (derived from APP_NAME_PREFIX above): unique host
 # port + service-name alias namespace so co-located instances never collide.
@@ -3487,6 +3894,9 @@ POTOK_UPSTREAM=${POTOK_UPSTREAM:-}
 IMAGE_CADDY=${IMAGE_CADDY}
 IMAGE_NGINX=${IMAGE_NGINX}
 IMAGE_DOCKER_CLI=${IMAGE_DOCKER_CLI}
+# GPU uzel (vrstva accel): pin vLLM enginů a proxy socketu hlídače (config/image-versions.env).
+IMAGE_VLLM=${IMAGE_VLLM}
+IMAGE_DOCKER_SOCKET_PROXY=${IMAGE_DOCKER_SOCKET_PROXY}
 IMAGE_BUSYBOX=${IMAGE_BUSYBOX}
 
 # NetBird agent runtime variables (set inside containers; placeholders for contract)
@@ -3610,6 +4020,7 @@ COOLIFY_SERVER_UUID_FRONTEND=${COOLIFY_SERVER_UUID_FRONTEND:-}
 COOLIFY_SERVER_UUID_BACKEND=${COOLIFY_SERVER_UUID_BACKEND:-}
 COOLIFY_SERVER_UUID_EXPERIMENTAL=${COOLIFY_SERVER_UUID_EXPERIMENTAL:-}
 COOLIFY_SERVER_UUID_BUILD=${COOLIFY_SERVER_UUID_BUILD:-}
+COOLIFY_SERVER_UUID_GPU=${COOLIFY_SERVER_UUID_GPU:-}
 
 # ── Phase 2 autopilot — LLM Gateway (theopenco/llmgateway) ───────────────────
 # Auto-generated on first cold-start; preserved across re-runs via REGEN_KEYS
@@ -3759,7 +4170,7 @@ HEADER
     'RESEND_API_KEY'
     'NETBIRD_API_TOKEN'
     'TELEGRAM_(API_HASH|API_ID|BOT_TOKEN)'
-    'COOLIFY_(API_KEY|API_TOKEN|URL|BASE_URL|PROJECT_UUID|SERVER_UUID_(FRONTEND|BACKEND|EXPERIMENTAL|BUILD))'
+    'COOLIFY_(API_KEY|API_TOKEN|URL|BASE_URL|PROJECT_UUID|SERVER_UUID_(FRONTEND|BACKEND|EXPERIMENTAL|BUILD|GPU))'
     'FORGEJO_TOKEN'
     'APP_DOMAIN'
     'API_DOMAIN'
@@ -3920,10 +4331,30 @@ HEADER
       exit 1
     fi
     printf '%s\n' "$_kontrakt_doktora" \
-      | awk -F'\t' '$2 == "secret" || $2 == "hex" || $2 == "b64std" { print $1 }' \
+      | awk -F'\t' '$2 == "secret" || $2 == "hex" || $2 == "b64std" || $2 == "external" || $2 == "placeholder" { print $1 }' \
       | awk -F= 'NR == FNR { tajne[$1] = 1; next } ($1 in tajne) && length($0) > length($1) + 1' - "$ENV_COOLIFY" \
       > "$_tajne_z_minula"
     unset _kontrakt_doktora
+    # ⛔ ŽIVÉ HODNOTY OPERÁTORA SE NEVYPRAZDŇUJÍ (2026-10-03, konvergence existující
+    # instance). Druhy `external` (hodnota operátora) a `placeholder` (doplní ji nástroj
+    # PO nasazení — roster dveří, adresy peerů) se znovu vyrobit nedají. Když je záloha
+    # nenese, heredoc je zapsal PRÁZDNÉ a sync je v Coolify přepsal prázdnem; u rosteru
+    # dveří šel knock-provision cestou „vygeneruj nový“ a zařízení by přišla o dveře.
+    # Prázdný řádek heredocu se proto nahradí neprázdnou hodnotou z minulého
+    # .env.coolify; neprázdná hodnota heredocu (záloha, odvození) vyhrává dál.
+    if [ -s "$_tajne_z_minula" ]; then
+      _prevzate="$(mktemp)"
+      awk -F= 'NR == FNR { minule[$1] = $0; next }
+               ($0 == $1 "=") && ($1 in minule) { print minule[$1]; prevzato[$1] = 1; next }
+               { print }
+               END { for (k in prevzato) print k > "/dev/stderr" }' "$_tajne_z_minula" "$TMP_ENV" \
+        > "${TMP_ENV}.prevzate" 2> "$_prevzate" && env_zapis_atomicky "${TMP_ENV}.prevzate" "$TMP_ENV"
+      if [ -s "$_prevzate" ]; then
+        warn "Krok 2: převzato z minulého .env.coolify (záloha je nenese, heredoc je zapsal prázdné): $(sort "$_prevzate" | tr '\n' ' ')"
+        warn "  Doplň je do .env-prod-backup — převzetí chrání běh, záloha patří operátorovi."
+      fi
+      rm -f "$_prevzate"; unset _prevzate
+    fi
   fi
   { cat "$_tajne_z_minula"
     grep -E "^[A-Z][A-Z0-9_]+=" "$ENV_PROD_BACKUP" 2>/dev/null \
@@ -3938,6 +4369,24 @@ HEADER
   rm -f "$_klice_zapsane" "$_tajne_z_minula"
   unset _klice_zapsane _tajne_z_minula
 
+  # ── Zavřená opt-in lane: její adresy se vydají VÝSLOVNĚ PRÁZDNÉ ───────────────
+  # ⛔ NAMĚŘENO 2026-10-04 (vypnutí lokálního modelu na nasazené instanci): operátor lane
+  # zavřel (`CHAT_GGUF_URL=`), resolver službu vynechal — a její adresa
+  # (`VLLM_GENERATION_URL`, čte ji core i ai-chat) v novém souboru jen CHYBĚLA. Chybějící
+  # čtený klíč kontinuita níž převezme z minula: migrace by dostala adresu služby, která
+  # se nenasazuje, a provider lokálního modelu by ZAPNULA; v Coolify by stará adresa
+  # visela dál, protože sync klíče nemaže. Zavřít lane je rozhodnutí, ne zapomenutí —
+  # adresa se proto vydá prázdná (týž tvar jako SURFACE_OVERLAY_REF výš): kontinuita
+  # prázdnou nepřebíjí a sync zastaralou hodnotu přepíše.
+  # Až ZA průchodem zálohy: adresu, kterou operátor připnul (cizí služba místo vlastní),
+  # průchod už zapsal a tady se nemění. Které klíče to jsou, říká katalog — jediný domov
+  # je lib/provision-gate.mjs (tatáž odpověď „zapnuto?“ jako story-init a resolver).
+  if ! node "$REPO_ROOT/scripts/lib/provision-gate.mjs" --dopln-adresy-zavrenych "$TMP_ENV"; then
+    err "Krok 2: adresy zavřených lanes nejdou určit (výpis výš) — .env.coolify se NEPŘEPISUJE."
+    rm -f "$TMP_ENV"
+    exit 1
+  fi
+
   # ── Jeden zápis na klíč: měří se VÝSLEDEK, ne jen emitory ────────────────────
   # Brána kontrakt-nema-dva-domovy měří heredoc + printf; průchod závisí na obsahu
   # zálohy, takže vlastnost se ověřuje tady, nad souborem, který se právě zapíše.
@@ -3951,6 +4400,31 @@ HEADER
   fi
   unset _dvakrat
 
+  # ── Kontinuita existující instance: nový soubor nesmí ztratit, co drží provoz ──
+  # ⛔ NAMĚŘENO 2026-10-03 (výpadek ~7 h): soubor vyrobený nanovo ztratil DRŽENÝ klíč
+  # (POSTGRES_MAJOR 17 → doktor doplnil domov 18 → obraz 18 nad daty 17 odmítl start),
+  # pin operátora (KEYCLOAK_URL → `https://`) a 12 klíčů, které compose čte. Hlídat to
+  # simulací vedle běhu nestačilo (viděla jen vyprázdnění) — rozhoduje se proto TADY,
+  # nad souborem, který se právě zapíše. Pravidla a důvody: scripts/lib/kontinuita-env.mjs.
+  # Jen nad existujícím stackem; wipe a první založení berou hodnoty z domova.
+  # ⛔ BEZ podmínky na existenci minulého souboru (revize 2026-10-03): ten je vlastnost
+  # STROMU, ne instance — z čerstvého klonu nebo jiného stroje chybí a kontrola se s
+  # podmínkou `-s` tiše přeskočila. Že není s čím srovnat, řekne nástroj sám (kód 4).
+  if [ "$SKIP_CREATE" = "1" ]; then
+    _kont_rc=0
+    node "$REPO_ROOT/scripts/lib/kontinuita-env.mjs" --minule "$ENV_COOLIFY" --nove "$TMP_ENV" --koren "$REPO_ROOT" || _kont_rc=$?
+    if [ "$_kont_rc" -ne 0 ]; then
+      if [ "$_kont_rc" -eq 4 ]; then
+        err "Krok 2: kontinuita NEMĚŘENA (výpis výš) — .env.coolify se NEZAPISUJE."
+      else
+        err "Krok 2: nový .env.coolify by nasadil rozbitou hodnotu (výpis výš) — .env.coolify se NEPŘEPISUJE."
+      fi
+      rm -f "$TMP_ENV"
+      exit 1
+    fi
+    unset _kont_rc
+  fi
+
   env_zapis_atomicky "$TMP_ENV" "$ENV_COOLIFY"
   # Re-enable strict unbound-var check (off during heredoc expansion above).
   set -u
@@ -3959,12 +4433,30 @@ HEADER
   # (Coolify build-time parser by ji rozbil).
   ok "Wrote $ENV_COOLIFY ($(wc -l < "$ENV_COOLIFY") lines)"
 
+  # Kód env-doktora: 0 = hotovo; 3 = WEB_FQDNS (domény webu) NEZNÁ — ostatní klíče
+  # doplnil, ale deklaraci domén nemá (vadný odkaz v overlayi apod.). Krok 4 by pak
+  # srovnal domény hodnotou ze shellu, kterou env-doktor odmítl — proto KONEC.
+  # Jiný nenulový kód = chybějící externí hodnoty / dílčí vada, jako dosud nefatální.
+  vyhodnot_env_doktora() {
+    case "${1:-0}" in
+      0) : ;;
+      3)
+        err "env-doctor: WEB_FQDNS (domény webu) NEZNÁ — klíč nezapsán, ostatní doplněny (příčina ve výpisu výše)"
+        err "  NEPOKRAČUJU: krok 4 by srovnal domény webu hodnotou, kterou env-doktor jako deklaraci nepřijal."
+        exit 1
+        ;;
+      *) warn "env-doctor skončil kódem ${1} — chybějící externí hodnoty nebo dílčí vada (non-fatal, výpis výše)" ;;
+    esac
+  }
+
   # ── Heal pass: env-doctor doplní jakýkoli klíč z compose contractu, který by
   # zde chyběl (idempotentní, neporuší existující hodnoty). Single source of
   # truth pro contract: scripts/aisha-env-doctor.mjs (CONTRACT array).
   if command -v node >/dev/null 2>&1; then
     info "Running aisha-env-doctor (heal pass)..."
-    node "${REPO_ROOT}/scripts/aisha-env-doctor.mjs" || warn "env-doctor reported missing externals (non-fatal)"
+    _env_doktor_rc=0
+    node "${REPO_ROOT}/scripts/aisha-env-doctor.mjs" || _env_doktor_rc=$?
+    vyhodnot_env_doktora "$_env_doktor_rc"
   else
     warn "node not found; skipping env-doctor heal pass"
   fi
@@ -3992,7 +4484,9 @@ HEADER
     warn "Chybí ${MISSING_COUNT} klíčů — druhý heal pass env-doctoru…"
     echo "$MISSING_KEYS" | sed 's/^/   - /'
     if command -v node >/dev/null 2>&1; then
-      node "${REPO_ROOT}/scripts/aisha-env-doctor.mjs" || warn "env-doctor heal pass (non-fatal)"
+      _env_doktor_rc=0
+      node "${REPO_ROOT}/scripts/aisha-env-doctor.mjs" || _env_doktor_rc=$?
+      vyhodnot_env_doktora "$_env_doktor_rc"
     fi
     VALIDATE_TMP="$(mktemp)"
     MANIFEST_FILE="$MANIFEST" SKIP_ENV_PREFLIGHT=1 VALIDATE_ONLY=1 bash "${REPO_ROOT}/scripts/coolify-sync-envs.sh" >"$VALIDATE_TMP" 2>&1 || true
@@ -4038,7 +4532,7 @@ _dvere_rc=0
 node scripts/lib/dvere-soulad.mjs --deklarovano --env-file "$ENV_COOLIFY" || _dvere_rc=$?
 case "$_dvere_rc" in
   0)
-    if AISHA_INSTANCE_ENV="$ENV_COOLIFY" node scripts/knock-provision.mjs; then
+    if AISHA_INSTANCE_ENV="$ENV_COOLIFY" AISHA_STACK_EXISTS="$SKIP_CREATE" node scripts/knock-provision.mjs; then
       ok "Dveře: deklarované — parametry odvozeny, roster podle režimu (výpis výše)"
     else
       nedokonceno "Dveře: deklarované, ale knock-provision.mjs selhal (výpis výše) — svc-knock nenastartuje a shodí edge"
@@ -4065,7 +4559,7 @@ step "2b. PREFLIGHT — validate every docker-compose.coolify*.yml"
 # `${X:?}` vars (generate-secrets mints only what the topology includes), so
 # validating the full catalog turns "excluded on purpose" into a false FATAL.
 # Non-manifest compose files are validated by the full-profile CI runs instead.
-PREFLIGHT_COMPOSE_FILES="$(awk -F: '/^app:/ { gsub(/ /,"",$4); print $4 }' "$MANIFEST" | sort -u | tr '\n' ' ')"
+PREFLIGHT_COMPOSE_FILES="$(vlastni_aplikace | cut -f3 | sort -u | tr '\n' ' ')"
 if [ "$DRY_RUN" = "1" ]; then
   warn "[DRY RUN] Would run: scripts/preflight-compose.sh (manifest scope: ${PREFLIGHT_COMPOSE_FILES:-full catalog})"
 else
@@ -4100,11 +4594,30 @@ step "2b2. NASAZUJE SE TO, CO BYLO PRÁVĚ ZVALIDOVÁNO?"
 #
 # Měří se VLASTNOST („nasadím, co jsem validoval"), ne konkrétní větev — jméno
 # si bere z manifestu, takže fork s vlastní deploy větví projde touž cestou.
-_deploy_branch="$(awk -F: '/^branch:/ { gsub(/ /,"",$2); print $2; exit }' "$MANIFEST")"
-_deploy_branch="${_deploy_branch:-main}"
+#
+# ⛔ A NE PODLE JMÉNA REMOTE (naměřeno 2026-10-03 při konvergenci instance forku): `ls-remote origin`
+# ve fork checkoutu četl UPSTREAM, zatímco Coolify staví z repozitáře forku →
+# „Nasadil by se JINÝ kód“ nad stromem, který souhlasil. Repozitář i větev dává
+# týž vstup, ze kterého story-init skládá `git_repository` (FORGEJO_URL + repo:
+# + branch:); remote se vybírá podle identity URL — scripts/lib/nasazovany-repozitar.mjs.
+# Story-init se ptá TÉHOŽ režimu (--deklarace): výklad je jeden, ne dva podobné.
+#
+# ⛔ ROZPOR DEKLARACE S PROSTŘEDÍM PADÁ TADY, PŘED KROKEM 2c (recenze 2026-10-04).
+# `GIT_BRANCH` v prostředí odlišný od větve manifestu znal jen story-init (krok 3):
+# běh prošel doktorem i tímhle krokem a zastavil se až PO odloženém wipu — instance
+# smazaná, aplikace nezaložené. Režim --deklarace proto čte GIT_BRANCH z prostředí
+# sám a rozpor vrací nenulou; prostředí tohohle volání se nesmí měnit (žádné
+# `GIT_BRANCH=…` ani `env -u` před příkazem), jinak by krok o rozporu nevěděl.
+if ! _deploy_dekl="$(node "${REPO_ROOT}/scripts/lib/nasazovany-repozitar.mjs" --manifest "$MANIFEST" --deklarace)"; then
+  err "Deklaraci nasazení nejde použít (důvod ve výpisu výše) — nevím, ze kterého repozitáře a větve Coolify staví,"
+  err "  nebo jí odporuje prostředí. Zastavuji PŘED wipem: story-init (krok 3) by na témže skončil až po něm."
+  exit 1
+fi
+# Třetí sloupec (cesta `org/repo`) tenhle krok nepotřebuje — čte ho story-init.
+IFS=$'\t' read -r _deploy_branch _deploy_repo _ <<< "$_deploy_dekl"
 
 if [ "$DRY_RUN" = "1" ]; then
-  warn "[DRY RUN] Would verify: pracovní strom == origin/${_deploy_branch} (Coolify staví odtud)"
+  warn "[DRY RUN] Would verify: pracovní strom == ${_deploy_repo} ${_deploy_branch} (Coolify staví odtud)"
 else
   # --ignore-submodules=dirty: špinavý pracovní strom submodulu není změna
   # obsahu, který se nasazuje; posunutý SHA submodulu ANO a ten se nahlásí.
@@ -4127,23 +4640,31 @@ else
   # Prázdná odpověď NENÍ shoda — buď větev neexistuje, nebo je Forgejo nedostupné.
   # Obojí znamená, že nevím, co Coolify postaví; číst to jako „v pořádku" je
   # přesně ta vada, kterou tenhle krok zavírá.
-  _head_vzdal="$(git -C "$REPO_ROOT" ls-remote origin "refs/heads/${_deploy_branch}" 2>/dev/null | awk 'NR==1 { print $1 }')"
+  _head_vzdal=""
+  _deploy_pres="-"
+  if _deploy_cteni="$(node "${REPO_ROOT}/scripts/lib/nasazovany-repozitar.mjs" --manifest "$MANIFEST" --repo-root "$REPO_ROOT" --cti)"; then
+    IFS=$'\t' read -r _head_vzdal _ _ _deploy_pres <<< "$_deploy_cteni"
+  fi
   if [ -z "$_head_vzdal" ]; then
-    err "Větev '${_deploy_branch}' se z originu nepodařilo přečíst (git ls-remote)."
+    err "Větev '${_deploy_branch}' z ${_deploy_repo} se nepodařilo přečíst (git ls-remote, výpis výše)."
     err "  Coolify z ní bude stavět. Bez přečtení nevím, co nasadím — a nepokračuji."
+    err "  Důvod od gitu je ve výpisu výš. Nejčastěji je to PŘÍSTUP: soukromý repozitář a git na tomto"
+    err "  stroji pro něj nemá přihlašovací údaje (jinde je dodá správce pověření)."
+    err "  Remote přidávej jen tehdy, když na tenhle repozitář žádný remote stromu neukazuje:"
+    err "    git remote add <jméno> ${_deploy_repo}"
     exit 1
   fi
 
   if [ "$_head_lokal" != "$_head_vzdal" ]; then
     err "Nasadil by se JINÝ kód, než jaký krok 2b zvalidoval."
-    err "  pracovní strom      : ${_head_lokal}"
-    err "  origin/${_deploy_branch} : ${_head_vzdal}  ← odtud staví Coolify"
+    err "  pracovní strom : ${_head_lokal}"
+    err "  ${_deploy_repo} ${_deploy_branch} : ${_head_vzdal}  ← odtud staví Coolify (remote: ${_deploy_pres})"
     err "  Náprava: dostaň své commity do '${_deploy_branch}' (push → PR → merge),"
     err "           nebo v ${MANIFEST} přepiš 'branch:' na větev, kterou chceš nasadit."
     exit 1
   fi
 
-  ok "Nasazuje se přesně zvalidovaný strom (${_deploy_branch} @ $(printf '%s' "$_head_lokal" | cut -c1-9))"
+  ok "Nasazuje se přesně zvalidovaný strom (${_deploy_repo} ${_deploy_branch} @ $(printf '%s' "$_head_lokal" | cut -c1-9), remote: ${_deploy_pres})"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -4208,6 +4729,9 @@ step "2d. REWARMUP — přestavba datastore jmenovaných aplikací"
 # zahodí i s volumes a zbytek řetězu ji postaví znovu (3 založí → 4 dodá env →
 # 5 nasadí). Proto tu není ani řádek zakládací logiky — zdvojit ji by znamenalo
 # druhý domov pro tutéž otázku.
+# Držení se mohlo načíst až v kroku 2 (pozdní overlay) — rozpor se měří i tady,
+# těsně před mazáním.
+cs_rewarmup_nesmi_drzenou
 if [ -z "$REWARMUP_APPS" ]; then
   info "Žádný rewarmup nevyžádán (--rewarmup=<jméno[,jméno]> ho zapíná)."
 else
@@ -4249,7 +4773,7 @@ else
       #   b) jméno v manifestu NENÍ → překlep, nebo míří do cizího projektu.
       #      Tam se pokračovat nesmí.
       _role="${_pozadovana#${APP_NAME_PREFIX}-}"
-      if grep -qE "^app: ${_role}:" "$MANIFEST" 2>/dev/null; then
+      if vlastni "$_role"; then
         ok "rewarmup: '$_pozadovana' už v Coolify není — cíl je přestavěný, krok 3 ho založí."
         IFS=','
         continue
@@ -4403,11 +4927,18 @@ if [ "$DRY_RUN" != "1" ]; then
     while IFS= read -r _id; do
       [ -n "$_id" ] || continue
       case "$_neprovisionovane" in *" ${_id} "*) info "  ${APP_NAME_PREFIX}-${_id}: lane vypnutá — nezakládá se"; continue ;; esac
+      # Držená aplikace se nezakládá ani nesrovnává (story-init ji vynechal) — že
+      # v projektu není, není nález.
+      if drzena "$_id"; then info "  ${APP_NAME_PREFIX}-${_id}: DRŽENO — nezakládá se, existence se nevyžaduje"; continue; fi
       _ocekavano=$((_ocekavano + 1))
       if ! printf '%s\n' "$_v_projektu" | cut -f1 | grep -qx "${APP_NAME_PREFIX}-${_id}"; then
         _chybi+=("${APP_NAME_PREFIX}-${_id}")
       fi
-    done < <(grep -E '^app:' "$MANIFEST" | sed -E 's/^app:[[:space:]]*([a-z0-9-]+):.*/\1/')
+    done < <(vlastni_aplikace | cut -f1)
+    # Externí služby se nezakládají (story-init je vynechal) — že v projektu nejsou, není nález.
+    while IFS= read -r _id; do
+      [ -n "$_id" ] && info "  ${APP_NAME_PREFIX}-${_id}: $(vlastnictvi_hlaska "$_id") — nezakládá se, existence se nevyžaduje"
+    done <<< "$EXTERNI_APLIKACE"
     if [ "${#_chybi[@]}" -eq 0 ]; then
       ok "Všech ${_ocekavano} aplikací z manifestu v projektu existuje."
     elif [ "${#_chybi[@]}" -gt "$((_ocekavano / 2))" ]; then
@@ -4609,6 +5140,102 @@ else
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
+step "4c. PROXY SERVERŮ — typ proxy podle deklarace slotu (před vlnami)"
+# Proxy serveru (Traefik/Caddy, kterou Coolify spouští na každém serveru) je
+# vlastnost STROJE. Slot, který ji deklaruje (`proxy` v coolify/servers.json — GPU
+# uzel `gpu`: none), ji má mít dřív, než na něj vlny cokoli nasadí. Měří a srovná
+# jeden nástroj (scripts/coolify-server-proxy.mjs): bez lane slotu se nic neměří.
+#   • zápis (--apply, PATCH + zpětné čtení) jen produkční běh — server je společný
+#     všem projektům na něm, ne-produkční běh ho jen změří (cs_beh_odpovida_za_sdileny_server),
+#   • rozdíl nebo NEMĚŘENO = v produkčním běhu NEDOKONČENO (běh skončí červeně),
+#     ale vlny poběží: firewall hostitele (vlna 1) zahodí veřejné 80/443 i s proxy,
+#     tvrdý stop by ho nenasadil vůbec. V běhu, který za sdílený server neodpovídá
+#     (ne-produkční, dry-run), je to hlasité VAROVÁNÍ — server měnit nesmí a za jeho
+#     stav nemůže, červeně kvůli němu nekončí,
+#   • kód 0 mluví o TYPU V API: zápis `none` běžící kontejner proxy nezastaví. Že
+#     na uzlu žádná proxy porty nepublikuje, měří až závěrečné ověření na konci
+#     běhu (overeni_proxy_na_uzlu níž).
+
+# Verdikt kroku 4c z KÓDU nástroje. Jen kód 0 je splněno.
+#   • Rozdíl (2) a NEMĚŘENO (3) jsou STAV SDÍLENÉHO SERVERU. V běhu, který za něj
+#     odpovídá (cs_beh_odpovida_za_sdileny_server — táž jediná odpověď, podle které
+#     se výš přidává --apply), jdou do NEDOKONCENO a běh končí nenulou („brána
+#     hotovosti"). Běh, který za něj neodpovídá, ho měnit nesmí a za jeho stav
+#     nemůže: hlasité VAROVÁNÍ, červeně kvůli tomu nekončí — a `ok` to není nikdy.
+#   • Jiný kód je chyba deklarace, čtení nebo zápisu TOHOHLE běhu, ne stav
+#     serveru: NEDOKONCENO v každém běhu.
+#   proxy_serveru_krok_verdikt <návratový kód coolify-server-proxy.mjs>
+proxy_serveru_krok_verdikt() {
+  case "$1" in
+    0) ok "Typ proxy serverů v API Coolify odpovídá deklaraci slotů (nebo žádný slot v provozu proxy nedeklaruje)" ;;
+    2)
+      if cs_beh_odpovida_za_sdileny_server; then
+        nedokonceno "Krok 4c: proxy serveru se liší od deklarace slotu a tenhle běh ji nenastavil (výpis výš)"
+      else
+        warn "Krok 4c: proxy serveru se liší od deklarace slotu (výpis výš) — sdílený server tenhle běh nemění; srovná ho produkční běh"
+      fi ;;
+    3)
+      if cs_beh_odpovida_za_sdileny_server; then
+        nedokonceno "Krok 4c: proxy serveru NEZMĚŘENA (výpis výš) — chybí UUID serveru slotu, nebo typ proxy v API změřit ani zapsat nejde (důvod ve výpisu, viz POLE_PROXY v scripts/coolify-server-proxy.mjs)"
+      else
+        warn "Krok 4c: proxy serveru NEZMĚŘENA (výpis výš) — sdílený server tenhle běh nemění; srovná ho produkční běh"
+      fi ;;
+    *) nedokonceno "Krok 4c: proxy serveru — chyba deklarace, čtení nebo zápisu (kód $1, výpis výš)" ;;
+  esac
+}
+
+# Verdikt kontroly kontejnerů NA UZLU (za vlnami) z KÓDU nástroje. Jen kód 0 je
+# splněno: nález (1) i NEZMĚŘENO (2, 3) jdou do NEDOKONCENO — shoda typu v API
+# bez tohohle měření nedokazuje, že proxy neběží. Nález je KAŽDÝ port publikovaný
+# mimo loopback a mimo deklaraci uzlu — kontejner proxy serveru i kterýkoli jiný
+# (R1 re-recenze d8: dřív se poznávala jen proxy podle jména).
+#   kontejnery_uzlu_krok_verdikt <návratový kód lib/kontejnery-uzlu.mjs>
+kontejnery_uzlu_krok_verdikt() {
+  case "$1" in
+    0) ok "Proxy na uzlech s firewallem hostitele: žádný kontejner (proxy serveru ani jiný) nepublikuje port mimo loopback a deklaraci uzlu (měřeno na uzlu), nebo se firewall hostitele nenasazuje" ;;
+    1) nedokonceno "Proxy na uzlu: kontejner PUBLIKUJE port mimo loopback a deklaraci uzlu (výpis výš — proxy serveru, nebo jiný) — typ 'none' v API Coolify proxy nezastaví a firewall nález jen zakryje; zastavení kontejneru je rozhodnutí majitele, tenhle běh jen měří" ;;
+    2|3) nedokonceno "Proxy na uzlu NEZMĚŘENA (výpis výš, kód $1) — bez výpisu kontejnerů uzlu s kotvou firewallu není 'proxy none' doložená (node scripts/lib/kontejnery-uzlu.mjs)" ;;
+    *) nedokonceno "Proxy na uzlu: kontrola kontejnerů selhala (kód $1, výpis výš) — NEZMĚŘENO" ;;
+  esac
+}
+
+# Závěrečné ověření: kontejner proxy NA UZLECH s firewallem hostitele (ne z API).
+# Krok 4c srovnal TYP proxy v API Coolify; zápis `none` ale běžící kontejner proxy
+# nezastaví a firewall v enforce ho zakryje i vnější sondě. Jediný důkaz je výpis
+# kontejnerů uzlu (`docker -H ssh://<hostname slotu>`, jen čtení).
+#   • Měří KAŽDÝ produkční běh naostro — i se --skip-deploy: je to čtecí měření,
+#     na nasazení nezávisí, a bez něj by nález z předletu (kde je jen varováním)
+#     zmizel. Ne-produkční běh ani dry-run neměří (sdílený server není jejich)
+#     a řekne to.
+#   • Volá se až na KONCI běhu: kotvou výpisu je kontejner firewallu hostitele
+#     a ten nasazuje vlna — před vlnami by kotva chyběla.
+#   • Kontejner proxy se NEZASTAVUJE (rozhodnutí majitele); nález i NEZMĚŘENO
+#     jsou NEDOKONČENO.
+overeni_proxy_na_uzlu() {
+  if ! cs_beh_odpovida_za_sdileny_server; then
+    info "Proxy na uzlech s firewallem hostitele se v tomhle běhu NEMĚŘÍ (DRY_RUN=${DRY_RUN}, AISHA_ENV='${AISHA_ENV:-}' — prázdné = přímý běh = produkce) — sdílený server ověřuje produkční běh naostro"
+    return 0
+  fi
+  info "Závěrečné ověření: kontejner proxy na uzlech s firewallem hostitele (scripts/lib/kontejnery-uzlu.mjs, jen čtení)..."
+  local _ku_args=() _ku_rc=0
+  if [ -n "${ENV_COOLIFY:-}" ] && [ -f "$ENV_COOLIFY" ]; then _ku_args+=(--env-soubor "$ENV_COOLIFY"); fi
+  (cd "$REPO_ROOT" && node scripts/lib/kontejnery-uzlu.mjs ${_ku_args[@]+"${_ku_args[@]}"} </dev/null) || _ku_rc=$?
+  kontejnery_uzlu_krok_verdikt "$_ku_rc"
+}
+
+_px_args=()
+if [ -n "${ENV_COOLIFY:-}" ] && [ -f "$ENV_COOLIFY" ]; then _px_args+=(--env-soubor "$ENV_COOLIFY"); fi
+if cs_beh_odpovida_za_sdileny_server; then
+  _px_args+=(--apply)
+else
+  info "Proxy serverů: jen měření (DRY_RUN=${DRY_RUN}, AISHA_ENV='${AISHA_ENV:-}' — prázdné = přímý běh = produkce)"
+fi
+_px_rc=0
+node "$REPO_ROOT/scripts/coolify-server-proxy.mjs" ${_px_args[@]+"${_px_args[@]}"} || _px_rc=$?
+proxy_serveru_krok_verdikt "$_px_rc"
+unset _px_args _px_rc
+
+# ─────────────────────────────────────────────────────────────────────────────
 step "5. TRIGGER FIRST DEPLOY (POST /restart per app)"
 # Od kdy se počítají záznamy TOHOTO běhu (verdikt bootstrapu n8n v kroku 6).
 COLD_START_KROK5_T0="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -4640,6 +5267,11 @@ else
     # succeed without bootstrap dance.
     info "Pre-seeding docker_compose_raw for apps with NULL value..."
     while IFS=$'\t' read -r name uuid; do
+      # Držená aplikace: žádný zápis konfigurace (ani seed compose).
+      if drzena "$(cs_role_aplikace "$name")"; then
+        info "  ${name}: DRŽENO — docker_compose_raw se nedoplňuje"
+        continue
+      fi
       compose_path=$(coolify_api GET "/applications/${uuid}" 2>/dev/null \
         | jq -r '.docker_compose_location // "" | ltrimstr("/")')
       raw_state=$(coolify_api GET "/applications/${uuid}" 2>/dev/null \
@@ -4665,6 +5297,10 @@ else
     # --skip-healthy would filter ALL of them out and no redeploy would happen.
     # Use --skip-healthy ONLY on fresh install where nothing is running yet.
     REDEPLOY_FLAGS="--wave-timeout=${WAVE_TIMEOUT:-${AISHA_WAVE_TIMEOUT_S:-420}}"
+    # Domény v Coolify srovnal krok 4 (deploy-init + doktor domén) a krok 4 běží
+    # před vlnami VŽDY (výjimkou je jen --dry-run, kde vlny neběží). Redeploy by
+    # je jinak srovnával znovu v každé fázi — deklarujeme, že vlastník je tady.
+    REDEPLOY_FLAGS="$REDEPLOY_FLAGS --bez-domen"
     if [ "$SKIP_CREATE" = "0" ]; then
       # Fresh install: apps just created, none running → safe to skip already-healthy
       REDEPLOY_FLAGS="$REDEPLOY_FLAGS --skip-healthy"
@@ -4886,13 +5522,20 @@ else
     # MUST NOT run: at best they fail, at worst they authenticate against someone
     # else's identity provider. Own it → full bootstrap. Don't own it → verify the
     # realm is already served and tell the operator exactly what to do if not.
-    if grep -qE '^app: *keycloak:' "$MANIFEST" 2>/dev/null; then
+    # Vlastnictví říká domov (profil prostředí), ne přítomnost řádku v manifestu:
+    # manifest je inventář všech prostředí a produkce může Keycloak vlastnit,
+    # zatímco staging téže instance konzumuje sdílený.
+    if vlastni keycloak; then
       KC_OWNED=1
     else
       KC_OWNED=0
     fi
     if [ "$KC_OWNED" = "0" ]; then
-      warn "Keycloak is EXTERNAL (not in ${MANIFEST##*/}) — this deploy does not own it."
+      if externi keycloak; then
+        warn "keycloak: $(vlastnictvi_hlaska keycloak) — realm neimportuji, SSO ani uživatele nezakládám."
+      else
+        warn "Keycloak is EXTERNAL (not in ${MANIFEST##*/}) — this deploy does not own it."
+      fi
       # A consumer NEVER administers someone else's Keycloak — not with its own
       # generated admin, and not by borrowing the owner's either. The owner PROVIDES
       # the realm as a service: our realm is declared as a record in the OWNING
@@ -5163,6 +5806,19 @@ else
         err "  netbird-bootstrap.sh failed — stopping before mesh peers/downstream waves"
         err "  Diagnose:  bash scripts/smoke-netbird.sh && bash scripts/netbird-bootstrap.sh"
         exit 1
+      fi
+      # Modelový mesh forku (varianta C): TÝŽ skript nad modelovou instancí — jen když
+      # topologie vydala MODEL_MESH (model forku na GPU slotu); bez ní se nevolá vůbec.
+      if [ -n "${MODEL_MESH:-}" ]; then
+        if SYNC_COOLIFY=1 NETBIRD_INSTANCE=model \
+           KEYCLOAK_PUBLIC_URL="${KEYCLOAK_URL}" \
+           bash "${REPO_ROOT}/scripts/netbird-bootstrap.sh" </dev/null; then
+          ok "  Modelový mesh: bootstrap hotov (skupiny, politika, klíč uzlu na GPU slotu)"
+        else
+          err "  Modelový mesh: bootstrap selhal nebo ZASTAVIL (cizí/zdvojený peer) — uzel na GPU slotu se nezapíše"
+          err "  Diagnose:  NETBIRD_INSTANCE=model bash scripts/netbird-bootstrap.sh"
+          exit 1
+        fi
       fi
       # Operátorské kroky skončily → kanál se zavírá. Nechat ho žít by znamenalo
       # trvalé dveře, které nikdo nehlídá.
@@ -5487,6 +6143,8 @@ else
           nedokonceno "Fáze G: re-migrace core skončila nenulou — operátoři NEPROVISIONOVÁNI (roster existuje)"
         fi
         unset _provision_flags
+    elif [ "${_kc_gate_ok:-0}" != "1" ] && [ "${KC_OWNED:-}" = "0" ] && { [ -n "${OPERATORS_COMPACT:-}" ] || [ -n "${AISHA_PRIMARY_ADMIN_EMAIL:-}" ]; }; then
+      nedokonceno "Fáze G (DB grant operátorů) neproběhla — Keycloak v tomhle prostředí není náš (KC_OWNED=0); operátory v realmu spravuje vlastník a DB grant tímto během nezměřen"
     elif [ "${_kc_gate_ok:-0}" != "1" ]; then
       nedokonceno "Fáze G (DB grant operátorů) neproběhla — KC brána ve fázi B neprošla"
     else
@@ -5527,7 +6185,7 @@ elif [ -z "${AISHA_SURFACES:-}" ]; then
   # zapnutá (EXTRANET_ENABLED) — a profil žádný povrch nedeklaruje. Build pak
   # nemá overlay (instances/<instance> neexistuje) a padá; tady to prošlo jako
   # „nothing to provision". Zapnutý extranet bez povrchu je rozpor, ne klid.
-  if grep -qE '^app:[[:space:]]*extranet:' "$MANIFEST" \
+  if vlastni extranet \
      && node "${REPO_ROOT}/scripts/lib/provision-gate.mjs" --zapnuto extranet --env-file "$ENV_COOLIFY" >/dev/null; then
     nedokonceno "Krok 5c: extranet je v manifestu a zapnutý, ale profil nedeklaruje žádný povrch (surfaces) — build extranetu nemá overlay"
   else
@@ -5891,7 +6549,23 @@ if [ "$SKIP_DEPLOY" != "1" ] && [ "$DRY_RUN" != "1" ]; then
   fi
 fi
 
+# Proxy na uzlech se měří MIMO podmínku nasazení: i běh se --skip-deploy musí nález
+# z předletu dovést do NEDOKONČENO (kdo a kdy měří, rozhoduje overeni_proxy_na_uzlu).
+overeni_proxy_na_uzlu
+
 echo ""
+# ── DRŽENÉ APLIKACE: běh je vynechal — a souhrn to říká jménem ─────────────────
+# Zelený konec nesmí znamenat „nasazeno všechno“, když část stacku běh záměrně
+# obešel. Držení trvá, dokud položku v overlayi instance někdo nesmaže.
+if [ -n "$DRZENI_APLIKACE" ]; then
+  warn "DRŽENÉ APLIKACE ($(printf '%s\n' "$DRZENI_APLIKACE" | awk 'NF { n++ } END { print n + 0 }')) — běh je NENASADIL, nerestartoval, nedoručil jim env a nesmazal je:"
+  while IFS= read -r _dr_hlaska; do
+    [ -n "$_dr_hlaska" ] || continue
+    warn "  · ${_dr_hlaska}"
+  done <<< "$(drzeni_vypis)"
+  unset _dr_hlaska
+  warn "  Držení se ruší smazáním položky v nasazeni-drzene.json overlaye instance; pak je dorovná: bash scripts/aisha-cold-start.sh --skip-create"
+fi
 if [ "${#VSTUPY_OBSLUHY[@]}" -gt 0 ]; then
   warn "CHYBÍ VSTUP OBSLUHY (${#VSTUPY_OBSLUHY[@]}) — funkce na něm závislé spadnou až za provozu:"
   for _v in "${VSTUPY_OBSLUHY[@]}"; do warn "  · ${_v}"; done

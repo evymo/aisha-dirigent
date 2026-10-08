@@ -30,6 +30,7 @@
 
 import { buildTopology, formatShellExports, internalEndpointUrlFor, internalUrlFor, keycloakExtraHostAlias } from "../scripts/lib/derive-domains.mjs";
 import { gatewayTrustedProxies, NETBIRD_PEER_CIDR } from "../scripts/lib/derive-subnets.mjs";
+import { verejniKlientiRealmu } from "../scripts/lib/povoleni-klienti.mjs";
 import { createHmac } from "node:crypto";
 import { createConnection } from "node:net";
 import { readFileSync, existsSync } from "node:fs";
@@ -651,17 +652,22 @@ export const devEnvDefaults = {
   // lokální doručení pro `${VAR:?…}`; hodnoty jsou tytéž, které realm import
   // skutečně založí.
   OIDC_APP_CLIENT_ID: "aisha-app",
-  // Komu brána věří při výměně KC tokenu za PostgREST JWT. V nasazení to skládá
-  // `aisha-env-doctor` z deklarovaných OIDC klientů; lokální preset si deklaruje
-  // vlastní, protože brána chybějící hodnotu ZÁMĚRNĚ neodpustí (`requireEnv`).
-  KC_ALLOWED_CLIENTS: "aisha-app,aisha-dirigent-device",
+  // Komu věří brána (výměna KC tokenu za PostgREST JWT) a koncový bod MCP
+  // (svc-mcp-knowledge `/mcp`) — obě služby chybějící hodnotu ZÁMĚRNĚ neodpustí
+  // (`requireEnv`). V nasazení ji skládá `aisha-env-doctor` z deklarovaných OIDC
+  // klientů; tady vzniká TÝMŽ pravidlem (scripts/lib/povoleni-klienti.mjs) z téhož
+  // realmu, který se místně importuje. Místní stack instanční overlay nemá, takže
+  // platformní část je celý seznam. Do 2026-10-04 tu stál ruční výčet dvou jmen —
+  // nový veřejný klient realmu by se do něj nedostal.
+  KC_ALLOWED_CLIENTS: verejniKlientiRealmu(
+    JSON.parse(readFileSync(join(_REPO_ROOT, "keycloak", "aisha-realm.json"), "utf8")),
+  ).join(","),
   WS_JWT_AUDIENCE: "aisha-app",
   KC_ADMIN_CLIENT_ID: "aisha-user-admin",
   N8N_BOOTSTRAP_OWNER_EMAIL: `n8n-owner@${LOCAL_TLD}`,
   AISHA_DB_IMAGE: "aisha-db-pg18:local",
   POSTGRES_MAJOR: "18",
-  // Exec stack: lokální hostitelské cesty, derivované z identity dev instance.
-  AGENT_REPO_PATH: `/srv/${INSTANCE_PREFIX}/base-repo`,
+  // Exec stack: lokální hostitelská cesta běhů, derivovaná z identity dev instance.
   AGENT_RUNS_DIR: `/var/lib/${INSTANCE_PREFIX}/agent-runs`,
   PKI_DB_ROOT_PASSWORD: "dev_pki_root_password",
   // Required (:?) by pki-init since the operator-owns-their-CA work (fork
@@ -1180,6 +1186,8 @@ export const devEnvDefaults = {
   N8N_WEBHOOK_URL: "http://localhost:5678",
   VLLM_EMBEDDING_URL: "http://localhost:8123/v1",
   VLLM_GENERATION_URL: "http://localhost:8100/v1",
+  // Klíč modelu: llm-dispatch ho při nastavené adrese VYŽADUJE (bez literálu "vllm").
+  VLLM_API_KEY: "vllm-dev-lokalni",
   DOCKER_MODEL_RUNNER_URL: "http://localhost:12434/engines/v1",
   OLLAMA_URL: "http://localhost:11434/v1",
   NOCODB_URL: "http://localhost:8085",

@@ -79,6 +79,8 @@ function makeCtx(
   opts: {
     failTripsFor?: number;
     drivers?: unknown[];
+    /** `configuration.filter`; výchozí = přesně vozidla ze STATES. null = dodavatel filtr neposlal. */
+    filter?: string[] | null;
     trips?: Record<number, unknown[]>;
     rpcFail?: string;
     rpcReturns?: Record<string, unknown>;
@@ -90,7 +92,7 @@ function makeCtx(
   const rpcCalls: Volani[] = [];
   const urls: string[] = [];
   const ctx = {
-    plugin: { version: '0.2.1' },
+    plugin: { version: '0.2.2' },
     tenant: { id: 't1' },
     config: {
       baseUrl: 'https://telematics.example.test/customer-api/v1',
@@ -117,6 +119,11 @@ function makeCtx(
       urls.push(url);
       if (url.includes('/token')) return json({ access_token: 't', expires_in: 300 });
       if (url.includes('/vehicles-states')) return json(STATES);
+      if (url.includes('/configuration')) {
+        const filter = opts.filter === undefined ? ['900001', '900002'] : opts.filter;
+        // ostré API vrací v těle i api_key — plugin ho nesmí nikam propsat
+        return json({ id: 1, name: 'test', api_key: 'TAJNY-KLIC', filter, client_id: '1' });
+      }
       if (url.includes('/drivers')) {
         const vse = opts.drivers ?? DRIVERS;
         const s = strana(vse, url);
@@ -257,6 +264,30 @@ describe('0.2.1 — stránkování (limit ≤ 29) a strop volání', () => {
     await handle(s.ctx as never, 'cron.sync_trips');
     expect(s.urls.filter((u) => u.includes('/trips')), 'po 3 stránkách prvního vozidla se druhé už nečte').toHaveLength(3);
     expect(s.kv.get('eurowag:last-trip-sync'), 'vyčerpaný strop drží kurzor').toBeUndefined();
+  });
+});
+
+describe('0.2.2 — soupis vozidel proti filtru API klíče', () => {
+  it('shoda filtru a vrácených vozidel: běh projde a počet objektů filtru je v logu', async () => {
+    const { ctx, rpcCalls } = makeCtx();
+    await handle(ctx as never, 'cron.sync_fleet');
+    const zapsan = (ctx.log as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[1] === 'eurowag: číselník zapsán');
+    expect(zapsan?.[2]).toMatchObject({ vehicles: 2, filterObjects: 2 });
+    expect(JSON.stringify([(ctx.log as ReturnType<typeof vi.fn>).mock.calls, rpcCalls])).not.toContain('TAJNY-KLIC');
+  });
+
+  it('filtr pouští víc, než API vrátilo → číselník uložen, běh skončí chybou s oběma počty a radou', async () => {
+    const { ctx, rpcCalls } = makeCtx({ filter: ['900001', '900002', '900003'] });
+    await expect(handle(ctx as never, 'cron.sync_fleet')).rejects.toThrow(
+      /filtr 3 objektů, \/vehicles-states vrátil 2 \(ve filtru a nevráceno: 1, vráceno mimo filtr: 0\).*dodavatel \(Eurowag\)/,
+    );
+    expect(zapisy(rpcCalls, 'vehicle')).toHaveLength(2);
+    expect(rpcCalls.some((c) => c.fn === 'ew_propose_identity'), 'návrhy vazeb proběhnou i při nesouladu').toBe(true);
+  });
+
+  it('vozidlo vrácené mimo filtr je taky nesoulad; chybějící filtr se neporovnává', async () => {
+    await expect(handle(makeCtx({ filter: ['900001'] }).ctx as never, 'cron.sync_fleet')).rejects.toThrow(/vráceno mimo filtr: 1/);
+    await expect(handle(makeCtx({ filter: null }).ctx as never, 'cron.sync_fleet')).resolves.toMatchObject({ vehicles: 2 });
   });
 });
 

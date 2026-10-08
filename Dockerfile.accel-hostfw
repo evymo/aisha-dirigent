@@ -1,0 +1,29 @@
+# Dockerfile.accel-hostfw — hostitelský firewall uzlu `gpu` (GPU).
+# Výklad: docs/compose-notes/docker-compose.coolify-accel-hostfw.yml.md
+#
+# iptables obou backendů (nf_tables i legacy): kontejner použije TENTÝŽ, ve kterém
+# drží Docker hostitele řetěz DOCKER-USER, a ověří to `iptables -V` — jinak NIC.
+# Node jen kvůli jedinému výkladu deklarací (scripts/lib/accel-deklarace.mjs,
+# sdílený s env-doktorem); kopíruje se přesně jeho řetěz importů, ne celé scripts/.
+# Relativní rozložení /opt/aisha zrcadlí repo: hostfw.sh hledá lib přes ../../.
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/node:22-alpine
+RUN apk add --no-cache iptables ip6tables iptables-legacy iproute2
+COPY scripts/lib/accel-deklarace.mjs scripts/lib/provision-gate.mjs scripts/lib/cli-entry.mjs \
+     scripts/lib/config-env-files.mjs scripts/lib/env-hodnota.mjs /opt/aisha/scripts/lib/
+COPY infra/accel/hostfw.sh /opt/aisha/infra/accel/hostfw.sh
+# Kde hostfw.sh v kontejneru žije, deklaruje OBRAZ — skript nic nedosazuje a bez
+# těchhle hodnot skončí hned: adresář stavu (tmpfs /run z compose, čte healthcheck),
+# /proc/net (IPv6 v jádře, legacy tabulky) a krok čekání na potvrzení enforce (s).
+ENV HOSTFW_STAV_DIR=/run/hostfw \
+    HOSTFW_PROC_NET=/proc/net \
+    HOSTFW_KROK_S=5
+# Stavba ověří, co hostfw.sh volá jménem (oba backendy, restore/save, ip) a že výklad
+# deklarací v obrazu běží: bez prostředí MUSÍ odmítnout (kód 1), ne mlčet.
+RUN chmod 0555 /opt/aisha/infra/accel/hostfw.sh \
+ && for b in iptables ip6tables; do for v in nft legacy; do \
+      "$b-$v" -V && command -v "$b-$v-restore" "$b-$v-save" >/dev/null || exit 1; \
+    done; done \
+ && command -v ip >/dev/null \
+ && { node /opt/aisha/scripts/lib/accel-deklarace.mjs --firewall >/dev/null 2>&1; [ $? -eq 1 ]; }
+ENTRYPOINT ["/opt/aisha/infra/accel/hostfw.sh"]

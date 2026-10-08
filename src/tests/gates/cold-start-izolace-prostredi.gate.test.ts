@@ -28,6 +28,16 @@
  *        discovery nečte produkční deklarace serverů (COOLIFY_PROD_SERVER_NAME_*)
  *   (e)  ostrý --wipe, jméno ukazuje na PRODUKCI → pin vyhraje: běh dojde k wipu a smaže
  *        PRÁVĚ své 2 aplikace (dřív se zastavil na izolaci — bezpečné, ale staging nešel)
+ *   (f)  JEDINÝ scénář s oknem až do kroku 3: v kořeni stromu leží záloha JINÉHO prostředí
+ *        s jiným projektem a jinou adresou Forgeja → story-init zakládá ve SVÉM projektu
+ *        a z repozitáře SVÉHO prostředí. Běh se zastaví po založení první aplikace.
+ *        NAMĚŘENO 2026-10-04: story-init si prostředí skládá sám (lib/resolve-domains-env.sh)
+ *        a četl napevno `.env-prod-backup` z kořene — zděděný projekt i adresu Forgeja tím
+ *        přepsal produkčními. Scénáře (a)–(e) to vidět nemohly: končí na kroku 2d, tedy PŘED
+ *        story-initem, a záloha v kořeni u nich projekt ani adresu nenese.
+ *   (g)  záloha PROSTŘEDÍ nese GIT_BRANCH jinou než větev manifestu → běh se zastaví
+ *        v kroku 2b2, PŘED wipem: 0 mutujících. Recenze 2026-10-04: rozpor znal jen
+ *        story-init (krok 3), takže běh smazal aplikace a pak nic nezaložil.
  *
  * ČERVENÁ CESTA (ověřeno na d0609e93, před opravou): (a) smaže stagingové aplikace
  * i v dry-runu, (b) smaže PRODUKČNÍ aplikace, (c) založí projekt (POST /projects).
@@ -55,7 +65,9 @@ import {
   zalozGitOrigin,
   zapisDomenyStagingu,
   type Scenar,
+  FORGEJO_DOMENA_POSTROJE,
 } from "./_falesny-coolify";
+import { zManifestu } from "../../../scripts/lib/nasazovany-repozitar.mjs";
 
 const ROOT = process.cwd();
 const BEH_MS = 480_000;
@@ -88,6 +100,10 @@ async function beh(opts: {
   /** Prostředí běhu; `inst-staging` = slot forku (identita jen v záloze, v configu nic). */
   slot?: "staging" | "inst-staging";
   env?: Record<string, string>;
+  /** Co navíc nese záloha JINÉHO prostředí v kořeni stromu (`.env-prod-backup`). */
+  zalohaVKoreni?: Record<string, string>;
+  /** Kde běh zastavit; výchozí je značka kroku 2d (okno měření do wipu). */
+  zastavNa?: RegExp;
 }) {
   const sc = opts.scenar ?? scenarSdilenaJmena();
   const slot = opts.slot ?? "staging";
@@ -97,15 +113,20 @@ async function beh(opts: {
     vycistiPriklady(p.repo, coolify.url);
     zapisDomenyStagingu(p.repo);
     if (slot !== "staging") cpSync(join(p.repo, "config", "domains-staging.env"), join(p.repo, "config", `domains-${slot}.env`));
-    zalozGitOrigin(p.repo);
+    // Checkout operátora ukazuje na repozitář, ze kterého Coolify staví (krok 2b2 ho
+    // hledá podle adresy, ne podle jména remote).
+    const { repo: repoManifestu } = zManifestu(readFileSync(join(p.repo, "coolify", "manifests", "aisha.manifest"), "utf8"));
+    zalozGitOrigin(p.repo, `https://${FORGEJO_DOMENA_POSTROJE}/${repoManifestu}.git`);
     writeFileSync(join(p.repo, `.env-${slot}-backup`), envSoubor({ COOLIFY_URL: coolify.url, ...ZALOHA, ...opts.zaloha }), {
       mode: 0o600,
     });
     // Produkční záloha na stanovišti obsluhy (sdílený pracovní strom): externí klíč,
     // který ve stagingu nemá co dělat.
-    writeFileSync(join(p.repo, ".env-prod-backup"), envSoubor({ COHERE_API_KEY: JEN_PRODUKCE, APP_NAME_PREFIX: "inst" }), {
-      mode: 0o600,
-    });
+    writeFileSync(
+      join(p.repo, ".env-prod-backup"),
+      envSoubor({ COHERE_API_KEY: JEN_PRODUKCE, APP_NAME_PREFIX: "inst", ...opts.zalohaVKoreni }),
+      { mode: 0o600 },
+    );
     // Produkční instance má na disku svůj .env.coolify (ve forku 24. 9. ano). Falešné hodnoty.
     writeFileSync(
       join(p.repo, ".env.coolify"),
@@ -140,7 +161,7 @@ async function beh(opts: {
       },
       args: opts.args,
       timeoutMs: BEH_MS,
-      zastavNa: /={5,} 2d\./,
+      zastavNa: opts.zastavNa ?? /={5,} 2d\./,
     });
     const mutujici = coolify.pozadavky.filter(jeMutujici).map((q) => ({ ...q, projekt: cilovyProjekt(q, sc) }));
     const diagnoza = () =>
@@ -216,6 +237,46 @@ describe("cold-start: izolace prostředí (skutečný běh proti falešnému Coo
       .map((m) => m.path.split("?")[0])
       .sort();
     expect(smazane, diagnoza()).toEqual(["/api/v1/applications/app-stg-core", "/api/v1/applications/app-stg-netinit"]);
+  });
+
+  test("(f) záloha jiného prostředí v kořeni nezmění projekt ani repozitář, se kterými story-init pracuje", async () => {
+    const CIZI_FORGEJO = "repo.jine-prostredi.invalid";
+    const { r, mutujici, diagnoza } = await beh({
+      args: ["--wipe", "--skip-doctor"],
+      zaloha: { COOLIFY_PROJECT_NAME: "inst-staging" },
+      // Záloha v kořeni patří JINÉMU prostředí (na sdíleném stanovišti produkci).
+      zalohaVKoreni: { COOLIFY_PROJECT_UUID: "proj-prod", FORGEJO_URL: `https://${CIZI_FORGEJO}` },
+      // Okno až do kroku 3: po založení první aplikace (nebo na konci story-initu) stop.
+      zastavNa: /Created: inst-[\w-]+ → |━━━ Summary ━━━/,
+    });
+    const zalozeni = mutujici.filter((m) => m.method === "POST" && m.path.split("?")[0] === "/api/v1/applications/public");
+    // Neprázdnost NAPŘED: běh musí dojít až k založení aplikace story-initem, jinak se neměří nic.
+    expect(zalozeni.length, `story-init nezaložil žádnou aplikaci — okno měření nedošlo ke kroku 3\n${diagnoza()}`).toBeGreaterThan(0);
+    expect(r.vystup, diagnoza()).toMatch(/Created: inst-[\w-]+ → /);
+    // Projekt: vše, co běh v Coolify změnil (wipe i založení), je v JEHO projektu.
+    expect(mutujici.filter((m) => m.projekt !== "proj-stg"), diagnoza()).toEqual([]);
+    // Repozitář: aplikace se zakládá z Forgeja SVÉHO prostředí, ne ze zálohy v kořeni.
+    for (const z of zalozeni) {
+      const telo = JSON.parse(z.body) as { project_uuid: string; git_repository: string; git_branch: string };
+      expect(telo.project_uuid, diagnoza()).toBe("proj-stg");
+      expect(telo.git_repository, diagnoza()).toContain(`${FORGEJO_DOMENA_POSTROJE}/`);
+      expect(telo.git_repository, diagnoza()).not.toContain(CIZI_FORGEJO);
+      expect(telo.git_branch, diagnoza()).toBe("main");
+    }
+  });
+
+  test("(g) GIT_BRANCH v záloze prostředí jiná než větev manifestu zastaví běh PŘED wipem", async () => {
+    const { r, mutujici, diagnoza } = await beh({
+      args: ["--wipe", "--skip-doctor"],
+      zaloha: { COOLIFY_PROJECT_NAME: "inst-staging", GIT_BRANCH: "jina-nez-manifest" },
+    });
+    // Neprázdnost: běh došel ke kroku 2b2 a zastavil se na rozporu — ne dřív na něčem jiném.
+    expect(r.vystup, diagnoza()).toMatch(/GIT_BRANCH v prostředí tvrdí větev 'jina-nez-manifest', manifest deklaruje 'main'/);
+    expect(r.vystup, diagnoza()).toMatch(/Zastavuji PŘED wipem/);
+    expect(r.zastaveno, `běh pokračoval ke kroku 2d — rozpor ho nezastavil\n${diagnoza()}`).toBe(false);
+    expect(r.kod, diagnoza()).not.toBe(0);
+    // A hlavně: nic se nesmazalo ani nezaložilo.
+    expect(mutujici, diagnoza()).toEqual([]);
   });
 
   test("(c) dry-run nezaloží projekt, když jméno v Coolify není — ohlásí, co hledal", async () => {

@@ -25,12 +25,17 @@
 #                        from (token-in-URL). This is THIS repo — the shells
 #                        (apps/*-shell) and deploy/surface-host/Dockerfile live
 #                        here since the staging repo was dissolved. Falls back to
-#                        the checkout's own `origin` remote, so the common case
-#                        needs no configuration at all.
-#   AISHA_SURFACE_BRANCH branch Coolify tracks (default: main). Pinning a feature
-#                        branch means merges to main never reach the surface —
-#                        measured 2026-07-27, the live extranet tracked a feature
-#                        branch long after its work had merged.
+#                        the checkout's remote that IS the deployed repository
+#                        (chosen by URL identity from the manifest declaration,
+#                        never by remote name), so the common case needs no
+#                        configuration at all.
+#   AISHA_SURFACE_BRANCH branch Coolify tracks. Default: the branch the manifest
+#                        declares (`branch:`, else main) — the surface is built
+#                        from the same branch as the rest of the instance. Pinning
+#                        a DIFFERENT branch here means merges to the deploy branch
+#                        never reach the surface — measured 2026-07-27, the live
+#                        extranet tracked a feature branch long after its work
+#                        had merged.
 #   AISHA_INSTANCE_SLUG  instances/<slug> overlay to build against (default: APP_NAME_PREFIX)
 #   APP_NAME_PREFIX, PUBLIC_TLD
 #   KEYCLOAK_URL, KEYCLOAK_ADMIN_PASSWORD, KEYCLOAK_REALM (default: aisha)
@@ -49,20 +54,90 @@ fi
 need() { [ -n "${!1:-}" ] || die "$1 is required when AISHA_SURFACES is set"; }
 
 # Surfaces are built from THIS repo (apps/*-shell + deploy/surface-host/Dockerfile
-# landed here when the aisha-multi-surface staging repo was dissolved). So the
-# sensible default is the checkout's own origin — an operator redeploying a
-# surface should not have to restate where the code lives. An explicit
+# landed here when the aisha-multi-surface staging repo was dissolved). So an
+# operator redeploying a surface should not have to restate where the code lives:
+# the default is the checkout's remote that IS the deployed repository. An explicit
 # AISHA_SURFACE_REPO still wins, which is what a token-in-URL clone needs.
+#
+# ⛔ „TENHLE repozitář" = ten, ZE KTERÉHO SE STAVÍ — ne remote zvykového jména
+# (nedůvěřivé čtení 2026-10-03, nález 4). Výchozí hodnota se dřív brala z remote
+# podle jména; ve fork checkoutu tak povrch dostal `git_repository` upstreamu a stavěl
+# by se odjinud než zbytek instance. Remote se proto vybírá podle IDENTITY
+# nasazovaného repozitáře z deklarace manifestu (lib/nasazovany-repozitar.mjs
+# --remote, bez sítě). Manifest je týž jako všude jinde: MANIFEST_FILE (cold-start
+# ho předává), jinak sdílený rozcestník instance. Když žádný remote neodpovídá,
+# výchozí hodnota NENÍ — skript skončí s důvodem, jiný remote se nedosazuje.
+_ps_koren="$(cd "$(dirname "$0")/.." && pwd)"
+_ps_manifest=""
+# Manifest instance — jednou a jen když je potřeba (výchozí repozitář, výchozí větev).
+# $1 = čím větu dokončit, když ho určit nejde.
+ps_manifest() {
+  [ -n "$_ps_manifest" ] && return 0
+  _ps_manifest="${MANIFEST_FILE:-}"
+  if [ -z "$_ps_manifest" ]; then
+    local rc=0
+    _ps_manifest="$(node "$_ps_koren/scripts/lib/coolify-instance-scope.mjs" --manifest-path)" || rc=$?
+    [ "$rc" -eq 0 ] || die "manifest instance nejde určit (kód ${rc}, důvod výše) — $1"
+  fi
+}
+
 if [ -z "${AISHA_SURFACE_REPO:-}" ]; then
-  AISHA_SURFACE_REPO="$(git -C "$(dirname "$0")/.." remote get-url origin 2>/dev/null || true)"
-  [ -n "$AISHA_SURFACE_REPO" ] && log "AISHA_SURFACE_REPO unset — using this checkout's origin: ${AISHA_SURFACE_REPO%%:*}…"
+  ps_manifest "AISHA_SURFACE_REPO není nastavený a nevím, ze kterého repozitáře povrch stavět"
+  _ps_rc=0
+  _ps_remote="$(node "$_ps_koren/scripts/lib/nasazovany-repozitar.mjs" --manifest "$_ps_manifest" --repo-root "$_ps_koren" --remote)" || _ps_rc=$?
+  [ "$_ps_rc" -eq 0 ] || die "AISHA_SURFACE_REPO není nastavený a remote nasazovaného repozitáře nejde určit (kód ${_ps_rc}, důvod výše) — nastav AISHA_SURFACE_REPO výslovně"
+  IFS=$'\t' read -r _ps_jmeno _ <<< "$_ps_remote"
+  AISHA_SURFACE_REPO="$(git -C "$_ps_koren" remote get-url "$_ps_jmeno")" || _ps_rc=$?
+  [ "$_ps_rc" -eq 0 ] && [ -n "$AISHA_SURFACE_REPO" ] || die "adresu remote '${_ps_jmeno}' nejde přečíst (kód ${_ps_rc}) — nastav AISHA_SURFACE_REPO výslovně"
+  log "AISHA_SURFACE_REPO nenastaveno — beru remote '${_ps_jmeno}' tohoto checkoutu (nasazovaný repozitář podle identity URL): ${AISHA_SURFACE_REPO%%:*}…"
+  unset _ps_rc _ps_remote _ps_jmeno
 fi
 export AISHA_SURFACE_REPO
 
-for v in COOLIFY_BASE_URL COOLIFY_API_TOKEN COOLIFY_PROJECT_UUID AISHA_SURFACE_REPO APP_NAME_PREFIX PUBLIC_TLD KEYCLOAK_URL KEYCLOAK_ADMIN_PASSWORD; do need "$v"; done
+# ⛔ VĚTEV POVRCHU = VĚTEV, ZE KTERÉ SE STAVÍ INSTANCE. Výchozí hodnota bývala pevné
+# jméno větve; instance, jejíž manifest deklaruje jinou deploy větev, tak stavěla
+# stacky z jedné větve a povrch z druhé — oprava čekající v deploy větvi by se do
+# povrchu nedostala (a naopak). Výchozí větev proto dává deklarace manifestu týmž
+# výkladem jako všude jinde (lib/nasazovany-repozitar.mjs --vyklad). Výslovně
+# nastavená AISHA_SURFACE_BRANCH má dál přednost.
+if [ -n "${AISHA_SURFACE_BRANCH:-}" ]; then
+  BRANCH="$AISHA_SURFACE_BRANCH"
+  log "větev povrchu: ${BRANCH} (AISHA_SURFACE_BRANCH)"
+else
+  ps_manifest "AISHA_SURFACE_BRANCH není nastavená a nevím, ze které větve povrch stavět"
+  _ps_rc=0
+  _ps_vyklad="$(node "$_ps_koren/scripts/lib/nasazovany-repozitar.mjs" --manifest "$_ps_manifest" --vyklad)" || _ps_rc=$?
+  [ "$_ps_rc" -eq 0 ] || die "AISHA_SURFACE_BRANCH není nastavená a deklaraci větve v manifestu nejde vyložit (kód ${_ps_rc}, důvod výše) — nastav AISHA_SURFACE_BRANCH výslovně"
+  IFS=$'\t' read -r BRANCH _ <<< "$_ps_vyklad"
+  [ -n "$BRANCH" ] || die "výklad deklarace vrátil prázdnou větev ('${_ps_vyklad}')"
+  log "větev povrchu: ${BRANCH} (z deklarace manifestu — táž, ze které se staví instance)"
+  unset _ps_rc _ps_vyklad
+fi
+
+for v in COOLIFY_BASE_URL COOLIFY_API_TOKEN COOLIFY_PROJECT_UUID AISHA_SURFACE_REPO APP_NAME_PREFIX PUBLIC_TLD KEYCLOAK_URL; do need "$v"; done
+
+# Keycloak v tomhle prostředí NÁŠ? Domov vlastnictví (profil prostředí: external_domain).
+# Cizí (sdílený) Keycloak se NIKDY nespravuje — klienty povrchů v jeho realmu dodává
+# vlastník (deklarace realmu v jeho overlayi); admin heslo tohoto prostředí k němu nepatří.
+# Až ZA kontrolou prostředí: chybějící proměnná se hlásí sama, ne přes chybu profilu.
+# Manifest se tu čte VŽDY (i s výslovnou AISHA_SURFACE_REPO/BRANCH) — ne kvůli repozitáři
+# a větvi, ale kvůli inventáři; bez něj nevíme, co je naše (fail-closed).
+# shellcheck source=lib/vlastnictvi.sh
+. "$_ps_koren/scripts/lib/vlastnictvi.sh"
+ps_manifest "nevím, které aplikace jsou v tomhle prostředí naše (Keycloak)"
+vlastnictvi_nacti "$_ps_manifest" || die "vlastnictví aplikací v prostředí nejde určit (důvod výše) — Keycloak nespravuji naslepo"
+KC_SPRAVUJI=1
+if externi keycloak; then
+  KC_SPRAVUJI=0
+  log "keycloak: $(vlastnictvi_hlaska keycloak) — klienty povrchů v realmu nezakládám (dodává vlastník realmu)"
+fi
+[ "$KC_SPRAVUJI" = "0" ] || need KEYCLOAK_ADMIN_PASSWORD
 
 CB="${COOLIFY_BASE_URL%/}"
-BRANCH="${AISHA_SURFACE_BRANCH:-main}"
+# Nasazení povrchu odesílá jediný domov mutace aplikace v Coolify (ptá se na
+# deklarované držení před voláním) — tenhle skript adresu nasazení sám neskládá.
+# shellcheck source=lib/coolify-mutace.sh
+. "$_ps_koren/scripts/lib/coolify-mutace.sh"
 SLUG="${AISHA_INSTANCE_SLUG:-$APP_NAME_PREFIX}"
 REALM="${KEYCLOAK_REALM:?jméno realmu je identita instance — nedosazuje se}"
 KC="${KEYCLOAK_URL%/}"
@@ -97,7 +172,10 @@ kc_token() {
     --data-urlencode "password=$KEYCLOAK_ADMIN_PASSWORD" -d grant_type=password \
     | python3 -c 'import sys,json;print(json.load(sys.stdin)["access_token"])'
 }
-KTOK="$(kc_token)" || die "keycloak admin login failed"
+KTOK=""
+if [ "$KC_SPRAVUJI" = "1" ]; then
+  KTOK="$(kc_token)" || die "keycloak admin login failed"
+fi
 
 # ── Per-surface provisioning ──────────────────────────────────────────────────
 IFS=',' read -ra ENTRIES <<< "$SURFACES"
@@ -209,6 +287,8 @@ for entry in "${ENTRIES[@]}"; do
   fi
 
   # 2) Keycloak public client (create if absent) ------------------------------
+  # Jen ve VLASTNÍM Keycloaku (KC_SPRAVUJI) — cizí realm spravuje jeho vlastník.
+  if [ "$KC_SPRAVUJI" = "1" ]; then
   # The client MUST carry the platform token shape — the audience + PostgREST
   # role + subject + realm-role protocol mappers — or the SPA logs in fine but
   # every API call is rejected: no `aud` for the gateway allow-list and no
@@ -248,10 +328,24 @@ f=os.environ["FQDN"];print(json.dumps({
       done
     fi
   fi
+  else
+    log "  KC client $app: Keycloak externí — nezakládám (klient musí být v deklaraci realmu u vlastníka)"
+  fi
 
   # 3) Deploy the surface -----------------------------------------------------
   if [ "$spravujeme_appku" = "1" ]; then
-    cf -X POST "$CB/api/v1/deploy?uuid=$uuid&force=false" >/dev/null && log "  deploy queued for $app" || warn "  deploy trigger failed for $app"
+    # Přes domov mutace: 0 = zařazeno · 100 = DRŽENO (nic se neodeslalo, hláška ve výstupu).
+    _ps_mut_rc=0
+    _ps_mut="$(export COOLIFY_URL="$CB" COOLIFY_API_TOKEN
+      coolify_mutace deploy "$app" "$uuid" --kdo provision-surfaces --prefix "$APP_NAME_PREFIX" --force false ${ENV_FILE:+--env-soubor "$ENV_FILE"})" || _ps_mut_rc=$?
+    if [ "$_ps_mut_rc" -eq 0 ]; then
+      log "  deploy queued for $app"
+    elif [ "$_ps_mut_rc" -eq "$COOLIFY_MUTACE_DRZENO" ]; then
+      warn "  ${_ps_mut}. Povrch $app NENASAZUJI."
+    else
+      warn "  deploy trigger failed for $app (coolify-mutace kód ${_ps_mut_rc})"
+    fi
+    unset _ps_mut _ps_mut_rc
   else
     log "  nasazení $app nespouštím — appku spravuje jiný model (viz výše)"
   fi

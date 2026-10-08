@@ -1,5 +1,5 @@
 import Fastify, { type FastifyError, type FastifyReply, type FastifyRequest } from 'fastify';
-import { applySecurity, pluginRejection } from '@aisha/security';
+import { applySecurity, pluginRejection, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import { config } from './config.js';
@@ -14,7 +14,7 @@ import { clientOpsRoutes } from './routes/client-ops.js';
 // Rollback: OTEL_SDK_DISABLED=true env (Coolify) + container restart.
 bootstrapOtel({ serviceName: 'svc-matrix' });
 const app = Fastify({
-  logger: { level: config.logLevel },
+  logger: safeLoggerOptions({ level: config.logLevel }),
   trustProxy: true,
 });
 

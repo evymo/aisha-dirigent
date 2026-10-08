@@ -3,6 +3,8 @@ import { verifyToken } from '../auth.js';
 import { rpcUser, rpcService } from '../postgrest.js';
 import { config } from '../config.js';
 import { buildHeuristicInsights } from '../helpers.js';
+import { isRateLimitExceeded, rateLimitFailureLogFields } from '../rate-limit.js';
+import type { VoidRpcResult } from '@aisha/postgrest-client';
 import { z } from 'zod';
 
 interface AnalyzeWearableBody {
@@ -29,14 +31,20 @@ export async function analyzeWearableRoutes(app: FastifyInstance): Promise<void>
     }
     const { syncBatchId } = parsed.data;
 
-    // Rate limit
+    // Rate limit (RETURNS void → 204 → null). 429 JEN pro skutečné překročení;
+    // jiná chyba = porucha stráže → 503 fail-closed (viz rate-limit.ts).
+    const rateLimitKey = 'wearable_sync_analysis';
     try {
-      await rpcUser('enforce_rate_limit', {
-        p_endpoint_key: 'wearable_sync_analysis',
+      await rpcUser<VoidRpcResult>('enforce_rate_limit', {
+        p_endpoint_key: rateLimitKey,
         p_max_requests: config.wearableAnalysesPerHour,
         p_window_ms: 60 * 60 * 1000,
       }, jwt);
-    } catch {
+    } catch (err) {
+      if (!isRateLimitExceeded(err, rateLimitKey)) {
+        req.log.error(rateLimitFailureLogFields(err, rateLimitKey), 'rate limit check failed — fail-closed 503');
+        return reply.status(503).send({ error: 'Rate limit check unavailable' });
+      }
       return reply.status(429).send({ error: 'Rate limit exceeded' });
     }
 

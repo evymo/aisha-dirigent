@@ -27,7 +27,7 @@ BEGIN
   FROM expert_rules er
   WHERE er.is_default = true
     AND er.status = 'published'
-    AND er.visibility = 'public';
+    AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, NULL::uuid);
 
   IF v_categories IS NULL THEN
     v_md := v_md || '_No default rules found. Seed the database with default expert rules._' || E'\n';
@@ -46,7 +46,7 @@ BEGIN
       FROM expert_rules er
       WHERE er.is_default = true
         AND er.status = 'published'
-        AND er.visibility = 'public'
+        AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, NULL::uuid)
         AND er.category::text = v_cat
       ORDER BY er.slug
     LOOP

@@ -248,6 +248,10 @@ jobs:
           - event-worker
           # Phase 13.1 (2026-05-19) — dynamic agent broadcasting service
           - svc-ide-context
+          # Thin client of the shared GPU lane (fork side, model-gpu compose)
+          - svc-lane-klient
+          # Enforcement point of the shared GPU lane (operator side, accel-vstup compose)
+          - svc-accel-vstup
     env:
       SERVICE_NAME: ${{ matrix.service }}
     steps:
@@ -360,6 +364,10 @@ jobs:
           - svc-aisha-kronos-shim
           # Phase 13.1 (2026-05-19) — dynamic agent broadcasting service
           - svc-ide-context
+          # Thin client of the shared GPU lane (fork side, model-gpu compose)
+          - svc-lane-klient
+          # Enforcement point of the shared GPU lane (operator side, accel-vstup compose)
+          - svc-accel-vstup
           # NOT listed here: svc-local-ingest + svc-potok (packages/local-ingest,
           # packages/potok — Python submodules built via root Dockerfile.*).
           # This lane is cyclonedx-npm over services/<target>/package-lock.json;
@@ -672,6 +680,10 @@ jobs:
           - svc-push
           - svc-web-artifact
           - svc-ide-context
+          # Thin client of the shared GPU lane (fork side, model-gpu compose)
+          - svc-lane-klient
+          # Enforcement point of the shared GPU lane (operator side, accel-vstup compose)
+          - svc-accel-vstup
     env:
       TARGET_NAME: ${{ matrix.target }}
     steps:

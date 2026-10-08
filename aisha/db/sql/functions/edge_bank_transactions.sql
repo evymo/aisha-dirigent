@@ -1,8 +1,8 @@
 -- edge_bank_transactions: Edge-safe bank transaction operations (insert, match, list)
---   služba (svc-fio-bank): insert_transaction, auto_match_by_vs
---   admin/staff (AdminBankReconciliation): get_unmatched, get_all, get_awaiting_orders,
---                                          match_to_order, dismiss_transaction
---   vlastník objednávky: get_order_bank_transfer
+--   služba (svc-fio-bank, rpcService):            insert_transaction, auto_match_by_vs
+--   správa (admin UI useBankReconciliation):       get_unmatched, get_all, get_awaiting_orders,
+--                                                  match_to_order, dismiss_transaction
+--   vlastník objednávky (useOrderBankTransfer):    get_order_bank_transfer
 CREATE OR REPLACE FUNCTION public.edge_bank_transactions(
   p_action text,
   p_payload jsonb DEFAULT '{}'::jsonb
@@ -22,18 +22,21 @@ DECLARE
   v_tx_uuid uuid;
   v_limit int;
 BEGIN
-  -- ⛔ SECURITY DEFINER vypíná RLS, takže nárok musí vymáhat tělo. Do 2026-10-04
-  -- tu žádná stráž nebyla a funkce má GRANT pro `authenticated` (admin UI ji volá
-  -- přímo): kdokoli přihlášený si přímým /rpc/edge_bank_transactions mohl
-  -- označit vlastní objednávku za zaplacenou (match_to_order), podstrčit
-  -- platbu (insert_transaction) a přečíst účty a jména plátců (get_unmatched).
-  -- Zápis pohybů z banky dělá jen služba (svc-fio-bank); párování a frontu
-  -- nespárovaných admin/staff. get_order_bank_transfer stráží vlastníka níž.
-  IF p_action IN ('insert_transaction', 'auto_match_by_vs') AND NOT public.is_service_role() THEN
+  -- ⛔ NÁROK PŘED DISPEČEREM, VÝCHOZÍ ODMÍTNUTÍ (nález 2026-10-06; ve stagingu
+  -- opraveno 10-04, upstream to nedostal). SECURITY DEFINER vypíná RLS a funkce má
+  -- GRANT pro authenticated (admin UI ji volá přímo), ale stráž tu nebyla: kdokoli
+  -- přihlášený si přímým /rpc/edge_bank_transactions označil VLASTNÍ objednávku za
+  -- zaplacenou (match_to_order → orders.status = 'paid'), vložil falešný bankovní
+  -- pohyb (insert_transaction) a přečetl účty a jména plátců (get_unmatched).
+  -- Členovi patří jen VYJMENOVANÁ akce get_order_bank_transfer (vlastnictví hlídá
+  -- její dotaz); každá jiná — i budoucí — chce službu nebo správu. Pohyby z banky
+  -- zapisuje jen služba. `IS NOT TRUE`, ne `NOT (…)`: NULL nesmí stráž přeskočit.
+  -- Třídu hlídá src/tests/gates/definer-dispecer-autorizuje-kazdou-akci.gate.test.ts.
+  IF p_action IS DISTINCT FROM 'get_order_bank_transfer'
+     AND (public.is_service_role() OR public.is_admin_or_staff()) IS NOT TRUE THEN
     RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
   END IF;
-  IF p_action IN ('match_to_order', 'get_unmatched', 'get_all', 'get_awaiting_orders', 'dismiss_transaction')
-     AND NOT (public.is_service_role() OR public.is_admin_or_staff()) THEN
+  IF p_action IN ('insert_transaction', 'auto_match_by_vs') AND public.is_service_role() IS NOT TRUE THEN
     RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
   END IF;
 
@@ -236,6 +239,7 @@ BEGIN
 
     RETURN jsonb_build_object('ok', FOUND);
   END IF;
+
 
   -- GET bank transfer details for an order (member view)
   IF p_action = 'get_order_bank_transfer' THEN

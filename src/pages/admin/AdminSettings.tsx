@@ -2,19 +2,21 @@
  * Admin Settings Page
  *
  * Centrální stránka pro nastavení systému:
- * - API klíče (Stripe, Packeta, OpenAI, Fio)
+ * - Poskytovatelé AI a tokeny (katalog z DB — Anthropic, OpenAI, Google, token Claude …)
+ * - API klíče integrací (Stripe, Packeta, Fio, Home Assistant)
  * - E-mail branding
  * - Fakturační hlavička
  * - Platební metody
  */
 import { useTranslation } from "react-i18next";
-import { CreditCard, FileText, Globe, Key, Palette, Settings } from "lucide-react";
+import { Bot, CreditCard, FileText, Globe, Key, Palette, Settings } from "lucide-react";
 
 import { AllApiKeysManager } from "@/components/admin/settings/AllApiKeysManager";
 import { BrandingProfileSettings } from "@/components/admin/settings/BrandingProfileSettings";
 import { DomainRoutingSettings } from "@/components/admin/settings/DomainRoutingSettings";
 import { InvoiceHeaderSettings } from "@/components/admin/settings/InvoiceHeaderSettings";
 import { PaymentMethodSettings } from "@/components/admin/settings/PaymentMethodSettings";
+import { ProviderCredentialsManager } from "@/components/admin/settings/ProviderCredentialsManager";
 
 export default function AdminSettings() {
   const { t } = useTranslation();
@@ -30,6 +32,15 @@ export default function AdminSettings() {
       </div>
 
       <div className="space-y-6">
+        {/* Poskytovatelé AI a tokeny — každý fork svoje (trezor instance) */}
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Bot className="h-5 w-5" />
+            <h2 className="text-lg font-semibold">{t("admin.settings.providerCredentials.sectionTitle")}</h2>
+          </div>
+          <ProviderCredentialsManager />
+        </section>
+
         {/* API Keys Section */}
         <section>
           <div className="flex items-center gap-2 mb-4">

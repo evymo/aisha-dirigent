@@ -138,6 +138,16 @@ export class EwClient {
   vehiclesStates<T = unknown>(): Promise<T> { return this.get<T>('vehicles-states'); }
 
   /**
+   * Ids of the monitored objects this API key may see (`configuration.filter`),
+   * or null when the vendor sends no filter. ⛔ The response also ECHOES the
+   * api_key — only the filter leaves this method, never the object.
+   */
+  async filterIds(): Promise<string[] | null> {
+    const cfg = await this.get<{ filter?: unknown }>('configuration');
+    return Array.isArray(cfg?.filter) ? cfg.filter.map((x) => String(x)) : null;
+  }
+
+  /**
    * ALL drivers. The endpoint answers `{data, limit, offset, total}` a page at a
    * time (max 29); a codebook snapshot built from one page would retire every
    * driver past it.

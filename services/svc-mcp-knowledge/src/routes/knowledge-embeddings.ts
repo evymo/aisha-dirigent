@@ -5,11 +5,12 @@ import { generateContextualPrefix, type PrefixResult } from '../lib/contextual-p
 import { resolveRagBackend, type ResolvedBackend } from '../lib/capability-resolver.js';
 import { scanForInjection } from '../lib/ingestion-safety.js';
 import {
-  embedTextsWithBackend,
+  apiKeyForBackend,
+  embedTextsSIdentitou,
   resolveEmbeddingBackendForSpace,
   type EmbeddingBackend,
 } from '../lib/embed-query-in-space.js';
-import { countTokens } from '../lib/embed-dispatcher.js';
+import { countTokens, EmbedDispatchError, type IdentitaVah } from '../lib/embed-dispatcher.js';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -175,10 +176,15 @@ function buildChunksForItem(item: {
  * OpenAI klient. Není to kosmetika: přes limit vrací poskytovatel chybu a
  * spadla by celá dávka, tedy i chunky, které se vejdou.
  */
-async function embedCorpus(texts: string[], backend: EmbeddingBackend): Promise<number[][]> {
-  return embedTextsWithBackend(
+async function embedCorpus(
+  texts: string[],
+  backend: EmbeddingBackend,
+): Promise<{ vectors: number[][]; identita: IdentitaVah | null }> {
+  // Ingest korpusu = dávka (lane ji plánuje odděleně od interaktivních dotazů).
+  return embedTextsSIdentitou(
     backend,
     texts.map((t) => (t.length > MAX_EMBED_CHARS ? t.slice(0, MAX_EMBED_CHARS) : t)),
+    'davka',
   );
 }
 
@@ -188,6 +194,14 @@ async function embedCorpus(texts: string[], backend: EmbeddingBackend): Promise<
  */
 const modelVersionOf = (backend: EmbeddingBackend): string =>
   `${backend.provider_slug}:space_resolver:${backend.rag_space}`;
+
+/**
+ * Identita vektoru (E2): když backend poslal identitu vah (lane na GPU), je to ONA —
+ * `<formát>:<sha256>;recipe=<recept>`, týž tvar, podle kterého fn_chunks_bez_zive_identity
+ * pozná živý vektor. Bez ní zůstává proveniencní značka resolveru.
+ */
+const verzeVektoru = (backend: EmbeddingBackend, identita: IdentitaVah | null): string =>
+  identita ? `${identita.identita};recipe=${identita.recept}` : modelVersionOf(backend);
 
 export async function knowledgeEmbeddingsRoutes(app: FastifyInstance): Promise<void> {
   app.post<{
@@ -388,7 +402,7 @@ export async function knowledgeEmbeddingsRoutes(app: FastifyInstance): Promise<v
           const p = prefixes[i];
           return p ? `${p.prefix} ${c.chunk_text}` : c.chunk_text;
         });
-        const embeddings = await embedCorpus(embeddingInputs, corpusBackend);
+        const { vectors: embeddings, identita: identitaKorpusu } = await embedCorpus(embeddingInputs, corpusBackend);
 
         // Clear existing if force — per-locale (Brick4): only this item's locale is
         // cleared, so re-ingesting one language never wipes its sibling locales.
@@ -441,7 +455,7 @@ export async function knowledgeEmbeddingsRoutes(app: FastifyInstance): Promise<v
             // Jinak by se do jednoho prostoru daly namíchat vektory dvou modelů a
             // pořadí výsledků by tiše zhoršilo, bez jediné chyby v logu.
             p_model: corpusBackend.model_id,
-            p_model_version: modelVersionOf(corpusBackend),
+            p_model_version: verzeVektoru(corpusBackend, identitaKorpusu),
           });
           embeddingsInserted++;
         }
@@ -667,7 +681,10 @@ export async function knowledgeEmbeddingsRoutes(app: FastifyInstance): Promise<v
         // Contextual prefix (when present) is part of the embedded text — same input
         // shape as the v1 path, so the two spaces stay comparable.
         const text = row.contextual_prefix ? `${row.contextual_prefix} ${row.chunk_text}` : row.chunk_text;
-        const [vec] = await embedTextsWithBackend(backend, [text]);
+        const {
+          vectors: [vec],
+          identita,
+        } = await embedTextsSIdentitou(backend, [text], 'davka');
         if (!vec) {
           failures.push({ chunk_id: row.chunk_id, reason: 'embed returned no vector' });
           failed += 1;
@@ -680,7 +697,7 @@ export async function knowledgeEmbeddingsRoutes(app: FastifyInstance): Promise<v
           // (surfaced by fn_get_embeddings_needing_v2).
           p_locale: row.locale,
           p_model: backend.model_id,
-          p_model_version: modelVersion,
+          p_model_version: identita ? verzeVektoru(backend, identita) : modelVersion,
         });
         generated += 1;
       } catch (err) {
@@ -704,8 +721,8 @@ export async function knowledgeEmbeddingsRoutes(app: FastifyInstance): Promise<v
 
   // ── POST /embeddings/v1-backfill — platformní dopočet vektorů ŽIVÉ identity ──────────
   // Rozhodnutí majitele 2026-09-29: staré vektory (sentence-transformers, MLX, žádné)
-  // přepočítat „samo na serveru". Chunky BEZ vektoru živé identity (fn_get_chunks_needing_v1:
-  // model resolveru v1 + deklarovaný pin vah `gguf:<sha>`) kóduje TÝŽ svc-model, kterým se
+  // přepočítat „samo na serveru". Chunky BEZ vektoru živé identity (fn_get_chunks_needing_v1 →
+  // fn_ziva_identita_v1: model resolveru v1 + deklarovaná identita vah `<formát>:<sha>`) kóduje TÝŽ svc-model, kterým se
   // kódují dotazy — identita strany dotazů z definice. Bez přechunkování a bez LLM prefixu:
   // vstup = uložený chunk (recept `chunk_text_v1`, zapsaný do model_version, aby šlo poznat,
   // co přepočítat, kdyby se recept změnil). Přepis NA MÍSTĚ (ON CONFLICT (chunk_id, locale)).
@@ -719,6 +736,17 @@ export async function knowledgeEmbeddingsRoutes(app: FastifyInstance): Promise<v
   // a USTOUPÍ, když latence na token vzroste nad VYSTUP_NASOBEK × medián dávky (souběh
   // s dotazy), nebo když vyprší max_ms. Postup je vidět ze serveru (pokrytí vektory
   // v brokeru, metadata.pokryti_vektoru), ne z historie plánovače.
+  //
+  // ⛔ P2 (NAMĚŘENO 2026-10-06, riq): jedno volání zpracovalo JEDNU dávku (≤ 200 chunků) a skončilo
+  // „hotovo“ — při 193 028 úsecích a plánovači */10 v noci ≈ 12k za noc, tedy ~16 nocí. Teď volání
+  // bere dávky ve SMYČCE, dokud fronta nevyschne nebo nevyprší časový rozpočet (max_ms) — a dál
+  // respektuje každý stop: kvóta nájemce na lane (KVOTA_PREKROCENA, kontrakt Infra 5607e6840),
+  // ústup při souběhu s dotazy, tokenizace nedostupná, cizí identita vah. Dávka bez postupu (jen
+  // selhání) smyčku zastaví (`bez_postupu`), aby se volání netočilo nad týmiž vadnými řádky.
+  // Idempotentní: fronta (fn_get_chunks_needing_v1) vrací jen chunky BEZ vektoru živé identity
+  // a chunk, který toto volání už zkusilo, se v něm podruhé nezkouší. Přepis na místě (ON CONFLICT)
+  // nastane až po úspěšném vektoru ověřené identity — starý vektor se předem nemaže; během přepočtu
+  // hledání (v3) srovnává jen s vektory deklarované identity, takže se generace nemíchají.
   app.post<{
     Body: {
       batch_size?: number;
@@ -752,17 +780,19 @@ export async function knowledgeEmbeddingsRoutes(app: FastifyInstance): Promise<v
       identita: string;
       max_tokens: number;
     }
+    /** Jedna dávka z fronty — jen chunky BEZ vektoru živé identity (idempotentní výběr). */
+    const nactiDavku = () => rpcService<ChunkNeedingV1[]>('fn_get_chunks_needing_v1', { p_batch_size: batchSize });
     let rows: ChunkNeedingV1[];
     try {
-      rows = await rpcService<ChunkNeedingV1[]>('fn_get_chunks_needing_v1', { p_batch_size: batchSize });
+      rows = await nactiDavku();
     } catch (err) {
-      // Typicky „živá identita neznámá" (chybí declared pin) — nahlas, ne prázdná dávka.
+      // Typicky „živá identita neznámá" (chybí declared pin nebo formát; zpráva nese návod) — nahlas, ne prázdná dávka.
       const msg = err instanceof Error ? err.message : String(err);
       req.log.error({ err: msg }, 'fn_get_chunks_needing_v1 failed');
       return reply.code(502).send({ error: 'Failed to fetch chunks needing v1', detail: msg });
     }
     if (!Array.isArray(rows) || rows.length === 0) {
-      return reply.send({ processed: 0, generated: 0, nad_limitem: 0, failed: 0,
+      return reply.send({ processed: 0, generated: 0, nad_limitem: 0, failed: 0, davek: 0, konec: 'hotovo',
         message: 'Všechny chunky mají vektor živé identity (nebo jsou záměrně vynechané)' });
     }
     if (rows.some((r) => r.model_id !== backend.model_id)) {
@@ -779,68 +809,167 @@ export async function knowledgeEmbeddingsRoutes(app: FastifyInstance): Promise<v
     let generated = 0;
     let nadLimitem = 0;
     let failed = 0;
-    let konec: 'hotovo' | 'casovy_limit' | 'ustoupeno' | 'tokenizace_nedostupna' = 'hotovo';
+    let konec:
+      | 'hotovo' | 'casovy_limit' | 'ustoupeno' | 'tokenizace_nedostupna' | 'identita_nesouhlasi' | 'kvota'
+      | 'bez_postupu' | 'vyber_selhal' | 'identita_zmenena' = 'hotovo';
+    // Kvóta nájemce na lane (KVOTA_PREKROCENA) platí pro celé okno: další řádky by dostaly
+    // totéž odmítnutí. Dávka proto KONČÍ (nic se nepočítá jako selhání) a pohon zkusí znovu.
+    let kvota: { druh: string | null; retry_after_s: number | null } | null = null;
+    const jeKvota = (err: unknown): err is EmbedDispatchError =>
+      err instanceof EmbedDispatchError && err.duvod === 'KVOTA_PREKROCENA';
     const latencePerToken: number[] = [];
+    // Lane na GPU počítadlo tokenů nemá (CESTA_NEZNAMA) a vstup nad oknem odmítne kódem
+    // ENGINE_ODMITL — po prvním takovém zjištění se předpočet přeskakuje.
+    let laneBezPocitadla = false;
     const failures: Array<{ chunk_id: string; reason: string }> = [];
+    // Identita a model první dávky platí pro celé volání; jiná v další dávce = přepnutí během běhu.
+    const identita = rows[0]?.identita ?? null;
+    // Chunky, které toto volání už zkusilo — podruhé se nezkoušejí (selhaný řádek fronta vrátí znovu).
+    const zkusene = new Set<string>();
+    let davek = 0;
 
-    for (const row of rows) {
+    for (;;) {
+      const nove = rows.filter((r) => !zkusene.has(r.chunk_id));
+      if (nove.length === 0) {
+        konec = 'bez_postupu';
+        break;
+      }
+      davek += 1;
+      const postupPred = generated + nadLimitem;
+      for (const row of nove) {
+        zkusene.add(row.chunk_id);
+        if (Date.now() - t0 > maxMs) {
+          konec = 'casovy_limit';
+          break;
+        }
+        const text = row.contextual_prefix ? `${row.contextual_prefix} ${row.chunk_text}` : row.chunk_text;
+        let tokenu: number | null = null;
+        if (!laneBezPocitadla) {
+          try {
+            tokenu = await countTokens(pocitadloUrl, backend.model_id, text, undefined, {
+              apiKey: await apiKeyForBackend(backend),
+              trida: 'davka',
+            });
+          } catch (err) {
+            if (jeKvota(err)) {
+              kvota = { druh: err.kvota ?? null, retry_after_s: err.znovuZaS };
+              konec = 'kvota';
+              break;
+            }
+            if (err instanceof EmbedDispatchError && err.duvod === 'CESTA_NEZNAMA') {
+              // Lane počítadlo NEMÁ a vstup NEOŘEZÁVÁ (E3): nad oknem odmítne ENGINE_ODMITL.
+              // Rozhodne tedy odpověď lane — kód protokolu, ne odhad.
+              laneBezPocitadla = true;
+            } else {
+              // Bez počtu tokenů nelze vyloučit tichý ořez → nekódovat nic dalšího.
+              req.log.warn({ err: err instanceof Error ? err.message : String(err) }, 'v1 backfill: tokenizace nedostupná');
+              konec = 'tokenizace_nedostupna';
+              break;
+            }
+          }
+        }
+        try {
+          if (tokenu !== null && tokenu > row.max_tokens) {
+            await rpcService('fn_record_embedding_vynechani', {
+              p_chunk_id: row.chunk_id,
+              p_duvod: 'nad_limitem',
+              p_identita: row.identita,
+              p_locale: row.locale,
+              p_tokenu: tokenu,
+            });
+            nadLimitem += 1;
+            continue;
+          }
+          const t1 = Date.now();
+          let vysledek: { vectors: number[][]; identita: IdentitaVah | null };
+          try {
+            vysledek = await embedTextsSIdentitou(backend, [text], 'davka');
+          } catch (err) {
+            if (jeKvota(err)) {
+              kvota = { druh: err.kvota ?? null, retry_after_s: err.znovuZaS };
+              konec = 'kvota';
+              break;
+            }
+            if (err instanceof EmbedDispatchError && err.duvod === 'ENGINE_ODMITL') {
+              // Lane odmítla vstup nad oknem (E3) — týž stav jako „nad limitem“ z počítadla.
+              await rpcService('fn_record_embedding_vynechani', {
+                p_chunk_id: row.chunk_id,
+                p_duvod: 'nad_limitem',
+                p_identita: row.identita,
+                p_locale: row.locale,
+                p_tokenu: null,
+              });
+              nadLimitem += 1;
+              continue;
+            }
+            throw err;
+          }
+          const [vec] = vysledek.vectors;
+          if (vysledek.identita && vysledek.identita.identita !== row.identita) {
+            // F5/R5c: vektor spočítaly JINÉ váhy, než instance deklaruje — neukládat a zastavit
+            // dávku (další vektory by byly z téhož cizího prostoru).
+            failures.push({
+              chunk_id: row.chunk_id,
+              reason: `identita vah ${vysledek.identita.identita} ≠ deklarovaná ${row.identita} — vektor neuložen`,
+            });
+            failed += 1;
+            konec = 'identita_nesouhlasi';
+            break;
+          }
+          const perToken = (Date.now() - t1) / Math.max(tokenu ?? 1, 1);
+          if (!vec) {
+            failures.push({ chunk_id: row.chunk_id, reason: 'embed returned no vector' });
+            failed += 1;
+            continue;
+          }
+          await rpcService('insert_knowledge_embedding', {
+            p_chunk_id: row.chunk_id,
+            p_embedding: JSON.stringify(vec),
+            p_knowledge_item_id: row.knowledge_item_id,
+            p_locale: row.locale,
+            p_model: row.model_id,
+            p_model_version: `${row.identita};recipe=${V1_BACKFILL_RECEPT}`,
+          });
+          generated += 1;
+          const median = medianOf(latencePerToken);
+          latencePerToken.push(perToken);
+          // Spodní mez 1 ms/token: medián blízko nuly (velmi rychlá volání) by jinak
+          // bral jako souběh i běžný šum. Reálný svc-model má ~15–20 ms/token.
+          if (latencePerToken.length > V1_BACKFILL_ZAHRATI && median !== null
+              && perToken > VYSTUP_NASOBEK * Math.max(median, 1)) {
+            konec = 'ustoupeno';
+            break;
+          }
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err);
+          req.log.warn({ chunk_id: row.chunk_id, reason }, 'v1 backfill row failed');
+          failures.push({ chunk_id: row.chunk_id, reason });
+          failed += 1;
+        }
+      }
+      // Postup je vidět i v logu služby (dávka po dávce), nejen v souhrnu odpovědi.
+      req.log.info({ davka: davek, generated, nad_limitem: nadLimitem, failed, konec, ms: Date.now() - t0 }, 'v1 backfill: dávka');
+      if (konec !== 'hotovo') break; // stop z dávky: kvóta, ústup, čas, tokenizace, cizí identita
+      if (generated + nadLimitem === postupPred) {
+        konec = 'bez_postupu';
+        break;
+      }
       if (Date.now() - t0 > maxMs) {
         konec = 'casovy_limit';
         break;
       }
-      const text = row.contextual_prefix ? `${row.contextual_prefix} ${row.chunk_text}` : row.chunk_text;
-      let tokenu: number;
       try {
-        tokenu = await countTokens(pocitadloUrl, backend.model_id, text);
+        rows = await nactiDavku();
       } catch (err) {
-        // Bez počtu tokenů nelze vyloučit tichý ořez → nekódovat nic dalšího.
-        req.log.warn({ err: err instanceof Error ? err.message : String(err) }, 'v1 backfill: tokenizace nedostupná');
-        konec = 'tokenizace_nedostupna';
+        req.log.error({ err: err instanceof Error ? err.message : String(err) }, 'v1 backfill: další dávka se nenačetla');
+        konec = 'vyber_selhal';
         break;
       }
-      try {
-        if (tokenu > row.max_tokens) {
-          await rpcService('fn_record_embedding_vynechani', {
-            p_chunk_id: row.chunk_id,
-            p_duvod: 'nad_limitem',
-            p_identita: row.identita,
-            p_locale: row.locale,
-            p_tokenu: tokenu,
-          });
-          nadLimitem += 1;
-          continue;
-        }
-        const t1 = Date.now();
-        const [vec] = await embedTextsWithBackend(backend, [text]);
-        const perToken = (Date.now() - t1) / Math.max(tokenu, 1);
-        if (!vec) {
-          failures.push({ chunk_id: row.chunk_id, reason: 'embed returned no vector' });
-          failed += 1;
-          continue;
-        }
-        await rpcService('insert_knowledge_embedding', {
-          p_chunk_id: row.chunk_id,
-          p_embedding: JSON.stringify(vec),
-          p_knowledge_item_id: row.knowledge_item_id,
-          p_locale: row.locale,
-          p_model: row.model_id,
-          p_model_version: `${row.identita};recipe=${V1_BACKFILL_RECEPT}`,
-        });
-        generated += 1;
-        const median = medianOf(latencePerToken);
-        latencePerToken.push(perToken);
-        // Spodní mez 1 ms/token: medián blízko nuly (velmi rychlá volání) by jinak
-        // bral jako souběh i běžný šum. Reálný svc-model má ~15–20 ms/token.
-        if (latencePerToken.length > V1_BACKFILL_ZAHRATI && median !== null
-            && perToken > VYSTUP_NASOBEK * Math.max(median, 1)) {
-          konec = 'ustoupeno';
-          break;
-        }
-      } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err);
-        req.log.warn({ chunk_id: row.chunk_id, reason }, 'v1 backfill row failed');
-        failures.push({ chunk_id: row.chunk_id, reason });
-        failed += 1;
+      if (!Array.isArray(rows) || rows.length === 0) break; // fronta vyschla → hotovo
+      if (rows.some((r) => r.model_id !== backend.model_id || r.identita !== identita)) {
+        // Deklarace nebo resolver se během běhu změnily — nic dalšího nepsat pod starou identitou.
+        konec = 'identita_zmenena';
+        break;
       }
     }
 
@@ -849,8 +978,10 @@ export async function knowledgeEmbeddingsRoutes(app: FastifyInstance): Promise<v
       generated,
       nad_limitem: nadLimitem,
       failed,
+      davek,
       konec,
-      identita: rows[0]?.identita ?? null,
+      kvota,
+      identita,
       model: backend.model_id,
       recept: V1_BACKFILL_RECEPT,
       ms: Date.now() - t0,

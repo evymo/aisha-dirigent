@@ -224,7 +224,15 @@ try {
     stdio: 'inherit',
     env: testEnv,
   });
-  process.exitCode = run.status ?? 1;
+  // Druhý konzument téhož clamd: brána dokumentů (infra/docs-scan) — karanténa → sken →
+  // vstup ingestu. Kořenový vitest (soubor se mimo tenhle běh sám přeskakuje přes AV_IT).
+  console.log('▶ running docs-scan integration (root vitest)…');
+  const docs = spawnSync('npx', ['vitest', 'run', 'src/tests/security/docs-scan-karantena.it.test.ts'], {
+    stdio: 'inherit',
+    env: testEnv,
+  });
+  // Obě sady musí projít: zelená jedné nesmí přikrýt červenou druhé.
+  process.exitCode = (run.status ?? 1) !== 0 ? (run.status ?? 1) : (docs.status ?? 1);
 } catch (err) {
   console.error(`✗ ${err instanceof Error ? err.message : String(err)}`);
   process.exitCode = 1;

@@ -18,8 +18,13 @@
  * preserved as options, not forks:
  *   - timeout: `timeoutMs` (svc-webdispecink needs 30s for batch upserts; most use
  *     5s; a few use none).
- *   - nullable result on a non-JSON 2xx body: `createNullable*Rpc` (svc-ai-chat,
- *     whose callers handle void-returning RPCs).
+ *   - nullable result on a non-JSON 2xx body: `createNullable*Rpc` (svc-ai-chat).
+ *
+ * Funkce `RETURNS void`: PostgREST odpoví 204 No Content bez těla a VŠECHNY RPC
+ * buildery (striktní i nullable) vrátí `null` — úspěch bez hodnoty. Volání typuj
+ * `rpcService<VoidRpcResult>('fn', …)` (alias `null`). Do 0.1.2 striktní buildery
+ * na 204 házely SyntaxError až po zápisu (viz HTTP_NO_CONTENT níž). 200 s prázdným
+ * tělem dál hází — to je vada serveru, ne void.
  *
  * Config is read from the SAME environment every service already resolved it from
  * (POSTGREST_URL / POSTGREST_SERVICE_TOKEN / JWT_SECRET|POSTGREST_JWT_SECRET), at
@@ -197,6 +202,15 @@ async function send(
   return { res, cleanup };
 }
 
+// ⛔ NAMĚŘENO (fork 2026-09-29, services/svc-agent-runner db.unit.test.ts): funkce
+// `RETURNS void` odpoví 204 No Content BEZ TĚLA. `strictRpc` volal na každé 2xx
+// `res.json()` → SyntaxError AŽ PO ZÁPISU v databázi; volající hlásil chybu u zápisu,
+// který proběhl (svc-health-ai z ní dělal 429 a falešný audit u KAŽDÉ analýzy).
+// PROČ podle STAVU, ne podle Content-Type: undici u 204 hlavičku klidně předá
+// (naměřeno v void-204.http.test.ts) a tělo 204 z definice HTTP nemá.
+// 200 s prázdným tělem ZŮSTÁVÁ výjimkou — to je vada serveru, ne void.
+const HTTP_NO_CONTENT = 204;
+
 async function strictRpc<T>(
   token: string,
   fn: string,
@@ -206,6 +220,8 @@ async function strictRpc<T>(
 ): Promise<T> {
   const { res, cleanup } = await send(token, fn, params, o, opts);
   try {
+    // void RPC → null; typuj takové volání `<VoidRpcResult>` (viz ServiceRpc).
+    if (res.status === HTTP_NO_CONTENT) return null as T;
     return (await res.json()) as T;
   } finally {
     cleanup();
@@ -221,6 +237,8 @@ async function nullableRpc<T>(
 ): Promise<T | null> {
   const { res, cleanup } = await send(token, fn, params, o, opts);
   try {
+    // Táž vada jako ve strictRpc: 204 s `Content-Type: application/json` padal na res.json().
+    if (res.status === HTTP_NO_CONTENT) return null;
     const ct = res.headers.get('Content-Type') ?? '';
     if (ct.includes('application/json')) return (await res.json()) as T;
     return null;
@@ -231,12 +249,25 @@ async function nullableRpc<T>(
 
 // ── Factory function types (generic-preserving, so callers keep `rpcService<Row>(...)`) ──
 
+/**
+ * Výsledek RPC funkce `RETURNS void` (204 No Content). Typuj taková volání
+ * `rpcService<VoidRpcResult>('fn', …)` — runtime hodnota je vždy `null`.
+ */
+export type VoidRpcResult = null;
+
+/**
+ * Service-role RPC. Resolves the parsed JSON body of a 2xx; `null` for 204 No
+ * Content (a `RETURNS void` function — type it `<VoidRpcResult>`); throws
+ * `SyntaxError` on a 2xx other than 204 whose body is not JSON (incl. empty) and
+ * `PostgRESTError` on a non-2xx.
+ */
 export type ServiceRpc = <T = unknown>(
   fn: string,
   params?: Record<string, unknown>,
   opts?: RpcOpts,
 ) => Promise<T>;
 
+/** User-scoped RPC — same result contract as {@link ServiceRpc} (204 → `null`). */
 export type UserRpc = <T = unknown>(
   fn: string,
   params: Record<string, unknown>,
@@ -265,25 +296,31 @@ export type UserClaimsRpc = <T = unknown>(
 
 // ── Builders ──
 
-/** Service-role RPC that throws on a non-2xx and always parses the JSON body. */
+/**
+ * Service-role RPC that throws on a non-2xx and parses the JSON body of every
+ * other 2xx; 204 No Content (`RETURNS void`) resolves `null`.
+ */
 export function createServiceRpc(o: ClientOptions = {}): ServiceRpc {
   return <T = unknown>(fn: string, params: Record<string, unknown> = {}, opts?: RpcOpts) =>
     strictRpc<T>(serviceToken(), fn, params, o, opts);
 }
 
-/** User-scoped RPC (forwards a caller-supplied JWT) that throws on a non-2xx. */
+/**
+ * User-scoped RPC (forwards a caller-supplied JWT) that throws on a non-2xx;
+ * 204 No Content (`RETURNS void`) resolves `null`.
+ */
 export function createUserRpc(o: ClientOptions = {}): UserRpc {
   return <T = unknown>(fn: string, params: Record<string, unknown>, jwt: string, opts?: RpcOpts) =>
     strictRpc<T>(jwt, fn, params, o, opts);
 }
 
-/** Service-role RPC that returns `null` when a 2xx response has a non-JSON body. */
+/** Service-role RPC that returns `null` on 204 or when a 2xx response has a non-JSON body. */
 export function createNullableServiceRpc(o: ClientOptions = {}): NullableServiceRpc {
   return <T = unknown>(fn: string, params: Record<string, unknown> = {}, opts?: RpcOpts) =>
     nullableRpc<T>(serviceToken(), fn, params, o, opts);
 }
 
-/** User-scoped RPC that returns `null` when a 2xx response has a non-JSON body. */
+/** User-scoped RPC that returns `null` on 204 or when a 2xx response has a non-JSON body. */
 export function createNullableUserRpc(o: ClientOptions = {}): NullableUserRpc {
   return <T = unknown>(fn: string, params: Record<string, unknown>, jwt: string, opts?: RpcOpts) =>
     nullableRpc<T>(jwt, fn, params, o, opts);

@@ -4,7 +4,7 @@ import type { SurfaceBlock, TableBlock } from '@aisha/surface-blocks';
 import { fetchBlockData } from '../api.js';
 import { instance } from '../instance.js';
 import { getIdpToken } from '../auth.js';
-import { t } from '../i18n.js';
+import { getLocale, t } from '../i18n.js';
 
 /**
  * Ask — asking the data in plain language, and reading the answer back with its
@@ -42,6 +42,24 @@ export function markFallback<T extends { sources?: string[] }>(answer: T, chainW
   return { ...answer, sources: [...(answer.sources ?? []), CHAIN_DOWN] };
 }
 
+/**
+ * Provenance marker: knowledge search is UNAVAILABLE (the chain answered 503
+ * KNOWLEDGE_SEARCH_UNAVAILABLE — embedding lane down, undeclared weights identity …).
+ * Exported so the gate pins the SIGNAL, not the wording. P2 2026-10-06: an outage of the
+ * search must never read as "nothing found" — the panel says it out loud (app.ask.searchUnavailable).
+ */
+export const SEARCH_DOWN = 'knowledge:unavailable';
+
+/** A knowledge passage the answer drew on (server citation → panel shape). */
+export interface Passage {
+  ref: string;
+  /** Source name for the provenance badge: the chunk slug, else the knowledge item id. */
+  source: string;
+  excerpt: string;
+  /** The answer referenced it ([K1] …). */
+  cited: boolean;
+}
+
 interface Exchange {
   question: string;
   /** Absent while in flight. */
@@ -51,10 +69,21 @@ interface Exchange {
   errorKey?: string;
   /** Ověřená odpověď už stojí, AISHA ji ještě formuluje (pomalý model uvnitř). */
   refining?: boolean;
+  /** Úseky znalostí, ze kterých odpověď čerpala (P2). */
+  passages?: Passage[];
+  /** Hlasité upozornění (i18n klíč) — např. vyhledávání ve znalostech nedostupné. */
+  noticeKey?: string;
 }
 
 type Fakta = Pick<Exchange, 'answer' | 'figures' | 'sources'>;
-type Retez = (Pick<Exchange, 'answer' | 'sources'> & { conversationId?: string; zFaktu?: boolean }) | null;
+type Retez =
+  | (Pick<Exchange, 'answer' | 'sources' | 'passages'> & {
+      conversationId?: string;
+      zFaktu?: boolean;
+      /** Řetěz odpověděl 503 KNOWLEDGE_SEARCH_UNAVAILABLE — hledání ve znalostech nejde. */
+      hledaniNedostupne?: boolean;
+    })
+  | null;
 
 /**
  * POŘADÍ ODPOVĚDI: FAKTA HNED, AISHA DOPLNÍ (rozhodnutí majitele 2026-09-29).
@@ -71,7 +100,9 @@ type Retez = (Pick<Exchange, 'answer' | 'sources'> & { conversationId?: string; 
  *   3b. řetěz odpověděl, ale jen fakty (kanál z faktů: model nic nepřidal, napsal
  *      číslo mimo fakta, byl obsazený…) → zůstanou NAŠE fakta a do zdrojů se
  *      připíše proč — žádné „AISHA formulovala", když neformulovala;
- *   4. nevyjdou fakta ani řetěz → chyba.
+ *   4. nevyjdou fakta ani řetěz → chyba;
+ *   5. (P2) řetěz hlásí, že vyhledávání ve znalostech NEJDE → fakta zůstanou a panel to řekne
+ *      NAHLAS (noticeKey + SEARCH_DOWN v provenienci) — nikdy jako „nic nenalezeno“.
  * Čistá funkce nad dvěma kroky: pořadí a mezistavy jdou testovat bez Reactu.
  */
 export async function odpovedVeDvouKrocich(
@@ -96,10 +127,17 @@ export async function odpovedVeDvouKrocich(
   } catch {
     r = null;
   }
-  if (r?.zFaktu && f?.answer !== undefined) {
+  if (r?.hledaniNedostupne) {
+    if (f) {
+      zmena({ sources: [...(f.sources ?? []), SEARCH_DOWN], noticeKey: 'app.ask.searchUnavailable', refining: false });
+    } else {
+      zmena({ errorKey: 'app.ask.searchUnavailable', refining: false });
+    }
+  } else if (r?.zFaktu && f?.answer !== undefined) {
     zmena({
       sources: [...(f.sources ?? []), ...(r.sources ?? [])],
       refining: false,
+      ...(r.passages ? { passages: r.passages } : {}),
       ...(r.conversationId ? { conversationId: r.conversationId } : {})
     });
   } else if (r) {
@@ -107,6 +145,7 @@ export async function odpovedVeDvouKrocich(
       answer: r.answer,
       sources: [...(f?.sources ?? []), ...(r.sources ?? [])],
       refining: false,
+      ...(r.passages ? { passages: r.passages } : {}),
       ...(r.conversationId ? { conversationId: r.conversationId } : {})
     });
   } else if (f) {
@@ -148,11 +187,15 @@ function readAnswer(block: SurfaceBlock): Pick<Exchange, 'answer' | 'figures' | 
  * it was always empty and session memory had nothing to key on. */
 export function readChainAnswer(
   j: unknown
-): (Pick<Exchange, 'answer' | 'sources'> & { conversationId?: string; zFaktu?: boolean }) | null {
+): (Pick<Exchange, 'answer' | 'sources' | 'passages'> & { conversationId?: string; zFaktu?: boolean }) | null {
   const r = j as
     | {
         message?: { content?: string };
-        metadata?: { run_id?: string; grounding?: { verdict?: string; reason?: string } };
+        metadata?: {
+          run_id?: string;
+          grounding?: { verdict?: string; reason?: string };
+          knowledge?: { citations?: unknown };
+        };
         conversation_id?: string;
       }
     | null;
@@ -163,15 +206,46 @@ export function readChainAnswer(
   // zdroj nese důvod, odpověď zůstane naše (odpovedVeDvouKrocich, bod 3b).
   const g = r?.metadata?.grounding;
   const zFaktu = g?.verdict === 'fakta';
+  // P2: úseky znalostí, ze kterých odpověď čerpala. Odkázané ([K#]) jsou i zdrojem odpovědi.
+  const passages = readPassages(r?.metadata?.knowledge?.citations);
   return {
     answer,
     sources: [
       ...(run ? [`ai_runs:${run.slice(0, 8)}`] : ['aisha-chat']),
-      ...(zFaktu ? [`aisha-chat:fakta:${g?.reason ?? '?'}`] : [])
+      ...(zFaktu ? [`aisha-chat:fakta:${g?.reason ?? '?'}`] : []),
+      ...passages.filter((p) => p.cited).map((p) => `knowledge:${p.source}`)
     ],
+    ...(passages.length ? { passages } : {}),
     ...(zFaktu ? { zFaktu: true } : {}),
     ...(typeof r?.conversation_id === 'string' && r.conversation_id ? { conversationId: r.conversation_id } : {})
   };
+}
+
+/** Server citations (svc-ai-chat metadata.knowledge.citations) → panel passages; junk is dropped. */
+function readPassages(citations: unknown): Passage[] {
+  if (!Array.isArray(citations)) return [];
+  return citations.flatMap((c): Passage[] => {
+    const o = (c ?? {}) as Record<string, unknown>;
+    if (typeof o.ref !== 'string' || typeof o.excerpt !== 'string') return [];
+    const source =
+      typeof o.chunk_slug === 'string' && o.chunk_slug
+        ? o.chunk_slug
+        : typeof o.knowledge_item_id === 'string'
+          ? o.knowledge_item_id
+          : null;
+    if (!source) return [];
+    return [{ ref: o.ref, source, excerpt: o.excerpt, cited: o.cited === true }];
+  });
+}
+
+/**
+ * A failed chain reply → the LOUD knowledge-search outage, or null (any other failure keeps
+ * the old behaviour: facts stay and provenance admits the chain is down). Pure, exported for
+ * tests: the server's `code` decides, never the HTTP status alone.
+ */
+export function readChainFailure(j: unknown): Retez {
+  const r = j as { code?: unknown } | null;
+  return r?.code === 'KNOWLEDGE_SEARCH_UNAVAILABLE' ? { hledaniNedostupne: true } : null;
 }
 
 /** The governed chat lane, when the instance wires it (ask.chat_path). Any
@@ -212,9 +286,15 @@ async function askChain(
       // Send the id the server gave us last turn; omit it on the first turn so
       // /chat mints one. This is the entire memory wiring — everything downstream
       // (history, session memory, compaction, engagement signals) keys on it.
-      body: JSON.stringify(conversationId ? { message: question, conversation_id: conversationId } : { message: question })
+      // `language` = the reader's locale: the chain answers in it (and ranks same-language
+      // knowledge first). Without it the server defaulted to English for every reader.
+      body: JSON.stringify(
+        conversationId
+          ? { message: question, conversation_id: conversationId, language: getLocale() }
+          : { message: question, language: getLocale() }
+      )
     });
-    if (!res.ok) return null;
+    if (!res.ok) return readChainFailure(await res.json().catch(() => null));
     return readChainAnswer(await res.json());
   } catch {
     return null;
@@ -295,6 +375,9 @@ export function Ask({ blockSlug, initialDraft }: { blockSlug: string; initialDra
             answer={x.errorKey ? t(x.errorKey) : (x.answer ?? (busy && i === log.length - 1 ? '…' : undefined))}
             figures={x.figures}
             sources={x.sources}
+            passages={x.passages}
+            passagesLabel={x.passages?.length ? t('app.ask.passages') : undefined}
+            notice={x.noticeKey ? t(x.noticeKey) : undefined}
             disclaimer={x.refining ? t('app.ask.refining') : t('app.ask.disclaimer')}
             placeholder={t('app.ask.placeholder')}
             submitLabel={t('app.ask.submit')}

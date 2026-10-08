@@ -40,7 +40,8 @@ BEGIN
             )
           )
           FROM vault.decrypted_secrets ds
-          WHERE ds.name = ANY(
+          WHERE ds.name NOT LIKE 'credential:%'
+            AND ds.name = ANY(
             COALESCE(
               (
                 SELECT array_agg(val)
@@ -66,6 +67,10 @@ BEGIN
 
     IF v_actor_user_id IS NULL OR v_key IS NULL OR v_value IS NULL OR btrim(v_value) = '' THEN
       RAISE EXCEPTION 'Missing required payload fields';
+    END IF;
+
+    IF v_key LIKE 'credential:%' THEN
+      RAISE EXCEPTION 'credential:* jen přes set_provider_credential_admin' USING ERRCODE = '42501';
     END IF;
 
     IF NOT public.has_role(v_actor_user_id, 'admin') THEN

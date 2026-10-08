@@ -1,19 +1,7 @@
 -- RLS: expert_rules
+--
+-- Politiky čtení napřímo (anon, authenticated, service_role) žijí v jediném souboru
+-- policies/expert_rules_visibility.sql (přehrává ho heals.sql). Do 2026-10-05 tu byly jejich druhé
+-- kopie s jiným tělem a do běžících databází nedoteklo ani jedno (soubor politik v heals nebyl).
 
 ALTER TABLE public.expert_rules ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY anon_read_public_rules ON public.expert_rules
-  FOR SELECT
-  TO anon
-  USING (status = 'published' AND visibility = 'public');
-
-CREATE POLICY auth_read_public_and_members_rules ON public.expert_rules
-  FOR SELECT
-  TO authenticated
-  USING (status = 'published' AND visibility IN ('public', 'members'));
-
-CREATE POLICY service_role_full_access_rules ON public.expert_rules
-  FOR ALL
-  TO service_role
-  USING (true)
-  WITH CHECK (true);

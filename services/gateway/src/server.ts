@@ -2,7 +2,7 @@ import Fastify, { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
-import { buildHelmetOptions } from '@aisha/security';
+import { buildHelmetOptions, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import { config } from './config.js';
@@ -47,10 +47,10 @@ import { maMeshPodil } from './lib/mesh-podil.js';
 bootstrapOtel({ serviceName: 'gateway' });
 
 const app = Fastify({
-  logger: {
+  logger: safeLoggerOptions({
     level: config.logLevel,
     ...(process.env.NODE_ENV !== 'production' ? { transport: { target: 'pino-pretty' } } : {}),
-  },
+  }),
   trustProxy: true,
   requestIdHeader: 'x-request-id',
   bodyLimit: 50 * 1024 * 1024, // 50MB — KB ingest uploads

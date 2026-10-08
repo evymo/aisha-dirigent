@@ -1,5 +1,7 @@
 -- Function: public.edge_payment_sessions
 -- Purpose: Edge-safe payment session writes.
+--   služba (svc-stripe webhook / subscription-checkout, rpcService): insert, update_status
+--   přihlášený za SEBE (svc-stripe checkout, rpcUser):               insert s user_id = auth.uid()
 
 CREATE OR REPLACE FUNCTION public.edge_payment_sessions(
   p_action text,
@@ -13,6 +15,21 @@ AS $function$
 DECLARE
   v_id uuid;
 BEGIN
+  -- ⛔ NÁROK PŘED DISPEČEREM, VÝCHOZÍ ODMÍTNUTÍ (nález 2026-10-06, táž třída jako
+  -- edge_bank_transactions). SECURITY DEFINER s GRANT pro authenticated a bez stráže:
+  -- kdokoli přihlášený přepsal stav CIZÍ platební relace (update_status podle
+  -- stripe_session_id, třeba na 'completed') a zakládal relace za cizí účty.
+  -- Člen smí jen to, co mu dovoluje RLS policy „Users can create own payment
+  -- sessions“: vložit relaci za SEBE. Každá jiná akce je práce služby.
+  -- `IS NOT TRUE`, ne `NOT (…)`: NULL nesmí stráž přeskočit.
+  IF p_action IS DISTINCT FROM 'insert' AND public.is_service_role() IS NOT TRUE THEN
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+  END IF;
+  IF p_action = 'insert' AND public.is_service_role() IS NOT TRUE
+     AND (NULLIF(p_payload ->> 'user_id', '')::uuid = auth.uid()) IS NOT TRUE THEN
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+  END IF;
+
   IF p_action = 'insert' THEN
     INSERT INTO public.payment_sessions (
       amount,
@@ -31,7 +48,7 @@ BEGIN
       COALESCE(NULLIF(p_payload ->> 'currency', ''), public.commerce_base_currency()),
       NULLIF(p_payload ->> 'expires_at', '')::timestamptz,
       COALESCE(p_payload -> 'metadata', '{}'::jsonb),
-      NULLIF(p_payload ->> 'reference_id', ''),
+      NULLIF(p_payload ->> 'reference_id', '')::uuid,
       NULLIF(p_payload ->> 'reference_type', ''),
       NULLIF(p_payload ->> 'session_type', ''),
       COALESCE(NULLIF(p_payload ->> 'status', ''), 'pending'),

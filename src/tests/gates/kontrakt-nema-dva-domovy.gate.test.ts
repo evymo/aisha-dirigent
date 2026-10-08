@@ -236,8 +236,9 @@ describe("kontrakt env-doktora nemá dva domovy pro týž klíč", () => {
   it("instančně odvozené cesty exec stacku jsou required, ne static", () => {
     // Komentář u nich tvrdí, že jsou odvozené proto, aby se dvě instance
     // nepřetahovaly o týž adresář. Jako "static" by prázdná identita zapsala
-    // `/srv//base-repo` — týž adresář pro všechny. Tvrzení musí platit i v kódu.
-    for (const klic of ["AGENT_REPO_PATH", "AGENT_RUNS_DIR"]) {
+    // `/var/lib//agent-runs` — týž adresář pro všechny. Tvrzení musí platit i v kódu.
+    // (AGENT_REPO_PATH pryč 2026-09-24: běh si repo klonuje sám.)
+    for (const klic of ["AGENT_RUNS_DIR"]) {
       const p = kontrakt.find((x) => x.klic === klic);
       expect(p, `${klic} v kontraktu chybí`).toBeDefined();
       expect(p!.druh, `${klic} musí být required-*, jinak prázdná identita projde tiše`).toMatch(/^required-/);

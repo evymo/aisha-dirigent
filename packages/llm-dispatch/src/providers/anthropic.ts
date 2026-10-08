@@ -40,6 +40,7 @@ import {
   type UnifiedStreamChunk,
 } from "./streaming.js";
 import { recordLlmCall } from "./metrics.js";
+import { chybiKlic, resolveProviderKey } from "../credentialSource.js";
 
 // =============================================================================
 // Shared body builder — THE single source of the Anthropic request shape
@@ -208,17 +209,24 @@ export class AnthropicBackend implements InferenceBackend {
   readonly defaultTimeoutMs = 60_000;
   priority = 50;
 
-  private readonly apiKey: string;
+  /** Pevný klíč, když ho volající předal výslovně; jinak se klíč bere při volání (credentialSource). */
+  private readonly fixedKey?: string;
 
   constructor(apiKey?: string) {
-    this.apiKey = apiKey ?? process.env.ANTHROPIC_API_KEY ?? "";
+    this.fixedKey = apiKey || undefined;
+  }
+
+  /** Klíč v okamžiku volání: pevný → zdroj pověření služby (trezor instance) → bez zdroje env. */
+  private key(): Promise<string | null> {
+    return resolveProviderKey("ANTHROPIC_API_KEY", this.fixedKey);
   }
 
   // ---------------------------------------------------------------------------
   // healthCheck
   // ---------------------------------------------------------------------------
   async healthCheck(): Promise<HealthResult> {
-    if (!this.apiKey) return { available: false };
+    const key = await this.key();
+    if (!key) return { available: false };
     const start = performance.now();
     try {
       // Anthropic exposes GET /v1/models — fetch it so discovery receives the
@@ -226,7 +234,7 @@ export class AnthropicBackend implements InferenceBackend {
       const res = await fetch("https://api.anthropic.com/v1/models", {
         signal: AbortSignal.timeout(5_000),
         headers: {
-          "x-api-key": this.apiKey,
+          "x-api-key": key,
           "anthropic-version": "2023-06-01",
         },
       });
@@ -280,10 +288,10 @@ export class AnthropicBackend implements InferenceBackend {
   // ---------------------------------------------------------------------------
   // shared headers (sync + stream)
   // ---------------------------------------------------------------------------
-  private headers(betas: string[]): Record<string, string> {
+  private headers(key: string, betas: string[]): Record<string, string> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      "x-api-key": this.apiKey,
+      "x-api-key": key,
       "anthropic-version": "2023-06-01",
     };
     if (betas.length > 0) headers["anthropic-beta"] = betas.join(",");
@@ -294,7 +302,8 @@ export class AnthropicBackend implements InferenceBackend {
   // chat
   // ---------------------------------------------------------------------------
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    if (!this.apiKey) throw new Error("[anthropic] ANTHROPIC_API_KEY not configured");
+    const key = await this.key();
+    if (!key) throw chybiKlic("anthropic", "ANTHROPIC_API_KEY");
 
     const { body, betas } = prepareAnthropicBody(request);
 
@@ -306,7 +315,7 @@ export class AnthropicBackend implements InferenceBackend {
       const response = await fetch("https://api.anthropic.com/v1/messages", {
         signal: AbortSignal.timeout(this.defaultTimeoutMs),
         method: "POST",
-        headers: this.headers(betas),
+        headers: this.headers(key, betas),
         body: JSON.stringify(body),
       });
 
@@ -366,7 +375,8 @@ export class AnthropicBackend implements InferenceBackend {
   // chatStream (§7 streaming inversion — B-4 native Anthropic SSE)
   // ---------------------------------------------------------------------------
   async *chatStream(request: ChatRequest): AsyncGenerator<UnifiedStreamChunk> {
-    if (!this.apiKey) throw new Error("[anthropic] ANTHROPIC_API_KEY not configured");
+    const key = await this.key();
+    if (!key) throw chybiKlic("anthropic", "ANTHROPIC_API_KEY");
 
     const { body, betas } = prepareAnthropicBody(request);
 
@@ -379,7 +389,7 @@ export class AnthropicBackend implements InferenceBackend {
       response = await fetch("https://api.anthropic.com/v1/messages", {
         signal: AbortSignal.timeout(this.defaultTimeoutMs),
         method: "POST",
-        headers: this.headers(betas),
+        headers: this.headers(key, betas),
         body: JSON.stringify({ ...body, stream: true }),
       });
     } catch (err) {
@@ -489,9 +499,8 @@ export class AnthropicBackend implements InferenceBackend {
   }
 }
 
-/** Create an Anthropic backend from env */
+/** Create an Anthropic backend when THIS process has the key in env — klíč se bere při volání (viz createOpenAIBackend). */
 export function createAnthropicBackend(): AnthropicBackend | null {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return null;
-  return new AnthropicBackend(key);
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  return new AnthropicBackend();
 }

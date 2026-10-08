@@ -77,6 +77,7 @@ BEGIN
              )
              FROM public.expert_rules er
              WHERE er.id = ANY (sr.rule_ids)
+               AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid())
            ),
            '[]'::jsonb
          ) AS rules

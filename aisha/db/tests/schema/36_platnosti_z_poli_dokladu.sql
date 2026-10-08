@@ -84,7 +84,7 @@ SELECT is(
   '[]'::jsonb, '(1) bez nároku: žádné řádky');
 SELECT is(
   get_doc_expiry_review_block('{"doc_type":"pgtap_platnost","date_field":"valid_to"}') #>> '{provenance,trace_id}',
-  'doc-expiry:unauthenticated', '(2) bez nároku: důvod v trace_id');
+  'doc-expiry:unauthorized', '(2) bez nároku (přihlášený bez role): důvod unauthorized v trace_id');
 
 -- ── admin ────────────────────────────────────────────────────────────────────
 SELECT set_config('request.jwt.claims',
@@ -96,7 +96,7 @@ SELECT is(
   'doc-expiry:missing_config', '(3) bez doc_type (stará konfigurace) = missing_config, ne chyba');
 SELECT is(
   get_doc_expiry_review_block('{"doc_type":"pgtap_platnost","date_field":"valid_to","direction":"bokem"}') #>> '{provenance,trace_id}',
-  'doc-expiry:missing_config', '(4) neznámý směr = missing_config, ne tichý výchozí');
+  'doc-expiry:bad_config', '(4) neznámý směr = bad_config (klíč je, hodnota nepoužitelná), ne missing_config ani tichý výchozí');
 
 -- ── (5)–(9) upcoming ─────────────────────────────────────────────────────────
 SELECT lives_ok(

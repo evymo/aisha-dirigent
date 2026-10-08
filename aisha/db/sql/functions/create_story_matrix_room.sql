@@ -28,7 +28,7 @@ BEGIN
   END IF;
   -- ⛔ Audit vydání 2026-10-01 (B2): kdokoli přihlášený připojil Matrix místnost
   -- ke KTERÉKOLI story — cizí story pak v klientech ukazovala jeho místnost jako
-  -- „obecnou“ (useStoryMatrixAutoMap). Mapování mění story → zápisové právo.
+  -- „obecnou“. Mapování mění story → zápisové právo.
   IF NOT public.can_access_story(p_story_id, true) THEN
     RAISE EXCEPTION 'Access denied: story owner or participant required'
       USING ERRCODE = '42501';

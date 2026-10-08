@@ -67,10 +67,16 @@ Required env (all present in a cold-start environment):
 `APP_NAME_PREFIX`, `PUBLIC_TLD`, `KEYCLOAK_URL`, `KEYCLOAK_ADMIN_PASSWORD`.
 
 Optional:
-- `AISHA_SURFACE_REPO` — the repo Coolify builds from. **Defaults to this
-  checkout's `origin`**, because the shells and `deploy/surface-host/Dockerfile`
-  live here; set it explicitly only when Coolify needs a token-in-URL clone.
-- `AISHA_SURFACE_BRANCH` (default `main`) · `AISHA_INSTANCE_SLUG` (default
+- `AISHA_SURFACE_REPO` — the repo Coolify builds from. **Defaults to the
+  checkout's remote that is the deployed repository** — chosen by URL identity
+  from the manifest declaration (`repo:`), never by remote name: in a fork
+  checkout `origin` is the upstream, not the repo the instance builds from. The
+  shells and `deploy/surface-host/Dockerfile` live here; set it explicitly when
+  Coolify needs a token-in-URL clone, or when no remote of the checkout points
+  at the deployed repository (the script then stops with the reason).
+- `AISHA_SURFACE_BRANCH` (default: the branch the manifest declares — `branch:`,
+  else `main`; the surface is built from the same branch as the rest of the
+  instance) · `AISHA_INSTANCE_SLUG` (default
   `APP_NAME_PREFIX`) · `KEYCLOAK_REALM` (default `aisha`).
 
 ```bash
@@ -102,9 +108,11 @@ is omitted on purpose — a tab leading nowhere is worse than no tab.
 
 ## Known traps
 
-- **`AISHA_SURFACE_BRANCH` must be `main`.** An app pinned to a feature branch
-  keeps deploying that branch, so merges to `main` silently never reach the
-  surface. Measured 2026-07-27: the live extranet tracked
+- **`AISHA_SURFACE_BRANCH` must be the instance's deploy branch** (the manifest's
+  `branch:`, normally `main` — which is also the default when the variable is
+  unset). An app pinned to a different branch keeps deploying that branch, so
+  merges to the deploy branch silently never reach the surface. Measured
+  2026-07-27: the live extranet tracked
   `feat/<fork>-extranet-surface-host` long after the work had merged.
 - **A running container shows the branch it was BUILT from**, not the app's
   current setting. After repointing the branch in Coolify, `docker inspect` still

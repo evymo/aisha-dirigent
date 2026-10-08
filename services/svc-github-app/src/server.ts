@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { applySecurity } from '@aisha/security';
+import { applySecurity, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import rawBody from 'fastify-raw-body';
@@ -15,7 +15,7 @@ import { webhookBridgeRoutes } from './routes/webhook-bridge.js';
 // Rollback: OTEL_SDK_DISABLED=true env (Coolify) + container restart.
 bootstrapOtel({ serviceName: 'svc-github-app' });
 const app = Fastify({
-  logger: { level: config.logLevel },
+  logger: safeLoggerOptions({ level: config.logLevel }),
   trustProxy: true,
 });
 

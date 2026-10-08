@@ -19,6 +19,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
+import { envDoktorDokoncil } from "./_env-doktor-dokoncil";
 
 const ROOT = process.cwd();
 const DOKTOR = join(ROOT, "scripts/aisha-env-doctor.mjs");
@@ -56,7 +57,7 @@ function behDoktora(manifest: string | null): { stderr: string; hodnota: string 
       timeout: 60_000,
     });
     if (beh.error) throw beh.error;
-    if (beh.status !== 0 || !existsSync(envFile)) {
+    if (!envDoktorDokoncil(beh.status) || !existsSync(envFile)) {
       throw new Error(`env-doktor skončil ${beh.status}: ${(beh.stderr ?? "").trim().split("\n").slice(-3).join(" | ")}`);
     }
     const radek = readFileSync(envFile, "utf8").split("\n").find((l) => l.startsWith("PKI_BUNDLE_REQUIRED="));

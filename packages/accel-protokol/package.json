@@ -1,0 +1,35 @@
+{
+  "name": "@aisha/accel-protokol",
+  "version": "0.1.2",
+  "license": "Elastic-2.0",
+  "description": "Protokol společné lane na GPU uzlu: uzavřený slovník důvodů odmítnutí (kód → HTTP), jména hlaviček a třídy požadavků. Sdílí ho vynucovací bod (svc-accel-vstup), klient tenkého stacku forku (svc-lane-klient) i dispatch forku (llm-dispatch) — jeden zdroj pravdy pro to, co lane smí odpovědět a jak se na to reaguje.",
+  "private": false,
+  "publishConfig": {
+    "access": "restricted"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.1.3"
+  }
+}

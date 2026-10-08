@@ -10,6 +10,8 @@
  * 1. Every *_audited.sql function contains write_audit_journal() or INSERT INTO audit_journal
  * 2. Every *_audited.sql function uses SECURITY DEFINER (audit must run as definer, not invoker)
  * 3. Every *_audited.sql function has SET search_path TO 'public' (SECURITY DEFINER requirement)
+ *    — nebo ZPEVNĚNÝ tvar 'pg_catalog', 'public', 'pg_temp' (směr brány definer-search-path:
+ *    pg_temp poslední, takže dočasný objekt nic nezastíní; přísnější, ne volnější).
  * 4. Every *_audited.sql function has REVOKE ALL + explicit GRANT
  *
  * Run: npm run test:gates -- src/tests/gates/audited-function-integrity.gate.test.ts
@@ -54,7 +56,9 @@ function analyzeAuditedFunction(filePath: string): AuditedFunctionInfo {
       // NOT an exemption (a non-auditing function still fails this check).
       /(?:PERFORM\s+)?(?:public\.)?audience_log_event\s*\(/i.test(content),
     hasSecurityDefiner: /SECURITY\s+DEFINER/i.test(content),
-    hasSearchPath: /SET\s+search_path\s+(TO\s+'public'|=\s*'?public'?)/i.test(content),
+    hasSearchPath:
+      /SET\s+search_path\s+(TO\s+'public'|=\s*'?public'?)/i.test(content) ||
+      /SET\s+search_path\s+TO\s+'pg_catalog',\s*'public',\s*'pg_temp'/i.test(content),
     hasRevokeAll: /REVOKE\s+ALL\s+ON\s+FUNCTION/i.test(content),
     hasGrantExecute: /GRANT\s+EXECUTE\s+ON\s+FUNCTION/i.test(content),
   };

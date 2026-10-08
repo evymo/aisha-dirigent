@@ -40,6 +40,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RESOLVER_ENV_INPUTS } from "../../../scripts/lib/derive-domains.mjs";
 import { DECLARATION_ENV, OVERLAY_ENV, REQUIRED_ENV } from "../../../scripts/lib/instance-overlay.mjs";
+import { envDoktorDokoncil } from "./_env-doktor-dokoncil";
 
 const ROOT = process.cwd();
 const DVERE = join(ROOT, "scripts/lib/instance-overlay.mjs");
@@ -183,7 +184,7 @@ describe("deklarovaný overlay je povinný", () => {
 
     test("s cestou dorazí do souboru hodnota z INSTANČNÍHO profilu", () => {
       const { r, poBehu } = doktor({ [OVERLAY_ENV]: overlayFixture() });
-      expect(r.status, r.stderr.slice(-800)).toBe(0);
+      expect(envDoktorDokoncil(r.status), r.stderr.slice(-800)).toBe(true);
       expect(poBehu).toMatch(/^SPA_DIAGNOSE=0$/m);
     });
   });

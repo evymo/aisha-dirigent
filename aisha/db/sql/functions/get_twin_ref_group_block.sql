@@ -13,7 +13,8 @@
 -- DATA bloku (`batch_classes`), ne kód; třída, která tam není, se nenabídne.
 --
 -- Konfigurace (p_params) — táž jako twin_ref_tridy, navíc:
---   batch_classes   POVINNÉ  pole tříd, které smějí do dávky (např. ["shoda_dva_zdroje"])
+--   batch_classes   POVINNÉ  pole tříd, které smějí do dávky (např. ["shoda_dva_zdroje"]);
+--                            chybí (i JSON null) → `missing_config`, není pole → `bad_config`
 --   title_template  POVINNÉ  placeholdery {trida} {pocet} {zdroje}
 --   quote_template  POVINNÉ  tytéž placeholdery
 --   class_titles    volitelné {trida: text} — text za {trida} (jinak kód třídy)
@@ -82,14 +83,22 @@ AS $$
       jsonb_build_object('data', jsonb_build_object('entity_kind', 'twin_identity_group',
           'items', '[]'::jsonb, 'actions', (select a from akce)),
         'provenance', jsonb_build_object('source_slug', 'twin-identity',
-          'trace_id', 'twin-ref-group:unauthenticated', 'freshness_at', now()))
+          'trace_id', 'twin-ref-group:unauthorized', 'freshness_at', now()))
     when (select src from cfg) is null or (select t_tpl from cfg) is null
-      or (select q_tpl from cfg) is null or jsonb_typeof((select bc from cfg)) is distinct from 'array'
+      or (select q_tpl from cfg) is null
+      or coalesce(jsonb_typeof((select bc from cfg)), 'null') = 'null'
       or p_params->'date_fields' is null then
       jsonb_build_object('data', jsonb_build_object('entity_kind', 'twin_identity_group',
           'items', '[]'::jsonb, 'actions', (select a from akce)),
         'provenance', jsonb_build_object('source_slug', 'twin-identity',
           'trace_id', 'twin-ref-group:missing_config', 'freshness_at', now()))
+    -- `batch_classes` v datech JE, ale není to pole tříd → vadná konfigurace, ne „chybí“
+    -- (slovník důvodů: brána cerstvost-z-dat). Dávka se nenabídne.
+    when jsonb_typeof((select bc from cfg)) <> 'array' then
+      jsonb_build_object('data', jsonb_build_object('entity_kind', 'twin_identity_group',
+          'items', '[]'::jsonb, 'actions', (select a from akce)),
+        'provenance', jsonb_build_object('source_slug', 'twin-identity',
+          'trace_id', 'twin-ref-group:bad_config', 'freshness_at', now()))
     else jsonb_build_object(
       'data', jsonb_build_object('entity_kind', 'twin_identity_group', 'items', coalesce(
         (select jsonb_agg(jsonb_build_object('id', id, 'title', title, 'quote', quote)

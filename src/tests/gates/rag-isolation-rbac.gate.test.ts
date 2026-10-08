@@ -101,10 +101,24 @@ describe('RAG isolation — LEAK 1: mcp_search_knowledge_v3 per-story RBAC', () 
     expect(v3, 'the unsafe `p_story_id IS NULL OR ki.story_id IS NULL …` filter must be gone').not.toMatch(
       /\(\s*p_story_id IS NULL OR ki\.story_id IS NULL OR ki\.story_id = p_story_id\s*\)/,
     );
-    // Secure form (verbatim from v2): brain ∪ (NULL⇒global) ∪ (X⇒X+global).
-    expect(v3).toMatch(/item_type::text IN \('core_value', 'personality_trait'\)/);
+    // Secure form: (NULL ⇒ global) ∪ (X ⇒ X + global).
     expect(v3).toMatch(/p_story_id IS NULL AND ki\.story_id IS NULL/);
     expect(v3).toMatch(/p_story_id IS NOT NULL AND \(ki\.story_id = p_story_id OR ki\.story_id IS NULL\)/);
+  });
+
+  it('LEAK 1c: the brain-layer exemption (core values, personality traits) is global-only in v2 and v3', () => {
+    // Until 2026-10-04 the secure form had a third member — an item_type override with NO story
+    // condition — and this gate REQUIRED it. Measured: a core value / personality trait living in
+    // another user's story reached every caller, anon included. The exemption may only ever be
+    // written together with `ki.story_id IS NULL`.
+    const UNSCOPED_BRAIN = /(?<!ki\.story_id IS NULL AND )ki\.item_type::text IN \('core_value', 'personality_trait'\)/;
+    for (const [name, sql] of [['v2', readText(V2)], ['v3', v3]] as const) {
+      expect(sql.length, `${name} source is missing`).toBeGreaterThan(0);
+      expect(sql, `${name}: item_type exemption without a story condition`).not.toMatch(UNSCOPED_BRAIN);
+    }
+    // Anchor: the rule bites on the old form and accepts the scoped one.
+    expect("OR ki.item_type::text IN ('core_value', 'personality_trait')").toMatch(UNSCOPED_BRAIN);
+    expect("OR (ki.story_id IS NULL AND ki.item_type::text IN ('core_value', 'personality_trait'))").not.toMatch(UNSCOPED_BRAIN);
   });
 });
 
@@ -112,13 +126,22 @@ describe('RAG isolation — sibling leaks in the same boundary (global accessors
   const v2 = readText(V2);
   const getItem = readText(GET_ITEM);
 
-  it('LEAK 3: 9-arg mcp_search_knowledge_v2 (no p_story_id) is restricted to global items', () => {
-    // The no-story overload must never return story-scoped (public-by-default) items.
-    expect(v2).toMatch(/AND ki\.story_id IS NULL/);
-    // It is the overload sitting right after the quarantine filter (9-arg only).
-    expect(v2).toMatch(
-      /quarantine_status NOT IN \('flagged', 'quarantined'\)[\s\S]{0,800}AND ki\.story_id IS NULL/,
+  it('LEAK 3: mcp_search_knowledge_v2 has exactly ONE overload and a no-story call is restricted to global items', () => {
+    // Until 2026-10-04 a 9-arg "global" overload sat next to the 11-arg one. They differed only by two
+    // defaulted parameters, so EVERY call without p_story_id / p_audience_user_id was ambiguous
+    // ("function … is not unique") — the overload this test used to guard could not be reached, and the
+    // no-story call it was meant to serve did not work at all. One function now serves both shapes.
+    expect((v2.match(/CREATE OR REPLACE FUNCTION public\.mcp_search_knowledge_v2\(/g) ?? []).length).toBe(1);
+    expect(v2, 'the superseded 9-arg signature must be dropped explicitly').toMatch(
+      /DROP FUNCTION IF EXISTS public\.mcp_search_knowledge_v2\(vector,text,text\[\],text,text,text\[\],boolean,integer,double precision\);/,
     );
+    expect(v2, 'no GRANT may name the dropped 9-arg signature').not.toMatch(
+      /ON FUNCTION mcp_search_knowledge_v2\(vector,text,text\[\],text,text,text\[\],boolean,integer,double precision\) /,
+    );
+    // The surviving function: NULL p_story_id ⇒ global items only; X ⇒ X + global. (Behaviour per
+    // role is measured in src/tests/db/znalosti-cteni-povoleny-stav.runtime.test.ts.)
+    expect(v2).toMatch(/p_story_id IS NULL AND ki\.story_id IS NULL/);
+    expect(v2).toMatch(/p_story_id IS NOT NULL AND \(ki\.story_id = p_story_id OR ki\.story_id IS NULL\)/);
   });
 
   it('LEAK 4: mcp_get_knowledge_item gates story-scoped items by membership (no service bypass)', () => {
@@ -126,9 +149,14 @@ describe('RAG isolation — sibling leaks in the same boundary (global accessors
     expect(getItem).toMatch(/SECURITY DEFINER/i);
     // Global items stay public; story items require owner/participant/admin.
     expect(getItem).toMatch(/ki\.story_id IS NULL/);
-    expect(getItem).toMatch(/is_admin_or_staff\s*\(\s*auth\.uid\(\)\s*\)/);
-    expect(getItem).toMatch(/partner_stories\s+ps[\s\S]{0,120}ps\.user_id\s*=\s*auth\.uid\(\)/);
-    expect(getItem).toMatch(/story_participants\s+sp[\s\S]{0,120}sp\.user_id\s*=\s*auth\.uid\(\)/);
+    // Členství se měří u toho, PRO KOHO se čte (v_audience_user): služba smí říct, za koho čte,
+    // ostatní jsou připnutí na sebe. Dokud funkce četla auth.uid(), nástroj MCP (servisní role)
+    // nevydal položku příběhu ani jeho vlastníkovi.
+    expect(getItem).toMatch(/is_admin_or_staff\s*\(\s*v_audience_user\s*\)/);
+    expect(getItem).toMatch(/partner_stories\s+ps[\s\S]{0,120}ps\.user_id\s*=\s*v_audience_user/);
+    expect(getItem).toMatch(/story_participants\s+sp[\s\S]{0,120}sp\.user_id\s*=\s*v_audience_user/);
+    // Role volajícího smí rozhodnout JEN o tom, čí identita se měří — v datovém filtru být nesmí.
+    expect(getItem.match(/v_caller_role/g) ?? [], 'v_caller_role: deklarace, přiřazení a určení publika — nic dalšího').toHaveLength(3);
     // Must NOT contain a service_role bypass in the data filter (the MCP tool
     // dispatches this as service_role, which would re-open the leak).
     expect(getItem, 'no service_role bypass may gate story access here').not.toMatch(
@@ -229,11 +257,11 @@ describe('RAG isolation — no-auth allowlist + runtime proof', () => {
     const pgtap = readText(PGTAP);
     expect(pgtap.length).toBeGreaterThan(0);
     // (a) v3 foreign story denial, (b) compose_context foreign requester denial,
-    // (c) owner/participant/admin allow, (d) v3 service_role bypass allow +
+    // (c) owner/participant/admin allow, (d) v3 service_role call not refused (data scope = audience) +
     // compose_context fail-closed when no requester identity is resolvable.
     expect(pgtap).toMatch(/throws_ok[\s\S]{0,400}mcp_search_knowledge_v3[\s\S]{0,500}'42501'/);
     expect(pgtap).toMatch(/throws_ok[\s\S]{0,400}compose_context[\s\S]{0,500}'42501'/);
-    expect(pgtap).toMatch(/service_role bypass is allowed/);
+    expect(pgtap).toMatch(/service_role call with a story is not refused/);
     // HARDENED contract (commit b9b301df): a story-scoped compose_context call with
     // no resolvable requester identity is REFUSED (42501), not silently bypassed.
     expect(pgtap).toMatch(/no requester identity is refused.*42501/);

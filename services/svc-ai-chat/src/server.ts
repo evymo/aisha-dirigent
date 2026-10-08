@@ -16,7 +16,7 @@
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
-import { applySecurity } from '@aisha/security';
+import { applySecurity, safeLoggerOptions } from '@aisha/security';
 import { config } from './config.js';
 import { chatRoutes } from './routes/chat.js';
 import { orchestrationRoutes } from './routes/orchestration.js';
@@ -40,12 +40,20 @@ import { discoverModels, repeatAfterCompletion, DISCOVERY_INTERVAL_MS } from './
 import { selfTestModels } from './lib/modelSelfTest.js';
 import { selfRegisterRuntimes } from './reflection/runtime/selfRegister.js';
 import { rpcService } from './postgrest.js';
+import { credentials, POVERENI_Z_PROSTREDI } from './lib/credentials.js';
+import { getRegistry, setProviderKeySource } from '@aisha/llm-dispatch';
 
 // MUST be first executable line — OTel auto-instrumentations attach to
 // http/fetch/pg before Fastify or any provider client builds connection pools.
 bootstrapOtel({ serviceName: 'svc-ai-chat' });
 
-const app = Fastify({ logger: { level: config.logLevel }, trustProxy: true });
+// Klíče poskytovatelů pro dispatch (OpenAI, Gemini, Anthropic, xAI) bere backend V OKAMŽIKU
+// VOLÁNÍ přes čtečku pověření (trezor instance, přechodně env s varováním) — dřív je
+// @aisha/llm-dispatch četl z process.env při sestavení backendu a klíč nastavený
+// v administraci forku chat ani reflexe nikdy nepoužily. Musí předcházet první registr.
+setProviderKeySource((envVar) => credentials.get(envVar));
+
+const app = Fastify({ logger: safeLoggerOptions({ level: config.logLevel }), trustProxy: true });
 
 await applySecurity(app, {
   service: 'svc-ai-chat',
@@ -80,6 +88,22 @@ await app.register(v1ChatRoutes);
 await app.listen({ host: '0.0.0.0', port: config.port });
 app.log.info(`svc-ai-chat listening on :${config.port}`);
 
+// Pověření z prostředí → trezor instance (jen kde trezor nic nemá; hodnotu z administrace
+// nepřepíše). Selhání jednotlivých jmen hlásí čtečka nahlas sama; obsluhu neblokuje.
+// Po přesunu se registr backendů srovná s pověřeními (klíč jen v administraci backend
+// přidá, klíč nikde ho odebere) — znovu v každém průchodu discovery níž.
+const srovnejBackendy = async (): Promise<void> => {
+  const r = await getRegistry().reconcileCredentialBackends();
+  if (r.added.length > 0 || r.removed.length > 0) {
+    app.log.info({ added: r.added, removed: r.removed }, '[llm-dispatch] backendy srovnány s pověřeními instance');
+  }
+};
+const startPovereni = credentials
+  .migrateEnvCredentials(POVERENI_Z_PROSTREDI)
+  .catch((e: unknown) => app.log.error({ err: e instanceof Error ? e.message : String(e) }, 'přesun pověření z prostředí selhal'))
+  .then(srovnejBackendy)
+  .catch((e: unknown) => app.log.error({ err: e instanceof Error ? e.message : String(e) }, 'srovnání backendů s pověřeními selhalo'));
+
 // Auto-discover models from the CONFIGURED backends on boot — "by available keys
 // AISHA discovers which models exist; nothing known in advance". Soft-fail: a
 // discovery error never blocks serving. Discovered models land in ai_model_registry
@@ -87,6 +111,9 @@ app.log.info(`svc-ai-chat listening on :${config.port}`);
 // discover → self-test: scan keys for models, then smoke-test the newly-pending ones
 // so they advance pending → tested/rejected (the resolver then ranks/excludes them).
 const discoveryCycle = async (phase: 'boot' | 'periodic'): Promise<void> => {
+  // Klíč nastavený/smazaný v administraci mezi průchody → backend přidat/odebrat dřív, než se hledají modely.
+  if (phase === 'boot') await startPovereni;
+  else await srovnejBackendy().catch((e: unknown) => app.log.error({ err: e instanceof Error ? e.message : String(e) }, 'srovnání backendů s pověřeními selhalo'));
   const r = await discoverModels((fn, params) => rpcService(fn, params));
   app.log.info(
     {

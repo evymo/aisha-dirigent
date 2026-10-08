@@ -252,7 +252,8 @@ About 1 300 merges reached upstream `main` between the previous snapshot and thi
   shell depends on `@aisha/extranet-sdk-ui`, which is published only on that mirror so far. Its source
   is public in `evymo/aisha-extranet-sdk`.
 - **Identity residue.** Defaults, examples and comments still mention the maintainers' own deployment
-  in places (235 files mention `aisha.guru`, 149 mention `id3a.cz`). None of it is a credential; the
+  in places (235 files mention `aisha.guru`, 149 mention `id3a.cz`), and comments, tests and fixtures
+  still name downstream forks by their short names. None of it is a credential; the
   cleanup is tracked upstream as "the base carries no instance identity". Set your own values through
   the documented variables — never rely on those defaults.
 - **Login from an apex domain** starts on a different origin than the OIDC callback and loses the

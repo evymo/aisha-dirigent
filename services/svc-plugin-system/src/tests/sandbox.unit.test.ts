@@ -12,9 +12,9 @@
  *      wildcards: `*`, `rpc.*`. Adversarial cases for prefix-matching attacks.
  *   2. `resolvePlugin` — only loadable (`canary` / `ga`) plugins are resolved
  *      (no draft / suspended / archived plugin execution).
- *   3. `createSandboxContext.fetch` — network allowlist enforcement.
- *      Adversarial: subdomain-only-match, exact-host-match, blocked-host
- *      rejection. AbortSignal.timeout enforced.
+ *   3. (odstraněno 2026-09-29) `createSandboxContext.fetch` — mrtvá cesta bez volajícího;
+ *      síť pluginu hlídá broker `/sandbox/fetch` (broker-sandbox-politika, broker-fetch-redirect)
+ *      nad `createSsrfGuard` z @aisha/security (ssrf.test.ts: přesná shoda, sufixový útok, schéma).
  *   4. `downloadAndVerifyArtifact` — SHA-256 verification. Tampered code
  *      MUST be rejected even if `Content-Length` matches.
  */
@@ -165,121 +165,6 @@ describe('resolvePlugin', () => {
     ]);
     const { resolvePlugin } = await import('../sandbox.js');
     expect(await resolvePlugin('a')).toBeNull();
-  });
-});
-
-// ── createSandboxContext.fetch — network allowlist ───────────
-
-describe('createSandboxContext.fetch — network allowlist', () => {
-  it('allows exact-host match (api.openai.com)', async () => {
-    mockFetch.mockResolvedValue(new Response('{}', { status: 200 }));
-    const { createSandboxContext } = await import('../sandbox.js');
-    const ctx = createSandboxContext('test-plugin', 'user-1', []);
-    await ctx.fetch('https://api.openai.com/v1/models');
-    expect(mockFetch).toHaveBeenCalledWith(
-      'https://api.openai.com/v1/models',
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
-    );
-  });
-
-  it('allows subdomain of allowed host (raw.githubusercontent.com)', async () => {
-    mockFetch.mockResolvedValue(new Response('', { status: 200 }));
-    const { createSandboxContext } = await import('../sandbox.js');
-    const ctx = createSandboxContext('test-plugin', 'user-1', []);
-    await ctx.fetch('https://raw.githubusercontent.com/file.txt');
-    expect(mockFetch).toHaveBeenCalled();
-  });
-
-  it('rejects blocked host (evil.com)', async () => {
-    const { createSandboxContext } = await import('../sandbox.js');
-    const ctx = createSandboxContext('test-plugin', 'user-1', []);
-    await expect(ctx.fetch('https://evil.com/exfil')).rejects.toThrow("'evil.com' is not allowed");
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-
-  it('rejects suffix-attack host (githubusercontent.com.evil.com)', async () => {
-    const { createSandboxContext } = await import('../sandbox.js');
-    const ctx = createSandboxContext('test-plugin', 'user-1', []);
-    await expect(ctx.fetch('https://githubusercontent.com.evil.com/x'))
-      .rejects.toThrow('not allowed');
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-
-  it('rejects prefix-attack host (Xapi.openai.com)', async () => {
-    const { createSandboxContext } = await import('../sandbox.js');
-    const ctx = createSandboxContext('test-plugin', 'user-1', []);
-    await expect(ctx.fetch('https://Xapi.openai.com/v1/x')).rejects.toThrow('not allowed');
-  });
-
-  it('rejects non-HTTPS URL even when host is allowlisted', async () => {
-    const { createSandboxContext } = await import('../sandbox.js');
-    const ctx = createSandboxContext('test-plugin', 'user-1', []);
-    await expect(ctx.fetch('http://api.openai.com:1337/x')).rejects.toThrow("'http:' URLs is not allowed");
-    expect(mockFetch).not.toHaveBeenCalled();
-  });
-
-  it('attaches AbortSignal.timeout(10s) — caller cannot disable', async () => {
-    mockFetch.mockResolvedValue(new Response('', { status: 200 }));
-    const { createSandboxContext } = await import('../sandbox.js');
-    const ctx = createSandboxContext('p', 'u', []);
-    // Pass a deliberately-disabled signal — the route must override
-    await ctx.fetch('https://api.openai.com/x', { signal: undefined as unknown as AbortSignal });
-    const init = mockFetch.mock.calls[0][1];
-    expect(init.signal).toBeInstanceOf(AbortSignal);
-  });
-});
-
-// ── createSandboxContext.fetch — empty allowlist = closed ────
-
-describe('createSandboxContext.fetch — empty allowlist', () => {
-  it('with networkAllowlist=[], all outbound network access is denied', async () => {
-    vi.resetModules();
-    vi.doMock('../config.js', () => ({
-      config: {
-        networkAllowlist: [],
-        aiGenerateUrl: 'http://svc-ai-chat:3011/generate',
-        postgrestServiceToken: 'service-token',
-        brokerTokenSecret: 'x'.repeat(32),
-        pushServiceUrl: 'http://svc-push:3000',
-        // Keep the config complete (mirrors the top-level mock): this doMock
-        // outlives its resetModules() and would otherwise leak an s3Endpoint-less
-        // config into the downloadAndVerifyArtifact block (artifactGuard → new URL).
-        s3Endpoint: 'http://10.0.0.1:9000',
-        ssrfHostAllowlist: '',
-      },
-    }));
-    const { createSandboxContext } = await import('../sandbox.js');
-    const ctx = createSandboxContext('p', 'u', []);
-    await expect(ctx.fetch('https://evil.com/anything')).rejects.toThrow('No network destinations are allowed');
-    expect(mockFetch).not.toHaveBeenCalled();
-    vi.resetModules();
-  });
-});
-
-// ── createSandboxContext.llm — governed route ────────────────
-
-describe('createSandboxContext.llm', () => {
-  it('routes plugin LLM prompts through the governed AISHA generator', async () => {
-    mockFetch.mockResolvedValue(new Response(JSON.stringify({ text: 'ok' }), { status: 200 }));
-    const { createSandboxContext } = await import('../sandbox.js');
-    const ctx = createSandboxContext('test-plugin', 'user-1', []);
-
-    await expect(ctx.llm('summarize this', { model: 'gpt-4o-mini', maxTokens: 123 })).resolves.toBe('ok');
-
-    expect(mockFetch).toHaveBeenCalledWith(
-      'http://svc-ai-chat:3011/generate',
-      expect.objectContaining({
-        method: 'POST',
-        headers: expect.objectContaining({ Authorization: 'Bearer service-token' }),
-      }),
-    );
-    const body = JSON.parse(mockFetch.mock.calls[0][1].body as string);
-    expect(body.constraints).toMatchObject({
-      source: 'plugin_sandbox',
-      plugin_slug: 'test-plugin',
-      requested_model: 'gpt-4o-mini',
-    });
-    expect(body.max_tokens).toBe(123);
   });
 });
 

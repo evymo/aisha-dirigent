@@ -335,7 +335,9 @@ async function scoreFaithfulness(
 ): Promise<number | null> {
   try {
     const provider = backendToProvider(judge);
-    const apiKey = judge.auth_env_var ? process.env[judge.auth_env_var] : undefined;
+    // Klíč soudce si bere backend @aisha/llm-dispatch sám v okamžiku volání (zdroj pověření
+    // služby = trezor instance). Volby UnifiedChatOptions.*ApiKey nikdo nečte (změřeno
+    // 2026-10-02) — klíč se sem proto nepředává, jedna cesta.
     const opts: UnifiedChatOptions = {
       provider,
       model: judge.model_id,
@@ -352,10 +354,6 @@ async function scoreFaithfulness(
     };
     // Provider-specific endpoint + key overrides.
     if (provider === "vllm" && judge.endpoint_url) opts.vllmBaseUrl = judge.endpoint_url;
-    if (provider === "vllm" && apiKey) opts.vllmApiKey = apiKey;
-    if (provider === "openai" && apiKey) opts.openaiApiKey = apiKey;
-    if (provider === "anthropic" && apiKey) opts.anthropicApiKey = apiKey;
-    if (provider === "gateway" && apiKey) opts.openaiApiKey = apiKey;
 
     await journalDispatch({ model: opts.model, provider: opts.provider, reason: "critic.faithfulness" });
     const result = await unifiedChat(opts);
@@ -483,7 +481,9 @@ async function expandQueryTerms(judge: ResolvedJudgeBackend, query: string): Pro
   // Best-effort — on failure, return original query unchanged.
   try {
     const provider = backendToProvider(judge);
-    const apiKey = judge.auth_env_var ? process.env[judge.auth_env_var] : undefined;
+    // Klíč soudce si bere backend @aisha/llm-dispatch sám v okamžiku volání (zdroj pověření
+    // služby = trezor instance). Volby UnifiedChatOptions.*ApiKey nikdo nečte (změřeno
+    // 2026-10-02) — klíč se sem proto nepředává, jedna cesta.
     const opts: UnifiedChatOptions = {
       provider,
       model: judge.model_id,
@@ -495,9 +495,6 @@ async function expandQueryTerms(judge: ResolvedJudgeBackend, query: string): Pro
       jsonMode: true,
     };
     if (provider === "vllm" && judge.endpoint_url) opts.vllmBaseUrl = judge.endpoint_url;
-    if (provider === "vllm" && apiKey) opts.vllmApiKey = apiKey;
-    if (provider === "openai" && apiKey) opts.openaiApiKey = apiKey;
-    if (provider === "anthropic" && apiKey) opts.anthropicApiKey = apiKey;
 
     await journalDispatch({ model: opts.model, provider: opts.provider, reason: "critic.expand_query" });
     const result = await unifiedChat(opts);

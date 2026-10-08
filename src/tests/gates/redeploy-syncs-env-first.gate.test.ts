@@ -54,7 +54,9 @@ describe("Redeploy re-syncs env before deploying", () => {
   test("the env-sync runs BEFORE the force=true deploy POST", () => {
     const body = triggerDeployBody(src);
     const syncIdx = body.indexOf("coolify-sync-envs.sh");
-    const deployIdx = body.search(/\/deploy\?uuid=\$\{uuid\}&force=true/);
+    // Od 2026-10-04 nasazení odesílá jediný domov mutace (lib/coolify-mutace.mjs — před
+    // voláním se ptá na deklarované držení); triggerDeploy ho volá akcí „deploy“ s force.
+    const deployIdx = body.search(/mutujAplikaci\(\{ akce: "deploy", [^}]*\bforce: true\b/);
     expect(deployIdx, "force=true deploy POST not found in triggerDeploy").toBeGreaterThanOrEqual(0);
     expect(syncIdx, "coolify-sync-envs.sh not found in triggerDeploy").toBeGreaterThanOrEqual(0);
     expect(

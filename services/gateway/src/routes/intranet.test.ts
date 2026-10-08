@@ -441,3 +441,38 @@ describe('S2 /mcp identity isolation', () => {
     }
   });
 });
+
+// ── Kdo: log intranetu nese userId, ne e-mail ─────────────────────────────────
+// Logger brány (safeLoggerOptions) e-mail jako PII redaktuje; kdyby řádek nesl
+// jen `email`, u zablokovaného nástroje MCP by chybělo, kdo to byl.
+describe('intranet log names the user by userId', () => {
+  it('blocked MCP tool: the log line carries userId, the e-mail does not reach the log', async () => {
+    const { Writable } = await import('node:stream');
+    const { safeLoggerOptions } = await import('@aisha/security');
+    const kusy: string[] = [];
+    const proud = new Writable({ write(k: Buffer, _e, hotovo) { kusy.push(k.toString('utf8')); hotovo(); } });
+
+    s2.verifyKeycloakClaims.mockResolvedValue(aliceClaims);
+    installFetchMock();
+    vi.resetModules();
+    process.env.INTRANET_API_KEY = API_KEY;
+    const { intranetRoutes } = await import('./intranet.js');
+    const app = Fastify({ logger: safeLoggerOptions({ level: 'info', stream: proud }) });
+    await app.register(intranetRoutes, { prefix: '/intranet' });
+    try {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/intranet/mcp',
+        headers: { 'x-intranet-api-key': API_KEY, authorization: 'Bearer verified-alice-token' },
+        payload: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'admin_deploy' } },
+      });
+      expect(res.statusCode).toBe(403);
+    } finally {
+      await app.close();
+    }
+    const radky = kusy.join('').trim().split('\n').map((r) => JSON.parse(r) as Record<string, unknown>);
+    const blokovano = radky.find((r) => r.msg === 'intranet MCP tool blocked');
+    expect(blokovano).toMatchObject({ tool: 'admin_deploy', userId: ALICE_DB_ID });
+    expect(kusy.join('')).not.toContain(ALICE_EMAIL);
+  });
+});

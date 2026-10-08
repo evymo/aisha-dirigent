@@ -126,6 +126,12 @@ Repo-root context (Coolify ARG_MAX pattern) — root Dockerfile.svc-model.
 chat lane — base pin (fail-closed: bez pinu/sha nesouhlasu kontejner nenastartuje).
 Zároveň podmínka provisioningu celé služby (services.json provision_when_env).
 
+Zavření lane (`CHAT_GGUF_URL=` prázdné) vydá cold-start i adresy služby výslovně
+prázdné (`VLLM_GENERATION_URL=` …), aby je kontinuita nevrátila z minula. Do
+běžících aplikací se to ale dostane až **syncem prostředí do Coolify** (krok 4
+cold-startu / `coolify-sync-envs.sh`), ne nasazením z CI — CI nasazuje
+s prostředím, které v Coolify už leží.
+
 ## `- EMBED_GGUF_URL=${EMBED_GGUF_URL:-}`
 
 embed lane — pin; zapnutá lane vyžaduje EMBED_ALIAS s markerem „embedding"

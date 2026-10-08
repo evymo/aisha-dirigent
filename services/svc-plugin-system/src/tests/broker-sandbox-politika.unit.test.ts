@@ -16,6 +16,8 @@ process.env.BROKER_TOKEN_SECRET = BROKER_SECRET;
 // Proměnné služby záměrně PRÁZDNÉ — přesně stav v produkci.
 process.env.PLUGIN_NETWORK_ALLOWLIST = '';
 process.env.PLUGIN_RPC_WHITELIST = '';
+// Řízený LLM router bez servisního tokenu odmítne (503) — test /sandbox/llm ho potřebuje.
+process.env.POSTGREST_SERVICE_TOKEN = 'service-token';
 
 const POVOLENY = 'https://93.184.216.34';
 const CIZI = 'https://93.184.216.35';
@@ -130,6 +132,87 @@ describe('broker: běh pluginu volá jen to, co schválila jeho sandbox politika
     expect(cizi.statusCode).toBe(403);
     expect(cizi.json().error).toMatch(/only write under its own source/);
     expect(h.rpc.mock.calls.filter(([fn]) => fn === 'audience_sync_source_catalog')).toHaveLength(1);
+  });
+
+  describe('zdroj pluginu jako TŘÍDA: každý argument, který jmenuje zdroj, patří zdroji pluginu', () => {
+    const ZDROJ = 'eurowag-telematics';
+    const RPC = ['twin_upsert_entity_audited', 'twin_record_events_audited', 'twin_identity_propose_match', 'audience_sync_source_catalog'];
+    const volej = (fn: string, params: Record<string, unknown>, tok = behPluginu) =>
+      app.inject({ method: 'POST', url: '/sandbox/rpc', headers: { authorization: `Bearer ${tok}` }, payload: { fn, params } });
+    const zavolano = (fn: string) => h.rpc.mock.calls.filter(([f]) => f === fn).length;
+    const udalost = (source: string, ref: string) => ({ source, source_ref: ref, event_type: 'vehicle_state', occurred_at: '2026-09-29T08:00:00Z' });
+
+    beforeEach(() => politika({ schvaleno: true, source_slug: ZDROJ, network_allowlist: [], rpc_allowlist: RPC }));
+
+    it('kladná kotva: skutečné tvary volání pod vlastním zdrojem i podzdroji `<zdroj>:<něco>` projdou', async () => {
+      // eurowag-telematics: entita pod slugem, události pod podzdroji (twin-events.ts)
+      expect((await volej('twin_upsert_entity_audited', { p_entity_type: 'vehicle', p_source: ZDROJ, p_source_key: 'VIN1', p_label: 'x' })).statusCode).toBe(200);
+      expect((await volej('twin_record_events_audited', { p_events: [udalost(`${ZDROJ}:vehicle-state`, 'a'), udalost(`${ZDROJ}:trip`, 'b')] })).statusCode).toBe(200);
+      expect(zavolano('twin_upsert_entity_audited')).toBe(1);
+      expect(zavolano('twin_record_events_audited')).toBe(1);
+    });
+
+    it.each([
+      ['p_source (dráha dvojčat)', 'twin_upsert_entity_audited', { p_entity_type: 'vehicle', p_source: 'webdispecink-fleet', p_source_key: 'VIN1' }, 'p_source'],
+      ['p_to_source (párování)', 'twin_identity_propose_match', { p_twin_id: 't', p_to_source: 'jiny-zdroj', p_source_key: 'k' }, 'p_to_source'],
+      ['p_source_slug (katalog)', 'audience_sync_source_catalog', { p_source_slug: 'jiny', p_kind: 'k', p_mode: 'series', p_rows: [] }, 'p_source_slug'],
+      ['položka pole (události)', 'twin_record_events_audited', { p_events: [udalost(`${ZDROJ}:trip`, 'a'), udalost('webdispecink-fleet', 'b')] }, 'p_events[1].source'],
+      ['past předpony (zdroj-ab ≠ zdroj-a:…)', 'twin_upsert_entity_audited', { p_source: `${ZDROJ}-evil`, p_source_key: 'k' }, 'p_source'],
+      ['prázdný podzdroj', 'twin_upsert_entity_audited', { p_source: `${ZDROJ}:`, p_source_key: 'k' }, 'p_source'],
+      ['podzdroj s další `:` (dvojí výklad)', 'twin_record_events_audited', { p_events: [udalost(`${ZDROJ}:trip:x`, 'a')] }, 'p_events[0].source'],
+      ['ne-řetězec', 'twin_upsert_entity_audited', { p_source: null, p_source_key: 'k' }, 'p_source'],
+      ['source_slug v objektu parametru', 'audience_sync_source_catalog', { p_source_slug: ZDROJ, p_meta: { source_slug: 'jiny' } }, 'p_meta.source_slug'],
+    ])('cizí zdroj — %s → 403 s cestou a RPC se nezavolá', async (_, fn, params, cesta) => {
+      const res = await volej(fn, params);
+      expect(res.statusCode).toBe(403);
+      expect(res.json().error).toContain(`(${cesta})`);
+      expect(zavolano(fn)).toBe(0);
+    });
+
+    it('klíč UVNITŘ zdroje (p_source_key, p_source_ref) ani data dodavatele hlouběji zdroj nejmenují', async () => {
+      const res = await volej('audience_sync_source_catalog', {
+        p_source_slug: ZDROJ, p_kind: 'k', p_mode: 'series', p_source_ref: 'cokoli',
+        p_rows: [{ external_id: 'e', fields: { source: 'web', lead_source: 'google' } }],
+      });
+      expect(res.statusCode).toBe(200);
+    });
+
+    it('plugin BEZ zdroje nesmí argument se zdrojem poslat vůbec; bez něj projde (kotva)', async () => {
+      politika({ schvaleno: true, source_slug: null, network_allowlist: [], rpc_allowlist: ['twin_upsert_entity_audited', 'wd_upsert_drivers_audited'] });
+      const res = await volej('twin_upsert_entity_audited', { p_source: 'cokoli', p_source_key: 'k' });
+      expect(res.statusCode).toBe(403);
+      expect(zavolano('twin_upsert_entity_audited')).toBe(0);
+      expect((await volej('wd_upsert_drivers_audited', { p_drivers: [{ id: 1 }] })).statusCode).toBe(200);
+    });
+
+    it('běh, který není plugin (bez zdroje): argument se zdrojem → 403 dřív, než dojde na proměnnou služby', async () => {
+      const jiny = await token({ kind: 'claude_cli_task', source_ref: '', user_id: 'u' });
+      const res = await volej('twin_upsert_entity_audited', { p_source: ZDROJ, p_source_key: 'k' }, jiny);
+      expect(res.statusCode).toBe(403);
+      expect(res.json().error).toMatch(/has no source/);
+      expect(h.sandboxed).not.toHaveBeenCalled();
+      // kotva: bez argumentu se zdrojem jde běh dál na proměnnou služby jako dřív
+      h.sandboxed.mockResolvedValueOnce({ ok: true });
+      expect((await volej('wd_upsert_drivers_audited', { p_drivers: [] }, jiny)).statusCode).toBe(200);
+      expect(h.sandboxed).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('/sandbox/llm jde přes řízený generátor; plugin_slug bere z TOKENU běhu, ne z těla (dřív hlídal jen mrtvý kontext v procesu)', async () => {
+    upstream.mockResolvedValueOnce(new Response(JSON.stringify({ text: 'ok' }), { status: 200 }));
+    const res = await app.inject({
+      method: 'POST', url: '/sandbox/llm', headers: { authorization: `Bearer ${behPluginu}` },
+      payload: { prompt: 'summarize this', model: 'gpt-4o-mini', maxTokens: 123, pluginSlug: 'cizi-plugin' },
+    });
+    expect(res.statusCode, res.body).toBe(200);
+    expect(res.body).toBe('ok');
+    expect(upstream).toHaveBeenCalledTimes(1);
+    const [url, init] = upstream.mock.calls[0];
+    expect(String(url)).toMatch(/ai-generate/);
+    expect(new Headers(init?.headers).get('authorization')).toBe('Bearer service-token');
+    const telo = JSON.parse(String(init?.body));
+    expect(telo.constraints).toMatchObject({ source: 'plugin_sandbox', plugin_slug: 'plugin-a', requested_model: 'gpt-4o-mini' });
+    expect(telo.max_tokens).toBe(123);
   });
 
   it('jiný druh běhu než plugin-exec dál používá proměnnou služby (prázdná = nic)', async () => {

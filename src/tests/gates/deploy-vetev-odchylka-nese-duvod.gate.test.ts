@@ -16,6 +16,16 @@
  * ho v prostředí neměl a vyšel správně; uvnitř cold-startu, který env načítá, by
  * měřil odchylku proti vlastnímu `main`. Test (5) to drží.
  *
+ * ⛔ NEDŮVĚŘIVÉ ČTENÍ 2026-10-03 (nálezy 1d a 2): měřítko se vybíralo podle URL, ale
+ * TIP deploy větve ne — bral se z remote zvykového jména, jinak z místní větve
+ * téhož jména. Ve fork checkoutu to zvykové jméno ukazuje na upstream. A větev
+ * sama se četla vlastním awk (první výskyt, bez komentářů, bez odsazení), tedy
+ * jiným pravidlem než story-init, který ji do Coolify zapisuje. Testy (11)–(16):
+ * větev dává jeden výklad deklarace, tip jen sledovací reference remote, který
+ * JE nasazovaný repozitář (podle identity URL); cokoli jiného je NEZMĚŘENO.
+ * Testy (17)–(18): i upstream a odkaz na PR čte týž výklad (vlastní awk nad
+ * manifestem tu nezůstal žádný) — stejná pravidla, chybějící klíč není chyba.
+ *
  * Remote-tracking refy se nastavují `update-ref`, síť se nepotřebuje.
  */
 import { describe, expect, it } from "vitest";
@@ -150,9 +160,9 @@ describe("deploy větev mimo main musí nést důvod", () => {
     expect(mer(r, manifest(NESE)).verdikt).toMatch(/^FAIL .*NEZMĚŘENO.*žádný remote neodpovídá/);
   });
 
-  it("8) deploy větev neexistuje lokálně ani na originu → NEZMĚŘENO", () => {
+  it("8) sledovací reference deploy větve na remote nasazovaného repozitáře neexistuje → NEZMĚŘENO", () => {
     const man = manifest("branch: neni/takova\nupstream_repo: aisha/evymo-ai-orchestrator\n");
-    expect(mer(repo(), man).verdikt).toMatch(/^FAIL .*NEZMĚŘENO.*neexistuje/);
+    expect(mer(repo(), man).verdikt).toMatch(/^FAIL .*NEZMĚŘENO.*sledovací reference 'origin\/neni\/takova'.*neexistuje/);
   });
 
   it("9) AISHA_UPSTREAM_REPO má přednost před manifestem", () => {
@@ -165,6 +175,92 @@ describe("deploy větev mimo main musí nést důvod", () => {
   it("10) deklarace i s hostitelem se trefí celá", () => {
     const man = manifest("branch: nasazeni/x\nupstream_repo: repo.example.test/aisha/evymo-ai-orchestrator\n");
     expect(mer(repo(), man).verdikt).toMatch(/^WARN .*proti zdroj\/main/);
+  });
+
+  it("11) fork checkout: tip se bere z remote nasazovaného repozitáře, NE ze zvykového jména", () => {
+    // Zvykové jméno remote ukazuje na upstream (tvar fork checkoutu) a nese větev
+    // téhož jména, která je předkem upstreamu — čtení podle jména by řeklo
+    // „už nic nenese“. Repozitář, ze kterého se staví, je pod jiným jménem.
+    const r = repo();
+    r.g("remote", "remove", "origin");
+    r.g("remote", "remove", "zdroj");
+    r.g("remote", "add", "origin", UPSTREAM);
+    r.g("update-ref", "refs/remotes/origin/main", r.U);
+    r.g("update-ref", "refs/remotes/origin/nasazeni/x", r.A);
+    r.g("remote", "add", "vlastni", FORK);
+    r.g("update-ref", "refs/remotes/vlastni/nasazeni/x", r.D);
+    const { verdikt, out } = mer(r, manifest(NESE));
+    expect(verdikt).toMatch(/^WARN .*nese 1 commit\(ů\) navíc proti origin\/main/);
+    expect(out).toMatch(/oprava ceka na sliti/);
+  });
+
+  it("12) místní větev téhož jména měřítkem NENÍ: bez sledovací reference → NEZMĚŘENO", () => {
+    const r = repo();
+    r.g("update-ref", "-d", "refs/remotes/origin/nasazeni/x");
+    // Kontrola stanoviště: místní větev existuje a odchylku nese.
+    expect(r.g("rev-parse", "refs/heads/nasazeni/x")).toBe(r.D);
+    expect(mer(r, manifest(NESE)).verdikt).toMatch(
+      /^FAIL .*NEZMĚŘENO.*sledovací reference 'origin\/nasazeni\/x'.*neexistuje.*místní větev téhož jména měřítkem není/,
+    );
+  });
+
+  it("13) žádný remote není nasazovaný repozitář → NEZMĚŘENO s důvodem", () => {
+    const r = repo();
+    r.g("remote", "remove", "origin");
+    expect(mer(r, manifest(NESE)).verdikt).toMatch(
+      /^FAIL .*NEZMĚŘENO.*tip větve 'nasazeni\/x' nemám odkud vzít.*žádný remote checkoutu neukazuje na nasazovaný repozitář/,
+    );
+  });
+
+  it("14) nevyložitelná deklarace větve → NEZMĚŘENO, ne `main`", () => {
+    // Dřív: awk vzal první řádek, prázdnou hodnotu četl jako main → „bez odchylky“.
+    for (const [radky, vzor] of [
+      ["branch: main\nbranch: nasazeni/x\n", /nejednoznačná/],
+      ["branch:\n", /PRÁZDNOU hodnotou/],
+    ] as const) {
+      const v = mer(repo(), manifest(radky)).verdikt;
+      expect(v, radky).toMatch(/^FAIL deploy větev NEZMĚŘENO — deklaraci manifestu nejde vyložit/);
+      expect(v, radky).toMatch(vzor);
+    }
+  });
+
+  it("15) větev čte týž výklad jako story-init: odsazení, komentář za hodnotou, uvozovky", () => {
+    // Dřív: odsazený řádek awk neviděl (→ main, „bez odchylky“) a komentář přilepil k větvi.
+    // Cesta upstreamu z téže adresy, kterou nese šablona repozitáře (remote `zdroj`).
+    const upstream = new URL(UPSTREAM).pathname.replace(/^\/|\.git$/g, "");
+    for (const radek of ["  branch: nasazeni/x", "branch: nasazeni/x   # odchylka čeká na slití", 'branch: "nasazeni/x"']) {
+      const man = manifest(`${radek}\nupstream_repo: ${upstream}\n`);
+      expect(mer(repo(), man).verdikt, radek).toMatch(/^WARN deploy větev 'nasazeni\/x' nese 1 commit/);
+    }
+  });
+
+  it("16) s deklarovanou adresou Forgeja rozhoduje celá identita (hostitel i cesta)", () => {
+    expect(mer(repo(), manifest(NESE), { FORGEJO_URL: "https://repo.example.test" }).verdikt).toMatch(/^WARN .*nese 1 commit/);
+    // Táž cesta na jiném hostiteli není repozitář, ze kterého se staví.
+    expect(mer(repo(), manifest(NESE), { FORGEJO_URL: "https://jinde.example.test" }).verdikt).toMatch(
+      /^FAIL .*NEZMĚŘENO.*žádný remote checkoutu neukazuje na nasazovaný repozitář https:\/\/jinde\.example\.test\//,
+    );
+  });
+
+  it("17) upstream čte týž výklad: odsazení, uvozovky a komentář za hodnotou nevadí; odkaz na PR smí nést `#` v uvozovkách", () => {
+    // Dřív (awk): odsazený řádek neviděl, uvozovky nechal v hodnotě a odkaz na PR uřízl u druhé dvojtečky.
+    const upstream = new URL(UPSTREAM).pathname.replace(/^\/|\.git$/g, "");
+    const man = manifest(`branch: nasazeni/x\n  upstream_repo: "${upstream}"   # rodič\nupstream_pr: "PR #12: oprava"\n`);
+    const { verdikt } = mer(repo(), man);
+    expect(verdikt).toMatch(/^WARN .*nese 1 commit\(ů\) navíc proti zdroj\/main/);
+    expect(verdikt).toMatch(/Ruší ji: PR #12: oprava\./);
+  });
+
+  it("18) nevyložitelný upstream → NEZMĚŘENO; chybějící odkaz na PR chyba není", () => {
+    const upstream = new URL(UPSTREAM).pathname.replace(/^\/|\.git$/g, "");
+    const dvakrat = mer(repo(), manifest(`branch: nasazeni/x\nupstream_repo: ${upstream}\nupstream_repo: jiny/zdroj\n`)).verdikt;
+    expect(dvakrat).toMatch(/^FAIL deploy větev NEZMĚŘENO — deklaraci manifestu nejde vyložit.*2 řádky `upstream_repo:`/);
+    const neparova = mer(repo(), manifest(`branch: nasazeni/x\nupstream_repo: "${upstream}\n`)).verdikt;
+    expect(neparova).toMatch(/^FAIL deploy větev NEZMĚŘENO — deklaraci manifestu nejde vyložit.*NEPÁROVOU uvozovkou/);
+    // Bez odkazu na PR: měří se dál, jen věta o PR chybí.
+    const bezPr = mer(repo(), manifest(`branch: nasazeni/x\nupstream_repo: ${upstream}\n`)).verdikt;
+    expect(bezPr).toMatch(/^WARN .*nese 1 commit/);
+    expect(bezPr).not.toMatch(/Ruší ji/);
   });
 });
 

@@ -17,6 +17,7 @@ import type {
   ToolCall,
 } from "./types.js";
 import { recordLlmCall } from "./metrics.js";
+import { chybiKlic, resolveProviderKey } from "../credentialSource.js";
 
 import { createSafeLogger } from '@aisha/security';
 const log = createSafeLogger('svc-ai-chat');
@@ -31,21 +32,28 @@ export class GeminiBackend implements InferenceBackend {
   readonly defaultTimeoutMs = 60_000;
   priority = 50;
 
-  private readonly apiKey: string;
+  /** Pevný klíč, když ho volající předal výslovně; jinak se klíč bere při volání (credentialSource). */
+  private readonly fixedKey?: string;
 
   constructor(apiKey?: string) {
-    this.apiKey = apiKey ?? process.env.GOOGLE_AI_API_KEY ?? "";
+    this.fixedKey = apiKey || undefined;
+  }
+
+  /** Klíč v okamžiku volání: pevný → zdroj pověření služby (trezor instance) → bez zdroje env. */
+  private key(): Promise<string | null> {
+    return resolveProviderKey("GOOGLE_AI_API_KEY", this.fixedKey);
   }
 
   // ---------------------------------------------------------------------------
   // healthCheck
   // ---------------------------------------------------------------------------
   async healthCheck(): Promise<HealthResult> {
-    if (!this.apiKey) return { available: false };
+    const key = await this.key();
+    if (!key) return { available: false };
     const start = performance.now();
     try {
       const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${this.apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${key}`,
         { signal: AbortSignal.timeout(5_000) },
       );
       if (!res.ok) return { available: false };
@@ -94,7 +102,8 @@ export class GeminiBackend implements InferenceBackend {
   // chat
   // ---------------------------------------------------------------------------
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    if (!this.apiKey) throw new Error("[gemini] GOOGLE_AI_API_KEY not configured");
+    const key = await this.key();
+    if (!key) throw chybiKlic("gemini", "GOOGLE_AI_API_KEY");
 
     // Build contents array
     const contents: Array<{
@@ -183,7 +192,7 @@ export class GeminiBackend implements InferenceBackend {
       }
     }
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${request.model}:generateContent?key=${this.apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${request.model}:generateContent?key=${key}`;
 
     if (!url.startsWith('https://')) throw new Error('SSRF: Gemini URL must use HTTPS');
 
@@ -246,9 +255,8 @@ export class GeminiBackend implements InferenceBackend {
   }
 }
 
-/** Create a Gemini backend from env */
+/** Create a Gemini backend when THIS process has the key in env — klíč se bere při volání (viz createOpenAIBackend). */
 export function createGeminiBackend(): GeminiBackend | null {
-  const key = process.env.GOOGLE_AI_API_KEY;
-  if (!key) return null;
-  return new GeminiBackend(key);
+  if (!process.env.GOOGLE_AI_API_KEY) return null;
+  return new GeminiBackend();
 }

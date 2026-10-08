@@ -4187,7 +4187,36 @@
         "publish": "Enregistrer & Publier",
         "savedDesc": "Profil de marque enregistré.",
         "publishedDesc": "Profil de marque publié et actif.",
-        "saveError": "Échec de l'enregistrement du profil de marque."
+        "saveError": "Échec de l'enregistrement du profil de marque.",
+        "colorPrimary": "Primaire",
+        "colorSecondary": "Secondaire",
+        "colorAccent": "Accent",
+        "colorBackground": "Arrière-plan",
+        "colorForeground": "Texte",
+        "colorMuted": "Atténuée",
+        "colorSurface": "Surface",
+        "colorDestructive": "Destructive",
+        "icon": {
+          "title": "Composer l'icône du navigateur",
+          "description": "Choisissez une image (SVG accepté), la forme du fond et sa couleur. L'icône est dessinée en PNG dans votre navigateur puis envoyée.",
+          "source": "Image",
+          "shape": "Fond",
+          "shapes": {
+            "kruh": "Cercle",
+            "ctverec": "Carré arrondi",
+            "zadne": "Aucun"
+          },
+          "color": "Couleur du fond",
+          "padding": "Marge",
+          "preview": "Aperçu (onglet, favoris, écran d'accueil)",
+          "apply": "Utiliser l'icône",
+          "upload": "Envoyer une image",
+          "compose": "Composer l'icône",
+          "uploaded": "Envoyé — enregistrez ou publiez le profil pour l'appliquer.",
+          "uploadError": "L'envoi a échoué.",
+          "loadError": "Cette image ne peut pas être lue.",
+          "unsupported": "Ce type de fichier n'est pas utilisable — utilisez PNG, JPG, WebP ou SVG."
+        }
       },
       "domainRouting": {
         "sectionTitle": "Routage par domaine",
@@ -4241,7 +4270,34 @@
       "iot": "IoT / Assistant domestique",
       "testConnection": "Tester la connexion",
       "connectionSuccess": "Connexion réussie",
-      "connectionFailed": "Échec de la connexion"
+      "connectionFailed": "Échec de la connexion",
+      "providerCredentials": {
+        "sectionTitle": "Fournisseurs d'IA et jetons",
+        "title": "Fournisseurs d'IA et jetons",
+        "description": "Les jetons et clés API propres à cette instance. Ils sont stockés sous forme chiffrée dans le coffre-fort de l'instance, d'où les services les récupèrent.",
+        "warning": "Une valeur ne peut être définie ou remplacée qu'une seule fois — elle n'apparaît plus par la suite. Un identifiant s'applique à l'ensemble de l'instance.",
+        "empty": "Aucun fournisseur, environnement d'exécution ou serveur MCP ne déclare d'identifiant.",
+        "loadError": "Impossible de charger les informations d'identification.",
+        "usedBy": "Utilisé par",
+        "orphan": "Plus personne ne s'en sert",
+        "kind": {
+          "provider": "fournisseur",
+          "runtime": "durée d'exécution",
+          "mcp_server": "Serveur MCP"
+        },
+        "placeholder": "Coller un nouveau jeton ou une nouvelle clé",
+        "set": "Ensemble",
+        "replace": "Remplacer",
+        "deleteAria": "Supprimer les informations d'identification {{name}}",
+        "sourceEnv": "Transféré depuis l'environnement de service",
+        "sourceAdmin": "Configuré dans l'administration",
+        "saved": "Identifiant {{name}} enregistré",
+        "saveError": "Impossible d'enregistrer l'identifiant {{name}}",
+        "deleted": "Identifiant {{name}} supprimé",
+        "deleteError": "Impossible de supprimer l'identifiant {{name}}",
+        "deleteConfirmTitle": "Supprimer les informations d'identification {{name}} ?",
+        "deleteConfirmDescription": "Les services qui l'utilisent cesseront de la recevoir. Tant qu'un service dispose encore de cette valeur dans son environnement, il l'utilise temporairement et enregistre un avertissement."
+      }
     },
     "notifications": {
       "title": "Campagnes de notification",
@@ -4886,7 +4942,25 @@
         "restoreError": "La restauration a échoué"
       },
       "publishedChanges": "Modifications publiées",
-      "draftDiscarded": "Brouillon abandonné"
+      "draftDiscarded": "Brouillon abandonné",
+      "tags": {
+        "manage": "Gérer les étiquettes",
+        "title": "Gérer les étiquettes",
+        "description": "Renommez ou fusionnez les étiquettes et définissez leur nom sur le site dans chaque langue. Une nouvelle étiquette se crée en l’ajoutant à un article.",
+        "none": "Aucune étiquette pour l’instant.",
+        "counts": "{{count}} articles · {{published}} sur le site",
+        "rename": "Renommer",
+        "newValue": "Nouvelle étiquette",
+        "renameConfirm": "Renommer",
+        "mergeQuestion": "L’étiquette « {{to}} » existe déjà. Y fusionner « {{from}} » ? Les articles qui ont les deux n’en garderont qu’une.",
+        "mergeConfirm": "Fusionner",
+        "renamed": "L’étiquette « {{from}} » s’appelle désormais « {{to}} » ({{count}} articles).",
+        "renameError": "Impossible de renommer l’étiquette.",
+        "names": "Noms par langue",
+        "saveNames": "Enregistrer les noms",
+        "namesSaved": "Noms enregistrés.",
+        "namesError": "Impossible d’enregistrer les noms."
+      }
     },
     "audit": {
       "severities": {
@@ -5886,6 +5960,7 @@
       "tooLarge": "Fichier trop volumineux (max {{mb}} Mo)",
       "invalidType": "Ce type de fichier ne peut pas être téléversé ({{type}})",
       "heicHint": "Les photos iPhone (HEIC) sont téléversées telles quelles et livrées converties.",
+      "notImage": "Pas une image ({{name}}) — impossible de l’utiliser comme image",
       "infected": "Le fichier a été refusé par l’antivirus",
       "scanUnavailable": "L’antivirus est indisponible pour le moment, réessayez dans un instant",
       "cancel": "Annuler",
@@ -7671,6 +7746,10 @@
       "discussion-thread": {
         "title": "Discussion",
         "description": "Messages des utilisateurs en fil de discussion sous ce nœud de contenu"
+      },
+      "app-banner": {
+        "title": "Bannière d’application",
+        "description": "Promotion de l’application mobile : iPhone → App Store, Android → Google Play, ordinateur → les deux"
       }
     },
     "traits": {
@@ -7787,7 +7866,9 @@
       "layers": "Calques",
       "i18n": "Traductions",
       "selectElement": "Sélectionnez un élément pour modifier ses propriétés",
-      "emptyCanvas": "Le canevas est vide"
+      "emptyCanvas": "Le canevas est vide",
+      "panelError": "Ce panneau n'a pas pu être affiché.",
+      "toggleVisibility": "Afficher ou masquer"
     },
     "i18n": {
       "injectTranslations": "Aperçu des traductions",
@@ -7830,7 +7911,10 @@
         "news_article": "Article d'actualité",
         "web_page": "Page web"
       },
-      "nodeId": "ID du nœud"
+      "nodeId": "ID du nœud",
+      "iosUrl": "Lien App Store (iPhone)",
+      "androidUrl": "Lien Google Play (Android)",
+      "dismissible": "Les visiteurs peuvent la fermer"
     },
     "versions": {
       "title": "Historique des versions",
@@ -7857,6 +7941,17 @@
       "invalidType": "Type de fichier non pris en charge",
       "tooLarge": "Fichier trop volumineux (max 20 Mo)",
       "uploadFailed": "Échec du téléversement de l’asset"
+    },
+    "draft": {
+      "pending": "Modifications non publiées",
+      "banner": "Vous modifiez un brouillon. Le site affiche la version publiée jusqu’à ce que vous cliquiez sur « Publier les modifications ».",
+      "publishChanges": "Publier les modifications",
+      "discard": "Abandonner le brouillon",
+      "conflictTitle": "La page a été modifiée ailleurs",
+      "conflictBody": "Quelqu’un a enregistré cette page après que vous l’avez ouverte. Rechargez pour voir sa version, ou remplacez-la par la vôtre.",
+      "reload": "Recharger",
+      "overwrite": "Remplacer par la mienne",
+      "restoredToDraft": "La version a été chargée dans le brouillon. Le site ne change qu’après la publication."
     }
   },
   "production": {
@@ -8759,6 +8854,7 @@
     "searchPlaceholder": "Rechercher des articles…",
     "filter": {
       "tags": "Mots-clés",
+      "allTags": "Tous",
       "sort": "Trier",
       "label": "Filtre"
     },
@@ -8940,6 +9036,13 @@
     "posted": "Publié",
     "signIn": "Connectez-vous pour participer à la discussion",
     "unconfigured": "La discussion n'est pas encore disponible ici."
+  },
+  "appBanner": {
+    "title": "Téléchargez notre application",
+    "text": "Emportez-nous partout — téléchargez l’application mobile.",
+    "appStore": "Télécharger dans l’App Store",
+    "googlePlay": "Disponible sur Google Play",
+    "close": "Fermer"
   },
   "flowboard": {
     "palette": {

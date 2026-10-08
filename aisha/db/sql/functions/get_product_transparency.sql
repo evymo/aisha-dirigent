@@ -4,15 +4,25 @@
 -- Security: SECURITY DEFINER - public product transparency access.
 -- @security: public
 -- @audit: none
+--
+-- ⛔ NAMĚŘENO 2026-10-05 (nezávislá revize nad mainem 8b7637acc): témata se vybírala vlastním
+-- výčtem `kt.visibility IN ('public', 'members')` bez ohledu na volajícího, takže NEPŘIHLÁŠENÝ (anon)
+-- dostal i témata s viditelností `members`. Pravidlo majitele (HARD, 2026-10-04): nepřihlášený vidí
+-- jen `public`, `members` jen přihlášený. Téma teď vybírá jeden domov viditelnosti
+-- public.knowledge_visibility_searchable za volajícího (je přihlášen = auth.uid() IS NOT NULL, gilda
+-- z public.knowledge_audience_in_guild); `internal` nevydá nikomu (veřejná stránka produktu).
+-- Měří src/tests/db/pribeh-a-beh-cteni-podle-id.runtime.test.ts.
 
 CREATE OR REPLACE FUNCTION public.get_product_transparency(p_product_slug text)
 RETURNS jsonb
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 AS $function$
 DECLARE
+  -- viditelnost témat za volajícího (bez identity jen `public`)
+  v_in_guild boolean := public.knowledge_audience_in_guild(auth.uid());
   v_product RECORD;
   v_batches jsonb;
   v_topics jsonb;
@@ -34,7 +44,7 @@ BEGIN
     p.doses_per_package,
     p.image_url
   INTO v_product
-  FROM products p
+  FROM public.products p
   WHERE p.slug = p_product_slug
     AND p.is_active = true;
 
@@ -60,7 +70,7 @@ BEGIN
       'available_units', pb.available_units
     ) ORDER BY pb.production_date DESC NULLS LAST
   ), '[]'::jsonb) INTO v_batches
-  FROM production_batches pb
+  FROM public.production_batches pb
   WHERE pb.product_id = v_product.id
     AND pb.status IN ('released', 'completed');
 
@@ -75,10 +85,11 @@ BEGIN
       'is_verified', ktl.is_verified
     ) ORDER BY ktl.sort_order
   ), '[]'::jsonb) INTO v_topics
-  FROM knowledge_topic_links ktl
-  JOIN knowledge_topics kt ON kt.id = ktl.topic_id
+  FROM public.knowledge_topic_links ktl
+  JOIN public.knowledge_topics kt ON kt.id = ktl.topic_id
   WHERE ktl.product_id = v_product.id
-    AND kt.visibility IN ('public', 'members');
+    -- domov viditelnosti (bez vlastního výčtu): nepřihlášený jen `public`
+    AND public.knowledge_visibility_searchable(kt.visibility, auth.uid() IS NOT NULL, v_in_guild);
 
   -- Get production variants for this product line
   SELECT COALESCE(jsonb_agg(
@@ -89,7 +100,7 @@ BEGIN
       'is_default', pv.is_default
     ) ORDER BY pv.sort_order
   ), '[]'::jsonb) INTO v_variants
-  FROM production_variants pv
+  FROM public.production_variants pv
   WHERE LOWER(pv.product) = LOWER(
     CASE
       WHEN v_product.slug LIKE 'retisin%' THEN 'Retisin'
@@ -124,6 +135,6 @@ END;
 $function$;
 
 -- Permissions: public transparency data
-REVOKE ALL ON FUNCTION public.get_product_transparency(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_product_transparency(text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.get_product_transparency(text) TO anon;
 GRANT EXECUTE ON FUNCTION public.get_product_transparency(text) TO authenticated;

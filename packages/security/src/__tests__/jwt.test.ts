@@ -7,7 +7,7 @@
  */
 
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
-import { AuthError, createJwtVerifier, verifyServiceRole } from '../jwt.js';
+import { AuthError, constantTimeStringCompare, createJwtVerifier, verifyServiceRole } from '../jwt.js';
 
 vi.mock('jose', () => ({
   createRemoteJWKSet: vi.fn(() => 'jwks-mock'),
@@ -215,6 +215,69 @@ describe('verifyServiceRole() — constant-time compare', () => {
 
   test('fail-closed: rejects any bearer when the expected token is empty', () => {
     expect(() => verifyServiceRole('Bearer anything', '')).toThrow(AuthError);
+  });
+});
+
+/**
+ * ── KONSTANTNÍ ČAS BEZ HODIN ──────────────────────────────────────────────────
+ *
+ * ⛔ NAMĚŘENO 2026-10-02: služby to hlídaly STOPKAMI — 1MB token a aserce
+ * `performance.now() - t0 < 50 ms`. Pod zátěží plného pre-push (load ~65) to
+ * vyšlo 76 ms a push padl na kódu, který se vůbec neměnil; samotný test přitom
+ * prošel 3/3. Navíc ty stopky měřily KOPII porovnání z mocku `@aisha/security`
+ * (v ai-chat už bez pojistky prázdného tokenu), ne tuhle implementaci.
+ *
+ * Vlastnost se tu proto dokazuje SONDOU, ne hodinami: objekt s `length`
+ * a počítadlem `charCodeAt`. Kolikrát se sáhne na znak, je přesné číslo —
+ * nezávislé na stroji, zátěži i JIT.
+ */
+describe('constantTimeStringCompare() — vlastnosti bez hodin', () => {
+  /** Řetězec-sonda: délka podle přání, každé čtení znaku se počítá. */
+  const sonda = (delka: number, znak = 65) => {
+    const charCodeAt = vi.fn((_i: number) => znak);
+    return { retezec: { length: delka, charCodeAt } as unknown as string, charCodeAt };
+  };
+
+  test('rozdílná délka → odmítne, aniž by přečetl jediný znak (DoS: 1 MB nestojí nic)', () => {
+    // Čtení znaku tu HÁZÍ: regrese (porovnání bez kontroly délky) by jinak
+    // poctivě odpočítala milion volání a test by padal 25 s místo okamžitě.
+    const zakazaneCteni = () => {
+      throw new Error('při rozdílné délce se nesmí číst ani jeden znak');
+    };
+    const velka = sonda(1_000_000);
+    velka.charCodeAt.mockImplementation(zakazaneCteni);
+    expect(constantTimeStringCompare(velka.retezec, 'abcdef123456')).toBe(false);
+
+    const druha = sonda(1_000_000);
+    druha.charCodeAt.mockImplementation(zakazaneCteni);
+    expect(constantTimeStringCompare('abcdef123456', druha.retezec)).toBe(false);
+  });
+
+  test('stejná délka → projde VŠECHNY znaky, ať se liší kdekoli (pozice rozdílu neprosákne časem)', () => {
+    const tajemstvi = 'abcdef123456';
+    const pozice = [0, Math.floor(tajemstvi.length / 2), tajemstvi.length - 1];
+    for (const p of pozice) {
+      const kandidat = tajemstvi.slice(0, p) + 'X' + tajemstvi.slice(p + 1);
+      const s = sonda(tajemstvi.length);
+      s.charCodeAt.mockImplementation((i: number) => kandidat.charCodeAt(i));
+      expect(constantTimeStringCompare(s.retezec, tajemstvi), `rozdíl na pozici ${p}`).toBe(false);
+      expect(s.charCodeAt, `rozdíl na pozici ${p}`).toHaveBeenCalledTimes(tajemstvi.length);
+    }
+  });
+
+  test('shoda → true, a i tehdy se čte každý znak právě jednou', () => {
+    const tajemstvi = 'abcdef123456';
+    const s = sonda(tajemstvi.length);
+    s.charCodeAt.mockImplementation((i: number) => tajemstvi.charCodeAt(i));
+    expect(constantTimeStringCompare(s.retezec, tajemstvi)).toBe(true);
+    expect(s.charCodeAt).toHaveBeenCalledTimes(tajemstvi.length);
+  });
+
+  test('verifyServiceRole: 1MB bearer se odmítne jako neplatný (403), ne jako chyba nebo pád', () => {
+    const huge = 'A'.repeat(1_000_000);
+    expect(() => verifyServiceRole(`Bearer ${huge}`, 'abcdef123456')).toThrow(
+      expect.objectContaining({ statusCode: 403, reason: 'invalid' }),
+    );
   });
 });
 

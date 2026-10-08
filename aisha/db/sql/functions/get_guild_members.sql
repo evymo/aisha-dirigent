@@ -24,7 +24,7 @@ BEGIN
     pp.certification_level::text,
     pp.is_production_provider,
     pp.guild_joined_at,
-    (SELECT count(*) FROM expert_rules er WHERE er.author_partner_id = pp.id AND er.status = 'published') AS rules_count,
+    (SELECT count(*) FROM expert_rules er WHERE er.author_partner_id = pp.id AND er.status = 'published' AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid())) AS rules_count,
     COALESCE(
       (SELECT jsonb_agg(jsonb_build_object(
         'id', gea.id,

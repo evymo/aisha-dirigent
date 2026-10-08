@@ -34,11 +34,20 @@ vi.mock('../lib/capability-resolver.js', () => ({ resolveRagBackend: resolveRagB
 // ho obslouží; embed-query-in-space zůstává SKUTEČNÝ (i jeho kontrola rozměru).
 
 const embedMock = vi.hoisted(() => vi.fn());
+const identitaMock = vi.hoisted(() => ({ hodnota: null as null | { identita: string; revize: string | null; recept: string } }));
 // Keep the REAL mapBackendKind (+ EmbedDispatchError) — brick1 moved mapBackendKind into this module,
 // so a bare {embed} mock leaves the route calling an undefined mapBackendKind → 500. Only embed is stubbed.
 vi.mock('../lib/embed-dispatcher.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/embed-dispatcher.js')>();
-  return { ...actual, embed: embedMock };
+  return {
+    ...actual,
+    embed: embedMock,
+    // Cesty volají embedSIdentitou (identita vah k vektoru); vektory dál dodává embedMock.
+    embedSIdentitou: async (o: Parameters<typeof actual.embedSIdentitou>[0]) => ({
+      vectors: (await embedMock(o)) as number[][],
+      identita: identitaMock.hodnota,
+    }),
+  };
 });
 
 // Imported by sibling handlers in the same module — stub so the import resolves.
@@ -82,6 +91,7 @@ describeIfFastify('POST /embeddings/v2-backfill', () => {
     rpcServiceMock.mockReset();
     resolveRagBackendMock.mockReset();
     embedMock.mockReset();
+    identitaMock.hodnota = null;
   });
   afterEach(() => vi.clearAllMocks());
 
@@ -137,6 +147,26 @@ describeIfFastify('POST /embeddings/v2-backfill', () => {
     const writes = rpcServiceMock.mock.calls.filter((c) => c[0] === 'insert_knowledge_embedding_v2_audited');
     expect(writes).toHaveLength(2);
     expect(writes[0][1]).toMatchObject({ p_chunk_id: 'c1', p_embedding_v2: JSON.stringify([0.1, 0.2, 0.3]), p_model: 'Qwen3-Embedding-4B' });
+    await app.close();
+  });
+
+  it('lane poslala identitu vah → model_version = `<identita>;recipe=<recept>` (E2), jinak značka resolveru', async () => {
+    const radky = [{ embedding_id: 'e1', chunk_id: 'c1', knowledge_item_id: 'k1', chunk_text: 'alpha', contextual_prefix: null }];
+    rpcServiceMock.mockImplementation(spaceRpc(FAKE_BACKEND, (fn) => (fn === 'fn_get_embeddings_needing_v2' ? radky : undefined)));
+    embedMock.mockResolvedValue([[0.1]]);
+    const app = await buildApp();
+
+    identitaMock.hodnota = { identita: 'safetensors:' + 'd'.repeat(64), revize: 'r7', recept: 'last-token;l2' };
+    await app.inject({ method: 'POST', url: '/embeddings/v2-backfill', payload: {} });
+    identitaMock.hodnota = null;
+    await app.inject({ method: 'POST', url: '/embeddings/v2-backfill', payload: {} });
+
+    const verze = rpcServiceMock.mock.calls
+      .filter((c) => c[0] === 'insert_knowledge_embedding_v2_audited')
+      .map((c) => (c[1] as Record<string, unknown>).p_model_version);
+    expect(verze).toEqual([`safetensors:${'d'.repeat(64)};recipe=last-token;l2`, 'qwen-local:space_resolver:v2']);
+    // přepočet korpusu je dávka
+    expect((embedMock.mock.calls[0][0] as Record<string, unknown>).trida).toBe('davka');
     await app.close();
   });
 

@@ -185,6 +185,10 @@
       "discussion-thread": {
         "title": "Discussion",
         "description": "Messages des utilisateurs en fil de discussion sous ce nœud de contenu"
+      },
+      "app-banner": {
+        "title": "Bannière d’application",
+        "description": "Promotion de l’application mobile : iPhone → App Store, Android → Google Play, ordinateur → les deux"
       }
     },
     "traits": {
@@ -301,7 +305,9 @@
       "layers": "Calques",
       "i18n": "Traductions",
       "selectElement": "Sélectionnez un élément pour modifier ses propriétés",
-      "emptyCanvas": "Le canevas est vide"
+      "emptyCanvas": "Le canevas est vide",
+      "panelError": "Ce panneau n'a pas pu être affiché.",
+      "toggleVisibility": "Afficher ou masquer"
     },
     "i18n": {
       "injectTranslations": "Aperçu des traductions",
@@ -344,7 +350,10 @@
         "news_article": "Article d'actualité",
         "web_page": "Page web"
       },
-      "nodeId": "ID du nœud"
+      "nodeId": "ID du nœud",
+      "iosUrl": "Lien App Store (iPhone)",
+      "androidUrl": "Lien Google Play (Android)",
+      "dismissible": "Les visiteurs peuvent la fermer"
     },
     "versions": {
       "title": "Historique des versions",
@@ -371,6 +380,17 @@
       "invalidType": "Type de fichier non pris en charge",
       "tooLarge": "Fichier trop volumineux (max 20 Mo)",
       "uploadFailed": "Échec du téléversement de l’asset"
+    },
+    "draft": {
+      "pending": "Modifications non publiées",
+      "banner": "Vous modifiez un brouillon. Le site affiche la version publiée jusqu’à ce que vous cliquiez sur « Publier les modifications ».",
+      "publishChanges": "Publier les modifications",
+      "discard": "Abandonner le brouillon",
+      "conflictTitle": "La page a été modifiée ailleurs",
+      "conflictBody": "Quelqu’un a enregistré cette page après que vous l’avez ouverte. Rechargez pour voir sa version, ou remplacez-la par la vôtre.",
+      "reload": "Recharger",
+      "overwrite": "Remplacer par la mienne",
+      "restoredToDraft": "La version a été chargée dans le brouillon. Le site ne change qu’après la publication."
     }
   }
 }

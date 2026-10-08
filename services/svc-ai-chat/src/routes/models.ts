@@ -1,5 +1,8 @@
 /**
- * POST /models/openai-key — Manage OpenAI API key (admin only).
+ * POST /models/openai-key — Stav a ověření klíče OpenAI (admin only). Klíč se NASTAVUJE
+ *   v administraci („Poskytovatelé AI a tokeny" → set_provider_credential_admin); akce
+ *   `set` odpovídá 410 (dřív psala přes edge_app_secrets akci, kterou funkce nezná —
+ *   každé volání padalo, 2026-10-02).
  * GET /models/list — List available chat models (admin only). Returns
  *   { models: Array<{ id, created, owned_by }> } — the OpenAiModelEntry shape the
  *   `useAvailableModels` client hook consumes directly (no post-mapping).
@@ -10,6 +13,7 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { verifyToken, verifyServiceRole, isAdminOrStaff, AuthError } from '../auth.js';
 import { rpcService } from '../postgrest.js';
 import { config } from '../config.js';
+import { credentials } from '../lib/credentials.js';
 import { discoverModels, isNonChatModelId } from '../lib/modelDiscovery.js';
 import { selfTestModels } from '../lib/modelSelfTest.js';
 import { getAllBackends } from '../lib/llmRouter.js';
@@ -30,14 +34,13 @@ export async function modelsRoutes(app: FastifyInstance): Promise<void> {
     const { action, key } = req.body ?? {};
 
     if (action === 'status') {
-      const secret = await rpcService<{ value: string | null }>('edge_app_secrets', {
-        p_action: 'get', p_key: 'OPENAI_API_KEY',
-      });
-      return reply.send({ configured: !!(secret?.value), masked: secret?.value ? `sk-...${secret.value.slice(-4)}` : null });
+      // Stav = přítomnost. Žádná část hodnoty (dřív posledních 4 znaků) do prohlížeče.
+      const klic = await credentials.get('OPENAI_API_KEY');
+      return reply.send({ configured: klic !== null, masked: null });
     }
 
     if (action === 'validate') {
-      const apiKey = key ?? config.openaiApiKey;
+      const apiKey = key ?? (await credentials.get('OPENAI_API_KEY'));
       if (!apiKey) return reply.send({ valid: false, error: 'No API key' });
 
       try {
@@ -52,16 +55,9 @@ export async function modelsRoutes(app: FastifyInstance): Promise<void> {
     }
 
     if (action === 'set') {
-      if (!key || !key.startsWith('sk-')) {
-        return reply.code(400).send({ error: 'Invalid OpenAI API key format' });
-      }
-      await rpcService('edge_app_secrets', { p_action: 'upsert', p_key: 'OPENAI_API_KEY', p_value: key });
-      await rpcService('log_audit_event', {
-        p_action: 'OPENAI_KEY_UPDATED',
-        p_metadata: { masked_key: `sk-...${key.slice(-4)}` },
-        p_user_id: user.userId,
-      }).catch(() => {});
-      return reply.send({ ok: true });
+      return reply.code(410).send({
+        error: 'Klíč OpenAI se nastavuje v administraci (Poskytovatelé AI a tokeny → OPENAI_API_KEY)',
+      });
     }
 
     return reply.code(400).send({ error: 'action must be status, validate, or set' });
@@ -81,7 +77,7 @@ export async function modelsRoutes(app: FastifyInstance): Promise<void> {
     }
     if (!isAdminOrStaff(user)) return reply.code(403).send({ error: 'Admin required' });
 
-    const apiKey = config.openaiApiKey;
+    const apiKey = await credentials.get('OPENAI_API_KEY');
     if (!apiKey) return reply.send({ models: [], error: 'No OpenAI API key configured' });
 
     const resp = await fetch('https://api.openai.com/v1/models', {

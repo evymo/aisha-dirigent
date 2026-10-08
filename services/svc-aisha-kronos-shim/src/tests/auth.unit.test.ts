@@ -11,17 +11,20 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock @aisha/security with the same constant-time impl as the real one,
-// so the adversarial timing assertions actually exercise that semantic.
+// Mock @aisha/security: totéž porovnání jako skutečné, obalené do vi.fn,
+// aby šlo ověřit, CO služba sdílené kontrole předává.
 vi.mock('@aisha/security', () => ({
-  constantTimeStringCompare(a: string, b: string): boolean {
+  // vi.fn kvůli testu volajícího místa: služba musí token předat sdílené
+  // kontrole se SVÝM tajemstvím. Vlastnosti porovnání (O(1) odmítnutí rozdílné
+  // délky, konstantní čas) drží SONDOU packages/security (jwt.test.ts).
+  constantTimeStringCompare: vi.fn((a: string, b: string): boolean => {
     if (a.length !== b.length) return false;
     let diff = 0;
     for (let i = 0; i < a.length; i++) {
       diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
     }
     return diff === 0;
-  },
+  }),
   // ⛔ Mock MUSÍ nést i `requireEnv` — config ho volá při importu. Chybějící
   // export se projeví jako pád CELÉHO souboru, ne jako chybějící hodnota.
   requireEnv: (name: string) => process.env[name] ?? `test-${name}`,
@@ -113,13 +116,21 @@ describe('verifyKronosApiKey — happy + sad paths', () => {
     expect([...messages][0]).toContain('Invalid');
   });
 
-  it('rejects 1MB token in microseconds (length-check fast-path, NOT O(n) full compare)', async () => {
+  it('1MB token: předá ho sdílené kontrole se SVÝM klíčem → 401 (bez stopek)', async () => {
+    // ⛔ Dřív tu stály stopky (`performance.now()` < 50 ms) nad KOPIÍ porovnání
+    // z mocku. Pod zátěží pre-push (2026-10-02, load ~65) vyšlo 76 ms ve
+    // vedlejší službě a push padl na kódu, který se neměnil. Vlastnosti
+    // porovnání dokazuje SONDOU packages/security; tady jen volající místo.
+    const { constantTimeStringCompare: sdilene } = await import('@aisha/security');
+    const sdileneSpy = vi.mocked(sdilene);
+    sdileneSpy.mockClear();
     const { verifyKronosApiKey } = await import('../auth.js');
     const huge = 'A'.repeat(1_000_000);
-    const t0 = performance.now();
-    try { verifyKronosApiKey({ 'x-api-key': huge }); } catch { /* expected */ }
-    const elapsed = performance.now() - t0;
-    expect(elapsed).toBeLessThan(50);
+    expect(() => verifyKronosApiKey({ 'x-api-key': huge })).toThrow(
+      expect.objectContaining({ statusCode: 401, message: 'Invalid Kronos API key' }),
+    );
+    expect(sdileneSpy).toHaveBeenCalledTimes(1);
+    expect(sdileneSpy).toHaveBeenCalledWith(huge, 'kronos-secret-token-deadbeef');
   });
 });
 

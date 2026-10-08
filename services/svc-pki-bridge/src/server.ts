@@ -1,6 +1,6 @@
 import Fastify, { type FastifyError, type FastifyRequest, type FastifyReply } from 'fastify';
 import { readFileSync, existsSync } from 'node:fs';
-import { applySecurity, pluginRejection } from '@aisha/security';
+import { applySecurity, pluginRejection, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import { config } from './config.js';
@@ -13,7 +13,7 @@ import { diagRoutes } from './routes/diag.js';
 // other module performs network I/O. Exporter routes to Langfuse OTLP.
 // Rollback: OTEL_SDK_DISABLED=true env (Coolify) + container restart.
 bootstrapOtel({ serviceName: 'svc-pki-bridge' });
-const app = Fastify({ logger: { level: config.logLevel }, trustProxy: true });
+const app = Fastify({ logger: safeLoggerOptions({ level: config.logLevel }), trustProxy: true });
 
 await applySecurity(app, {
   service: 'svc-pki-bridge',

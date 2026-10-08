@@ -1,5 +1,6 @@
 import { requireEnv } from '@aisha/security';
 import { dockerApiSegment } from './docker-api-verze.js';
+import { celeKladneCislo, uzivatelBehu } from './config-validace.js';
 export const config = {
   port: parseInt(process.env.SVC_AGENT_RUNNER_PORT ?? '3030', 10),
   logLevel: (process.env.LOG_LEVEL ?? 'info') as 'fatal' | 'error' | 'warn' | 'info' | 'debug' | 'trace',
@@ -17,11 +18,32 @@ export const config = {
   pluginBrokerUrl: process.env.PLUGIN_BROKER_URL ?? 'http://svc-plugin-system:3029',
   brokerTokenSecret: process.env.BROKER_TOKEN_SECRET ?? '',
 
+  /**
+   * Broker-proxy (rozhodnutí majitele 2026-10-01, varianta C): sandbox běhu NENÍ
+   * v meshi, takže na `PLUGIN_BROKER_URL` (jméno v meshi) nedosáhne. Runner, který
+   * v meshi je, se připojí k exec síti pod tímhle aliasem a přepošle jen `/sandbox/*`.
+   * Alias nese identitu instance (`<prefix>-plugin-broker`).
+   *
+   * ⛔ 2026-10-06 (majitel „síť zavřít“ = volba A): proxy je POVINNÁ. Síť běhů je
+   * `Internal: true` — přímá cesta na `PLUGIN_BROKER_URL` z ní nevede, takže „proxy
+   * vypnutá → běh dostane broker přímo“ by byl tichý výpadek. Chybějící alias = runner
+   * nenastartuje. Proxy je zároveň JEDINÁ cesta ven z běhu (CONNECT pro claude_cli_task).
+   */
+  brokerProxyAlias: requireEnv('BROKER_PROXY_ALIAS', {
+    service: 'svc-agent-runner',
+    why: 'Broker-proxy je jediná cesta z uzavřené sítě běhů; alias nese identitu instance (compose stacku exec).',
+  }),
+  brokerProxyPort: celeKladneCislo('BROKER_PROXY_PORT', 3031, 65535),
+  brokerProxyBodyLimit: celeKladneCislo('BROKER_PROXY_BODY_LIMIT', 10 * 1024 * 1024),
+
   runnerBackend: (process.env.RUNNER_BACKEND ?? 'docker') as 'docker' | 'kata',
 
   dockerSocket: process.env.DOCKER_SOCKET ?? '/var/run/docker.sock',
   // Segment cesty (`v1.45`); env smí nést i zápis Dockeru bez „v“ — viz docker-api-verze.ts.
   dockerApiVersion: dockerApiSegment(process.env.DOCKER_API_VERSION ?? 'v1.46'),
+  // Síť běhů. Runner ji zakládá jako `Internal: true` (bez výchozí trasy ven) a před
+  // KAŽDÝM během měří: existující síť toho jména, která uzavřená není, odmítne — nikdy
+  // ji tiše nepoužije (backends/docker-http.ts ensureExecNetwork).
   dockerExecNetwork: process.env.DOCKER_EXEC_NETWORK ?? 'aisha-exec-net',
   // Per-container RAM reservation. 256m OOMs a real Claude run; 2g is the runaway
   // multiplier when many run at once. 1g is the honest middle: with
@@ -32,13 +54,22 @@ export const config = {
 
   kataGrpcEndpoint: process.env.KATA_GRPC_ENDPOINT ?? '',
 
-  netbirdEnabled: process.env.NETBIRD_ENABLED !== 'false',
-  netbirdApiUrl: (process.env.NETBIRD_API_URL ?? '').replace(/\/+$/, ''),
-  netbirdAuthScheme: (process.env.NETBIRD_AUTH_SCHEME ?? 'Bearer') as 'Bearer' | 'Token',
-  netbirdApiToken: process.env.NETBIRD_API_TOKEN ?? '',
-  netbirdKeycloakClientId: process.env.NETBIRD_KEYCLOAK_CLIENT_ID ?? 'netbird-backend',
-  netbirdKeycloakClientSecret: process.env.NETBIRD_KEYCLOAK_CLIENT_SECRET ?? '',
-  netbirdSandboxGroup: process.env.NETBIRD_SANDBOX_GROUP ?? 'sandbox-run',
+  // ── Meze kontejneru běhu (svc-agent-runner vynucuje, ne obraz) ──
+  // ⛔ 2026-10-06 (majitel „síť zavřít“, volba A): strop procesů a uživatel jdou do
+  // KAŽDÉHO požadavku na kontejner běhu — obraz je jen tvrzení. Uživatel je ČÍSELNÝ
+  // a ne 0: jméno („node“) by si obraz mohl ve svém /etc/passwd namapovat na root.
+  // Nečitelná hodnota = služba NENASTARTUJE (neznámý bezpečnostní přepínač = fail-closed).
+  /** Strop procesů/vláken běhu pluginu (plugin-exec, workflow-exec, …). */
+  execPidsLimit: celeKladneCislo('EXEC_PIDS_LIMIT', 128),
+  /** Strop procesů/vláken běhu claude_cli_task (Claude Code + git + npm). */
+  claudePidsLimit: celeKladneCislo('CLAUDE_PIDS_LIMIT', 1024),
+  /** Uživatel běhu pluginu — uid[:gid]; výchozí = `USER node` obrazu plugin-exec. */
+  execRunUser: uzivatelBehu('EXEC_RUN_USER', '1000'),
+  /** Uživatel běhu claude_cli_task — uid[:gid]; výchozí = `useradd -u 10001 agent` v Dockerfile.agent-claude. */
+  claudeRunUser: uzivatelBehu('CLAUDE_RUN_USER', '10001'),
+
+  /** Registr balíčků pro běh claude_cli_task (npm) — jeho hostitel jde do výčtu broker-proxy (CONNECT). */
+  npmRegistryUrl: process.env.NPM_REGISTRY_URL ?? '',
 
   defaultTimeoutMs: parseInt(process.env.DEFAULT_TIMEOUT_MS ?? '30000', 10),
   maxTimeoutMs: parseInt(process.env.MAX_TIMEOUT_MS ?? '120000', 10),
@@ -46,10 +77,10 @@ export const config = {
   // ── Claude CLI agent runs (kind='claude_cli_task', Component 4 E4) ──
   // Everything env-driven — no hardcoded paths/images/URLs/tokens. Defaults are
   // conventional in-network values; secrets default empty (provided per-host).
-  /** Host worktree root (a volume the runner can write; per-run worktrees live here). */
-  agentRunsDir: process.env.AGENT_RUNS_DIR ?? '/var/lib/aisha/agent-runs',
-  /** Read-only base repo checkout the per-run worktrees branch from. */
-  agentRepoPath: process.env.AGENT_REPO_PATH ?? '',
+  /** Runner-side directory. The child mount is measured from Docker, including Coolify volumes. */
+  agentRunsContainerDir: '/var/lib/agent-runs',
+  /** Legacy host-path declaration retained for existing bind deployments; not used for child mounts. */
+  agentRunsHostDir: process.env.AGENT_RUNS_DIR ?? '',
   /** Default claude agent image ref when a request omits one (else request wins). */
   agentClaudeImage: process.env.AGENT_CLAUDE_IMAGE ?? '',
   /** Per-kind timeout ceiling for a (long-running) Claude CLI task. */
@@ -58,11 +89,11 @@ export const config = {
   agentGatewayUrl: process.env.AGENT_GATEWAY_URL ?? process.env.AISHA_GATEWAY_URL ?? '',
   agentMcpToken: process.env.AGENT_MCP_TOKEN ?? process.env.AISHA_MCP_TOKEN ?? '',
   anthropicBaseUrl: process.env.ANTHROPIC_BASE_URL ?? '',
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
-  /** Long-lived Claude SUBSCRIPTION token (`claude setup-token`). The CLI's
-   *  primary auth — uses the logged-in Max/Pro plan, NO API key / NO API credits.
-   *  Injected into the run as CLAUDE_CODE_OAUTH_TOKEN. */
-  agentClaudeOauthToken: process.env.AGENT_CLAUDE_OAUTH_TOKEN ?? '',
+  // ⛔ Token Claude (AGENT_CLAUDE_OAUTH_TOKEN → v běhu CLAUDE_CODE_OAUTH_TOKEN) ani
+  // ANTHROPIC_API_KEY tu NEJSOU (2026-10-02): čtou se v okamžiku běhu z trezoru
+  // instance (credentials.ts, administrace „Poskytovatelé AI a tokeny"), aby si každý
+  // fork nastavil vlastní token a změna platila bez restartu. Env jen přechodně —
+  // při startu se přesune do trezoru (migrateEnvCredentials).
   /** Host path to the agent's ~/.claude directory, bind-mounted read-only into the
    *  run (Linux hosts where the plan creds live in a file; macOS keeps them in the
    *  Keychain). This is a filesystem PATH, not a secret value — hence the non-secret
@@ -83,6 +114,9 @@ export const config = {
   claudePermissionMode: process.env.AGENT_CLAUDE_PERMISSION_MODE ?? 'acceptEdits',
   /** Git push of the produced branch: opt-in + credentialed remote. */
   agentGitPush: process.env.AGENT_GIT_PUSH === '1',
+  /** Repo, které si runner pro KAŽDÝ běh naklonuje do adresáře běhu (sdílený
+   *  base-repo s worktrees je pryč: nikdo ho neplnil a :ro mount git worktree add
+   *  znemožnil). Bez něj claude_cli_task selže nahlas. */
   agentGitRemote: process.env.AGENT_GIT_REMOTE ?? '',
   agentGitToken: process.env.AGENT_GIT_TOKEN ?? '',
   /** NOTE: the poll/concurrency/memory/timeout knobs below are the ENV BOOTSTRAP

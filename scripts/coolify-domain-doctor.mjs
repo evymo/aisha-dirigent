@@ -14,7 +14,11 @@ import { toStoryApp, stripStoryPrefix, appPrefix } from "./lib/story-app.mjs";
 import { buildOwnerIndex, findContractConflicts, findForeignClaimants, isUuidDefaultFqdn, extractHost, replaceOwner } from "./lib/fqdn-owners.mjs";
 import { probeRoute, scopeProbable } from "./lib/routing-probe.mjs";
 import { isMeshHost, withoutMeshHosts } from "./lib/mesh-host.mjs";
-import { EDGE_PROXY_SLUZBA, bezJmenEdge, edgeOwnedSet, isReleaseSentinel } from "./lib/edge-vlastni-jmena.mjs";
+import { EDGE_PROXY_SLUZBA, domenaProCoolify, edgeOwnedSet, isReleaseSentinel } from "./lib/edge-vlastni-jmena.mjs";
+import { CONFIG_ENV_FILES } from "./lib/config-env-files.mjs";
+import { drzenaPolozka, drzeniProcesu, externiPolozka, mutujAplikaci } from "./lib/coolify-mutace.mjs";
+import { hlaskaDrzeno } from "./lib/nasazeni-drzene.mjs";
+import { duvodyNeslozeni, rezimApexu, verejneDomenyWebu } from "./lib/domeny-webu.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
@@ -27,6 +31,15 @@ const arg = (name, fallback = "") => {
 const APPLY = flag("--apply");
 const RESTART = flag("--restart");
 const JSON_OUTPUT = flag("--json");
+// Bez živých sond — JEN s --apply: tam sonda verdikt neovlivňuje (routy se
+// změní až nasazením, které teprve přijde — redeploy před první vlnou). Při
+// kontrole je sonda hlavní rozhodčí, takže kontrola bez ní by byla tichá
+// zelená z neměření — kombinace se odmítá.
+const NO_PROBE = flag("--no-probe");
+if (NO_PROBE && !APPLY) {
+  process.stderr.write("FATAL: --no-probe jen s --apply — kontrola bez živé sondy by nic neověřila\n");
+  process.exit(2);
+}
 // 10s was too tight during cold-start (Coolify API has stretches of
 // ~20-30s slowness while creating 13 apps). Bumped to 60s default;
 // caller can still override via --timeout-ms.
@@ -90,29 +103,24 @@ function domainHosts(entries) {
     .filter(Boolean);
 }
 
-function safeAlias(alias) {
-  return /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(alias);
-}
-
-function webPublicDomains() {
-  const domains = [];
-  if (env.APP_DOMAIN) domains.push(`https://${env.APP_DOMAIN}`);
-  for (const rawAlias of parseCsv(env.AISHA_WEB_PUBLIC_ALIASES)) {
-    const alias = rawAlias.toLowerCase();
-    if (!safeAlias(alias) || !env.PUBLIC_TLD || env.PUBLIC_TLD.includes("${")) continue;
-    domains.push(`https://${alias}.${env.PUBLIC_TLD}`);
-  }
-  const apexMode = String(env.AISHA_WEB_APEX_MODE || "redirect").toLowerCase();
-  if (
-    apexMode === "serve"
-    && env.PUBLIC_TLD
-    && !env.PUBLIC_TLD.includes("${")
-    && env.PUBLIC_TLD !== env.APP_DOMAIN
-  ) {
-    domains.push(`https://${env.PUBLIC_TLD}`);
-  }
-  return [...new Set(domains)].join(",");
-}
+// ⛔ NAMĚŘENO 2026-10-04 (ostrý cold-start forku s víc značkami): tady stála
+// vlastní `webPublicDomains()` — APP_DOMAIN + aliasy + apex — a `WEB_FQDNS`
+// neznala. Krok 4 cold-startu (`--apply`) tak přepsal `web` na jediné
+// APP_DOMAIN, ačkoli deploy-init o krok dřív zapsal všech 13 jmen deklarace.
+// Dva výklady téže deklarace; vyhrál poslední zapisovatel. Domény webu teď
+// skládá JEDINÝ domov (lib/domeny-webu.mjs), týž, který volá deploy-init.
+//
+// „Nevím" není „nic": když deklarace instance v prostředí není (doktor puštěný
+// bez overlaye — `WEB_FQDNS` pak z domains.env zbyde jako nerozbalená šablona),
+// domov nevydá seznam a služba `web` jde níž jako NESLOŽENÁ — nic se pro edge
+// nezapíše (užší seznam by smazal routy značek) a řekne se proč.
+const DOMENY_WEBU = verejneDomenyWebu(env);
+const kontraktWebu = {
+  name: "web",
+  ...(DOMENY_WEBU.znamo
+    ? { domain: DOMENY_WEBU.domeny.join(",") }
+    : { domain: "", neslozeno: duvodyNeslozeni(DOMENY_WEBU) }),
+};
 
 function edgeProxyDomains() {
   // ⛔ AUTH_DOMAIN_PUBLIC TU DŘÍV NEBYL — a to byla vada (naměřeno 2026-08-28).
@@ -158,13 +166,23 @@ function edgeProxyDomains() {
   if (skutecne(env.NETBIRD_DOMAIN) && skutecne(env.NETBIRD_DOMAIN_DIRECT) && env.NETBIRD_DOMAIN !== env.NETBIRD_DOMAIN_DIRECT) {
     domains.push(`https://${env.NETBIRD_DOMAIN}`);
   }
+  // mesh-model.<public> — řídicí rovina MODELOVÉHO meshe (varianta C): týž vzor, jen
+  // s lane MODEL_MESH (bez ní topologie jména nevydá). Musí souhlasit s
+  // `netbird_model_block` v edge-proxy.
+  if (skutecne(env.NETBIRD_MODEL_DOMAIN) && skutecne(env.NETBIRD_MODEL_DOMAIN_DIRECT) && env.NETBIRD_MODEL_DOMAIN !== env.NETBIRD_MODEL_DOMAIN_DIRECT) {
+    domains.push(`https://${env.NETBIRD_MODEL_DOMAIN}`);
+  }
   // Cizí aplikace přes mesh (EXTERNAL_FACES). Seznam vydává derivace
   // jen pro tváře, které edge opravdu routuje — bez meshe je prázdný.
   // Musí souhlasit s coolify-deploy-init.sh.
   for (const host of parseCsv(env.EDGE_EXTERNAL_FACE_HOSTS)) {
     if (!host.includes("${") && !host.endsWith(".invalid")) domains.push(`https://${host}`);
   }
-  const apexMode = String(env.AISHA_WEB_APEX_MODE || "redirect").toLowerCase();
+  // Režim apexu čte TENTÝŽ normalizátor jako derivace i složení webu (lib/domeny-webu.mjs
+  // → derive-domains normalizeApexMode). Dřív tu stálo vlastní `toLowerCase() !== "serve"`:
+  // surové `web`/`spa` (operátorský trezor, .env.coolify) by dalo apex SOUČASNĚ webu
+  // (derivace: serve) i edge-proxy (tady: redirect) — dva routery na jeden host v jedné app.
+  const apexMode = rezimApexu(env);
   if (
     apexMode !== "serve"
     && env.PUBLIC_TLD
@@ -187,7 +205,7 @@ const EDGE_VLASTNI = edgeOwnedSet(env.EDGE_OWNED_HOSTS);
 const expected = [
   { app: "aisha-registry", domains: [{ name: "registry-cache", domain: `https://${env.REGISTRY_DOMAIN}:5000` }] },
   { app: "aisha-edge", domains: [
-    { name: "web", domain: webPublicDomains() },
+    kontraktWebu,
     // edge-proxy: the Caddy listener (port 80). It reverse-proxies the public
     // *.${PUBLIC_TLD} hostnames (auth/api/mcp/dirigent) to their
     // *.backend.${INTERNAL_TLD} upstreams. ALL public hostnames are
@@ -343,7 +361,7 @@ const expected = [
   // zónu na uzel s edge, takže veřejně 404 (/, /api, /relay i gRPC) a tamní
   // Traefik servíroval „TRAEFIK DEFAULT CERT", protože ACME výzva přistála
   // jinde (a pálila limit účtu). Týž případ jako veřejné jméno Keycloaku výš.
-  // Veřejnou tvář teď obsluhuje edge → přímá tvář (webPublicDomains).
+  // Veřejnou tvář teď obsluhuje edge → přímá tvář (edgeProxyDomains).
   //
   // `NETBIRD_DOMAIN_DIRECT` leží v zóně, kterou edge směruje na uzel služby:
   // na ni míří edge i operátorské nástroje (discovery, doktor). Agenti meshe
@@ -352,6 +370,13 @@ const expected = [
   // na https://undefined.
   { app: "aisha-netbird", domains: env.NETBIRD_DOMAIN_DIRECT
     ? [{ name: "netbird-proxy", domain: `https://${env.NETBIRD_DOMAIN_DIRECT}` }]
+    : [] },
+  // aisha-netbird-model: řídicí rovina MODELOVÉHO meshe (varianta C) — týž tvar jako
+  // aisha-netbird: Caddy v netbird-model-proxy demuxuje HTTP i gRPC za JEDNÍM Host
+  // routerem PŘÍMÉ tváře; veřejnou obsluhuje edge (netbird_model_block). Bez lane
+  // MODEL_MESH topologie jméno nevydá → [] (aplikace v Coolify ani není).
+  { app: "aisha-netbird-model", domains: env.NETBIRD_MODEL_DOMAIN_DIRECT
+    ? [{ name: "netbird-model-proxy", domain: `https://${env.NETBIRD_MODEL_DOMAIN_DIRECT}` }]
     : [] },
   // Prefix-generic: rewrite each contract's Coolify APP name (aisha-<role>) to
   // THIS deploy's prefix (APP_NAME_PREFIX, e.g. tenant-<role>) via the shared
@@ -363,7 +388,9 @@ const expected = [
   app: toStoryApp(c.app),
   domains: c.domains.map((entry) => ({
     ...entry,
-    domain: bezJmenEdge(entry.name, entry.domain, EDGE_VLASTNI, EDGE_VLASTNI.size > 0 ? appPrefix() : ""),
+    // Mesh jména i jména ve vlastnictví edge vyřadí JEDEN domov (domenaProCoolify);
+    // když nezbude nic, jde uvolňovací sentinel — jinak by starý router zůstal.
+    domain: domenaProCoolify(entry.name, entry.domain, EDGE_VLASTNI, appPrefix()),
   })),
 }));
 
@@ -489,6 +516,10 @@ const isSentinelDomain = (domain) => /\.invalid(?::\d+)?(?:\/.*)?$/i.test(String
 // Measured 2026-08-08: running the doctor with only one app's env exported
 // reported exactly this shape as `desired` for six other apps.
 const isUnresolvedDomain = (domain) => String(domain || "").includes("${");
+// Záznam, jehož domény domov odmítl složit (lib/domeny-webu.mjs: deklarace v prostředí
+// není, nebo je neplatná). Zachází se s ním PŘESNĚ jako s nerozbaleným `${VAR}`: jméno
+// se nárokuje (uložená hodnota není „extra"), nic se pro aplikaci nezapíše a hlásí se.
+const isNeslozeny = (entry) => Array.isArray(entry.neslozeno);
 // A mesh name — `*.internal` — is never a Coolify domain. Same rule as
 // set_coolify_domains in coolify-deploy-init.sh (2026-08-27): Coolify turns every
 // domain into a Traefik router with `certresolver=letsencrypt`, and LE can NEVER
@@ -506,6 +537,36 @@ const probeKind = (nameOrHost) =>
   : /auth|oauth|keycloak|login/i.test(nameOrHost) ? "oauth2"
   : "http";
 const reports = [];
+// ── Deklarované držení (2026-10-04) ──────────────────────────────────────────
+// Aplikace, kterou overlay instance drží (nasazeni-drzene.json), je zmrazená CELÁ:
+// doktor jí domény nepřepisuje (zápis definice by se projevil při příštím
+// nasazení, tedy mimo vědomé rozhodnutí), s --restart ji nenasadí a její drift ani
+// nepřítomnost v Coolify NEJSOU nález — vypíšou se jako DRŽENO. Deklaraci čte týž
+// domov jako každá mutace (lib/coolify-mutace.mjs → lib/nasazeni-drzene.mjs);
+// nečitelná deklarace = konec (kód 2) dřív, než se cokoli zapíše.
+const MUTACE = { kdo: "coolify-domain-doctor", volej: (cesta, volby) => coolify(cesta, volby), envSoubory: CONFIG_ENV_FILES };
+try {
+  drzeniProcesu(MUTACE.kdo, { envSoubory: MUTACE.envSoubory });
+} catch (e) {
+  if (!Array.isArray(e?.chyby)) throw e;
+  for (const c of e.chyby) console.error(`${e.titulek}: ${c}`);
+  process.exit(2);
+}
+const drzeniAplikace = (jmeno) => drzenaPolozka({ jmeno, prefix: appPrefix() }, MUTACE);
+// EXTERNÍ služba (profil prostředí: external_domain — domov vlastnictví přes domov
+// mutace): v tomhle prostředí není naše. Její doména patří vlastníkovi, aplikace v našem
+// projektu být nemá — nepřítomnost NENÍ nález a nic se nezapisuje ani nenasazuje.
+let profilNezmeren = "";
+MUTACE.priNezmereno = (duvod) => { profilNezmeren = duvod; };
+let externiAplikace;
+try {
+  externiAplikace = (jmeno) => externiPolozka({ jmeno, prefix: appPrefix() }, MUTACE);
+  externiAplikace(`${appPrefix()}-keycloak`); // načte profil teď: nečitelný = konec dřív, než se cokoli zapíše
+} catch (e) {
+  console.error(`vlastnictví aplikací: ${e.message}`);
+  process.exit(2);
+}
+if (profilNezmeren) console.error(`::warning title=vlastnictví aplikací::coolify-domain-doctor: ${profilNezmeren} — chybějící aplikace externí služby by se hlásila jako nález`);
 // Optional/profile-gated services emit no domain contract when absent. Do not
 // turn that legitimate topology into "missing app"; only active routes are
 // reconciled and probed.
@@ -523,6 +584,17 @@ const activeContracts = (() => {
 
 for (const contract of activeContracts) {
   const app = appByName.get(contract.app);
+  const cizi = externiAplikace(contract.app);
+  if (cizi) {
+    reports.push({ app: contract.app, ok: true, externi: cizi.hlaska, status: app?.status ?? "v Coolify není", drift: [] });
+    continue;
+  }
+  const drzena = drzeniAplikace(contract.app);
+  if (drzena) {
+    // Ani čtení driftu, ani zápis: co je drženo, to se nesrovnává — a řekne se to.
+    reports.push({ app: contract.app, ok: true, drzeno: hlaskaDrzeno(drzena), status: app?.status ?? "v Coolify není", drift: [] });
+    continue;
+  }
   if (!app) {
     reports.push({ app: contract.app, ok: false, missingApp: true, drift: contract.domains });
     continue;
@@ -544,7 +616,7 @@ for (const contract of activeContracts) {
   // they are a CALLER fault, not a topology state — so they are also surfaced on
   // the report instead of vanishing, and they hold back --apply for this app: a
   // partial payload would delete the routes whose vars did resolve.
-  const unresolved = contract.domains.filter((entry) => isUnresolvedDomain(entry.domain));
+  const unresolved = contract.domains.filter((entry) => isUnresolvedDomain(entry.domain) || isNeslozeny(entry));
   // Mesh hosts are stripped before anything is compared or sent: an entry that
   // listed only `.internal` hosts disappears from the contract entirely.
   const meshStripped = contract.domains.filter((entry) => withoutMeshHosts(entry.domain) !== entry.domain);
@@ -553,7 +625,7 @@ for (const contract of activeContracts) {
   // v Coolify zůstal starý router a edge by jméno nikdy nezískal. Je jedinečný
   // prefixem instance, takže netrpí kolizí společného sentinelu (viz výš).
   const routable = contract.domains.filter(
-    (entry) => (!isSentinelDomain(entry.domain) || isReleaseSentinel(entry.domain)) && !isUnresolvedDomain(entry.domain) && withoutMeshHosts(entry.domain),
+    (entry) => (!isSentinelDomain(entry.domain) || isReleaseSentinel(entry.domain)) && !isUnresolvedDomain(entry.domain) && !isNeslozeny(entry) && withoutMeshHosts(entry.domain),
   ).map((entry) => ({ ...entry, domain: withoutMeshHosts(entry.domain) }));
   const expectedNames = new Set(routable.map((entry) => normalizeName(entry.name)));
   const missing = routable.filter((entry) => stored.get(normalizeName(entry.name)) !== entry.domain);
@@ -604,7 +676,10 @@ for (const contract of activeContracts) {
     // DELETED from the app's routing rather than left alone. Re-run with that
     // service's env in scope (cold-start sources the resolver output for all of
     // them; a scoped manual run must export the same vars).
-    report.applyBlocked = `unresolved \${VAR} in ${unresolved.length} contract domain(s) — re-run with that service's env in scope`;
+    report.applyBlocked = unresolved.some((entry) => entry.neslozeno)
+      ? `NEVÍM — domény ${unresolved.filter((entry) => entry.neslozeno).map((entry) => entry.name).join(", ")} nejdou složit z deklarace ` +
+        `instance (výpis výše); užší seznam by smazal routy, proto se pro tuhle aplikaci nezapisuje nic`
+      : `unresolved \${VAR} in ${unresolved.length} contract domain(s) — re-run with that service's env in scope`;
   } else if (APPLY && fqdnConflicts.length > 0) {
     // Two of THIS PROJECT'S OWN apps collide on one host — a bug we must not paper over by
     // blindly re-binding one of them. Fail loud (project-scoped); the operator decides which
@@ -691,8 +766,11 @@ for (const contract of activeContracts) {
       // vidí uvolněná jména jako volná (edge po backendu — viz activeContracts).
       replaceOwner(ownerIndex, { ...app, docker_compose_domains: storedAfter });
       if (RESTART) {
-        const deployment = await coolify(`/deploy?uuid=${app.uuid}&force=true`, { method: "POST" });
-        report.restartTriggered = deployment?.deployment_uuid || deployment?.deployments?.[0]?.deployment_uuid || true;
+        // Nasazení odesílá jediný domov mutace (před voláním se ptá na držení).
+        const m = await mutujAplikaci({ akce: "deploy", jmeno: app.name, prefix: appPrefix(), uuid: app.uuid, force: true }, MUTACE);
+        const deployment = m.odpoved;
+        report.restartTriggered = m.drzeno ? false : deployment?.deployment_uuid || deployment?.deployments?.[0]?.deployment_uuid || true;
+        if (m.drzeno) report.drzeno = m.hlaska;
       }
     } catch (err) {
       // Per-app isolation: one app's PATCH failure must never abort the batch and strand the
@@ -711,8 +789,9 @@ for (const contract of activeContracts) {
 // only a live signal proves a host actually routes (2026-07-09: dcd looked fine, host 404'd).
 // Scoped to externally-reachable hosts; internal *.backend.<tld> and unresolvable = skip.
 const internalTld = env.INTERNAL_TLD;
-for (const report of reports) {
-  if (report.missingApp) continue;
+for (const report of NO_PROBE ? [] : reports) {
+  // Držená aplikace se neměří ani sondou: může být vědomě zastavená a „nerouruje“ u ní není nález.
+  if (report.missingApp || report.drzeno || report.externi) continue;
   const contract = activeContracts.find((entry) => entry.app === report.app);
   const hosts = scopeProbable(domainHosts(contract?.domains), { internalTld });
   report.probes = [];
@@ -747,15 +826,34 @@ if (JSON_OUTPUT) {
       console.log(`FAIL ${report.app}: missing app`);
       continue;
     }
+    if (report.externi) {
+      console.log(`EXT  ${report.app.padEnd(22)} ${report.externi}. Domény se NESROVNÁVAJÍ ani nezapisují.`);
+      continue;
+    }
+    if (report.drzeno) {
+      console.log(`DRŽ  ${report.app.padEnd(22)} ${report.drzeno}. Domény se NESROVNÁVAJÍ ani nezapisují.`);
+      continue;
+    }
     if (report.ok) {
       console.log(`OK   ${report.app.padEnd(22)} ${report.status}`);
       continue;
     }
     console.log(`${APPLY ? "FIX " : "FAIL"} ${report.app.padEnd(22)} ${report.status}`);
     for (const entry of report.unresolved || []) {
+      if (entry.neslozeno) {
+        for (const duvod of entry.neslozeno) console.log(`     ${duvod.replace(/^(NEVÍM|NEPLATNÉ): /, `$1 ${entry.name}: `)}`);
+        continue;
+      }
       console.log(`     UNRESOLVED \${VAR}: ${entry.name} -> ${entry.domain}`);
     }
-    if ((report.unresolved || []).length) {
+    if ((report.unresolved || []).some((entry) => entry.neslozeno)) {
+      console.log(`     → domény webu skládá jediný domov (scripts/lib/domeny-webu.mjs) a z téhle deklarace je`);
+      console.log(`       složit neumí (důvody výše). Pro aplikaci se NEZAPISUJE nic: užší seznam by smazal routy`);
+      console.log(`       značek. Chybí-li WEB_FQDNS: \`node scripts/aisha-env-doctor.mjs\` ho odvodí z doménového`);
+      console.log(`       overlaye do .env.coolify (prázdný = jedna značka; cold-start i redeploy to dělají samy);`);
+      console.log(`       neplatnou deklaraci oprav v overlayi.`);
+    }
+    if ((report.unresolved || []).some((entry) => !entry.neslozeno)) {
       console.log(`     → that service's env was not in scope, so the contract kept the literal. Nothing was`);
       console.log(`       written for it. Export the missing vars (cold-start does this via the resolver) and re-run.`);
     }

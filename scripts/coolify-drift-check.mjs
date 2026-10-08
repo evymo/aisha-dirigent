@@ -16,9 +16,14 @@
 //   4. SERVER     — app na jiném serveru než manifest říká
 //
 // Exit codes:
-//   0 — žádný drift
-//   1 — fatal drift (orphaned/missing apps)
+//   0 — žádný drift a všechno ZMĚŘENO
+//   1 — fatal drift (orphaned/missing apps). Aplikace z manifestu, jejíž opt-in
+//       lane je ZAVŘENÁ (config/services.json provision_when_env), v Coolify záměrně
+//       není — vypíše se v `zaZavrenouLane`, ne jako fatální „missing"
 //   2 — warning drift (jen compose/server divergence)
+//   3 — bez driftu ve změřeném, ale server aspoň jedné aplikace se NEZMĚŘIL
+//       (slot mimo coolify/servers.json nebo nenastavené COOLIFY_SERVER_UUID_<SLOT>);
+//       „nezměřeno" není „bez driftu" — volající (drift-watch) ho započítá
 //
 // Usage:
 //   node scripts/coolify-drift-check.mjs                # pretty output
@@ -31,10 +36,14 @@ import { readFileSync, existsSync } from "node:fs";
 import { resolve, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createProjectScope } from "./lib/coolify-project-scope.mjs";
+import { aplikaceManifestu, externiProstredi } from "./lib/vlastnictvi-aplikaci.mjs";
 import {
   resolveManifestPath,
   assertManifestMatchesInstance,
 } from "./lib/coolify-instance-scope.mjs";
+import { klicUuidSlotu, nactiSloty, uuidSlotu } from "./lib/sloty-serveru.mjs";
+import { klicePodminky, nactiKatalog, podminkaSplnena } from "./lib/provision-gate.mjs";
+import { readConfigKey } from "./lib/config-env-files.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, "..");
@@ -139,23 +148,22 @@ function parseManifest(text) {
         "Add e.g. 'story: aisha' (see coolify/manifests/_template.manifest).",
     );
   }
-  for (const line of text.split("\n")) {
-    const m = line.match(/^app:\s*([a-z0-9_-]+):([a-z0-9_-]+):(\S+?\.yml)(?::(\S+))?\s*$/i);
-    if (!m) continue;
+  // Řádky `app:` čte JEDINÝ parser (domov vlastnictví) — žádný vlastní regex.
+  for (const a of aplikaceManifestu(text)) {
     const tags = {};
-    if (m[4]) {
+    if (a.volby) {
       // Tags separator: comma (`,`) or colon (`:`) — both supported
-      for (const part of m[4].split(/[,:]/)) {
+      for (const part of a.volby.split(/[,:]/)) {
         const eq = part.indexOf("=");
         if (eq > 0) tags[part.slice(0, eq)] = part.slice(eq + 1);
         else if (part) tags[part] = true;
       }
     }
     apps.push({
-      name: m[1],
-      coolifyName: `${story}-${m[1]}`,
-      host: m[2],
-      composeFile: m[3],
+      name: a.role,
+      coolifyName: `${story}-${a.role}`,
+      host: a.slot,
+      composeFile: a.compose,
       tags,
     });
   }
@@ -165,15 +173,35 @@ function parseManifest(text) {
 // ── Server name → UUID resolution ───────────────────────────────────────────
 // UUIDs are deployment-specific and must be read from env (set by
 // cold-start from operator's .env-prod-backup or Coolify API discovery).
-// Returns null when the env var for that host is not set, which signals
-// "skip drift check for this server" upstream.
-function serverUuidFor(host) {
-  const map = {
-    frontend: process.env.COOLIFY_SERVER_UUID_FRONTEND,
-    backend:  process.env.COOLIFY_SERVER_UUID_BACKEND,
-    experimental: process.env.COOLIFY_SERVER_UUID_EXPERIMENTAL,
-  };
-  return map[host] || null;
+//
+// Sloty se NEOPISUJÍ: tady stála ruční mapa tří slotů a slot, který v ní nebyl
+// (build, nově `gpu`), se tiše neměřil. Seznam má jeden domov
+// (lib/sloty-serveru.mjs = klíče coolify/servers.json). `null` = neměřit, ale
+// důvod se vypíše (neznámý slot / UUID nenastaveno) — viz `serverUnmeasured`.
+const REGISTR_SLOTU = nactiSloty();
+const serverUuidFor = (host) => uuidSlotu(host, process.env, REGISTR_SLOTU);
+const procNemerit = (host) =>
+  Object.prototype.hasOwnProperty.call(REGISTR_SLOTU, host)
+    ? `${klicUuidSlotu(host)} nenastaveno`
+    : `slot '${host}' není v coolify/servers.json`;
+
+// ── Opt-in lane: aplikace, kterou story-init se zavřenou lane nezakládá ─────
+// ⛔ Do 2026-10-03 drift-check `provision_when_env` neznal: každá opt-in aplikace
+// v manifestu se zavřenou lane (accel-hostfw bez deklarace uzlu, local-ingest bez
+// INGEST_BUNDLE_GIT_URL…) vyšla jako FATÁLNÍ „missing" — tedy přesně stav, který je
+// správný. Otázka „zapnuto?" má jeden domov (lib/provision-gate.mjs) a jméno appky
+// v manifestu je id služby katalogu, stejně jako v coolify-story-init.sh
+// (provision_gate_skips "$role"). Hodnoty: prostředí, pak kanonický řetěz souborů.
+const KATALOG = nactiKatalog();
+const ctiLane = (k) => {
+  const v = process.env[k];
+  return v !== undefined && String(v).trim() !== "" ? v : readConfigKey(k);
+};
+/** Zavřená lane appky → jména podmínek; otevřená nebo bez podmínky → null. */
+function zavrenaLane(jmenoAppky) {
+  const deklarace = KATALOG[jmenoAppky]?.provision_when_env;
+  if (!deklarace || podminkaSplnena(deklarace, ctiLane)) return null;
+  return klicePodminky(deklarace);
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────
@@ -188,7 +216,22 @@ async function main() {
     fail(`Manifest missing: ${MANIFEST_PATH}`);
     process.exit(1);
   }
-  const { apps: manifestApps, story } = parseManifest(readFileSync(MANIFEST_PATH, "utf-8"));
+  const { apps: inventar, story } = parseManifest(readFileSync(MANIFEST_PATH, "utf-8"));
+  // Co z inventáře je v TOMHLE prostředí naše (profil prostředí: external_domain):
+  // externí služba se nehlásí jako chybějící ani se jí neopravuje compose. Bez profilu
+  // se vlastnictví nezměří — hlášení ano (s varováním), opravný zápis ne.
+  let externi = new Map();
+  try {
+    externi = externiProstredi();
+  } catch (e) {
+    if (FIX_COMPOSE) {
+      fail(`--fix-compose: ${e.message} — do Coolify nic nezapíšu`);
+      process.exit(2);
+    }
+    warn(`Vlastnictví aplikací NEZMĚŘENO (${e.message}) — externí služby by se hlásily jako chybějící`);
+  }
+  const manifestApps = inventar.filter((a) => !externi.has(a.name));
+  for (const a of inventar.filter((x) => externi.has(x.name))) log(`  ${C.dim(`EXT ${a.coolifyName}: externí (${externi.get(a.name)}) — v tomhle prostředí není naše, neočekávám ji`)}`);
   info(`Manifest declares ${manifestApps.length} apps`);
 
   // Fetch live Coolify state
@@ -217,20 +260,33 @@ async function main() {
     missing: [],    // in manifest but not in Coolify
     composeDrift: [],  // docker_compose_location mismatch
     serverDrift: [],   // server_uuid mismatch
+    // Aplikace, u kterých se server NEZMĚŘIL (neznámý slot / UUID nenastaveno).
+    // Není to drift, ale nesmí to být ani tichá zelená — vypisuje se s důvodem.
+    serverUnmeasured: [],
+    // Aplikace z manifestu, jejíž opt-in lane je zavřená — v Coolify záměrně není.
+    zaZavrenouLane: [],
   };
+
+  // ⛔ SERVER APLIKACE JE V `destination.server.uuid` (revize accel-1, 10-05). Pole
+  // `server_uuid` API Coolify u aplikací NEVRACÍ — změřeno živě 249/249 aplikací bez
+  // něj (výpis 2026-09-02 191/191 taky). Porovnání serveru tak nikdy neproběhlo
+  // a drift-check ani doktor přesun aplikace nemohly vidět. Chybí-li server i tam,
+  // je to NEZMĚŘENO, ne shoda.
+  const serverAplikace = (app) => app?.destination?.server?.uuid ?? app?.server_uuid ?? null;
 
   // 1. Orphaned (live but not declared)
   for (const [name, app] of liveByName) {
     if (!manifestByName.has(name)) {
-      drift.orphaned.push({ name, uuid: app.uuid, server: app.server_uuid });
+      drift.orphaned.push({ name, uuid: app.uuid, server: serverAplikace(app) });
     }
   }
 
-  // 2. Missing (declared but not live)
-  for (const [name] of manifestByName) {
-    if (!liveByName.has(name)) {
-      drift.missing.push({ name });
-    }
+  // 2. Missing (declared but not live) — kromě appek za zavřenou lane (ty tu být nemají)
+  for (const [name, app] of manifestByName) {
+    if (liveByName.has(name)) continue;
+    const lane = zavrenaLane(app.name);
+    if (lane) drift.zaZavrenouLane.push({ name, lane });
+    else drift.missing.push({ name });
   }
 
   // 3. Compose drift
@@ -254,10 +310,19 @@ async function main() {
     const manifest = manifestByName.get(name);
     if (!manifest) continue;
     const expectedUuid = serverUuidFor(manifest.host);
-    if (expectedUuid && app.server_uuid && app.server_uuid !== expectedUuid) {
+    if (!expectedUuid) {
+      drift.serverUnmeasured.push({ name, host: manifest.host, reason: procNemerit(manifest.host) });
+      continue;
+    }
+    const zivyServer = serverAplikace(app);
+    if (!zivyServer) {
+      drift.serverUnmeasured.push({ name, host: manifest.host, reason: "API Coolify neuvádí server aplikace (destination.server.uuid)" });
+      continue;
+    }
+    if (zivyServer !== expectedUuid) {
       drift.serverDrift.push({
         name,
-        liveServer: app.server_uuid,
+        liveServer: zivyServer,
         expectedServer: expectedUuid,
         expectedHost: manifest.host,
         uuid: app.uuid,
@@ -272,7 +337,8 @@ async function main() {
     log(C.bold("Drift report:"));
     if (drift.orphaned.length === 0 && drift.missing.length === 0
         && drift.composeDrift.length === 0 && drift.serverDrift.length === 0) {
-      ok("No drift detected — Coolify state matches manifest exactly");
+      if (drift.serverUnmeasured.length === 0) ok("No drift detected — Coolify state matches manifest exactly");
+      else warn(`Žádný drift ve ZMĚŘENÉM — server ${drift.serverUnmeasured.length} aplikací se neporovnal (viz níž)`);
     }
 
     if (drift.orphaned.length > 0) {
@@ -310,6 +376,20 @@ async function main() {
       }
       log(`  ${C.dim("Action: requires manual move via Coolify UI (server change is destructive).")}`);
     }
+
+    if (drift.zaZavrenouLane.length > 0) {
+      log(`\n  ${C.dim("ZA ZAVŘENOU LANE")} (v manifestu, v Coolify záměrně není — opt-in služba vypnutá):`);
+      for (const a of drift.zaZavrenouLane) {
+        log(`    ${a.name.padEnd(22)} lane: ${a.lane.join(" | ")}`);
+      }
+    }
+
+    if (drift.serverUnmeasured.length > 0) {
+      log(`\n  ${C.yellow("SERVER NEZMĚŘEN")} (server aplikace se neporovnal — není drift, ale ani shoda):`);
+      for (const a of drift.serverUnmeasured) {
+        log(`    ${a.name.padEnd(22)} slot ${a.host}: ${a.reason}`);
+      }
+    }
   }
 
   // ── Optional fix mode ────────────────────────────────────────────────────
@@ -329,12 +409,17 @@ async function main() {
     }
   }
 
-  // Exit code
+  // Exit code — jeden kód podle nejvážnějšího nálezu: 1 fatální > 2 varování > 3 nezměřeno > 0 shoda.
+  // Při souběhu (např. serverDrift A ZÁROVEŇ serverUnmeasured) vyhraje vyšší priorita (2) a 3 se v kódu
+  // ztratí — úplný obraz nese vždy výstup --json (drift-watch.sh čte JSON a započítá obojí).
   if (drift.orphaned.length > 0 || drift.missing.length > 0) {
     process.exit(1);  // fatal
   }
   if (drift.composeDrift.length > 0 || drift.serverDrift.length > 0) {
     process.exit(2);  // warning
+  }
+  if (drift.serverUnmeasured.length > 0) {
+    process.exit(3);  // nezměřeno — tichá nula by vypadala jako shoda
   }
   process.exit(0);
 }

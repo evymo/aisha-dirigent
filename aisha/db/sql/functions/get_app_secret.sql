@@ -25,6 +25,7 @@ BEGIN
   SELECT ds.decrypted_secret INTO v_value
   FROM vault.decrypted_secrets ds
   WHERE ds.name = p_key
+    AND ds.name NOT LIKE 'credential:%'
   ORDER BY ds.updated_at DESC NULLS LAST
   LIMIT 1;
 

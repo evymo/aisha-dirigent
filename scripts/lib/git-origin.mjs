@@ -10,6 +10,12 @@
  * ze které staví Coolify. Deklarace, kterou nikdo nevyplní, je ozdoba —
  * odvození je odpověď.
  *
+ * ⛔ KTERÝ remote (nedůvěřivé čtení 2026-10-03, nález 3): „táž adresa“ platí jen
+ * pro remote, který JE nasazovaný repozitář. Zvykové jméno to nezaručuje — ve fork
+ * checkoutu ukazuje na upstream. Remote proto vybírá volající podle identity
+ * (lib/nasazovany-repozitar.mjs --remote) a sem předává už jeho adresu; tenhle
+ * modul URL jen rozebírá, o výběru remote nerozhoduje.
+ *
  * BEZPEČNOST: Coolify má v `git_repository` uloženo `https://user:<token>@host/…`
  * a týž tvar se objevuje i v remote URL. Hostitel se proto vrací BEZ údajů —
  * tahle hodnota jde do logu cold-startu.
@@ -19,7 +25,7 @@
  * Vytáhne `scheme://host` z URL gitového remote. Podporuje oba tvary, kterými
  * git remote bývá zapsaný, a přihlašovací údaje zahazuje.
  *
- * @param {string} remoteUrl hodnota z `git remote get-url origin`
+ * @param {string} remoteUrl hodnota z `git remote get-url <jméno>`
  * @returns {string} `scheme://host` (u SSH tvaru `https://host`), nebo "" když to není URL
  */
 /**

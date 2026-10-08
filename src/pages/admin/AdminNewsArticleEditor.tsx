@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { History, Send, Undo2 } from "lucide-react";
@@ -24,7 +24,6 @@ import {
 } from "@/hooks/useAdminNewsArticleCanvas";
 import { useAdminNewsArticles } from "@/hooks/useAdminNewsArticles";
 import { useNewsArticleVersions, useRestoreNewsArticleVersion } from "@/hooks/useNewsArticleVersions";
-import { useMediaAssets, verejnaAdresaMedia } from "@/hooks/useMediaAssets";
 import { CanvasEditor, type CanvasSavePayload } from "@/components/admin/page-builder/CanvasEditor";
 import { usePageAssetUpload } from "@/hooks/usePageAssetUpload";
 import { jeKonfliktUlozeni } from "@/lib/novinky/konflikt";
@@ -55,7 +54,6 @@ export default function AdminNewsArticleEditor() {
   const { publishAsync, discardDraftAsync, isPublishing } = useAdminNewsArticles();
   const { data: versions } = useNewsArticleVersions(id);
   const restoreVersion = useRestoreNewsArticleVersion();
-  const { data: media } = useMediaAssets("", 60);
   // ⛔ BEZ TOHOHLE NEŠLO DO NOVINKY VLOŽIT OBRÁZEK Z POČÍTAČE (naměřeno 2026-09-21).
   // `CanvasEditor` předává `assetUpload` do `assetManager.uploadFile`; když ho
   // nedostane, GrapesJS nechá ve správci obrázků jen pole „vlož URL".
@@ -66,9 +64,15 @@ export default function AdminNewsArticleEditor() {
   // Razítko stavu, který editor upravuje. Po každém uložení se přebírá z odpovědi.
   const stampRef = useRef<string | null>(null);
   const lastSavedRef = useRef<string | null>(null);
+  // Editor se ZÁMĚRNĚ připojuje znovu s jiným obsahem (zahození konceptu, obnova
+  // verze, načtení po konfliktu): odcházející plátno se nesmí dopsat (2026-10-02).
+  const nahrazujiRef = useRef(false);
   if (article && stampRef.current === null) stampRef.current = article.edit_stamp;
 
-  const existingAssets = (media ?? []).map(verejnaAdresaMedia);
+  // Nový obsah ze serveru dorazil (jiné razítko) → nahrazení skončilo.
+  useEffect(() => {
+    nahrazujiRef.current = false;
+  }, [article?.edit_stamp]);
 
   const otisk = (p: CanvasSavePayload) => JSON.stringify([p.canvasHtml, p.canvasCss, p.canvasData]);
 
@@ -94,6 +98,7 @@ export default function AdminNewsArticleEditor() {
 
   const handleSave = async (payload: CanvasSavePayload) => {
     if (!id) return;
+    if (payload.priOdchodu && nahrazujiRef.current) return;
     // Nic se nezměnilo od posledního uložení → neposílat (undo zpět na uložený stav).
     if (!payload.publish && lastSavedRef.current === otisk(payload)) return;
     try {
@@ -109,6 +114,7 @@ export default function AdminNewsArticleEditor() {
 
   const handleRestoreVersion = async (versionId: string) => {
     if (!id) return;
+    nahrazujiRef.current = true;
     try {
       const stamp = await restoreVersion.mutateAsync({ articleId: id, versionId });
       stampRef.current = stamp;
@@ -118,6 +124,7 @@ export default function AdminNewsArticleEditor() {
         description: article?.is_published ? t("admin.newsArticles.versions.restoredToDraft") : undefined,
       });
     } catch (error) {
+      nahrazujiRef.current = false;
       safeError("AdminNewsArticleEditor.restoreVersion", error);
       toast({ title: t("builder.status.error"), description: t("admin.newsArticles.versions.restoreError"), variant: "destructive" });
     }
@@ -137,6 +144,7 @@ export default function AdminNewsArticleEditor() {
 
   const handleDiscardDraft = async () => {
     if (!id) return;
+    nahrazujiRef.current = true;
     const stamp = await discardDraftAsync(id);
     stampRef.current = stamp;
     lastSavedRef.current = null;
@@ -175,7 +183,6 @@ export default function AdminNewsArticleEditor() {
         onSave={handleSave}
         isSaving={updateCanvas.isPending || isPublishing}
         assetUpload={uploadAsset}
-        existingAssets={existingAssets}
         // Texty novinky žijí v namespacu `news` (tam míří title_key/content_key
         // /excerpt_key článku), ne ve `web`. Klíče se proto razí s prefixem
         // `news.<slug>` — `PageRenderer` odvozuje namespace z prvního segmentu
@@ -257,6 +264,7 @@ export default function AdminNewsArticleEditor() {
             <AlertDialogCancel
               onClick={() => {
                 setKonflikt(null);
+                nahrazujiRef.current = true;
                 stampRef.current = null;
                 lastSavedRef.current = null;
                 queryClient.invalidateQueries({ queryKey: ["admin-news-article", id] });

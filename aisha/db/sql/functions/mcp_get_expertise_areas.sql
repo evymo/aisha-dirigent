@@ -13,7 +13,7 @@ BEGIN
       'name_key', gea.name_key,
       'icon', gea.icon,
       'description_key', gea.description_key,
-      'rule_count', (SELECT count(*) FROM expert_rules er WHERE er.expertise_area_id = gea.id AND er.status = 'published'),
+      'rule_count', (SELECT count(*) FROM expert_rules er WHERE er.expertise_area_id = gea.id AND er.status = 'published' AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid())),
       'expert_count', (SELECT count(DISTINCT gme.partner_id) FROM guild_member_expertise gme WHERE gme.expertise_area_id = gea.id)
     ) ORDER BY gea.sort_order)
     FROM guild_expertise_areas gea

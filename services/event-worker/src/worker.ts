@@ -1,6 +1,7 @@
 import pg from 'pg';
 import { Redis } from 'ioredis';
 import { request } from 'undici';
+import { urlHostForLog } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { config, log, safeLog, type Budik } from './config.js';
 import { acsInbound } from './acsInbound.js';
@@ -107,9 +108,11 @@ async function handleNotification(channel: string, rawPayload: string): Promise<
         headers: { 'content-type': 'application/json' },
         body: rawPayload,
       });
-      log.debug({ tableKey, webhookUrl }, 'Webhook delivered');
+      log.debug({ tableKey, webhookHost: urlHostForLog(webhookUrl) }, 'Webhook delivered');
     } catch (err) {
-      log.error({ tableKey, webhookUrl, err }, 'Webhook delivery failed');
+      // Host only: the route URL comes from env and a webhook URL may carry its
+      // key in userinfo, query or path. tableKey names the route.
+      log.error({ tableKey, webhookHost: urlHostForLog(webhookUrl), err }, 'Webhook delivery failed');
     }
   }
 

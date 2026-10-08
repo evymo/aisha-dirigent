@@ -45,6 +45,10 @@ const FILTER_MIGRATION =
   '\n' +
   readFileSync(resolve(ROOT, 'aisha/db/sql/functions/mcp_search_knowledge_v3.sql'), 'utf-8');
 const V2_SOT           = resolve(ROOT, 'aisha/db/sql/functions/mcp_search_knowledge_v2.sql');
+// Retrieval filter contract: the RPCs call the ONE home of the readable-state allowlist and never
+// list forbidden states themselves (a denylist passes an unscanned or future state as clean).
+const ALLOWLIST_CALL    = /public\.knowledge_state_readable\(\s*ki\.quarantine_status\s*\)/;
+const DENYLIST          = /quarantine_status\s+NOT\s+IN/i;
 
 // Layer 2 — scanner library
 const SCANNER_LIB      = resolve(ROOT, 'services/svc-mcp-knowledge/src/lib/ingestion-safety.ts');
@@ -76,31 +80,47 @@ describe('Step 4 ingestion safety + retrieval quarantine filter', () => {
       expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.mcp_search_knowledge_v3/);
     });
 
-    test('v2 WHERE clause filters flagged + quarantined items', () => {
+    test('v2 WHERE clause filters by the readable-state allowlist (not a denylist)', () => {
       const sql = FILTER_MIGRATION;
       // The filter must be in the v2 function body (between its CREATE OR
       // REPLACE and the GRANT block).
       const v2Section = sql.split(/CREATE OR REPLACE FUNCTION public\.mcp_search_knowledge_v2/)[1]
         ?.split(/CREATE OR REPLACE FUNCTION public\.mcp_search_knowledge_v3/)[0] ?? '';
-      expect(v2Section).toMatch(/ki\.quarantine_status\s+NOT\s+IN\s+\(\s*'flagged'\s*,\s*'quarantined'\s*\)/);
+      expect(v2Section).toMatch(ALLOWLIST_CALL);
+      expect(v2Section).not.toMatch(DENYLIST);
     });
 
-    test('v3 WHERE clause filters flagged + quarantined items on BOTH v1 + v2 paths', () => {
+    test('v3 WHERE clause filters by the readable-state allowlist on BOTH v1 + v2 paths', () => {
       const sql = FILTER_MIGRATION;
       const v3Section = sql.split(/CREATE OR REPLACE FUNCTION public\.mcp_search_knowledge_v3/)[1] ?? '';
       // v3 has two RETURN QUERY branches (v1 and v2); both must filter.
-      const matches = v3Section.match(/ki\.quarantine_status\s+NOT\s+IN\s+\(\s*'flagged'\s*,\s*'quarantined'\s*\)/g);
+      const matches = v3Section.match(new RegExp(ALLOWLIST_CALL.source, 'g'));
       expect(matches?.length ?? 0).toBeGreaterThanOrEqual(2);
+      expect(v3Section).not.toMatch(DENYLIST);
     });
 
-    test('reviewed + reinstated states are TREATED AS CLEAN (not in NOT IN list)', () => {
-      const sql = FILTER_MIGRATION;
-      // Negative gate: NOT IN clauses must NOT contain reviewed/reinstated.
-      const notInClauses = sql.match(/quarantine_status\s+NOT\s+IN[^)]+\)/gi) ?? [];
-      for (const clause of notInClauses) {
-        expect(clause).not.toMatch(/'reviewed'/);
-        expect(clause).not.toMatch(/'reinstated'/);
-      }
+    test('reviewed + reinstated states are TREATED AS CLEAN (in the readable-state allowlist)', () => {
+      // The allowlist has ONE home; retrieval RPCs call it instead of listing states.
+      // (The former check walked NOT IN clauses — it passes vacuously once none are left.)
+      const home = readFileSync(resolve(ROOT, 'aisha/db/sql/functions/knowledge_state_readable.sql'), 'utf-8');
+      const list = home.match(/p_state\s+IN\s*\(([^)]*)\)/)?.[1] ?? '';
+      expect(list).toMatch(/'clear'/);
+      expect(list).toMatch(/'reviewed'/);
+      expect(list).toMatch(/'reinstated'/);
+      expect(list).not.toMatch(/'flagged'|'quarantined'/);
+      // No retrieval RPC falls back to a denylist — an unscanned or unknown state would pass it.
+      expect(FILTER_MIGRATION).not.toMatch(DENYLIST);
+    });
+
+    test('anchor: the allowlist requirement and the denylist ban both bite on a sample', () => {
+      const good = 'AND public.knowledge_state_readable(ki.quarantine_status)';
+      const old = "AND ki.quarantine_status NOT IN ('flagged', 'quarantined')";
+      expect(good).toMatch(ALLOWLIST_CALL);
+      expect(good).not.toMatch(DENYLIST);
+      expect(old).not.toMatch(ALLOWLIST_CALL);
+      expect(old).toMatch(DENYLIST);
+      // Allowlist call kept and a denylist re-added next to it is still a finding.
+      expect(`${good}\n${old}`).toMatch(DENYLIST);
     });
 
     test('SECURITY DEFINER + SET search_path preserved on both RPCs', () => {
@@ -123,7 +143,8 @@ describe('Step 4 ingestion safety + retrieval quarantine filter', () => {
 
     test('v2 SoT mirror has matching quarantine filter (no drift)', () => {
       const sot = readFileSync(V2_SOT, 'utf-8');
-      expect(sot).toMatch(/ki\.quarantine_status\s+NOT\s+IN\s+\(\s*'flagged'\s*,\s*'quarantined'\s*\)/);
+      expect(sot).toMatch(ALLOWLIST_CALL);
+      expect(sot).not.toMatch(DENYLIST);
     });
 
     test('quarantine filter is folded into the baseline (baseline-only state)', () => {

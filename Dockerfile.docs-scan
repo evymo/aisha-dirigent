@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1
+# Dockerfile.docs-scan — antivirová brána dokumentů ve stacku local-ingest.
+#
+# Sidecar mezi synchronizací dokumentů (docs-sync → karanténa) a vstupem enginu:
+# soubor pošle clamd a do vstupu ho přesune až po verdiktu „clean"
+# (infra/docs-scan/docs-scan.ts, tam je i celé zdůvodnění).
+#
+# Vlastní obraz místo inline skriptu v compose ze dvou důvodů:
+#  - compose jde na server jako argument příkazu (ARG_MAX) — skript do něj nepatří;
+#  - skript je soubor v repu, takže jde testovat (src/tests/security/docs-scan-karantena.test.ts).
+#
+# Bez sestavení: Node spouští TypeScript přímo ze zdroje (odmazání typů). Klient clamd
+# je TÝŽ soubor, který se staví do @aisha/security pro storage-auth a svc-mcp-knowledge —
+# cesty v obrazu proto kopírují cesty v repu, aby import platil na obou místech.
+ARG REGISTRY_PROXY=
+FROM ${REGISTRY_PROXY}library/node:22-alpine
+WORKDIR /app
+RUN printf '{"type":"module","private":true}\n' > package.json
+COPY packages/security/src/av-scan.ts packages/security/src/av-scan.ts
+COPY infra/docs-scan/docs-scan.ts infra/docs-scan/docs-scan.ts
+ENV NODE_ENV=production
+CMD ["node", "--experimental-strip-types", "--disable-warning=ExperimentalWarning", "infra/docs-scan/docs-scan.ts"]

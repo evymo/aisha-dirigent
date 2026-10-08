@@ -175,6 +175,14 @@ function simulovat(duvod: string, guardPlati: boolean): Record<string, string> {
   svet["needs.detect.outputs.deploy_apps"] =
     duvod === "deploy_apps" ? `,${VSECHNY_APPKY.join(",")},` : ",,";
   for (const id of Object.keys(wf.jobs)) svet[`needs.${id}.result`] = "success";
+  // Deklarované výstupy úloh (2026-10-01: `predano` vlny 7). Prázdné = běžná cesta
+  // bez předání; bez nich by podmínky, které je čtou, spadly do „nerozumím".
+  for (const [id, j] of Object.entries(wf.jobs)) {
+    for (const k of Object.keys((j as { outputs?: Record<string, string> }).outputs ?? {})) {
+      const klic = `needs.${id}.outputs.${k}`;
+      if (!(klic in svet)) svet[klic] = "";
+    }
+  }
 
   const vysledky: Record<string, string> = {};
   for (const id of PORADI) {

@@ -60,6 +60,15 @@
 #                     výchozí hodnotu (nebo prostředí HEALTH_ZA_DVERMI)
 #     --timeout-s     strop PRÁCE nasazení — běží až od opuštění fronty Coolify (default 1800)
 #     --fronta-s      strop čekání ve FRONTĚ Coolify, stav `queued` (default 1800)
+#     --termin        epoch (s): MĚKKÝ TERMÍN úlohy. Na něm skript přestane čekat
+#                     a skončí kódem 4 s hláškou „předáno pokračování“ — nasazení
+#                     v Coolify běží dál a dočká se ho pokračovací job
+#     --navazat-od    epoch (s): začátek TÉHOŽ běhu CI (job deploy-zacatek).
+#                     Pokračovací režim: naváže na nasazení s revizí GIT_SHA, které
+#                     vzniklo po razítku (běží → dočká se, doběhlo → ověří, spadlo
+#                     nebo není → nasadí). Nasazení s JINOU revizí po razítku = pád
+#                     („během nasazení bylo sloučeno“). Rozhoduje
+#                     scripts/lib/nasazeni-navazani.mjs.
 # ============================================================================
 set -uo pipefail
 
@@ -96,6 +105,8 @@ TIMEOUT_S=1800
 # TIMEOUT_S až od chvíle, kdy nasazení frontu opustí. Oba pojme strop úlohy
 # (hlídá `opakovani-nasazeni-se-vejde-do-ulohy`).
 FRONTA_S=1800
+TERMIN=""
+NAVAZAT_OD=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --optional)     OPTIONAL=1; shift ;;
@@ -104,8 +115,18 @@ while [ $# -gt 0 ]; do
     --health-za-dvermi) HEALTH_ZA_DVERMI="${2:-}"; shift 2 ;;
     --timeout-s)    TIMEOUT_S="${2:-1800}"; shift 2 ;;
     --fronta-s)     FRONTA_S="${2:-1800}"; shift 2 ;;
+    --termin)       TERMIN="${2:-}"; shift 2 ;;
+    --navazat-od)   NAVAZAT_OD="${2:-}"; shift 2 ;;
     *) echo "::error title=deploy-and-verify::neznámý přepínač '$1'"; exit 1 ;;
   esac
+done
+
+# Razítka jsou epochy v sekundách; cokoli jiného by se tiše porovnávalo jako 0.
+for _r in "$TERMIN" "$NAVAZAT_OD"; do
+  if [ -n "$_r" ] && ! [[ "$_r" =~ ^[0-9]{9,11}$ ]]; then
+    echo "::error title=deploy-and-verify::--termin / --navazat-od chce epochu v sekundách, dostal '${_r}'."
+    exit 1
+  fi
 done
 
 # ── 0. Kdo měří veřejnou cestu, musí říct, co za ní čeká. ──────────────────
@@ -350,9 +371,56 @@ NAPOVEDA
   rm -f "$ENVS_JSON"
 fi
 
+# ── 2c. POKRAČOVÁNÍ: navázat na nasazení TOHOTO běhu. ──────────────────────
+# Vlnový job na měkkém termínu předal rozpracované appky; jejich nasazení
+# v Coolify běží dál. Pokračování se jich dočká a ověří je — nespouští nové,
+# dokud k tomu není důvod. Rozhoduje se JEN podle nasazení po začátku běhu.
+NAVAZANO=0
+POKRACOVANI=""
+if [ -n "$NAVAZAT_OD" ]; then
+  if [ -z "${GIT_SHA:-}" ]; then
+    echo "::error title=pokračování nezná revizi::--navazat-od bez GIT_SHA — nevím, na které nasazení navázat."
+    exit 1
+  fi
+  SEZNAM=$(mktemp)
+  KOD=$(coolify_volani "$SEZNAM" "${COOLIFY_URL}/api/v1/deployments/applications/${UUID}?skip=0&take=50")
+  if [ "$KOD" != "200" ]; then
+    echo "::error title=pokračování neví, co tenhle běh nasadil::seznam nasazení ${APP} vrátil HTTP ${KOD} — bez něj se nenavazuje ani nenasazuje naslepo."
+    rm -f "$SEZNAM"
+    exit 1
+  fi
+  if ! VYBER=$(node scripts/lib/nasazeni-navazani.mjs --od "$NAVAZAT_OD" --sha "$GIT_SHA" < "$SEZNAM"); then
+    echo "::error title=pokračování nerozhodlo::seznam nasazení ${APP} nejde posoudit (scripts/lib/nasazeni-navazani.mjs)."
+    rm -f "$SEZNAM"
+    exit 1
+  fi
+  rm -f "$SEZNAM"
+  IFS=$'\t' read -r NAV_AKCE NAV_UUID NAV_STAV NAV_DETAIL <<< "$VYBER"
+  case "$NAV_AKCE" in
+    navazat)
+      NAVAZANO=1; NASAZENI="$NAV_UUID"
+      POKRACOVANI="navázáno na běžící ${NAV_UUID} (${NAV_STAV})" ;;
+    overit)
+      NAVAZANO=1; NASAZENI="$NAV_UUID"
+      POKRACOVANI="ověřeno hotové ${NAV_UUID}" ;;
+    nasadit)
+      POKRACOVANI="nasazeno znovu — ${NAV_DETAIL}${NAV_UUID:+ (${NAV_UUID})}" ;;
+    cizi_sha)
+      echo "::error title=během nasazení bylo sloučeno::${APP}: ${NAV_DETAIL} (nasazení ${NAV_UUID}, ${NAV_STAV}). Coolify staví HEAD mainu — tenhle běh už nasazuje cizí revizi a nic z ní nesmí prohlásit za ověřené. Pravidlo slučování: až po terminálním deploy-verdikt."
+      exit 1 ;;
+    *)
+      echo "::error title=pokračování nerozhodlo::${APP}: akce '${NAV_AKCE}'${NAV_DETAIL:+ — ${NAV_DETAIL}} — nejistota = STOP."
+      exit 1 ;;
+  esac
+  echo "pokračování: ${POKRACOVANI}"
+fi
+
 # ── 3. Otisk PŘED, když se má dokazovat změna obsahu. ──────────────────────
 OTISK_PRED=""
-if [ -n "$VERIFY_URL" ]; then
+if [ -n "$VERIFY_URL" ] && [ "$NAVAZANO" -eq 1 ]; then
+  # Navázané nasazení už běží — „před“ je pryč. Krok 6 pak nesmí tvrdit změnu obsahu.
+  echo "otisk PŘED: neměřen (navázáno na běžící nasazení)"
+elif [ -n "$VERIFY_URL" ]; then
   OTISK_PRED=$(curl -fsS --max-time 20 "$VERIFY_URL" 2>/dev/null | shasum -a 256 | cut -d' ' -f1 || true)
   printf 'otisk PŘED (%s): %s\n' "$VERIFY_URL" "${OTISK_PRED:0:12}"
 fi
@@ -386,25 +454,32 @@ fi
 # Production i preview zvlášť — Coolify v4 drží per klíč dva záznamy a při
 # duplicitě VYHRÁVÁ preview. Zápis jen do production by tedy neudělal nic.
 # (Týž důvod, proč to 2× posílá `set_coolify_env` v coolify-deploy-init.sh.)
-REVIZE_OK=1
-for JE_PREVIEW in false true; do
-  KOD=$(coolify_volani /dev/null \
-    -X PATCH "${COOLIFY_URL}/api/v1/applications/${UUID}/envs/bulk" \
-    -H "Content-Type: application/json" \
-    -d "{\"data\":[{\"key\":\"GIT_SHA\",\"value\":\"${GIT_SHA}\",\"is_preview\":${JE_PREVIEW}}]}")
-  case "$KOD" in
-    2*) : ;;
-    *)  REVIZE_OK=0
-        echo "::warning title=revize se nezapsala::PATCH envs/bulk (is_preview=${JE_PREVIEW}) vrátil HTTP ${KOD}." ;;
-  esac
-done
-# Nezapsaná revize NEBLOKUJE nasazení: je to diagnostický údaj, kdežto neproběhlé
-# nasazení je vada. Ale mlčet se o tom nesmí — artefakt pak nese revizi předchozí.
-if [ "$REVIZE_OK" -eq 1 ]; then
-  REVIZE_STAV="DOKÁZÁNO: revize ${GIT_SHA:0:12} zapsána do env před buildem."
-  printf 'revize → Coolify: %s (production i preview)\n' "${GIT_SHA:0:12}"
+if [ "$NAVAZANO" -eq 1 ]; then
+  # Navázané nasazení spustil dřívější pokus TÉHOŽ běhu a revizi zapsal on;
+  # přepisovat env by teď jen změnilo konfiguraci za běžícím buildem.
+  REVIZE_OK=1
+  REVIZE_STAV="NAVÁZÁNO: revizi ${GIT_SHA:0:12} zapsal do env pokus, který spustil nasazení ${NASAZENI} — pokračování ji nepřepisuje."
 else
-  REVIZE_STAV="NEDOKÁZÁNO: revize se do env NEZAPSALA — bundle ponese tu předchozí."
+  REVIZE_OK=1
+  for JE_PREVIEW in false true; do
+    KOD=$(coolify_volani /dev/null \
+      -X PATCH "${COOLIFY_URL}/api/v1/applications/${UUID}/envs/bulk" \
+      -H "Content-Type: application/json" \
+      -d "{\"data\":[{\"key\":\"GIT_SHA\",\"value\":\"${GIT_SHA}\",\"is_preview\":${JE_PREVIEW}}]}")
+    case "$KOD" in
+      2*) : ;;
+      *)  REVIZE_OK=0
+          echo "::warning title=revize se nezapsala::PATCH envs/bulk (is_preview=${JE_PREVIEW}) vrátil HTTP ${KOD}." ;;
+    esac
+  done
+  # Nezapsaná revize NEBLOKUJE nasazení: je to diagnostický údaj, kdežto neproběhlé
+  # nasazení je vada. Ale mlčet se o tom nesmí — artefakt pak nese revizi předchozí.
+  if [ "$REVIZE_OK" -eq 1 ]; then
+    REVIZE_STAV="DOKÁZÁNO: revize ${GIT_SHA:0:12} zapsána do env před buildem."
+    printf 'revize → Coolify: %s (production i preview)\n' "${GIT_SHA:0:12}"
+  else
+    REVIZE_STAV="NEDOKÁZÁNO: revize se do env NEZAPSALA — bundle ponese tu předchozí."
+  fi
 fi
 
 # ── 3c. Obnovit CACHEBUST overlaye dřív, než se build rozjede. ─────────────
@@ -422,16 +497,20 @@ fi
 # repa se nepodařilo přečíst" (deploy joby neměly FORGEJO_TOKEN), skončil ale 0
 # a tenhle souhrn z toho udělal „PROVEDENO" — core i extranet se postavily
 # z KEŠOVANÉHO overlaye. Skript teď vrací 3 = NEDOKÁZÁNO a souhrn čte kód.
-CACHEBUST_STAV="NEDOKÁZÁNO: cachebust overlaye se neobnovil — build mohl vzít overlay z keše."
-CACHEBUST_RC=0
-COOLIFY_BASE_URL="$COOLIFY_URL" bash scripts/deploy/refresh-overlay-cachebust.sh "$UUID" "$SUFFIX" || CACHEBUST_RC=$?
-case "$CACHEBUST_RC" in
-  0) CACHEBUST_STAV="DOKÁZÁNO: cachebust overlaye je aktuální před buildem (obnoven, beze změny, nebo stack overlay nemá — viz výpis výše)." ;;
-  3) CACHEBUST_STAV="NEDOKÁZÁNO: overlay je deklarovaný, ale cachebust se neobnovil (HEAD nečitelný, zápis nebo envy selhaly) — build vezme overlay z KEŠE."
-     echo "::warning title=cachebust NEDOKÁZÁN::'$APP' — build vezme overlay z keše (důvod ve výpisu refresh-overlay-cachebust výše; chybí FORGEJO_TOKEN?)." ;;
-  *) CACHEBUST_STAV="NEDOKÁZÁNO: refresh-overlay-cachebust.sh skončil kódem ${CACHEBUST_RC} (chyba zadání) — cachebust se neobnovil."
-     echo "::warning title=cachebust neobnoven::'$APP' — refresh-overlay-cachebust.sh kód ${CACHEBUST_RC}; build může vzít overlay z keše, nebo na prázdném cachebustu spadnout." ;;
-esac
+if [ "$NAVAZANO" -eq 1 ]; then
+  CACHEBUST_STAV="NAVÁZÁNO: cachebust obnovil pokus, který spustil nasazení ${NASAZENI} (overlay se během běhu nemění)."
+else
+  CACHEBUST_STAV="NEDOKÁZÁNO: cachebust overlaye se neobnovil — build mohl vzít overlay z keše."
+  CACHEBUST_RC=0
+  COOLIFY_BASE_URL="$COOLIFY_URL" bash scripts/deploy/refresh-overlay-cachebust.sh "$UUID" "$SUFFIX" || CACHEBUST_RC=$?
+  case "$CACHEBUST_RC" in
+    0) CACHEBUST_STAV="DOKÁZÁNO: cachebust overlaye je aktuální před buildem (obnoven, beze změny, nebo stack overlay nemá — viz výpis výše)." ;;
+    3) CACHEBUST_STAV="NEDOKÁZÁNO: overlay je deklarovaný, ale cachebust se neobnovil (HEAD nečitelný, zápis nebo envy selhaly) — build vezme overlay z KEŠE."
+       echo "::warning title=cachebust NEDOKÁZÁN::'$APP' — build vezme overlay z keše (důvod ve výpisu refresh-overlay-cachebust výše; chybí FORGEJO_TOKEN?)." ;;
+    *) CACHEBUST_STAV="NEDOKÁZÁNO: refresh-overlay-cachebust.sh skončil kódem ${CACHEBUST_RC} (chyba zadání) — cachebust se neobnovil."
+       echo "::warning title=cachebust neobnoven::'$APP' — refresh-overlay-cachebust.sh kód ${CACHEBUST_RC}; build může vzít overlay z keše, nebo na prázdném cachebustu spadnout." ;;
+  esac
+fi
 
 # ── 4–4b. Spustit, počkat — a PŘECHODNÝ pád dotáhnout. ─────────────────────
 # ⛔ NAMĚŘENO 2026-09-23 (<fork>-core po #380): build spadl na
@@ -450,18 +529,58 @@ esac
 # ⭐ OPAKOVANI a PRODLEVA_S jsou vlastnost TOHOTO skriptu (jeden domov), ne
 # proměnná prostředí s dosazeným literálem (brána `zadny-fallback-nad-identitou`).
 # 0 opakování = mechanismus vypnutý. Strop úlohy musí pojmout
-# (1 + OPAKOVANI) × TIMEOUT_S + prodlevu — hlídá `opakovani-nasazeni-se-vejde-do-ulohy`.
-OPAKOVANI=1
+# (1 + OPAKOVANI) × (FRONTA_S + TIMEOUT_S) + prodlevu — hlídá `opakovani-nasazeni-se-vejde-do-ulohy`.
+# ⛔ 2026-10-01 VYPNUTO (0): tvrdý strop sdíleného runneru je 1 h a přebíjí
+# timeout-minutes — druhý pokus (2 × 60 min + prodleva = 125) se do úlohy nevešel
+# NIKDY, runner ji utnul dřív. Opakování přechodného pádu patří do POKRAČOVACÍ
+# úlohy (vzor Stacky po vlnách: `--navazat-od`, jen jednou), ne do téže úlohy.
+# Od 2026-10-02 ji mají Kořen, Core, Edge, Extranet (deploy-*-pokracovani) a vlna 7:
+# navázání podle STAVU v Coolify — spadlé nasadí právě jednou znovu.
+OPAKOVANI=0
 PRODLEVA_S=120
+# ⭐ REZERVA ÚLOHY (2026-10-01): skript má VŽDY skončit dřív než runner a říct,
+# co se stalo. Úloha proto pojme fronta + práce + REZERVA_S, kde rezerva kryje vše
+# MIMO čekání na nasazení:
+#   · REZIE_NAMERENA_S — checkout, setup a kroky skriptu před čekáním a po něm.
+#     NAMĚŘENO 2026-10-01 z logů instance forku (66 úloh Core/Edge/Extranet, 09-22…10-01):
+#     max 45 s, medián 32–36 s. ⚠️ Jen hardware jedné instance.
+#   · DOBEH_S — krok 5 (dočkání v Coolify po „finished“); naměřeno max 5 s. Dřív
+#     měl strop TIMEOUT_S (30 min) — souběžné nasazení téže appky by úlohu
+#     protáhlo za strop runneru.
+#   · ohraničené kroky po čekání: sonda zdraví 6 × (curl 20 s + 10 s) − 10 s,
+#     --verify-url 20 s.
+# Brána `opakovani-nasazeni-se-vejde-do-ulohy` sčítá a hlídá obojí.
+REZIE_NAMERENA_S=45
+DOBEH_S=60
+REZERVA_S=300
 POKUSU_MAX=$(( 1 + OPAKOVANI ))
 POKUS=1
 OPAKOVANI_STAV="NEOPAKOVÁNO: nasazení doběhlo na první pokus."
+
+# Třída pádu z logu nasazení (nasazeni-prechodna-chyba.mjs) — JEN do souhrnu.
+# O opakování rozhoduje stav v Coolify (pokračovací úloha navazuje, spadlé nasadí
+# právě jednou znovu), ne tahle třída: trvalá vada spadne podruhé a viditelně
+# (2026-10-02). Nastaví TRIDA_PADU.
+trida_padu() {
+  local verdikt ano trida dukaz
+  if ! verdikt=$(curl -s --max-time 60 -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
+      "${COOLIFY_URL}/api/v1/deployments/$1" | node scripts/lib/nasazeni-prechodna-chyba.mjs); then
+    TRIDA_PADU="neposouzeno (klasifikace pádu selhala)"
+    return 0
+  fi
+  IFS=$'\t' read -r ano trida dukaz <<<"$verdikt"
+  if [ "$ano" = "ano" ]; then TRIDA_PADU="${trida} (přechodná): ${dukaz}"; else TRIDA_PADU="${trida} (nepřechodná): ${dukaz}"; fi
+}
 
 # Rozhodne, jestli spadlé nasazení zopakovat. 0 = opakovat (a počkalo se), 1 = ne.
 dalsi_pokus() {
   local nasazeni="$1" verdikt ano trida dukaz aktivni
   if [ "$POKUS" -ge "$POKUSU_MAX" ]; then
-    [ "$POKUSU_MAX" -gt 1 ] && echo "Opakování vyčerpáno (${POKUS}/${POKUSU_MAX} pokusů) — zůstává pád."
+    if [ "$POKUSU_MAX" -gt 1 ]; then
+      echo "Opakování vyčerpáno (${POKUS}/${POKUSU_MAX} pokusů) — zůstává pád."
+    else
+      echo "Uvnitř úlohy se neopakuje (OPAKOVANI=0, strop runneru pojme jeden pokus) — opakování patří pokračovací úloze (Kořen, Core, Edge, Extranet, vlna 7), jinak novému běhu."
+    fi
     return 1
   fi
   verdikt=$(curl -s --max-time 60 -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
@@ -493,6 +612,10 @@ dalsi_pokus() {
     echo "Neopakuji: větev se posunula na ${hlava:0:12} (nasazuji ${GIT_SHA:0:12}) — nasadí ji její vlastní běh CI."
     return 1
   fi
+  if [ -n "${TERMIN:-}" ] && [ $(( $(date +%s) + PRODLEVA_S )) -ge "$TERMIN" ]; then
+    echo "::warning title=předáno pokračování::${APP} — přechodná chyba '${trida}', na opakování do měkkého termínu nezbývá čas; nasazení zopakuje pokračovací job."
+    exit 4
+  fi
   echo "::warning title=nasazení se zopakuje::${APP} — přechodná chyba '${trida}': ${dukaz}. Pokus $((POKUS + 1))/${POKUSU_MAX} za ${PRODLEVA_S} s."
   sleep "$PRODLEVA_S"
   # Souběh se měří na nasazeních TÉTO appky podle UUID — globální seznam je sdílený
@@ -520,69 +643,75 @@ dalsi_pokus() {
 ODPOVED=$(mktemp)
 trap 'rm -f "$ODPOVED"' EXIT
 while :; do
-# ── 4. Spustit. ────────────────────────────────────────────────────────────
-# Odpověď do VLASTNÍHO souboru. Pevné `/tmp/deploy-resp.txt` sdílí celý stroj:
-# když curl selže (HTTP 000), soubor se nepřepíše a `cat` vypíše odpověď
-# z PŘEDCHOZÍHO nasazení — hlášení pak mluví o jiné aplikaci než ta, co spadla.
-# Naměřeno 2026-08-08: pád <fork>-core ukazoval tělo od <fork>-extranet.
-: > "$ODPOVED"   # opakovaný pokus nesmí vypsat tělo PŘEDCHOZÍHO volání
-printf 'Nasazuji %s — uuid=%s sha=%s (pokus %s/%s)\n' "$APP" "${UUID:0:12}" "${GIT_SHA:-?}" "$POKUS" "$POKUSU_MAX"
-# ⛔ `force=true`, NE `false`. NAMĚŘENO 2026-08-10:
-# Při `force=false` Coolify nasazení NEZALOŽÍ, když usoudí, že není co dělat —
-# vrátí 2xx a nic nezařadí. Krok 5 pak uvidí „deploys 0 active, 0 latest failed"
-# a ohlásí HOTOVO. Ten rychlý konec je o pár řádků níž popsaný jako ŽÁDOUCÍ,
-# jenže je NEROZLIŠITELNÝ od „nic se nenasadilo".
-#
-# Tak vypadal `Deploy: Edge` toho dne: zelený za pár sekund, a web dál servíroval
-# bundle ze 7. srpna (`last-modified` i hashe bundlů beze změny). Ruční
-# `aisha-redeploy.mjs` tutéž appku nasadil na první pokus — protože posílá
-# `force=true` (viz jeho ř. 1398). Dva nástroje, dvě různá volání, jedno z nich
-# tiše nic nedělalo.
-HTTP_CODE=$(coolify_volani "$ODPOVED" \
-  -X POST "${COOLIFY_URL}/api/v1/deploy?uuid=${UUID}&force=true" \
-  -H "Content-Type: application/json")
-if ! [[ "$HTTP_CODE" =~ ^[0-9]+$ ]] || [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
-  echo "::error title=deploy odmítnut::POST /api/v1/deploy vrátil HTTP $HTTP_CODE"
-  cat "$ODPOVED" 2>/dev/null || true
-  exit 1
+if [ "$NAVAZANO" -eq 1 ] && [ "$POKUS" -eq 1 ]; then
+  # Pokračování: nasazení tohoto běhu už existuje (krok 2c) — nové se nespouští.
+  # Opakování po doložené přechodné chybě (POKUS > 1) nasazuje normálně.
+  echo "Navazuji na nasazení ${NASAZENI} tohoto běhu — nové nespouštím. Čekám na JEHO výsledek."
+else
+  # ── 4. Spustit. ────────────────────────────────────────────────────────────
+  # Odpověď do VLASTNÍHO souboru. Pevné `/tmp/deploy-resp.txt` sdílí celý stroj:
+  # když curl selže (HTTP 000), soubor se nepřepíše a `cat` vypíše odpověď
+  # z PŘEDCHOZÍHO nasazení — hlášení pak mluví o jiné aplikaci než ta, co spadla.
+  # Naměřeno 2026-08-08: pád <fork>-core ukazoval tělo od <fork>-extranet.
+  : > "$ODPOVED"   # opakovaný pokus nesmí vypsat tělo PŘEDCHOZÍHO volání
+  printf 'Nasazuji %s — uuid=%s sha=%s (pokus %s/%s)\n' "$APP" "${UUID:0:12}" "${GIT_SHA:-?}" "$POKUS" "$POKUSU_MAX"
+  # ⛔ `force=true`, NE `false`. NAMĚŘENO 2026-08-10:
+  # Při `force=false` Coolify nasazení NEZALOŽÍ, když usoudí, že není co dělat —
+  # vrátí 2xx a nic nezařadí. Krok 5 pak uvidí „deploys 0 active, 0 latest failed"
+  # a ohlásí HOTOVO. Ten rychlý konec je o pár řádků níž popsaný jako ŽÁDOUCÍ,
+  # jenže je NEROZLIŠITELNÝ od „nic se nenasadilo".
+  #
+  # Tak vypadal `Deploy: Edge` toho dne: zelený za pár sekund, a web dál servíroval
+  # bundle ze 7. srpna (`last-modified` i hashe bundlů beze změny). Ruční
+  # `aisha-redeploy.mjs` tutéž appku nasadil na první pokus — protože posílá
+  # `force=true` (viz jeho ř. 1398). Dva nástroje, dvě různá volání, jedno z nich
+  # tiše nic nedělalo.
+  HTTP_CODE=$(coolify_volani "$ODPOVED" \
+    -X POST "${COOLIFY_URL}/api/v1/deploy?uuid=${UUID}&force=true" \
+    -H "Content-Type: application/json")
+  if ! [[ "$HTTP_CODE" =~ ^[0-9]+$ ]] || [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+    echo "::error title=deploy odmítnut::POST /api/v1/deploy vrátil HTTP $HTTP_CODE"
+    cat "$ODPOVED" 2>/dev/null || true
+    exit 1
+  fi
+  # ⭐ 2xx JE JEN PŘIJETÍ. Důkaz, že se něco ZAŘADILO, je `deployment_uuid`
+  # v odpovědi — bez něj by se čekalo na něco, co neexistuje.
+  # ⛔ JSON se PARSUJE, negrepuje. Odpověď je JEDEN řádek a `"status"` je v ní
+  # TŘIKRÁT: kromě stavu nasazení i vnořený stav aplikace (`running:healthy`).
+  # Hladový `sed` vrací poslední výskyt — u dnešní odpovědi náhodou správně, ale
+  # stačí, aby Coolify pole přeházel, a krok by hlásil zdraví APLIKACE jako
+  # výsledek NASAZENÍ. Přesně ta záměna, kterou tenhle blok odstraňuje.
+  #
+  # ⛔ POLE JE VNOŘENÉ. NAMĚŘENO 2026-08-10 živým voláním nad <fork>-core:
+  #   {"deployments":[{"message":"…queued.","resource_uuid":"…","deployment_uuid":"…"}]}
+  # Kořenový `deployment_uuid` NEEXISTUJE (je `undefined`). Původní verze četla
+  # jen kořen, dostala prázdno a skončila hláškou „nasazení se nezařadilo" —
+  # přestože Coolify nasazení POCTIVĚ zařadil.
+  #
+  # ⭐ Důsledek byl horší než vada, kterou tenhle blok opravoval: `Deploy: Core`,
+  # `Deploy: Edge` i `Deploy: Extranet` padaly na mainu ČTYŘI merge po sobě
+  # (#177 → #181) a nikdo si toho nevšiml, protože na PR se deploy PŘESKAKUJE —
+  # první běh nad mainem je zároveň první test a ten už nic neblokuje.
+  # Zaměnit „tiše zeleno" za „vždy červeno" NENÍ oprava.
+  #
+  # Tvar bere `aisha-redeploy.mjs` (ř. 1425) správně od začátku; tenhle skript se
+  # s ním teď shoduje — a hlídá to brána `deploy-cte-vnorene-pole`.
+  NASAZENI=$(node -e '
+    const fs=require("fs");
+    try {
+      const r = JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
+      process.stdout.write(String(r?.deployments?.[0]?.deployment_uuid ?? r?.deployment_uuid ?? ""));
+    }
+    catch { process.stdout.write(""); }
+  ' "$ODPOVED")
+  if [ -z "$NASAZENI" ]; then
+    echo "::error title=nasazení se nezařadilo::Coolify vrátil HTTP $HTTP_CODE, ale v odpovědi NENÍ deployment_uuid."
+    echo "Požadavek byl tedy přijat a zahozen — čekat na výsledek nemá na co."
+    cat "$ODPOVED" 2>/dev/null || true
+    exit 1
+  fi
+  echo "Požadavek přijat (HTTP $HTTP_CODE), nasazení ${NASAZENI} zařazeno. Čekám na JEHO výsledek."
 fi
-# ⭐ 2xx JE JEN PŘIJETÍ. Důkaz, že se něco ZAŘADILO, je `deployment_uuid`
-# v odpovědi — bez něj by se čekalo na něco, co neexistuje.
-# ⛔ JSON se PARSUJE, negrepuje. Odpověď je JEDEN řádek a `"status"` je v ní
-# TŘIKRÁT: kromě stavu nasazení i vnořený stav aplikace (`running:healthy`).
-# Hladový `sed` vrací poslední výskyt — u dnešní odpovědi náhodou správně, ale
-# stačí, aby Coolify pole přeházel, a krok by hlásil zdraví APLIKACE jako
-# výsledek NASAZENÍ. Přesně ta záměna, kterou tenhle blok odstraňuje.
-#
-# ⛔ POLE JE VNOŘENÉ. NAMĚŘENO 2026-08-10 živým voláním nad <fork>-core:
-#   {"deployments":[{"message":"…queued.","resource_uuid":"…","deployment_uuid":"…"}]}
-# Kořenový `deployment_uuid` NEEXISTUJE (je `undefined`). Původní verze četla
-# jen kořen, dostala prázdno a skončila hláškou „nasazení se nezařadilo" —
-# přestože Coolify nasazení POCTIVĚ zařadil.
-#
-# ⭐ Důsledek byl horší než vada, kterou tenhle blok opravoval: `Deploy: Core`,
-# `Deploy: Edge` i `Deploy: Extranet` padaly na mainu ČTYŘI merge po sobě
-# (#177 → #181) a nikdo si toho nevšiml, protože na PR se deploy PŘESKAKUJE —
-# první běh nad mainem je zároveň první test a ten už nic neblokuje.
-# Zaměnit „tiše zeleno" za „vždy červeno" NENÍ oprava.
-#
-# Tvar bere `aisha-redeploy.mjs` (ř. 1425) správně od začátku; tenhle skript se
-# s ním teď shoduje — a hlídá to brána `deploy-cte-vnorene-pole`.
-NASAZENI=$(node -e '
-  const fs=require("fs");
-  try {
-    const r = JSON.parse(fs.readFileSync(process.argv[1],"utf8"));
-    process.stdout.write(String(r?.deployments?.[0]?.deployment_uuid ?? r?.deployment_uuid ?? ""));
-  }
-  catch { process.stdout.write(""); }
-' "$ODPOVED")
-if [ -z "$NASAZENI" ]; then
-  echo "::error title=nasazení se nezařadilo::Coolify vrátil HTTP $HTTP_CODE, ale v odpovědi NENÍ deployment_uuid."
-  echo "Požadavek byl tedy přijat a zahozen — čekat na výsledek nemá na co."
-  cat "$ODPOVED" 2>/dev/null || true
-  exit 1
-fi
-echo "Požadavek přijat (HTTP $HTTP_CODE), nasazení ${NASAZENI} zařazeno. Čekám na JEHO výsledek."
 
 # ── 4b. Počkat na TOTO nasazení, ne na „nějaké aktivní". ───────────────────
 # ⛔ NAMĚŘENO 2026-08-10 — tohle je ta vada, kvůli které byl web tři dny starý.
@@ -676,6 +805,11 @@ cekej_na_nasazeni() {
   STAV=""
   while :; do
     ted=$(date +%s)
+    # Měkký termín úlohy: nečekat, až runner job utne uprostřed — předat.
+    if [ -n "${TERMIN:-}" ] && [ "$ted" -ge "$TERMIN" ]; then
+      echo "::warning title=předáno pokračování::${APP} — nasazení ${NASAZENI}${STAV:+ (poslední stav: ${STAV})} běží v Coolify dál; měkký termín úlohy vypršel, dočká se ho a ověří pokračovací job."
+      exit 4
+    fi
     if [ "$konec" -eq 0 ]; then
       [ "$ted" -lt "$fronta_konec" ] || break
     else
@@ -698,6 +832,13 @@ cekej_na_nasazeni() {
         echo "úspěšně — compose je JEDEN CELEK, takže pád kterékoli služby znamená, že se"
         echo "nevymění ŽÁDNÝ kontejner a běží dál ta stará verze."
         diagnostikuj_neuplny_prenos "$NASAZENI"
+        trida_padu "$NASAZENI"
+        if [ "${NAV_AKCE:-}" = "nasadit" ]; then
+          # Pokračování už jednou nasadilo znovu — druhý pád se NESMÍ číst jako přechodný.
+          echo "::error title=pád i po opakování::${APP} — nasazení ${NASAZENI} spadlo i po opakování v pokračovací úloze; další opakování nepomůže, oprav příčinu. Třída: ${TRIDA_PADU}"
+        else
+          echo "třída pádu: ${TRIDA_PADU}"
+        fi
         if dalsi_pokus "$NASAZENI"; then STAV="opakovat"; break; fi
         exit 1 ;;
       "") printf '  (stav nasazení zatím neznámý)\n' ;;
@@ -751,8 +892,8 @@ done
 # (nebo veřejným artefaktem přes --verify-url), ne odsud.
 if ! node scripts/coolify-deploy-watch.mjs \
       --wait --strict --no-health --no-clear \
-      --prefix="$APP_PREFIX" --only="$SUFFIX" --timeout-s="$TIMEOUT_S"; then
-  echo "::error title=deploy neproběhl::'$APP' nedoběhl do zdravého stavu (nebo spadl) do ${TIMEOUT_S}s."
+      --prefix="$APP_PREFIX" --only="$SUFFIX" --timeout-s="$DOBEH_S"; then
+  echo "::error title=deploy neproběhl::'$APP' — nasazení ${NASAZENI} hlásí finished, ale Coolify do ${DOBEH_S}s neukázal klidný stav (běží jiné nasazení téže appky, nebo spadlo)."
   exit 1
 fi
 
@@ -832,6 +973,8 @@ if [ -n "$VERIFY_URL" ]; then
   if [ -n "${GIT_SHA:-}" ] && grep -qF "$GIT_SHA" "$TELO" 2>/dev/null; then
     echo "veřejná cesta nese revizi ${GIT_SHA:0:12} ✓"
     OBSAH_DUKAZ="DOKÁZÁNO: ${VERIFY_URL} servíruje revizi ${GIT_SHA:0:12} (zapečenou v artefaktu)."
+  elif [ -z "$OTISK_PRED" ]; then
+    OBSAH_DUKAZ="NEDOKÁZÁNO: že se ZMĚNIL obsah (otisk PŘED neměřen — navázáno na běžící nasazení; revizi v odpovědi nenajdu)."
   elif [ "$OTISK_PO" != "$OTISK_PRED" ]; then
     OBSAH_DUKAZ="DOKÁZÁNO: obsah na ${VERIFY_URL} se po nasazení ZMĚNIL (revizi v něm ale nenajdu)."
   else
@@ -908,3 +1051,7 @@ echo "$REVIZE_STAV"
 echo "${REVIZE_DUKAZ:-NEDOKÁZÁNO: která revize je nasazená.}"
 echo "$OBSAH_DUKAZ"
 echo "NEDOKÁZÁNO: dostupnost po VNITŘNÍ (mesh) cestě — na tu runner nevidí a nemá tam co dělat."
+# Pro souhrn vlny (nasad-podle-vln.sh): co pokračování skutečně udělalo, s id nasazení.
+if [ -n "$POKRACOVANI" ]; then
+  echo "pokračování-výsledek: ${POKRACOVANI} → ověřeno nasazení ${NASAZENI}"
+fi

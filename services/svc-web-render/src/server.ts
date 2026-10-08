@@ -34,7 +34,7 @@ import { join } from "node:path";
 
 import { chybejiciKlice, radkyNaMapu } from "./preklady.js";
 
-import { applySecurity } from "@aisha/security";
+import { applySecurity, safeLoggerOptions } from "@aisha/security";
 // ⛔ TÁŽ TRANSFORMACE JAKO V PROHLÍŽEČI. Kdyby generátor překládal `data-i18n-key`
 // po svém, statická stránka by nesla jiný text než tatáž stránka vykreslená
 // SPA při prokliku — a rozdíl by závisel na tom, jak na ni návštěvník přišel.
@@ -53,6 +53,8 @@ import pino from "pino";
 
 import { requireService } from "./auth.js";
 import { loadConfig, type WebRenderConfig } from "./config.js";
+import { zaregistrujServirovani } from "./servirovani.js";
+import { zaregistrujSkorapku } from "./skorapka.js";
 import {
   rozeberSkorapku,
   slozStranku,
@@ -62,12 +64,13 @@ import {
   barvaZOdpovedi,
   type Branding,
   vychozíJazyk,
+  zapisAtomicky,
 } from "./render.js";
 
 const SLUZBA = "svc-web-render";
 const VEREJNA_CESTA_OBRAZKU = "/_img";
 
-const log = pino({ name: SLUZBA });
+const log = pino(safeLoggerOptions({ name: SLUZBA }));
 
 /**
  * Parser a sanitizér pro Node. V prohlížeči je dodá DOMParser a DOMPurify nad
@@ -227,8 +230,8 @@ export async function vygeneruj(
   // (`shared-BL9zUP3B.js`), takže vepsaná jména by po prvním rebuildu
   // odkazovala na neexistující soubory a SPA by se nikdy nepřevzala.
   // Cesta pochází z nasazovací konfigurace (WEB_RENDER_SHELL), ne ze vstupu
-  // uživatele; do kontejneru je navíc připojený jediný read-only volume se
-  // skořápkou, takže traversal nemá kam vést. Literál sem dát nelze —
+  // uživatele; soubor do VLASTNÍHO svazku zapisuje jen `PUT /shell` (web ho
+  // tlačí při startu, ověřený vlastním tokenem). Literál sem dát nelze —
   // umístění skořápky je fakt o nasazení a hádat ho zakazuje brána o identitě.
   // eslint-disable-next-line security/detect-non-literal-fs-filename
   const skorapka = rozeberSkorapku(await readFile(cfg.shellPath, "utf8"));
@@ -377,7 +380,7 @@ export async function start(): Promise<void> {
   // změní typ FastifyInstance a rozbije applySecurity. Domácí tvar (a jediný,
   // co funguje s oběma) jsou VOLBY, ne instance — viz svc-source-broker.
   const app = Fastify({
-    logger: { level: cfg.logLevel },
+    logger: safeLoggerOptions({ level: cfg.logLevel }),
     bodyLimit: 1_048_576,
     trustProxy: true,
   });
@@ -388,27 +391,25 @@ export async function start(): Promise<void> {
     rateLimit: { enabled: cfg.rateLimitEnabled, max: 60, timeWindow: 60_000 },
   });
 
-  // Start = vždy plné vygenerování, aby nasazení nikdy neservírovalo obsah
-  // z předchozí verze. Selhání je fatální: prázdný výstupní adresář by
-  // znamenal tichý pád zpět na prázdnou skořápku.
-  let posledniRazitko = (await vygeneruj(cfg)).razitko;
-
-  app.get("/healthz", async () => ({ status: "ok", service: SLUZBA, razitko: posledniRazitko }));
-
-  // ⛔ PŘEGENEROVÁNÍ NENÍ VEŘEJNÁ OPERACE. Bez ověření by kdokoli mohl
-  // opakovaným voláním nutit službu tahat všechny stránky z databáze —
-  // tedy DoS páka, ne jen zbytečná práce. Volající je gateway/cron se
-  // sdíleným service tokenem, týž vzor jako u sourozeneckých služeb.
-  app.post<{ Querystring: { slug?: string } }>(
-    "/render",
-    { preHandler: requireService(cfg.serviceToken) },
-    async (request, reply) => {
-      const slug = request.query.slug;
-      const r = await vygeneruj(cfg, slug ? { jenSlug: slug } : {});
-      if (!slug) posledniRazitko = r.razitko;
-      return reply.send({ ok: true, vyrobeno: r.vyrobeno });
-    },
-  );
+  // ⛔ (d-ii) SKOŘÁPKU TLAČÍ WEB, NE SDÍLENÝ DISK. Web a web-render jsou dvě Coolify
+  // aplikace a disk sdílet neumějí (rozbor 2026-09-28). Kontejner `web` při startu
+  // pošle svou index.html sem — skořápka je tak VŽDY z právě běžícího buildu webu
+  // (jména chunků sedí). Cesta vede přímo meshem (vlastní routa webu); nic
+  // veřejného se neotvírá a nejde to přes dveře ani gateway.
+  //
+  // ⛔ VLASTNÍ TAJEMSTVÍ jen pro dvojici web → web-render (WEB_RENDER_SHELL_TOKEN),
+  // ne sdílený service token: kdo by ho měl, může jen vyměnit skořápku, nic víc.
+  if (!cfg.shellToken) {
+    log.error(
+      {},
+      "WEB_RENDER_SHELL_TOKEN nedoručen — PUT /shell odmítá (503), předrender nevznikne z nové skořápky. Dorovnej instanci: aisha-cold-start.sh --skip-create",
+    );
+  }
+  zaregistrujSkorapku(app, {
+    shellPath: cfg.shellPath,
+    shellToken: cfg.shellToken,
+    poZapisu: () => void zkontroluj("nová skořápka"),
+  });
 
   // ⛔ ČERSTVOST MÁ DVA ZDROJE, NE JEDEN (naměřeno 2026-09-01 na produkci).
   //
@@ -425,49 +426,131 @@ export async function start(): Promise<void> {
   // nepřeložily, přepínač jazyků nefungoval a stránka zůstala neinteraktivní.
   // Opravilo by se to samo až ve chvíli, kdy někdo upraví OBSAH — tedy nikdy.
   //
-  // Otisk skořápky je proto rovnocenný spouštěč. Levný: čte jeden soubor,
-  // který je k dispozici lokálně (bind mount z téhož buildu).
-  const otiskSkorapky = async (): Promise<string> => {
-    // Táž cesta a týž důvod jako u čtení skořápky výš: pochází z nasazovací
-    // konfigurace (WEB_RENDER_SHELL), ne ze vstupu, a svazek je read-only.
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    const text = await readFile(cfg.shellPath, "utf8");
-    return createHash("sha256").update(text).digest("hex").slice(0, 16);
+  // Otisk skořápky je proto rovnocenný spouštěč. Levný: čte jeden soubor
+  // ve vlastním svazku.
+  const otiskSkorapky = async (): Promise<string | null> => {
+    try {
+      // eslint-disable-next-line security/detect-non-literal-fs-filename
+      const text = await readFile(cfg.shellPath, "utf8");
+      return createHash("sha256").update(text).digest("hex").slice(0, 16);
+    } catch {
+      return null; // skořápka ještě nedorazila
+    }
   };
-  let posledniOtisk = await otiskSkorapky().catch(() => "");
 
-  setInterval(() => {
-    void (async () => {
-      try {
-        const index = await rpc<IndexRadek[]>(cfg, "get_published_web_page_index", {
-          p_hostname: cfg.hostname,
-        });
-        const razitko = (index ?? []).reduce((m, r) => (r.updated_at > m ? r.updated_at : m), "");
-        const otisk = await otiskSkorapky();
-        const zmenaObsahu = razitko !== posledniRazitko;
-        const zmenaSkorapky = otisk !== posledniOtisk;
-        if (zmenaObsahu || zmenaSkorapky) {
-          log.info(
-            { duvod: zmenaObsahu ? (zmenaSkorapky ? "obsah+skořápka" : "obsah") : "skořápka",
-              otiskZ: posledniOtisk, otiskNa: otisk, z: posledniRazitko, na: razitko },
-            "přegenerovávám",
-          );
-          posledniRazitko = (await vygeneruj(cfg)).razitko;
-          posledniOtisk = otisk;
-        }
-      } catch (err) {
-        // ⛔ `warn` schovává TRVALÉ selhání. Když se nepředgenerovává pořád
-        // (třeba nedeklarovaný jazyk nebo nedostupné RPC), instance tiše
-        // ztratí celý přínos předrenderu — web funguje, jen bez SEO a bez
-        // prvního vykreslení, a nikdo si toho nevšimne, dokud nečte logy.
-        // Na `error` se aspoň dá navěsit alerting. (Nález z cizího review.)
-        log.error({ err: String(err).slice(0, 160) }, "přegenerování selhalo — statické stránky NEVZNIKLY, servíruje SPA");
+  // NIKDY dvě generování naráz — ani celé (start, perioda, nová skořápka), ani
+  // jedné stránky z `POST /render`: souběžné běhy by si přepisovaly výstup i úklid
+  // osiřelých stránek (nález revize d-ii: /render šel dřív mimo zámek).
+  let fronta: Promise<unknown> = Promise.resolve();
+  const serializuj = <T>(prace: () => Promise<T>): Promise<T> => {
+    const vysledek = fronta.then(prace);
+    fronta = vysledek.catch(() => undefined);
+    return vysledek;
+  };
+
+  // Otisk skořápky, ze které je AKTUÁLNÍ výstup. Drží se i na disku, aby po
+  // restartu služby Edge nepadal na SPA, dokud první kontrola nedoběhne.
+  const souborOtisku = join(cfg.outDir, ".skorapka-otisk");
+  let otiskVystupu = "";
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    otiskVystupu = (await readFile(souborOtisku, "utf8")).trim();
+  } catch {
+    /* první start nebo prázdný svazek */
+  }
+
+  let posledniRazitko = "";
+  let posledniOtisk = "";
+  let bezi = false;
+  let dalsiCeka = false;
+  async function zkontroluj(proc: string): Promise<void> {
+    if (bezi) {
+      dalsiCeka = true;
+      return;
+    }
+    bezi = true;
+    try {
+      const otisk = await otiskSkorapky();
+      if (otisk === null) {
+        // Ne chyba: po startu web-renderu ji web pošle do chvíle (opakuje, dokud
+        // neuspěje). Do té doby Edge servíruje SPA — dnešní chování.
+        log.info({ proc }, "skořápka zatím nedorazila (čekám na PUT /shell od webu) — servíruje SPA");
+        return;
       }
-    })();
-  }, cfg.pollMs);
+      const index = await rpc<IndexRadek[]>(cfg, "get_published_web_page_index", {
+        p_hostname: cfg.hostname,
+      });
+      const razitko = (index ?? []).reduce((m, r) => (r.updated_at > m ? r.updated_at : m), "");
+      const zmenaObsahu = razitko !== posledniRazitko;
+      const zmenaSkorapky = otisk !== posledniOtisk;
+      if (zmenaObsahu || zmenaSkorapky) {
+        log.info(
+          { proc, duvod: zmenaObsahu ? (zmenaSkorapky ? "obsah+skořápka" : "obsah") : "skořápka",
+            otiskZ: posledniOtisk, otiskNa: otisk, z: posledniRazitko, na: razitko },
+          "přegenerovávám",
+        );
+        posledniRazitko = (await serializuj(() => vygeneruj(cfg))).razitko;
+        posledniOtisk = otisk;
+        await zapisAtomicky(souborOtisku, otisk);
+        otiskVystupu = otisk;
+      }
+    } catch (err) {
+      // ⛔ `warn` schovává TRVALÉ selhání. Když se nepředgenerovává pořád
+      // (třeba nedeklarovaný jazyk nebo nedostupné RPC), instance tiše
+      // ztratí celý přínos předrenderu — web funguje, jen bez SEO a bez
+      // prvního vykreslení, a nikdo si toho nevšimne, dokud nečte logy.
+      // Na `error` se aspoň dá navěsit alerting. (Nález z cizího review.)
+      log.error({ proc, err: String(err).slice(0, 160) }, "přegenerování selhalo — statické stránky NEVZNIKLY, servíruje SPA");
+    } finally {
+      bezi = false;
+      if (dalsiCeka) {
+        dalsiCeka = false;
+        void zkontroluj("dobíhá");
+      }
+    }
+  }
 
+  // Živost = proces poslouchá. Připravenost (`pripraveno`) = existuje výstup
+  // z aktuální skořápky. Healthcheck kontejneru hlídá jen živost: dokud web
+  // nepošle skořápku, nemá smysl web-render restartovat — Edge mezitím
+  // servíruje SPA.
+  app.get("/healthz", async () => ({
+    status: "ok",
+    service: SLUZBA,
+    razitko: posledniRazitko,
+    otisk: posledniOtisk,
+    pripraveno: posledniOtisk !== "",
+  }));
+
+  // ⛔ PŘEGENEROVÁNÍ NENÍ VEŘEJNÁ OPERACE. Bez ověření by kdokoli mohl
+  // opakovaným voláním nutit službu tahat všechny stránky z databáze —
+  // tedy DoS páka, ne jen zbytečná práce. Volající je gateway/cron se
+  // sdíleným service tokenem, týž vzor jako u sourozeneckých služeb.
+  app.post<{ Querystring: { slug?: string } }>(
+    "/render",
+    { preHandler: requireService(cfg.serviceToken) },
+    async (request, reply) => {
+      const slug = request.query.slug;
+      const r = await serializuj(() => vygeneruj(cfg, slug ? { jenSlug: slug } : {}));
+      if (!slug) posledniRazitko = r.razitko;
+      return reply.send({ ok: true, vyrobeno: r.vyrobeno });
+    },
+  );
+
+  // Výstup po HTTP (d-ii) — až po specifických trasách, ať /healthz má přednost.
+  zaregistrujServirovani(app, { koren: cfg.outDir, otiskVystupu: () => otiskVystupu });
+
+  setInterval(() => void zkontroluj("perioda"), cfg.pollMs);
+
+  // ⛔ NAPŘED POSLOUCHAT, PAK GENEROVAT. Dřív start generoval před `listen`
+  // (fatálně), aby se neservíroval obsah z předchozí verze — to platilo, když
+  // výstup četl nginx z disku. Teď výstup servíruje tahle služba a Edge při
+  // jakékoli chybě padá na SPA, takže první render smí běžet až za poslechem
+  // a jeho selhání je hlasitá chyba, ne pád procesu (ten by jen restartoval
+  // službu bez skořápky dokola).
   await app.listen({ host: "0.0.0.0", port: cfg.port });
   log.info({ port: cfg.port, pollMs: cfg.pollMs }, `${SLUZBA} poslouchá`);
+  void zkontroluj("start");
 }
 
 start().catch((err) => {

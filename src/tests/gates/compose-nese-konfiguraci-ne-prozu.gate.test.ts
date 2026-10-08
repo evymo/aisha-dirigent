@@ -105,7 +105,7 @@ const ROHATKA: Record<string, number> = {
   "docker-compose.coolify-mesh-router-experimental.yml": 1,
   "docker-compose.coolify-matrix.yml": 1,
   "docker-compose.coolify-n8n.yml": 3,
-  "docker-compose.coolify-netbird.yml": 4,
+  // 2026-10-05 (generátor instancí NetBirdu): próza netbird šla do compose-notes, naměřeno 0 — rohatka dotažena.
   "docker-compose.coolify-pki.yml": 1,
   "docker-compose.coolify-playwright.yml": 2,
   "docker-compose.coolify-prebuilt.yml": 4,

@@ -14,7 +14,7 @@
  * zapisují. Brána je SPOUŠTÍ nad týmiž vstupy:
  *   derivace    → CLI `--shell` nad profilem v dočasném overlayi instance
  *   doktor      → skutečný coolify-domain-doctor --apply proti místnímu „Coolify"
- *   deploy-init → vyříznuté bez_jmen_edge + set_coolify_domains (DRY_RUN) v bashi
+ *   deploy-init → vyříznuté domena_pro_coolify + set_coolify_domains (DRY_RUN) v bashi
  *
  * Mimo rozsah (vědomě): bez meshe jde edge přes `*_UPSTREAM_PUBLIC`, na
  * jednozónové instanci je to totéž veřejné jméno → edge by proxoval sám na sebe.
@@ -36,7 +36,7 @@ import {
   edgeOwnedHosts,
 } from "../../../scripts/lib/derive-domains.mjs";
 import {
-  bezJmenEdge,
+  domenaProCoolify,
   edgeOwnedSet,
   isReleaseSentinel,
   releaseSentinel,
@@ -123,13 +123,24 @@ describe("derivace: EDGE_OWNED_HOSTS", () => {
     expect(v.get("EDGE_OWNED_HOSTS")).toBe("");
   });
 
+  // ⛔ OTOČENO 2026-10-02 („vše jen přes edge“): dřív tu stálo, že na víc uzlech
+  // edge sporná jména NEPŘEBÍRÁ — tím brána VYNUCOVALA boční router n8n-auth pro
+  // veřejné mcp/dirigent na backendovém Traefiku, ačkoli edge k nim jde meshem.
+  // Teď: tvář, ke které edge jde MESHEM, vlastní edge na jakémkoli uzlu; tvář,
+  // ke které jde přes Traefik backendu (auth = přímá tvář Keycloaku, bootstrap
+  // meshe), zůstává backendu — převzetí by vyrobilo smyčku.
   test.each([
     ["víc uzlů (backend jinde než edge)", "test-vic-uzlu"],
-    ["bez server_bindings — nevázaný slot je samostatný uzel (R-e beze změny)", "test-bez-vazeb"],
-  ])("%s: sporná jména edge NEPŘEBÍRÁ", (_popis, profil) => {
+    ["bez server_bindings — nevázaný slot je samostatný uzel", "test-bez-vazeb"],
+  ])("%s: edge přebírá tváře, ke kterým jde meshem; auth (Traefik) ne", (_popis, profil) => {
     const v = derivace(profil, "on");
     const vlastni = (v.get("EDGE_OWNED_HOSTS") ?? "").split(",").filter(Boolean);
-    for (const klic of SPORNA) expect(vlastni, klic).not.toContain(v.get(klic));
+    for (const klic of ["API_DOMAIN_PUBLIC", "MCP_DOMAIN", "DIRIGENT_DOMAIN"]) {
+      expect(v.get(klic.replace(/_DOMAIN(_PUBLIC)?$/, "") === "API" ? "API_UPSTREAM_MESH" : `${klic.replace(/_DOMAIN(_PUBLIC)?$/, "")}_UPSTREAM_MESH`), `${klic}: edge k ní jde meshem`).toMatch(/\.internal(:\d+)?(\/|$)/);
+      expect(vlastni, klic).toContain(v.get(klic));
+    }
+    expect(v.get("AUTH_UPSTREAM_MESH"), "kontrolní vzorek: auth jde přes Traefik").not.toMatch(/\.internal/);
+    expect(vlastni, "auth zůstává přímé tváři Keycloaku").not.toContain(v.get("KEYCLOAK_DOMAIN_PUBLIC"));
   });
 
   test("kladná kotva: bez edge v topologii se nevydá nic a backend registruje dál", () => {
@@ -141,7 +152,7 @@ describe("derivace: EDGE_OWNED_HOSTS", () => {
     };
     expect(edgeOwnedHosts(topo, hodnota)).toEqual([]);
     const beze = edgeOwnedSet("");
-    expect(bezJmenEdge("gateway", `https://acme-api.${ZONA}:3001`, beze, "acme")).toBe(`https://acme-api.${ZONA}:3001`);
+    expect(domenaProCoolify("gateway", `https://acme-api.${ZONA}:3001`, beze, "acme")).toBe(`https://acme-api.${ZONA}:3001`);
   });
 
   test("sentinel `.invalid`, nerozvinutá šablona ani prázdno se nevydají", () => {
@@ -247,6 +258,10 @@ async function doktor(apps: App[], env: Record<string, string>): Promise<Beh> {
             COOLIFY_PROJECT_UUID: "projekt-nas",
             APP_NAME_PREFIX: PREFIX,
             APP_DOMAIN: H.web,
+            // Deklarace instance s jednou značkou. Bez ní doktor domény webu
+            // neskládá (lib/domeny-webu.mjs: chybějící WEB_FQDNS = „nevím")
+            // a pro edge nezapíše nic — viz domeny-webu-jeden-domov.
+            WEB_FQDNS: "",
             API_DOMAIN: H.api,
             API_DOMAIN_PUBLIC: H.api,
             KEYCLOAK_DOMAIN_DIRECT: H.auth,
@@ -307,6 +322,27 @@ describe("doktor --apply: uvolnění před převzetím, v jednom běhu", () => {
     expect(r.patche.map((p) => p.uuid)).not.toContain("core-uuid");
     expect(r.patche.map((p) => p.uuid)).not.toContain("kc-uuid");
   });
+
+  test("mesh na víc uzlech: n8n-auth s mesh jménem UVOLNÍ boční mcp/dirigent (dřív se neposlalo nic)", { timeout: 90_000 }, async () => {
+    // ⛔ NAMĚŘENO 2026-10-02: N8N_DOMAIN je s meshem `.internal`; po vyřazení
+    // jmen edge a mesh jména nezbylo nic a doktor NEPOSLAL NIC — v Coolify tak
+    // zůstal boční router veřejných mcp/dirigent na backendovém Traefiku.
+    const meshN8n = `zkusebni-n8n.mesh.zkusebni.internal`;
+    const apps = naMeřenyStav(1);
+    const orch = apps.find((a) => a.uuid === "orch-uuid")!;
+    orch.docker_compose_domains = [{ name: "n8n-auth", domain: `https://${H.mcp}:4180,https://${H.dirigent}:4180` }];
+    const r = await doktor(apps, {
+      EDGE_OWNED_HOSTS: [H.api, H.mcp, H.dirigent].join(","),
+      N8N_DOMAIN: meshN8n,
+      API_DOMAIN: `zkusebni-api.mesh.zkusebni.internal`,
+    });
+    expect(r.kod, r.vystup).toBe(0);
+    expect(hostyPatche(r, "orch-uuid")).toEqual([{ name: "n8n-auth", domain: releaseSentinel("n8n-auth", PREFIX) }]);
+    const edgeProxy = hostyPatche(r, "edge-uuid").find((e) => e.name === "edge-proxy")?.domain ?? "";
+    for (const h of [H.mcp, H.dirigent]) expect(edgeProxy, h).toContain(`https://${h}`);
+    // Keycloak (auth přes Traefik) si přímou tvář nechává.
+    expect(r.patche.map((p) => p.uuid)).not.toContain("kc-uuid");
+  });
 });
 
 // ── deploy-init (bash) mluví stejně jako doktor ─────────────────────────────
@@ -327,7 +363,7 @@ function bash(skript: string, env: Record<string, string>) {
   return r;
 }
 
-describe("deploy-init: bez_jmen_edge = bezJmenEdge (spuštěno, ne čteno)", () => {
+describe("deploy-init: domena_pro_coolify = domenaProCoolify (spuštěno, ne čteno)", () => {
   const PRIPADY: Array<[string, string, string]> = [
     ["gateway", `https://${H.api}:3001`, VLASTNI_EDGE],
     ["keycloak", `https://${H.auth}:80`, VLASTNI_EDGE],
@@ -336,29 +372,34 @@ describe("deploy-init: bez_jmen_edge = bezJmenEdge (spuštěno, ne čteno)", () 
     ["edge-proxy", `https://${H.api},https://${H.mcp}`, VLASTNI_EDGE],
     ["gateway", `https://${H.api}:3001`, ""],
     ["nocodb", `https://nocodb.${L}:8080`, VLASTNI_EDGE],
+    // Mesh jména: vyřadí se; nezbude-li nic, odejde uvolňovací sentinel.
+    ["n8n-auth", `https://zkusebni-n8n.mesh.zkusebni.internal:4180,https://${H.mcp}:4180,https://${H.dirigent}:4180`, VLASTNI_EDGE],
+    ["svc-model", `https://zkusebni-svc-model.mesh.zkusebni.internal:8000`, ""],
+    ["gateway", `https://zkusebni-api.mesh.zkusebni.internal:3001,https://pub.${L}:3001`, ""],
   ];
-  const fn = () => vyrizni("bez_jmen_edge");
+  const fn = () => vyrizni("domena_pro_coolify");
 
   test.each(PRIPADY)("%s = %s (vlastní: %s)", (sluzba, domena, vlastni) => {
-    const r = bash(`${fn()}\nbez_jmen_edge '${sluzba}' '${domena}'`, {
+    const r = bash(`${fn()}\ndomena_pro_coolify '${sluzba}' '${domena}'`, {
       EDGE_OWNED_HOSTS: vlastni,
       APP_NAME_PREFIX: PREFIX,
     });
-    expect(r.stdout).toBe(bezJmenEdge(sluzba, domena, edgeOwnedSet(vlastni), PREFIX));
+    expect(r.stdout).toBe(domenaProCoolify(sluzba, domena, edgeOwnedSet(vlastni), PREFIX));
   });
 
   test("bez prefixu instance bash router NEuvolní a řekne to (knihovna by spadla — doktor prefix vyžaduje vždy)", () => {
-    const r = bash(`${fn()}\nbez_jmen_edge gateway 'https://${H.api}:3001'`, { EDGE_OWNED_HOSTS: VLASTNI_EDGE });
-    expect(r.stdout).toBe(`https://${H.api}:3001`);
+    const r = bash(`${fn()}\ndomena_pro_coolify gateway 'https://${H.api}:3001'`, { EDGE_OWNED_HOSTS: VLASTNI_EDGE });
+    // Prázdno = volající položku vynechá a ohlásí (set_coolify_domains).
+    expect(r.stdout).toBe("");
     expect(r.stderr).toMatch(/APP_NAME_PREFIX chybí — router NEuvolňuji/);
-    expect(() => bezJmenEdge("gateway", `https://${H.api}:3001`, edgeOwnedSet(VLASTNI_EDGE), "")).toThrow(/prefix instance chybí/);
+    expect(() => domenaProCoolify("gateway", `https://${H.api}:3001`, edgeOwnedSet(VLASTNI_EDGE), "")).toThrow(/prefix instance chybí/);
   });
 
   test("set_coolify_domains odešle hodnoty už bez jmen edge (DRY_RUN)", () => {
     const stuby = 'info() { printf "%s\\n" "$*"; }\nwarn() { :; }\nok() { :; }\nerr() { :; }\n';
     const r = bash(
       `${stuby}${fn()}${vyrizni("set_coolify_domains")}\n` +
-        `set_coolify_domains uuid 'gateway=https://${H.api}:3001' 'n8n-auth=https://${H.n8n}:4180,https://${H.mcp}:4180' 'edge-proxy=https://${H.api}'`,
+        `set_coolify_domains uuid 'gateway=https://${H.api}:3001' 'n8n-auth=https://${H.n8n}:4180,https://${H.mcp}:4180' 'edge-proxy=https://${H.api}' 'svc-model=https://zkusebni-svc-model.mesh.zkusebni.internal:8000'`,
       { EDGE_OWNED_HOSTS: VLASTNI_EDGE, APP_NAME_PREFIX: PREFIX, DRY_RUN: "1" },
     );
     const json = /docker_compose_domains = (\[.*\])/.exec(r.stdout);
@@ -367,13 +408,15 @@ describe("deploy-init: bez_jmen_edge = bezJmenEdge (spuštěno, ne čteno)", () 
       { name: "gateway", domain: releaseSentinel("gateway", PREFIX) },
       { name: "n8n-auth", domain: `https://${H.n8n}:4180` },
       { name: "edge-proxy", domain: `https://${H.api}` },
+      // Jen mesh jméno: dřív se položka přeskočila a starý router zůstal.
+      { name: "svc-model", domain: releaseSentinel("svc-model", PREFIX) },
     ]);
   });
 
   test("ověření po zápisu porovnává s ODESLANOU hodnotou (jinak falešné „stale values“)", () => {
     const fnSet = vyrizni("set_coolify_domains");
     const overeni = fnSet.slice(fnSet.indexOf("local missing=() mismatched=()"));
-    expect(overeni).toMatch(/svc_domain="\$\(bez_jmen_edge "\$svc_name" "\$svc_domain"\)"/);
+    expect(overeni).toMatch(/svc_domain="\$\(domena_pro_coolify "\$svc_name" "\$svc_domain"\)"/);
   });
 });
 

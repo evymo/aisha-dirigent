@@ -1,5 +1,5 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
-import { applySecurity } from '@aisha/security';
+import { applySecurity, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import { config } from './config.js';
@@ -17,7 +17,7 @@ import { chainHeadAnchorRoutes } from './routes/chain-head-anchor.js';
 // Rollback: OTEL_SDK_DISABLED=true env (Coolify) + container restart.
 bootstrapOtel({ serviceName: 'svc-blockchain' });
 const app = Fastify({
-  logger: { level: config.logLevel },
+  logger: safeLoggerOptions({ level: config.logLevel }),
   trustProxy: true,
 });
 

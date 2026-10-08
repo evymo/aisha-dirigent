@@ -24,6 +24,9 @@ export default defineConfig({
     environment: "node",
     globals: true,
     include: ["src/tests/omni-acceptance/**/*.omni.spec.ts"],
+    // Každý soubor dostane vlastní dočasný adresář a po sobě ho smaže.
+    setupFiles: [path.resolve(__dirname, "./src/test/docasny-adresar-souboru.ts")],
+    globalSetup: [path.resolve(__dirname, "./src/test/docasny-adresar-behu.ts")],
     // _helpers / _fixtures hold shared scaffold, not test files — never matched
     // by the glob above (no .omni.spec.ts suffix), but excluded for clarity.
     exclude: [

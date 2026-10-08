@@ -136,6 +136,29 @@ describe("generátor nevyrobí stavový klíč nad existujícím stackem bez vst
     }
   });
 
+  it.each(["WEB_RENDER_SHELL_TOKEN", "KNOCK_ROSTER_TOKEN"])("6) nový BEZSTAVOVÝ klíč (%s) chybí v trezoru existujícího stacku → vyrobí ho, stavové zachová", (klic) => {
+    // ⛔ NAMĚŘENO 2026-10-03 (kolo 16 riq): WEB_RENDER_SHELL_TOKEN (d-ii) přibyl přes pg()
+    // jako implicitně stavový → konvergence existující instance ho odmítla vyrobit.
+    // ⛔ NAMĚŘENO 2026-10-04 (předlet forku nad W1): totéž KNOCK_ROSTER_TOKEN u instance bez dveří.
+    // Trezor nese VŠECHNO kromě něj — závora se nesmí spustit a token musí vzniknout.
+    const d = mkdtempSync(join(tmpdir(), "generator-zavora-bezstavovy-"));
+    try {
+      const prazdnyVstup = join(d, "prazdny.env");
+      writeFileSync(prazdnyVstup, "");
+      const prvni = spust(prazdnyVstup, join(d, "neexistuje.env"), []);
+      expect(prvni.rc, prvni.err.slice(-600)).toBe(0);
+      const trezor = join(d, "trezor-bez-tokenu.env");
+      writeFileSync(trezor, prvni.out.split("\n").filter((r) => !r.startsWith(`${klic}=`)).join("\n"));
+
+      const r = spust(prazdnyVstup, trezor, ["--stack-exists=1"]);
+      expect(r.rc, `bezstavový klíč nemá závoru spouštět:\n${r.err.slice(-600)}`).toBe(0);
+      expect(hodnota(r.out, klic), "token musí vzniknout").toMatch(/^.{32,}$/);
+      expect(hodnota(r.out, "PKI_SVAULT_KEY"), "stavový klíč se zachová").toBe(hodnota(prvni.out, "PKI_SVAULT_KEY"));
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
   it("neznámá hodnota přepínače (true/yes/překlep) → odmítne, nevyrobí", () => {
     // Bezpečnostní přepínač, který by `true` tiše přečetl jako „neexistuje",
     // by závoru vypnul právě tomu, kdo ji chtěl zapnout.

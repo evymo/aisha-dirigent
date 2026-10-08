@@ -132,7 +132,11 @@ BEGIN
     auth.uid(),
     p_source,
     COALESCE(p_source_ref, NULLIF(p_inputs->>'branch', '')),
-    p_inputs,
+    -- cli_slug do vstupů běhu (2026-10-02): runner podle něj vybere pověření runtime
+    -- (ai_runtime_registry.credential_env_var — cli:claude-cli → AGENT_CLAUDE_OAUTH_TOKEN,
+    -- cli:codex-cli → OPENAI_API_KEY). Dřív žil slug jen v deníku rozhodnutí a runner
+    -- codexu žádné pověření nepředal.
+    p_inputs || jsonb_build_object('cli_slug', p_cli_slug),
     v_approval_req,
     CASE WHEN v_approval_req THEN v_awaiting ELSE NULL END
   )

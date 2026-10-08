@@ -76,6 +76,18 @@ M=$(psql_q "select public.document_sensitivity_min_tier('public')||'/'||public.d
 U=$(psql_q "select public.document_visible_to(gen_random_uuid(), 'sha-that-cannot-exist')")
 [ "$U" = "f" ] && ok "unpromoted document invisible (promotion seam enforced)" \
                || bad "unpromoted document returned '${U:-<none>}' — expected f"
+# Schema public: only the named role may create in it. READ-ONLY measurement —
+# the schema ACL plus has_schema_privilege for every non-superuser role, inside
+# a read-only transaction; nothing is attempted against the live database. (The
+# behavioural probe, CREATE TABLE under each role, runs only on the throwaway DB
+# of the upgrade gate.) heals revoke CREATE from PUBLIC but never stop a
+# migration over it; this is where a leftover grant fails hard.
+VP=$(bash scripts/db/verify-schema-public-live.sh "$HOST" 2>&1); VP_RC=$?
+case "$VP_RC" in
+  0) ok "schema public: only the named role may create" ;;
+  1) bad "schema public: $VP" ;;
+  *) skip "schema public not measured — $VP" ;;
+esac
 
 printf '\n\033[1mResult:\033[0m %d passed, %d failed, %d skipped\n\n' "$PASS" "$FAIL" "$SKIP"
 [ "$FAIL" -eq 0 ] || exit 1

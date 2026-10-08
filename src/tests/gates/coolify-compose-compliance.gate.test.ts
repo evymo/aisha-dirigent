@@ -810,14 +810,10 @@ describe("Volume Source Compliance", () => {
    * Známý dluh — holé `${VAR}` ve zdroji svazku (past: Coolify 4.3.16 z něj udělá
    * pojmenovaný svazek). Krok 2 systémové opravy (rozhodnutí 2026-09-28): Edge × web-render
    * jsou DVĚ aplikace, svazek mezi nimi sdílet nejde → předání po síti nebo jedna aplikace.
-   * Do té doby Edge ani web-render z mainu nenasazovat (hlídá předávka). Smí jen ubývat.
+   * SPLACENO 2026-10-02 (varianta d-ii, předání po síti): web-render má vlastní pojmenované
+   * svazky, web nic nemontuje. Seznam zůstává jako ráčna — smí jen ubývat, nic nepřibude.
    */
-  const ZNAMY_DLUH_VAR_VE_ZDROJI = [
-    "docker-compose.coolify-prebuilt.yml:web (krátký tvar) '${WEB_RENDER_STATIC_HOST_DIR}'",
-    "docker-compose.coolify-prebuilt.yml:web (krátký tvar) '${WEB_RENDER_SHELL_HOST_DIR}'",
-    "docker-compose.coolify-web-render.yml:svc-web-render (krátký tvar) '${WEB_RENDER_STATIC_HOST_DIR}'",
-    "docker-compose.coolify-web-render.yml:svc-web-render (krátký tvar) '${WEB_RENDER_SHELL_HOST_DIR}'",
-  ];
+  const ZNAMY_DLUH_VAR_VE_ZDROJI: string[] = [];
 
   function porusSvazku(soubor: string, obsah: string): string[] {
     const porus: string[] = [];

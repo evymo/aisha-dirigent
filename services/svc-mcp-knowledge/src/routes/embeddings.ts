@@ -68,7 +68,8 @@ export async function embeddingsRoutes(app: FastifyInstance): Promise<void> {
     for (const rule of rules) {
       try {
         const text = composeRuleEmbeddingText(rule);
-        const [embedding] = await embedTextsWithBackend(backend, [text]);
+        // Dopočet vektorů pravidel = dávka.
+        const [embedding] = await embedTextsWithBackend(backend, [text], 'davka');
 
         await rpcService('update_rule_embedding', {
           p_embedding: JSON.stringify(embedding),
@@ -119,7 +120,8 @@ export async function embeddingsRoutes(app: FastifyInstance): Promise<void> {
     if (!backend) return reply.code(503).send(NO_V1_BACKEND);
 
     const texts = memories.map((m) => `[${m.agent_slug}/${m.memory_type}] ${m.content}`);
-    const embeddings = await embedTextsWithBackend(backend, texts);
+    // Dopočet vektorů pamětí = dávka.
+    const embeddings = await embedTextsWithBackend(backend, texts, 'davka');
 
     let successCount = 0;
     let errorCount = 0;

@@ -35,6 +35,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from 
 import { nahradObsahAtomicky } from "./lib/zapis-env-atomicky.mjs";
 import { resolve, dirname, join } from "node:path";
 import { deklarovanyOverlayRepo, overlayDirOrRequired, OVERLAY_ENV } from "./lib/instance-overlay.mjs";
+import { verejniKlientiRealmu } from "./lib/povoleni-klienti.mjs";
 import { fileURLToPath } from "node:url";
 import { randomBytes } from "node:crypto";
 import { buildTopology, formatShellExports, RESOLVER_ENV_INPUTS } from "./lib/derive-domains.mjs";
@@ -51,7 +52,11 @@ import { pkiBundleRequiredForInstance } from "./lib/derive-pki-bundle-required.m
 import { domovRegistryProxy, rozlisRegistryProxy } from "./lib/registry-proxy.mjs";
 import { posudVapidPar } from "./lib/vapid-par.mjs";
 import { pbEnvSoubor, pbJeProd, pbZdrojDoplneni } from "./lib/prostredi-behu.mjs";
+import { jeLaneZapnuta, podminkaSplnena } from "./lib/provision-gate.mjs";
+import { posudAccel } from "./lib/accel-deklarace.mjs";
+import { hodnotaVrstvyNeboPrazdno, kliceVrstvy } from "./lib/derive-accel-uzel.mjs";
 import { isDirectRun } from "./lib/cli-entry.mjs";
+import { KOD_ENV_DOKTORA_WEB_NEVIM, deklaraceWebFqdns } from "./lib/domenovy-overlay.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
@@ -269,6 +274,12 @@ function hydrateProcessEnvFromProdBackup() {
   }
 }
 
+// Výslovný požadavek na doménový overlay smí přijít JEN od cold-startu (export
+// před spuštěním doktora) — ne z trezoru, kterým se prostředí hned níž doplní:
+// hodnota uložená v trezoru by jinak z dopočteného požadavku udělala „výslovný"
+// a ten smí seznam značek zúžit (revize 27d6f3f5e). Zachytí se proto PŘED hydratací.
+const VYSLOVNY_POZADAVEK_OVERLAYE = process.env.DOMAINS_OVERLAY_REQUESTED;
+
 hydrateProcessEnvFromProdBackup();
 
 // ── Domain contract loader (config/domains.env is the single source of truth)
@@ -456,6 +467,48 @@ const DOMENY = loadDomains(
   existsSync(ENV_PATH) ? parseEnvFile(ENV_PATH).values : new Map(),
 );
 const DOMAINS = DOMENY.hodnoty;
+
+// ── Deklarace domén webu (WEB_FQDNS) — odvozený klíč s rozlišením „nevím" ─────
+//
+// ⛔ NAMĚŘENO 2026-10-05: redeploy srovnává domény doktorem domén s prostředím
+// z `.env.coolify` — a WEB_FQDNS (seznam značek webu) žil jen v doménovém
+// overlayi instance, který tenhle doktor nečetl a do `.env.coolify` ho nepsal
+// nikdo. Doktor domén v redeployi proto „nevěděl" a edge nezapsal u KAŽDÉHO forku.
+// Overlay se teď najde TÝMŽ rozkladem jako v obalu cold-startu a v cold-startu
+// (lib/domenovy-overlay.mjs) a hodnota se při každém běhu odvodí ZNOVU — stará
+// hodnota v souboru se tak neudrží (srovná se jako každý derived klíč, i na prázdno).
+//
+// ⛔ „NEVÍM" SE NEZAPISUJE. Prázdná hodnota = instance víc značek nedeklaruje;
+// nevím (overlay vyžádaný a nenalezený, deklarovaný overlay nejde získat,
+// dopočtený požadavek by ubral uložené značky…) se nezapíše VŮBEC a doktor
+// skončí vlastním kódem KOD_ENV_DOKTORA_WEB_NEVIM s příčinou — prázdné by
+// doktoru domén řeklo „jedna značka" a ten by routy značek smazal. Ostatní
+// odvozené klíče se zapíšou, takže redeploy aplikace nasadí.
+const WEB_DEKLARACE = (() => {
+  try {
+    return deklaraceWebFqdns({
+      repo: ROOT,
+      env: AISHA_ENV_BEHU,
+      prostredi: (() => {
+        const p = { ...process.env };
+        if (VYSLOVNY_POZADAVEK_OVERLAYE === undefined) delete p.DOMAINS_OVERLAY_REQUESTED;
+        else p.DOMAINS_OVERLAY_REQUESTED = VYSLOVNY_POZADAVEK_OVERLAYE;
+        return p;
+      })(),
+      ziskejOverlayDir: () => overlayDirOrRequired("env-doktor: deklarace domén webu (WEB_FQDNS)"),
+      trezor: prodEnvMap(),
+      najdi: (jmeno) => prodEnv(jmeno) || cleanEnvValue(DERIVACE_INSTANCE[jmeno] ?? "") || "",
+      // Uložený seznam: dopočtený požadavek (redeploy) ho smí jen rozšířit, ne zúžit —
+      // a CHYBĚJÍCÍ klíč (undefined) nezaloží (není s čím porovnat).
+      ulozena: (() => {
+        const ulozene = existsSync(ENV_PATH) ? parseEnvFile(ENV_PATH).values : new Map();
+        return ulozene.has("WEB_FQDNS") ? cleanEnvValue(ulozene.get("WEB_FQDNS") ?? "") : undefined;
+      })(),
+    });
+  } catch (e) {
+    return { znamo: false, duvod: String(e?.message ?? e).split("\n")[0] };
+  }
+})();
 // Nerozbalitelné odkazy, které kontrakt OPRAVDU čte — jen pro výpis u stráže
 // (NEROZVINUTÁ ŠABLONA), rozhodnutí „nezapsat" dělá stráž sama.
 const domenyNerozbalenePouzite = new Map();
@@ -496,6 +549,20 @@ const dom = (key) => {
 // Operátor má pořád poslední slovo — prodEnv() zůstává první. Jen cílový
 // soubor už nemluví do toho, čím sám má být.
 const derivedTopo = (key) => prodEnv(key) || TOPOLOGY_ENV[key] || "";
+
+// Model pro běhy claude_cli_task (svc-agent-runner) — veřejná tvář „AISHA jako model“
+// (`GATEWAY_DOMAIN_PUBLIC` = ask.<public_tld>, derive-domains; core gateway /v1).
+// ⛔ 2026-10-07 (revize D6, majitel „síť zavřít“ = volba A): síť běhů je uzavřená,
+// běh smí ven jen přes broker-proxy runneru na VEŘEJNÉ https adresy z konfigurace — bez
+// adresy modelu se claude běh nespustí (fail-closed). Hodnota se ODVOZUJE (žádná doména
+// v kódu); instance bez veřejné tváře modelu dostane prázdno a claude běhy hlasitě odmítne.
+// Jiné rozhodnutí operátora (jiný model / vlastní endpoint) patří do .env-prod-backup.
+const modelBehuAgenta = () => {
+  const deklarace = prodEnv("ANTHROPIC_BASE_URL");
+  if (deklarace) return deklarace;
+  const tvar = derivedTopo("GATEWAY_DOMAIN_PUBLIC");
+  return tvar ? `https://${tvar}` : "";
+};
 
 // domZTopologie — složenina z config/domains.env rozvinutá proti TOPOLOGII.
 //
@@ -648,7 +715,8 @@ const image = (key, fallback) => process.env[key] || IMAGE_VERSIONS[key] || fall
 //                              an explicitly EMPTY one. For values where empty
 //                              is a meaningful choice rather than "unset".
 /**
- * Komu brána věří při výměně Keycloak tokenu za PostgREST JWT.
+ * Komu brána věří při výměně Keycloak tokenu za PostgREST JWT — a od 2026-10-04 i komu
+ * věří koncový bod MCP (svc-mcp-knowledge `/mcp`): táž hodnota, jeden domov.
  *
  * ⛔ PROČ SE TO ODVOZUJE. `services/gateway/src/config.ts` měl výčet
  * `?? 'aisha-app,aisha-dirigent-device'` — dosazený literál, který HÁDÁ fakt
@@ -670,13 +738,11 @@ const image = (key, fallback) => process.env[key] || IMAGE_VERSIONS[key] || fall
 function kcAllowedClients() {
   const out = new Set();
 
+  // Pravidlo pro platformní realm má jeden domov (lib/povoleni-klienti.mjs) — týmž
+  // skládají hodnotu místní presety, takže se místní stack a nasazení nerozejdou.
   const realm = join(ROOT, "keycloak", "aisha-realm.json");
   if (existsSync(realm)) {
-    for (const c of JSON.parse(readFileSync(realm, "utf8")).clients ?? []) {
-      if (c?.clientId && c.publicClient === true && !String(c.clientId).startsWith("account")) {
-        out.add(c.clientId);
-      }
-    }
+    for (const id of verejniKlientiRealmu(JSON.parse(readFileSync(realm, "utf8")))) out.add(id);
   }
 
   // Overlay je nepovinný (fork bez instance je platný stav), ale když je
@@ -717,6 +783,29 @@ const VAPID_PAR = Object.freeze({
   soukromy: "WEB_PUSH_VAPID_PRIVATE_KEY",
 });
 const jeParKlicu = (arg) => typeof arg === "object" && arg !== null && arg.par === "vapid";
+
+/**
+ * Klíč, který patří OPT-IN službě katalogu: dokud je její lane (`provision_when_env`)
+ * zavřená, doktor ho nevyrábí (secret) ani nehlásí jako chybějící (external) —
+ * instance, která službu nenasazuje, ho nenese a nemá ho nést. Vypíše se zvlášť
+ * („za zavřenou lane"), takže mlčení není tiché.
+ *
+ * Lane se NEOPISUJE: čte se z katalogu té služby (jeden domov `provision_when_env`),
+ * výklad „zapnuto?" z lib/provision-gate.mjs. Neznámá služba je chyba kontraktu.
+ *
+ * Druhý argument a dál = DALŠÍ přepínače, které musí být zapnuté taky (klíč smí
+ * žádat jen ta část služby, která se opravdu nasazuje). Funguje pro
+ * každý druh klíče (i `derived`): rozhoduje se dřív, než se větví podle druhu.
+ * Hodnoty: prostředí procesu, pak trezor (.env-prod-backup).
+ */
+const zaLaneSluzby = (id, ...dalsiPrepinace) => Object.freeze({ zaLaneSluzby: id, dalsiPrepinace });
+const podminkaZaLane = (rest) => rest.find((x) => x && typeof x === "object" && typeof x.zaLaneSluzby === "string");
+const ctiLane = (k) => process.env[k] || prodEnv(k);
+function laneSluzbyOtevrena({ zaLaneSluzby: id, dalsiPrepinace = [] }) {
+  const svc = JSON.parse(readFileSync(resolve(ROOT, "config/services.json"), "utf8")).services?.[id];
+  if (!svc) throw new Error(`kontrakt váže klíč na lane služby '${id}', kterou config/services.json nezná`);
+  return podminkaSplnena(svc.provision_when_env, ctiLane) && dalsiPrepinace.every((k) => jeLaneZapnuta(ctiLane(k)));
+}
 
 const CONTRACT = [
   // ── Core secrets (preserve if exist) ──────────────────────────────────────
@@ -881,24 +970,22 @@ const CONTRACT = [
   // "localhost" by se jako `static` zapsal NATRVALO a e-mail vlastníka n8n by
   // navždy ukazoval mimo instanci.
   ["N8N_BOOTSTRAP_OWNER_EMAIL", "static", `n8n-owner@${topo("PUBLIC_TLD") || topo("MESH_TLD")}`],
-  // Hostitelské cesty exec stacku — instančně odvozené (generate-secrets ř. 638/639),
-  // aby se dvě instance na jednom hostu nepřetahovaly o týž adresář.
-  // required-static, ne static: zdroj je fail-closed (generate-secrets ř. 560-570
-  // při prázdné identitě odmítne emitovat). Jako "static" by prázdné IDENTITY
-  // tiše zapsalo `/srv//base-repo` — tedy TÝŽ adresář pro každou instanci, přesně
-  // ta kolize, které mají zabránit. Tvrzení komentáře musí platit i v kódu.
+  // Hostitelská cesta běhů exec stacku — instančně odvozená (generate-secrets), aby se
+  // dvě instance na jednom hostu nepřetahovaly o týž adresář (runner ji dává dětem
+  // v Binds, sám pracuje v pevném /var/lib/agent-runs). AGENT_REPO_PATH (sdílený
+  // base-repo) je pryč: běh si repo klonuje sám z AGENT_GIT_REMOTE (fix/exec-klon-per-beh).
+  // required-static, ne static: zdroj je fail-closed (generate-secrets při prázdné
+  // identitě odmítne emitovat). Jako "static" by prázdné IDENTITY tiše zapsalo
+  // `/var/lib//agent-runs` — TÝŽ adresář pro každou instanci.
   // ⛔ A NEPRÁZDNOST MUSÍ MĚŘIT IDENTITU, NE ŘETĚZEC (naměřeno 2026-09-27 dry-runem nad
   // trezorem <fork>, který identitu neukládá): `/var/lib/${""}/…` je `/var/lib//…` —
   // NEPRÁZDNÝ řetězec, takže kontrola required-static prošla a doktor chtěl zapsat
   // cestu s dírou. Bez identity je hodnota PRÁZDNÁ → required-static ji ohlásí jako
   // chybějící (týž vzor jako INGEST_ALLOWED_HOSTS níž).
-  ["AGENT_REPO_PATH", "required-static", IDENTITY ? `/srv/${IDENTITY}/base-repo` : ""],
   ["AGENT_RUNS_DIR", "required-static", IDENTITY ? `/var/lib/${IDENTITY}/agent-runs` : ""],
-  // Hostitelské adresáře předrenderování — sdílí je renderer a web TÉŽE instance
-  // (naměřeno 2026-09-23: renderery dvou instancí zapisovaly do TÉHOŽ web-static).
-  // Jméno jiné než legacy /var/lib/aisha/web-* (tam píše starý renderer jiné instance).
-  ["WEB_RENDER_STATIC_HOST_DIR", "required-static", IDENTITY ? `/var/lib/${IDENTITY}/web-render/static` : ""],
-  ["WEB_RENDER_SHELL_HOST_DIR", "required-static", IDENTITY ? `/var/lib/${IDENTITY}/web-render/shell` : ""],
+  // Předrender po síti (d-ii, 2026-10-02): tajemství jen pro dvojici web → web-render
+  // (PUT /shell). Dřívější WEB_RENDER_*_HOST_DIR zmizely se sdíleným diskem.
+  ["WEB_RENDER_SHELL_TOKEN", "secret", 32],
   ["KEYCLOAK_URL", "static", dom("KEYCLOAK_URL")],
   ["KEYCLOAK_REALM", "static", "aisha"],
   ["KEYCLOAK_DOMAIN", "static", dom("KEYCLOAK_DOMAIN")],
@@ -1340,6 +1427,24 @@ const CONTRACT = [
   ["NETBIRD_AUTH_SCHEME", "static", "Bearer"],
   ["NETBIRD_SANDBOX_GROUP", "static", "sandbox-run"],
   ["NETBIRD_DNS_IP", "static", "127.0.0.11"],
+
+  // ── Modelový mesh forku (varianta C) ──────────────────────────────────────
+  // Druhá instance stacku NetBird (docker-compose.coolify-netbird-model.yml).
+  // Tajemství vydává generate-secrets (cold-start) i doktor: řídicí rovina
+  // modelového meshe přibývá i k EXISTUJÍCÍ instanci (model přesunutý na GPU slot)
+  // a na cestě redeploye do .env.coolify zapisuje jen doktor. Svazky nového stacku
+  // v té chvíli neexistují, takže vyrobit chybějící hodnotu je bezpečné; jednou
+  // zapsanou hodnotu doktor (jako každé `secret`) už nepřepíše a konvergence ji
+  // pak jen zachová.
+  // Bez STUN/TURN (v1 jen relay TCP 443) — TURN klíče proto nemá.
+  ["NETBIRD_MODEL_OIDC_CLIENT_ID", "static", "netbird-model"],
+  ["NETBIRD_MODEL_OIDC_SECRET", "secret", 32],
+  ["NETBIRD_MODEL_MGMT_SECRET", "secret", 32],
+  ["NETBIRD_MODEL_RELAY_SECRET", "secret", 32],
+  ["NETBIRD_MODEL_DATASTORE_ENC_KEY", "b64std", 24],
+  ["NETBIRD_MODEL_DB_PASSWORD", "secret", 32],
+  // Tajemství KC klienta `netbird-model-bootstrap` (token jen s audiencí modelového meshe).
+  ["NETBIRD_MODEL_BOOTSTRAP_SECRET", "secret", 32],
   // Rozsah peerů — edge-proxy si přes něj staví routu do mesh. Jediný domov
   // hodnoty je derive-subnets; tady se jen deklaruje, že se doručuje.
   ["NETBIRD_PEER_CIDR", "static", NETBIRD_PEER_CIDR],
@@ -1368,11 +1473,20 @@ const CONTRACT = [
   // multi-server operators override NETBIRD_MGMT_HOST with the Frontend host's
   // LAN IP in their environment (never committed — no infra addresses in repo).
   ["NETBIRD_MGMT_HOST", "static", "host-gateway"],
+  // Most modelového meshe (C4): kam z hostitele forku míří VEŘEJNÉ jméno řídicí
+  // roviny modelového meshe — uzel edge (slot s has_traefik). Jednouzlová instalace
+  // = host-gateway; cold-start dosadí zjištěnou adresu (PUBLIC_EDGE_HOST_ADDR) jako
+  // u NETBIRD_MGMT_HOST. Bez ní by agent mostu spoléhal na hairpin routeru.
+  ["MODEL_MESH_VSTUP_ADDR", "static", "host-gateway"],
   ["NETBIRD_MESH_HOST", "static", dom("NETBIRD_MESH_HOST")],
   ["NETBIRD_API_TOKEN", "external"], // PAT from netbird dashboard
   // Setup keys: filled by netbird-bootstrap.sh after netbird control plane is up.
   ["NETBIRD_STACK_KEY_FRONTEND", "placeholder"],
   ["NETBIRD_STACK_KEY_BACKEND", "placeholder"],
+  // Modelový mesh: jednorázový klíč mostu a IP uzlu na GPU slotu — zapisuje
+  // netbird-bootstrap.sh (NETBIRD_INSTANCE=model), doručuje se jen aplikaci mostu.
+  ["MODEL_MESH_MOST_SETUP_KEY", "placeholder"],
+  ["MODEL_MESH_GPU_PEER_IP", "placeholder"],
   ["NETBIRD_STACK_KEY_INTEGRATION", "placeholder"],
   ["NETBIRD_STACK_KEY_EXPERIMENTAL", "placeholder"],
   // Identifikátor patří ke klíči; deklaruje se stejně, aby ho kontrakt
@@ -1439,6 +1553,9 @@ const CONTRACT = [
     "static",
     process.env.AISHA_WEB_PUBLIC_ALIASES || prodEnv("AISHA_WEB_PUBLIC_ALIASES"),
   ],
+  // Seznam značek webu z doménového overlaye instance (viz WEB_DEKLARACE výš).
+  // Čte ho doktor domén a deploy-init přes lib/domeny-webu.mjs; „nevím" se nezapíše.
+  ["WEB_FQDNS", "derived", WEB_DEKLARACE.znamo ? WEB_DEKLARACE.hodnota : ""],
   // Apex routed by edge-proxy only in redirect mode. Resolver-derived:
   // PUBLIC_TLD when the apex redirect applies, else the unroutable sentinel
   // apex-redirect-disabled.invalid (router exists, never matches).
@@ -1464,6 +1581,8 @@ const CONTRACT = [
   // v kontraktu chyběl — a compose s `:?` ho vyžaduje, takže brána
   // env-doctor-contract-coverage právem zastavila push.
   ["INGEST_UPSTREAM_MESH", "derived", derivedTopo("INGEST_UPSTREAM_MESH")],
+  // Mesh cíl web-renderu pro web (předrender po síti, d-ii — web má vlastní routu).
+  ["WEB_RENDER_UPSTREAM_MESH", "derived", derivedTopo("WEB_RENDER_UPSTREAM_MESH")],
   ["MATRIX_DOMAIN", "static", dom("MATRIX_DOMAIN")],
   ["ELEMENT_DOMAIN", "static", dom("ELEMENT_DOMAIN")],
   ["ELEMENT_CALL_DOMAIN", "static", dom("ELEMENT_CALL_DOMAIN")],
@@ -1558,9 +1677,18 @@ const CONTRACT = [
   ["STORAGE_PUBLIC_URL", "derived", domZTopologie("STORAGE_PUBLIC_URL")],
 
   // ── Plugin / exec runtime ─────────────────────────────────────────────────
-  ["PLUGIN_SYSTEM_URL", "static", dom("PLUGIN_SYSTEM_URL")],
-  ["PLUGIN_BROKER_URL", "static", dom("PLUGIN_BROKER_URL")],
+  // `derived`, ne `static` (2026-10-01): adresa je jméno v meshi z derivace topologie.
+  // Jako `static` ji apply zachoval ZASTARALOU — naměřeno na instanci: uloženo
+  // `backend.mesh…` (jméno před 2026-08-25), derivace `<prefix>-plugin-system.mesh…`;
+  // runner pak brokeru nedosáhl a každý běh pluginu skončil exit 255. Jiné rozhodnutí
+  // operátora patří do .env-prod-backup (derivedTopo() ho čte první). ⛔ derivedTopo,
+  // ne holé dom(): dom() bere process.env dřív než derivaci, a ten nese hodnotu
+  // z cílového souboru — drift by potvrdil sám sebe (naměřeno: apply nezměnil nic).
+  ["PLUGIN_SYSTEM_URL", "derived", derivedTopo("PLUGIN_SYSTEM_URL") || dom("PLUGIN_SYSTEM_URL")],
+  ["PLUGIN_BROKER_URL", "derived", derivedTopo("PLUGIN_BROKER_URL") || dom("PLUGIN_BROKER_URL")],
   ["AGENT_RUNNER_URL", "static", dom("AGENT_RUNNER_URL")],
+  // Model claude_cli_task — viz modelBehuAgenta() (veřejná tvář ask.<tld> z topologie).
+  ["ANTHROPIC_BASE_URL", "derived", modelBehuAgenta()],
   ["AGENT_RUNNER_ENABLED", "static", "true"],
   ["RUNNER_BACKEND", "static", "docker"],
   ["KATA_DEFAULT_RUNTIME", "static", "kata-dragonball"],
@@ -1571,6 +1699,14 @@ const CONTRACT = [
   ["DEFAULT_TIMEOUT_MS", "static", "30000"],
   ["MAX_TIMEOUT_MS", "static", "300000"],
   ["LOG_LEVEL", "static", "info"],
+
+  // Klíč modelu forku (VLLM_GENERATION_URL): lane na GPU ho vyžaduje u každého požadavku
+  // a ověřuje proti otisku (sha256) v deklaraci uzlu. Vzniká TADY (secret — přibývá i
+  // k existující instanci), doručuje se JEN volajícím modelu (svc-ai-chat, svc-mcp-knowledge;
+  // K1). Jednou zapsaný se nepřepisuje: rotace = vědomý krok s novým otiskem u uzlu.
+  // Compose ho nese jako `${VLLM_API_KEY:-}` — `:?` by ho vtáhl do build-time množiny
+  // (zapečení do obrazu); chybějící klíč hlásí nahlas llm-dispatch a lane (KLIC_CHYBI).
+  ["VLLM_API_KEY", "secret", 32],
 
   // ── External (3rd-party API keys; populate from .env-prod-backup) ─────────
   ["OPENAI_API_KEY", "external"],
@@ -1612,7 +1748,12 @@ const CONTRACT = [
   ["LLM_GATEWAY_DOMAIN", "static", dom("LLM_GATEWAY_DOMAIN")],
   // Traefik Host() in docker-compose.coolify-llm-gateway.yml — canonical subdomain
   // alias; resolver emits GATEWAY_DOMAIN alongside legacy LLM_GATEWAY_DOMAIN.
-  ["GATEWAY_DOMAIN", "required-static", topo("GATEWAY_DOMAIN")],
+  // NOT "required-static" (stejná třída jako BROKER_DOMAIN výš): llm-gateway je tier
+  // optional a profil ho smí vyloučit — resolver pak klíč NEVYDÁ a tvrdá povinnost by
+  // shodila preflight i studený start instance, která o gateway nikdy nežádala
+  // (naměřeno 2026-10-06 na profilu s tier_filter required+important). Kde gateway běží,
+  // vynutí klíč validátor aplikace z ${VAR} jejího compose (_unprovisioned_services()).
+  ["GATEWAY_DOMAIN", "static", topo("GATEWAY_DOMAIN")],
   // LLM_GW_UPSTREAM_URL: upstream OpenAI-compatible endpoint the gateway
   // forwards to (own SaaS, vLLM, Ollama, etc.). Empty means no managed
   // upstream configured; the key still has to exist for compose validation.
@@ -1887,6 +2028,33 @@ const CONTRACT = [
   // podmiňuje celou službu (`provision_when_env: INGEST_BUNDLE_GIT_URL`).
   // Bez URL je ref bezpředmětný, takže ho nelze vyžadovat samostatně.
   ["INGEST_BUNDLE_GIT_REF", "placeholder"],
+  // ── Akcelerační vrstva (GPU uzel, slot `gpu`) ────────────────────────────
+  // Všechno ACCEL_* je odvozené z deklarace GPU uzlu v datech instance vlastníka vrstvy
+  // (overlay accel/uzel.json) — JEDEN domov: lib/derive-accel-uzel.mjs, týž, který volá
+  // cold-start (heredoc přes lib/accel-vrstva-env.sh). `derived` = drift se přepíše, takže
+  // změna deklarace dojde i redeployem. Instance bez deklarace: prázdné (lane vrstvy
+  // zavřené). Vadná deklarace: prázdné + důvod na stderr (cold-start na ní STOPne).
+  // Výklad a ověření deklarace: lib/accel-uzel.mjs; tvar proměnných firewallu posuzuje
+  // posudAccel (lib/accel-deklarace.mjs) níž v malformedValues.
+  ...kliceVrstvy().map((k) => [k, "derived", hodnotaVrstvyNeboPrazdno(k)]),
+  // Port SSH do CI VM na hostiteli uzlu (DNAT správy), nebo výslovné `zadna` =
+  // žádná CI VM. Čte ho vnější sonda doktora (lib/vnejsi-expozice.mjs), žádný
+  // compose. Hodnotu dodává OBSLUHA instance: doktor ji jen přenese z trezoru,
+  // výchozí není a port se nehádá (výklad: lib/accel-deklarace.mjs portCiVm;
+  // bez deklarace sonda hlásí NEZMĚŘENO).
+  ["ACCEL_CI_VM_SSH_PORT", "external", zaLaneSluzby("accel-hostfw")],
+  // Interní klíč operátora mezi vstupem lane a enginy (VLLM_API_KEY enginu, obrana do
+  // hloubky na síti jádra; nájemci ho nikdy nedostanou). Vyrábí ho doktor se zapnutou lane
+  // vstupu, cold-start ho zachová (carry-over tajemství): nový klíč by rozpojil VB a enginy
+  // do příštího nasazení obou. Compose ho čte HOLÝ (`${ACCEL_JADRO_API_KEY}`), nikdy `:?`.
+  ["ACCEL_JADRO_API_KEY", "secret", 32, zaLaneSluzby("accel-vstup")],
+  // Čtecí token Hugging Face (repozitáře za licencí, kterou účet přijal). V trezoru
+  // pod jménem HF_READ_TOKEN; compose vstupu ho předá JEN stahovači vah (accel-vahy)
+  // jako HF_TOKEN HOLÝM `${HF_READ_TOKEN}` — `${…:?}` by z tajemství udělal build-time
+  // hodnotu zapsanou do historie obrazu (rohatka build-time-mnozina-vsech-compose).
+  // Povinný jen pro bázi za licencí (pozná až stažení u Hugging Face) — proto
+  // deklarace obsluhy, ne povinný vstup.
+  ["HF_READ_TOKEN", "template-default", "", zaLaneSluzby("accel-vstup")],
   // Build-time pull-through cache prefix. cold-start's heredoc derives it
   // (`REGISTRY_PROXY=${REGISTRY_DOMAIN:+${REGISTRY_DOMAIN}/}`) but this tool did not know
   // it at all, so when REGISTRY_DOMAIN was repaired here the prefix kept the stale host —
@@ -1913,7 +2081,8 @@ const CONTRACT = [
   ["OPENCLAW_DOMAIN", "static", dom("OPENCLAW_DOMAIN")],
   // Traefik Host() in docker-compose.coolify-openclaw.yml — canonical subdomain
   // alias; resolver emits COMPANION_DOMAIN alongside legacy OPENCLAW_DOMAIN.
-  ["COMPANION_DOMAIN", "required-static", topo("COMPANION_DOMAIN")],
+  // NOT "required-static" — openclaw je tier optional (viz GATEWAY_DOMAIN výš, táž třída).
+  ["COMPANION_DOMAIN", "static", topo("COMPANION_DOMAIN")],
 
   // ── Maestro / integration (aisha-integration stack) ───────────────────────
   // MAESTRO_API_KEY: auth token for internal Maestro REST API calls.
@@ -2118,6 +2287,7 @@ async function main() {
   const additions = []; // [key, value, source, kind, nahradit?]
   const externalMissing = [];
   const externalNekonzumovane = [];
+  const zaZavrenouLane = []; // klíče opt-in služby, jejíž lane je zavřená — nevyrábí se ani nehlásí
   // Klíč → NEPRÁZDNÁ hodnota, kterou tenhle běh přepsal (ne doplnil). Alias,
   // který byl kopií té staré hodnoty, ji musí následovat — jinak by po opravě
   // cíle nesl dál starý svět (plocha by odebírala jiným klíčem, než svc-push
@@ -2218,6 +2388,11 @@ async function main() {
 
   function resolveOne(entry) {
     const [key, kind, ...rest] = entry;
+    const zaLane = podminkaZaLane(rest);
+    if (zaLane && !laneSluzbyOtevrena(zaLane)) {
+      zaZavrenouLane.push(key);
+      return;
+    }
     if (kind === "secret" && jeParKlicu(rest[0])) return resolveVapidPar(rest[0]);
     // ⛔ ODVOZENÁ HODNOTA BEZ VSTUPU NENÍ DRIFT (naměřeno 2026-09-13).
     //
@@ -2249,6 +2424,15 @@ async function main() {
       duvodOdvozeni = REGISTRY_PROXY_ROZLISENI.zdroj === "deklarace"
         ? (rest[0] ? "deklarace operátora" : "cache výslovně vypnutá operátorem")
         : "centrální cache z domova";
+    }
+    if (kind === "derived" && key === "WEB_FQDNS") {
+      // Nevím = nezapsat nic (ani prázdno) a skončit nenulou — viz WEB_DEKLARACE.
+      if (!WEB_DEKLARACE.znamo) return;
+      if (existing.has(key) && existing.get(key) === String(rest[0] ?? "")) return;
+      // Známá PRÁZDNÁ deklarace musí přepsat i neprázdnou uloženou hodnotu (značky
+      // z overlaye zmizely); obecná pojistka `odvozeno !== ""` níž by ji spolkla.
+      vynutitZapis = true;
+      duvodOdvozeni = WEB_DEKLARACE.zdroj;
     }
     if (kind === "derived" && key === "GATEWAY_TRUSTED_PROXIES") {
       const r = srovnaniTrustedProxies({ existujici: existing.get(key), meshPeerIps: meshPeerIps() });
@@ -2565,6 +2749,9 @@ async function main() {
   const derivedPrazdne = [];
   for (const e of CONTRACT) {
     const [key, kind] = e;
+    // Klíč za zavřenou lane se nevyrábí — vyžadovat ho by byl fail-closed na
+    // podmínku, kterou instance bez té služby nemůže a nemá splnit.
+    if (zaZavrenouLane.includes(key)) continue;
     if (kind === "secret" || kind === "hex") REQUIRED_NON_EMPTY.add(key);
     if (kind === "required-static") REQUIRED_NON_EMPTY.add(key);
     if (kind === "derived") {
@@ -2585,6 +2772,7 @@ async function main() {
     "LANGFUSE_DB_PASSWORD", "PKI_DB_PASSWORD", "PKI_DB_ROOT_PASSWORD",
     "PKI_OIDC_SECRET", "PKI_SVAULT_KEY", "PKI_COOKIE_SECRET",
     "NETBIRD_OIDC_SECRET", "NETBIRD_MGMT_SECRET", "NETBIRD_RELAY_SECRET",
+    "NETBIRD_MODEL_DB_PASSWORD", "NETBIRD_MODEL_MGMT_SECRET", "NETBIRD_MODEL_RELAY_SECRET",
     "RABBITMQ_DEFAULT_PASS", "MINIO_ROOT_PASSWORD", "REDIS_PASSWORD",
   ];
   const emptyRequired = [];
@@ -2689,6 +2877,10 @@ async function main() {
     }
   }
   for (const key of JWT_SHAPE_KEYS) checkShape(key, assertJwtShape);
+  // Firewall hostitele GPU uzlu: tvar každé VYPLNĚNÉ hodnoty, povinnost s otevřenou lane
+  // accel-hostfw (deklarace uzlu). Bez lane a bez hodnot žádný nález. Výklad sdílí
+  // s firewallem v kontejneru (lib/accel-deklarace.mjs).
+  for (const c of posudAccel((k) => resolved.get(k) ?? process.env[k])) malformedValues.push(c);
   if (malformedValues.length > 0) {
     log(C.bold("Malformed values (wrong byte length / not a JWT — would crash at deploy):"));
     for (const m of malformedValues) log(`  ${C.red("✗")} ${m}`);
@@ -2731,6 +2923,12 @@ async function main() {
   if (placeholders.length > 0) {
     log(C.bold("Placeholders (empty, filled by other tools):"));
     for (const k of placeholders) log(`  ${C.yellow("~")} ${k}`);
+    log("");
+  }
+
+  if (zaZavrenouLane.length > 0) {
+    log(C.bold("Klíče opt-in služeb za ZAVŘENOU lane (služba se nenasazuje — nic se nevyrábí ani nevyžaduje):"));
+    for (const k of zaZavrenouLane) log(`  ${C.dim ? C.dim("·") : "·"} ${k}`);
     log("");
   }
 
@@ -2797,17 +2995,31 @@ async function main() {
     ...(STRICT ? prepsaneHodnoty : []),
   ];
   const strictFail = strictFailures.length > 0;
+  if (!WEB_DEKLARACE.znamo) {
+    const duvod =
+      `WEB_FQDNS (domény webu) NEZNÁM: ${WEB_DEKLARACE.duvod} — klíč NEZAPSÁN (ani prázdný: ` +
+      `„jedna značka" by doktor domén zapsal a routy značek smazal). Zpřístupni doménový overlay instance ` +
+      `(AISHA_INSTANCE_CONFIG_DIR / AISHA_INSTANCE_DATA_GIT_URL, COOLIFY_<ENV>_DOMAINS_FILE) a spusť znovu.`;
+    err(duvod);
+    console.error(duvod);
+  }
+  // Kód „WEB_FQDNS nevím" jen tam, kde by se klíč ZAPISOVAL (apply). Kontrolní
+  // běhy (--report / --dry-run — preflight syncu prostředí, doktor cold-startu)
+  // se ptají na úplnost prostředí aplikací, ne na domény webu: nevím vypíšou
+  // (výš), ale kód řídí jejich vlastní otázka.
+  const webNevimKod = !WEB_DEKLARACE.znamo && !REPORT_ONLY && !DRY_RUN;
+  const kodKonce = strictFail && STRICT ? 1 : webNevimKod ? KOD_ENV_DOKTORA_WEB_NEVIM : 0;
   if (REPORT_ONLY) {
     log(C.dim("(report-only mode — no changes written)\n"));
-    await konec(strictFail && STRICT ? 1 : 0);
+    await konec(kodKonce);
   }
   if (DRY_RUN) {
     log(C.dim("(dry-run — no changes written; rerun without --dry-run to apply)\n"));
-    await konec(strictFail && STRICT ? 1 : 0);
+    await konec(kodKonce);
   }
   if (additions.length === 0) {
     ok("Nothing to add — env file is complete.\n");
-    await konec(strictFail && STRICT ? 1 : 0);
+    await konec(kodKonce);
   }
 
   // ⛔ SOUBĚH ZAPISOVATELŮ (naměřeno 2026-09-15 ve vlně redeploye). Doktor
@@ -2865,7 +3077,7 @@ async function main() {
   }
   nahradObsahAtomicky(ENV_PATH, appendKeysToText(uvozeny, additions), { mode: 0o600 });
   ok(`Wrote ${additions.length} new keys to ${ENV_PATH}\n`);
-  await konec(strictFail && STRICT ? 1 : 0);
+  await konec(kodKonce);
 }
 
 // `main` je asynchronní kvůli `konec()` — vylití výstupu před ukončením.

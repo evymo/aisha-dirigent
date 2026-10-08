@@ -72,6 +72,27 @@ describe("Proposal outcome: cron workflow + migration", () => {
     }
   });
 
+  it("kotví jen fázi outcome přes insert_record a typ záznamu je v uzavřené taxonomii (2026-10-07)", () => {
+    // ⛔ Dřív uzel volal edge_blockchain_audit('proposal_outcome_anchor') — akci, kterou
+    // dispečer nikdy neměl; fail-open uzel každé kotvení tiše ztratil. Třídu hlídá
+    // n8n-vola-jen-akce-dispeceru; tady tvar konkrétního kotvení.
+    const wf = JSON.parse(fs.readFileSync(WF, "utf-8"));
+    const nodes: N8nNode[] = wf.nodes || [];
+    const anchor = nodes.find((n) => n.name === "Anchor Outcome");
+    const build = nodes.find((n) => n.name === "Build Outcome Anchor");
+    expect(anchor?.parameters?.functionName).toBe("edge_blockchain_audit");
+    expect(String(anchor?.parameters?.rpcParams)).toMatch(/p_action:\s*'insert_record'/);
+    const code = String((build?.parameters as { jsCode?: string } | undefined)?.jsCode ?? "");
+    expect(code, "kotví se rozhodnutí (fáze outcome), ne baseline").toMatch(/phase\s*!==\s*'outcome'/);
+    expect(code).toMatch(/payload_hash/);
+    const typ = /event_type:\s*'([a-z_]+)'/.exec(code)?.[1];
+    const taxonomie = fs.readFileSync(path.join(ROOT, "aisha/db/sql/tables/blockchain_audit_records.sql"), "utf-8");
+    expect(typ, "typ záznamu kotvy").toBeTruthy();
+    expect(taxonomie, `record_type '${typ}' musí být v CHECK taxonomii`).toContain(`'${typ}'`);
+    expect(wf.connections?.["Record outcome"]?.main?.[0]?.[0]?.node).toBe("Build Outcome Anchor");
+    expect(wf.connections?.["Build Outcome Anchor"]?.main?.[0]?.[0]?.node).toBe("Anchor Outcome");
+  });
+
   it("proposal outcome is column + functions only (no dedicated table)", () => {
     // The lens/loop adds an `outcome jsonb` column to improvement_proposals plus
     // functions — NO new table. The migration was folded into the baseline, so

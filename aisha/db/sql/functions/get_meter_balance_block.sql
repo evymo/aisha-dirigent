@@ -16,16 +16,29 @@
 --                              (např. ["energie","nasobitel"]); bez ní 1
 --   residual_path      volitelné cesta k seznamu dopočtových řádků v metadatech
 --                              hlavního (neprázdný = rozdíl vychází nulový Z PRINCIPU)
+--   reading_rule       volitelné jak se odvodí stav podružného k hranici období, když k ní
+--                              není přesný odečet: 'linearne' (výchozí) | 'posledni_pred' |
+--                              'presny' — viz meter_usage_between; jiná hodnota = bad_config
+--   tz                 volitelné pásmo, ve kterém období začíná a končí (výchozí 'UTC',
+--                              jako bloky twin_metric_*); instance s odečty o místní půlnoci
+--                              ho MUSÍ deklarovat, jinak hranice minou odečty o hodinu–dvě
 --
 -- ⭐ PODRUŽNÁ JEN PŘES POTVRZENÉ HRANY (twin_relations). Návrh vazby, o kterém
 -- ještě nikdo nerozhodl, do bilance nevstupuje — jinak by bilance tvrdila
 -- strukturu, kterou člověk neschválil. Hrana musí platit v daném období.
 --
--- ⭐ SPOTŘEBA SE POČÍTÁ Z ODEČTŮ (event_type 'meter_reading', tatáž veličina jako
--- terénní odečet): konec období − počátek období, kde počátek je výslovný
--- odečet 'pocatek' (výměna měřidla, první měsíc), jinak konec předchozího
--- období; krát násobitel. Odečet bez `period` do bilance nevstupuje — neví se,
--- kam patří (hlásí se jako chybějící, ne jako nula).
+-- ⭐ ODEČET JE HODNOTA K DATU, ROLI ODVOZUJE BILANCE (majitel 2026-10-04: „je to prostě
+-- odečet k datu; jak a kam vstupuje, jsou věci vždy dynamické, odvozené v čase“).
+-- Spotřeba podružného za období = stav k jeho konci − stav k jeho počátku, odvozené
+-- z odečtů (event_type 'meter_reading', jakýkoli zdroj — sešit, terén, IoT) funkcí
+-- meter_usage_between podle `reading_rule`; krát násobitel. Přesný odečet k hranici má
+-- přednost; odvozený stav je ODHAD a řádek to řekne (sloupec `odhad`, stav estimated).
+-- Výměna měřidla (`kind = 'pocatek'` uprostřed řady) není spotřeba. Mimo rozsah odečtů se
+-- neextrapoluje — chybí. Nálepka `period` na odečtu (import sešitu) se NEČTE: odečty ze
+-- sešitu leží přesně na hranicích (místní půlnoc), takže dávají totéž jako dřív.
+--
+-- (do 2026-10-04 bilance četla jen odečty s nálepkou `period`/`kind` — terénní odečet,
+-- který je nenese, do ní nikdy nevstoupil: mezera G3 návrhu vyúčtování energií.)
 --
 -- STAV řádku (klíč app.meters.balance.state.*, sloupec value_keys) říká, JAK
 -- rozdíl číst — bilance bez něj svádí k závěru i tam, kde žádný není:
@@ -33,6 +46,8 @@
 --   no_main          hlavní za období nemá spotřebu
 --   unit_mismatch    jednotky hlavního a podružných se liší (nepřepočítává se)
 --   missing_readings některému podružnému chybí odečet → součet je neúplný
+--   estimated        stav některého podružného k hranici je odvozený (odhad) → součet platí
+--                    s přesností odhadu (sloupec `odhad` = kolik podružných)
 --   residual         hlavní má dopočtový řádek → rozdíl je nulový z principu
 --   measured         změřená bilance
 -- ============================================================================
@@ -58,7 +73,9 @@ AS $$
                   then p_params->'multiplier_path' else '[]'::jsonb end)), '{}'::text[]) as mult_path,
            coalesce(array(select jsonb_array_elements_text(
              case when jsonb_typeof(p_params->'residual_path') = 'array'
-                  then p_params->'residual_path' else '[]'::jsonb end)), '{}'::text[]) as resid_path
+                  then p_params->'residual_path' else '[]'::jsonb end)), '{}'::text[]) as resid_path,
+           coalesce(nullif(btrim(coalesce(p_params->>'reading_rule', '')), ''), 'linearne') as pravidlo,
+           coalesce(nullif(btrim(coalesce(p_params->>'tz', '')), ''), 'UTC') as tz
   ),
   sloupce as (
     select jsonb_build_array(
@@ -69,6 +86,7 @@ AS $$
       jsonb_build_object('key', 'rozdil',     'label_key', 'app.meters.balance.col.difference', 'align', 'right'),
       jsonb_build_object('key', 'rozdil_pct', 'label_key', 'app.meters.balance.col.difference_pct', 'align', 'right'),
       jsonb_build_object('key', 'chybi',      'label_key', 'app.meters.balance.col.missing', 'align', 'right'),
+      jsonb_build_object('key', 'odhad',      'label_key', 'app.meters.balance.col.estimated', 'align', 'right'),
       jsonb_build_object('key', 'stav',       'label_key', 'app.meters.balance.col.state', 'value_keys', true)
     ) as c
   ),
@@ -83,22 +101,25 @@ AS $$
   ),
   podruzna as (
     select r.source_twin_id as id, r.valid_from, r.valid_to,
-           coalesce(nullif(s.metadata #>> (select mult_path from cfg), '')::numeric, 1) as nas
+           -- Bez `multiplier_path` násobitel 1 (hlavička). ⛔ Prázdná cesta NESMÍ do `#>>`:
+           -- `metadata #>> '{}'` vrátí CELÝ objekt jako text a `::numeric` spadne (naměřeno
+           -- 2026-10-04 testem odecet-nese-obdobi — dosavadní test cestu vždy předával).
+           case when cardinality((select mult_path from cfg)) = 0 then 1
+                else coalesce(nullif(s.metadata #>> (select mult_path from cfg), '')::numeric, 1)
+           end as nas
       from twin_relations r
       join twin_entities s on s.id = r.source_twin_id
       join cfg on r.target_twin_id = cfg.twin and r.relation_kind = cfg.kind
   ),
-  -- Jeden odečet na (měřidlo, období, druh): při souběhu platí poslední pořízený.
+  -- Odečty podružných (jakýkoli zdroj) — jen pro výčet období a čerstvost; spotřebu
+  -- odvozuje meter_usage_between z odečtů K DATU.
   odecty as (
-    select distinct on (e.twin_id, e.attrs->>'period', e.attrs->>'kind')
-           e.twin_id, e.attrs->>'period' as per, e.attrs->>'kind' as druh,
-           (e.attrs->>'value')::numeric as v, e.attrs->>'unit' as j, e.occurred_at
+    select e.twin_id, e.occurred_at,
+           e.occurred_at = min(e.occurred_at) over (partition by e.twin_id) as prvni
       from twin_events e
       join podruzna p on p.id = e.twin_id
      where e.event_type = 'meter_reading'
-       and e.attrs->>'period' ~ '^\d{4}-\d{2}$'
        and jsonb_typeof(e.attrs->'value') = 'number'
-     order by e.twin_id, e.attrs->>'period', e.attrs->>'kind', e.occurred_at desc, e.id
   ),
   spotreba_hl as (
     select e.attrs->>'period' as per, sum((e.attrs->>'value')::numeric) as v,
@@ -110,24 +131,37 @@ AS $$
        and jsonb_typeof(e.attrs->'value') = 'number'
      group by e.attrs->>'period'
   ),
+  -- Období = měsíce spotřeby hlavního ∪ měsíce, které odečet podružného UZAVÍRÁ nebo do
+  -- kterých padá (v pásmu bloku; odečet přesně o půlnoci 1. dne uzavírá PŘEDCHOZÍ měsíc).
+  -- První odečet měřidla období nezakládá — před ním není co uzavírat (jinak by import
+  -- sešitu s počátky k 1. 1. vyrobil prázdný řádek za prosinec).
   obdobi as (
-    select per from odecty where druh = 'konec'
+    select distinct to_char((o.occurred_at at time zone (select tz from cfg)) - interval '1 microsecond', 'YYYY-MM') as per
+      from odecty o
+     where not o.prvni
     union
     select per from spotreba_hl
   ),
-  spotreba_pod as (
-    select o.per, p.id,
-           (k.v - coalesce(z.v, pk.v)) * p.nas as sp,
-           coalesce(k.j, z.j) as j
+  hranice as (
+    select o.per,
+           (to_date(o.per, 'YYYY-MM')::timestamp at time zone (select tz from cfg))                       as od,
+           ((to_date(o.per, 'YYYY-MM') + interval '1 month')::timestamp at time zone (select tz from cfg)) as do_
       from obdobi o
-      cross join podruzna p
-      left join odecty k  on k.twin_id = p.id and k.per = o.per and k.druh = 'konec'
-      left join odecty z  on z.twin_id = p.id and z.per = o.per and z.druh = 'pocatek'
-      left join odecty pk on pk.twin_id = p.id and pk.druh = 'konec'
-                         and pk.per = to_char(to_date(o.per, 'YYYY-MM') - interval '1 month', 'YYYY-MM')
-     -- hrana musí platit v období (osa B: příslušnost k datu)
-     where p.valid_from < (to_date(o.per, 'YYYY-MM') + interval '1 month')
-       and (p.valid_to is null or p.valid_to > to_date(o.per, 'YYYY-MM'))
+  ),
+  spotreba_pod as (
+    select x.per, x.id,
+           (x.u->>'spotreba')::numeric * x.nas as sp,
+           x.u->>'jednotka' as j,
+           coalesce((x.u->>'odhad')::boolean, false) and not coalesce((x.u->>'chybi')::boolean, true) as odhad
+      from (
+        select h.per, p.id, p.nas,
+               public.meter_usage_between(p.id, h.od, h.do_, (select pravidlo from cfg)) as u
+          from hranice h
+          cross join podruzna p
+         -- hrana musí platit v období (osa B: příslušnost k datu)
+         where p.valid_from < h.do_
+           and (p.valid_to is null or p.valid_to > h.od)
+      ) x
   ),
   bilance as (
     select o.per,
@@ -135,6 +169,7 @@ AS $$
            (select sum(s.sp) from spotreba_pod s where s.per = o.per) as podruzne,
            (select count(*) from spotreba_pod s where s.per = o.per) as podruznych,
            (select count(*) from spotreba_pod s where s.per = o.per and s.sp is null) as chybi,
+           (select count(*) from spotreba_pod s where s.per = o.per and s.odhad) as odhadu,
            (select count(distinct s.j) from spotreba_pod s where s.per = o.per and s.j is not null) as jednotek_pod,
            (select min(s.j) from spotreba_pod s where s.per = o.per) as j_pod
       from obdobi o
@@ -157,12 +192,14 @@ AS $$
              'rozdil_pct', case when b.hlavni is not null and b.hlavni <> 0 and b.podruzne is not null
                                 then round(100 * (b.hlavni - b.podruzne) / b.hlavni, 1) end,
              'chybi',      b.chybi,
+             'odhad',      b.odhadu,
              'stav', 'app.meters.balance.state.' || case
                 when b.podruznych = 0                                        then 'no_submeters'
                 when b.hlavni is null                                        then 'no_main'
                 when b.jednotek_hl > 1 or b.jednotek_pod > 1
                   or b.j_hl is distinct from b.j_pod                         then 'unit_mismatch'
                 when b.chybi > 0                                             then 'missing_readings'
+                when b.odhadu > 0                                            then 'estimated'
                 when coalesce((select ano from dopocet), false)              then 'residual'
                 else 'measured' end
            ) as r
@@ -184,6 +221,13 @@ AS $$
       'data', jsonb_build_object('columns', '[]'::jsonb, 'rows', '[]'::jsonb),
       'provenance', jsonb_build_object('source_slug', 'meter-balance',
         'trace_id', 'meter-balance:missing_config', 'freshness_at', now()))
+    -- Pravidlo nebo pásmo v datech JE, ale nejde použít → vadná konfigurace (ne tichý výchozí).
+    when (select pravidlo from cfg) not in ('presny', 'posledni_pred', 'linearne')
+      or not exists (select 1 from pg_timezone_names z where z.name = (select tz from cfg))
+    then jsonb_build_object(
+      'data', jsonb_build_object('columns', '[]'::jsonb, 'rows', '[]'::jsonb),
+      'provenance', jsonb_build_object('source_slug', 'meter-balance',
+        'trace_id', 'meter-balance:bad_config', 'freshness_at', now()))
     else jsonb_build_object(
       'data', jsonb_build_object(
         'columns', (select c from sloupce),

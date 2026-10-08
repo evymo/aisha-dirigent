@@ -347,3 +347,45 @@ describe('AISHA packages auto-publish — CVE-recovery force input (E)', () => {
     }
   });
 });
+
+describe('AISHA packages auto-publish — a failed build keeps the compiler output', () => {
+  // `tsc` writes diagnostics to STDOUT; npm writes the failed lifecycle to STDERR.
+  // Measured 2026-10-03: three publish runs in a row logged "build failed (exit 2)"
+  // for six packages without a single TS error — `stderr || stdout` dropped the
+  // compiler output whenever npm said anything, so a broken package could not be
+  // told apart from a broken workflow.
+  const source = readFileSync(RUNNER, 'utf8');
+  const match = source.match(/function buildPkg\(pkgDir, pkgName\) \{[\s\S]*?\n\}\n/);
+
+  /** The REAL buildPkg from the runner, with `spawnSync` swapped for a fake. */
+  const buildPkgWith = (result: { status: number; stdout: string; stderr: string }) => {
+    const spawnSync = () => ({ status: result.status, stdout: Buffer.from(result.stdout), stderr: Buffer.from(result.stderr) });
+    return new Function('spawnSync', `${match![0]}; return buildPkg;`)(spawnSync) as (dir: string, name: string) => string;
+  };
+
+  test('buildPkg is found in the runner (the extraction below must not test nothing)', () => {
+    expect(match, 'buildPkg not found in scripts/aisha-packages-publish.mjs').not.toBeNull();
+  });
+
+  test('failure message carries stdout (tsc) AND stderr (npm)', () => {
+    const buildPkg = buildPkgWith({
+      status: 2,
+      stdout: "src/index.ts(3,21): error TS2307: Cannot find module 'x' or its corresponding type declarations.\n",
+      stderr: 'npm error Lifecycle script `build` failed with error:\nnpm error code 2\n',
+    });
+    let message = '';
+    try {
+      buildPkg('/nonexistent/pkg', '@scope/pkg');
+    } catch (e) {
+      message = (e as Error).message;
+    }
+    expect(message).toContain('build failed (exit 2)');
+    expect(message, 'compiler diagnostics were dropped from the failure message').toContain('error TS2307');
+    expect(message, 'npm lifecycle line was dropped from the failure message').toContain('npm error code 2');
+  });
+
+  test('a successful build still returns its duration', () => {
+    const buildPkg = buildPkgWith({ status: 0, stdout: '', stderr: '' });
+    expect(buildPkg('/nonexistent/pkg', '@scope/pkg')).toMatch(/^\d+\.\d$/);
+  });
+});

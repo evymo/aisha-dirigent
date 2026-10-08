@@ -44,7 +44,7 @@ BEGIN
       'provenance', jsonb_build_object(
         'source_slug', 'plugin-health',
         'freshness_at', to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'),
-        'trace_id', 'data-source-feed-health:forbidden'));
+        'trace_id', 'data-source-feed-health:unauthorized'));
   END IF;
 
   WITH zdroje AS (

@@ -4,25 +4,27 @@
 --   Setting approved_at clears the hold so claim_queued_claude_run drains it. The
 --   approver-side twin of fn_spawn_claude_cli_run's ask branch. Mirrors
 --   approve_playwright_run: admin/staff + segregation of duties + audit.
--- Security: SECURITY INVOKER (admin check + approver identity from the caller).
+-- Security: SECURITY DEFINER; explicit admin gate and caller identity.
+-- A distinct approver has no own-row RLS access; INVOKER could neither read nor update it.
 
 CREATE OR REPLACE FUNCTION public.approve_claude_run(p_run_id uuid)
 RETURNS void
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path TO 'public'
 AS $$
 DECLARE
   v_run record;
 BEGIN
-  IF NOT public.is_admin_or_staff() THEN
+  IF public.is_admin_or_staff() IS NOT TRUE THEN
     RAISE EXCEPTION 'Unauthorized: admin/staff required to approve a claude_cli_task';
   END IF;
 
   SELECT id, kind, status, approval_required, approved_at, requested_by, inputs
   INTO v_run
   FROM public.agent_runs
-  WHERE id = p_run_id;
+  WHERE id = p_run_id
+  FOR UPDATE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'agent_run not found: %', p_run_id;
@@ -46,6 +48,12 @@ BEGIN
   -- (mirrors approve_playwright_run).
   IF v_run.requested_by IS NOT NULL AND v_run.requested_by = auth.uid() THEN
     RAISE EXCEPTION 'Segregation of duties: approver must differ from the requester';
+  END IF;
+  -- Běh schopnosti (fn_spawn_capability_run_admin, 2026-10-07): spouští ho správce mostem,
+  -- ale ŽADATELEM schopnosti je uživatel, jehož otázka běh vyvolala. Ani on si běh, který
+  -- napíše kód podle jeho otázky, neschválí.
+  IF NULLIF(v_run.inputs->>'capability_requested_by', '')::uuid = auth.uid() THEN
+    RAISE EXCEPTION 'Segregation of duties: approver must differ from the capability requester';
   END IF;
 
   UPDATE public.agent_runs

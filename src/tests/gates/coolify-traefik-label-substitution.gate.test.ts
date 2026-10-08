@@ -235,7 +235,11 @@ describe("Coolify Traefik Label Substitution Gate", () => {
       /name: "netbird-proxy", domain: `https:\/\/\$\{env\.NETBIRD_DOMAIN_DIRECT\}`/,
     );
     expect(netbirdPolozka, "doctor: veřejné jméno NESMÍ být u netbird-proxy").not.toMatch(/env\.NETBIRD_DOMAIN\b(?!_)/);
-    const webFaces = doctor.slice(doctor.indexOf("function webPublicDomains"), doctor.indexOf("const expected = ["));
+    // Úsek tváří edge-proxy. Dřív začínal u `function webPublicDomains` — ta je od
+    // 2026-10-04 pryč (domény webu skládá lib/domeny-webu.mjs), kotvou je teď
+    // sama funkce tváří edge-proxy.
+    const webFaces = doctor.slice(doctor.indexOf("function edgeProxyDomains"), doctor.indexOf("const expected = ["));
+    expect(doctor.indexOf("function edgeProxyDomains"), "doctor: chybí edgeProxyDomains()").toBeGreaterThan(-1);
     expect(webFaces, "doctor: veřejnou tvář registruje edge, jen s přímou tváří").toMatch(
       /skutecne\(env\.NETBIRD_DOMAIN\) && skutecne\(env\.NETBIRD_DOMAIN_DIRECT\)[\s\S]{0,80}domains\.push\(`https:\/\/\$\{env\.NETBIRD_DOMAIN\}`\)/,
     );

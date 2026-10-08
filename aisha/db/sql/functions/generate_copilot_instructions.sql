@@ -72,7 +72,7 @@ BEGIN
   FROM expert_rules er
   WHERE er.id = ANY(v_ruleset.rule_ids)
     AND er.status = 'published'
-    AND er.visibility IN ('public', 'members');
+    AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid());
 
   IF v_categories IS NOT NULL THEN
     FOREACH v_cat IN ARRAY v_categories
@@ -87,7 +87,7 @@ BEGIN
         FROM expert_rules er
         WHERE er.id = ANY(v_ruleset.rule_ids)
           AND er.status = 'published'
-          AND er.visibility IN ('public', 'members')
+          AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid())
           AND er.category::text = v_cat
         ORDER BY er.slug
       LOOP

@@ -38,17 +38,29 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 SUBSTRATE="$ROOT/infra/postgres/000_init_roles_schemas.sql"
 SEED="$ROOT/aisha/db/seed.compiled.sql"
+VERIFY_PUBLIC="$ROOT/scripts/db/verify-schema-public-create.sql"
+VERIFY_PUBLIC_ACL="$ROOT/scripts/db/verify-schema-public-acl.sql"
 
 : "${AISHA_DB_URL:?AISHA_DB_URL must be set (admin connection to the postgres db)}"
 ADMIN_URL="$AISHA_DB_URL"
 PROBE_DB="aisha_upgrade_probe"
 PROBE_URL="${ADMIN_URL%/*}/$PROBE_DB"
+RESET_DB="aisha_reset_probe"
+RESET_URL="${ADMIN_URL%/*}/$RESET_DB"
 
 scalar() { psql "$PROBE_URL" -v ON_ERROR_STOP=1 -tA -c "$1"; }
+# Čtecí kontrola schématu public — PŘESNĚ tak, jak ji pouští živé ověření: v transakci
+# jen pro čtení. Tady běží vedle zkoušky chováním a musí se s ní shodnout; čtecí
+# kontrola, která by byla zelená tam, kde chování ukáže díru, by nad produkcí lhala.
+verify_public_acl() { PGOPTIONS="-c default_transaction_read_only=on" psql "$1" -v ON_ERROR_STOP=1 -q -f "$VERIFY_PUBLIC_ACL"; }
 
 cleanup() {
   psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -q \
     -c "DROP DATABASE IF EXISTS $PROBE_DB WITH (FORCE);" >/dev/null 2>&1 || true
+  psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -q \
+    -c "DROP DATABASE IF EXISTS $RESET_DB WITH (FORCE);" >/dev/null 2>&1 || true
+  psql "$ADMIN_URL" -q -c "DROP ROLE IF EXISTS aisha_probe_udelovatel;" \
+    -c "DROP ROLE IF EXISTS aisha_probe_vlastnik;" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -56,10 +68,76 @@ echo "── 1/6  fresh probe DB + substrate ───────────�
 psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -q -c "DROP DATABASE IF EXISTS $PROBE_DB WITH (FORCE);"
 psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -q -c "CREATE DATABASE $PROBE_DB;"
 psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q -f "$SUBSTRATE" >/dev/null
-echo "   probe DB created, substrate applied"
+# Značka běhu jako na produkci. Vstupní skript migrace (write_running_marker
+# v scripts/docker-migrate-entrypoint.sh) ji v public zakládá PŘED migrací; na
+# čisté databázi kvůli ní migrate.mjs vidí „tabulky bez baseline“ a schéma public
+# RESETUJE. Studený start tedy vede přes reset VŽDY — bez značky by sonda tu
+# cestu nikdy neprošla a vadu v SQL resetu by ukázala až skutečná instance.
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q -c "CREATE TABLE public.migration_log_dump (id BIGSERIAL PRIMARY KEY, created_at TIMESTAMPTZ DEFAULT now(), status TEXT, exit_code INT, output TEXT);"
+echo "   probe DB created, substrate applied, run marker present (as on a real cold start)"
+
+echo "── 1b   reset schématu public: vytvářet smí jen vyjmenovaná role ───────"
+# SQL resetu SAMOTNÉ, na vlastní zahazované databázi téhož clusteru (role jsou
+# společné celému clusteru, založil je substrát výš). Sonda níž ho neukáže: v kroku
+# 2 po resetu hned běží heals a práva dorovnají, takže vada v resetu by za nimi
+# zmizela. Stojí PŘED krokem 2 — levná kontrola má selhat dřív než drahá.
+psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -q -c "DROP DATABASE IF EXISTS $RESET_DB WITH (FORCE);"
+psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -q -c "DROP ROLE IF EXISTS aisha_probe_udelovatel;" -c "DROP ROLE IF EXISTS aisha_probe_vlastnik;"
+psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -q -c "CREATE DATABASE $RESET_DB;"
+( cd "$ROOT" && node -e 'import("./scripts/db/lib/reset-public-schema.mjs").then((m) => process.stdout.write(m.RESET_PUBLIC_SCHEMA_SQL))' ) \
+  | psql "$RESET_URL" -v ON_ERROR_STOP=1 -q -f - >/dev/null
+psql "$RESET_URL" -v ON_ERROR_STOP=1 -q -f "$VERIFY_PUBLIC"
+verify_public_acl "$RESET_URL"
+echo "   ✓ po resetu vytváří ve schématu public jen vyjmenovaná role; role API mají USAGE (chováním i čtením)"
+
+echo "── 1c   heal schématu public migraci NEZASTAVÍ ─────────────────────────"
+# Zastavená migrace je nenasazené jádro — heal proto zbylé právo jen OHLÁSÍ a
+# doběhne; natvrdo ho hlídá kontrola (tady v kroku 5 a po nasazení). Stav, který
+# heal sám nespraví: CREATE pro PUBLIC udělila jiná role a heal pouští role, která
+# se jí stát nesmí (ne-superuživatelský vlastník schématu). SET SESSION
+# AUTHORIZATION dává relaci přesně takovou přihlášenou roli — SET ROLE uvnitř
+# healu se řídí jí, ne tím, kdo se původně připojil.
+psql "$RESET_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+CREATE ROLE aisha_probe_udelovatel NOLOGIN;
+CREATE ROLE aisha_probe_vlastnik NOLOGIN;
+GRANT CREATE ON SCHEMA public TO aisha_probe_udelovatel WITH GRANT OPTION;
+SET ROLE aisha_probe_udelovatel;
+GRANT CREATE ON SCHEMA public TO PUBLIC;
+RESET ROLE;
+ALTER SCHEMA public OWNER TO aisha_probe_vlastnik;
+SQL
+heal_out=$( { echo "SET SESSION AUTHORIZATION aisha_probe_vlastnik;"; cat "$ROOT/aisha/db/sql/grants/schema_public_create.sql"; } \
+  | psql "$RESET_URL" -v ON_ERROR_STOP=1 -q -f - 2>&1 ) && heal_rc=0 || heal_rc=$?
+if [ "$heal_rc" -ne 0 ]; then
+  echo "❌ heal schématu public migraci ZASTAVIL (rc=$heal_rc) nad právem, které odvolat nemůže — má ho ohlásit a doběhnout:"
+  echo "$heal_out"; exit 1
+fi
+case "$heal_out" in
+  *WARNING*aisha_probe_udelovatel*) ;;
+  *) echo "❌ heal doběhl, ale zbylé právo NEOHLÁSIL varováním s udělovatelem:"; echo "$heal_out"; exit 1 ;;
+esac
+verify_out=$(psql "$RESET_URL" -v ON_ERROR_STOP=1 -q -f "$VERIFY_PUBLIC" 2>&1) && verify_rc=0 || verify_rc=$?
+case "$verify_rc:$verify_out" in
+  0:*) echo "❌ kontrola schématu public PROŠLA nad právem, které heal odvolat nemohl — zbylou díru by nezastavilo nic"; exit 1 ;;
+  *"PUBLIC má ve schématu public právo CREATE"*) ;;
+  *) echo "❌ kontrola schématu public selhala z jiného důvodu než kvůli zbylému právu (rc=$verify_rc): $verify_out"; exit 1 ;;
+esac
+acl_out=$(verify_public_acl "$RESET_URL" 2>&1) && acl_rc=0 || acl_rc=$?
+case "$acl_rc:$acl_out" in
+  0:*) echo "❌ čtecí kontrola schématu public PROŠLA tam, kde zkouška chováním ukázala díru — živé ověření by ji nevidělo"; exit 1 ;;
+  *"PUBLIC má ve schématu public právo CREATE"*) ;;
+  *) echo "❌ čtecí kontrola schématu public selhala z jiného důvodu než kvůli díře (rc=$acl_rc): $acl_out"; exit 1 ;;
+esac
+psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -q -c "DROP DATABASE IF EXISTS $RESET_DB WITH (FORCE);"
+psql "$ADMIN_URL" -v ON_ERROR_STOP=1 -q -c "DROP ROLE IF EXISTS aisha_probe_udelovatel;" -c "DROP ROLE IF EXISTS aisha_probe_vlastnik;"
+echo "   ✓ heal nad právem, které odvolat nemůže, DOBĚHL a ohlásil udělovatele; kontrola zbylé právo vidí"
 
 echo "── 2/6  build full schema via the REAL runner (baseline + heals) ───────"
 ( cd "$ROOT" && AISHA_DB_URL="$PROBE_URL" node scripts/db/migrate.mjs )
+# Kontrolní vzorek cesty: značka je pryč → reset schématu opravdu proběhl.
+if [ -n "$(scalar "SELECT to_regclass('public.migration_log_dump');")" ]; then
+  echo "❌ setup error: značka běhu přežila migraci — reset schématu public neproběhl, sonda nejde cestou studeného startu"; exit 1
+fi
 
 echo "── 3/6  REGRESS to the pre-fold existing-DB state ──────────────────────"
 # Regress to what an EXISTING pre-fold prod DB actually looks like: the agent-
@@ -992,7 +1070,330 @@ gone_etd=$(scalar "SELECT to_regclass('public.entry_type_definitions');")
 if [ -n "$gone_etd" ]; then
   echo "❌ setup error: entry_type_definitions still present after DROP — #516 table reconcile would be a no-op"; exit 1
 fi
-echo "   regressed: agent-activity surface + generational tables stripped of attribute columns (column-drift) + whole-dropped tables + 9 enums removed + #516/#512 discussion/news surface"
+# ── politiky tabulky znalostí do stavu dnešních instancí ─────────────────────
+# Na databázi založené dřív jsou dvě PERMISSIVE politiky TO public pod starými jmény;
+# druhá pouští každou globální položku. Heals je musí ZAHODIT — vedle nových by se
+# s nimi sečetly a díra by zůstala.
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+DROP POLICY IF EXISTS knowledge_items_global_anon_read ON public.knowledge_items;
+DROP POLICY IF EXISTS knowledge_items_global_authenticated_read ON public.knowledge_items;
+DROP POLICY IF EXISTS knowledge_items_story_participants_read ON public.knowledge_items;
+DROP POLICY IF EXISTS knowledge_items_admin_read ON public.knowledge_items;
+CREATE POLICY "Anyone can read active public knowledge items" ON public.knowledge_items
+  AS PERMISSIVE FOR SELECT TO public
+  USING (status = 'active' AND visibility IN ('public', 'members') AND story_id IS NULL);
+CREATE POLICY "Per-story KB visible to participants" ON public.knowledge_items
+  AS PERMISSIVE FOR SELECT TO public
+  USING (story_id IS NULL OR (SELECT is_admin_or_staff()));
+SQL
+stare=$(scalar "SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='knowledge_items' AND policyname IN ('Anyone can read active public knowledge items','Per-story KB visible to participants');")
+if [ "${stare:-0}" -ne 2 ]; then
+  echo "❌ setup error: staré politiky znalostí se nepodařilo založit ($stare ze 2) — jejich zahození by se neměřilo"; exit 1
+fi
+# ── hledání rysů osobnosti do stavu dnešních instancí ────────────────────────
+# Na databázi založené dřív funkce stav položky nefiltruje a cestu má bez pg_temp.
+# Sonda ji do toho stavu vrátí z dnešní definice (signaturu drží katalog); heals ji
+# musí PŘEHRÁT — zdroj bez \ir v heals by se na běžící databázi nikdy neprojevil.
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+DO $zk$
+DECLARE f oid; d text;
+BEGIN
+  SELECT p.oid INTO STRICT f FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'fn_search_personality_context';
+  d := replace(pg_get_functiondef(f), 'AND public.knowledge_state_readable(ki.quarantine_status)', '');
+  EXECUTE d;
+  EXECUTE format('ALTER FUNCTION %s SET search_path TO ''public'', ''extensions''', f::regprocedure);
+END $zk$;
+SQL
+stara=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='fn_search_personality_context' AND p.prosrc NOT LIKE '%knowledge_state_readable%' AND array_to_string(p.proconfig, ',') NOT LIKE '%pg_temp%';")
+if [ "${stara:-0}" -ne 1 ]; then
+  echo "❌ setup error: hledání rysů osobnosti se nepodařilo vrátit do starého stavu — přehrání z heals by se neměřilo"; exit 1
+fi
+# ── druhý index znalostí do stavu dnešních instancí ──────────────────────────
+# Na databázi založené dřív spoušť o stavu karantény neví a sestavení dokumentu
+# ho nečte. Sonda obě funkce nahradí tělem BEZ nového rozhodování (signatury
+# jsou bez typů rozšíření, jdou založit přímo); heals je musí PŘEHRÁT.
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+CREATE OR REPLACE FUNCTION public.fn_notify_knowledge_change() RETURNS trigger
+  LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
+AS $zk$ BEGIN IF TG_OP = 'DELETE' THEN RETURN OLD; END IF; RETURN NEW; END $zk$;
+CREATE OR REPLACE FUNCTION public.fn_build_ragnarok_document(p_source_table text, p_source_id uuid) RETURNS jsonb
+  LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public'
+AS $zk$ BEGIN RETURN '{}'::jsonb; END $zk$;
+DROP FUNCTION IF EXISTS public.knowledge_ragnarok_action(text, text, text, text, text, boolean);
+SQL
+stare=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname IN ('fn_notify_knowledge_change','fn_build_ragnarok_document') AND p.prosrc NOT LIKE '%knowledge_%' AND array_to_string(p.proconfig, ',') NOT LIKE '%pg_temp%';")
+if [ "${stare:-0}" -ne 2 ]; then
+  echo "❌ setup error: funkce druhého indexu se nepodařilo vrátit do starého stavu ($stare ze 2) — přehrání z heals by se neměřilo"; exit 1
+fi
+# ── citace běhu do stavu dnešních instancí ───────────────────────────────────
+# Na databázi založené dřív má funkce sloupce bez aliasu tabulky a každé volání končí
+# chybou 42702. Sonda ji do toho stavu vrátí z dnešní definice; heals ji musí PŘEHRÁT
+# a krok 5 ji opravdu ZAVOLÁ (text funkce by vadu, která se projeví až při volání, neukázal).
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+DO $zk$
+DECLARE f oid;
+BEGIN
+  SELECT p.oid INTO STRICT f FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'fn_get_run_citations';
+  EXECUTE replace(pg_get_functiondef(f), 'ka.relevance_score', 'relevance_score');
+END $zk$;
+SQL
+if psql "$PROBE_URL" -v ON_ERROR_STOP=1 -tA -c "BEGIN; SET LOCAL ROLE service_role; SELECT count(*) FROM public.fn_get_run_citations(gen_random_uuid()); ROLLBACK;" >/dev/null 2>&1; then
+  echo "❌ setup error: citace běhu po návratu do starého stavu NEPADAJÍ — přehrání z heals by se neměřilo"; exit 1
+fi
+# ── čtecí funkce znalostí do stavu dnešních instancí ─────────────────────────
+# Na databázi založené dřív filtrují stav výčtem zakázaných hodnot (nebo vůbec) a
+# pomocník čitelného stavu neexistuje. Sonda z dnešních definic volání pomocníka
+# vymění za starý výčet (signatury drží katalog) a pomocníka zahodí: heals ho musí
+# založit DŘÍV, než přehrají první funkci, a přehrát všech deset souborů.
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+DO $zk$
+DECLARE r record;
+BEGIN
+  FOR r IN SELECT p.oid FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'public' AND p.proname IN ('mcp_search_knowledge_v2','mcp_search_knowledge_v3','fn_get_platform_warmup_state','mcp_get_knowledge_item','fn_get_psyche_traits','fn_get_tao_principles','fn_get_run_citations','fn_get_run_extract_context','extract_training_pairs_from_kb','compose_context') LOOP
+    EXECUTE regexp_replace(pg_get_functiondef(r.oid), 'public\.knowledge_state_readable\((\w+)\.quarantine_status\)',
+                           '\1.quarantine_status NOT IN (''flagged'', ''quarantined'')', 'g');
+  END LOOP;
+END $zk$;
+DROP FUNCTION public.knowledge_state_readable(text);
+SQL
+# Kolik funkcí tu je, určuje i starší část sondy (v2 a v3 vrací do tvaru před Brick6);
+# podmínka je proto „žádná už pomocníka nevolá a pomocník neexistuje“, ne pevný počet.
+stare=$(scalar "SELECT count(*) FILTER (WHERE p.prosrc LIKE '%knowledge_state_readable%') || '/' || (SELECT count(*) FROM pg_proc h JOIN pg_namespace hn ON hn.oid=h.pronamespace WHERE hn.nspname='public' AND h.proname='knowledge_state_readable') || '/' || (count(*) >= 8) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname IN ('mcp_search_knowledge_v2','mcp_search_knowledge_v3','fn_get_platform_warmup_state','mcp_get_knowledge_item','fn_get_psyche_traits','fn_get_tao_principles','fn_get_run_citations','fn_get_run_extract_context','extract_training_pairs_from_kb','compose_context');")
+if [ "$stare" != "0/0/true" ]; then
+  echo "❌ setup error: čtecí funkce znalostí se nepodařilo vrátit do starého stavu ($stare; čekám 0 s pomocníkem / 0 pomocníků / aspoň 8 funkcí) — přehrání z heals by se neměřilo"; exit 1
+fi
+# ── fronty zpracování a graf běhu do stavu dnešních instancí ─────────────────
+# Na databázi založené dřív stav položky nečtou vůbec a cestu mají 'public'. Sonda z dnešních
+# definic volání pomocníka vyjme a cestu vrátí; heals musí přehrát všechny čtyři soubory.
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+DO $zk$
+DECLARE r record;
+BEGIN
+  FOR r IN SELECT p.oid FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'public' AND p.proname IN ('fn_get_chunks_needing_context','fn_get_embeddings_needing_v2','fn_chunks_bez_zive_identity','fn_get_run_graph_context') LOOP
+    EXECUTE replace(regexp_replace(pg_get_functiondef(r.oid), '\s+AND public\.knowledge_state_readable\(ki\.quarantine_status\)', '', 'g'),
+                    $$SET search_path TO 'pg_catalog', 'public', 'pg_temp'$$, $$SET search_path TO 'public'$$);
+  END LOOP;
+END $zk$;
+SQL
+stare=$(scalar "SELECT count(*) FILTER (WHERE p.prosrc LIKE '%knowledge_state_readable%') || '/' || count(*) FILTER (WHERE array_to_string(p.proconfig, ',') LIKE '%pg_temp%') || '/' || count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname IN ('fn_get_chunks_needing_context','fn_get_embeddings_needing_v2','fn_chunks_bez_zive_identity','fn_get_run_graph_context');")
+if [ "$stare" != "0/0/4" ]; then
+  echo "❌ setup error: fronty zpracování a graf běhu se nepodařilo vrátit do starého stavu ($stare; čekám 0 s pomocníkem / 0 se zpevněnou cestou / 4 funkce) — přehrání z heals by se neměřilo"; exit 1
+fi
+# ── čtení podle id do stavu dnešních instancí ────────────────────────────────
+# Na databázi založené dřív má funkce dva parametry (bez publika). Sonda ji do toho tvaru vrátí:
+# heals musí starou signaturu zahodit a založit novou — jinak zůstanou dvě přetížení a volání
+# dvěma jmennými parametry skončí „is not unique“ (poučení z hledání v2).
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+DROP FUNCTION public.mcp_get_knowledge_item(uuid, text, uuid);
+CREATE FUNCTION public.mcp_get_knowledge_item(p_item_id uuid DEFAULT NULL::uuid, p_source_slug text DEFAULT NULL::text)
+ RETURNS jsonb LANGUAGE sql STABLE AS $zk$ SELECT NULL::jsonb $zk$;
+SQL
+stare=$(scalar "SELECT string_agg(pg_get_function_identity_arguments(p.oid), ' | ' ORDER BY 1) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='mcp_get_knowledge_item';")
+if [ "$stare" != "p_item_id uuid, p_source_slug text" ]; then
+  echo "❌ setup error: čtení podle id se nepodařilo vrátit na dvouargumentový tvar ($stare) — výměna signatury by se neměřila"; exit 1
+fi
+# ── granty funkcí spouští znalostí do stavu dnešních instancí ────────────────
+# Na databázi založené dřív mají obě funkce EXECUTE pro PUBLIC, authenticated i service_role.
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+GRANT EXECUTE ON FUNCTION public.sync_expert_rule_to_knowledge_item() TO PUBLIC, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.sync_topic_version_to_knowledge_item() TO PUBLIC, authenticated, service_role;
+SQL
+stare=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace CROSS JOIN (VALUES ('anon'),('authenticated'),('service_role')) r(role) WHERE ns.nspname='public' AND p.proname IN ('sync_expert_rule_to_knowledge_item','sync_topic_version_to_knowledge_item') AND has_function_privilege(r.role, p.oid, 'EXECUTE');")
+if [ "${stare:-0}" -ne 6 ]; then
+  echo "❌ setup error: granty funkcí spouští znalostí se nepodařilo vrátit ($stare ze 6) — jejich odebrání by se neměřilo"; exit 1
+fi
+# ── granty statistik znalostí do stavu dnešních instancí ─────────────────────
+# Na databázi založené dřív má funkce EXECUTE pro anon i authenticated.
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q -c "GRANT EXECUTE ON FUNCTION public.mcp_get_knowledge_stats() TO anon, authenticated;"
+stare=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace CROSS JOIN (VALUES ('anon'),('authenticated')) r(role) WHERE ns.nspname='public' AND p.proname='mcp_get_knowledge_stats' AND has_function_privilege(r.role, p.oid, 'EXECUTE');")
+if [ "${stare:-0}" -ne 2 ]; then
+  echo "❌ setup error: granty statistik znalostí se nepodařilo vrátit ($stare ze 2) — jejich odebrání by se neměřilo"; exit 1
+fi
+# ── čtení osobnosti do stavu dnešních instancí ───────────────────────────────
+# Na databázi založené dřív čtou rysy a zásady položky VŠECH příběhů. Sonda ze tří funkcí
+# podmínku na příběh odebere (v2 a v3 sonda zahazuje celé — tam stačí kontrola po heals).
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+DO $zk$
+DECLARE r record;
+BEGIN
+  FOR r IN SELECT p.oid FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+            WHERE n.nspname = 'public' AND p.proname IN ('fn_get_psyche_traits', 'fn_get_tao_principles', 'fn_search_personality_context') LOOP
+    EXECUTE replace(pg_get_functiondef(r.oid), 'AND ki.story_id IS NULL', '');
+  END LOOP;
+END $zk$;
+SQL
+stare=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname IN ('fn_get_psyche_traits','fn_get_tao_principles','fn_search_personality_context') AND p.prosrc NOT LIKE '%ki.story_id IS NULL%';")
+if [ "${stare:-0}" -ne 3 ]; then
+  echo "❌ setup error: čtení osobnosti se nepodařilo vrátit do starého stavu ($stare ze 3) — přehrání z heals by se neměřilo"; exit 1
+fi
+# ── hledání v2 do stavu předchozího mainu: DVĚ přetížení ─────────────────────
+# Sonda výš nechává jen starou 9argumentovou v2. Na instancích je vedle ní 11argumentová a ty
+# dvě se liší jen parametry s výchozí hodnotou — volání bez příběhu je nejednoznačné. Sonda
+# 11argumentovou založí a ZMĚŘÍ, že volání bez příběhu opravdu padá; heals musí nechat jednu.
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+CREATE FUNCTION public.mcp_search_knowledge_v2(p_query_embedding vector DEFAULT NULL, p_query_text text DEFAULT NULL, p_item_types text[] DEFAULT '{}', p_category text DEFAULT NULL, p_expertise_slug text DEFAULT NULL, p_context_tags text[] DEFAULT '{}', p_include_ai_instructions boolean DEFAULT true, p_limit integer DEFAULT 20, p_similarity_threshold double precision DEFAULT 0.3, p_story_id uuid DEFAULT NULL, p_audience_user_id uuid DEFAULT NULL)
+RETURNS jsonb LANGUAGE sql AS 'SELECT ''[]''::jsonb';
+SQL
+v2n=$(scalar "SELECT count(*) FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname='mcp_search_knowledge_v2';")
+if [ "${v2n:-0}" -ne 2 ] || psql "$PROBE_URL" -v ON_ERROR_STOP=1 -qtA -c "SELECT public.mcp_search_knowledge_v2(p_query_text => 'x'::text);" >/dev/null 2>&1; then
+  echo "❌ setup error: stav „dvě přetížení v2, volání bez příběhu nejednoznačné“ se nepodařilo založit (přetížení: ${v2n:-?}) — odstranění by se neměřilo"; exit 1
+fi
+# ── expertní pravidla do stavu předchozího mainu (revize B1) ─────────────────
+# Politiky čtení napřímo s vlastními výčty (soubor politik v heals nebyl), pomocník viditelnosti pravidel
+# neexistuje a čtyři čtenáři mají tvar bez parametru publika. Heals musí politiky převést na domov,
+# pomocníka založit, staré tvary zahodit a čtenáře přehrát. Politiky PŘED zahozením množiny štítků níž
+# (nové na ní závisí).
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+DROP POLICY IF EXISTS anon_read_public_rules ON public.expert_rules;
+DROP POLICY IF EXISTS auth_read_public_and_members_rules ON public.expert_rules;
+CREATE POLICY anon_read_public_rules ON public.expert_rules FOR SELECT TO anon USING (status = 'published' AND visibility = 'public');
+CREATE POLICY auth_read_public_and_members_rules ON public.expert_rules FOR SELECT TO authenticated USING (status = 'published' AND visibility IN ('public', 'members'));
+DROP FUNCTION IF EXISTS public.get_expert_rule_detail(text, uuid);
+DROP FUNCTION IF EXISTS public.mcp_get_rule_detail(text, uuid);
+DROP FUNCTION IF EXISTS public.mcp_search_knowledge(text, text, text, text[], boolean, integer, uuid);
+DROP FUNCTION IF EXISTS public.mcp_get_agent_knowledge(text, text, uuid);
+CREATE FUNCTION public.get_expert_rule_detail(p_rule_slug text) RETURNS jsonb LANGUAGE sql AS $zk$ SELECT NULL::jsonb $zk$;
+CREATE FUNCTION public.mcp_get_rule_detail(p_rule_slug text) RETURNS jsonb LANGUAGE sql AS $zk$ SELECT NULL::jsonb $zk$;
+CREATE FUNCTION public.mcp_search_knowledge(p_query text DEFAULT NULL, p_category text DEFAULT NULL, p_expertise_slug text DEFAULT NULL, p_context_tags text[] DEFAULT '{}', p_include_ai_instructions boolean DEFAULT true, p_limit integer DEFAULT 20) RETURNS jsonb LANGUAGE sql AS $zk$ SELECT '[]'::jsonb $zk$;
+CREATE FUNCTION public.mcp_get_agent_knowledge(p_agent_slug text, p_binding_type text DEFAULT NULL) RETURNS TABLE(id uuid) LANGUAGE sql AS $zk$ SELECT NULL::uuid WHERE false $zk$;
+DROP FUNCTION IF EXISTS public.expert_rule_visible_to(text, uuid, uuid);
+SQL
+stare=$(scalar "SELECT (SELECT count(*) FROM pg_policy WHERE polrelid = 'public.expert_rules'::regclass AND pg_get_expr(polqual, polrelid) LIKE '%knowledge_visibilities_for_caller%') || '/' || (SELECT count(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname = 'expert_rule_visible_to') || '/' || (SELECT string_agg(proname || '(' || pg_get_function_identity_arguments(oid) || ')', ',' ORDER BY proname) FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname IN ('get_expert_rule_detail', 'mcp_get_rule_detail', 'mcp_get_agent_knowledge'));")
+if [ "$stare" != "0/0/get_expert_rule_detail(p_rule_slug text),mcp_get_agent_knowledge(p_agent_slug text, p_binding_type text),mcp_get_rule_detail(p_rule_slug text)" ]; then
+  echo "❌ setup error: expertní pravidla se nepodařilo vrátit do stavu předchozího mainu ($stare) — přehrání z heals by se neměřilo"; exit 1
+fi
+# ── pomocník viditelnosti: na databázi založené dřív neexistuje, nebo má dva vstupy ──
+# (v2 a v3 sonda vrací do starého tvaru výš; heals musí pomocníka založit DŘÍV, než je přehrají.
+# Politiky tabulky jsou v tu chvíli staré — na domov nezávisí, proto ho jde zahodit.)
+# Sonda nechá dvouvstupový tvar bez „je přihlášen“: heals ho musí zahodit — žádný obal vedle nového.
+# Množina štítků pro politiky a domov gildy na databázi založené dřív neexistují — sonda je zahodí, heals je musí založit.
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+DROP FUNCTION IF EXISTS public.knowledge_visibility_for_caller(text);
+DROP FUNCTION IF EXISTS public.knowledge_visibilities_for_caller();
+DROP FUNCTION IF EXISTS public.knowledge_audience_in_guild(uuid);
+DROP FUNCTION IF EXISTS public.knowledge_visibility_searchable(text, boolean, boolean);
+CREATE OR REPLACE FUNCTION public.knowledge_visibility_searchable(p_visibility text, p_in_guild boolean)
+RETURNS boolean LANGUAGE sql IMMUTABLE AS $zk$ SELECT true $zk$;
+SQL
+stare=$(scalar "SELECT string_agg(pg_get_function_identity_arguments(p.oid), ' | ' ORDER BY 1) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='knowledge_visibility_searchable';")
+if [ "$stare" != "p_visibility text, p_in_guild boolean" ]; then
+  echo "❌ setup error: pomocník viditelnosti se nepodařilo vrátit na dvouvstupový tvar ($stare) — výměna signatury by se neměřila"; exit 1
+fi
+# ── vrstva mozku do tvaru předchozího mainu: bez parametru publika (a bez viditelnosti) ──
+# Heals musí bezargumentový tvar zahodit (soubory nesou DROP) a založit tvar s publikem — jinak by
+# vedle sebe žila dvě přetížení a volání bez argumentů by skončilo „is not unique“.
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+DROP FUNCTION IF EXISTS public.fn_get_tao_principles(uuid);
+DROP FUNCTION IF EXISTS public.fn_get_psyche_traits(uuid);
+CREATE FUNCTION public.fn_get_tao_principles() RETURNS jsonb LANGUAGE sql AS $zk$ SELECT '[]'::jsonb $zk$;
+CREATE FUNCTION public.fn_get_psyche_traits() RETURNS jsonb LANGUAGE sql AS $zk$ SELECT '[]'::jsonb $zk$;
+SQL
+stare=$(scalar "SELECT string_agg(p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')', ',' ORDER BY 1) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname IN ('fn_get_tao_principles','fn_get_psyche_traits');")
+if [ "$stare" != "fn_get_psyche_traits(),fn_get_tao_principles()" ]; then
+  echo "❌ setup error: vrstvu mozku se nepodařilo vrátit na bezargumentový tvar ($stare) — výměna signatury by se neměřila"; exit 1
+fi
+# ── spoušť guardu profilu partnera do stavu předchozího mainu: jen BEFORE UPDATE (tgtype 19) ──
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+DROP TRIGGER IF EXISTS partner_profiles_privilege_guard ON public.partner_profiles;
+CREATE TRIGGER partner_profiles_privilege_guard BEFORE UPDATE ON public.partner_profiles
+  FOR EACH ROW EXECUTE FUNCTION public.guard_partner_profile_privilege_columns();
+SQL
+stara=$(scalar "SELECT tgtype FROM pg_trigger WHERE tgrelid = 'public.partner_profiles'::regclass AND tgname = 'partner_profiles_privilege_guard';")
+if [ "${stara:-0}" -ne 19 ]; then
+  echo "❌ setup error: spoušť guardu se nepodařilo vrátit na BEFORE UPDATE ($stara) — přehrání z heals by se neměřilo"; exit 1
+fi
+# ── seznam položek příběhu do stavu předchozího mainu: bez vlastníka ─────────────
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+DO $zk$
+DECLARE f oid;
+BEGIN
+  SELECT p.oid INTO STRICT f FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'list_story_knowledge_items';
+  EXECUTE replace(pg_get_functiondef(f), 'AND (ps.user_id = v_user_id', 'AND (false');
+END $zk$;
+SQL
+stara=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='list_story_knowledge_items' AND p.prosrc NOT LIKE '%(ps.user_id = v_user_id%';")
+if [ "${stara:-0}" -ne 1 ]; then
+  echo "❌ setup error: seznam položek příběhu se nepodařilo vrátit do stavu bez vlastníka — přehrání z heals by se neměřilo"; exit 1
+fi
+# ── graf běhu do stavu dnešních instancí ─────────────────────────────────────
+# Na databázi založené dřív čte závěrečný dotaz výstupní sloupce bez aliasu a volání s citacemi
+# končí 42702. Sonda funkci do toho stavu vrátí a ZMĚŘÍ, že volání padá (běh musí mít citaci —
+# bez ní se funkce vrací dřív a vada by se neprojevila).
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+DO $zk$
+DECLARE f oid;
+BEGIN
+  SELECT p.oid INTO STRICT f FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+   WHERE n.nspname = 'public' AND p.proname = 'fn_get_run_graph_context';
+  EXECUTE replace(pg_get_functiondef(f), 'hops.seed_label', 'seed_label');
+END $zk$;
+SQL
+if psql "$PROBE_URL" -v ON_ERROR_STOP=1 -qtA >/dev/null 2>&1 <<'SQL'
+BEGIN;
+INSERT INTO aisha_auth.users (id, email) VALUES ('0f0f0f0f-0000-4000-8000-00000000a001', 'zk-upgrade-graf@test.local');
+INSERT INTO public.partner_stories (id, title, user_id) VALUES ('0f0f0f0f-0000-4000-8000-00000000a002', 'ZK upgrade graf', '0f0f0f0f-0000-4000-8000-00000000a001');
+INSERT INTO public.ai_runs (id, kind, story_id, citation_chunk_ids) VALUES ('0f0f0f0f-0000-4000-8000-00000000a003', 'chat', '0f0f0f0f-0000-4000-8000-00000000a002', ARRAY[gen_random_uuid()]);
+SET LOCAL ROLE service_role;
+SELECT count(*) FROM public.fn_get_run_graph_context('0f0f0f0f-0000-4000-8000-00000000a003'::uuid, NULL, NULL);
+ROLLBACK;
+SQL
+then
+  echo "❌ setup error: graf běhu po návratu do starého stavu NEPADÁ — přehrání z heals by se neměřilo"; exit 1
+fi
+# ── čtyři mrtvé funkce, které heals odstraňují ───────────────────────────────
+# Na databázi založené dřív existují (zdroj je smazaný, baseline je už nenese).
+# Sonda je proto založí se STEJNOU signaturou — jinak by DROP … IF EXISTS byl
+# no-op a kontrola v kroku 5 by prošla nad ničím.
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+CREATE FUNCTION public.raw_query_admin(p_sql text, p_params text[] DEFAULT '{}'::text[]) RETURNS void LANGUAGE plpgsql AS $f$ BEGIN END $f$;
+CREATE FUNCTION public.edge_database_dump_table(p_actor_user_id uuid, p_table text) RETURNS jsonb LANGUAGE plpgsql AS $f$ BEGIN RETURN '{}'::jsonb; END $f$;
+CREATE FUNCTION public.fn_rollback_agent_config(p_agent_configuration_id uuid, p_proposal_id uuid DEFAULT NULL, p_reason text DEFAULT 'auto_rollback_regression', p_target_version integer DEFAULT NULL) RETURNS jsonb LANGUAGE plpgsql AS $f$ BEGIN RETURN '{}'::jsonb; END $f$;
+CREATE FUNCTION public.get_story_basic_info(p_story_id uuid DEFAULT NULL) RETURNS TABLE(id uuid, title text) LANGUAGE plpgsql AS $f$ BEGIN RETURN; END $f$;
+SQL
+mrtve=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname IN ('raw_query_admin','edge_database_dump_table','fn_rollback_agent_config','get_story_basic_info');")
+if [ "${mrtve:-0}" -ne 4 ]; then
+  echo "❌ setup error: mrtvé funkce se nepodařilo založit ($mrtve ze 4) — jejich odstranění by se neměřilo"; exit 1
+fi
+# ── příjem pošty: staré signatury, které heals zahodí (2026-10-06) ─────────────
+# Baseline už nese jen nové tvary (append s p_event_id, výběr opakování s p_sources)
+# a jednorázový ingest vůbec ne. Na dřívějších databázích ale staré signatury jsou —
+# a dokud jsou, jdou volat a kontrolu skenu obcházejí. Sonda je proto založí.
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+CREATE FUNCTION public.append_inbound_comm_entry_audited(p_story_id uuid, p_channel text, p_external_id text, p_from text DEFAULT NULL, p_subject text DEFAULT NULL, p_body text DEFAULT NULL, p_parent_entry_id uuid DEFAULT NULL, p_metadata jsonb DEFAULT '{}'::jsonb) RETURNS jsonb LANGUAGE plpgsql AS $f$ BEGIN RETURN '{}'::jsonb; END $f$;
+CREATE FUNCTION public.ingest_inbound_comm_audited(p_channel text, p_external_id text, p_story_id uuid, p_from text DEFAULT NULL, p_subject text DEFAULT NULL, p_body text DEFAULT NULL, p_parent_entry_id uuid DEFAULT NULL, p_routed_to text DEFAULT NULL, p_metadata jsonb DEFAULT '{}'::jsonb) RETURNS jsonb LANGUAGE plpgsql AS $f$ BEGIN RETURN '{}'::jsonb; END $f$;
+CREATE FUNCTION public.get_retryable_integration_events(p_limit integer DEFAULT 20) RETURNS jsonb LANGUAGE plpgsql AS $f$ BEGIN RETURN '[]'::jsonb; END $f$;
+SQL
+posta_stare=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.oid::regprocedure::text IN ('append_inbound_comm_entry_audited(uuid,text,text,text,text,text,uuid,jsonb)','ingest_inbound_comm_audited(text,text,uuid,text,text,text,uuid,text,jsonb)','get_retryable_integration_events(integer)')")
+if [ "${posta_stare:-0}" -ne 3 ]; then
+  echo "❌ setup error: staré signatury příjmu pošty se nepodařilo založit ($posta_stare ze 3) — jejich odstranění by se neměřilo"; exit 1
+fi
+# ── schéma public do stavu dnešních instancí ─────────────────────────────────
+# Změřeno 2026-10-03 na živé instanci: {vlastník=UC, postgres=UC, =UC} — CREATE
+# pro PUBLIC a ŽÁDNÝ výslovný grant roli, která v public vytváří (smazal ho reset).
+psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q <<'SQL'
+GRANT CREATE ON SCHEMA public TO PUBLIC;
+REVOKE ALL ON SCHEMA public FROM nocodb_app;
+SQL
+# Kontrolní vzorek MĚŘIDLA: nad tímhle stavem musí kontrola SELHAT, a to pro díru,
+# ne z jiného důvodu. Kdyby prošla, zelená v kroku 5 by neznamenala nic.
+verify_out=$(psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q -f "$VERIFY_PUBLIC" 2>&1) && verify_rc=0 || verify_rc=$?
+case "$verify_rc:$verify_out" in
+  0:*) echo "❌ setup error: kontrola schématu public PROŠLA nad stavem s CREATE pro PUBLIC — měřidlo díru nevidí"; exit 1 ;;
+  *"PUBLIC má ve schématu public právo CREATE"*) ;;
+  *) echo "❌ setup error: kontrola schématu public selhala z jiného důvodu než kvůli díře (rc=$verify_rc): $verify_out"; exit 1 ;;
+esac
+acl_out=$(verify_public_acl "$PROBE_URL" 2>&1) && acl_rc=0 || acl_rc=$?
+case "$acl_rc:$acl_out" in
+  0:*) echo "❌ setup error: čtecí kontrola schématu public PROŠLA tam, kde zkouška chováním ukázala díru — živé ověření by ji nevidělo"; exit 1 ;;
+  *"PUBLIC má ve schématu public právo CREATE"*) ;;
+  *) echo "❌ setup error: čtecí kontrola schématu public selhala z jiného důvodu než kvůli díře (rc=$acl_rc): $acl_out"; exit 1 ;;
+esac
+echo "   regressed: agent-activity surface + generational tables stripped of attribute columns (column-drift) + whole-dropped tables + 9 enums removed + #516/#512 discussion/news surface + schema public ACL as on today's instances + 4 dead definer functions recreated"
 
 echo "── 4/6  re-run the REAL runner — the prod-redeploy path (heals.sql) ─────"
 # No pending deltas now: this exercises migrate.mjs's no-pending branch, which is
@@ -1446,6 +1847,240 @@ n=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pron
 if [ "${n:-0}" -ne 1 ]; then echo "   ❌ get_kiosk_rozvozy zůstal STARÝ (jen dnešek, bez stavu zdroje)"; fail=1; else echo "   ✓ rozvozy tabletu: okno nedoručených + stav zdroje"; fi
 n=$(scalar "SELECT count(*) FROM information_schema.routine_privileges WHERE routine_schema='public' AND routine_name='kiosk_krok_nasi_flotily' AND grantee IN ('anon','authenticated','PUBLIC');")
 if [ "${n:-1}" -ne 0 ]; then echo "   ❌ pomocník flotily má grant klientům ($n)"; fail=1; else echo "   ✓ pomocník flotily jen pro server"; fi
+# Politiky tabulky znalostí: staré dvě pryč, nové čtyři cílené na role.
+n=$(scalar "SELECT count(*) FROM pg_policies WHERE schemaname='public' AND tablename='knowledge_items' AND policyname IN ('Anyone can read active public knowledge items','Per-story KB visible to participants');")
+if [ "${n:-1}" -ne 0 ]; then echo "   ❌ staré politiky znalostí přežily heals ($n ze 2) — sčítají se s novými"; fail=1; fi
+politiky=$(scalar "SELECT string_agg(policyname || ':' || array_to_string(roles, '+'), ',' ORDER BY policyname) FROM pg_policies WHERE schemaname='public' AND tablename='knowledge_items';")
+chci="knowledge_items_admin_read:authenticated,knowledge_items_global_anon_read:anon,knowledge_items_global_authenticated_read:authenticated,knowledge_items_story_participants_read:authenticated"
+if [ "$politiky" != "$chci" ]; then echo "   ❌ politiky znalostí po heals: $politiky"; fail=1; else echo "   ✓ tabulka znalostí: čtyři politiky cílené na role, staré dvě pryč"; fi
+# Hledání rysů osobnosti: heals funkci přehrály — čitelný stav v obou větvích, pg_temp poslední.
+n=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='fn_search_personality_context' AND (length(p.prosrc) - length(replace(p.prosrc, 'public.knowledge_state_readable(', ''))) / length('public.knowledge_state_readable(') = 2 AND array_to_string(p.proconfig, ',') LIKE '%pg_temp';")
+if [ "${n:-0}" -ne 1 ]; then echo "   ❌ hledání rysů osobnosti zůstalo STARÉ (bez čitelného stavu v obou větvích nebo bez pg_temp na konci cesty)"; fail=1; else echo "   ✓ hledání rysů osobnosti: čitelný stav v obou větvích, pg_temp poslední"; fi
+# Druhý index znalostí: heals přehrály spoušť i sestavení dokumentu a založily rozhodovací funkci.
+n=$(scalar "SELECT (SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='fn_notify_knowledge_change' AND p.prosrc LIKE '%public.knowledge_ragnarok_action(%' AND array_to_string(p.proconfig, ',') LIKE '%pg_temp') + (SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='fn_build_ragnarok_document' AND p.prosrc LIKE '%public.knowledge_state_readable(%' AND array_to_string(p.proconfig, ',') LIKE '%pg_temp') + (SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='knowledge_ragnarok_action');")
+if [ "${n:-0}" -ne 3 ]; then echo "   ❌ druhý index znalostí zůstal STARÝ ($n ze 3: spoušť, sestavení dokumentu, rozhodovací funkce)"; fail=1; else echo "   ✓ druhý index znalostí: spoušť rozhoduje čistou funkcí, dokument jen pro čitelnou položku"; fi
+# Citace běhu: heals funkci přehrály — volání projde (dřív 42702 při každém volání).
+citace_err=$(psql "$PROBE_URL" -v ON_ERROR_STOP=1 -tA \
+  -c "BEGIN; SET LOCAL ROLE service_role; SELECT count(*) FROM public.fn_get_run_citations(gen_random_uuid()); ROLLBACK;" 2>&1) \
+  && echo "   ✓ citace běhu: volání projde" \
+  || { echo "   ❌ citace běhu při volání padají:"; echo "$citace_err" | sed 's/^/      /'; fail=1; }
+# Čtecí funkce znalostí: heals založily pomocníka a přehrály všech deset souborů (10 funkcí — hledání v2 má jedno přetížení).
+n=$(scalar "SELECT count(*) FILTER (WHERE p.prosrc LIKE '%public.knowledge_state_readable(%' AND p.prosrc NOT LIKE '%quarantine_status NOT IN%' AND array_to_string(p.proconfig, ',') LIKE '%pg_temp') || '/' || count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname IN ('mcp_search_knowledge_v2','mcp_search_knowledge_v3','fn_get_platform_warmup_state','mcp_get_knowledge_item','fn_get_psyche_traits','fn_get_tao_principles','fn_get_run_citations','fn_get_run_extract_context','extract_training_pairs_from_kb','compose_context');")
+h=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='knowledge_state_readable';")
+if [ "$n" != "10/10" ] || [ "${h:-0}" -ne 1 ]; then echo "   ❌ čtecí funkce znalostí zůstaly STARÉ ($n s allowlistem a pg_temp, pomocník: $h)"; fail=1; else echo "   ✓ čtecí funkce znalostí: 10 z 10 volá pomocníka čitelného stavu, pg_temp poslední"; fi
+# Funkce spouští znalostí: po heals je nesmí spustit žádná role API (ani přes PUBLIC).
+n=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace CROSS JOIN (VALUES ('anon'),('authenticated'),('service_role')) r(role) WHERE ns.nspname='public' AND p.proname IN ('sync_expert_rule_to_knowledge_item','sync_topic_version_to_knowledge_item') AND has_function_privilege(r.role, p.oid, 'EXECUTE');")
+if [ "${n:-1}" -ne 0 ]; then echo "   ❌ funkce spouští znalostí mají po heals EXECUTE pro roli API ($n ze 6)"; fail=1; else echo "   ✓ funkce spouští znalostí: žádný grant rolím API"; fi
+# Vrstva mozku jen globálně: tři čtení osobnosti nesou podmínku na příběh a v hledání v2/v3
+# je výjimka podle typu jen spolu s `ki.story_id IS NULL` (počet výskytů výjimky = počet
+# výskytů s podmínkou).
+n=$(psql "$PROBE_URL" -v ON_ERROR_STOP=1 -tA <<'SQL'
+WITH f AS (
+  SELECT p.proname, p.prosrc,
+         'ki.item_type::text IN (''core_value'', ''personality_trait'')' AS vyjimka,
+         'ki.story_id IS NULL AND ki.item_type::text IN (''core_value'', ''personality_trait'')' AS s_podminkou
+    FROM pg_proc p JOIN pg_namespace ns ON ns.oid = p.pronamespace WHERE ns.nspname = 'public'
+)
+SELECT (SELECT count(*) FROM f WHERE proname IN ('fn_get_psyche_traits', 'fn_get_tao_principles', 'fn_search_personality_context') AND prosrc LIKE '%ki.story_id IS NULL%')
+       || '/' ||
+       (SELECT count(*) FROM f WHERE proname IN ('mcp_search_knowledge_v2', 'mcp_search_knowledge_v3')
+           AND (length(prosrc) - length(replace(prosrc, vyjimka, ''))) / length(vyjimka)
+               <> (length(prosrc) - length(replace(prosrc, s_podminkou, ''))) / length(s_podminkou));
+SQL
+)
+if [ "$n" != "3/0" ]; then echo "   ❌ vrstva mozku po heals není jen globální ($n; čekám 3 čtení osobnosti s podmínkou / 0 hledání s výjimkou bez podmínky)"; fail=1; else echo "   ✓ vrstva mozku jen globálně: tři čtení osobnosti i hledání v2/v3"; fi
+# Hledání v2: po heals PRÁVĚ JEDNO přetížení a projdou tři tvary volání — pozičně 9 argumenty,
+# jmenně bez příběhu, jmenně s příběhem (na předchozím mainu první dva končily „is not unique“).
+v2n=$(scalar "SELECT count(*) FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname='mcp_search_knowledge_v2';")
+v2_err=$(psql "$PROBE_URL" -v ON_ERROR_STOP=1 -qtA 2>&1 <<'SQL'
+BEGIN;
+SET LOCAL ROLE service_role;
+SELECT jsonb_typeof(public.mcp_search_knowledge_v2(NULL::vector, 'x'::text, '{}'::text[], NULL::text, NULL::text, '{}'::text[], true, 5, 0.3::double precision));
+SELECT jsonb_typeof(public.mcp_search_knowledge_v2(p_query_text => 'x'::text));
+SELECT jsonb_typeof(public.mcp_search_knowledge_v2(p_query_text => 'x'::text, p_story_id => NULL::uuid));
+ROLLBACK;
+SQL
+) && v2_ok=1 || v2_ok=0
+if [ "${v2n:-0}" -ne 1 ] || [ "$v2_ok" -ne 1 ]; then echo "   ❌ hledání v2 po heals: přetížení ${v2n:-?} (čekám 1), volání: $v2_err"; fail=1; else echo "   ✓ hledání v2: jedno přetížení; volání pozičně, jmenně bez příběhu i s příběhem projde"; fi
+# Hledání v3 (sonda ho před heals zahazuje celé): po heals nese plniče parametrů. Viditelnost měří tvrzení o jejím domově níž.
+n=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='mcp_search_knowledge_v3' AND p.prosrc LIKE '%gea.slug = p_expertise_slug%' AND p.prosrc LIKE '%cardinality(p_item_types) = 0%' AND p.prosrc LIKE '%kc.source_field <> ''ai_instructions''%';")
+if [ "${n:-0}" -ne 1 ]; then echo "   ❌ hledání v3 po heals nenese plniče parametrů"; fail=1; else echo "   ✓ hledání v3: plniče parametrů (výběr odbornosti, prázdný seznam typů, pokyny pro model)"; fi
+# Viditelnost: JEDEN domov se vstupem „je přihlášen“ (jedna signatura), rolím API NEvydaný (vkládá se do dotazů
+# definer funkcí) a všechny čtecí cesty mu předávají identitu (počet volání v každé funkci = počet jejích větví).
+n=$(psql "$PROBE_URL" -v ON_ERROR_STOP=1 -tA <<'SQL'
+SELECT (SELECT string_agg(pg_get_function_identity_arguments(p.oid), ' | ' ORDER BY 1) FROM pg_proc p JOIN pg_namespace ns ON ns.oid = p.pronamespace
+         WHERE ns.nspname = 'public' AND p.proname = 'knowledge_visibility_searchable')
+       || '/' || (SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid = p.pronamespace WHERE ns.nspname = 'public' AND p.proname = 'knowledge_visibility_searchable'
+                    AND (has_function_privilege('anon', p.oid, 'EXECUTE') OR has_function_privilege('authenticated', p.oid, 'EXECUTE')))
+       || '/' || (SELECT string_agg(p.proname || '=' || ((length(p.prosrc) - length(replace(p.prosrc, 'public.knowledge_visibility_searchable(', ''))) / length('public.knowledge_visibility_searchable('))::text, ',' ORDER BY p.proname)
+                    FROM pg_proc p JOIN pg_namespace ns ON ns.oid = p.pronamespace WHERE ns.nspname = 'public'
+                     AND p.proname IN ('mcp_search_knowledge_v2', 'mcp_search_knowledge_v3', 'mcp_get_knowledge_item', 'fn_get_tao_principles', 'fn_get_psyche_traits',
+                                       'fn_search_personality_context', 'fn_get_run_citations', 'fn_get_run_graph_context', 'knowledge_visibilities_for_caller',
+                                       'list_story_knowledge_items'));
+SQL
+)
+cekam="p_visibility text, p_signed_in boolean, p_in_guild boolean/0/fn_get_psyche_traits=1,fn_get_run_citations=2,fn_get_run_graph_context=2,fn_get_tao_principles=1,fn_search_personality_context=2,knowledge_visibilities_for_caller=1,list_story_knowledge_items=1,mcp_get_knowledge_item=1,mcp_search_knowledge_v2=1,mcp_search_knowledge_v3=2"
+if [ "$n" != "$cekam" ]; then echo "   ❌ viditelnost po heals: $n (čekám $cekam)"; fail=1; else echo "   ✓ viditelnost: jeden domov s „je přihlášen“, nevydaný; devět čtecích funkcí a množina pro politiky ho volají ve všech větvích"; fi
+# Množina štítků pro politiky: definer bez parametru, vydaná anonymovi i přihlášenému; starý pomocník s voláním na řádek pryč.
+n=$(scalar "SELECT coalesce(string_agg(p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')/' || p.prosecdef::text || '/' || has_function_privilege('anon', p.oid, 'EXECUTE')::text || '/' || has_function_privilege('authenticated', p.oid, 'EXECUTE')::text, ' | ' ORDER BY p.proname), '') FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname IN ('knowledge_visibilities_for_caller', 'knowledge_visibility_for_caller');")
+if [ "$n" != "knowledge_visibilities_for_caller()/true/true/true" ]; then echo "   ❌ množina štítků pro politiky po heals: [$n] (čekám knowledge_visibilities_for_caller()/true/true/true a nic dalšího)"; fail=1; else echo "   ✓ množina štítků pro politiky: jednou za dotaz z identity volajícího; pomocník s voláním na řádek pryč"; fi
+# Domov gildy (G1): schválený konzultant studie + certifikace od správy; rolím API nevydaný.
+n=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='knowledge_audience_in_guild' AND p.prosrc LIKE '%study_consultants%' AND p.prosrc LIKE '%is_certified%' AND p.prosrc NOT LIKE '%guild_tier%' AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE');")
+if [ "${n:-0}" -ne 1 ]; then echo "   ❌ domov gildy po heals chybí, je vydaný nebo nemá definici G1"; fail=1; else echo "   ✓ domov gildy: G1 (schválený konzultant + certifikace), nevydaný"; fi
+# Politiky tabulky po heals se ptají množiny štítků pro volajícího a vlastní výčet (members) nenesou.
+n=$(scalar "SELECT string_agg(polname || '=' || (pg_get_expr(polqual, polrelid) LIKE '%knowledge_visibilities_for_caller()%')::text || '/' || (pg_get_expr(polqual, polrelid) LIKE '%members%')::text, ',' ORDER BY polname) FROM pg_policy WHERE polrelid = 'public.knowledge_items'::regclass AND polname IN ('knowledge_items_global_anon_read', 'knowledge_items_global_authenticated_read');")
+if [ "$n" != "knowledge_items_global_anon_read=true/false,knowledge_items_global_authenticated_read=true/false" ]; then echo "   ❌ politiky tabulky po heals nevolají domov viditelnosti ($n)"; fail=1; else echo "   ✓ politiky tabulky: množina štítků pro volajícího (domov), bez vlastního výčtu"; fi
+# Chováním: nepřihlášený přes tabulku dostane `public`, ne `members`; přihlášený obě.
+n=$(psql "$PROBE_URL" -v ON_ERROR_STOP=1 -qtA 2>&1 <<'SQL'
+BEGIN;
+INSERT INTO public.knowledge_items (id, item_type, title, body_markdown, status, visibility) VALUES
+  ('0f0f0f0f-0000-4000-8000-00000000b001', 'domain_doc', 'ZK upgrade public', 't', 'active', 'public'),
+  ('0f0f0f0f-0000-4000-8000-00000000b002', 'domain_doc', 'ZK upgrade members', 't', 'active', 'members');
+SELECT set_config('request.jwt.claims', '{"role":"anon"}', true);
+SET LOCAL ROLE anon;
+SELECT 'anon=' || string_agg(title, ',' ORDER BY title) FROM public.knowledge_items WHERE id IN ('0f0f0f0f-0000-4000-8000-00000000b001', '0f0f0f0f-0000-4000-8000-00000000b002');
+RESET ROLE;
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","sub":"0f0f0f0f-0000-4000-8000-00000000b003"}', true);
+SET LOCAL ROLE authenticated;
+SELECT 'prihlaseny=' || string_agg(title, ',' ORDER BY title) FROM public.knowledge_items WHERE id IN ('0f0f0f0f-0000-4000-8000-00000000b001', '0f0f0f0f-0000-4000-8000-00000000b002');
+ROLLBACK;
+SQL
+)
+if [ "$(echo "$n" | grep -E '^(anon|prihlaseny)=' | tr '\n' ' ' | sed 's/ *$//')" != "anon=ZK upgrade public prihlaseny=ZK upgrade members,ZK upgrade public" ]; then echo "   ❌ tabulka po heals vydá nepřihlášenému víc než public, nebo přihlášenému míň: $n"; fail=1; else echo "   ✓ tabulka chováním: nepřihlášený jen public, přihlášený public + members"; fi
+# Vrstva mozku: po heals jediná signatura s publikem a volání bez argumentů projde (službou).
+n=$(scalar "SELECT string_agg(p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')', ',' ORDER BY 1) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname IN ('fn_get_tao_principles','fn_get_psyche_traits');")
+mozek_err=$(psql "$PROBE_URL" -v ON_ERROR_STOP=1 -qtA 2>&1 <<'SQL'
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
+SET LOCAL ROLE service_role;
+SELECT jsonb_typeof(public.fn_get_tao_principles()), jsonb_typeof(public.fn_get_psyche_traits());
+SELECT jsonb_typeof(public.fn_get_tao_principles(p_audience_user_id => gen_random_uuid()));
+ROLLBACK;
+SQL
+) && mozek_ok=1 || mozek_ok=0
+if [ "$n" != "fn_get_psyche_traits(p_audience_user_id uuid),fn_get_tao_principles(p_audience_user_id uuid)" ] || [ "$mozek_ok" -ne 1 ]; then echo "   ❌ vrstva mozku po heals: [$n] volání: $mozek_err"; fail=1; else echo "   ✓ vrstva mozku: jedna signatura s publikem; volání bez argumentů i s publikem projde"; fi
+# Skládání kontextu: žadatele jmenuje jen služba a vrstvy mozku ho dostávají.
+n=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='compose_context' AND p.prosrc LIKE '%WHEN public.get_jwt_role() = ''service_role'' THEN COALESCE(p_requester_id, auth.uid())%' AND p.prosrc LIKE '%fn_get_tao_principles(p_audience_user_id := v_requester)%' AND p.prosrc LIKE '%fn_get_psyche_traits(p_audience_user_id := v_requester)%';")
+if [ "${n:-0}" -ne 1 ]; then echo "   ❌ compose_context po heals nepřipíná žadatele nebo ho nepředává vrstvě mozku"; fail=1; else echo "   ✓ compose_context: žadatele jmenuje jen služba, vrstva mozku ho dostává"; fi
+# Čtení podle id: správa čte i soukromou položku; vlastní výčet viditelností pryč.
+n=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='mcp_get_knowledge_item' AND p.prosrc LIKE '%v_is_admin%' AND p.prosrc NOT LIKE '%ki.visibility IN%';")
+if [ "${n:-0}" -ne 1 ]; then echo "   ❌ čtení podle id po heals nese vlastní výčet viditelností nebo nemá větev správy"; fail=1; else echo "   ✓ čtení podle id: větev správy, bez vlastního výčtu"; fi
+# Hledání v3 (sonda ho před heals zahazuje celé): po heals měří přístup k příběhu u publika, v obou větvích.
+n=$(scalar "SELECT ((length(p.prosrc) - length(replace(p.prosrc, '(ki.story_id IS NOT NULL AND v_story_ok)', ''))) / length('(ki.story_id IS NOT NULL AND v_story_ok)'))::text || '/' || (p.prosrc LIKE '%v_story_ok := p_story_id IS NULL%')::text || '/' || ((length(p.prosrc) - length(replace(p.prosrc, '(ki.story_id IS NULL AND public.knowledge_visibility_searchable(', ''))) / length('(ki.story_id IS NULL AND public.knowledge_visibility_searchable('))::text FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='mcp_search_knowledge_v3';")
+if [ "$n" != "2/true/2" ]; then echo "   ❌ hledání v3 po heals neměří přístup k příběhu u publika ($n; čekám 2/true/2)"; fail=1; else echo "   ✓ hledání v3: přístup k příběhu se měří u publika, v obou větvích; viditelnost rozhoduje jen u globální položky"; fi
+# Seznam položek příběhu: heals ho přehrály — vlastník příběhu je tam.
+n=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='list_story_knowledge_items' AND p.prosrc LIKE '%(ps.user_id = v_user_id%' AND p.prosrc LIKE '%OR (ki.status = ''active''%public.knowledge_visibility_searchable(ki.visibility%';")
+if [ "${n:-0}" -ne 1 ]; then echo "   ❌ seznam položek příběhu zůstal STARÝ (bez vlastníka, bez štítku nebo bez filtru aktivních ve výchozím příběhu)"; fail=1; else echo "   ✓ seznam položek příběhu: vlastník, účastník, správa; výchozí příběh jen aktivní a podle štítku"; fi
+# Citace a graf běhu: výchozí příběh už neotevírá soukromé položky — položka příběhu podle pravidel příběhu + štítku.
+n=$(scalar "SELECT string_agg(p.proname || '=' || (p.prosrc LIKE '%is_stack_default AND public.knowledge_visibility_searchable(%' OR p.prosrc LIKE '%v_pribeh_vychozi AND public.knowledge_visibility_searchable(%')::text, ',' ORDER BY p.proname) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname IN ('fn_get_run_citations', 'fn_get_run_graph_context');")
+if [ "$n" != "fn_get_run_citations=true,fn_get_run_graph_context=true" ]; then echo "   ❌ citace / graf běhu po heals pouštějí výchozí příběh bez štítku ($n)"; fail=1; else echo "   ✓ citace a graf běhu: výchozí příběh jen podle štítku"; fi
+# Graf běhu: heals funkci přehrály — volání nad během s citací projde (dřív 42702).
+graf_err=$(psql "$PROBE_URL" -v ON_ERROR_STOP=1 -qtA 2>&1 <<'SQL'
+BEGIN;
+INSERT INTO aisha_auth.users (id, email) VALUES ('0f0f0f0f-0000-4000-8000-00000000a001', 'zk-upgrade-graf@test.local');
+INSERT INTO public.partner_stories (id, title, user_id) VALUES ('0f0f0f0f-0000-4000-8000-00000000a002', 'ZK upgrade graf', '0f0f0f0f-0000-4000-8000-00000000a001');
+INSERT INTO public.ai_runs (id, kind, story_id, citation_chunk_ids) VALUES ('0f0f0f0f-0000-4000-8000-00000000a003', 'chat', '0f0f0f0f-0000-4000-8000-00000000a002', ARRAY[gen_random_uuid()]);
+SET LOCAL ROLE service_role;
+SELECT count(*) FROM public.fn_get_run_graph_context('0f0f0f0f-0000-4000-8000-00000000a003'::uuid, NULL, NULL);
+ROLLBACK;
+SQL
+) && echo "   ✓ graf běhu: volání nad během s citací projde" \
+  || { echo "   ❌ graf běhu při volání padá:"; echo "$graf_err" | sed 's/^/      /'; fail=1; }
+# Fronty zpracování a graf běhu: po heals všechny čtyři volají pomocníka čitelného stavu, pg_temp poslední.
+n=$(scalar "SELECT count(*) FILTER (WHERE p.prosrc LIKE '%public.knowledge_state_readable(ki.quarantine_status)%' AND array_to_string(p.proconfig, ',') LIKE '%pg_temp') || '/' || count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname IN ('fn_get_chunks_needing_context','fn_get_embeddings_needing_v2','fn_chunks_bez_zive_identity','fn_get_run_graph_context');")
+if [ "$n" != "4/4" ]; then echo "   ❌ fronty zpracování a graf běhu zůstaly STARÉ ($n volá pomocníka čitelného stavu se zpevněnou cestou)"; fail=1; else echo "   ✓ fronty zpracování a graf běhu: 4 ze 4 volají pomocníka čitelného stavu, pg_temp poslední"; fi
+# Statistiky znalostí: po heals je nespustí anon ani authenticated; službě grant zůstal.
+n=$(scalar "SELECT (SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace CROSS JOIN (VALUES ('anon'),('authenticated')) r(role) WHERE ns.nspname='public' AND p.proname='mcp_get_knowledge_stats' AND has_function_privilege(r.role, p.oid, 'EXECUTE')) || '/' || (SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='mcp_get_knowledge_stats' AND has_function_privilege('service_role', p.oid, 'EXECUTE'));")
+if [ "$n" != "0/1" ]; then echo "   ❌ statistiky znalostí po heals: $n (čekám 0 rolí API s EXECUTE / 1 = služba ho má)"; fail=1; else echo "   ✓ statistiky znalostí: anon ani authenticated je nespustí, služba ano"; fi
+# Čtení podle id: po heals PRÁVĚ JEDNO přetížení (s publikem) a projde volání starým tvarem i novým.
+n=$(scalar "SELECT string_agg(pg_get_function_identity_arguments(p.oid), ' | ' ORDER BY 1) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname='mcp_get_knowledge_item';")
+if [ "$n" != "p_item_id uuid, p_source_slug text, p_audience_user_id uuid" ]; then echo "   ❌ čtení podle id po heals: přetížení [$n] (čekám jedno, s p_audience_user_id)"; fail=1; fi
+id_err=$(psql "$PROBE_URL" -v ON_ERROR_STOP=1 -qtA 2>&1 <<'SQL'
+BEGIN;
+SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
+SET LOCAL ROLE service_role;
+SELECT public.mcp_get_knowledge_item(p_item_id => gen_random_uuid(), p_source_slug => NULL::text) IS NULL;
+SELECT public.mcp_get_knowledge_item(p_source_slug => 'zk-upgrade-neexistuje') IS NULL;
+SELECT public.mcp_get_knowledge_item(gen_random_uuid(), NULL::text) IS NULL;
+SELECT public.mcp_get_knowledge_item(p_item_id => gen_random_uuid(), p_audience_user_id => gen_random_uuid()) IS NULL;
+ROLLBACK;
+SQL
+) && echo "   ✓ čtení podle id: jedno přetížení; volání dvěma jmennými parametry, jedním, pozičně i s publikem projde" \
+  || { echo "   ❌ čtení podle id po heals při volání padá:"; echo "$id_err" | sed 's/^/      /'; fail=1; }
+# Expertní pravidla (revize B1): pomocník viditelnosti existuje a není vydaný; čtyři čtenáři mají jen tvar
+# s publikem; všichni čtenáři obsahu pravidel ho volají; politiky čtení napřímo se ptají množiny štítků.
+n=$(psql "$PROBE_URL" -v ON_ERROR_STOP=1 -tA <<'SQL'
+SELECT (SELECT count(*) FROM pg_proc p WHERE p.pronamespace = 'public'::regnamespace AND p.proname = 'expert_rule_visible_to'
+          AND NOT has_function_privilege('anon', p.oid, 'EXECUTE') AND NOT has_function_privilege('authenticated', p.oid, 'EXECUTE'))
+       || '/' || (SELECT string_agg(proname || '(' || pg_get_function_identity_arguments(oid) || ')', ',' ORDER BY proname, pg_get_function_identity_arguments(oid))
+                    FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname IN ('get_expert_rule_detail', 'mcp_get_rule_detail', 'mcp_get_agent_knowledge'))
+       || '/' || (SELECT count(*) FROM pg_proc WHERE pronamespace = 'public'::regnamespace AND proname = 'mcp_search_knowledge')
+       || '/' || (SELECT coalesce(string_agg(proname, ',' ORDER BY proname), '') FROM pg_proc WHERE pronamespace = 'public'::regnamespace
+                    AND proname IN ('assess_code_quality', 'compose_context', 'evaluate_test_strategy', 'generate_copilot_instructions', 'generate_default_copilot_instructions', 'get_expert_rule_detail', 'get_expert_rules', 'get_expertise_areas', 'get_guild_member_detail', 'get_guild_members', 'get_instruction_payload', 'get_my_rule_subscriptions', 'get_story_knowledge_context', 'get_story_rulesets', 'list_agent_kb_bindings', 'mcp_consult_dirigent', 'mcp_get_agent_knowledge', 'mcp_get_compliance_context', 'mcp_get_expertise_areas', 'mcp_get_rule_detail', 'mcp_get_story_context', 'mcp_match_experts', 'mcp_propose_improvement', 'mcp_request_unblock', 'mcp_search_knowledge', 'moderate_development_flow', 'recommend_ruleset_for_story', 'subscribe_to_expert_rule', 'create_story_ruleset') AND prosrc NOT LIKE '%public.expert_rule_visible_to(%')
+       || '/' || (SELECT string_agg(polname || '=' || (pg_get_expr(polqual, polrelid) LIKE '%knowledge_visibilities_for_caller()%' AND pg_get_expr(polqual, polrelid) NOT LIKE '%members%')::text, ',' ORDER BY polname)
+                    FROM pg_policy WHERE polrelid = 'public.expert_rules'::regclass AND polname IN ('anon_read_public_rules', 'auth_read_public_and_members_rules'));
+SQL
+)
+cekam="1/get_expert_rule_detail(p_rule_slug text, p_audience_user_id uuid),mcp_get_agent_knowledge(p_agent_slug text, p_binding_type text, p_audience_user_id uuid),mcp_get_rule_detail(p_rule_slug text, p_audience_user_id uuid)/1//anon_read_public_rules=true,auth_read_public_and_members_rules=true"
+if [ "$n" != "$cekam" ]; then echo "   ❌ expertní pravidla po heals: $n (čekám $cekam)"; fail=1; else echo "   ✓ expertní pravidla: pomocník viditelnosti, tvary s publikem, všichni čtenáři ho volají, politiky přes domov"; fi
+# Chováním: nepřihlášený soukromé pravidlo nedostane ani tabulkou, ani detailem; veřejné ano.
+# (Chyba volání se vypíše a brána spadne tvrzením — ne tichým koncem skriptu pod `set -e`.)
+# Spouště publikace (zápis běhu do ai_runs chce výchozí příběh ze seedu, který tu ještě neproběhl) se pro
+# vložení sond vypnou — sonda měří čtení, ne publikaci.
+if n=$(psql "$PROBE_URL" -v ON_ERROR_STOP=1 -qtA 2>&1 <<'SQL'
+BEGIN;
+SET LOCAL session_replication_role = replica;
+INSERT INTO aisha_auth.users (id, email) VALUES ('0f0f0f0f-0000-4000-8000-00000000c001', 'zk-upgrade-pravidla@test.local');
+INSERT INTO public.partner_profiles (id, user_id, display_name, city) VALUES ('0f0f0f0f-0000-4000-8000-00000000c002', '0f0f0f0f-0000-4000-8000-00000000c001', 'ZK autor', 'Brno');
+INSERT INTO public.expert_rules (slug, title, body_markdown, status, visibility, author_partner_id) VALUES
+  ('zk-upgrade-pub', 'ZK pub', 't', 'published', 'public', '0f0f0f0f-0000-4000-8000-00000000c002'),
+  ('zk-upgrade-pri', 'ZK pri', 't', 'published', 'private', '0f0f0f0f-0000-4000-8000-00000000c002');
+SET LOCAL session_replication_role = origin;
+SELECT set_config('request.jwt.claims', '{"role":"anon"}', true);
+SET LOCAL ROLE anon;
+SELECT 'tabulka=' || string_agg(slug, ',' ORDER BY slug) FROM public.expert_rules WHERE slug LIKE 'zk-upgrade-%';
+SELECT 'detail=' || (public.get_expert_rule_detail('zk-upgrade-pub') IS NOT NULL)::text || '/' || (public.get_expert_rule_detail('zk-upgrade-pri') IS NOT NULL)::text;
+ROLLBACK;
+SQL
+); then
+  if [ "$(echo "$n" | grep -E '^(tabulka|detail)=' | tr '\n' ' ' | sed 's/ *$//')" != "tabulka=zk-upgrade-pub detail=true/false" ]; then echo "   ❌ expertní pravidla chováním po heals: $n"; fail=1; else echo "   ✓ expertní pravidla chováním: nepřihlášený soukromé nedostane tabulkou ani detailem"; fi
+else
+  echo "   ❌ expertní pravidla chováním po heals: volání padá:"; echo "$n" | sed 's/^/      /'; fail=1
+fi
+# Guard profilu partnera (revize 2, N2): po heals BEFORE INSERT OR UPDATE (tgtype 23) a chováním přihlášený
+# nezaloží vlastní profil s is_certified = true (na předchozím mainu prošlo).
+n=$(scalar "SELECT tgtype FROM pg_trigger WHERE tgrelid = 'public.partner_profiles'::regclass AND tgname = 'partner_profiles_privilege_guard';")
+if pp_err=$(psql "$PROBE_URL" -v ON_ERROR_STOP=1 -qtA 2>&1 <<'SQL'
+BEGIN;
+INSERT INTO aisha_auth.users (id, email) VALUES ('0f0f0f0f-0000-4000-8000-00000000d001', 'zk-upgrade-guard@test.local');
+SELECT set_config('request.jwt.claims', '{"role":"authenticated","sub":"0f0f0f0f-0000-4000-8000-00000000d001"}', true);
+SELECT set_config('request.jwt.claim.sub', '0f0f0f0f-0000-4000-8000-00000000d001', true);
+SET LOCAL ROLE authenticated;
+INSERT INTO public.partner_profiles (user_id, display_name, city, is_certified) VALUES ('0f0f0f0f-0000-4000-8000-00000000d001', 'ZK', 'Brno', true);
+ROLLBACK;
+SQL
+); then
+  echo "   ❌ guard profilu po heals: přihlášený založil certifikovaný profil (tgtype $n)"; fail=1
+elif [ "$n" != "23" ] || ! grep -q "is_certified is server-managed" <<< "$pp_err"; then
+  echo "   ❌ guard profilu po heals: tgtype $n (čekám 23), chyba: $pp_err"; fail=1
+else
+  echo "   ✓ guard profilu partnera: BEFORE INSERT OR UPDATE; přihlášený nezaloží certifikovaný profil"
+fi
+# Čtyři mrtvé funkce SECURITY DEFINER: heals je na běžící databázi odstraní.
+n=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.proname IN ('raw_query_admin','edge_database_dump_table','fn_rollback_agent_config','get_story_basic_info');")
+if [ "${n:-1}" -ne 0 ]; then echo "   ❌ mrtvé funkce přežily heals ($n ze 4)"; fail=1; else echo "   ✓ čtyři mrtvé definer funkce jsou pryč"; fi
+# Příjem pošty: staré signatury pryč, nové tvary jsou (jinak by sken šel obejít).
+n=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.oid::regprocedure::text IN ('append_inbound_comm_entry_audited(uuid,text,text,text,text,text,uuid,jsonb)','ingest_inbound_comm_audited(text,text,uuid,text,text,text,uuid,text,jsonb)','get_retryable_integration_events(integer)')")
+m=$(scalar "SELECT count(*) FROM pg_proc p JOIN pg_namespace ns ON ns.oid=p.pronamespace WHERE ns.nspname='public' AND p.oid::regprocedure::text IN ('append_inbound_comm_entry_audited(uuid,text,text,text,text,text,uuid,jsonb,uuid)','get_retryable_integration_events(text[],integer)')")
+if [ "${n:-1}" -ne 0 ] || [ "${m:-0}" -ne 2 ]; then echo "   ❌ příjem pošty po heals: starých signatur $n (čekám 0), nových $m (čekám 2)"; fail=1; else echo "   ✓ příjem pošty: staré signatury (append bez eventu, ingest bez skenu, opakování bez zdrojů) pryč, nové tvary jsou"; fi
+# Schéma public: heals vrátily grant roli, která v public vytváří, a CREATE pro
+# PUBLIC odebraly. Měří se chováním (pokus o CREATE TABLE pod každou rolí) i čtecí
+# kontrolou, kterou pouští živé ověření — projít musí obě.
+if psql "$PROBE_URL" -v ON_ERROR_STOP=1 -q -f "$VERIFY_PUBLIC" && verify_public_acl "$PROBE_URL"; then
+  echo "   ✓ schéma public: vytváří jen vyjmenovaná role"
+else
+  echo "   ❌ schéma public: heals práva nedorovnaly (chyba výš říká, která role co smí)"; fail=1
+fi
 if [ "$fail" -ne 0 ]; then
   echo "❌ heals.sql did NOT reconcile the existing DB — db:seed would fail on redeploy"; exit 1
 fi

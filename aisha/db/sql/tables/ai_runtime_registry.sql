@@ -94,6 +94,13 @@ CREATE TABLE IF NOT EXISTS public.ai_runtime_registry (
     'autonomous'             -- acts without per-action human gating
   )),
 
+  -- POVĚŘENÍ, které runtime ke svému běhu potřebuje — JMÉNO proměnné, nikdy hodnota
+  -- (sebe-popis, jako ai_provider_registry.auth_env_var). Z obou sloupců
+  -- (∪ mcp_server_registry.auth_env_var) se ODVOZUJE katalog pověření, která si správa
+  -- instance nastaví v administraci (provider_credential_catalog); hodnota leží
+  -- v trezoru instance pod `credential:<JMÉNO>`. NULL = runtime vlastní pověření nemá.
+  credential_env_var text CHECK (credential_env_var IS NULL OR credential_env_var ~ '^[A-Z][A-Z0-9_]{2,63}$'),
+
   notes text,
   metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
 

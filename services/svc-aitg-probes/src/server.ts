@@ -16,7 +16,7 @@
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import Fastify from 'fastify';
-import { applySecurity } from '@aisha/security';
+import { applySecurity, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import { config } from './config.js';
@@ -37,7 +37,7 @@ bootstrapOtel({ serviceName: 'svc-aitg-probes' });
 // trustProxy: false — službu volají jen naše kontejnery PŘÍMO, žádná proxy před ní
 // není (změřeno 2026-09-26: v logu jen healthcheck, Prometheus a svc-mcp-knowledge). S `true` si
 // volající volil počítadlo limitu hlavičkou X-Forwarded-For (ověřeno živě na svc-money).
-const app = Fastify({ logger: { level: config.logLevel }, trustProxy: false });
+const app = Fastify({ logger: safeLoggerOptions({ level: config.logLevel }), trustProxy: false });
 
 await applySecurity(app, {
   service: 'svc-aitg-probes',

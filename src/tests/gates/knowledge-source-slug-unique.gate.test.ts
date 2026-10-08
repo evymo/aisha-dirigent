@@ -25,13 +25,16 @@ const INDEX = read('aisha/db/sql/indexes/idx_knowledge_items_source_slug_locale_
 const HEALS = read('aisha/db/heals.sql');
 const BASELINE = read('aisha/db/migrations/00000000000000_baseline.sql');
 const PGTAP = read('aisha/db/tests/schema/09_knowledge_source_slug_unique.sql');
+const RESERVED = read('aisha/db/sql/indexes/idx_knowledge_items_reserved_slug_unique.sql');
 
 describe('#33 — knowledge_items (source_slug, locale) structural dedup', () => {
   it('the SoT index is a partial UNIQUE on (source_slug, locale) WHERE source_slug IS NOT NULL', () => {
     expect(INDEX.length, 'index SoT file must exist').toBeGreaterThan(0);
     expect(INDEX).toMatch(/CREATE UNIQUE INDEX idx_knowledge_items_source_slug_locale_unique/);
     expect(INDEX).toMatch(/\(source_slug, locale\)/);
-    expect(INDEX).toMatch(/WHERE \(source_slug IS NOT NULL\)/);
+    // Reserved knowledge sources (repository seed only) are left out — they have their
+    // own namespace below, so no ordinary item can occupy a slug the seed will add.
+    expect(INDEX).toMatch(/WHERE \(\(source_slug IS NOT NULL\) AND \(source_type <> ALL \(ARRAY\['platform_knowledge'::text, 'instance_knowledge'::text\]\)\)\)/);
     // must NOT be a bare UNIQUE(source_slug) — that would forbid legitimate Brick4 locale variants
     expect(INDEX).not.toMatch(/USING btree \(source_slug\)\s+WHERE/);
   });
@@ -54,6 +57,19 @@ describe('#33 — knowledge_items (source_slug, locale) structural dedup', () =>
 
   it('the regenerated baseline carries the unique index', () => {
     expect(BASELINE).toMatch(/CREATE UNIQUE INDEX idx_knowledge_items_source_slug_locale_unique/);
+  });
+
+  it('reserved knowledge sources keep slugs unique in their own namespace (SoT, heals, baseline)', () => {
+    expect(RESERVED, 'reserved index SoT file must exist').toMatch(
+      /CREATE UNIQUE INDEX idx_knowledge_items_reserved_slug_unique\s+ON public\.knowledge_items USING btree \(source_type, source_slug, locale\)\s+WHERE \(source_type = ANY \(ARRAY\['platform_knowledge'::text, 'instance_knowledge'::text\]\)\)/,
+    );
+    expect(HEALS).toContain('\\ir sql/indexes/idx_knowledge_items_reserved_slug_unique.sql');
+    expect(BASELINE).toMatch(/CREATE UNIQUE INDEX idx_knowledge_items_reserved_slug_unique/);
+    // the dup collapse must use the SAME predicate as the global index, or it would
+    // delete a legitimate ordinary row sharing a slug with a reserved one
+    const healIdx = HEALS.indexOf('heal #33');
+    const collapse = HEALS.slice(healIdx, HEALS.indexOf('idx_knowledge_items_source_slug_locale_unique', healIdx));
+    expect(collapse).toMatch(/source_type <> ALL \(ARRAY\['platform_knowledge'::text, 'instance_knowledge'::text\]\)/);
   });
 
   it('the pgTAP runtime contract exists (reject dup / allow locale variant / allow NULL slug)', () => {

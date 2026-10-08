@@ -54,10 +54,10 @@ export const config = {
     process.env.KC_JWKS_URL ??
     `${requireEnv('KEYCLOAK_URL', { service: 'svc-ai-chat', why: 'Dosazené `keycloak:8080` nenese prefix instance ani správný port.' })}/realms/${requireEnv('KEYCLOAK_REALM', { service: 'svc-ai-chat', why: 'Realm je deklarovaná konstanta, ne výchozí hodnota.' })}/protocol/openid-connect/certs`,
 
-  /** LLM providers */
-  openaiApiKey: process.env.OPENAI_API_KEY ?? '',
-  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
-  googleApiKey: process.env.GOOGLE_AI_API_KEY ?? '',
+  // ⛔ Klíče poskytovatelů LLM (OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_AI_API_KEY)
+  // tu NEJSOU (2026-10-02): čtou se za běhu z trezoru instance (lib/credentials.ts,
+  // administrace „Poskytovatelé AI a tokeny") — každý fork si nastaví svoje. Env jen
+  // přechodně; při startu se přesune do trezoru (migrateEnvCredentials).
 
   /** Local LLM backends */
   dockerModelRunnerUrl: process.env.DOCKER_MODEL_RUNNER_URL ?? '',

@@ -20,8 +20,11 @@ const mocks = vi.hoisted(() => ({
   sandboxWorkflow: vi.fn(),
 }));
 
-vi.mock('@aisha/security', () => ({
+vi.mock('@aisha/security', async (importActual) => ({
   applySecurity: mocks.applySecurity,
+  // Továrna loggeru je SKUTEČNÁ: server.ts z ní staví Fastify({ logger }) a test
+  // tak běží se stejnými serializery jako provoz (ne s mockem, který nic neredaguje).
+  safeLoggerOptions: (await importActual<typeof import('@aisha/security')>()).safeLoggerOptions,
   createSsrfGuard: () => ({ safeFetch: mocks.safeFetch }),
   // Per-route rate-limit config helper — returns the Fastify `{ rateLimit }` shape. The real
   // @fastify/rate-limit plugin is not registered here (applySecurity is mocked to a no-op), so

@@ -51,13 +51,20 @@
 -- selfRegisterRuntimes reconciles is_enabled to the adapter's real availability — so a
 -- runtime with a LIVE adapter that shipped disabled here would only be a transient,
 -- misleading pre-boot state, not an honored opt-out. Ship it as it actually runs.
+--
+-- POVĚŘENÍ RUNTIME (credential_env_var) je táž sebe-deklarace jako
+-- ai_provider_registry.auth_env_var: JMÉNO proměnné, kterou runtime ke svému běhu
+-- potřebuje (cli:claude-cli → AGENT_CLAUDE_OAUTH_TOKEN, který runner předá jako
+-- CLAUDE_CODE_OAUTH_TOKEN; cli:codex-cli → OPENAI_API_KEY, který čte
+-- docker/agent-codex). Z deklarací se odvozuje katalog pověření v administraci;
+-- hodnotu si každá instance nastaví do SVÉHO trezoru (credential:<JMÉNO>).
 -- ============================================================================
 
 INSERT INTO public.ai_runtime_registry
   (slug, display_name, runtime_kind,
    is_enabled, adapter_health,
    can_write, needs_network, supports_tools, is_in_process_executor, side_effect_class, autonomy_class,
-   notes)
+   credential_env_var, notes)
 VALUES
   -- ── direct_llm — AISHA calls a model directly via a reflection node. ───────
   -- Read-only executor: produces tokens, performs no side-effecting write and
@@ -66,7 +73,7 @@ VALUES
   -- fn_runtime_available additionally requires ≥1 available provider (DERIVED).
   ('direct_llm', 'Direct LLM (reflection node)', 'direct_llm',
    true, 'healthy',
-   false, false, true, true, 'read_only', 'semi',   -- is_in_process_executor=true (direct_llm/hermes/workbench)
+   false, false, true, true, 'read_only', 'semi', NULL,   -- is_in_process_executor=true (direct_llm/hermes/workbench)
    'AISHA generates directly through a reflection node. Read-only: no side-effecting write, no egress of its own. Availability also requires an enabled+healthy provider (derived in fn_runtime_available, not listed here).'),
 
   -- ── openclaw — operative agent-mesh runtime (helpdesk/CRM/onboarding/tools).
@@ -74,7 +81,7 @@ VALUES
   -- reversible-with-effort (semi): compensating actions exist for most ops.
   ('openclaw', 'OpenClaw (agent mesh)', 'openclaw',
    true, 'healthy',
-   true, true, true, true, 'reversible', 'semi',    -- is_in_process_executor=true (openclaw)
+   true, true, true, true, 'reversible', 'semi', NULL,    -- is_in_process_executor=true (openclaw)
    'Operative agent-mesh runtime. Side-effecting + tool-capable + needs egress; effects are semi-reversible (compensating actions exist). Wrapped as one RuntimeAdapter over existing openclaw_* nodes — no parallel surface.'),
 
   -- ── workflow — hand off to an n8n / orchestrated workflow. ─────────────────
@@ -83,7 +90,7 @@ VALUES
   -- runtime, so supports_tools=false at this axis.
   ('workflow', 'Workflow (n8n / orchestrated)', 'workflow',
    true, 'healthy',
-   true, true, false, false, 'reversible', 'semi',  -- is_in_process_executor=FALSE (workflow = n8n hand-off, no adapter)
+   true, true, false, false, 'reversible', 'semi', NULL,  -- is_in_process_executor=FALSE (workflow = n8n hand-off, no adapter)
    'Hand off to an n8n / orchestrated workflow. Side-effecting + networked; reversible (idempotent, audited steps). Tool use lives in the workflow, not at this axis.'),
 
   -- ── human — route to a person (approval / manual step). ───────────────────
@@ -92,7 +99,7 @@ VALUES
   -- so this runtime is supervised by definition.
   ('human', 'Human (manual / approval)', 'human',
    true, 'healthy',
-   true, false, false, false, 'irreversible', 'supervised',  -- is_in_process_executor=FALSE (human = manual inbox, no adapter)
+   true, false, false, false, 'irreversible', 'supervised', NULL,  -- is_in_process_executor=FALSE (human = manual inbox, no adapter)
    'Route to a person (approval or manual step) via Mission Control. Adapter is the human inbox — healthy by construction. Human actions may be irreversible; supervised by definition.'),
 
   -- ── hermes — reflexive/expert runtime (closed-story learning, skills). ─────
@@ -102,7 +109,7 @@ VALUES
   -- Ships ENABLED to match the live adapter (selfRegisterRuntimes reconciles at boot anyway).
   ('hermes', 'Hermes (reflexive / expert)', 'hermes',
    true, 'unknown',
-   false, false, true, true, 'read_only', 'semi',   -- is_in_process_executor=true (direct_llm/hermes/workbench)
+   false, false, true, true, 'read_only', 'semi', NULL,   -- is_in_process_executor=true (direct_llm/hermes/workbench)
    'Reflexive/expert runtime (closed-story learning, skill creation). Adapter is live (evaluate_story_self + fn_hermes_learning_loop). Read-only/advisory — mutating publish/install steps are human-gated; no egress. adapter_health starts unknown (passes availability) and is reconciled to healthy at boot by selfRegisterRuntimes.'),
 
   -- ── cli:claude-cli — first instance of the generic external-CLI driver. ────
@@ -115,7 +122,7 @@ VALUES
   -- side-effects are treated as irreversible and supervised.
   ('cli:claude-cli', 'Claude CLI (external CLI driver)', 'cli',
    true, 'unknown',
-   true, true, true, true, 'irreversible', 'supervised',  -- is_in_process_executor=TRUE: the cli RuntimeAdapter ships (RUNTIME_ADAPTERS.cli → enqueue via fn_spawn_claude_cli_run), so fn_resolve_runtime derives cli (with an explicit slug, per its cli clause). Matches the coupling rule: the column flips true the moment the adapter lands.
+   true, true, true, true, 'irreversible', 'supervised', 'AGENT_CLAUDE_OAUTH_TOKEN',  -- is_in_process_executor=TRUE: the cli RuntimeAdapter ships (RUNTIME_ADAPTERS.cli → enqueue via fn_spawn_claude_cli_run), so fn_resolve_runtime derives cli (with an explicit slug, per its cli clause). Matches the coupling rule: the column flips true the moment the adapter lands.
    'First instance of the generic external-CLI runtime (runtime_kind=cli, slug=cli:<cli_slug>). ENABLED: the cli RuntimeAdapter enqueues via fn_spawn_claude_cli_run (admission-gated by fn_admit_clow + I1-journaled via fn_record_execution_decision); svc-agent-runner drains the queue into an isolated container. adapter_health is owned by the dedicated runtime health probe (WF_RUNTIME_HEALTH_PROBE → svc-agent-runner /health), not self-written. Writes + needs egress + tool-capable; irreversible/supervised. New CLIs are added as their own cli:<slug> row — none are hardcoded.'),
 
   -- ── cli:codex-cli — second instance of the generic external-CLI driver. ─────
@@ -126,7 +133,7 @@ VALUES
   -- irreversible/supervised); docker/agent-codex drives it.
   ('cli:codex-cli', 'OpenAI Codex CLI (external CLI driver)', 'cli',
    true, 'unknown',
-   true, true, true, true, 'irreversible', 'supervised',
+   true, true, true, true, 'irreversible', 'supervised', 'OPENAI_API_KEY',
    'Second instance of the generic external-CLI runtime (runtime_kind=cli, slug=cli:codex-cli). OpenAI Codex (codex exec) on the OpenAI backend, driven by docker/agent-codex with the SAME RuntimeAdapter + fn_admit_clow admission + I1 journal + __result result contract as cli:claude-cli — AISHA selects the suitable CLI tool per capability-availability, nothing tool-specific is hardcoded in the runner. Writes + needs egress + tool-capable; irreversible/supervised.'),
 
   -- ── workbench — local models surfaced via the VSCode workbench extension. ───
@@ -137,7 +144,7 @@ VALUES
   -- CONTRIBUTES models, it does not yet execute via this axis.
   ('workbench', 'VSCode Workbench (local models)', 'workbench',
    false, 'unknown',
-   false, false, true, true, 'read_only', 'semi',   -- is_in_process_executor=true (direct_llm/hermes/workbench)
+   false, false, true, true, 'read_only', 'semi', NULL,   -- is_in_process_executor=true (direct_llm/hermes/workbench)
    'Local models (ollama / llama.cpp / openai-compat) discovered + reported into this registry by the aisha-dirigent VSCode extension — surface-agnostic with cloud/central models. DISABLED until a workbench execution adapter ships; today it contributes models, it does not yet execute via this axis.')
 ON CONFLICT (slug) DO UPDATE
 SET display_name         = EXCLUDED.display_name,
@@ -157,6 +164,9 @@ SET display_name         = EXCLUDED.display_name,
     is_in_process_executor = EXCLUDED.is_in_process_executor,
     side_effect_class    = EXCLUDED.side_effect_class,
     autonomy_class       = EXCLUDED.autonomy_class,
+    -- Pověření runtime je SEBE-POPIS (jméno proměnné, nikdy hodnota) — obnovuje se
+    -- se seedem jako ostatní deklarace; hodnotu nastavuje správa instance v trezoru.
+    credential_env_var   = EXCLUDED.credential_env_var,
     notes                = EXCLUDED.notes,
     updated_at           = now();
     -- NOTE: is_enabled is intentionally NOT in the SET list — operator opt-in

@@ -83,7 +83,7 @@ AS $$
       -- `error` v ní schéma nezná, důvod patří do `trace_id`.
       jsonb_build_object('data', jsonb_build_object('columns', '[]'::jsonb, 'rows', '[]'::jsonb),
         'provenance', jsonb_build_object('source_slug', 'twin_events',
-          'trace_id', 'twin-events:unauthenticated', 'freshness_at', to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))
+          'trace_id', 'twin-events:unauthorized', 'freshness_at', to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))
     when (select ev from cfg) is null or jsonb_array_length((select cols from cfg)) = 0 then
       jsonb_build_object('data', jsonb_build_object('columns', '[]'::jsonb, 'rows', '[]'::jsonb),
         'provenance', jsonb_build_object('source_slug', 'twin_events',

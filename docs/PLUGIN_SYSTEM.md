@@ -66,7 +66,7 @@ interface SandboxContext {
   tenant: { id, name }
   config: Record<string, unknown>  // get_plugin_runtime_config: výchozí (schéma) → zdroj → dešifrovaná pověření → přepis tenanta; shim ji vyzvedne přes broker /sandbox/config na token běhu, NIKDY z ENV
 
-  // Core Data — RPC proxy (whitelisted by capabilities)
+  // Core Data — RPC proxy (approved sandbox.rpc_allowlist; arguments naming a source = the plugin's own, see Sandbox Rules)
   rpc(functionName: string, params): Promise<unknown>
 
   // Key-Value Store (namespaced per plugin + tenant)
@@ -276,11 +276,38 @@ plugins/
 
 | Sandbox Rule | Enforcement |
 |-------------|-------------|
-| RPC calls | Whitelist per `manifest.capabilities` (`rpc.*` entries) |
+| RPC calls | `manifest.sandbox.rpc_allowlist` from the APPROVED (canary/ga) sandbox policy (`get_plugin_sandbox_policy`); the instance env `PLUGIN_RPC_WHITELIST` may only narrow it |
+| Source | Every RPC argument that names a source belongs to the plugin's own source — see below |
 | Network | Restricted to `manifest.sandbox.network_allowlist` |
 | Timeout | `manifest.sandbox.timeout_ms` (100–30,000ms) |
 | Memory | `manifest.sandbox.max_memory_mb` (8–256MB) |
 | Cron frequency | Trust tier dependent (external: min 15m) |
+| Globály ve VM | Jen `AbortController`, `AbortSignal`, `URL`, `URLSearchParams`, `setTimeout`, `clearTimeout` (`images/plugin-exec/shim/src/sandbox-context.ts`); `setInterval`, `crypto`, `process`, `require` NE. Brána `plugin-dorazi-do-sandboxu` každý zabalený plugin spustí a hlídá hodnotové použití jiných globálů |
+| `ctx.fetch` · `init` | Broker uplatní jen `method`, `headers`, `body`, `redirect`, `signal`; **jiný klíč = chyba**, ne tiše ignorovaná volba |
+| `ctx.fetch` · lhůta | `init.signal` platí pro KRATŠÍ lhůtu (AbortError, jakmile ho plugin zruší); strop brokeru 15 s zůstává horní mezí — delším signálem ho prodloužit nejde |
+| Konec běhu | Běh končí výsledkem pluginu; časovač, který po návratu ještě čeká, běh NEDRŽÍ (shim proces hned ukončí) — práce „na pozadí“ po návratu se neprovede |
+
+**Hranice sandboxu.** VM (`node:vm`) je **jen izolace jmen**: plugin nevidí `process` ani `require`, ale `ctx`
+i předané globály jsou objekty hostitele a únik z VM přes konstruktor existuje (nezávislé čtení rady, 2026-10-03).
+**Hranicí je kontejner běhu** (plugin-exec): co plugin smí, musí platit pro celý proces v něm — síť jen přes broker,
+v prostředí žádná pověření. Stav z provozu instance (2026-10-04): kontejner běhu má **otevřenou síť** a v prostředí
+**klíč k mesh síti** (nález W2) — hranice to tedy zatím NEzaručuje; oprava je v upstreamu rozpracovaná. Co hranice
+kontejneru skutečně zaručuje, změří rada (prostředí procesu shimu, síť kontejneru plugin-exec).
+
+### Zdroj pluginu (broker `/sandbox/rpc`, `sandbox-politika.ts` `ciziZdroj`)
+
+Obecné dráhy (katalog zdroje, dvojčata, události, párování) klíčují data **jménem zdroje**. Plugin do nich
+zapisuje jen pod svým `source_spec.source_slug` — jinak by přepsal (u snapshotu i smazal) data jiného zdroje.
+
+- **Co jmenuje zdroj** (třída podle tvaru jména, ne výčet funkcí): parametr `p_source`, `p_source_slug`,
+  `p_<cokoli>_source(_slug)` (např. `p_to_source`); o úroveň níž pole `source` / `source_slug` objektu, který
+  parametr nese přímo nebo v poli (`p_events[].source`). Hlouběji se nečte — tam leží data dodavatele.
+  `p_source_key` / `p_source_ref` zdroj nejmenují (klíč uvnitř zdroje).
+- **Co patří zdroji:** přesně jeho jméno, nebo **podzdroj** `<zdroj>:<podzdroj>` — jmenný prostor téhož zdroje
+  (`eurowag-telematics:trip`). Podzdroj je neprázdný a bez další `:`. Past předpony (`<zdroj>-x`) je cizí zdroj.
+- **Kdo nesmí vůbec:** plugin bez zdroje a běh, který pluginem není (`claude_cli_task`, …).
+- Porušení → 403 s cestou argumentu (ne hodnotou); RPC se nezavolá. Obě větve `/sandbox/rpc` (běh pluginu
+  i ostatní druhy běhu) jdou přes tutéž kontrolu.
 
 ---
 

@@ -13,17 +13,33 @@
 
 import type { InferenceBackend, HealthResult } from "./providers/types.js";
 import { getExecutionMode } from "./executionMode.js";
-import { createOpenAIBackend } from "./providers/openai.js";
-import { createGeminiBackend } from "./providers/gemini.js";
-import { createAnthropicBackend } from "./providers/anthropic.js";
+import { OpenAIBackend, createOpenAIBackend } from "./providers/openai.js";
+import { GeminiBackend, createGeminiBackend } from "./providers/gemini.js";
+import { AnthropicBackend, createAnthropicBackend } from "./providers/anthropic.js";
 import {
   createOllamaBackend,
   createDockerBackend,
   createVLLMBackend,
   createGatewayBackend,
   createXAIBackend,
+  xaiBackend,
 } from "./providers/openai-compat.js";
 import { createMaestroBackend } from "./providers/maestro.js";
+import { hasProviderKeySource, resolveProviderKey } from "./credentialSource.js";
+
+/**
+ * Cloudové backendy, jejichž klíč je POVĚŘENÍ POSKYTOVATELE (nastavitelné v administraci
+ * instance). Jejich registrace = schopnost „tenhle proces klíč má" — při startu podle
+ * env (synchronně), za běhu ji srovná `reconcileCredentialBackends` podle zdroje
+ * pověření (trezor instance). Platformní klíče (llm-gateway, maestro, vLLM) sem
+ * nepatří — ty generuje platforma a žijí v env služby.
+ */
+const BACKENDY_S_POVERENIM: ReadonlyArray<{ id: string; envVar: string; create: () => InferenceBackend }> = [
+  { id: "openai", envVar: "OPENAI_API_KEY", create: () => new OpenAIBackend() },
+  { id: "google", envVar: "GOOGLE_AI_API_KEY", create: () => new GeminiBackend() },
+  { id: "anthropic", envVar: "ANTHROPIC_API_KEY", create: () => new AnthropicBackend() },
+  { id: "xai", envVar: "XAI_API_KEY", create: () => xaiBackend() },
+];
 
 // =============================================================================
 // Circuit Breaker
@@ -149,6 +165,37 @@ export class BackendRegistry {
     if (this.backends.some((b) => b.id === backend.id)) return;
     if (!residencyAllows(backend)) return;
     this.backends.push(backend);
+  }
+
+  /**
+   * Srovná registraci cloudových backendů s pověřeními podle ZDROJE POVĚŘENÍ služby
+   * (setProviderKeySource → čtečka: trezor instance, přechodně env). Klíč nastavený
+   * jen v administraci backend PŘIDÁ (dřív by ho registr z env nikdy neviděl), klíč,
+   * který nikde není, backend ODEBERE (jinak by zůstal „obsluhovatelný" a volání by
+   * padala). Bez zdroje nic nedělá — registr pak zůstává čistě podle env jako dřív.
+   * Výpadek trezoru se propaguje (volající ho ohlásí); registr se nezmění.
+   */
+  async reconcileCredentialBackends(): Promise<{ added: string[]; removed: string[] }> {
+    this.initialize();
+    const added: string[] = [];
+    const removed: string[] = [];
+    if (!hasProviderKeySource()) return { added, removed };
+    const klice = await Promise.all(BACKENDY_S_POVERENIM.map((b) => resolveProviderKey(b.envVar)));
+    BACKENDY_S_POVERENIM.forEach((spec, i) => {
+      const registrovany = this.backends.some((b) => b.id === spec.id);
+      if (klice[i] && !registrovany) {
+        const backend = spec.create();
+        if (residencyAllows(backend)) {
+          this.backends.push(backend);
+          added.push(spec.id);
+        }
+      } else if (!klice[i] && registrovany) {
+        this.backends = this.backends.filter((b) => b.id !== spec.id);
+        this.healthCache.delete(spec.id);
+        removed.push(spec.id);
+      }
+    });
+    return { added, removed };
   }
 
   /**

@@ -44,6 +44,10 @@ vi.mock('../auth.js', () => ({
 }));
 
 const rpcServiceMock = vi.hoisted(() => vi.fn());
+// Čtečka pověření (2026-10-02): v testu trezor = prostředí procesu (tvar createCredentialReader).
+vi.mock('../lib/credentials.js', () => ({
+  credentials: () => ({ get: async (n: string) => process.env[n] ?? null }),
+}));
 vi.mock('../postgrest.js', () => ({
   rpcService: rpcServiceMock,
 }));
@@ -53,7 +57,15 @@ vi.mock('../postgrest.js', () => ({
 const embedMock = vi.hoisted(() => vi.fn());
 vi.mock('../lib/embed-dispatcher.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/embed-dispatcher.js')>();
-  return { ...actual, embed: embedMock };
+  return {
+    ...actual,
+    embed: embedMock,
+    // Cesty volají embedSIdentitou (identita vah k vektoru); vektory dál dodává embedMock.
+    embedSIdentitou: async (o: Parameters<typeof actual.embedSIdentitou>[0]) => ({
+      vectors: (await embedMock(o)) as number[][],
+      identita: null,
+    }),
+  };
 });
 
 // fn_resolve_embedding_model returns the CANDIDATE embedding backend — brick1c re-embeds the query
@@ -295,6 +307,13 @@ describeIfFastify('POST /rag/eval/run', () => {
     expect(body.scored).toBe(1);
     expect(body.failed).toBe(0);
     expect(body.baseline_rows_upserted).toBe(3);
+    // Běh říká, PRO KOHO vyhledání měřil: publikum se hledání neposílá → jen korpus `public`.
+    expect(body.retrieval_audience).toBe('none:public-corpus');
+    const hledani = rpcServiceMock.mock.calls.find((c) => c[0] === 'mcp_search_knowledge_v3');
+    expect(hledani, 'vyhodnocení hledá přes v3').toBeDefined();
+    expect(Object.keys(hledani![1] as Record<string, unknown>)).not.toContain('p_audience_user_id');
+    const zaznam = rpcServiceMock.mock.calls.find((c) => c[0] === 'fn_record_rag_eval_run_audited');
+    expect((zaznam![1] as { p_metadata: Record<string, unknown> }).p_metadata.retrieval_audience).toBe('none:public-corpus');
 
     // Verify the audited record RPC got the scores
     const recordCall = rpcServiceMock.mock.calls.find(

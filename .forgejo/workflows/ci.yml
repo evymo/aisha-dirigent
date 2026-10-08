@@ -68,7 +68,7 @@ jobs:
   # ===========================================================================
   detect:
     name: Detect Changes
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     outputs:
       app: ${{ steps.changes.outputs.app }}
@@ -307,8 +307,16 @@ jobs:
   # ===========================================================================
   check-web:
     name: "Web: TypeScript & Lint"
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Izolovaný runner: NEAKTIVNÍ, dokud nejsou nastavené CI_IZOLOVANY_*_LABEL (jinak výchozí runner).
+    # PR z forku nikdy; hlídá brána izolovany-runner-nese-jen-ciste-joby.
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && vars.CI_IZOLOVANY_PR_LABEL) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CI_IZOLOVANY_PUSH_LABEL) || 'ubuntu-latest' }}
+    # ⏱ 30, ne 20 (naměřeno 2026-10-03, #1141 job 347567): běžně ~8 min (job 345972),
+    # ale scripts/ci/npm-ci.sh má ZÁMĚRNÝ druhý pokus přes soukromou cache, když
+    # uklízeč runneru smaže sdílenou npm cache pod běžící instalací. Ta cesta stála
+    # 7 min marného prvního pokusu + 2 min soukromé cache; spolu s pomalým diskem
+    # (zápis Node do tool cache 3,5 min místo 10 s) job přetekl 20 min v půlce lintu.
+    # Strop má pokrýt cestu, kterou skript dělá schválně — jinak z odolnosti pád.
+    timeout-minutes: 30
     needs: detect
     if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.app == 'true'
     env:
@@ -398,7 +406,7 @@ jobs:
   # ===========================================================================
   secret-scan:
     name: "Secret scan (gitleaks)"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
@@ -447,7 +455,7 @@ jobs:
   # merge commit neopakuje, co PR běh právě prohlásil za čisté.
   disclosure-scan:
     name: "Disclosure: celý strom (jména, osobní data, cesty)"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 10
     needs: [detect]
     if: needs.detect.outputs.already_verified != 'true'
@@ -469,7 +477,16 @@ jobs:
     name: "Web: Tests"
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    needs: [detect, check-web]
+    # Jen `detect`, ne `check-web`: testy z lintu nic nečtou (každý job má svůj
+    # checkout a `npm ci`) a čekání na něj stálo lint + druhé zařazení na konec
+    # fronty runneru. Proč těžké joby už nejdou za sebou: viz service-tests.
+    #
+    # Jen unit testy (shardy). Brány a testy skriptů běží SOUBĚŽNĚ v jobu
+    # test-web-brany — dřív šly za shardy ve TÉMŽE jobu a job trval ~28 min
+    # (naměřeno 2026-09-29: instalace 3,7 + shardy 16,7 + brány 5,4 + skripty
+    # 1,7 min). Rozdělené leží na kritické cestě jen ~21 min; cena je jedna
+    # instalace navíc (~2 min slotu).
+    needs: [detect]
     if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.app == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -597,6 +614,131 @@ jobs:
             fi
             echo "::endgroup::"
           done
+
+      - name: Surface failure cause (CI hygiene — runner logs unreachable via API)
+        if: failure()
+        shell: bash
+        env:
+          # github.token lacks comment/status:write on this Forgejo runner (the diag
+          # silently no-op'd on #283), so a full-scope API token secret is needed.
+          # ⛔ NAMĚŘENO 2026-09-12 06:08 UTC (token z `git credential fill`,
+          # Forgejo `GET /version` = 16.0.2+gitea-1.22.0, nezávisle 2×):
+          # `GET /repos/aisha/evymo-ai-orchestrator/actions/secrets` (100 jmen)
+          # má `FORGEJO_API_TOKEN` a NEMÁ `REPO_API_TOKEN`;
+          # `GET /orgs/aisha/actions/secrets` (1 jméno) má `REPO_API_TOKEN`.
+          # FetchActionSecrets (models/secret/secret.go) slévá owner + repo
+          # secrety bez filtru → neforkový běh dostane OBA, fork-PR běh ŽÁDNÝ.
+          # Dřívější tvrzení „Forgejo rezervuje prefix FORGEJO_,
+          # secrets.FORGEJO_API_TOKEN nemůže existovat" (2026-08-02, z HTTP 400
+          # na PUT) platí jen pro ZALOŽENÍ (ValidateName) — existující secret
+          # se doručuje. Tenhle krok čte org-scope jméno, které do neforkového
+          # běhu dorazí; jeho chování se tu nemění. Dluh mainu mimo tuhle větev:
+          # číst obě jména jako krok „Registr forků" výš, aby krok nezávisel na
+          # tom, ve kterém rozsahu jméno zrovna leží.
+          TOK: ${{ secrets.REPO_API_TOKEN }}
+          PRNUM: ${{ github.event.pull_request.number }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          echo "::group::env / memory"
+          (free -m 2>/dev/null || true); (cat /sys/fs/cgroup/memory.max 2>/dev/null || true); node -v; npm -v
+          echo "::endgroup::"
+          echo "::group::test:run tail"
+          tail -60 /tmp/webtests.log 2>/dev/null || echo "(no test:run log — failed at npm ci or earlier)"
+          echo "::endgroup::"
+          echo "::group::test:gates tail"
+          tail -60 /tmp/gates.log 2>/dev/null || echo "(gates step not reached — failure was upstream)"
+          echo "::endgroup::"
+          echo "::group::failure signatures"
+          grep -iEn "Killed|heap out of memory|JS heap|FATAL ERROR|Test Files +[0-9]+ failed|onTaskUpdate|ECONN|ENOTFOUND|npm error|Cannot find module" /tmp/webtests.log /tmp/gates.log 2>/dev/null | tail -50 || true
+          echo "::endgroup::"
+          # Forgejo job logs are unreachable via the API, so a failing Web:Tests is
+          # otherwise undiagnosable. Post the failure cause where it gets SOLVED
+          # (majitel 08-02): a PR failure comments on the PR; a MAIN failure files
+          # an ISSUE — main has no PR thread, and a red main that nobody opens the
+          # runner for is exactly the failure this diag exists to surface.
+          # Permanent CI hygiene (#279) — keep it.
+          MEM=$( (free -m 2>/dev/null | sed -n '1,2p'); echo "cgroup.max=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo n/a)" )
+          # SHARD-FAILED* první, protože nese návratový kód — ten rozhoduje.
+          # `ECONN` bez konce chytalo `useWearableConnections` (grep je -i), proto
+          # jen skutečné kódy chyb; `Serialized`/`exceeded` zůstávají pro vitest.
+          SIG=$(grep -iEn "SHARD-FAILED[A-Z-]*|Killed|heap out of memory|JS heap|FATAL ERROR|Test Files +[0-9]+ failed|Tests +[0-9]+ failed|onTaskUpdate|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|npm error|Cannot find module|RangeError|must not conflict|Serialized|worker (exited|terminated)|exceeded" /tmp/webtests.log /tmp/gates.log 2>/dev/null | tail -25)
+          BODY=$(printf '### Web:Tests runner failure cause (temp #279 diag)\n\ncommit: %s\n\n**mem:**\n```\n%s\n```\n\n**signatures:**\n```\n%s\n```\n\n**webtests.log (last 30):**\n```\n%s\n```\n\n**gates.log (last 30):**\n```\n%s\n```\n' "${SHA:-${GITHUB_SHA:-?}}" "$MEM" "${SIG:-<none matched>}" "$(tail -30 /tmp/webtests.log 2>/dev/null)" "$(tail -30 /tmp/gates.log 2>/dev/null)")
+          if [ -n "${PRNUM:-}" ]; then
+            node -e 'const https=require("https");const data=JSON.stringify({body:process.argv[1]});const u=new URL(process.env.GITHUB_API_URL+"/repos/"+process.env.GITHUB_REPOSITORY+"/issues/"+process.env.PRNUM+"/comments");const r=https.request(u,{method:"POST",headers:{Authorization:"token "+process.env.TOK,"Content-Type":"application/json","Content-Length":Buffer.byteLength(data)}},res=>{res.resume();res.on("end",()=>console.log("comment posted:",res.statusCode))});r.on("error",e=>console.log("comment err:",e.message));r.write(data);r.end();' "$BODY"
+          else
+            # Main push — file an issue so the failure lands in the queue where
+            # work is picked up, not only in a red badge nobody clicks.
+            TITLE="Web:Tests selhal na main (${GITHUB_SHA:-?})"
+            node -e 'const https=require("https");const data=JSON.stringify({title:process.argv[1],body:process.argv[2]});const u=new URL(process.env.GITHUB_API_URL+"/repos/"+process.env.GITHUB_REPOSITORY+"/issues");const r=https.request(u,{method:"POST",headers:{Authorization:"token "+process.env.TOK,"Content-Type":"application/json","Content-Length":Buffer.byteLength(data)}},res=>{res.resume();res.on("end",()=>console.log("issue filed:",res.statusCode))});r.on("error",e=>console.log("issue err:",e.message));r.write(data);r.end();' "$TITLE" "$BODY"
+          fi
+          # also a commit status (github.token reliably has status:write) — readable via the combined-status API
+          if [ -n "${SHA:-}" ]; then
+            node -e 'const https=require("https");const d=JSON.stringify({state:"error",context:"diag/webtests-cause",description:(process.argv[1]||"no-signature").replace(/\s+/g," ").slice(0,240)});const u=new URL(process.env.GITHUB_API_URL+"/repos/"+process.env.GITHUB_REPOSITORY+"/statuses/"+process.env.SHA);const r=https.request(u,{method:"POST",headers:{Authorization:"token "+process.env.TOK,"Content-Type":"application/json","Content-Length":Buffer.byteLength(d)}},res=>{res.resume();res.on("end",()=>console.log("status set:",res.statusCode))});r.on("error",e=>console.log("status err:",e.message));r.write(d);r.end();' "${SIG:-no-signature-matched}"
+          fi
+
+  # ===========================================================================
+  # CI: Web App — Production build verification
+  # ===========================================================================
+
+  test-web-brany:
+    name: "Web: Brány"
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Brány (test:gates) a testy skriptů, oddělené od unit testů v test-web, aby
+    # běžely SOUBĚŽNĚ s nimi (důvod a čísla v hlavičce test-web). Nasazení a verdikt
+    # čekají na OBA joby.
+    # ⛔ BEZ PODMÍNKY NA `app` (rozhodnutí majitele 2026-10-05 „plné sady jen v CI"):
+    # pre-push pouští jen brány dotčené změnou, CELOU sadu měří jen tenhle job. Dokud
+    # běžel jen při app=true, změna jen v services/, plugins/, Dockerfile*, coolify/,
+    # .forgejo/workflows/, .husky/ nebo docs/ neprošla celou sadou NIKDE — dřív ji
+    # dokrýval pre-push, který pouštěl všechny brány vždy. Brány jsou zákony nad celým
+    # repem; o tom, že se změny netýkají, rozhoduje jejich běh, ne předfiltr.
+    needs: [detect]
+    if: needs.detect.outputs.already_verified != 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # packages/insight is a github.com submodule the self-hosted runner
+          # cannot reach (checkout failed at ~10s). Check out WITHOUT submodules;
+          # the insight gates skip-when-absent and run fully in any checkout that
+          # HAS the submodule (local dev / full clones). The pin/patch-drift check
+          # still runs here (it reads the gitlink via `git ls-tree`, no content).
+          submodules: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install dependencies
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
+
+      # npm/cli#4828 guard — shared script; see scripts/ci/repair-native-deps.sh
+      # for the full live-failure forensics (runs 1832/1840/1846/1850).
+      - name: Repair native optional deps (npm/cli#4828 guard)
+        run: bash scripts/ci/repair-native-deps.sh
+
+      # `jq` pro brány, které spouštějí SKUTEČNÉ shellové skripty stacku.
+      # Naměřeno 2026-08-11: pki-renewer-token-failure-diagnosis padala čtyřmi
+      # behaviorálními testy, protože get_token() rozebírá odpověď Keycloaku přes
+      # jq — a runner ho nemá. Renewer běží v kontejneru, který jq MÁ, takže
+      # závislost je legitimní; chybělo jen ji tady doručit. Brána si ji od té
+      # doby sama vynucuje (fail-loud, ne skip), takže tenhle krok NENÍ tichý
+      # předpoklad: kdyby zmizel, brána to řekne jednou větou.
+      - name: Install jq (shell-level gates run the real scripts)
+        run: |
+          command -v jq >/dev/null && { jq --version; exit 0; }
+          SUDO=""; [ "$(id -u)" -ne 0 ] && SUDO="sudo"
+          $SUDO apt-get update
+          $SUDO apt-get install -y --no-install-recommends jq
+          jq --version
+
+      # Táž třída jako v check-web (#89), tady RUNTIME podoba: vitest řeší
+      # @aisha/* po PUBLIKOVANÉM vstupu (dist/), ne po zdrojích. Naměřeno
+      # 2026-08-02 (task 184007): surface-block-contract.runtime.test.ts padá na
+      # "Failed to resolve entry for package \"@aisha/surface-blocks\"" — test
+      # dorazil s #86 a tenhle job byl první, kdo ho spustil bez dist/.
+      - name: Build workspace packages (runtime deps of the test suite)
+        run: npm run build:packages
 
       - name: Generate source-of-truth report (required by gate tests)
         run: node scripts/db/db-manager/source.mjs
@@ -766,76 +908,15 @@ jobs:
         run: |
           set -o pipefail
           npm run test:scripts 2>&1 | tee -a /tmp/scripts-tests.log
-
-      - name: Surface failure cause (CI hygiene — runner logs unreachable via API)
-        if: failure()
-        shell: bash
-        env:
-          # github.token lacks comment/status:write on this Forgejo runner (the diag
-          # silently no-op'd on #283), so a full-scope API token secret is needed.
-          # ⛔ NAMĚŘENO 2026-09-12 06:08 UTC (token z `git credential fill`,
-          # Forgejo `GET /version` = 16.0.2+gitea-1.22.0, nezávisle 2×):
-          # `GET /repos/aisha/evymo-ai-orchestrator/actions/secrets` (100 jmen)
-          # má `FORGEJO_API_TOKEN` a NEMÁ `REPO_API_TOKEN`;
-          # `GET /orgs/aisha/actions/secrets` (1 jméno) má `REPO_API_TOKEN`.
-          # FetchActionSecrets (models/secret/secret.go) slévá owner + repo
-          # secrety bez filtru → neforkový běh dostane OBA, fork-PR běh ŽÁDNÝ.
-          # Dřívější tvrzení „Forgejo rezervuje prefix FORGEJO_,
-          # secrets.FORGEJO_API_TOKEN nemůže existovat" (2026-08-02, z HTTP 400
-          # na PUT) platí jen pro ZALOŽENÍ (ValidateName) — existující secret
-          # se doručuje. Tenhle krok čte org-scope jméno, které do neforkového
-          # běhu dorazí; jeho chování se tu nemění. Dluh mainu mimo tuhle větev:
-          # číst obě jména jako krok „Registr forků" výš, aby krok nezávisel na
-          # tom, ve kterém rozsahu jméno zrovna leží.
-          TOK: ${{ secrets.REPO_API_TOKEN }}
-          PRNUM: ${{ github.event.pull_request.number }}
-          SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          echo "::group::env / memory"
-          (free -m 2>/dev/null || true); (cat /sys/fs/cgroup/memory.max 2>/dev/null || true); node -v; npm -v
-          echo "::endgroup::"
-          echo "::group::test:run tail"
-          tail -60 /tmp/webtests.log 2>/dev/null || echo "(no test:run log — failed at npm ci or earlier)"
-          echo "::endgroup::"
-          echo "::group::test:gates tail"
-          tail -60 /tmp/gates.log 2>/dev/null || echo "(gates step not reached — failure was upstream)"
-          echo "::endgroup::"
-          echo "::group::failure signatures"
-          grep -iEn "Killed|heap out of memory|JS heap|FATAL ERROR|Test Files +[0-9]+ failed|onTaskUpdate|ECONN|ENOTFOUND|npm error|Cannot find module" /tmp/webtests.log /tmp/gates.log 2>/dev/null | tail -50 || true
-          echo "::endgroup::"
-          # Forgejo job logs are unreachable via the API, so a failing Web:Tests is
-          # otherwise undiagnosable. Post the failure cause where it gets SOLVED
-          # (majitel 08-02): a PR failure comments on the PR; a MAIN failure files
-          # an ISSUE — main has no PR thread, and a red main that nobody opens the
-          # runner for is exactly the failure this diag exists to surface.
-          # Permanent CI hygiene (#279) — keep it.
-          MEM=$( (free -m 2>/dev/null | sed -n '1,2p'); echo "cgroup.max=$(cat /sys/fs/cgroup/memory.max 2>/dev/null || echo n/a)" )
-          # SHARD-FAILED* první, protože nese návratový kód — ten rozhoduje.
-          # `ECONN` bez konce chytalo `useWearableConnections` (grep je -i), proto
-          # jen skutečné kódy chyb; `Serialized`/`exceeded` zůstávají pro vitest.
-          SIG=$(grep -iEn "SHARD-FAILED[A-Z-]*|Killed|heap out of memory|JS heap|FATAL ERROR|Test Files +[0-9]+ failed|Tests +[0-9]+ failed|onTaskUpdate|ECONNREFUSED|ECONNRESET|ETIMEDOUT|ENOTFOUND|npm error|Cannot find module|RangeError|must not conflict|Serialized|worker (exited|terminated)|exceeded" /tmp/webtests.log /tmp/gates.log 2>/dev/null | tail -25)
-          BODY=$(printf '### Web:Tests runner failure cause (temp #279 diag)\n\ncommit: %s\n\n**mem:**\n```\n%s\n```\n\n**signatures:**\n```\n%s\n```\n\n**webtests.log (last 30):**\n```\n%s\n```\n\n**gates.log (last 30):**\n```\n%s\n```\n' "${SHA:-${GITHUB_SHA:-?}}" "$MEM" "${SIG:-<none matched>}" "$(tail -30 /tmp/webtests.log 2>/dev/null)" "$(tail -30 /tmp/gates.log 2>/dev/null)")
-          if [ -n "${PRNUM:-}" ]; then
-            node -e 'const https=require("https");const data=JSON.stringify({body:process.argv[1]});const u=new URL(process.env.GITHUB_API_URL+"/repos/"+process.env.GITHUB_REPOSITORY+"/issues/"+process.env.PRNUM+"/comments");const r=https.request(u,{method:"POST",headers:{Authorization:"token "+process.env.TOK,"Content-Type":"application/json","Content-Length":Buffer.byteLength(data)}},res=>{res.resume();res.on("end",()=>console.log("comment posted:",res.statusCode))});r.on("error",e=>console.log("comment err:",e.message));r.write(data);r.end();' "$BODY"
-          else
-            # Main push — file an issue so the failure lands in the queue where
-            # work is picked up, not only in a red badge nobody clicks.
-            TITLE="Web:Tests selhal na main (${GITHUB_SHA:-?})"
-            node -e 'const https=require("https");const data=JSON.stringify({title:process.argv[1],body:process.argv[2]});const u=new URL(process.env.GITHUB_API_URL+"/repos/"+process.env.GITHUB_REPOSITORY+"/issues");const r=https.request(u,{method:"POST",headers:{Authorization:"token "+process.env.TOK,"Content-Type":"application/json","Content-Length":Buffer.byteLength(data)}},res=>{res.resume();res.on("end",()=>console.log("issue filed:",res.statusCode))});r.on("error",e=>console.log("issue err:",e.message));r.write(data);r.end();' "$TITLE" "$BODY"
-          fi
-          # also a commit status (github.token reliably has status:write) — readable via the combined-status API
-          if [ -n "${SHA:-}" ]; then
-            node -e 'const https=require("https");const d=JSON.stringify({state:"error",context:"diag/webtests-cause",description:(process.argv[1]||"no-signature").replace(/\s+/g," ").slice(0,240)});const u=new URL(process.env.GITHUB_API_URL+"/repos/"+process.env.GITHUB_REPOSITORY+"/statuses/"+process.env.SHA);const r=https.request(u,{method:"POST",headers:{Authorization:"token "+process.env.TOK,"Content-Type":"application/json","Content-Length":Buffer.byteLength(d)}},res=>{res.resume();res.on("end",()=>console.log("status set:",res.statusCode))});r.on("error",e=>console.log("status err:",e.message));r.write(d);r.end();' "${SIG:-no-signature-matched}"
-          fi
-
-  # ===========================================================================
-  # CI: Web App — Production build verification
-  # ===========================================================================
   build-web:
     name: "Web: Build"
-    runs-on: ubuntu-latest
+    # Izolovaný runner: NEAKTIVNÍ, dokud nejsou nastavené CI_IZOLOVANY_*_LABEL (jinak výchozí runner).
+    # PR z forku nikdy; hlídá brána izolovany-runner-nese-jen-ciste-joby.
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && vars.CI_IZOLOVANY_PR_LABEL) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CI_IZOLOVANY_PUSH_LABEL) || 'ubuntu-latest' }}
     timeout-minutes: 20
-    needs: [detect, test-web]
+    # Build z testů nic nečte (vlastní checkout a `npm ci`); nasazení dál čeká na
+    # testy i build. Proč těžké joby už nejdou za sebou: viz service-tests.
+    needs: [detect]
     if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.app == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -860,7 +941,9 @@ jobs:
   # ===========================================================================
   test-n8n:
     name: "n8n: Test & Build"
-    runs-on: ubuntu-latest
+    # Izolovaný runner: NEAKTIVNÍ, dokud nejsou nastavené CI_IZOLOVANY_*_LABEL (jinak výchozí runner).
+    # PR z forku nikdy; hlídá brána izolovany-runner-nese-jen-ciste-joby.
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && vars.CI_IZOLOVANY_PR_LABEL) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CI_IZOLOVANY_PUSH_LABEL) || 'ubuntu-latest' }}
     timeout-minutes: 20
     needs: detect
     if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.n8n_nodes == 'true'
@@ -928,7 +1011,9 @@ jobs:
   # ===========================================================================
   test-extension:
     name: "Extension: Test"
-    runs-on: ubuntu-latest
+    # Izolovaný runner: NEAKTIVNÍ, dokud nejsou nastavené CI_IZOLOVANY_*_LABEL (jinak výchozí runner).
+    # PR z forku nikdy; hlídá brána izolovany-runner-nese-jen-ciste-joby.
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && vars.CI_IZOLOVANY_PR_LABEL) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CI_IZOLOVANY_PUSH_LABEL) || 'ubuntu-latest' }}
     timeout-minutes: 15
     needs: detect
     if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.extension == 'true'
@@ -981,7 +1066,9 @@ jobs:
   # ===========================================================================
   workbench-rail:
     name: "Workbench: rail gate"
-    runs-on: ubuntu-latest
+    # Izolovaný runner: NEAKTIVNÍ, dokud nejsou nastavené CI_IZOLOVANY_*_LABEL (jinak výchozí runner).
+    # PR z forku nikdy; hlídá brána izolovany-runner-nese-jen-ciste-joby.
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && vars.CI_IZOLOVANY_PR_LABEL) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CI_IZOLOVANY_PUSH_LABEL) || 'ubuntu-latest' }}
     timeout-minutes: 20
     needs: detect
     if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.workbench == 'true'
@@ -1010,12 +1097,17 @@ jobs:
   # ===========================================================================
   deploy-extranet:
     name: "Deploy: Extranet"
-    runs-on: ubuntu-latest
-    # (1 + NASAZENI_OPAKOVANI) × (FRONTA_S + TIMEOUT_S) + prodleva: pokus = fronta Coolify
-    # 30 min + práce 30 min, jedno opakování po doložené přechodné chybě, 2 min čekání
-    # — hlídá `opakovani-nasazeni-se-vejde-do-ulohy`.
-    timeout-minutes: 125
-    needs: [detect, check-web, test-web, build-web, governance-gate, surface-tests, deploy-koren]
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
+    # JEDEN pokus: fronta Coolify (--fronta-s 1500) + práce (TIMEOUT_S 1800) + rezerva
+    # (REZERVA_S 300) = 3600 s — hlídá `opakovani-nasazeni-se-vejde-do-ulohy`. Skript
+    # tak skončí dřív než tvrdý strop sdíleného runneru (1 h) a řekne, co se stalo.
+    # Naměřeno na instanci forku: práce max 22 min, fronta max 17 min, režie max 45 s.
+    timeout-minutes: 60
+    # ⛔ FRONTEND NIKDY PŘED BACKENDEM: čeká na Core (úspěch, přeskočení — změna se ho
+    # netýká — nebo úspěšné pokračování). Do 2026-10-03 běžely Core, Edge a Extranet
+    # po Kořeni VEDLE SEBE: nový web proti starému jádru = rozbité volání, dokud Core
+    # nedoběhne (naměřený výpadek nahrávání 25 min). Padlý Core tuhle úlohu přeskočí.
+    needs: [detect, check-web, test-web, test-web-brany, build-web, governance-gate, surface-tests, deploy-koren, deploy-razitko, deploy-koren-pokracovani, deploy-core, deploy-core-pokracovani]
     # ⭐ `already_verified` NAHRAZUJE důkaz „testy byly zelené", NE otázku
     # „týká se ta změna extranetu". Proto stojí UVNITŘ každé větve, ne před
     # nimi: relevanci pořád rozhoduje detect, jen se místo výsledku úlohy uzná,
@@ -1024,16 +1116,19 @@ jobs:
     # Proč to tu vůbec je: viz poznámka nad `deploy-core`.
     if: >-
       always()
+      && needs.deploy-razitko.result == 'success'
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
       && needs.detect.result == 'success'
-      && needs.deploy-koren.result != 'failure'
-      && needs.deploy-koren.result != 'cancelled'
+      && (needs.deploy-koren.result == 'success' || needs.deploy-koren-pokracovani.result == 'success')
+      && (needs.deploy-core.result == 'success' || needs.deploy-core.result == 'skipped' || needs.deploy-core-pokracovani.result == 'success')
       && (needs.governance-gate.result == 'success' || needs.governance-gate.result == 'skipped')
       && needs.check-web.result != 'failure'
       && needs.check-web.result != 'cancelled'
       && needs.test-web.result != 'failure'
       && needs.test-web.result != 'cancelled'
+      && needs.test-web-brany.result != 'failure'
+      && needs.test-web-brany.result != 'cancelled'
       && needs.surface-tests.result != 'failure'
       && needs.surface-tests.result != 'cancelled'
       && needs.build-web.result != 'failure'
@@ -1043,7 +1138,8 @@ jobs:
           || needs.detect.outputs.already_verified == 'true'
           || (needs.build-web.result == 'success'
               && needs.check-web.result == 'success'
-              && needs.test-web.result == 'success'))
+              && needs.test-web.result == 'success'
+              && needs.test-web-brany.result == 'success'))
       && (needs.detect.outputs.surfaces != 'true'
           || needs.detect.outputs.already_verified == 'true'
           || needs.surface-tests.result == 'success')
@@ -1064,6 +1160,7 @@ jobs:
             scripts/lib/cli-entry.mjs
             scripts/ci/deploy-and-verify.sh
             scripts/lib/nasazeni-prechodna-chyba.mjs
+            scripts/lib/nasazeni-navazani.mjs
             scripts/deploy/refresh-overlay-cachebust.sh
             scripts/deploy/overlay-cachebust.sh
             scripts/coolify-deploy-watch.mjs
@@ -1103,7 +1200,94 @@ jobs:
         # o obsahu NIC netvrdí — a přesně tenhle stav 08-08 propustil extranet,
         # který po zeleném nasazení servíroval bajtově týž bundle.
         run: |
-          bash scripts/ci/deploy-and-verify.sh extranet \
+          bash scripts/ci/deploy-and-verify.sh extranet --fronta-s 1500 \
+            --verify-url "${{ secrets.DEPLOY_VERIFY_URL_EXTRANET }}"
+
+  # Pokračování úlohy deploy-extranet (2026-10-02, vzor Stacky po vlnách): spadla-li
+  # nebo ji runner utnul, naváže JEDNOU na nasazení téhož běhu (razítko
+  # z deploy-razitko): běžící dočká, hotové ověří, spadlé nasadí znovu — tím se
+  # vrací opakování přechodného pádu; cizí revize = pád. Samo už nepokračuje.
+  # Hlídá brána nasazeni-pokracovani-uloh.
+  deploy-extranet-pokracovani:
+    name: "Deploy: Extranet — pokračování (navázání, jen jednou)"
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
+    # JEDEN pokus: fronta Coolify (--fronta-s 1500) + práce (TIMEOUT_S 1800) + rezerva
+    # (REZERVA_S 300) = 3600 s — hlídá `opakovani-nasazeni-se-vejde-do-ulohy`. Skript
+    # tak skončí dřív než tvrdý strop sdíleného runneru (1 h) a řekne, co se stalo.
+    # Naměřeno na instanci forku: práce max 22 min, fronta max 17 min, režie max 45 s.
+    timeout-minutes: 60
+    needs: [detect, deploy-razitko, deploy-extranet]
+    # ⭐ `already_verified` NAHRAZUJE důkaz „testy byly zelené", NE otázku
+    # „týká se ta změna extranetu". Proto stojí UVNITŘ každé větve, ne před
+    # nimi: relevanci pořád rozhoduje detect, jen se místo výsledku úlohy uzná,
+    # že BAJTOVĚ TENTÝŽ strom byl zelený v běhu nad hlavou PR. Kdyby ta výjimka
+    # stála před nimi, nasazoval by se extranet i po merge, který se ho netýká.
+    # Proč to tu vůbec je: viz poznámka nad `deploy-core`.
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.deploy-razitko.result == 'success'
+      && (needs.deploy-extranet.result == 'failure' || needs.deploy-extranet.result == 'cancelled')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/lib/coolify-resolve-uuid.sh
+            scripts/lib/coolify-project-scope.mjs
+            scripts/lib/coolify-instance-scope.mjs
+            scripts/lib/instance-overlay.mjs
+            scripts/lib/coolify-http.mjs
+            scripts/lib/povinne-promenne.mjs
+            scripts/lib/razeni.mjs
+            scripts/lib/compose-env-refs.mjs
+            scripts/lib/config-env-files.mjs
+            scripts/lib/env-hodnota.mjs
+            scripts/lib/cli-entry.mjs
+            scripts/ci/deploy-and-verify.sh
+            scripts/lib/nasazeni-prechodna-chyba.mjs
+            scripts/lib/nasazeni-navazani.mjs
+            scripts/deploy/refresh-overlay-cachebust.sh
+            scripts/deploy/overlay-cachebust.sh
+            scripts/coolify-deploy-watch.mjs
+            scripts/lib/coolify-app-status.mjs
+            instances/
+
+      - name: Deploy extranet surface
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
+          # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
+          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
+          # deploy joby běží jen na push do main (kód z main), ne na PR.
+          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          GIT_SHA: ${{ github.sha }}
+          DEPLOY_RAZITKO: ${{ needs.deploy-razitko.outputs.razitko }}
+          # Veřejná adresa pro sondu „odpovídá to?". Ze SECRETU, ne ze zdrojáku:
+          # adresa je vlastnost nasazení a každá instance má svou.
+          HEALTH_URL: ${{ secrets.DEPLOY_HEALTH_URL_EXTRANET }}
+          # Extranet stojí ZA DVEŘMI (naměřeno 2026-09-05: `extra.` jde přes
+          # edge-proxy a vrátný ho odmítá 403 s prázdným tělem). Sonda z CI
+          # tedy povrch změřit NEMŮŽE — ťuká vždy jen člověk.
+          HEALTH_ZA_DVERMI: 'ano'
+          # ⛔ KTEROU instanci nasazujeme, se ŘEKNE — neodvozuje se z toho, co
+          # náhodou leží ve stromu. Skript to dřív hádal z `ls instances/`;
+          # jakmile instanční data odešla do datového repa (#163), výpis se
+          # vyprázdnil a deploy nad `main` padal po 4 s. Táž proměnná, jakou už
+          # používá deploy.yml — jeden způsob, ne dva.
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+        # Jeden sdílený krok pro všechny deploy úlohy. Dřív tu stálo 40 řádků,
+        # které POUZE odeslaly požadavek — a skončily `exit 0` i tehdy, když
+        # chybělo pověření nebo appka v Coolify nebyla. Naměřeno 2026-08-08:
+        # po merge byly všechny deploy úlohy zelené a extranet servíroval
+        # bajtově týž bundle jako před opravou. Skript čeká na terminální stav
+        # a nahlas říká, co dokázal a co ne.
+        # `--verify-url` doplněno 2026-08-10 spolu se secretem. Bez něj krok
+        # o obsahu NIC netvrdí — a přesně tenhle stav 08-08 propustil extranet,
+        # který po zeleném nasazení servíroval bajtově týž bundle.
+        run: |
+          bash scripts/ci/deploy-and-verify.sh extranet --fronta-s 1500 --navazat-od "$DEPLOY_RAZITKO" \
             --verify-url "${{ secrets.DEPLOY_VERIFY_URL_EXTRANET }}"
 
   # ===========================================================================
@@ -1158,32 +1342,36 @@ jobs:
     # Jméno úlohy je tvrzení o tom, co se nasadilo; nepravdivé jméno je horší
     # než chybějící, protože se podle něj přestane hledat.
     name: "Deploy: Core (keycloak · edge functions · db)"
-    runs-on: ubuntu-latest
-    # (1 + NASAZENI_OPAKOVANI) × (FRONTA_S + TIMEOUT_S) + prodleva: pokus = fronta Coolify
-    # 30 min + práce 30 min, jedno opakování po doložené přechodné chybě, 2 min čekání
-    # — hlídá `opakovani-nasazeni-se-vejde-do-ulohy`.
-    timeout-minutes: 125
-    needs: [detect, check-web, test-web, build-web, governance-gate, deploy-koren]
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
+    # JEDEN pokus: fronta Coolify (--fronta-s 1500) + práce (TIMEOUT_S 1800) + rezerva
+    # (REZERVA_S 300) = 3600 s — hlídá `opakovani-nasazeni-se-vejde-do-ulohy`. Skript
+    # tak skončí dřív než tvrdý strop sdíleného runneru (1 h) a řekne, co se stalo.
+    # Naměřeno na instanci forku: práce max 22 min, fronta max 17 min, režie max 45 s.
+    timeout-minutes: 60
+    needs: [detect, check-web, test-web, test-web-brany, build-web, governance-gate, deploy-koren, deploy-razitko, deploy-koren-pokracovani]
     if: >-
       always()
+      && needs.deploy-razitko.result == 'success'
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
       && needs.detect.result == 'success'
-      && needs.deploy-koren.result != 'failure'
-      && needs.deploy-koren.result != 'cancelled'
+      && (needs.deploy-koren.result == 'success' || needs.deploy-koren-pokracovani.result == 'success')
       && contains(needs.detect.outputs.deploy_apps, ',core,')
       && (needs.governance-gate.result == 'success' || needs.governance-gate.result == 'skipped')
       && needs.check-web.result != 'failure'
       && needs.check-web.result != 'cancelled'
       && needs.test-web.result != 'failure'
       && needs.test-web.result != 'cancelled'
+      && needs.test-web-brany.result != 'failure'
+      && needs.test-web-brany.result != 'cancelled'
       && needs.build-web.result != 'failure'
       && needs.build-web.result != 'cancelled'
       && (needs.detect.outputs.app != 'true'
           || needs.detect.outputs.already_verified == 'true'
           || (needs.build-web.result == 'success'
               && needs.check-web.result == 'success'
-              && needs.test-web.result == 'success'))
+              && needs.test-web.result == 'success'
+              && needs.test-web-brany.result == 'success'))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1201,6 +1389,7 @@ jobs:
             scripts/lib/cli-entry.mjs
             scripts/ci/deploy-and-verify.sh
             scripts/lib/nasazeni-prechodna-chyba.mjs
+            scripts/lib/nasazeni-navazani.mjs
             scripts/deploy/refresh-overlay-cachebust.sh
             scripts/deploy/overlay-cachebust.sh
             scripts/coolify-deploy-watch.mjs
@@ -1226,7 +1415,73 @@ jobs:
           HEALTH_ZA_DVERMI: 'ano'
           # Viz poznámka u extranetu: instance se DEKLARUJE, neodvozuje ze stromu.
           APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
-        run: bash scripts/ci/deploy-and-verify.sh core
+        run: bash scripts/ci/deploy-and-verify.sh core --fronta-s 1500
+
+  # Pokračování úlohy deploy-core (2026-10-02, vzor Stacky po vlnách): spadla-li
+  # nebo ji runner utnul, naváže JEDNOU na nasazení téhož běhu (razítko
+  # z deploy-razitko): běžící dočká, hotové ověří, spadlé nasadí znovu — tím se
+  # vrací opakování přechodného pádu; cizí revize = pád. Samo už nepokračuje.
+  # Hlídá brána nasazeni-pokracovani-uloh.
+  deploy-core-pokracovani:
+    name: "Deploy: Core — pokračování (navázání, jen jednou)"
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
+    # JEDEN pokus: fronta Coolify (--fronta-s 1500) + práce (TIMEOUT_S 1800) + rezerva
+    # (REZERVA_S 300) = 3600 s — hlídá `opakovani-nasazeni-se-vejde-do-ulohy`. Skript
+    # tak skončí dřív než tvrdý strop sdíleného runneru (1 h) a řekne, co se stalo.
+    # Naměřeno na instanci forku: práce max 22 min, fronta max 17 min, režie max 45 s.
+    timeout-minutes: 60
+    needs: [detect, deploy-razitko, deploy-core]
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.deploy-razitko.result == 'success'
+      && (needs.deploy-core.result == 'failure' || needs.deploy-core.result == 'cancelled')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/lib/coolify-resolve-uuid.sh
+            scripts/lib/coolify-project-scope.mjs
+            scripts/lib/coolify-instance-scope.mjs
+            scripts/lib/instance-overlay.mjs
+            scripts/lib/coolify-http.mjs
+            scripts/lib/povinne-promenne.mjs
+            scripts/lib/razeni.mjs
+            scripts/lib/compose-env-refs.mjs
+            scripts/lib/config-env-files.mjs
+            scripts/lib/env-hodnota.mjs
+            scripts/lib/cli-entry.mjs
+            scripts/ci/deploy-and-verify.sh
+            scripts/lib/nasazeni-prechodna-chyba.mjs
+            scripts/lib/nasazeni-navazani.mjs
+            scripts/deploy/refresh-overlay-cachebust.sh
+            scripts/deploy/overlay-cachebust.sh
+            scripts/coolify-deploy-watch.mjs
+            scripts/lib/coolify-app-status.mjs
+            instances/
+
+      - name: Deploy core stack
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
+          # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
+          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
+          # deploy joby běží jen na push do main (kód z main), ne na PR.
+          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          GIT_SHA: ${{ github.sha }}
+          DEPLOY_RAZITKO: ${{ needs.deploy-razitko.outputs.razitko }}
+          # Veřejná adresa pro sondu „odpovídá to?". Ze SECRETU, ne ze zdrojáku:
+          # adresa je vlastnost nasazení a každá instance má svou.
+          HEALTH_URL: ${{ secrets.DEPLOY_HEALTH_URL_CORE }}
+          # Jádro se vystavuje přes `api.`, které rovněž jde přes edge-proxy
+          # a vrátného (naměřeno 2026-09-05: 6/6 sond 403, prázdné tělo,
+          # `server: Caddy`; v logu svc-knock je každý dotaz na /dvere 403).
+          HEALTH_ZA_DVERMI: 'ano'
+          # Viz poznámka u extranetu: instance se DEKLARUJE, neodvozuje ze stromu.
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+        run: bash scripts/ci/deploy-and-verify.sh core --fronta-s 1500 --navazat-od "$DEPLOY_RAZITKO"
 
   # ===========================================================================
   # Deploy: Edge — TADY VZNIKÁ WEB, KTERÝ UŽIVATEL VIDÍ
@@ -1262,32 +1517,41 @@ jobs:
   # nenasazovat rozbitý build.
   deploy-edge:
     name: "Deploy: Edge (web SPA · knock · edge-proxy)"
-    runs-on: ubuntu-latest
-    # (1 + NASAZENI_OPAKOVANI) × (FRONTA_S + TIMEOUT_S) + prodleva: pokus = fronta Coolify
-    # 30 min + práce 30 min, jedno opakování po doložené přechodné chybě, 2 min čekání
-    # — hlídá `opakovani-nasazeni-se-vejde-do-ulohy`.
-    timeout-minutes: 125
-    needs: [detect, check-web, test-web, build-web, governance-gate, deploy-koren]
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
+    # JEDEN pokus: fronta Coolify (--fronta-s 1500) + práce (TIMEOUT_S 1800) + rezerva
+    # (REZERVA_S 300) = 3600 s — hlídá `opakovani-nasazeni-se-vejde-do-ulohy`. Skript
+    # tak skončí dřív než tvrdý strop sdíleného runneru (1 h) a řekne, co se stalo.
+    # Naměřeno na instanci forku: práce max 22 min, fronta max 17 min, režie max 45 s.
+    timeout-minutes: 60
+    # ⛔ FRONTEND NIKDY PŘED BACKENDEM: čeká na Core (úspěch, přeskočení — změna se ho
+    # netýká — nebo úspěšné pokračování). Do 2026-10-03 běžely Core, Edge a Extranet
+    # po Kořeni VEDLE SEBE: nový web proti starému jádru = rozbité volání, dokud Core
+    # nedoběhne (naměřený výpadek nahrávání 25 min). Padlý Core tuhle úlohu přeskočí.
+    needs: [detect, check-web, test-web, test-web-brany, build-web, governance-gate, deploy-koren, deploy-razitko, deploy-koren-pokracovani, deploy-core, deploy-core-pokracovani]
     if: >-
       always()
+      && needs.deploy-razitko.result == 'success'
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
       && needs.detect.result == 'success'
-      && needs.deploy-koren.result != 'failure'
-      && needs.deploy-koren.result != 'cancelled'
+      && (needs.deploy-koren.result == 'success' || needs.deploy-koren-pokracovani.result == 'success')
+      && (needs.deploy-core.result == 'success' || needs.deploy-core.result == 'skipped' || needs.deploy-core-pokracovani.result == 'success')
       && contains(needs.detect.outputs.deploy_apps, ',edge,')
       && (needs.governance-gate.result == 'success' || needs.governance-gate.result == 'skipped')
       && needs.check-web.result != 'failure'
       && needs.check-web.result != 'cancelled'
       && needs.test-web.result != 'failure'
       && needs.test-web.result != 'cancelled'
+      && needs.test-web-brany.result != 'failure'
+      && needs.test-web-brany.result != 'cancelled'
       && needs.build-web.result != 'failure'
       && needs.build-web.result != 'cancelled'
       && (needs.detect.outputs.app != 'true'
           || needs.detect.outputs.already_verified == 'true'
           || (needs.build-web.result == 'success'
               && needs.check-web.result == 'success'
-              && needs.test-web.result == 'success'))
+              && needs.test-web.result == 'success'
+              && needs.test-web-brany.result == 'success'))
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1305,6 +1569,7 @@ jobs:
             scripts/lib/cli-entry.mjs
             scripts/ci/deploy-and-verify.sh
             scripts/lib/nasazeni-prechodna-chyba.mjs
+            scripts/lib/nasazeni-navazani.mjs
             scripts/deploy/refresh-overlay-cachebust.sh
             scripts/deploy/overlay-cachebust.sh
             scripts/coolify-deploy-watch.mjs
@@ -1334,7 +1599,78 @@ jobs:
         # nasazení → ze secretu. Když secret není, skript to NAHLAS napíše
         # („NEDOKÁZÁNO: že se změnil OBSAH artefaktu") místo tichého přeskočení.
         run: |
-          bash scripts/ci/deploy-and-verify.sh edge \
+          bash scripts/ci/deploy-and-verify.sh edge --fronta-s 1500 \
+            --verify-url "${{ secrets.DEPLOY_VERIFY_URL_EDGE }}"
+
+  # Pokračování úlohy deploy-edge (2026-10-02, vzor Stacky po vlnách): spadla-li
+  # nebo ji runner utnul, naváže JEDNOU na nasazení téhož běhu (razítko
+  # z deploy-razitko): běžící dočká, hotové ověří, spadlé nasadí znovu — tím se
+  # vrací opakování přechodného pádu; cizí revize = pád. Samo už nepokračuje.
+  # Hlídá brána nasazeni-pokracovani-uloh.
+  deploy-edge-pokracovani:
+    name: "Deploy: Edge — pokračování (navázání, jen jednou)"
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
+    # JEDEN pokus: fronta Coolify (--fronta-s 1500) + práce (TIMEOUT_S 1800) + rezerva
+    # (REZERVA_S 300) = 3600 s — hlídá `opakovani-nasazeni-se-vejde-do-ulohy`. Skript
+    # tak skončí dřív než tvrdý strop sdíleného runneru (1 h) a řekne, co se stalo.
+    # Naměřeno na instanci forku: práce max 22 min, fronta max 17 min, režie max 45 s.
+    timeout-minutes: 60
+    needs: [detect, deploy-razitko, deploy-edge]
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.deploy-razitko.result == 'success'
+      && (needs.deploy-edge.result == 'failure' || needs.deploy-edge.result == 'cancelled')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/lib/coolify-resolve-uuid.sh
+            scripts/lib/coolify-project-scope.mjs
+            scripts/lib/coolify-instance-scope.mjs
+            scripts/lib/instance-overlay.mjs
+            scripts/lib/coolify-http.mjs
+            scripts/lib/povinne-promenne.mjs
+            scripts/lib/razeni.mjs
+            scripts/lib/compose-env-refs.mjs
+            scripts/lib/config-env-files.mjs
+            scripts/lib/env-hodnota.mjs
+            scripts/lib/cli-entry.mjs
+            scripts/ci/deploy-and-verify.sh
+            scripts/lib/nasazeni-prechodna-chyba.mjs
+            scripts/lib/nasazeni-navazani.mjs
+            scripts/deploy/refresh-overlay-cachebust.sh
+            scripts/deploy/overlay-cachebust.sh
+            scripts/coolify-deploy-watch.mjs
+            scripts/lib/coolify-app-status.mjs
+            instances/
+
+      - name: Deploy edge stack
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
+          # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
+          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
+          # deploy joby běží jen na push do main (kód z main), ne na PR.
+          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          # Revizi bere `vite.config.ts` (define __GIT_SHA__) přes build arg
+          # `GIT_SHA`, který prebuilt compose PŘEDÁVÁ — na rozdíl od core compose.
+          GIT_SHA: ${{ github.sha }}
+          DEPLOY_RAZITKO: ${{ needs.deploy-razitko.outputs.razitko }}
+          HEALTH_URL: ${{ secrets.DEPLOY_HEALTH_URL_EDGE }}
+          # Edge je PŘED dveřmi — doloženo měřením, ne úvahou: jeho sonda
+          # dostala z nezaklepaného runneru HTTP 200 (běh 226308, 2026-09-05).
+          # Tady tedy cokoli mimo 2xx/3xx JE pád, a to má zůstat.
+          HEALTH_ZA_DVERMI: 'ne'
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+        # `--verify-url` je tu ZÁMĚRNĚ: bez něj úloha dokáže jen „deploy doběhl",
+        # a přesně to dva dny mlčelo o starém bundlu. Adresa je vlastnost
+        # nasazení → ze secretu. Když secret není, skript to NAHLAS napíše
+        # („NEDOKÁZÁNO: že se změnil OBSAH artefaktu") místo tichého přeskočení.
+        run: |
+          bash scripts/ci/deploy-and-verify.sh edge --fronta-s 1500 --navazat-od "$DEPLOY_RAZITKO" \
             --verify-url "${{ secrets.DEPLOY_VERIFY_URL_EDGE }}"
 
   # ===========================================================================
@@ -1369,19 +1705,27 @@ jobs:
           bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
           npm run build
 
-      - name: Publish to Verdaccio
-        working-directory: packages/n8n-nodes-aisha
+      # ⛔ Přihlášení a vydání jdou přes TYTÉŽ skripty jako vydávání ostatních balíčků.
+      # Dřív: statický token do ~/.npmrc a `npm publish … || echo "Version may already
+      # exist — skipping"` — po vypršení třicetidenního tokenu se balíček tiše nevydal,
+      # úloha byla zelená a n8n se restartovalo „na novou verzi“, která v registru nebyla.
+      # Bez údajů k registru (fork) se vydání přeskočí nahlas; s údaji, které nefungují, je to pád.
+      - name: Configure registry auth (mint fresh token if credentials present)
+        id: registr
         env:
           VERDACCIO_TOKEN: ${{ secrets.VERDACCIO_TOKEN }}
-        run: |
-          if [ -z "$VERDACCIO_TOKEN" ]; then
-            echo "VERDACCIO_TOKEN not set — skipping publish"
-            exit 0
-          fi
+          VERDACCIO_USER: ${{ secrets.VERDACCIO_USER }}
+          VERDACCIO_PASSWORD: ${{ secrets.VERDACCIO_PASSWORD }}
+        run: bash scripts/ci/registr-prihlaseni.sh nastav
 
-          VERDACCIO_HOST="${VERDACCIO_URL#https://}"; VERDACCIO_HOST="${VERDACCIO_HOST%/}"
-          echo "//${VERDACCIO_HOST}/:_authToken=${VERDACCIO_TOKEN}" > ~/.npmrc
-          npm publish --registry "${VERDACCIO_URL}" || echo "Version may already exist — skipping"
+      - name: Verify registry login (npm whoami)
+        if: steps.registr.outputs.publish == 'true'
+        run: bash scripts/ci/registr-prihlaseni.sh over
+
+      - name: Publish to Verdaccio
+        if: steps.registr.outputs.publish == 'true'
+        working-directory: packages/n8n-nodes-aisha
+        run: bash "$GITHUB_WORKSPACE/scripts/ci/vydej-balicek.sh"
 
       - name: Restart n8n to load new version
         env:
@@ -1453,7 +1797,7 @@ jobs:
   # ===========================================================================
   provision-n8n-content:
     name: "Provision: n8n Content"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 25
     needs: [detect, deploy-n8n]
     # Táž past ještě o krok dál: bez `always()` se tenhle krok přeskočil VŽDY,
@@ -1542,6 +1886,99 @@ jobs:
           exit $fail
 
   # ===========================================================================
+  # Deploy: začátek nasazení — JEDINÉ razítko běhu (2026-10-02)
+  # ===========================================================================
+  # Razítko bere tahle malá úloha DŘÍV, než cokoli nasadí Kořen, Core, Edge
+  # nebo Extranet. Pokračovací úlohy (deploy-*-pokracovani) podle něj navazují
+  # na nasazení TÉHOŽ běhu. Z vlastní úlohy razítko brát nejde: u utnuté nebo
+  # zrušené úlohy není jisté, že Forgejo vydá její output. Tady se také otevře
+  # kontext deploy-verdikt = pending — do mainu neslučovat, dokud není terminální.
+  deploy-razitko:
+    name: "Deploy: začátek nasazení (razítko)"
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    needs: [detect, check-web, test-web, test-web-brany, build-web, governance-gate, coldstart-db-gate, service-tests, blockchain-integration, av-integration-gate, surface-tests, surface-contract-gate, test-cosmos]
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.detect.result == 'success'
+      && needs.detect.outputs.deploy_apps != ',,'
+      && needs.check-web.result != 'failure'
+      && needs.check-web.result != 'cancelled'
+      && needs.test-web.result != 'failure'
+      && needs.test-web.result != 'cancelled'
+      && needs.test-web-brany.result != 'failure'
+      && needs.test-web-brany.result != 'cancelled'
+      && needs.build-web.result != 'failure'
+      && needs.build-web.result != 'cancelled'
+      && needs.governance-gate.result != 'failure'
+      && needs.governance-gate.result != 'cancelled'
+      && needs.coldstart-db-gate.result != 'failure'
+      && needs.coldstart-db-gate.result != 'cancelled'
+      && needs.service-tests.result != 'failure'
+      && needs.service-tests.result != 'cancelled'
+      && needs.blockchain-integration.result != 'failure'
+      && needs.blockchain-integration.result != 'cancelled'
+      && needs.av-integration-gate.result != 'failure'
+      && needs.av-integration-gate.result != 'cancelled'
+      && needs.surface-tests.result != 'failure'
+      && needs.surface-tests.result != 'cancelled'
+      && needs.surface-contract-gate.result != 'failure'
+      && needs.surface-contract-gate.result != 'cancelled'
+      && needs.test-cosmos.result != 'failure'
+      && needs.test-cosmos.result != 'cancelled'
+    outputs:
+      razitko: ${{ steps.razitko.outputs.razitko }}
+      drzene: ${{ steps.drzeni.outputs.drzene }}
+    steps:
+      # DEKLAROVANÉ DRŽENÍ (overlay instance, nasazeni-drzene.json) se čte TADY —
+      # jako PRVNÍ krok celého nasazení, jednou za běh; ostatní úlohy ho dostanou
+      # outputem. Overlay deklarovaný a nečitelný nebo neplatná deklarace = pád
+      # DŘÍV, než se cokoli nasadí: nevíme, co smíme nasadit.
+      # ⛔ Do 2026-10-03 se četla až v deploy-zacatek, tedy PO Kořeni, Core, Edge
+      # a Extranetu: nečitelný overlay by zastavil jen vlny 3+ a nechal instanci
+      # napůl nasazenou (nové jádro, staré stacky) — třída výpadků z částečného
+      # nasazení. Držet jde dál jen aplikace vln 3+ (jen vlnové úlohy mají plnič;
+      # deklarace vln 0–2 nebo přímé úlohy je chyba — scripts/lib/nasazeni-drzene.mjs).
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/
+            instances/
+            .forgejo/
+
+      - name: Deklarace držení aplikací (overlay instance)
+        id: drzeni
+        env:
+          OVERLAY_REPO: ${{ secrets.INSTANCE_OVERLAY_REPO }}
+          OVERLAY_TOKEN_PRIMARY: ${{ secrets.REPO_API_TOKEN }}
+          OVERLAY_TOKEN_FALLBACK: ${{ secrets.FORGEJO_API_TOKEN }}
+        run: bash scripts/ci/drzene-z-overlaye.sh
+
+      - name: Razítko začátku a stav nasazení na HEAD mainu
+        id: razitko
+        env:
+          TOK: ${{ secrets.REPO_API_TOKEN }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          set -uo pipefail
+          R=$(date +%s)
+          echo "razitko=$R" >> "$GITHUB_OUTPUT"
+          echo "začátek nasazení stacků: $R ($(date -u -d "@$R" +%FT%TZ))"
+          if [ -z "${TOK:-}" ]; then
+            echo "::warning title=deploy-verdikt::stav 'pending' na ${SHA:0:12} nelze publikovat (chybí REPO_API_TOKEN) — před slučováním čti úlohu deploy-verdikt."
+            exit 0
+          fi
+          curl -sS -X POST -H "Authorization: token ${TOK}" -H "Content-Type: application/json" \
+            "${SERVER}/api/v1/repos/${REPO}/statuses/${SHA}" \
+            -d '{"state":"pending","context":"deploy-verdikt","description":"nasazení běží — do mainu neslučovat, dokud není terminální"}' \
+            -o /dev/null -w 'stav pending publikován: HTTP %{http_code}\n' || \
+            echo "::warning title=deploy-verdikt::publikace stavu 'pending' selhala — před slučováním čti úlohu deploy-verdikt."
+
+  # ===========================================================================
   # Deploy: Infrastructure stacks (Integration, Langfuse, Admin,
   # + Phase 2 autopilot: LLM Gateway, OpenClaw — both opt-in tier=optional)
   # ===========================================================================
@@ -1567,13 +2004,14 @@ jobs:
   # dřív než ony, STACKY (vlny 3+) až po nich.
   deploy-koren:
     name: "Deploy: Kořen (vlny 0–2 · netinit · registry · pki)"
-    runs-on: ubuntu-latest
-    # Vlny 0–2 jdou po sobě; každá appka smí jednou opakovat doložený přechodný pád
-    # (deploy-and-verify.sh), proto rezerva nad dřívějších 60 min.
-    timeout-minutes: 90
-    needs: [detect, check-web, test-web, build-web, governance-gate, coldstart-db-gate, service-tests, blockchain-integration, av-integration-gate, surface-tests, surface-contract-gate, test-cosmos]
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
+    # Vlny 0–2 jdou po sobě, každá appka jeden pokus (deploy-and-verify.sh neopakuje
+    # uvnitř úlohy). Naměřeno 0,1–6,8 min; strop sdíleného runneru je 1 h.
+    timeout-minutes: 60
+    needs: [detect, check-web, test-web, test-web-brany, build-web, governance-gate, coldstart-db-gate, service-tests, blockchain-integration, av-integration-gate, surface-tests, surface-contract-gate, test-cosmos, deploy-razitko]
     if: >-
       always()
+      && needs.deploy-razitko.result == 'success'
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
       && needs.detect.result == 'success'
@@ -1582,6 +2020,8 @@ jobs:
       && needs.check-web.result != 'cancelled'
       && needs.test-web.result != 'failure'
       && needs.test-web.result != 'cancelled'
+      && needs.test-web-brany.result != 'failure'
+      && needs.test-web-brany.result != 'cancelled'
       && needs.build-web.result != 'failure'
       && needs.build-web.result != 'cancelled'
       && needs.governance-gate.result != 'failure'
@@ -1600,6 +2040,8 @@ jobs:
       && needs.surface-contract-gate.result != 'cancelled'
       && needs.test-cosmos.result != 'failure'
       && needs.test-cosmos.result != 'cancelled'
+    outputs:
+      nenalezeno: ${{ steps.vlny.outputs.nenalezeno }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1608,6 +2050,7 @@ jobs:
             instances/
 
       - name: Nasadit dotčené stacky po vlnách (0-2)
+        id: vlny
         env:
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
           # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
@@ -1619,19 +2062,88 @@ jobs:
           GIT_SHA: ${{ github.sha }}
           APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
           DEPLOY_APPS: ${{ needs.detect.outputs.deploy_apps }}
+          # Strop úlohy = timeout-minutes výš; měkký termín 8 min před ním (vzor vln 3+):
+          # vlny 0–2 jdou po sobě a bez termínu by úlohu utnul runner uprostřed.
+          STROP_ULOHY_MIN: "60"
         run: |
-          bash scripts/ci/nasad-podle-vln.sh --aplikace "$DEPLOY_APPS" --vlny 0-2
+          TERMIN=$(( $(date +%s) + (STROP_ULOHY_MIN - 8) * 60 ))
+          bash scripts/ci/nasad-podle-vln.sh --aplikace "$DEPLOY_APPS" --vlny 0-2 --mekky-termin "$TERMIN"
+
+  # Pokračování úlohy deploy-koren (2026-10-02, vzor Stacky po vlnách): spadla-li
+  # nebo ji runner utnul, naváže JEDNOU na nasazení téhož běhu (razítko
+  # z deploy-razitko): běžící dočká, hotové ověří, spadlé nasadí znovu — tím se
+  # vrací opakování přechodného pádu; cizí revize = pád. Samo už nepokračuje.
+  # Hlídá brána nasazeni-pokracovani-uloh.
+  deploy-koren-pokracovani:
+    name: "Deploy: Kořen — pokračování (navázání, jen jednou)"
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
+    # Vlny 0–2 jdou po sobě, každá appka jeden pokus (deploy-and-verify.sh neopakuje
+    # uvnitř úlohy). Naměřeno 0,1–6,8 min; strop sdíleného runneru je 1 h.
+    timeout-minutes: 60
+    needs: [detect, deploy-razitko, deploy-koren]
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.deploy-razitko.result == 'success'
+      && (needs.deploy-koren.result == 'failure' || needs.deploy-koren.result == 'cancelled')
+    outputs:
+      nenalezeno: ${{ steps.vlny.outputs.nenalezeno }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/
+            instances/
+
+      - name: Nasadit dotčené stacky po vlnách (0-2)
+        id: vlny
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
+          # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
+          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
+          # deploy joby běží jen na push do main (kód z main), ne na PR.
+          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          GIT_SHA: ${{ github.sha }}
+          DEPLOY_RAZITKO: ${{ needs.deploy-razitko.outputs.razitko }}
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+          DEPLOY_APPS: ${{ needs.detect.outputs.deploy_apps }}
+          # Strop úlohy = timeout-minutes výš; měkký termín 8 min před ním (vzor vln 3+):
+          # vlny 0–2 jdou po sobě a bez termínu by úlohu utnul runner uprostřed.
+          STROP_ULOHY_MIN: "60"
+        run: |
+          TERMIN=$(( $(date +%s) + (STROP_ULOHY_MIN - 8) * 60 ))
+          bash scripts/ci/nasad-podle-vln.sh --aplikace "$DEPLOY_APPS" --vlny 0-2 --mekky-termin "$TERMIN" --navazat-od "$DEPLOY_RAZITKO"
 
   # Vlny 3+ — po kořeni a po úlohách Core/Edge/Extranet (ty se vynechávají,
   # nasazují je vlastní úlohy; brána stack-bez-deploy-ulohy hlídá, že seznam
   # `--vynech` odpovídá úlohám, které je opravdu nasazují).
-  deploy-stacky:
-    name: "Deploy: Stacky po vlnách (vlny 3+)"
-    runs-on: ubuntu-latest
-    timeout-minutes: 240
-    needs: [detect, check-web, test-web, build-web, governance-gate, coldstart-db-gate, service-tests, blockchain-integration, av-integration-gate, surface-tests, surface-contract-gate, test-cosmos, deploy-koren, deploy-core, deploy-edge, deploy-extranet]
+  #
+  # ⛔ PO VLNÁCH V ŘADĚ ÚLOH (2026-10-01). Jedna úloha „vlny 3+“ s timeout 240
+  # narazila na TVRDÝ strop runneru (1 h přebíjí timeout-minutes):
+  # 2026-09-30 ji runner utnul přesně v 60. min uprostřed vlny 8 — Coolify
+  # nasazení doběhla, ale nic je neověřilo. Naměřeno na 10 nasazeních: běžně
+  # 4–17 min, ale vlna 7 se 6–9 appkami sama 35–49 min.
+  #   deploy-zacatek → vlny 3–6 → vlna 7 → [pokračování vlny 7] → vlny 8+ → deploy-verdikt
+  # Každá vlnová úloha má MĚKKÝ TERMÍN 8 min před stropem: přestane čekat, řekne,
+  # co zůstalo, a vlna 7 rozpracované appky PŘEDÁ (output predano=true) jednomu
+  # pokračování, které na nasazení TÉHOŽ běhu naváže (razítko z deploy-zacatek)
+  # a ověří je dnešním standardem. Skutečná chyba appky zůstává pádem.
+  # ⛔ Výsledek nasazení čte jen deploy-verdikt — vlna s předáním končí zeleně,
+  # i když ještě není ověřená. PRAVIDLO SLUČOVÁNÍ: do mainu až po terminálním
+  # deploy-verdikt předchozího commitu (kontext `deploy-verdikt` na HEAD mainu je
+  # po dobu nasazení `pending`). Coolify staví HEAD mainu — sloučení během
+  # nasazení ho rozbije (#1000, #1013); pokračování to pozná a spadne.
+  deploy-zacatek:
+    name: "Deploy: Stacky — začátek běhu"
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    needs: [detect, check-web, test-web, test-web-brany, build-web, governance-gate, coldstart-db-gate, service-tests, blockchain-integration, av-integration-gate, surface-tests, surface-contract-gate, test-cosmos, deploy-koren, deploy-core, deploy-edge, deploy-extranet, deploy-razitko, deploy-koren-pokracovani, deploy-core-pokracovani, deploy-edge-pokracovani, deploy-extranet-pokracovani]
     if: >-
       always()
+      && needs.deploy-razitko.result == 'success'
       && github.event_name == 'push'
       && github.ref == 'refs/heads/main'
       && needs.detect.result == 'success'
@@ -1640,6 +2152,8 @@ jobs:
       && needs.check-web.result != 'cancelled'
       && needs.test-web.result != 'failure'
       && needs.test-web.result != 'cancelled'
+      && needs.test-web-brany.result != 'failure'
+      && needs.test-web-brany.result != 'cancelled'
       && needs.build-web.result != 'failure'
       && needs.build-web.result != 'cancelled'
       && needs.governance-gate.result != 'failure'
@@ -1658,14 +2172,35 @@ jobs:
       && needs.surface-contract-gate.result != 'cancelled'
       && needs.test-cosmos.result != 'failure'
       && needs.test-cosmos.result != 'cancelled'
-      && needs.deploy-koren.result != 'failure'
-      && needs.deploy-koren.result != 'cancelled'
-      && needs.deploy-core.result != 'failure'
-      && needs.deploy-core.result != 'cancelled'
-      && needs.deploy-edge.result != 'failure'
-      && needs.deploy-edge.result != 'cancelled'
-      && needs.deploy-extranet.result != 'failure'
-      && needs.deploy-extranet.result != 'cancelled'
+      && (needs.deploy-koren.result == 'success' || needs.deploy-koren-pokracovani.result == 'success')
+      && (needs.deploy-core.result == 'success' || needs.deploy-core.result == 'skipped' || needs.deploy-core-pokracovani.result == 'success')
+      && (needs.deploy-edge.result == 'success' || needs.deploy-edge.result == 'skipped' || needs.deploy-edge-pokracovani.result == 'success')
+      && (needs.deploy-extranet.result == 'success' || needs.deploy-extranet.result == 'skipped' || needs.deploy-extranet-pokracovani.result == 'success')
+    outputs:
+      razitko: ${{ needs.deploy-razitko.outputs.razitko }}
+      # Deklaraci držení přečetlo a ověřilo deploy-razitko (první krok nasazení);
+      # tady se jen předává vlnovým úlohám, aby jejich `needs` zůstaly krátké.
+      drzene: ${{ needs.deploy-razitko.outputs.drzene }}
+    steps:
+      - name: Začátek vln 3+ (držení přečteno v razítku)
+        env:
+          DRZENE: ${{ needs.deploy-razitko.outputs.drzene }}
+        run: |
+          # Prázdný output = razítko deklaraci nepředalo: nevíme, co je drženo → nenasazovat.
+          [ -n "${DRZENE:-}" ] || { echo "::error title=deklarace držení::deploy-razitko nepředalo output drzene — vlny se nespustí."; exit 1; }
+          echo "držení (z deploy-razitko): ${DRZENE}"
+
+  deploy-stacky-vlny-3-6:
+    name: "Deploy: Stacky — vlny 3–6"
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    needs: [detect, deploy-zacatek]
+    if: >-
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.deploy-zacatek.result == 'success'
+    outputs:
+      nenalezeno: ${{ steps.vlny.outputs.nenalezeno }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -1673,21 +2208,252 @@ jobs:
             scripts/
             instances/
 
-      - name: Nasadit dotčené stacky po vlnách (3-)
+      - name: Nasadit dotčené stacky (vlny 3-6)
+        id: vlny
         env:
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
-          # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
-          # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
-          # se postavily z KEŠOVANÉHO overlaye. Org-scope secret, týž jako u n8n výše;
-          # deploy joby běží jen na push do main (kód z main), ne na PR.
           FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
           COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
           GIT_SHA: ${{ github.sha }}
           APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
           DEPLOY_APPS: ${{ needs.detect.outputs.deploy_apps }}
+          DEPLOY_ZACATEK: ${{ needs.deploy-zacatek.outputs.razitko }}
+          DRZENE: ${{ needs.deploy-zacatek.outputs.drzene }}
+          # Strop úlohy = timeout-minutes výš (hlídá brána nasazeni-stacku-po-vlnach).
+          STROP_ULOHY_MIN: "60"
         run: |
-          bash scripts/ci/nasad-podle-vln.sh --aplikace "$DEPLOY_APPS" --vlny 3- \
-            --vynech core,edge,extranet
+          # Měkký termín 8 min před stropem: úloha skončí sama a řekne, co zůstalo,
+          # místo aby ji runner zabil uprostřed operace.
+          TERMIN=$(( $(date +%s) + (STROP_ULOHY_MIN - 8) * 60 ))
+          bash scripts/ci/nasad-podle-vln.sh --aplikace "$DEPLOY_APPS" --drzene "$DRZENE" --vlny 3-6 \
+            --vynech core,edge --mekky-termin "$TERMIN"
+
+  deploy-stacky-vlna-7:
+    name: "Deploy: Stacky — vlna 7"
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    needs: [detect, deploy-zacatek, deploy-stacky-vlny-3-6]
+    if: >-
+      github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.deploy-zacatek.result == 'success'
+      && needs.deploy-stacky-vlny-3-6.result == 'success'
+    outputs:
+      predano: ${{ steps.vlny.outputs.predano }}
+      nenalezeno: ${{ steps.vlny.outputs.nenalezeno }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/
+            instances/
+
+      - name: Nasadit dotčené stacky (vlny 7-7)
+        id: vlny
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          GIT_SHA: ${{ github.sha }}
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+          DEPLOY_APPS: ${{ needs.detect.outputs.deploy_apps }}
+          DEPLOY_ZACATEK: ${{ needs.deploy-zacatek.outputs.razitko }}
+          DRZENE: ${{ needs.deploy-zacatek.outputs.drzene }}
+          # Strop úlohy = timeout-minutes výš (hlídá brána nasazeni-stacku-po-vlnach).
+          STROP_ULOHY_MIN: "60"
+        run: |
+          # Měkký termín 8 min před stropem: úloha skončí sama a řekne, co zůstalo,
+          # místo aby ji runner zabil uprostřed operace.
+          TERMIN=$(( $(date +%s) + (STROP_ULOHY_MIN - 8) * 60 ))
+          bash scripts/ci/nasad-podle-vln.sh --aplikace "$DEPLOY_APPS" --drzene "$DRZENE" --vlny 7-7 \
+            --vynech extranet --mekky-termin "$TERMIN" --predat
+
+  deploy-stacky-vlna-7-pokracovani:
+    name: "Deploy: Stacky — vlna 7, pokračování"
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    needs: [detect, deploy-zacatek, deploy-stacky-vlna-7]
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.deploy-zacatek.result == 'success'
+      && needs.deploy-stacky-vlna-7.result != 'skipped'
+      && (needs.deploy-stacky-vlna-7.outputs.predano == 'true'
+          || needs.deploy-stacky-vlna-7.result == 'failure'
+          || needs.deploy-stacky-vlna-7.result == 'cancelled')
+    outputs:
+      nenalezeno: ${{ steps.vlny.outputs.nenalezeno }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/
+            instances/
+
+      - name: Nasadit dotčené stacky (vlny 7-7)
+        id: vlny
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          GIT_SHA: ${{ github.sha }}
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+          DEPLOY_APPS: ${{ needs.detect.outputs.deploy_apps }}
+          DEPLOY_ZACATEK: ${{ needs.deploy-zacatek.outputs.razitko }}
+          DRZENE: ${{ needs.deploy-zacatek.outputs.drzene }}
+          # Strop úlohy = timeout-minutes výš (hlídá brána nasazeni-stacku-po-vlnach).
+          STROP_ULOHY_MIN: "60"
+        run: |
+          # Měkký termín 8 min před stropem: úloha skončí sama a řekne, co zůstalo,
+          # místo aby ji runner zabil uprostřed operace.
+          TERMIN=$(( $(date +%s) + (STROP_ULOHY_MIN - 8) * 60 ))
+          bash scripts/ci/nasad-podle-vln.sh --aplikace "$DEPLOY_APPS" --drzene "$DRZENE" --vlny 7-7 \
+            --vynech extranet --mekky-termin "$TERMIN" \
+            --navazat-od "$DEPLOY_ZACATEK"
+
+  deploy-stacky-vlny-8:
+    name: "Deploy: Stacky — vlny 8+"
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 60
+    needs: [detect, deploy-zacatek, deploy-stacky-vlna-7, deploy-stacky-vlna-7-pokracovani]
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.deploy-zacatek.result == 'success'
+      && ((needs.deploy-stacky-vlna-7.result == 'success' && needs.deploy-stacky-vlna-7.outputs.predano != 'true')
+          || needs.deploy-stacky-vlna-7-pokracovani.result == 'success')
+    outputs:
+      nenalezeno: ${{ steps.vlny.outputs.nenalezeno }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/
+            instances/
+
+      - name: Nasadit dotčené stacky (vlny 8-)
+        id: vlny
+        env:
+          COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+          FORGEJO_TOKEN: ${{ secrets.REPO_API_TOKEN }}
+          COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
+          GIT_SHA: ${{ github.sha }}
+          APP_NAME_PREFIX: ${{ vars.APP_NAME_PREFIX }}
+          DEPLOY_APPS: ${{ needs.detect.outputs.deploy_apps }}
+          DEPLOY_ZACATEK: ${{ needs.deploy-zacatek.outputs.razitko }}
+          DRZENE: ${{ needs.deploy-zacatek.outputs.drzene }}
+          # Strop úlohy = timeout-minutes výš (hlídá brána nasazeni-stacku-po-vlnach).
+          STROP_ULOHY_MIN: "60"
+        run: |
+          # Měkký termín 8 min před stropem: úloha skončí sama a řekne, co zůstalo,
+          # místo aby ji runner zabil uprostřed operace.
+          TERMIN=$(( $(date +%s) + (STROP_ULOHY_MIN - 8) * 60 ))
+          bash scripts/ci/nasad-podle-vln.sh --aplikace "$DEPLOY_APPS" --drzene "$DRZENE" --vlny 8- \
+            --mekky-termin "$TERMIN"
+
+  # Jediný čtenář výsledku nasazení stacků (brána nasazeni-stacku-po-vlnach):
+  # success jen tehdy, když KAŽDÁ vlna má ověření z tohoto běhu.
+  deploy-verdikt:
+    name: "Deploy: verdikt nasazení"
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 5
+    needs: [deploy-razitko, deploy-koren, deploy-koren-pokracovani, deploy-core, deploy-core-pokracovani, deploy-edge, deploy-edge-pokracovani, deploy-extranet, deploy-extranet-pokracovani, deploy-zacatek, deploy-stacky-vlny-3-6, deploy-stacky-vlna-7, deploy-stacky-vlna-7-pokracovani, deploy-stacky-vlny-8]
+    if: >-
+      always()
+      && github.event_name == 'push'
+      && github.ref == 'refs/heads/main'
+      && needs.deploy-razitko.result == 'success'
+    steps:
+      - name: Má každá vlna ověření z tohoto běhu?
+        env:
+          V36: ${{ needs.deploy-stacky-vlny-3-6.result }}
+          V7: ${{ needs.deploy-stacky-vlna-7.result }}
+          P7: ${{ needs.deploy-stacky-vlna-7.outputs.predano }}
+          K7: ${{ needs.deploy-stacky-vlna-7-pokracovani.result }}
+          V8: ${{ needs.deploy-stacky-vlny-8.result }}
+          K: ${{ needs.deploy-koren.result }}
+          KP: ${{ needs.deploy-koren-pokracovani.result }}
+          C: ${{ needs.deploy-core.result }}
+          CP: ${{ needs.deploy-core-pokracovani.result }}
+          E: ${{ needs.deploy-edge.result }}
+          EP: ${{ needs.deploy-edge-pokracovani.result }}
+          X: ${{ needs.deploy-extranet.result }}
+          XP: ${{ needs.deploy-extranet-pokracovani.result }}
+          Z: ${{ needs.deploy-zacatek.result }}
+          DRZENE: ${{ needs.deploy-razitko.outputs.drzene }}
+          # Aplikace, které vlnové úlohy v Coolify instance NENAŠLY (`--optional` → zeleně přeskočeno).
+          NEN: >-
+            ${{ needs.deploy-koren.outputs.nenalezeno }},${{ needs.deploy-koren-pokracovani.outputs.nenalezeno }},${{ needs.deploy-stacky-vlny-3-6.outputs.nenalezeno }},${{ needs.deploy-stacky-vlna-7.outputs.nenalezeno }},${{ needs.deploy-stacky-vlna-7-pokracovani.outputs.nenalezeno }},${{ needs.deploy-stacky-vlny-8.outputs.nenalezeno }}
+          TOK: ${{ secrets.REPO_API_TOKEN }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+          SERVER: ${{ github.server_url }}
+        run: |
+          set -uo pipefail
+          ok=1
+          # Přímé úlohy: ověřené vlastní úlohou, nebo pokračováním (právě jednou).
+          # Přeskočená Core/Edge/Extranet = změna se jí netýká; Kořen běží vždy.
+          prima() {
+            if [ "$2" = success ]; then echo "$1: ověřeno úlohou"
+            elif [ "$4" = ano ] && [ "$2" = skipped ]; then echo "$1: nenasazováno (změna se ho netýká)"
+            elif [ "$3" = success ]; then echo "$1: ověřeno pokračováním (úloha: $2)"
+            else echo "$1: NEOVĚŘENO (úloha: $2, pokračování: $3)"; ok=0; fi
+          }
+          prima "Kořen" "$K" "$KP" ne
+          prima "Core" "$C" "$CP" ano
+          prima "Edge" "$E" "$EP" ano
+          prima "Extranet" "$X" "$XP" ano
+          [ "$V36" = success ] || ok=0
+          if [ "$V7" = success ] && [ "$P7" != true ]; then
+            VLNA7="ověřena vlnovou úlohou"
+          elif [ "$K7" = success ]; then
+            VLNA7="ověřena pokračováním (vlnová úloha: ${V7}, předáno: ${P7:-ne})"
+          else
+            VLNA7="NEOVĚŘENA (vlnová úloha: ${V7}, předáno: ${P7:-ne}, pokračování: ${K7})"
+            ok=0
+          fi
+          [ "$V8" = success ] || ok=0
+          printf 'vlny 3–6: %s\nvlna 7:   %s\nvlny 8+:  %s\n' "$V36" "$VLNA7" "$V8"
+          [ "$Z" = success ] || echo "::error title=deploy-zacatek ${Z}::začátek běhu neprošel (deklarace držení, podmínky spuštění) — vlny se nespustily."
+          # Výjimky jsou součástí verdiktu: zelená S VÝPISEM držených aplikací, ne zelená mlčky.
+          DRZ=""
+          if [ -n "$DRZENE" ] && [ "$DRZENE" != "[]" ]; then
+            if DRZ=$(node -e '
+                const d = JSON.parse(process.argv[1]);
+                for (const p of d) console.error(`DRŽENO: ${p.aplikace} — ${p.duvod} (rozhodnutí ${p.kdo} ${p.datum}, ${p.odkaz}; drženo ${p.dni} dní)`);
+                console.log(d.map((p) => `${p.aplikace} (${p.dni} dní)`).join(", "));' "$DRZENE"); then
+              echo "drženo (deklarace instance): $DRZ"
+            else
+              echo "::error title=deklarace držení::výstup deploy-zacatek nejde přečíst — výjimky verdiktu nejsou známé."
+              ok=0
+              DRZ=""
+            fi
+          fi
+          # „Ověřeno“ nesmí schovat aplikaci, která se vůbec nenasazovala, protože v Coolify
+          # není (volitelná — nebo špatný prefix instance): vyjmenovat a spočítat.
+          NENALEZENE=$(printf '%s' "${NEN:-}" | tr ',' '\n' | sed 's/^ *//; s/ *$//' | grep -v '^$' | sort -u | paste -sd, - || true)
+          POCET_NEN=0
+          if [ -n "$NENALEZENE" ]; then
+            POCET_NEN=$(printf '%s' "$NENALEZENE" | tr ',' '\n' | grep -c .)
+            echo "::warning title=v Coolify nenalezeno (${POCET_NEN})::${NENALEZENE} — tyhle aplikace instance v Coolify nemá, takže se NENASAZOVALY (volitelné, nebo špatný prefix instance)."
+          fi
+          echo "v Coolify nenalezeno: ${POCET_NEN}${NENALEZENE:+ (${NENALEZENE})}"
+          if [ "$ok" -eq 1 ]; then STAV=success; POPIS="každá úloha nasazení ověřena v tomto běhu${DRZ:+ · drženo: ${DRZ}}${NENALEZENE:+ · v Coolify nenalezeno ${POCET_NEN}: ${NENALEZENE}}"; else STAV=failure; POPIS="nasazení NEOVĚŘENO — viz úlohu deploy-verdikt"; fi
+          if [ -n "${TOK:-}" ]; then
+            curl -sS -X POST -H "Authorization: token ${TOK}" -H "Content-Type: application/json" \
+              "${SERVER}/api/v1/repos/${REPO}/statuses/${SHA}" \
+              -d "$(printf '{"state":"%s","context":"deploy-verdikt","description":"%s"}' "$STAV" "$POPIS")" \
+              -o /dev/null -w 'stav publikován: HTTP %{http_code}\n' || \
+              echo "::warning title=deploy-verdikt::publikace stavu selhala — ${POPIS}"
+          else
+            echo "::warning title=deploy-verdikt::stav nelze publikovat (chybí REPO_API_TOKEN) — ${POPIS}"
+          fi
+          if [ "$ok" -ne 1 ]; then
+            echo "::error title=nasazení stacků NEOVĚŘENO::${POPIS}"
+            exit 1
+          fi
 
   # ===========================================================================
   # Governance Gate — mandatory for DB/security-sensitive changes
@@ -1696,7 +2462,7 @@ jobs:
   # ===========================================================================
   governance-gate:
     name: "Governance: DB & Security Gate"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     needs: detect
     if: >-
@@ -2058,10 +2824,8 @@ jobs:
     name: "AV: real clamd + MinIO integration"
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # Serialize after test-web like the other heavy DinD/test lanes — this gate was
-    # OOM-killed collaterally on a PR that merely touched a service (storage-auth),
-    # because it ran concurrently with test-web on the single runner (#279).
-    needs: [detect, test-web]
+    # Dřív za test-web kvůli OOM (#279); proč to už neplatí, viz service-tests.
+    needs: [detect]
     if: ${{ needs.detect.outputs.already_verified != 'true' && !cancelled() && needs.detect.outputs.av_change == 'true' }}
     steps:
       - uses: actions/checkout@v4
@@ -2126,11 +2890,16 @@ jobs:
     name: "Services: Tests"
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # Serialize AFTER the heaviest job (test-web) so the single self-hosted runner is
-    # not running test-web + service-tests + the other heavy jobs concurrently (#279
-    # OOM class — collateral OOM was sinking AV too). !cancelled() so a skipped/failed
-    # test-web does not skip us: `needs` here is for ORDERING, not a hard dependency.
-    needs: [detect, test-web]
+    # ⛔ ŽÁDNÉ ŘAZENÍ ZA test-web (dřív kvůli OOM #279). Serializace uvnitř JEDNOHO
+    # běhu nic nechrání: runner má sloty pro všechna repa instance, takže těžké joby
+    # z RŮZNÝCH běhů (jiné PR, forky) se potkávají stejně. Naměřeno 2026-09-28/29
+    # (39 h, runner se 4 sloty): 18 běhů Web: Tests jelo vedle tří dalších těžkých
+    # jobů, z toho vedle jiného Web: Tests — všechny zelené; DinD se stropem 20 GB,
+    # cgroup `oom_kill 0`, špička 17,4 GB i s cache; joby mají strop haldy
+    # (NODE_OPTIONS). Paměť hlídá strop stroje, ne pořadí ve workflow. Řazení přitom
+    # stálo každý článek druhé zařazení na konec fronty (12–34 min).
+    # !cancelled() zůstává: `needs` už je jen `detect`.
+    needs: [detect]
     if: ${{ needs.detect.outputs.already_verified != 'true' && !cancelled() && needs.detect.outputs.services_change == 'true' }}
     steps:
       - uses: actions/checkout@v4
@@ -2197,11 +2966,12 @@ jobs:
   # ===========================================================================
   surface-tests:
     name: "Surfaces: Contract & Overlays"
-    runs-on: ubuntu-latest
+    # Izolovaný runner: NEAKTIVNÍ, dokud nejsou nastavené CI_IZOLOVANY_*_LABEL (jinak výchozí runner).
+    # PR z forku nikdy; hlídá brána izolovany-runner-nese-jen-ciste-joby.
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && vars.CI_IZOLOVANY_PR_LABEL) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CI_IZOLOVANY_PUSH_LABEL) || 'ubuntu-latest' }}
     timeout-minutes: 30
-    # Ordering, not dependency (same reasoning as service-tests): keep the single
-    # self-hosted runner from holding test-web and this at once (#279 OOM class).
-    needs: [detect, test-web]
+    # Dřív za test-web kvůli OOM (#279); proč to už neplatí, viz service-tests.
+    needs: [detect]
     if: ${{ needs.detect.outputs.already_verified != 'true' && !cancelled() && needs.detect.outputs.surfaces == 'true' }}
     steps:
       - uses: actions/checkout@v4
@@ -2248,10 +3018,9 @@ jobs:
     name: "Blockchain: Integration (real PostgREST)"
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    # Serialize the heavy lanes into a chain (test-web → service-tests → this) so the
-    # single self-hosted runner never runs two DinD/test-heavy jobs at once (#279 OOM).
-    # !cancelled() keeps us running even if an upstream is skipped/failed (order, not dep).
-    needs: [detect, test-web, service-tests]
+    # Dřív řetěz test-web → service-tests → tahle úloha kvůli OOM (#279); proč to
+    # už neplatí, viz service-tests.
+    needs: [detect]
     if: ${{ needs.detect.outputs.already_verified != 'true' && !cancelled() && needs.detect.outputs.blockchain_change == 'true' }}
     steps:
       - uses: actions/checkout@v4
@@ -2318,7 +3087,7 @@ jobs:
   # ===========================================================================
   validate-n8n-workflows:
     name: "Validate: n8n Workflows"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 15
     needs: detect
     if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.n8n_workflow == 'true'
@@ -2376,7 +3145,9 @@ jobs:
   # ===========================================================================
   test-mobile:
     name: "Mobile: TypeScript, Lint & Tests"
-    runs-on: ubuntu-latest
+    # Izolovaný runner: NEAKTIVNÍ, dokud nejsou nastavené CI_IZOLOVANY_*_LABEL (jinak výchozí runner).
+    # PR z forku nikdy; hlídá brána izolovany-runner-nese-jen-ciste-joby.
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && vars.CI_IZOLOVANY_PR_LABEL) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CI_IZOLOVANY_PUSH_LABEL) || 'ubuntu-latest' }}
     timeout-minutes: 20
     needs: detect
     if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.mobile_app == 'true'
@@ -2458,7 +3229,9 @@ jobs:
   # ===========================================================================
   test-cosmos:
     name: "Cosmos: Go Build & Test"
-    runs-on: ubuntu-latest
+    # Izolovaný runner: NEAKTIVNÍ, dokud nejsou nastavené CI_IZOLOVANY_*_LABEL (jinak výchozí runner).
+    # PR z forku nikdy; hlídá brána izolovany-runner-nese-jen-ciste-joby.
+    runs-on: ${{ (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && vars.CI_IZOLOVANY_PR_LABEL) || (github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.CI_IZOLOVANY_PUSH_LABEL) || 'ubuntu-latest' }}
     timeout-minutes: 15
     needs: detect
     if: needs.detect.outputs.already_verified != 'true' && needs.detect.outputs.cosmos == 'true'
@@ -2471,7 +3244,12 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: cosmos/go.mod
-          cache: true
+          # BEZ cache: job může vyjít na izolovaný runner, kde cache
+          # server nesmí nést build cache mezi repy (GOCACHE se neověřuje — otrávený
+          # záznam = cizí zkompilovaný kód v `go test`). setup-go od v4 cachuje
+          # i bez `cache:`, proto výslovně false. Cena: job běží jen při změně
+          # cosmos/ (za posledních 60 běhů ani jednou), cache stejně skoro netrefí.
+          cache: false
 
       - name: go vet
         run: go vet ./...
@@ -2494,7 +3272,7 @@ jobs:
   # has no Security tab); CVE exit-code gating + MinIO SBOM mirror preserved.
   semgrep:
     name: Semgrep SAST
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 25
     # SEC-02: runs on every push/PR. A SAST scanner gated behind
     # `workflow_dispatch + run_supply_chain=yes` never fires on a PR — security
@@ -2594,9 +3372,9 @@ jobs:
     name: "DB: Kontrakt bloků povrchu (runtime)"
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    # Serializace těžkých lane na jednom runneru (#279 OOM) — stejný řetěz jako
-    # blockchain-integration. !cancelled() drží pořadí, ne závislost.
-    needs: [detect, test-web, service-tests]
+    # Dřív řetěz za test-web a service-tests kvůli OOM (#279); proč to už neplatí,
+    # viz service-tests.
+    needs: [detect]
     if: >-
       ${{ needs.detect.outputs.already_verified != 'true' && !cancelled() && (
         needs.detect.outputs.db_change == 'true' ||
@@ -2604,6 +3382,9 @@ jobs:
       ) }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Sada `znalosti` měří upgrade na datech PŘEDCHOZÍHO mainu (merge-base s origin/main).
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -2625,6 +3406,124 @@ jobs:
           $SUDO apt-get install -y --no-install-recommends docker-ce-cli
           docker --version
 
+      # ⛔ JEDNA THROWAWAY DB PRO VŠECHNY SADY (2026-10-01). Dřív každý krok volal
+      # with-throwaway-db zvlášť: kontejner, init, baseline, heals a seed pro KAŽDOU
+      # sadu (~60 s; naměřeno: 10 sad = job 13,2 min, skoro celý stavění DB). Teď
+      # běží v jedné DB za sebou (--no-file-parallelism), stejně jako `npm run test:db`
+      # pouští celý src/tests/db v jedné DB. Testy jsou psané pro soužití v jedné DB
+      # (náhodná UUID se sufixem běhu, úklid v afterAll, transakce s ROLLBACK).
+      #
+      # ⛔ Workflow nese JMÉNA sad, ne soubory. Soubory čte
+      # scripts/ci/db-kontrakt-jmenovite.mjs z `test:db:<jméno>` v package.json —
+      # seznam opsaný sem se rozjel za den (sada přibyla, jiná narostla o soubory)
+      # a lane by nové soubory tiše vynechala. Skript, jehož tvar nezná, je chyba.
+      # Novou sadu stačí přidat do package.json a JMÉNEM na řádek volání níž.
+      # Jednotlivě je každá sada dál k mání přes `npm run test:db:<jméno>`.
+      #
+      # Proč je která sada v téhle lane (zdůvodnění dřívějších jmenovitých kroků):
+      #   surfaces — Kontrakt bloků — hodnota, kterou vydá živá funkce bloku.
+      #   story-entry — Autorství story entry.
+      #       Autorizace zapisovatele story entries. Sedí v téhle lane, protože jediná
+      #       v pipeline drží živou DB — a měřit SECURITY DEFINER staticky nejde: RLS
+      #       ho neomezuje, takže pravdu vydá jedině volání pod dvěma identitami.
+      #   navrh-aplikace — Schválení návrhu zlepšení.
+      #       Schválení návrhu zlepšení smí zapsat „applied" jen po SKUTEČNÉ změně agenta.
+      #       Do 2026-09-28 prošel návrh bez typu (tak ho zakládá fn_create_improvement_proposal)
+      #       větví ELSE NULL a přesto se označil jako aplikovaný — outcome review a rollback
+      #       pak pracovaly se změnou, která nenastala. Rozhodnutí je uvnitř SECURITY DEFINER
+      #       funkce, pravdu vydá jen živá DB (K-05).
+      #   tower — Nárok na timing tower.
+      #       Nárok na věž (řidič své běhy × admin všechny). Patří do TÉTO lane ze
+      #       stejného důvodu jako sonda nad story entries: nárok drží SECURITY DEFINER
+      #       funkce, kterou RLS neomezuje, takže pravdu vydá jedině volání pod dvěma
+      #       identitami proti živé DB. Staticky se to změřit nedá.
+      #
+      #       Jmenovitě, ne celá `test:db` — viz hlavička téhle lane: 60 runtime testů
+      #       v CI nikdy neběželo a zapnout je naslepo by shodilo pipeline z cizích
+      #       důvodů. Rozšíření zůstává vědomým dalším krokem.
+      #   reflexe-kontext — Běh reflexe dostane kontext.
+      #       Běh reflexe musí dostat kontext. Do 2026-09-29 chyběl výchozí profil
+      #       learnings_enabled a runner neposílal žadatele → každý běh jel bez pravidel,
+      #       KB i paměti a chyba se jen zalogovala. Profil a RBAC compose_context změří jen
+      #       živá DB (K-26a).
+      #   doklad-narok — Nárok na doklad.
+      #   navrh-straz — Návrh zlepšení jen služba a správa.
+      #       Vstup do smyčky sebezměny: návrh zlepšení smí založit jen služba nebo správa.
+      #       Do 2026-09-28 ho zakládal kdokoli přihlášený (definer bez stráže) a u plně
+      #       autonomního agenta rovnou jako 'auto_approved'. Stráž uvnitř definer funkce
+      #       změří jen volání pod čtyřmi identitami proti živé DB (K-15).
+      #   narok-definer — Nárok u definer bloků.
+      #   subjekt — Definer se subjektem odpovídá jen o volajícím.
+      #       Predikát o třetí osobě je orákulum (naměřeno na instanci operátora 2026-09-19): definer
+      #       funkce se subjektem (uuid osoby) odpovídá jen o volajícím, služba a správa
+      #       na kohokoli — a RLS legitimního volajícího přitom dál funguje. Statická
+      #       brána definer-subjekt-jen-volajici pozná jen TVAR stráže; co funkce vydá
+      #       anonymovi, cizímu, vlastníkovi a službě, řekne jen živá DB.
+      #   beh-hodnoceni — Běh hodnocení založí služba.
+      #       Běh hodnocení kvality zakládá služba (svc-ai-chat benchmark). Do 2026-09-29 stráž
+      #       pouštěla jen správu, grant měla jen služba → funkce nikdy neprošla a chybu volající
+      #       spolkl. Unit test runner RPC mockuje; pravdu vydá jen živá DB (K-25).
+      #   step-detail — Nárok na detail kroku.
+      #       Otevření JEDNOHO kroku: dispečer na cizí dosáhne, řidič ne — a jméno
+      #       účtu dostane jen dispečer, ne každý držitel sdílené role. Obojí je
+      #       rozhodnutí uvnitř SECURITY DEFINER funkce, tedy zase mimo dosah statické
+      #       kontroly. Sonda je mutačně ověřená: zrušení brány i vydání jména každému,
+      #       kdo krok vidí, ji shodí (změřeno 2026-08-05).
+      #   hodnoceni-zpravy — Hodnocení zprávy — čtečky a zápis skóre.
+      #       Čtečky zprávy pro hodnocení kvality (K-17): do 2026-09-29 neexistovaly a každé
+      #       hodnocení odpovědi padlo. Jen služba smí číst cizí zprávy; to a správnou
+      #       „předchozí otázku" změří jen živá DB.
+      #   kalendar — Kalendář nad frontou.
+      #       Kalendář nad frontou. Tři pravidla, která selhávají TICHÝM PRÁZDNEM —
+      #       fronta se vykreslí a je prázdná, což se nedá odlišit od „ten den se nic
+      #       nevezlo". Statická kontrola na to nedosáhne; jediný důkaz je běh proti DB
+      #       s daty rozprostřenými přes několik dní a stavů.
+      #   zakazane-nastroje — Trasa odečte zakázané nástroje.
+      #       Zakázaný nástroj agenta se nepoužije (K-36): route_task do 2026-10-01 slučoval jen
+      #       allowed_tools, denied_tools nečetl nikdo za běhu. Co trasa vybere a odečte, závisí na
+      #       rozhodovacím stromu a katalogu — změří jen živá DB.
+      #   zpetna-vazba — Zpětná vazba jen na vlastní zprávu.
+      #       Zpětná vazba na odpověď AI jen ve VLASTNÍ konverzaci — a musí dotéct do tréninku.
+      #       Do 2026-09-29 (INVOKER nad chat_messages, kterou čte jen správce) se k ní nikdy
+      #       nedohledala konverzace, takže z ní nevznikl pár; a cizí message_id prošlo. Co
+      #       vidí vlastník a co cizí, změří jen volání pod rolí authenticated (K-16).
+      #   entity-ref — Přesný klíč a cíl odpovědi.
+      #       Přesný klíč → entita + kanál `target`. Čtyři pravidla, která nejde
+      #       změřit staticky: nejednoznačnost nesmí vrátit „ten první" (poslalo by to
+      #       člověka na cizí doklad), nárok se nesmí obejít (jinak je z resolveru
+      #       orákulum na cizí doklady), klíč se musí brát z KATALOGU (jinak je natvrdo
+      #       v kódu) a `target` smí odejít jen tomu, kdo o něj požádal (Ajv je
+      #       all-or-nothing). Mutačně ověřeno 2026-08-05.
+      #   trenink-pary — Zpětná vazba na trénovací páry.
+      #       Oprava uživatele (zpětná vazba) → trénovací pár. Do 2026-09-28 dávala
+      #       process_feedback_to_training NULL do NOT NULL sloupců, první vhodná zpětná
+      #       vazba shodila celou dávku a pár nikdy nevznikl. Porušení omezení tabulky
+      #       vydá jen živá DB (K-02).
+      #   app-secrets — Tajemství jen v trezoru.
+      #       Tajemství jen v trezoru (2026-09-28): admin přes roli authenticated
+      #       app_secrets nepřečte, set_api_key_admin nepíše nešifrovanou kopii,
+      #       čtenáři berou trezor a převod starých řádků je idempotentní. Grant a
+      #       zápis jsou vlastnosti živé DB (heals, výchozí oprávnění), staticky
+      #       se nezměří celé.
+      #   pohledavka — Stav pohledávky a identita protistrany.
+      #       Stav pohledávky má JEDEN slovník (invoice_state) pro kartu protistrany,
+      #       stáří dluhu, faktury odběratele, dlužníky i Ask. Co se nedá změřit
+      #       staticky: předepsaná faktura (vznik v budoucnu) není dluh, storno není
+      #       nic, dobropis odečítá všude stejně, twin bez IČO dojde k týmž fakturám
+      #       a otázka, kterou karta předvyplňuje, dostane odpověď o dluhu z týchž
+      #       čteček. Naměřeno 2026-09-25 na produkci: karta 588 383 Kč místo 259 597 Kč.
+      #   znalosti — Znalosti ze zkušenosti: seed, vyhrazený prostor, viditelnost, upgrade.
+      #       Seed znalostí (aisha/knowledge/ → 41_…) na čisté DB i jako UPGRADE na DB naseedované
+      #       předchozím mainem (výpadek 2026-09-24: seed měřený jen nad čistou DB). Kolize slugu je
+      #       nemožná konstrukcí (vyhrazený source_type + trigger) — měří jen volání pod identitami
+      #       proti živé DB. Každá viditelnost, kterou generátor povolí, se změří na všech cestách
+      #       čtení. Upgrade potřebuje historii gitu (předchozí main) — proto fetch-depth: 0 níž.
+      #   vykon-agenta — Snímek výkonu agenta.
+      #       Snímek výkonu agenta uzavírá smyčku zlepšování (WF_IMPROVEMENT_EVAL po 24 h,
+      #       WF_MODEL_ADVISORY týdně). Do 2026-09-28 padal při každém volání (spojoval
+      #       neexistující ai_eval_runs.run_id), neměřenou kvalitu vracel jako 0 (→ falešný
+      #       rollback) a jako SECURITY DEFINER neměl stráž. Co funkce vydá službě, správci,
+      #       cizímu a anonymovi a že null zůstane null, řekne jen živá DB (K-01).
       - name: Kontrakt bloků proti throwaway DB
         run: |
           # DinD je TVRDÝ požadavek: brána měří hodnotu, kterou vydá živá funkce.
@@ -2641,129 +3540,7 @@ jobs:
           psql --version
           bash "$GITHUB_WORKSPACE/scripts/ci/npm-ci.sh"
           npm run build:packages   # brána importuje @aisha/surface-blocks přes dist/
-          npm run test:db:surfaces
-
-      # Autorizace zapisovatele story entries. Sedí v téhle lane, protože jediná
-      # v pipeline drží živou DB — a měřit SECURITY DEFINER staticky nejde: RLS
-      # ho neomezuje, takže pravdu vydá jedině volání pod dvěma identitami.
-      - name: Autorství story entry proti throwaway DB
-        run: npm run test:db:story-entry
-
-      # Schválení návrhu zlepšení smí zapsat „applied" jen po SKUTEČNÉ změně agenta.
-      # Do 2026-09-28 prošel návrh bez typu (tak ho zakládá fn_create_improvement_proposal)
-      # větví ELSE NULL a přesto se označil jako aplikovaný — outcome review a rollback
-      # pak pracovaly se změnou, která nenastala. Rozhodnutí je uvnitř SECURITY DEFINER
-      # funkce, pravdu vydá jen živá DB (K-05).
-      - name: Schválení návrhu zlepšení proti throwaway DB
-        run: npm run test:db:navrh-aplikace
-
-      # Nárok na věž (řidič své běhy × admin všechny). Patří do TÉTO lane ze
-      # stejného důvodu jako sonda nad story entries: nárok drží SECURITY DEFINER
-      # funkce, kterou RLS neomezuje, takže pravdu vydá jedině volání pod dvěma
-      # identitami proti živé DB. Staticky se to změřit nedá.
-      #
-      # Jmenovitě, ne celá `test:db` — viz hlavička téhle lane: 60 runtime testů
-      # v CI nikdy neběželo a zapnout je naslepo by shodilo pipeline z cizích
-      # důvodů. Rozšíření zůstává vědomým dalším krokem.
-      - name: Nárok na timing tower proti throwaway DB
-        run: npm run test:db:tower
-      # Běh reflexe musí dostat kontext. Do 2026-09-29 chyběl výchozí profil
-      # learnings_enabled a runner neposílal žadatele → každý běh jel bez pravidel,
-      # KB i paměti a chyba se jen zalogovala. Profil a RBAC compose_context změří jen
-      # živá DB (K-26a).
-      - name: Běh reflexe dostane kontext proti throwaway DB
-        run: npm run test:db:reflexe-kontext
-      - name: Nárok na doklad proti throwaway DB
-        run: npm run test:db:doklad-narok
-      # Vstup do smyčky sebezměny: návrh zlepšení smí založit jen služba nebo správa.
-      # Do 2026-09-28 ho zakládal kdokoli přihlášený (definer bez stráže) a u plně
-      # autonomního agenta rovnou jako 'auto_approved'. Stráž uvnitř definer funkce
-      # změří jen volání pod čtyřmi identitami proti živé DB (K-15).
-      - name: Návrh zlepšení jen služba a správa proti throwaway DB
-        run: npm run test:db:navrh-straz
-      - name: Nárok u definer bloků proti throwaway DB
-        run: npm run test:db:narok-definer
-      # Predikát o třetí osobě je orákulum (naměřeno na guru 2026-09-19): definer
-      # funkce se subjektem (uuid osoby) odpovídá jen o volajícím, služba a správa
-      # na kohokoli — a RLS legitimního volajícího přitom dál funguje. Statická
-      # brána definer-subjekt-jen-volajici pozná jen TVAR stráže; co funkce vydá
-      # anonymovi, cizímu, vlastníkovi a službě, řekne jen živá DB.
-      - name: Definer se subjektem odpovídá jen o volajícím proti throwaway DB
-        run: npm run test:db:subjekt
-      # Běh hodnocení kvality zakládá služba (svc-ai-chat benchmark). Do 2026-09-29 stráž
-      # pouštěla jen správu, grant měla jen služba → funkce nikdy neprošla a chybu volající
-      # spolkl. Unit test runner RPC mockuje; pravdu vydá jen živá DB (K-25).
-      - name: Běh hodnocení založí služba proti throwaway DB
-        run: npm run test:db:beh-hodnoceni
-
-      # Otevření JEDNOHO kroku: dispečer na cizí dosáhne, řidič ne — a jméno
-      # účtu dostane jen dispečer, ne každý držitel sdílené role. Obojí je
-      # rozhodnutí uvnitř SECURITY DEFINER funkce, tedy zase mimo dosah statické
-      # kontroly. Sonda je mutačně ověřená: zrušení brány i vydání jména každému,
-      # kdo krok vidí, ji shodí (změřeno 2026-08-05).
-      - name: Nárok na detail kroku proti throwaway DB
-        run: npm run test:db:step-detail
-      # Čtečky zprávy pro hodnocení kvality (K-17): do 2026-09-29 neexistovaly a každé
-      # hodnocení odpovědi padlo. Jen služba smí číst cizí zprávy; to a správnou
-      # „předchozí otázku" změří jen živá DB.
-      - name: Hodnocení zprávy — čtečky a zápis skóre proti throwaway DB
-        run: npm run test:db:hodnoceni-zpravy
-
-      # Kalendář nad frontou. Tři pravidla, která selhávají TICHÝM PRÁZDNEM —
-      # fronta se vykreslí a je prázdná, což se nedá odlišit od „ten den se nic
-      # nevezlo". Statická kontrola na to nedosáhne; jediný důkaz je běh proti DB
-      # s daty rozprostřenými přes několik dní a stavů.
-      - name: Kalendář nad frontou proti throwaway DB
-        run: npm run test:db:kalendar
-      # Zakázaný nástroj agenta se nepoužije (K-36): route_task do 2026-10-01 slučoval jen
-      # allowed_tools, denied_tools nečetl nikdo za běhu. Co trasa vybere a odečte, závisí na
-      # rozhodovacím stromu a katalogu — změří jen živá DB.
-      - name: Trasa odečte zakázané nástroje proti throwaway DB
-        run: npm run test:db:zakazane-nastroje
-      # Zpětná vazba na odpověď AI jen ve VLASTNÍ konverzaci — a musí dotéct do tréninku.
-      # Do 2026-09-29 (INVOKER nad chat_messages, kterou čte jen správce) se k ní nikdy
-      # nedohledala konverzace, takže z ní nevznikl pár; a cizí message_id prošlo. Co
-      # vidí vlastník a co cizí, změří jen volání pod rolí authenticated (K-16).
-      - name: Zpětná vazba jen na vlastní zprávu proti throwaway DB
-        run: npm run test:db:zpetna-vazba
-
-      # Přesný klíč → entita + kanál `target`. Čtyři pravidla, která nejde
-      # změřit staticky: nejednoznačnost nesmí vrátit „ten první" (poslalo by to
-      # člověka na cizí doklad), nárok se nesmí obejít (jinak je z resolveru
-      # orákulum na cizí doklady), klíč se musí brát z KATALOGU (jinak je natvrdo
-      # v kódu) a `target` smí odejít jen tomu, kdo o něj požádal (Ajv je
-      # all-or-nothing). Mutačně ověřeno 2026-08-05.
-      - name: Přesný klíč a cíl odpovědi proti throwaway DB
-        run: npm run test:db:entity-ref
-      # Oprava uživatele (zpětná vazba) → trénovací pár. Do 2026-09-28 dávala
-      # process_feedback_to_training NULL do NOT NULL sloupců, první vhodná zpětná
-      # vazba shodila celou dávku a pár nikdy nevznikl. Porušení omezení tabulky
-      # vydá jen živá DB (K-02).
-      - name: Zpětná vazba na trénovací páry proti throwaway DB
-        run: npm run test:db:trenink-pary
-      # Tajemství jen v trezoru (2026-09-28): admin přes roli authenticated
-      # app_secrets nepřečte, set_api_key_admin nepíše nešifrovanou kopii,
-      # čtenáři berou trezor a převod starých řádků je idempotentní. Grant a
-      # zápis jsou vlastnosti živé DB (heals, výchozí oprávnění), staticky
-      # se nezměří celé.
-      - name: Tajemství jen v trezoru proti throwaway DB
-        run: npm run test:db:app-secrets
-      # Stav pohledávky má JEDEN slovník (invoice_state) pro kartu protistrany,
-      # stáří dluhu, faktury odběratele, dlužníky i Ask. Co se nedá změřit
-      # staticky: předepsaná faktura (vznik v budoucnu) není dluh, storno není
-      # nic, dobropis odečítá všude stejně, twin bez IČO dojde k týmž fakturám
-      # a otázka, kterou karta předvyplňuje, dostane odpověď o dluhu z týchž
-      # čteček. Naměřeno 2026-09-25 na produkci: karta 588 383 Kč místo 259 597 Kč.
-      - name: Stav pohledávky a identita protistrany proti throwaway DB
-        run: npm run test:db:pohledavka
-
-      # Snímek výkonu agenta uzavírá smyčku zlepšování (WF_IMPROVEMENT_EVAL po 24 h,
-      # WF_MODEL_ADVISORY týdně). Do 2026-09-28 padal při každém volání (spojoval
-      # neexistující ai_eval_runs.run_id), neměřenou kvalitu vracel jako 0 (→ falešný
-      # rollback) a jako SECURITY DEFINER neměl stráž. Co funkce vydá službě, správci,
-      # cizímu a anonymovi a že null zůstane null, řekne jen živá DB (K-01).
-      - name: Snímek výkonu agenta proti throwaway DB
-        run: npm run test:db:vykon-agenta
+          node scripts/ci/db-kontrakt-jmenovite.mjs surfaces story-entry navrh-aplikace tower reflexe-kontext doklad-narok navrh-straz narok-definer subjekt beh-hodnoceni step-detail hodnoceni-zpravy kalendar zakazane-nastroje zpetna-vazba web-koncept stitky entity-ref trenink-pary app-secrets pohledavka vykon-agenta znalosti
 
   # ===========================================================================
   # CI: Celá sada DB runtime testů — s rohatkou známých pádů
@@ -2802,6 +3579,10 @@ jobs:
       ) }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Sada měří i upgrade na datech PŘEDCHOZÍHO mainu (seed-upgrade-bez-duplicit:
+          # merge-base s origin/main). Mělký checkout = NEZMĚŘENO = nový pád rohatky.
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
@@ -2883,7 +3664,7 @@ jobs:
   # ===========================================================================
   overlay-gates:
     name: "Instance: brány nad overlayem"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 20
     needs: [detect]
     if: >-
@@ -3013,7 +3794,9 @@ jobs:
             src/tests/gates/overlay-jde-jen-jednemi-dvermi.gate.test.ts \
             src/tests/gates/overlay-tema-neztrati-klice.gate.test.ts \
             src/tests/gates/money-agendy-odpovidaji-rosteru.gate.test.ts \
-            src/tests/gates/profil-instance-plni-schema.gate.test.ts
+            src/tests/gates/profil-instance-plni-schema.gate.test.ts \
+            src/tests/gates/lehka-draha-nese-jen-lehke-joby.gate.test.ts \
+            src/tests/gates/nasazeni-drzene-aplikace.gate.test.ts
 
   # ─────────────────────────────────────────────────────────────────────────
   # PR: VERDIKT — jediná kontrola, na které smí viset slití do mainu
@@ -3037,7 +3820,7 @@ jobs:
   # totéž co být v pořádku.
   pr-verdikt:
     name: "PR: verdikt"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 5
     # ⛔ `always()` NENÍ POHODLÍ, JE TO PODMÍNKA EXISTENCE. Bez něj platí výchozí
     # pravidlo „všechny `needs` musely uspět" — a protože se úlohy filtrují podle
@@ -3054,6 +3837,7 @@ jobs:
       - build-runner-health
       - check-web
       - test-web
+      - test-web-brany
       - build-web
       - secret-scan
       - disclosure-scan

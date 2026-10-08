@@ -11,6 +11,24 @@ import { z } from "zod";
 
 const keycloakUrl = requireEnv('KEYCLOAK_URL', { service: 'svc-ide-context', why: 'Dosazené `keycloak:8080` nenese prefix instance ani správný port.' });
 const keycloakRealm = requireEnv('KEYCLOAK_REALM', { service: 'svc-ide-context', why: 'Realm je deklarovaná konstanta, ne výchozí hodnota.' });
+/**
+ * Klienti realmu, jejichž tokenům služba věří.
+ *
+ * ⛔ ŽÁDNÝ VÝČET V KÓDU. Do 2026-10-04 tu stál výchozí seznam tří jmen (jedno z nich ani
+ * nebylo klientem realmu) a compose službě posílal proměnnou, kterou nikdo nevydával —
+ * platil tedy výčet z kódu, DRUHÝ domov vedle deklarace realmu. Hodnotu skládá
+ * `aisha-env-doctor` z deklarovaných OIDC klientů (platformní realm + instanční overlay) —
+ * táž, kterou dostává gateway a svc-mcp-knowledge. Když chybí, služba nenastartuje:
+ * nevím-li, komu věřit, není to důvod si tipnout. Seznam bez jediného jména (např. `,`)
+ * projde startem, ale nevěří nikomu (auth.ts `isAllowedClient`).
+ */
+const kcAllowedClients = requireEnv('KC_ALLOWED_CLIENTS', {
+  service: 'svc-ide-context',
+  why: 'Komu služba věří, je vlastnost NASAZENÍ — skládá ji env-doctor z deklarovaných OIDC klientů.',
+})
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 const RawConfigSchema = z.object({
   port: z.coerce.number().int().positive().default(3050),
@@ -26,11 +44,7 @@ const RawConfigSchema = z.object({
   keycloakRealm: z.string().default(keycloakRealm),
   kcIssuer: z.string().url().default(`${keycloakUrl}/realms/${keycloakRealm}`),
   jwksUrl: z.string().url().default(`${keycloakUrl}/realms/${keycloakRealm}/protocol/openid-connect/certs`),
-  kcAllowedClients: z.array(z.string()).default([
-    "aisha-app",
-    "aisha-dirigent-device",
-    "aisha-ide-bridge",
-  ]),
+  kcAllowedClients: z.array(z.string()),
 
   /** OWASP hardening (@aisha/security) */
   corsAllowlist: z.string().default(""),
@@ -63,9 +77,7 @@ function readConfig(): Config {
     keycloakRealm: process.env.KEYCLOAK_REALM,
     kcIssuer: process.env.KC_ISSUER,
     jwksUrl: process.env.KC_JWKS_URL,
-    kcAllowedClients: process.env.KC_ALLOWED_CLIENTS
-      ? process.env.KC_ALLOWED_CLIENTS.split(",").map((s) => s.trim()).filter(Boolean)
-      : undefined,
+    kcAllowedClients,
 
     corsAllowlist: process.env.CORS_ALLOWLIST,
     rateLimitEnabled: process.env.RATE_LIMIT_ENABLED !== "false",

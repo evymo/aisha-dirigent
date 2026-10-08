@@ -29,6 +29,7 @@ import { z } from 'zod';
 import { verifyServiceRole, AuthError } from '../auth.js';
 import { rpcService } from '../postgrest.js';
 import { config } from '../config.js';
+import { credentials } from '../lib/credentials.js';
 
 const PlanSchema = z.object({
   task: z.record(z.string(), z.unknown()),
@@ -346,7 +347,8 @@ export async function openclawBridgeRoutes(app: FastifyInstance): Promise<void> 
 
     if (audit.payload.transport === 'http' || audit.payload.transport === 'sse') {
       try {
-        const token = audit.payload.auth_env_var ? process.env[audit.payload.auth_env_var] : undefined;
+        // Token, který MCP server deklaruje (mcp_server_registry.auth_env_var), z trezoru instance.
+        const token = audit.payload.auth_env_var ? (await credentials.get(audit.payload.auth_env_var)) ?? undefined : undefined;
         const headers: Record<string, string> = { 'Content-Type': 'application/json' };
         if (token) headers.Authorization = `Bearer ${token}`;
 

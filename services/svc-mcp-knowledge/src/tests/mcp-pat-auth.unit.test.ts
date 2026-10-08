@@ -20,7 +20,8 @@ vi.mock('@aisha/security', () => ({
   requireEnv: (name: string) => process.env[name] ?? `test-${name}`,
 }));
 vi.mock('../config.js', () => ({
-  config: { jwksUrl: 'http://kc/jwks', kcIssuer: 'http://kc/realms/aisha', kcAllowedClients: [], postgrestJwtSecret: '' },
+  // Prázdný seznam klientů = nikdo (auth.ts isAllowedClient) — test si svého klienta deklaruje.
+  config: { jwksUrl: 'http://kc/jwks', kcIssuer: 'http://kc/realms/aisha', kcAllowedClients: ['aisha-app'], postgrestJwtSecret: '' },
 }));
 vi.mock('../postgrest.js', () => ({ rpcService: rpcServiceMock, rpcUserClaims: vi.fn(), rpcUser: vi.fn() }));
 
@@ -69,8 +70,8 @@ describe('verifyMcpToken — mcp_ PAT', () => {
     expect(await kodChyby(verifyMcpToken(`Bearer ${TOKEN}`))).toBe(403);
   });
 
-  it('jiný než mcp_ token jde beze změny do Keycloak ověření', async () => {
-    kcVerifyMock.mockResolvedValueOnce({ sub: 'kc-user', azp: 'aisha-app', realm_access: { roles: ['staff'] } });
+  it('jiný než mcp_ token jde do Keycloak ověření (token vydaný pro server MCP)', async () => {
+    kcVerifyMock.mockResolvedValueOnce({ sub: 'kc-user', azp: 'aisha-app', aud: ['aisha-mcp-knowledge'], realm_access: { roles: ['staff'] } });
     const u = await verifyMcpToken('Bearer a.b.c');
     expect(rpcServiceMock).not.toHaveBeenCalled();
     expect(u.userId).toBe('kc-user');

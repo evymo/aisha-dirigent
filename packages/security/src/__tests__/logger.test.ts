@@ -80,6 +80,128 @@ describe('redact() — PII value patterns in strings', () => {
   });
 });
 
+describe('redact() — credentials inside URLs', () => {
+  test.each([
+    ['https://bob:hunter2@api.example.com/v1', ['bob', 'hunter2']],
+    // raw `@` inside the password: nothing of it may survive
+    ['https://bob:p@ss@w0rd@api.example.com/v1', ['bob', 'p@ss', 'w0rd']],
+    ['postgres://svc:Zx9-secret-tail@db.internal:5432/app', ['svc', 'Zx9-secret-tail']],
+  ])('userinfo of %s is gone, host and path stay', (url, leaked) => {
+    const out = redact(`fetch failed for ${url} after retry`) as string;
+    for (const part of leaked) expect(out).not.toContain(part);
+    expect(out).toContain('[userinfo-redacted]@');
+    expect(out).toMatch(/@(api\.example\.com\/v1|db\.internal:5432\/app) after retry$/);
+  });
+
+  test.each([
+    'access_token',
+    'token',
+    'api_key',
+    'apikey',
+    'key',
+    'sig',
+    'X-Amz-Signature',
+    'X-Amz-Credential',
+    'code',
+    'client_secret',
+    'password',
+    'auth',
+  ])('value of query param "%s" is redacted', (name) => {
+    const out = redact(`GET https://api.example.com/cb?page=2&${name}=Q7-leaky-value&lang=cs`) as string;
+    expect(out).not.toContain('Q7-leaky-value');
+    expect(out).toContain(`&${name}=[redacted]`);
+  });
+
+  test('anchor: harmless params, path and host stay readable', () => {
+    const url = 'https://api.example.com/v1/items?page=2&lang=cs&sort=desc#top';
+    expect(redact(`calling ${url}`)).toBe(`calling ${url}`);
+  });
+
+  test.each([
+    // non-word characters in the password: the email pattern alone would keep the user and its head
+    ['_https://bobA:pw!A1@h.example.com/', 'bobA'],
+    ['_https://bobA:pw!A1@h.example.com/', 'pw!'],
+    ['1https://bobB:pw!B2@h.example.com/', 'bobB'],
+    ['1https://bobB:pw!B2@h.example.com/', 'pw!'],
+    ['see //bobC:pw!C3@h.example.com/x', 'bobC'],
+    ['see //bobC:pw!C3@h.example.com/x', 'pw!'],
+    ['cb#access_token=TK1&state=ok', 'TK1'],
+    ['cb#id_token=TK2', 'TK2'],
+    ['x?code_verifier=V1&page=2', 'V1'],
+    ['x?pwd=V2&page=2', 'V2'],
+    ['x?pass=V3&page=2', 'V3'],
+    ['x?passwd=V4&page=2', 'V4'],
+    ['x?otp=V5&page=2', 'V5'],
+    ['x?redirect_uri=https%3A%2F%2Fadmin%3ApwD4%40host.example.com%2Fp', 'pwD4'],
+  ])('no credential survives in %s', (input, secret) => {
+    const out = redact(`log ${input}`) as string;
+    expect(out).not.toContain(secret);
+  });
+
+  test('an authority cut by truncation is dropped, not shown in part', () => {
+    const out = redact(`${'x'.repeat(490)} https://user:secretpassXYZ@host.example.com/`) as string;
+    expect(out).toContain('[truncated:');
+    expect(out).not.toContain('secretpass');
+  });
+
+  // Logged strings are attacker-shaped (Origin header → cors.deny, unauthenticated).
+  // Inputs that made the earlier patterns quadratic: each must stay cheap.
+  test.each([
+    [';', ';'.repeat(1_000_000)],
+    ['?', '?'.repeat(1_000_000)],
+    ['?a', '?a'.repeat(500_000)],
+    ['a.', 'a.'.repeat(500_000)],
+    ['a-', 'a-'.repeat(500_000)],
+    ['//', '//'.repeat(500_000)],
+    ['%2F%2F', '%2F%2F'.repeat(200_000)],
+    ['a.a@', 'a.a@'.repeat(250_000)],
+  ])('redaction stays cheap on a 1 MB %s input', (_name, input) => {
+    const start = performance.now();
+    redact(input);
+    expect(performance.now() - start).toBeLessThan(5000);
+  });
+
+  test('applies inside nested log context, not only top-level strings', () => {
+    const out = JSON.stringify(redact({ hop: { target: 'https://u:pw-123@h.example.com/?sig=abc123' } }));
+    expect(out).not.toContain('pw-123');
+    expect(out).not.toContain('abc123');
+  });
+});
+
+describe('redact() — e-mail pattern is linear, Authorization in text, encoded parameter names', () => {
+  test('real addresses are still redacted (local part up to 64)', () => {
+    expect(redact('kontakt: jan.novak+test@example.test, díky')).toBe('kontakt: [email-redacted], díky');
+    expect(redact(`${'a'.repeat(64)}@example.test`)).toBe('[email-redacted]');
+  });
+
+  // Vlastnost, ne mikro-benchmark: neomezená lokální část stála 14 s na 100 kB
+  // tvaru `a.a.a…` (každá hranice slova znovu prohledala zbytek vstupu), omezená
+  // 29 ms. Strop 2 s má rezervu ~70× i pro zatížený stroj a kvadratiku pořád chytí.
+  test('attacker-shaped 100 kB text without @ costs linear time', () => {
+    const vstup = 'a.'.repeat(50_000);
+    const start = performance.now();
+    const out = redact(vstup, { maxStringLength: 100_000 });
+    expect(performance.now() - start).toBeLessThan(2000);
+    expect(out).toBe(vstup);
+  });
+
+  test('Authorization header written as text keeps the scheme, drops the credential', () => {
+    expect(redact('Authorization: Basic dXNlcjpwYXNzd29yZA==')).toBe('Authorization: Basic [redacted]');
+    expect(redact('{"authorization":"Digest username=\\"u\\""}')).not.toContain('username');
+    expect(redact('proxy-authorization=NTLM TlRMTVNTUAAB')).toBe('proxy-authorization=NTLM [redacted]');
+  });
+
+  test('anchor: the word Basic in prose is left alone', () => {
+    expect(redact('Basic information about the plan')).toBe('Basic information about the plan');
+  });
+
+  test('percent-encoded parameter names are recognised (once or twice encoded)', () => {
+    expect(redact('/x?%74oken=abc123&lang=cs')).toBe('/x?%74oken=[redacted]&lang=cs');
+    expect(redact('/x?%2574oken=abc123&lang=cs')).toBe('/x?%2574oken=[redacted]&lang=cs');
+    expect(redact('/x?%6C%61ng=cs')).toBe('/x?%6C%61ng=cs');
+  });
+});
+
 describe('redact() — safety guards', () => {
   test('truncates over-long strings', () => {
     const long = 'x'.repeat(2000);

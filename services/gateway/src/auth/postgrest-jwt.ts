@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { createRemoteJWKSet, decodeJwt, jwtVerify, SignJWT, type JWTPayload, type JWTVerifyGetKey } from 'jose';
 import { config } from '../config.js';
 import { isTokenRevoked } from './jwt-revocation.js';
+import { KLIENT_MCP } from '../lib/chraneny-zdroj.js';
 
 const JWKS = createRemoteJWKSet(new URL(config.kcJwksUrl));
 const textEncoder = new TextEncoder();
@@ -54,6 +55,9 @@ function tokenLooksLikeKeycloak(token: string, issuer: string): boolean {
 }
 
 function isAllowedKeycloakClient(payload: JWTPayload, allowedClients: readonly string[]): boolean {
+  // ⛔ Revize Guru 2026-10-07: token klienta MCP (z IDE) patří jen serveru MCP. Sdílený seznam
+  // KC_ALLOWED_CLIENTS ho obsahuje kvůli /mcp, tady by z něj byl přístup k celému API přes PostgREST.
+  if (payload.azp === KLIENT_MCP) return false;
   const allowed = new Set(allowedClients);
   const azp = typeof payload.azp === 'string' ? payload.azp : '';
   const audiences = asStringArray(payload.aud);

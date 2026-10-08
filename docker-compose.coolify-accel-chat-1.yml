@@ -1,0 +1,94 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify-accel-chat-1.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+x-aisha-povinne-za-behu: [ACCEL_OWNER_PREFIX, ACCEL_CHAT_1_REPO, ACCEL_CHAT_1_REVIZE, ACCEL_CHAT_1_SOUBOR_VAH, ACCEL_CHAT_1_FORMAT_VAH, ACCEL_CHAT_1_SHA256, ACCEL_CHAT_1_PODIL_GPU, ACCEL_CHAT_1_MAX_MODEL_LEN, ACCEL_CHAT_1_MAX_LORAS, ACCEL_CHAT_1_MAX_LORA_RANK, ACCEL_JADRO_API_KEY]
+services:
+  accel-chat-1:
+    image: ${IMAGE_VLLM:?pinned vLLM image (digest)}
+    container_name: ${ACCEL_OWNER_PREFIX}-accel-chat-1
+    restart: unless-stopped
+    devices: ["nvidia.com/gpu=all"]
+    shm_size: 4g
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ulimits:
+      core: 0
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        for k in ACCEL_CHAT_1_REPO ACCEL_CHAT_1_REVIZE ACCEL_CHAT_1_SOUBOR_VAH ACCEL_CHAT_1_FORMAT_VAH ACCEL_CHAT_1_SHA256 ACCEL_CHAT_1_PODIL_GPU ACCEL_CHAT_1_MAX_MODEL_LEN ACCEL_CHAT_1_MAX_LORAS ACCEL_CHAT_1_MAX_LORA_RANK VLLM_API_KEY; do
+          [ -n "$$(printenv "$$k" || true)" ] || { echo "[accel-chat-1] FATAL: $$k nedeklarováno" >&2; exit 1; }
+        done
+        vahy="/vahy/$$(printf '%s' "$$ACCEL_CHAT_1_REPO" | sed 's#/#--#g')@$$ACCEL_CHAT_1_REVIZE"
+        [ -s "$$vahy/aisha-identita.json" ] || { echo "[accel-chat-1] FATAL: $$vahy bez změřené identity" >&2; exit 1; }
+        python3 - "$$vahy" <<'PREMER'
+        import hashlib, json, os, pathlib, sys
+        def sha(p):
+            h = hashlib.sha256()
+            with open(p, "rb") as f:
+                for b in iter(lambda: f.read(1 << 20), b""): h.update(b)
+            return h.hexdigest()
+        def identita(d, soubor):
+            # `@vse`: identita CELÉHO adresáře revize — sha256 seřazeného seznamu `relativní/cesta:sha256`
+            # všech souborů (váhy, config.json, tokenizér, šablona chatu, adapter_config.json …), mimo
+            # vlastní aisha-identita.json a mezipaměť .cache. vLLM z adresáře čte všechno, měří se všechno.
+            if soubor == "@vse":
+                radky = sorted(f"{p.relative_to(d).as_posix()}:{sha(p)}" for p in d.rglob("*") if p.is_file() and p.name != "aisha-identita.json" and ".cache" not in p.relative_to(d).parts)
+                if not radky: sys.exit(f"[accel-chat-1 FATAL] {d.name} je prázdný")
+                return hashlib.sha256("\n".join(radky).encode()).hexdigest()
+            return sha(d / soubor)
+        d = pathlib.Path(sys.argv[1])
+        e = {k: os.environ["ACCEL_CHAT_1_" + k] for k in ("REVIZE", "SOUBOR_VAH", "FORMAT_VAH", "SHA256")}
+        if json.loads((d / "aisha-identita.json").read_text()) != {"format": e["FORMAT_VAH"], "sha256": e["SHA256"], "revize": e["REVIZE"]}:
+            sys.exit("[accel-chat-1] FATAL: identita vah neodpovídá deklaraci uzlu")
+        z = identita(d, e["SOUBOR_VAH"])
+        if z != e["SHA256"]: sys.exit(f"[accel-chat-1] FATAL: NESHODA vah: deklarováno {e['SHA256']}, změřeno {z}")
+        print(f"[accel-chat-1] váhy přeměřeny ({e['FORMAT_VAH']}:{z})")
+        PREMER
+        set -- --served-model-name chat-1 --dtype bfloat16 \
+          --max-model-len "$$ACCEL_CHAT_1_MAX_MODEL_LEN" --gpu-memory-utilization "$$ACCEL_CHAT_1_PODIL_GPU" \
+          --enable-prefix-caching --enable-lora --max-loras "$$ACCEL_CHAT_1_MAX_LORAS" --max-lora-rank "$$ACCEL_CHAT_1_MAX_LORA_RANK" \
+          --host 0.0.0.0 --port 8000
+        exec vllm serve "$$vahy" "$$@"
+    environment:
+      ACCEL_CHAT_1_REPO: ${ACCEL_CHAT_1_REPO}
+      ACCEL_CHAT_1_REVIZE: ${ACCEL_CHAT_1_REVIZE}
+      ACCEL_CHAT_1_SOUBOR_VAH: ${ACCEL_CHAT_1_SOUBOR_VAH}
+      ACCEL_CHAT_1_FORMAT_VAH: ${ACCEL_CHAT_1_FORMAT_VAH}
+      ACCEL_CHAT_1_SHA256: ${ACCEL_CHAT_1_SHA256}
+      ACCEL_CHAT_1_PODIL_GPU: ${ACCEL_CHAT_1_PODIL_GPU}
+      ACCEL_CHAT_1_MAX_MODEL_LEN: ${ACCEL_CHAT_1_MAX_MODEL_LEN}
+      ACCEL_CHAT_1_MAX_LORAS: ${ACCEL_CHAT_1_MAX_LORAS}
+      ACCEL_CHAT_1_MAX_LORA_RANK: ${ACCEL_CHAT_1_MAX_LORA_RANK}
+      VLLM_API_KEY: ${ACCEL_JADRO_API_KEY}
+      # Načítání adaptérů za běhu: endpoint jen na síti jádra pod klíčem jádra, volá ho JEN vstup lane
+      # (adaptery.ts: deklarovaný adresář, přeměřená identita celého adresáře). Nájemci CESTA_NEZNAMA.
+      VLLM_ALLOW_RUNTIME_LORA_UPDATING: "True"
+      HF_HUB_OFFLINE: "1"
+    volumes:
+      - vahy:/vahy:ro
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 900s
+      retries: 3
+    networks:
+      jadro:
+        aliases:
+          - ${ACCEL_OWNER_PREFIX}-accel-chat-1
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=false"
+
+networks:
+  jadro:
+    external: true
+    name: ${ACCEL_OWNER_PREFIX}-accel-jadro
+
+volumes:
+  vahy:
+    external: true
+    name: ${ACCEL_OWNER_PREFIX}-accel-vahy

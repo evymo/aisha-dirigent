@@ -13,6 +13,7 @@ import { useIsMountedRef } from "./useIsMountedRef";
 import { safeError, safeWarn } from "@/lib/security/safeLogger";
 
 import type { KcUser, KcSession } from "@/integrations/auth/types";
+import { jeTyzUzivatel } from "@/integrations/auth/tyzUzivatel";
 
 /**
  * Hook for managing authentication state and multi-tab synchronization.
@@ -73,7 +74,11 @@ export function useAuth() {
     // OIDC event handlers
     const handleUserLoaded = (oidcUser: import("oidc-client-ts").User) => {
       if (isMountedRef.current) {
-        setUser(mapOidcUser(oidcUser));
+        // Tichá obnova tokenu (každé ~3 min) přinese tentýž účet v NOVÉM objektu.
+        // Ponechat starý objekt, jinak se rozjede každý konzument s `[user]`
+        // a ochrana adminu odmontuje otevřený editor (viz tyzUzivatel.ts).
+        const dalsi = mapOidcUser(oidcUser);
+        setUser((predchozi) => (jeTyzUzivatel(predchozi, dalsi) ? predchozi : dalsi));
         setSession(mapOidcSession(oidcUser));
         setLoading(false);
       }

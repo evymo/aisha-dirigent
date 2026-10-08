@@ -1,0 +1,13 @@
+{
+  "$komentar": "VĚDOMĚ VEŘEJNÉ PROJEKCE — jediný výčet pohledů, které smí číst klientská role (anon / authenticated), ačkoli běží s právy VLASTNÍKA (bez security_invoker, tedy mimo RLS podkladu). Čte ho statická brána anon-grants-select-only (SoT granty) i runtime měřidlo src/tests/db/pohled-s-pravy-vlastnika-bez-klientskeho-grantu.runtime.test.ts (katalog živé DB). Každá položka je ROZHODNUTÍ s důvodem: projekce, která nese jen veřejné sloupce, a čtení klientem je její účel. Zápis (DML) nemá nikdo z klientů nikdy — bez výjimky. Nová položka patří do review, ne do tichého přírůstku; položka pohledu, který zmizel nebo dostal security_invoker, se musí smazat (měřidlo to hlídá).",
+  "verejne": {
+    "partner_profiles_public": {
+      "role": ["anon", "authenticated"],
+      "duvod": "Veřejný adresář partnerů: filtr is_visible = true a jen veřejné sloupce (bez kontaktů). security_invoker tu být nesmí — anon by pak potřeboval SELECT na celé partner_profiles včetně kontaktů; projekce s právy vlastníka je tu účel. DML odebráno 2026-10-06 (auto-updatable pohled obcházel RLS partner_profiles)."
+    },
+    "public_service_health": {
+      "role": ["authenticated"],
+      "duvod": "Stavová projekce integration_services (jméno služby, stav, čas kontroly) bez api_token/base_url/config — tajemství v ní nejsou fyzicky. Čte ji veřejná RPC get_public_service_status; DML odebral heals 2026-08-06 (auto-updatable pohled nad tabulkou s tokeny)."
+    }
+  }
+}

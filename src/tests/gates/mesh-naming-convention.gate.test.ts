@@ -25,6 +25,7 @@
 import { describe, expect, test } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { getServerRoles } from "./lib/domain-topology";
 
 const ROOT = process.cwd();
 
@@ -110,7 +111,10 @@ describe("Internal domains match <svc>.<server>.${INTERNAL_TLD}", () => {
     "LIVEKIT_DOMAIN", "TURN_DOMAIN", "PKI_DOMAIN", "NOCODB_DOMAIN",
     "APPSMITH_DOMAIN", "INTRANET_DOMAIN", "DOZZLE_DOMAIN",
   ];
-  const knownServers = ["frontend", "backend", "experimental", "build"];
+  // Sloty se neopisují: jeden domov je registr coolify/servers.json (táž čtečka
+  // jako domain-zoning / legacy-domains). Opsaný výčet by nový slot (gpu)
+  // odmítl jako „neznámý server", přestože registr ho zná.
+  const knownServers = [...getServerRoles()];
 
   for (const v of internalVars) {
     test(`${v} matches <svc>.<server>.${env.INTERNAL_TLD || "<unset>"}`, () => {

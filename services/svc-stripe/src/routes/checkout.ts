@@ -2,7 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type Stripe from 'stripe';
 import { verifyToken, AuthError } from '../auth.js';
 import { createStripeClient } from '../lib/stripe-client.js';
-import { rpcUser } from '../postgrest.js';
+import { rpcService, rpcUser } from '../postgrest.js';
 import { resolveBaseCurrency } from '../lib/currency.js';
 
 export async function checkoutRoute(app: FastifyInstance): Promise<void> {
@@ -43,11 +43,11 @@ export async function checkoutRoute(app: FastifyInstance): Promise<void> {
       }
 
       // Get or create Stripe customer
-      const profileResult = await rpcUser<{ row?: { stripe_customer_id?: string | null; email?: string | null } | null } | null>(
-        'edge_profiles',
-        { p_action: 'get_user_profile', p_payload: { user_id: user.userId } },
-        jwt,
-      );
+      // ⛔ edge_profiles je dispečer SPRÁVY a SLUŽBY — uživatelským tokenem ho člen
+      // nezavolá (DB: „Unauthorized“), takže tahle cesta padala každému členovi.
+      // user_id pochází z ověřeného tokenu (verifyToken), ne od klienta → službou.
+      const profileResult = await rpcService<{ row?: { stripe_customer_id?: string | null; email?: string | null } | null } | null>('edge_profiles',
+        { p_action: 'get_user_profile', p_payload: { user_id: user.userId } });
       const profile = profileResult?.row ?? null;
 
       let stripeCustomerId: string;
@@ -60,10 +60,10 @@ export async function checkoutRoute(app: FastifyInstance): Promise<void> {
         });
         stripeCustomerId = customer.id;
 
-        await rpcUser('edge_profiles', {
+        await rpcService('edge_profiles', {
           p_action: 'set_stripe_customer',
           p_payload: { stripe_customer_id: stripeCustomerId, user_id: user.userId },
-        }, jwt);
+        });
       }
 
       // Build line items — currency comes from the order; fall back to the
@@ -115,7 +115,9 @@ export async function checkoutRoute(app: FastifyInstance): Promise<void> {
       });
 
       // Update order
-      await rpcUser('edge_orders', {
+      // ⛔ update_order zapisuje jen služba (edge_orders); vlastnictví objednávky
+      // ověřil výš get_checkout_context uživatelským tokenem.
+      await rpcService('edge_orders', {
         p_action: 'update_order',
         p_payload: {
           order_id: orderId,
@@ -123,7 +125,7 @@ export async function checkoutRoute(app: FastifyInstance): Promise<void> {
           stripe_payment_intent_id: session.id,
           stripe_session_id: session.id,
         },
-      }, jwt);
+      });
 
       // Record payment session
       await rpcUser('edge_payment_sessions', {

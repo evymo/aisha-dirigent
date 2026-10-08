@@ -56,6 +56,19 @@ export const webPageAdminDetailSchema = z.object({
   status: z.string(),
   title_key: z.string(),
   updated_at: z.string(),
+  // 2026-10-02: razítko pro souběžnou kontrolu uložení a koncept zveřejněné
+  // stránky (editor z něj hydratuje). Starší server je nevrací → výchozí null.
+  edit_stamp: z.string().nullable().default(null),
+  draft: z
+    .object({
+      canvas_css: z.string().nullable(),
+      canvas_data: z.unknown().nullable(),
+      canvas_html: z.string().nullable(),
+      page_settings: z.unknown().nullable(),
+      updated_at: z.string(),
+    })
+    .nullable()
+    .default(null),
 });
 
 /** Schema for an admin brand "site" (get_branding_sites_admin response) */

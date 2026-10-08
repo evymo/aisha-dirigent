@@ -19,6 +19,7 @@
  */
 
 import { rpcService } from '../postgrest.js';
+import { credentials } from './credentials.js';
 
 export type BatchProvider = 'anthropic' | 'openai';
 
@@ -39,9 +40,9 @@ export interface SubmitBatchOptions {
   agentSlug?: string;
   storyId?: string;
   estimatedCostUsd?: number;
-  /** Anthropic API key override. Falls back to env ANTHROPIC_API_KEY. */
+  /** Anthropic API key override. Jinak čtečka pověření (trezor instance → přechodně env). */
   anthropicApiKey?: string;
-  /** OpenAI API key override. Falls back to env OPENAI_API_KEY. */
+  /** OpenAI API key override. Jinak čtečka pověření (trezor instance → přechodně env). */
   openaiApiKey?: string;
 }
 
@@ -117,7 +118,7 @@ export async function submitBatch(opts: SubmitBatchOptions): Promise<SubmitBatch
 // Anthropic Message Batches
 // =============================================================================
 async function submitAnthropicBatch(opts: SubmitBatchOptions): Promise<string> {
-  const key = opts.anthropicApiKey ?? process.env.ANTHROPIC_API_KEY;
+  const key = opts.anthropicApiKey ?? (await credentials.get('ANTHROPIC_API_KEY'));
   if (!key) {
     throw new BatchSubmitError('ANTHROPIC_API_KEY not configured', 500, null);
   }
@@ -161,7 +162,7 @@ async function submitAnthropicBatch(opts: SubmitBatchOptions): Promise<string> {
 // OpenAI Batch API
 // =============================================================================
 async function submitOpenAIBatch(opts: SubmitBatchOptions): Promise<string> {
-  const key = opts.openaiApiKey ?? process.env.OPENAI_API_KEY;
+  const key = opts.openaiApiKey ?? (await credentials.get('OPENAI_API_KEY'));
   if (!key) {
     throw new BatchSubmitError('OPENAI_API_KEY not configured', 500, null);
   }

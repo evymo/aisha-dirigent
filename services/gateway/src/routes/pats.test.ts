@@ -100,3 +100,93 @@ describe('POST /auth/v1/pats — self-service PAT minting', () => {
     expect(res.statusCode).toBe(502);
   });
 });
+
+// ⛔ NAMĚŘENO 2026-10-03 (mapa mezer, nález G21): trasa do create_mcp_token neposílala
+// seznam nástrojů, takže samoobslužný token měl `allowed_tools` prázdné a koncový bod MCP
+// ho odmítal 403. Seznam je autorizace vlastníka tokenu; roli tahle trasa neurčuje.
+describe('POST /auth/v1/pats — seznam nástrojů (allowed_tools)', () => {
+  const prelozeno: Translate = { ok: true, authorization: 'Bearer hs256', translated: true };
+  const VYDANY_TOKEN = { token_id: 't1', raw_token: 'mcp_abc123', scope: 'story', warning: 'Store this token securely. It cannot be retrieved again.' };
+  const rpcVydaToken = () => vi.fn(async () => new Response(JSON.stringify(VYDANY_TOKEN), { status: 200 }));
+  const odeslaneRpc = (fetchMock: ReturnType<typeof vi.fn>) =>
+    JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body)) as Record<string, unknown>;
+
+  it('seznam předá RPC jako p_allowed_tools a odpověď je beze změny', async () => {
+    const fetchMock = rpcVydaToken();
+    const res = await inject({
+      translate: prelozeno,
+      body: { story_id: 's-1', allowed_tools: ['search_knowledge_v2', 'get_expert_rule'] },
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+    expect(res.statusCode).toBe(200);
+    expect(odeslaneRpc(fetchMock)).toMatchObject({
+      p_scoped_to_story_id: 's-1',
+      p_allowed_tools: ['search_knowledge_v2', 'get_expert_rule'],
+    });
+    expect(res.json(), 'token se seznamem upozornění nenese').toEqual(VYDANY_TOKEN);
+  });
+
+  it('bez seznamu token vznikne, parametr se neposílá a odpověď to řekne v mcp_warning', async () => {
+    for (const telo of [{ story_id: 's-1' }, { story_id: 's-1', allowed_tools: [] }]) {
+      const fetchMock = rpcVydaToken();
+      const res = await inject({ translate: prelozeno, body: telo, fetchImpl: fetchMock as unknown as typeof fetch });
+      expect(res.statusCode).toBe(200);
+      expect(odeslaneRpc(fetchMock), 'bez seznamu platí výchozí hodnota funkce').not.toHaveProperty('p_allowed_tools');
+      const odpoved = res.json() as Record<string, unknown>;
+      expect(odpoved, 'pole z RPC zůstávají, včetně původního warning').toMatchObject(VYDANY_TOKEN);
+      expect(String(odpoved.mcp_warning)).toMatch(/allowed_tools/);
+      expect(String(odpoved.mcp_warning)).toMatch(/403/);
+    }
+  });
+
+  it('neplatný seznam → 400 s důvodem a token se NEVYDÁ', async () => {
+    const fetchMock = rpcVydaToken();
+    const res = await inject({
+      translate: prelozeno,
+      body: { story_id: 's-1', allowed_tools: ['get_expert_rule', 'get_expert_rule'] },
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+    expect(res.statusCode).toBe(400);
+    expect(res.json()).toMatchObject({ error: 'invalid_request' });
+    expect(String((res.json() as { message: string }).message)).toMatch(/víckrát/);
+    expect(fetchMock, 'RPC se nesmí zavolat — tiché zahození by vydalo token bez seznamu').not.toHaveBeenCalled();
+  });
+});
+
+// Tvar seznamu se ověřuje čistou funkcí — tady bez Fastify, aby každý případ nestál
+// nové natažení modulů (viz měření u `inject` nahoře).
+describe('overSeznamNastroju — tvar allowed_tools', () => {
+  const over = async (hodnota: unknown) => (await import('./auth.js')).overSeznamNastroju(hodnota);
+
+  it('chybějící a prázdné pole = token bez seznamu', async () => {
+    expect(await over(undefined)).toEqual({ ok: true, seznam: [] });
+    expect(await over([])).toEqual({ ok: true, seznam: [] });
+  });
+
+  it('platná jména projdou beze změny a v pořadí', async () => {
+    const seznam = ['search_knowledge_v2', 'get_expert_rule', 'a', 'Nastroj-1.v2'];
+    expect(await over(seznam)).toEqual({ ok: true, seznam });
+  });
+
+  it.each<[string, unknown, RegExp]>([
+    ['není pole', 'search_knowledge_v2', /musí být pole/],
+    ['null', null, /musí být pole/],
+    ['objekt', { 0: 'search_knowledge_v2' }, /musí být pole/],
+    ['položka není řetězec', ['search_knowledge_v2', 7], /allowed_tools\[1\]/],
+    ['prázdný řetězec', [''], /allowed_tools\[0\]/],
+    ['mezera ve jméně', ['search knowledge'], /allowed_tools\[0\]/],
+    ['jméno začíná číslicí', ['1nastroj'], /allowed_tools\[0\]/],
+    ['jméno delší než 64 znaků', ['a'.repeat(65)], /allowed_tools\[0\]/],
+    ['duplicitní jméno', ['get_expert_rule', 'search_knowledge_v2', 'get_expert_rule'], /víckrát/],
+    ['nad stropem počtu', Array.from({ length: 65 }, (_, i) => `nastroj_${i}`), /nejvýše 64/],
+  ])('odmítne s důvodem: %s', async (_popis, hodnota, duvod) => {
+    const vysledek = await over(hodnota);
+    expect(vysledek.ok).toBe(false);
+    expect(vysledek.ok === false && vysledek.duvod).toMatch(duvod);
+  });
+
+  it('kotva: hranice délky a počtu jsou hranice, ne zákaz', async () => {
+    expect((await over(['a'.repeat(64)])).ok).toBe(true);
+    expect((await over(Array.from({ length: 64 }, (_, i) => `nastroj_${i}`))).ok).toBe(true);
+  });
+});

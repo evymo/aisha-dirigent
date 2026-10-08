@@ -79,13 +79,57 @@ export async function politikaPluginu(slug: string, deps: PolitikaDeps = vychozi
 }
 
 /**
- * Smí plugin volat RPC s těmito argumenty? `p_source_slug` (obecné dráhy jako
- * audience_sync_source_catalog) musí být jméno JEHO zdroje — cizí katalog by
- * jinak mohl přepsat, u snapshotu i smazat. Plugin bez zdroje ho nesmí poslat.
+ * Které argumenty RPC JMENUJÍ ZDROJ — třída podle tvaru jména, ne výčet funkcí:
+ *   - parametr `p_source`, `p_source_slug` a `p_<cokoli>_source(_slug)` (např. `p_to_source`
+ *     u twin_identity_propose_match). NE `p_source_key` / `p_source_ref` — to je klíč UVNITŘ zdroje;
+ *   - o úroveň níž pole `source` / `source_slug` objektu, který parametr nese přímo nebo v poli
+ *     (`p_events[].source` u twin_record_events_audited).
+ * Hlouběji se nečte: tam leží data dodavatele (`p_rows[].fields`), kde `source` znamená cokoli.
  */
-export function zdrojSedi(politika: SandboxPolitika, params: Record<string, unknown>): boolean {
-  if (!Object.prototype.hasOwnProperty.call(params, 'p_source_slug')) return true;
-  return politika.zdroj !== null && params.p_source_slug === politika.zdroj;
+const PARAMETR_ZDROJE = /^p_(?:[a-z0-9]+_)*source(?:_slug)?$/;
+const POLE_ZDROJE = /^source(?:_slug)?$/;
+
+/**
+ * Hodnota patří zdroji pluginu: přesně jeho jméno, nebo podzdroj `<zdroj>:<podzdroj>` — jmenný prostor
+ * TÉHOŽ zdroje (eurowag: `eurowag-telematics:trip`). Podzdroj je neprázdný a bez další `:`, ať nevznikne
+ * dvojí výklad (`a:b:c` = podzdroj `b:c` zdroje `a`, nebo podzdroj `c` zdroje `a:b`?).
+ */
+function patriZdroji(hodnota: unknown, zdroj: string): boolean {
+  if (typeof hodnota !== 'string') return false;
+  if (hodnota === zdroj) return true;
+  const podzdroj = hodnota.startsWith(`${zdroj}:`) ? hodnota.slice(zdroj.length + 1) : '';
+  return podzdroj !== '' && !podzdroj.includes(':');
+}
+
+const jeObjekt = (x: unknown): x is Record<string, unknown> => typeof x === 'object' && x !== null && !Array.isArray(x);
+
+/**
+ * První argument, který jmenuje zdroj a NEPATŘÍ zdroji pluginu (cesta, např. `p_events[3].source`),
+ * nebo null. Plugin bez zdroje — a běh, který pluginem není — nesmí takový argument poslat vůbec.
+ * Důvod: obecné dráhy (katalog zdroje, dvojčata, události, párování) klíčují data jménem zdroje;
+ * pod cizím jménem by plugin přepsal, u snapshotu i smazal data jiného zdroje.
+ */
+export function ciziZdroj(zdroj: string | null, params: Record<string, unknown>): string | null {
+  const cizi = (cesta: string, hodnota: unknown) => (zdroj !== null && patriZdroji(hodnota, zdroj) ? null : cesta);
+  const vObjektu = (cesta: string, o: Record<string, unknown>): string | null => {
+    for (const [k, v] of Object.entries(o)) {
+      if (POLE_ZDROJE.test(k) && cizi(`${cesta}.${k}`, v)) return `${cesta}.${k}`;
+    }
+    return null;
+  };
+  for (const [k, v] of Object.entries(params)) {
+    if (PARAMETR_ZDROJE.test(k) && cizi(k, v)) return k;
+    if (jeObjekt(v)) {
+      const n = vObjektu(k, v);
+      if (n) return n;
+    } else if (Array.isArray(v)) {
+      for (const [i, polozka] of v.entries()) {
+        const n = jeObjekt(polozka) ? vObjektu(`${k}[${i}]`, polozka) : null;
+        if (n) return n;
+      }
+    }
+  }
+  return null;
 }
 
 /** Jen pro testy. */

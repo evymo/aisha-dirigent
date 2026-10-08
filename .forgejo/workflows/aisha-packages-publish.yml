@@ -32,6 +32,9 @@ on:
       # Re-run if the publish runner itself changes (so a bug fix in the runner
       # picks up packages that should have already been published but weren't).
       - 'scripts/aisha-packages-publish.mjs'
+      - 'scripts/ci/registr-prihlaseni.sh'
+      - 'scripts/verdaccio-mint-token.mjs'
+      - 'scripts/lib/poradi-sestaveni-balicku.mjs'
       - '.forgejo/workflows/aisha-packages-publish.yml'
   workflow_dispatch:
     inputs:
@@ -101,92 +104,58 @@ jobs:
 
       - name: Configure registry auth (mint fresh token if credentials present)
         id: auth
-        # Sets a registry-scoped auth token in ~/.npmrc before publish, so auth
-        # lives in the runner env, not in source. PREFERS minting a fresh token
-        # from VERDACCIO_USER + VERDACCIO_PASSWORD: Verdaccio signs API tokens
-        # with `jwt.sign.expiresIn: 30d`, so a static VERDACCIO_TOKEN secret
-        # silently EXPIRES and breaks every publish (incident 2026-06-13). The
-        # mint (scripts/verdaccio-mint-token.mjs, zero deps) uses the web-login
-        # endpoint, which authenticates existing htpasswd users even under
-        # `max_users: -1`. Falls back to the static VERDACCIO_TOKEN secret.
+        # PREFERS minting a fresh token from VERDACCIO_USER + VERDACCIO_PASSWORD:
+        # Verdaccio signs API tokens with `jwt.sign.expiresIn: 30d`, so a static
+        # VERDACCIO_TOKEN secret silently EXPIRES and breaks every publish
+        # (incident 2026-06-13). Falls back to the static secret — and says so,
+        # with its expiry date, instead of failing later as a bare E401.
+        #
+        # ⛔ The token is written with `npm config set --location=user`, NOT
+        # appended to ~/.npmrc. setup-node above (`registry-url`) points npm at
+        # its own file through NPM_CONFIG_USERCONFIG, and npm reads exactly one
+        # user config: a token in ~/.npmrc is never seen. The minted token is
+        # also handed to the following steps (masked, via GITHUB_ENV) — the
+        # publish step used to receive the static secret instead.
+        #
+        # No credentials = THIS CHECKOUT IS NOT THE PUBLISHER (the normal state
+        # of a fork): skipped loudly, not failed. All of it lives in the script,
+        # guarded by src/tests/gates/vydavani-prihlaseni-k-registru.gate.test.ts.
         env:
           VERDACCIO_TOKEN: ${{ secrets.VERDACCIO_TOKEN }}
           VERDACCIO_USER: ${{ secrets.VERDACCIO_USER }}
           VERDACCIO_PASSWORD: ${{ secrets.VERDACCIO_PASSWORD }}
-        run: |
-          # VERDACCIO_URL comes from the vars.VERDACCIO_URL Actions VARIABLE (env
-          # block at job top). Fail fast with an actionable message if unset.
-          if [ -z "$VERDACCIO_URL" ]; then
-            echo "::error::vars.VERDACCIO_URL Actions variable is not set — set it at the org level (aisha) so all publish/CI workflows resolve the Verdaccio registry. Cannot publish."
-            exit 1
-          fi
-          # Prefer a freshly-minted token (no 30-day expiry drift).
-          if [ -n "$VERDACCIO_USER" ] && [ -n "$VERDACCIO_PASSWORD" ]; then
-            if FRESH="$(node scripts/verdaccio-mint-token.mjs --check 2>/dev/null)" && [ -n "$FRESH" ]; then
-              VERDACCIO_TOKEN="$FRESH"
-              echo "Minted fresh Verdaccio token (user=$VERDACCIO_USER) — no 30-day expiry drift"
-            else
-              echo "::warning::Verdaccio token mint failed; falling back to static VERDACCIO_TOKEN secret"
-            fi
-          fi
-          # No credentials = THIS CHECKOUT IS NOT THE PUBLISHER, which is the
-          # normal state of a fork: the shared registry is published from the
-          # upstream repository, and a fork publishes only if it configures a
-          # registry of its OWN (set VERDACCIO_USER+VERDACCIO_PASSWORD, or
-          # VERDACCIO_TOKEN, on that fork). Measured 2026-07-29: upstream holds
-          # VERDACCIO_TOKEN, the fork holds none — so on the fork this job
-          # red-failed on EVERY packages/** push forever, for doing exactly what
-          # it should do, which is nothing.
-          #
-          # Skipped, not failed — but LOUDLY (warning + audit line), because the
-          # gap this workflow exists to close is a SILENT stale registry. On the
-          # publisher the credential is present, so a lost token still fails the
-          # publish itself; what is tolerated here is only "this repo does not
-          # publish", never "this repo failed to publish".
-          if [ -z "$VERDACCIO_TOKEN" ]; then
-            echo "::warning title=publish skipped::No Verdaccio credentials in this repository — not the publisher, skipping. This is expected on a fork; the shared registry is published from upstream. To publish from here, set VERDACCIO_USER+VERDACCIO_PASSWORD (preferred, auto-refresh) or VERDACCIO_TOKEN on THIS repository."
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          echo "publish=true" >> "$GITHUB_OUTPUT"
-          # Write the registry-specific token to the user-level .npmrc so npm
-          # picks it up regardless of the runner's working directory at publish.
-          VERDACCIO_HOST="${VERDACCIO_URL#https://}"; VERDACCIO_HOST="${VERDACCIO_HOST%/}"
-          echo "//${VERDACCIO_HOST}/:_authToken=${VERDACCIO_TOKEN}" >> ~/.npmrc
-          # Route the @aisha scope to Verdaccio even if a sub-package has a
-          # registry-less .npmrc nearby.
-          echo "@aisha:registry=${VERDACCIO_URL}" >> ~/.npmrc
-          # Catch-all so generic dep installs still work.
-          echo "registry=${VERDACCIO_URL}" >> ~/.npmrc
+        run: bash scripts/ci/registr-prihlaseni.sh nastav
+
+      - name: Verify registry login (npm whoami)
+        if: steps.auth.outputs.publish == 'true'
+        # Measured BEFORE minutes of install and build, and in dry-run too: a
+        # login that does not work fails here, with the file npm actually reads.
+        run: bash scripts/ci/registr-prihlaseni.sh over
 
       - name: Install root dependencies
         if: steps.auth.outputs.publish == 'true'
-        # The publish script itself has zero runtime deps (only stdlib), but
-        # each package's build (typescript) needs its own node_modules. Build
-        # dependencies are installed by `npm publish`'s prepublishOnly hook
-        # OR explicitly when we run `npm run build`. Doing a root install up
-        # front guarantees workspaces / linked deps resolve.
+        # ONE install, in the root. The root declares `workspaces`, so this
+        # installs the dependencies of every package (hoisted) and links the
+        # packages to each other.
+        #
+        # ⛔ Do NOT add a per-package `npm ci` / `npm install`. Inside a workspace
+        # directory npm acts on the ROOT for that single workspace: it removes
+        # the root node_modules and reinstalls one package's dependencies only.
+        # Measured 2026-10-03: 779 entries after this step, 2 after a loop over
+        # packages/*/ — every package with dependencies then failed to build
+        # (exit 2). Every CI run that had something to ship ended that way as far
+        # back as the logs were read (2026-06-11); the registry only moved when
+        # someone published by hand.
+        # Guarded by src/tests/gates/balicky-se-stavi-nad-celou-instalaci.gate.test.ts.
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
-
-      - name: Install per-package build dependencies
-        if: steps.auth.outputs.publish == 'true'
-        # Each publishable @aisha/* package needs its devDependencies installed
-        # so its `npm run build` works inside aisha-packages-publish.mjs. We
-        # walk the dirs sequentially because they're independent.
-        run: |
-          for d in packages/*/; do
-            if [ -f "$d/package.json" ] && [ ! -d "$d/node_modules" ]; then
-              echo "→ install $d"
-              (cd "$d" && npm ci --ignore-scripts --no-audit --no-fund) || \
-                (cd "$d" && npm install --ignore-scripts --no-audit --no-fund)
-            fi
-          done
 
       - name: Publish (dry run or live)
         if: steps.auth.outputs.publish == 'true'
         env:
-          VERDACCIO_TOKEN: ${{ secrets.VERDACCIO_TOKEN }}
+          # VERDACCIO_TOKEN comes from the auth step (GITHUB_ENV): the token that
+          # was actually written for npm. Setting it here from the static secret
+          # would override a freshly minted one.
           VERDACCIO_URL: ${{ env.VERDACCIO_URL }}
           DRY_RUN: ${{ inputs.dry_run == true && '1' || '' }}
           # FORCE=1 bypasses the "version unchanged → skip" optimization.

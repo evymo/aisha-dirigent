@@ -3,6 +3,7 @@ import { rpc } from '../postgrest.js';
 import { reflectionConfig as config } from '../config.js';
 
 import { createSafeLogger } from '@aisha/security';
+import { credentials } from '../../lib/credentials.js';
 const log = createSafeLogger('svc-ai-chat');
 /**
  * mcp_test — probe an MCP server before AISHA relies on it.
@@ -63,7 +64,8 @@ export const mcpTest: NodeHandler = async (ctx) => {
 
   if (audit?.payload?.transport === 'http' || audit?.payload?.transport === 'sse') {
     try {
-      const token = audit.payload.auth_env_var ? process.env[audit.payload.auth_env_var] : undefined;
+      // Token, který MCP server deklaruje (mcp_server_registry.auth_env_var), z trezoru instance.
+      const token = audit.payload.auth_env_var ? (await credentials.get(audit.payload.auth_env_var)) ?? undefined : undefined;
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers.Authorization = `Bearer ${token}`;
 

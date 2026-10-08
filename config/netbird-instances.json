@@ -1,0 +1,59 @@
+{
+  "_pozn": [
+    "DEKLARACE INSTANCÍ STACKU NETBIRD — jeden zdroj obou řídicích rovin forku (aisha.decision 2026-10-05 03:17:54Z, varianta C).",
+    "Šablony: coolify/netbird/compose.sablona.yml.tpl a coolify/netbird/management.sablona.json.tpl. Výstupy vykreslí scripts/gen-netbird-instance.mjs; brána netbird-instance-z-generatoru hlídá, že se soubory s generátorem nerozešly.",
+    "hodnoty = zástupné znaky šablony ({{T}} token jmen, {{E}} předpona proměnných instance, {{Z_OIDC}}/{{Z_IMG_*}} chování proměnné bez hodnoty — hlavní výchozí literál, modelová povinné `:?`, {{IDP}} klient IdP managementu, {{DNS}} proměnná s DNS doménou meshe, {{SIGNAL}}/{{RELAY}} adresy inzerované peerům, {{MGMT_SABLONA}} šablona management.json pro netbird-init).",
+    "sekce = bloky šablony, které instance nese (vnitrni_tls: pki-init + netbird-internal-tls + port na hostiteli; peer_sso: přihlášení peerů přes device flow / PKCE; vlastni_sablona: build arg netbird-init s vlastní šablonou management.json; stun_turn: STUN/TURN na UDP 3478 — modelový mesh v1 jen relay přes TCP 443).",
+    "Hlavní instance MUSÍ vyjít bajtově shodná s dnešními soubory — fork bez modelového meshe se tím nemění.",
+    "Instance „model“ (varianta C): řídicí rovina modelového meshe forku — veřejně jen přes edge forku (Signal/Relay inzerované pod veřejným jménem :443, D2), bez vnitřního TLS a portu na hostiteli, peery jen jednorázovým klíčem (bez device flow/PKCE, C1), vlastní OIDC klient/IdP klient a DNS doména (pod .internal), žádné záložní literály (selže nahlas)."
+  ],
+  "instance": [
+    {
+      "id": "hlavni",
+      "compose": "docker-compose.coolify-netbird.yml",
+      "management": "coolify/netbird-management.json.template",
+      "hodnoty": {
+        "T": "netbird",
+        "E": "NETBIRD",
+        "IDP": "netbird-backend",
+        "DNS": "MESH_TLD",
+        "SIGNAL": "${NETBIRD_MESH_HOST}:${NETBIRD_MESH_PORT}",
+        "RELAY": "rels://${NETBIRD_MESH_HOST}:${NETBIRD_MESH_PORT}/relay",
+        "Z_OIDC": ":-netbird",
+        "Z_IMG_MGMT": ":-netbirdio/management:0.70.0",
+        "Z_IMG_SIGNAL": ":-netbirdio/signal:0.70.0",
+        "Z_IMG_RELAY": ":-netbirdio/relay:0.70.0"
+      },
+      "sekce": {
+        "vnitrni_tls": true,
+        "peer_sso": true,
+        "vlastni_sablona": false,
+        "stun_turn": true
+      }
+    },
+    {
+      "id": "model",
+      "compose": "docker-compose.coolify-netbird-model.yml",
+      "management": "coolify/netbird-model-management.json.template",
+      "hodnoty": {
+        "T": "netbird-model",
+        "E": "NETBIRD_MODEL",
+        "Z_OIDC": ":?NETBIRD_MODEL_OIDC_CLIENT_ID doručuje cold-start — modelový mesh nemá výchozí klient",
+        "Z_IMG_MGMT": ":?IMAGE_NETBIRD_MANAGEMENT doručuje cold-start — žádný literál obrazu",
+        "Z_IMG_SIGNAL": ":?IMAGE_NETBIRD_SIGNAL doručuje cold-start — žádný literál obrazu",
+        "Z_IMG_RELAY": ":?IMAGE_NETBIRD_RELAY doručuje cold-start — žádný literál obrazu",
+        "IDP": "netbird-model-backend",
+        "DNS": "NETBIRD_MODEL_DNS_DOMAIN",
+        "SIGNAL": "${NETBIRD_DOMAIN}:443",
+        "RELAY": "rels://${NETBIRD_DOMAIN}:443/relay",
+        "MGMT_SABLONA": "coolify/netbird-model-management.json.template"
+      },
+      "sekce": {
+        "vnitrni_tls": false,
+        "peer_sso": false,
+        "vlastni_sablona": true,
+        "stun_turn": false
+      }
+    }
+  ]
+}

@@ -185,6 +185,10 @@
       "discussion-thread": {
         "title": "Diskussion",
         "description": "Nutzerbeiträge als Threads unter diesem Inhaltsknoten"
+      },
+      "app-banner": {
+        "title": "App-Banner",
+        "description": "Hinweis auf die mobile App: iPhone → App Store, Android → Google Play, Computer → beide"
       }
     },
     "traits": {
@@ -301,7 +305,9 @@
       "layers": "Ebenen",
       "i18n": "Übersetzungen",
       "selectElement": "Wählen Sie ein Element, um seine Eigenschaften zu bearbeiten",
-      "emptyCanvas": "Canvas ist leer"
+      "emptyCanvas": "Canvas ist leer",
+      "panelError": "Dieses Panel konnte nicht angezeigt werden.",
+      "toggleVisibility": "Ein- oder ausblenden"
     },
     "i18n": {
       "injectTranslations": "Übersetzungen vorschau",
@@ -344,7 +350,10 @@
         "news_article": "Nachrichtenartikel",
         "web_page": "Webseite"
       },
-      "nodeId": "Knoten-ID"
+      "nodeId": "Knoten-ID",
+      "iosUrl": "App-Store-Link (iPhone)",
+      "androidUrl": "Google-Play-Link (Android)",
+      "dismissible": "Besucher können es schließen"
     },
     "versions": {
       "title": "Versionsverlauf",
@@ -371,6 +380,17 @@
       "invalidType": "Nicht unterstützter Dateityp",
       "tooLarge": "Datei ist zu groß (max. 20 MB)",
       "uploadFailed": "Asset-Upload fehlgeschlagen"
+    },
+    "draft": {
+      "pending": "Unveröffentlichte Änderungen",
+      "banner": "Sie bearbeiten einen Entwurf. Die Website zeigt weiterhin die veröffentlichte Version, bis Sie auf „Änderungen veröffentlichen“ klicken.",
+      "publishChanges": "Änderungen veröffentlichen",
+      "discard": "Entwurf verwerfen",
+      "conflictTitle": "Die Seite wurde anderswo geändert",
+      "conflictBody": "Jemand hat diese Seite gespeichert, nachdem Sie sie geöffnet haben. Laden Sie neu, um diese Version zu sehen, oder überschreiben Sie sie mit Ihrer.",
+      "reload": "Neu laden",
+      "overwrite": "Mit meiner überschreiben",
+      "restoredToDraft": "Die Version wurde in den Entwurf geladen. Die Website ändert sich erst nach dem Veröffentlichen."
     }
   }
 }

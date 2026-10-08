@@ -33,9 +33,11 @@ BEGIN
     RETURN jsonb_build_object('error', 'rule_id and non-empty suggestion required');
   END IF;
 
-  SELECT slug, title INTO v_rule_slug, v_rule_title
-  FROM expert_rules
-  WHERE id = p_rule_id;
+  SELECT er.slug, er.title INTO v_rule_slug, v_rule_title
+  FROM expert_rules er
+  WHERE er.id = p_rule_id
+    -- pravidlo, které volající nevidí, je pro něj „nenalezeno“ (viditelnost pravidel, revize B1)
+    AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid());
 
   IF v_rule_slug IS NULL THEN
     RETURN jsonb_build_object('error', 'rule not found', 'rule_id', p_rule_id);

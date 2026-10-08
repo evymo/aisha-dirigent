@@ -1,0 +1,7 @@
+{
+  "_comment": "VZOROVÝ zdroj pro brány — dokumentový zdroj, agendy Money nepoužívá.",
+  "source_slug": "dokumenty",
+  "connection": {
+    "protocol": "webdav"
+  }
+}

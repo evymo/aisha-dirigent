@@ -41,7 +41,7 @@ import { resolve, dirname, join } from "node:path";
 import { nejlepsiPeerPodleJmena } from "./lib/mesh-peers.mjs";
 import { meshUserToken, meshAuthFromEnv, tvarKteraObsluhuje } from "./lib/netbird-auth.mjs";
 import { fileURLToPath } from "node:url";
-import { buildTopology, containerNameFrom } from "./lib/derive-domains.mjs";
+import { buildTopology, containerNameFrom, domovVHlavnimMeshi } from "./lib/derive-domains.mjs";
 import { overForwarder } from "./lib/dns-forwarder.mjs";
 import { ZNACKA, planZon, reconcileZony } from "./lib/netbird-dns-zony.mjs";
 
@@ -312,12 +312,16 @@ function buildPlan(aliasIp, peerIp) {
     // Cíl = PEER IP stacku (mesh), ne docker alias. Alias zůstává jen jako
     // záchrana pro služby, jejichž stack nemá netbird agenta — ty na mesh
     // adresu nedosáhnou a jméno by jinak zůstalo bez záznamu.
-    const home = svc.compose ? peerIp.get(svc.compose) : null;
+    // Domov v hlavním meshi — u modelu na slotu modelového meshe MOST (C4): záznam
+    // musí mířit tam, kam vede trasa ingressu (týž zdroj `domovVHlavnimMeshi`), a NIKDY
+    // na kontejner CPU modelu, který by mohl na sdílené síti ještě viset (MM8).
+    const domov = domovVHlavnimMeshi(topo, key);
+    const home = domov.compose ? peerIp.get(domov.compose) : null;
     // Jméno kontejneru se skládá z identity zákazníka — katalog na compose
     // službu jen ukazuje. Bez identity se nesloží a kandidát prostě odpadne;
     // dosadit ji nesmíme, alias bez identity patří komukoli na sdílené síti.
-    const declaredName = svc.internal_url?.service
-      ? containerNameFrom(svc.compose, svc.internal_url.service, APP_NAME_PREFIX)
+    const declaredName = domov.sluzba
+      ? containerNameFrom(domov.compose, domov.sluzba, APP_NAME_PREFIX)
       : null;
     const declared = declaredName ? [declaredName] : [];
     const candidates = [...declared, ...(SUBDOMAIN_ALIASES[sub] || [])];

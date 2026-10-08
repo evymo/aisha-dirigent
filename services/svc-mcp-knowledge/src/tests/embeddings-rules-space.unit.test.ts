@@ -23,7 +23,15 @@ vi.mock('../postgrest.js', () => ({ rpcService: rpcServiceMock }));
 const embedMock = vi.hoisted(() => vi.fn());
 vi.mock('../lib/embed-dispatcher.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../lib/embed-dispatcher.js')>();
-  return { ...actual, embed: embedMock };
+  return {
+    ...actual,
+    embed: embedMock,
+    // Cesty volají embedSIdentitou (identita vah k vektoru); vektory dál dodává embedMock.
+    embedSIdentitou: async (o: Parameters<typeof actual.embedSIdentitou>[0]) => ({
+      vectors: (await embedMock(o)) as number[][],
+      identita: null,
+    }),
+  };
 });
 
 const V1_BACKEND = {

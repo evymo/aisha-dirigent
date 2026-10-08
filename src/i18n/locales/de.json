@@ -4187,7 +4187,36 @@
         "publish": "Speichern & Veröffentlichen",
         "savedDesc": "Branding-Profil gespeichert.",
         "publishedDesc": "Branding-Profil veröffentlicht und aktiv.",
-        "saveError": "Fehler beim Speichern des Branding-Profils."
+        "saveError": "Fehler beim Speichern des Branding-Profils.",
+        "colorPrimary": "Primär",
+        "colorSecondary": "Sekundär",
+        "colorAccent": "Akzent",
+        "colorBackground": "Hintergrund",
+        "colorForeground": "Text",
+        "colorMuted": "Gedämpft",
+        "colorSurface": "Fläche",
+        "colorDestructive": "Destruktiv",
+        "icon": {
+          "title": "Browser-Symbol zusammenstellen",
+          "description": "Wählen Sie ein Bild (auch SVG), die Hintergrundform und ihre Farbe. Das Symbol wird in Ihrem Browser als PNG gezeichnet und hochgeladen.",
+          "source": "Bild",
+          "shape": "Hintergrund",
+          "shapes": {
+            "kruh": "Kreis",
+            "ctverec": "Abgerundetes Quadrat",
+            "zadne": "Keiner"
+          },
+          "color": "Hintergrundfarbe",
+          "padding": "Rand",
+          "preview": "Vorschau (Tab, Lesezeichen, Startbildschirm)",
+          "apply": "Symbol verwenden",
+          "upload": "Bild hochladen",
+          "compose": "Symbol zusammenstellen",
+          "uploaded": "Hochgeladen — Profil speichern oder veröffentlichen, um es anzuwenden.",
+          "uploadError": "Hochladen fehlgeschlagen.",
+          "loadError": "Dieses Bild kann nicht gelesen werden.",
+          "unsupported": "Dieser Dateityp kann nicht verwendet werden — bitte PNG, JPG, WebP oder SVG."
+        }
       },
       "domainRouting": {
         "sectionTitle": "Domänen-Routing",
@@ -4241,7 +4270,34 @@
       "iot": "IoT / Heimassistent",
       "testConnection": "Verbindung testen",
       "connectionSuccess": "Verbindung erfolgreich",
-      "connectionFailed": "Verbindung fehlgeschlagen"
+      "connectionFailed": "Verbindung fehlgeschlagen",
+      "providerCredentials": {
+        "sectionTitle": "KI-Anbieter und Token",
+        "title": "KI-Anbieter und Token",
+        "description": "Die eigenen Tokens und API-Schlüssel dieser Instanz. Sie werden verschlüsselt im Instanz-Tresor gespeichert und von den Diensten von dort abgerufen.",
+        "warning": "Ein Wert kann nur festgelegt oder geändert werden – er wird danach nie wieder angezeigt. Eine Anmeldeinformation gilt für die gesamte Instanz.",
+        "empty": "Kein Anbieter, keine Laufzeitumgebung und kein MCP-Server deklariert eine Berechtigung.",
+        "loadError": "Die Anmeldedaten konnten nicht geladen werden.",
+        "usedBy": "Verwendet von",
+        "orphan": "Niemand nutzt es mehr",
+        "kind": {
+          "provider": "Anbieter",
+          "runtime": "Laufzeit",
+          "mcp_server": "MCP-Server"
+        },
+        "placeholder": "Ein neues Token oder einen neuen Schlüssel einfügen",
+        "set": "Set",
+        "replace": "Ersetzen",
+        "deleteAria": "Anmeldedaten {{name}} löschen",
+        "sourceEnv": "Aus der Serviceumgebung verschoben",
+        "sourceAdmin": "In der Verwaltung festgelegt",
+        "saved": "Anmeldedaten {{name}} gespeichert",
+        "saveError": "Die Anmeldeinformationen {{name}} konnten nicht gespeichert werden",
+        "deleted": "Anmeldeinformationen {{name}} wurden gelöscht",
+        "deleteError": "Die Berechtigung {{name}} konnte nicht gelöscht werden",
+        "deleteConfirmTitle": "Anmeldedaten {{name}} löschen?",
+        "deleteConfirmDescription": "Dienste, die diesen Wert verwenden, erhalten ihn nicht mehr. Solange ein Dienst diesen Wert noch in seiner Umgebung hat, verwendet er ihn vorübergehend und protokolliert eine Warnung."
+      }
     },
     "notifications": {
       "title": "Benachrichtigungskampagnen",
@@ -4886,7 +4942,25 @@
         "restoreError": "Wiederherstellen fehlgeschlagen"
       },
       "publishedChanges": "Änderungen veröffentlicht",
-      "draftDiscarded": "Entwurf verworfen"
+      "draftDiscarded": "Entwurf verworfen",
+      "tags": {
+        "manage": "Tags verwalten",
+        "title": "Tags verwalten",
+        "description": "Tags umbenennen oder zusammenführen und festlegen, wie ein Tag auf der Website in jeder Sprache heißt. Neue Tags entstehen, indem Sie sie einem Artikel hinzufügen.",
+        "none": "Noch keine Tags.",
+        "counts": "{{count}} Artikel · {{published}} auf der Website",
+        "rename": "Umbenennen",
+        "newValue": "Neuer Tag",
+        "renameConfirm": "Umbenennen",
+        "mergeQuestion": "Der Tag „{{to}}“ existiert bereits. „{{from}}“ damit zusammenführen? Artikel mit beiden behalten einen.",
+        "mergeConfirm": "Zusammenführen",
+        "renamed": "Der Tag „{{from}}“ heißt jetzt „{{to}}“ ({{count}} Artikel).",
+        "renameError": "Der Tag konnte nicht umbenannt werden.",
+        "names": "Namen je Sprache",
+        "saveNames": "Namen speichern",
+        "namesSaved": "Namen gespeichert.",
+        "namesError": "Die Namen konnten nicht gespeichert werden."
+      }
     },
     "audit": {
       "severities": {
@@ -5886,6 +5960,7 @@
       "tooLarge": "Datei ist zu groß (max. {{mb}} MB)",
       "invalidType": "Dieser Dateityp kann nicht hochgeladen werden ({{type}})",
       "heicHint": "iPhone-Fotos (HEIC) werden unverändert hochgeladen und konvertiert ausgeliefert.",
+      "notImage": "Kein Bild ({{name}}) — kann nicht als Bild verwendet werden",
       "infected": "Der Virenscanner hat die Datei abgelehnt",
       "scanUnavailable": "Der Virenscanner ist gerade nicht erreichbar, bitte gleich noch einmal versuchen",
       "cancel": "Abbrechen",
@@ -7669,6 +7744,10 @@
       "discussion-thread": {
         "title": "Diskussion",
         "description": "Nutzerbeiträge als Threads unter diesem Inhaltsknoten"
+      },
+      "app-banner": {
+        "title": "App-Banner",
+        "description": "Hinweis auf die mobile App: iPhone → App Store, Android → Google Play, Computer → beide"
       }
     },
     "traits": {
@@ -7785,7 +7864,9 @@
       "layers": "Ebenen",
       "i18n": "Übersetzungen",
       "selectElement": "Wählen Sie ein Element, um seine Eigenschaften zu bearbeiten",
-      "emptyCanvas": "Canvas ist leer"
+      "emptyCanvas": "Canvas ist leer",
+      "panelError": "Dieses Panel konnte nicht angezeigt werden.",
+      "toggleVisibility": "Ein- oder ausblenden"
     },
     "i18n": {
       "injectTranslations": "Übersetzungen vorschau",
@@ -7828,7 +7909,10 @@
         "news_article": "Nachrichtenartikel",
         "web_page": "Webseite"
       },
-      "nodeId": "Knoten-ID"
+      "nodeId": "Knoten-ID",
+      "iosUrl": "App-Store-Link (iPhone)",
+      "androidUrl": "Google-Play-Link (Android)",
+      "dismissible": "Besucher können es schließen"
     },
     "versions": {
       "title": "Versionsverlauf",
@@ -7855,6 +7939,17 @@
       "invalidType": "Nicht unterstützter Dateityp",
       "tooLarge": "Datei ist zu groß (max. 20 MB)",
       "uploadFailed": "Asset-Upload fehlgeschlagen"
+    },
+    "draft": {
+      "pending": "Unveröffentlichte Änderungen",
+      "banner": "Sie bearbeiten einen Entwurf. Die Website zeigt weiterhin die veröffentlichte Version, bis Sie auf „Änderungen veröffentlichen“ klicken.",
+      "publishChanges": "Änderungen veröffentlichen",
+      "discard": "Entwurf verwerfen",
+      "conflictTitle": "Die Seite wurde anderswo geändert",
+      "conflictBody": "Jemand hat diese Seite gespeichert, nachdem Sie sie geöffnet haben. Laden Sie neu, um diese Version zu sehen, oder überschreiben Sie sie mit Ihrer.",
+      "reload": "Neu laden",
+      "overwrite": "Mit meiner überschreiben",
+      "restoredToDraft": "Die Version wurde in den Entwurf geladen. Die Website ändert sich erst nach dem Veröffentlichen."
     }
   },
   "production": {
@@ -8757,6 +8852,7 @@
     "searchPlaceholder": "Artikel suchen…",
     "filter": {
       "tags": "Stichwörter",
+      "allTags": "Alle",
       "sort": "Sortieren",
       "label": "Filter"
     },
@@ -8938,6 +9034,13 @@
     "posted": "Veröffentlicht",
     "signIn": "Melden Sie sich an, um an der Diskussion teilzunehmen",
     "unconfigured": "Eine Diskussion ist hier noch nicht verfügbar."
+  },
+  "appBanner": {
+    "title": "Holen Sie sich unsere App",
+    "text": "Immer dabei — laden Sie die mobile App herunter.",
+    "appStore": "Laden im App Store",
+    "googlePlay": "Jetzt bei Google Play",
+    "close": "Schließen"
   },
   "flowboard": {
     "palette": {

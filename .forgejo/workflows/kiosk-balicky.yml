@@ -147,8 +147,10 @@ jobs:
     needs: plan
     if: needs.plan.outputs.appky != '' && needs.plan.outputs.appky != '[]'
     runs-on: ubuntu-latest
-    # Build appky (prebuild + Gradle) trvá ~40 min; runner je sdílený.
-    timeout-minutes: 120
+    # Build appky (prebuild + Gradle) trvá ~20–40 min (2026-09-30: 20,2 min);
+    # runner je sdílený. 60 se vejde pod strop výchozí dráhy platformy i instance
+    # se stropem 1 h (deklarace .forgejo/ci-drahy.json, brána lehka-draha-…).
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
 

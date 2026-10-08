@@ -3,6 +3,7 @@ import { jwtVerify, type JWTPayload } from 'jose';
 import { createJwtVerifier, AuthError as SecurityAuthError, verifyServiceRole as sharedVerifyServiceRole } from '@aisha/security';
 import { config } from './config.js';
 import { rpcService } from './postgrest.js';
+import { jeTokenKlientaMcp, maAudienceServeruZnalosti } from './mcp-zdroj.js';
 
 const verifier = createJwtVerifier({
   jwksUrl: config.jwksUrl,
@@ -60,8 +61,15 @@ function collectScopes(payload: JWTPayload): string[] {
   return [...new Set([...scopeClaim, ...asStringArray(record.scp)])].filter(Boolean);
 }
 
+/**
+ * Token smí přijít jen od klienta ze seznamu `KC_ALLOWED_CLIENTS` — podle `azp`, nebo `aud`.
+ *
+ * ⛔ PRÁZDNÝ SEZNAM = NIKDO. Do 2026-10-04 tu stálo „prázdný seznam pustí každého“: stačilo,
+ * aby seznam vyšel prázdný, a `/mcp` věřil tokenu kteréhokoli klienta realmu. Chybějící
+ * proměnná službu zastaví už při startu (config.ts); tohle je druhá pojistka pro seznam,
+ * který dorazil, ale nenese jediné jméno — nevím-li, komu věřit, nevěřím nikomu.
+ */
 function isAllowedClient(payload: JWTPayload): boolean {
-  if (config.kcAllowedClients.length === 0) return true;
   const allowed = new Set(config.kcAllowedClients);
   const record = payload as Record<string, unknown>;
   const azp = typeof record.azp === 'string' ? record.azp : '';
@@ -98,7 +106,19 @@ export async function verifyMediatedToken(token: string): Promise<JWTPayload | n
   }
 }
 
+/**
+ * Ověření pro routy MIMO `/mcp` (ragnarok, translate, …): token vydaný klientem MCP sem nepatří
+ * — jeho audience je server MCP, ne tato API (mcp-zdroj.ts).
+ */
 export async function verifyToken(authHeader: string | undefined): Promise<VerifiedUser> {
+  const user = await overToken(authHeader);
+  if (jeTokenKlientaMcp(user.claims as Record<string, unknown>)) {
+    throw new AuthError(403, 'MCP client token is valid only on /mcp');
+  }
+  return user;
+}
+
+async function overToken(authHeader: string | undefined): Promise<VerifiedUser> {
   // RFC 8693: a short-lived USER-scoped token minted by svc-ai-chat carries
   // sub=user_id + role=authenticated, so MCP tools run under the user's identity
   // (DB RLS) — never the service role. Tried before JWKS; a Keycloak JWT can't
@@ -190,13 +210,19 @@ export async function verifyMcpPat(token: string): Promise<VerifiedUser> {
 }
 
 /**
- * Ověření pro `/mcp`: `mcp_` PAT, jinak beze změny `verifyToken`.
- * Záměrně SAMOSTATNĚ — ostatní routy služby PAT nepřijímají.
+ * Ověření pro `/mcp`: `mcp_` PAT, mediovaný token chatu, nebo token Keycloaku s audience serveru MCP.
+ * Záměrně SAMOSTATNĚ — ostatní routy služby PAT ani token klienta MCP nepřijímají.
  */
 export async function verifyMcpToken(authHeader: string | undefined): Promise<VerifiedUser> {
   const token = /^Bearer\s+(\S+)$/i.exec(authHeader ?? '')?.[1] ?? '';
   if (token.startsWith(MCP_PAT_PREFIX)) return verifyMcpPat(token);
-  return verifyToken(authHeader);
+  const user = await overToken(authHeader);
+  // Mediovaný token chatu (HS256, jen svc-ai-chat) audience Keycloaku nenese a nemá — ověřený je
+  // tajemstvím mediátora. Token Keycloaku musí být vydaný PRO server MCP (mcp-zdroj.ts).
+  if (user.claims.token_use !== 'omni-mcp-mediation' && !maAudienceServeruZnalosti(user.claims as Record<string, unknown>)) {
+    throw new AuthError(403, 'Keycloak token is not issued for the MCP server (audience)');
+  }
+  return user;
 }
 
 export function isAdminOrStaff(user: VerifiedUser): boolean {

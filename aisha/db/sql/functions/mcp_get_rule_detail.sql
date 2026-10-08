@@ -1,14 +1,27 @@
 -- Function: mcp_get_rule_detail
+--
+-- Viditelnost (2026-10-05, revize B1): pravidlo podle public.expert_rule_visible_to pro toho, PRO KOHO
+-- se čte. Do 2026-10-05 tu stál vlastní výčet ('public', 'members') pro kohokoli — `members` šlo
+-- anonymovi. Nástroj MCP volá servisní rolí a publikum předává z ověřeného tokenu (p_audience_user_id);
+-- služba bez publika = bez identity (jen `public`), přihlášený je připnutý na sebe.
+-- Signatura se mění výměnou (přibyl parametr s výchozí hodnotou).
+DROP FUNCTION IF EXISTS public.mcp_get_rule_detail(text);
 
-CREATE OR REPLACE FUNCTION public.mcp_get_rule_detail(p_rule_slug text)
+CREATE OR REPLACE FUNCTION public.mcp_get_rule_detail(p_rule_slug text, p_audience_user_id uuid DEFAULT NULL::uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
- SET search_path TO 'public'
+ SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 AS $function$
 DECLARE
   v_result jsonb;
+  v_audience_user uuid;  -- pro koho se čte (služba smí říct; jinak volající sám; bez identity NULL)
 BEGIN
+  v_audience_user := CASE
+    WHEN public.get_jwt_role() = 'service_role' THEN COALESCE(p_audience_user_id, auth.uid())
+    ELSE auth.uid()
+  END;
+
   SELECT jsonb_build_object(
     'id', er.id,
     'slug', er.slug,
@@ -49,7 +62,8 @@ BEGIN
   LEFT JOIN guild_expertise_areas gea ON gea.id = er.expertise_area_id
   WHERE er.slug = p_rule_slug
     AND er.status = 'published'
-    AND er.visibility IN ('public', 'members');
+    -- Viditelnost pro toho, pro koho se čte (autor své, správa vše, ostatní podle domova).
+    AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, v_audience_user);
 
   -- Track usage
   IF v_result IS NOT NULL THEN
@@ -61,7 +75,7 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION mcp_get_rule_detail(p_rule_slug text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION mcp_get_rule_detail(text) TO anon;
-GRANT EXECUTE ON FUNCTION mcp_get_rule_detail(text) TO authenticated;
-GRANT EXECUTE ON FUNCTION mcp_get_rule_detail(text) TO service_role;
+REVOKE ALL ON FUNCTION public.mcp_get_rule_detail(text, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.mcp_get_rule_detail(text, uuid) TO anon;
+GRANT EXECUTE ON FUNCTION public.mcp_get_rule_detail(text, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.mcp_get_rule_detail(text, uuid) TO service_role;

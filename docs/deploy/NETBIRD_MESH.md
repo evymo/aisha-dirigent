@@ -92,22 +92,25 @@ services:
 
 ---
 
-## Per-run agent sandboxing
+## Per-run agent sandboxing — běh do meshe NEPATŘÍ (2026-10-06, volba A)
 
-`svc-agent-runner` (`services/svc-agent-runner/src/`) integruje NetBird API:
+Runner (`services/svc-agent-runner/src/`) dřív pro každý běh razil klíč NetBirdu
+(`createEphemeralKey`) a předával ho kontejneru jako `NB_SETUP_KEY`. Žádný obraz běhu ho
+nepoužil — klíč jen ležel v prostředí pluginu, a `revokePeer` hledal uzel podle id KLÍČE,
+takže zapsaný uzel by v meshi zůstal. Majitel 2026-10-06 („síť zavřít“ = volba A):
 
-1. Před spuštěním agent runu → `createEphemeralKey()` (NetBird Management API).
-2. Backend (Docker / Kata-FC) spustí kontejner s `NB_SETUP_KEY=<ephemeral>`.
-3. Po dokončení → `revokePeer()` (cleanup + audit).
+1. Klíč se pro běh **nerazí vůbec**; runner nemá klienta správy meshe ani pověření
+   (`NETBIRD_MGMT_SECRET`, `NETBIRD_API_*`, `NETBIRD_SANDBOX_GROUP` v exec stacku nejsou).
+2. Síť běhů zakládá runner s `Internal: true` a bez adresy hostitele (`inhibit_ipv4`) —
+   žádná výchozí trasa ven ani cesta k posluchačům hostitele; otevřenou síť toho jména odmítne.
+3. Jediná cesta ven je **broker-proxy** runneru (`broker-proxy.ts`, převzatá z větve forku
+   `feat/runner-broker-proxy`, varianta C 2026-10-01): `/sandbox/*` na broker pro všechny
+   běhy a `CONNECT` s tokenem běhu jen pro claude_cli_task (hostitelé z konfigurace, jen
+   https, jen veřejné adresy). Mesh trasu má jen runner sám (`NETBIRD_PEER_CIDR` přes `NETBIRD_DNS_IP`).
 
-Konfigurace v `services/svc-agent-runner/src/config.ts`:
-
-```typescript
-NETBIRD_ENABLED      // boolean — feature flag
-NETBIRD_API_URL      // https://netbird.aisha.network/api
-NETBIRD_API_TOKEN    // PAT s scope: peers + setup-keys
-NETBIRD_SANDBOX_GROUP // group ID pro per-run peers (network policy isolation)
-```
+Výklad: `docs/compose-notes/docker-compose.coolify-exec.yml.md`; brána tvaru:
+`src/tests/gates/beh-kontejneru-tvar.gate.test.ts`. Skupina `sandbox-run` v NetBirdu
+(netbird-bootstrap.sh) zůstává založená, runner ji nepoužívá.
 
 ---
 
@@ -215,7 +218,7 @@ všechny kontejnery). Ingress řeší směr PŘÍCHOZÍ; odchozí je samostatná
 - [`docs/deploy/MULTI_SERVER_COOLIFY.md`](MULTI_SERVER_COOLIFY.md) — multi-server topologie
 - [`coolify/manifests/netbird.manifest`](../../coolify/manifests/netbird.manifest) — Coolify deployment manifest
 - [`docker-compose.coolify-netbird.yml`](../../docker-compose.coolify-netbird.yml) — control plane
-- [`services/svc-agent-runner/src/netbird-client.ts`](../../services/svc-agent-runner/src/netbird-client.ts) — Management API client
+- [`services/svc-agent-runner/src/broker-proxy.ts`](../../services/svc-agent-runner/src/broker-proxy.ts) — broker-proxy (jediná cesta ven ze sítě běhů)
 
 ---
 

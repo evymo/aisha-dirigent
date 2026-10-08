@@ -135,6 +135,14 @@ interface FilterDropdownMultiProps {
   placeholder: string;
   options: FilterDropdownOption[];
   className?: string;
+  /**
+   * Label for the "show all" entry (same idea as FilterDropdown.allLabel).
+   * Shown first and marked while nothing is selected; picking it clears the
+   * selection via `onClearAll`. Omitted → no such entry.
+   */
+  allLabel?: string;
+  /** Clears the whole selection; required for the `allLabel` entry. */
+  onClearAll?: () => void;
 }
 
 export function FilterDropdownMulti({
@@ -143,6 +151,8 @@ export function FilterDropdownMulti({
   placeholder,
   options,
   className,
+  allLabel,
+  onClearAll,
 }: FilterDropdownMultiProps) {
   const [open, setOpen] = React.useState(false);
   const listRef = React.useRef<HTMLDivElement>(null);
@@ -185,6 +195,11 @@ export function FilterDropdownMulti({
         onOpenAutoFocus={handleOpenAutoFocus}
         onKeyDown={(e) => handleListKeyDown(e, listRef)}
       >
+        {allLabel && onClearAll && (
+          <DropdownItem selected={selected.length === 0} onSelect={onClearAll}>
+            {allLabel}
+          </DropdownItem>
+        )}
         {options.map((opt) => (
           <DropdownItem
             key={opt.value}

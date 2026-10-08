@@ -19,6 +19,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { envDoktorDokoncil } from "./_env-doktor-dokoncil";
 
 const ROOT = process.cwd();
 const DOKTOR = join(ROOT, "scripts/aisha-env-doctor.mjs");
@@ -61,7 +62,7 @@ function behDoktora(): { vystup: string; zapsano: Map<string, string> } {
       timeout: 60_000,
     });
     if (beh.error) throw beh.error;
-    if (beh.status !== 0 || !existsSync(envFile)) {
+    if (!envDoktorDokoncil(beh.status) || !existsSync(envFile)) {
       throw new Error(`env-doktor skončil ${beh.status} bez zápisu: ${(beh.stderr ?? "").trim().split("\n").slice(-3).join(" | ")}`);
     }
     const zapsano = new Map<string, string>();

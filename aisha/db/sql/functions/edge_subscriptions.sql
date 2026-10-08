@@ -1,5 +1,9 @@
 -- Function: public.edge_subscriptions
 -- Purpose: Edge-safe subscription and package operations.
+--   služba (svc-stripe rpcService: checkout, webhook, check-subscription):
+--       create_member_subscription, update_package_stripe, update_subscription
+--   vlastník / správa / služba (svc-stripe rpcUser):  get_user_subscriptions
+--   kdokoli přihlášený (katalog aktivních balíčků):    get_package_by_id
 
 CREATE OR REPLACE FUNCTION public.edge_subscriptions(
   p_action text,
@@ -18,17 +22,18 @@ DECLARE
   v_stripe_subscription_id text;
   v_user_id uuid;
 BEGIN
-  -- ⛔ SECURITY DEFINER vypíná RLS, takže nárok musí vymáhat tělo. Do 2026-10-04
-  -- tu žádná stráž nebyla a funkce má GRANT pro `authenticated` (svc-stripe čte
-  -- předplatné uživatelským tokenem): kdokoli přihlášený si přímým
-  -- /rpc/edge_subscriptions mohl přepnout VLASTNÍ předplatné na 'active' bez
-  -- platby (update_subscription), založit si ho (create_member_subscription),
-  -- přepsat Stripe ceny balíčku (update_package_stripe) a číst předplatné cizích
-  -- účtů (get_user_subscriptions s cizím user_id).
-  -- Zápisy dělá jen služba (svc-stripe po ověření u Stripe / z webhooku); číst
-  -- předplatné smí vlastník, služba a správa. Katalog balíčků zůstává čitelný.
-  IF p_action IN ('create_member_subscription', 'update_package_stripe', 'update_subscription')
-     AND NOT public.is_service_role() THEN
+  -- ⛔ NÁROK PŘED DISPEČEREM, VÝCHOZÍ ODMÍTNUTÍ (nález 2026-10-06; ve stagingu
+  -- opraveno 10-04, upstream to nedostal). SECURITY DEFINER vypíná RLS a funkce má
+  -- GRANT pro authenticated (svc-stripe čte předplatné uživatelským tokenem), ale
+  -- stráž tu nebyla: kdokoli přihlášený si přímým /rpc/edge_subscriptions přepnul
+  -- vlastní předplatné na 'active' bez platby (update_subscription), založil si ho
+  -- (create_member_subscription), přepsal Stripe ceny balíčku (update_package_stripe)
+  -- a četl předplatné cizích účtů (get_user_subscriptions s cizím user_id).
+  -- Zápisy dělá jen služba (svc-stripe po ověření u Stripe / z webhooku). Člen smí
+  -- jen VYJMENOVANÉ čtecí akce; vlastnictví u get_user_subscriptions hlídá akce níž.
+  -- `IS NOT TRUE`, ne `NOT (…)`: NULL nesmí stráž přeskočit.
+  IF COALESCE(p_action, '') NOT IN ('get_package_by_id', 'get_user_subscriptions')
+     AND public.is_service_role() IS NOT TRUE THEN
     RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
   END IF;
 
@@ -101,8 +106,9 @@ BEGIN
     IF v_user_id IS NULL THEN
       RAISE EXCEPTION 'Missing user_id';
     END IF;
+    -- Cizí předplatné čte jen správa a služba.
     IF v_user_id IS DISTINCT FROM auth.uid()
-       AND NOT (public.is_service_role() OR public.is_admin_or_staff()) THEN
+       AND (public.is_service_role() OR public.is_admin_or_staff()) IS NOT TRUE THEN
       RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
     END IF;
 

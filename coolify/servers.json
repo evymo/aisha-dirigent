@@ -9,8 +9,6 @@
       "coolify_uuid": "${COOLIFY_SERVER_UUID_FRONTEND}",
       "is_build_server": false,
       "has_traefik": true,
-      "cpu": 12,
-      "ram_gb": 24,
       "disk_gb": 200,
       "placement_rules": {
         "accepts": ["http-frontend", "api-gateway", "admin-ui", "observability"],
@@ -38,8 +36,6 @@
       "coolify_uuid": "${COOLIFY_SERVER_UUID_BUILD}",
       "is_build_server": true,
       "has_traefik": false,
-      "cpu": 4,
-      "ram_gb": 8,
       "disk_gb": 64,
       "stacks": [],
       "domains": [],
@@ -53,8 +49,6 @@
       "is_build_server": false,
       "has_traefik": false,
       "has_gpu": false,
-      "cpu": 6,
-      "ram_gb": 12,
       "disk_gb": 100,
       "placement_rules": {
         "accepts": ["database", "app-primary", "headless-backend"],
@@ -76,8 +70,6 @@
       "is_build_server": false,
       "has_traefik": false,
       "has_gpu": false,
-      "cpu": 4,
-      "ram_gb": 8,
       "disk_gb": 80,
       "placement_rules": {
         "accepts": ["ai-inference", "ml-model", "staging"],
@@ -91,6 +83,18 @@
       ],
       "domains": [],
       "notes": "Staging + AI hosting + Cosmos chain node — isolated from production"
+    },
+    "gpu": {
+      "hostname": "${GPU_HOSTNAME}",
+      "role": "gpu",
+      "coolify_uuid": "${COOLIFY_SERVER_UUID_GPU}",
+      "is_build_server": false,
+      "has_traefik": false,
+      "has_gpu": true,
+      "proxy": "none",
+      "stacks": [],
+      "domains": [],
+      "notes": "GPU uzel — volitelný slot (jeden stroj = jeden slot): bydlí na něm vrstva accel (lane ACCEL_ENABLED) i firewall hostitele (accel-hostfw, A2-2; přepínač = deklarace uzlu ACCEL_FW_NODE_OWNER / ACCEL_FW_SSH, nasazuje se dřív než lane). Jeho služby se nasazují jen s otevřenou lane (config/services.json). Discovery serveru tohoto slotu NEHÁDÁ (has_gpu): vyžaduje výslovnou vazbu (GPU_HOSTNAME, SERVER_NAME/UUID prostředí nebo server_bindings profilu)."
     }
   }
 }

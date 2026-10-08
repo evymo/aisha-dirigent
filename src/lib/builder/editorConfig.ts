@@ -11,7 +11,9 @@
  * @module
  */
 
-import type { EditorConfig, UploadFileClb } from "grapesjs";
+import type { CustomParserCss, EditorConfig, UploadFileClb } from "grapesjs";
+import ikonySablonCssUrl from "@/styles/ikony-sablon.css?url";
+import { parserCssZachovaPromenne } from "./parserCssZachovaPromenne";
 
 /**
  * Branding tokens subset consumed by the editor config.
@@ -448,10 +450,19 @@ export function getPageEditorConfig(
       autoAdd: true,
     },
     canvas: {
-      styles: [],
+      // Ikony šablon (`ti ti-…`) i v plátně editoru — týž soubor jako na webu
+      // (src/index.css ho importuje). Odkazem, ne textem: soubor je jediný zdroj.
+      styles: [ikonySablonCssUrl],
       scripts: [],
     },
     canvasCss: buildCanvasCss(tokens),
+    // ⛔ Výchozí parser CSS zahazoval zkratky s proměnnými (`background:
+    // linear-gradient(… var(--x) …)`, `padding: var(--space-6)` …) — první
+    // změna stylu pak uložila CSS celé stránky bez nich (2026-10-02, z instance:
+    // 40/40 takových deklarací pryč z úvodní stránky). Viz parserCssZachovaPromenne.
+    // Výstup má tvar vestavěného parseru (pole selektorů), ne užší ParsedCssRule
+    // z typů GrapesJS — checkNode ho propouští beze změny.
+    parser: { parserCss: parserCssZachovaPromenne as unknown as CustomParserCss },
     ...overrides,
   };
 }

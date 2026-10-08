@@ -56,7 +56,18 @@ const VZDY: Record<string, string> = {
   "deploy-core": "deploy",
   "deploy-n8n": "deploy",
   "deploy-koren": "deploy (po vlnách, 2026-09-16 nahradil deploy-infra)",
-  "deploy-stacky": "deploy (po vlnách, 2026-09-16 nahradil deploy-infra)",
+  "deploy-razitko": "deploy — jediné razítko běhu a stav pending, dřív než cokoli nasadí (2026-10-02)",
+  "deploy-koren-pokracovani": "deploy — pokračování Kořene po pádu/utnutí (navázání, jen jednou)",
+  "deploy-core-pokracovani": "deploy — pokračování Core po pádu/utnutí (navázání, jen jednou)",
+  "deploy-edge-pokracovani": "deploy — pokračování Edge po pádu/utnutí (navázání, jen jednou)",
+  "deploy-extranet-pokracovani": "deploy — pokračování Extranetu po pádu/utnutí (navázání, jen jednou)",
+  // 2026-10-01: „deploy-stacky“ rozdělen do řetězu úloh po vlnách (strop runneru 1 h).
+  "deploy-zacatek": "deploy — začátek stacků: deklarace držení a razítko pro pokračování vlny 7",
+  "deploy-stacky-vlny-3-6": "deploy (vlny 3–6)",
+  "deploy-stacky-vlna-7": "deploy (vlna 7)",
+  "deploy-stacky-vlna-7-pokracovani": "deploy (pokračování vlny 7 po předání na měkkém termínu)",
+  "deploy-stacky-vlny-8": "deploy (vlny 8+)",
+  "deploy-verdikt": "jediný čtenář výsledku CELÉHO nasazení — musí rozhodnout na každém nasazení",
   "provision-n8n-content": "navazuje na deploy n8n",
   // Verdikt MUSÍ vydat stav na KAŽDÉM PR, jinak by povinná kontrola na
   // mainu u části PR nikdy nevznikla — a nevzniklá povinná kontrola

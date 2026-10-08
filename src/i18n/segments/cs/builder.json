@@ -185,6 +185,10 @@
       "discussion-thread": {
         "title": "Diskuse",
         "description": "Uživatelské příspěvky ve vláknech pod tímto obsahovým uzlem"
+      },
+      "app-banner": {
+        "title": "Banner aplikace",
+        "description": "Nabídka mobilní aplikace: iPhone → App Store, Android → Google Play, počítač → oba"
       }
     },
     "traits": {
@@ -301,7 +305,9 @@
       "layers": "Vrstvy",
       "i18n": "Překlady",
       "selectElement": "Vyberte element pro úpravu jeho vlastností",
-      "emptyCanvas": "Plátno je prázdné"
+      "emptyCanvas": "Plátno je prázdné",
+      "panelError": "Tento panel se nepodařilo zobrazit.",
+      "toggleVisibility": "Zobrazit nebo skrýt"
     },
     "i18n": {
       "injectTranslations": "Náhled překladů",
@@ -344,7 +350,10 @@
         "news_article": "Novinový článek",
         "web_page": "Webová stránka"
       },
-      "nodeId": "ID uzlu"
+      "nodeId": "ID uzlu",
+      "iosUrl": "Odkaz do App Store (iPhone)",
+      "androidUrl": "Odkaz na Google Play (Android)",
+      "dismissible": "Návštěvník ho může zavřít"
     },
     "versions": {
       "title": "Historie verzí",
@@ -371,6 +380,17 @@
       "invalidType": "Nepodporovaný typ souboru",
       "tooLarge": "Soubor je příliš velký (max 20 MB)",
       "uploadFailed": "Nahrání assetu selhalo"
+    },
+    "draft": {
+      "pending": "Nezveřejněné změny",
+      "banner": "Upravujete koncept. Web dál ukazuje zveřejněnou verzi, dokud nekliknete na „Zveřejnit změny“.",
+      "publishChanges": "Zveřejnit změny",
+      "discard": "Zahodit koncept",
+      "conflictTitle": "Stránku mezitím změnil někdo jiný",
+      "conflictBody": "Po otevření stránky ji někdo jiný uložil. Načtěte jeho verzi, nebo ji přepište svou.",
+      "reload": "Načíst znovu",
+      "overwrite": "Přepsat svou verzí",
+      "restoredToDraft": "Verze se nahrála do konceptu. Web se změní až po zveřejnění."
     }
   }
 }

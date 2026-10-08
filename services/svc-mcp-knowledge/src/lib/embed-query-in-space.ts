@@ -11,11 +11,14 @@
  *      pre-branched into the v1/v2 query params mcp_search_knowledge_v3 expects.
  *
  * Invariant (model-as-index-constant): the embedding model is NEVER defaulted here — it is a
- * property of the corpus/index. An unresolvable model/space throws; the caller fails loud or
- * degrades to text-only, never silently embeds with a different-space model.
+ * property of the corpus/index. An unresolvable model/space throws; the caller fails loud
+ * (P2 2026-10-06: no text-only fallback), never silently embeds with a different-space model.
  */
+import type { Trida } from '@aisha/accel-protokol';
 import { rpcService } from '../postgrest.js';
-import { embed, mapBackendKind } from './embed-dispatcher.js';
+import { embedSIdentitou, mapBackendKind, type IdentitaVah } from './embed-dispatcher.js';
+import { EmbeddingSpaceUnresolvedError } from './knowledge-search-unavailable.js';
+import { credentials } from './credentials.js';
 
 /** Backend + corpus space for an embedding model — the shape both resolvers RETURN. */
 export interface EmbeddingBackend {
@@ -38,11 +41,13 @@ export interface EmbeddedQuery {
   /** The query vector, or null on the arm that does not match ragSpace. */
   queryEmbeddingV1: number[] | null;
   queryEmbeddingV2: number[] | null;
+  /** Identita vah, které dotaz spočítaly (lane), nebo null (backend identitu neposílá). E4: táž jako korpusu. */
+  identita: IdentitaVah | null;
 }
 
-/** Read the API key the resolver pointed at (env var name → value), if any. */
-function apiKeyForBackend(backend: EmbeddingBackend): string | undefined {
-  return backend.auth_env_var ? process.env[backend.auth_env_var] : undefined;
+/** Klíč, na který resolver ukázal (auth_env_var → pověření z trezoru instance, přechodně env). */
+export async function apiKeyForBackend(backend: EmbeddingBackend): Promise<string | undefined> {
+  return backend.auth_env_var ? (await credentials().get(backend.auth_env_var)) ?? undefined : undefined;
 }
 
 /**
@@ -84,13 +89,27 @@ export async function resolveEmbeddingBackendForSpace(space: RagSpace): Promise<
 export async function embedTextsWithBackend(
   backend: EmbeddingBackend,
   texts: string[],
+  trida: Trida,
 ): Promise<number[][]> {
-  const vectors = await embed({
+  return (await embedTextsSIdentitou(backend, texts, trida)).vectors;
+}
+
+/**
+ * Jako `embedTextsWithBackend`, navíc identita vah (lane). Kdo vektory UKLÁDÁ do korpusu,
+ * volá tuhle — identita patří k vektoru (E2), ne konstanta ze souboru.
+ */
+export async function embedTextsSIdentitou(
+  backend: EmbeddingBackend,
+  texts: string[],
+  trida: Trida,
+): Promise<{ vectors: number[][]; identita: IdentitaVah | null }> {
+  const { vectors, identita } = await embedSIdentitou({
     texts,
     model: backend.model_id,
     backendKind: mapBackendKind(backend.backend_kind),
-    apiKey: apiKeyForBackend(backend),
+    apiKey: await apiKeyForBackend(backend),
     baseUrl: backend.endpoint_url ?? undefined,
+    trida,
   });
   if (vectors.length !== texts.length) {
     throw new Error(
@@ -105,7 +124,7 @@ export async function embedTextsWithBackend(
         `registr vede ${expected} (prostor ${backend.rag_space}) — rozměr v registru neodpovídá obsluhovanému modelu`,
     );
   }
-  return vectors;
+  return { vectors, identita };
 }
 
 /**
@@ -116,21 +135,25 @@ export async function embedTextsWithBackend(
 export async function embedQueryWithBackend(
   backend: EmbeddingBackend,
   query: string,
+  trida: Trida,
 ): Promise<EmbeddedQuery> {
-  const [vector] = await embed({
+  const { vectors, identita } = await embedSIdentitou({
     texts: [query],
     model: backend.model_id,
     backendKind: mapBackendKind(backend.backend_kind),
-    apiKey: apiKeyForBackend(backend),
+    apiKey: await apiKeyForBackend(backend),
     baseUrl: backend.endpoint_url ?? undefined,
     dimensions: backend.embedding_dimensions ?? undefined,
+    trida,
   });
+  const [vector] = vectors;
   const isV2 = backend.rag_space === 'v2';
   return {
     backend,
     ragSpace: backend.rag_space,
     queryEmbeddingV1: isV2 ? null : vector,
     queryEmbeddingV2: isV2 ? vector : null,
+    identita,
   };
 }
 
@@ -151,7 +174,8 @@ export async function embedQueryWithNamedModel(
       `Embedding model "${modelId}" is not resolvable — no enabled is_embedding provider serves it.`,
     );
   }
-  return embedQueryWithBackend(backend, query);
+  // Eval harness = dávka (přepočet sady otázek), ne interaktivní dotaz.
+  return embedQueryWithBackend(backend, query, 'davka');
 }
 
 /**
@@ -159,8 +183,9 @@ export async function embedQueryWithNamedModel(
  * fn_resolve_embedding_model_for_space, then embed the query in that space. Used by the prod
  * search path: the function reads the profile's embedding_model_pref DB-side (RPC-only) so
  * the query is embedded in the SAME space the corpus was indexed in. `fallbackSpace` is used
- * when no profile slug is given or the profile has no pref. Throws if no live model targets
- * the resolved space (caller degrades to text-only — never embeds with a wrong-space model).
+ * when no profile slug is given or the profile has no pref. Throws EmbeddingSpaceUnresolvedError
+ * if no live model targets the resolved space — the caller FAILS LOUD (never embeds with a
+ * wrong-space model, never substitutes a text search).
  */
 export async function embedQueryForProfile(
   query: string,
@@ -172,9 +197,10 @@ export async function embedQueryForProfile(
     p_rag_space: fallbackSpace,
   });
   if (!backend) {
-    throw new Error(
-      `No live embedding model resolvable for context profile "${contextProfileSlug ?? fallbackSpace}" — degrade to text-only.`,
+    throw new EmbeddingSpaceUnresolvedError(
+      `No live embedding model resolvable for context profile "${contextProfileSlug ?? fallbackSpace}" — knowledge search unavailable (fail loud, no text fallback).`,
     );
   }
-  return embedQueryWithBackend(backend, query);
+  // Produkční hledání = interaktivní dotaz uživatele.
+  return embedQueryWithBackend(backend, query, 'dotaz');
 }

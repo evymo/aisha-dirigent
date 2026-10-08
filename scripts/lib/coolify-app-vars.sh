@@ -166,7 +166,8 @@ _unprovisioned_services() {
 }
 
 load_app_compose_map() {
-  local manifest_file="$1"
+  local manifest_file="$1" root
+  root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
   [ -f "$manifest_file" ] || { echo "load_app_compose_map: $manifest_file neexistuje" >&2; return 1; }
   APP_NAMES=()
   APP_COMPOSES=()
@@ -178,20 +179,25 @@ load_app_compose_map() {
     return 1
   }
   _skip_list=" $(printf '%s' "$_neprovisionovane" | tr '\n' ' ') "
-  while IFS= read -r line; do
-    # formát: app: <name>:<server>:<compose-file>[:tag=value...]
-    # Tag suffix (např. :bluegreen=on) je opt-in — story-init pak vytvoří B/G pair.
-    # Pro sync-envs / preflight chceme jen čistou cestu k compose souboru.
-    [[ "$line" =~ ^app:[[:space:]]*([a-zA-Z0-9_-]+):([a-zA-Z0-9_-]+):(.+)$ ]] || continue
-    local compose_with_tags="${BASH_REMATCH[3]}"
-    local app_id="${BASH_REMATCH[1]}"
+  # Aplikace: JEN ty, které tohle prostředí VLASTNÍ — domov vlastnictví (profil
+  # prostředí: external_domain). Externí služba se nesrovnává (env, domény) ani
+  # nevaliduje. Řádky `app:` se tu nečtou (brána vlastnictvi-z-topologie).
+  # shellcheck source=vlastnictvi.sh
+  . "$root/scripts/lib/vlastnictvi.sh"
+  vlastnictvi_nacti "$manifest_file" "" "${ENV_FILE:-$root/.env.coolify}" || {
+    echo "load_app_compose_map: vlastnictví aplikací v prostředí nejde určit — mapu nesestavím" >&2
+    return 1
+  }
+  local app_id slot compose volby
+  while IFS=$'\t' read -r app_id slot compose volby; do
+    [ -n "$app_id" ] || continue
     # Opt-in service the operator did not enable: not deployed, so its compose
     # must not be validated either. Same rule the topology resolver applies.
     case "$_skip_list" in *" $app_id "*) continue ;; esac
     APP_NAMES+=("$app_id")
-    APP_SLOTS+=("${BASH_REMATCH[2]}")
-    APP_COMPOSES+=("${compose_with_tags%%:*}")
-  done < "$manifest_file"
+    APP_SLOTS+=("$slot")
+    APP_COMPOSES+=("$compose")
+  done < <(vlastni_aplikace)
 }
 
 # Slot (server label) aplikace podle manifestu — TÝŽ zdroj, kterým story-init
@@ -242,8 +248,14 @@ resolve_slot_for_app() {
 # Volá se s načtenou mapou (`load_app_compose_map`) a s prostředím, kam se
 # sourcovalo `.env.coolify`. Návrat 0 = shoda, 1 = rozpor (vypsán na stderr).
 # ─────────────────────────────────────────────────────────────────────────────
+# Aplikace, které kontrola s profilem SKUTEČNĚ porovnala (profil o nich mluví). Vystavené pro
+# měřidla: ⛔ 2026-10-07 negativní sonda v CI přesunula aplikaci, kterou kontrola v tom prostředí
+# vůbec neporovnala, a „souhlasí“ hlásila slepá sonda, ne slepá kontrola. Sonda bere aplikaci odsud.
+PLACEMENT_POROVNANE=()
+
 assert_placement_agrees() {
   local i app slot var prof mismatches=0
+  PLACEMENT_POROVNANE=()
 
   for i in "${!APP_NAMES[@]}"; do
     app="${APP_NAMES[$i]}"
@@ -254,6 +266,7 @@ assert_placement_agrees() {
 
     # Profil o službě nemluví → manifest je jediný zdroj a rozpor nevzniká.
     [ -n "$prof" ] || continue
+    PLACEMENT_POROVNANE+=("$app")
     [ "$prof" = "$slot" ] && continue
 
     if [ "$mismatches" -eq 0 ]; then
@@ -290,12 +303,14 @@ assert_placement_agrees() {
 manifest_declares_app() {
   local manifest_file="$1" needle="${2#aisha-}"
   [ -f "$manifest_file" ] || return 1
-  local line
-  while IFS= read -r line; do
-    [[ "$line" =~ ^app:[[:space:]]*([a-zA-Z0-9_-]+):[a-zA-Z0-9_-]+:(.+)$ ]] || continue
-    [ "${BASH_REMATCH[1]}" = "$needle" ] && return 0
-  done < "$manifest_file"
-  return 1
+  # Vlastnictví načtené (load_app_compose_map) nad TÍMTÉŽ manifestem — jinak načíst.
+  if [ "${VLASTNICTVI_NACTENO:-}" != "1" ]; then
+    # shellcheck source=vlastnictvi.sh
+    . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/vlastnictvi.sh"
+    vlastnictvi_nacti "$manifest_file" "" "${ENV_FILE:-}" || return 1
+  fi
+  # Deklaruje = vlastní NEBO externí (inventář ji jmenuje; externí se hlásí zvlášť).
+  vlastni "$needle" || externi "$needle"
 }
 
 resolve_compose_for_app() {

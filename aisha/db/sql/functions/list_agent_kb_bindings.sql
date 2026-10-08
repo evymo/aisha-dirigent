@@ -84,6 +84,7 @@ BEGIN
     akb.created_by
   FROM public.agent_knowledge_bindings akb
   JOIN public.expert_rules er ON er.id = akb.knowledge_item_id
+    AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid())
   WHERE (akb.story_id = p_story_id OR akb.story_id IS NULL)
     AND (p_agent_slug IS NULL OR akb.agent_slug = p_agent_slug)
   ORDER BY

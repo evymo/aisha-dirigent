@@ -17,39 +17,26 @@
  * je v tom, že takový rozpor nikdo neměřil.
  */
 import { describe, expect, test } from "vitest";
-import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { aplikaceManifestu } from "../../../scripts/gen-instance-manifest.mjs";
 
 const ROOT = process.cwd();
 
 /**
- * Co manifest ZALOŽÍ — reprodukce pravidla z `gen-instance-manifest.mjs`.
+ * Co manifest ZALOŽÍ — PŘÍMO z generátoru (`aplikaceManifestu()` v gen-instance-manifest.mjs).
  *
  * ⛔ Jméno aplikace NENÍ jméno compose. Několik aplikací sdílí jeden compose
  * a několik se jmenuje jinak (`orchestration` ← coolify-n8n, `messaging` ←
  * coolify-matrix, `ledger` ← coolify-cosmos). První verze téhle brány je
- * ztotožnila a nahlásila ŠEST falešných sirotků. Univerzum se proto skládá
- * stejně jako v generátoru: kurátorované mapování ze sourozeneckých manifestů,
- * a teprve zbylé compose se přidají pod svým vlastním jménem.
+ * ztotožnila a nahlásila ŠEST falešných sirotků.
+ *
+ * ⛔ 2026-10-05: brána pravidlo generátoru dřív NAPODOBOVALA. S variantou compose podle slotu
+ * (`compose_gpu`) se napodobenina od generátoru rozešla — mutace generátoru (varianta jako
+ * samostatná aplikace) prošla zeleně, protože brána měřila svou kopii. Měří se proto generátor sám.
  */
 function zalozeneAplikace(): { jmeno: string; compose: string }[] {
-  const manifestDir = join(ROOT, "coolify/manifests");
-  const declared = new Map<string, string>(); // jméno → compose
-  for (const f of readdirSync(manifestDir).filter((f) => f.endsWith(".manifest"))) {
-    for (const line of readFileSync(join(manifestDir, f), "utf-8").split(/\r?\n/)) {
-      const m = /^app:\s*([a-z0-9-]+):([a-z]+):(\S+)/.exec(line.trim());
-      if (m && !declared.has(m[1]) && existsSync(join(ROOT, m[3]))) declared.set(m[1], m[3]);
-    }
-  }
-  const apps = [...declared.entries()].map(([jmeno, compose]) => ({ jmeno, compose }));
-  const pokryto = new Set(apps.map((a) => a.compose));
-  for (const f of readdirSync(ROOT).filter((f) => /^docker-compose\.coolify-[a-z0-9-]+\.yml$/.test(f))) {
-    if (pokryto.has(f)) continue;
-    const jmeno = /^docker-compose\.coolify-([a-z0-9-]+)\.yml$/.exec(f)![1];
-    if (declared.has(jmeno)) continue;
-    apps.push({ jmeno, compose: f });
-  }
-  return apps;
+  return aplikaceManifestu({ koren: ROOT }).apps.map((a: { name: string; compose: string }) => ({ jmeno: a.name, compose: a.compose }));
 }
 
 /** Co vlny nasazují: jména z bloku WAVES v aisha-redeploy.mjs. */

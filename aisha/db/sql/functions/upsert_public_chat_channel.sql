@@ -9,16 +9,16 @@ CREATE OR REPLACE FUNCTION public.upsert_public_chat_channel(
   p_id                     uuid DEFAULT NULL,
   p_slug                   text DEFAULT NULL,
   p_display_name           text DEFAULT NULL,
-  p_channel_type           text DEFAULT 'web_widget',
-  p_status                 text DEFAULT 'draft',
-  p_context_profile        text DEFAULT 'public_chat',
-  p_model                  text DEFAULT 'gpt-4o-mini',
-  p_temperature            numeric DEFAULT 0.7,
-  p_max_tokens             int4 DEFAULT 2048,
-  p_system_prompt          text DEFAULT '',
-  p_model_settings         jsonb DEFAULT '{}'::jsonb,
+  p_channel_type           text DEFAULT NULL,
+  p_status                 text DEFAULT NULL,
+  p_context_profile        text DEFAULT NULL,
+  p_model                  text DEFAULT NULL,
+  p_temperature            numeric DEFAULT NULL,
+  p_max_tokens             int4 DEFAULT NULL,
+  p_system_prompt          text DEFAULT NULL,
+  p_model_settings         jsonb DEFAULT NULL,
   p_vector_store_config    jsonb DEFAULT NULL,
-  p_personality_enabled    boolean DEFAULT true,
+  p_personality_enabled    boolean DEFAULT NULL,
   p_webhook_url            text DEFAULT NULL,
   p_webhook_secret         text DEFAULT NULL,
   p_guardrails             jsonb DEFAULT NULL,
@@ -30,13 +30,27 @@ CREATE OR REPLACE FUNCTION public.upsert_public_chat_channel(
 )
 RETURNS uuid
 LANGUAGE plpgsql SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 AS $$
 DECLARE
   v_user_id uuid := auth.uid();
   v_channel_id uuid;
   v_version int4;
 BEGIN
+  -- ⛔ NÁROK (nález 2026-10-07). SECURITY DEFINER s GRANT pro authenticated a BEZ stráže:
+  -- kdokoli přihlášený přímým /rpc/ přepsal veřejný chat — systémový prompt, model,
+  -- webhook URL i jeho tajemství (únik konverzací na cizí adresu). Kanály spravuje
+  -- jen správa (admin UI) nebo služba. `IS NOT TRUE`: NULL stráž nepřeskočí.
+  IF (public.is_service_role() OR public.is_admin_or_staff()) IS NOT TRUE THEN
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+  END IF;
+
+  -- ⛔ VÝCHOZÍ HODNOTY JEN PŘI ZALOŽENÍ (nález 2026-10-07). Parametry měly DEFAULT
+  -- 'gpt-4o-mini', 'draft', '' … a aktualizace `sloupec = COALESCE(p_x, sloupec)`;
+  -- vynechané pole tak nebylo NULL, ale výchozí hodnota — změna stavu z UI (posílá
+  -- jen p_id + p_status) vrátila model, prompt, teplotu i typ kanálu na výchozí.
+  -- Teď DEFAULT NULL a výchozí hodnoty jen ve větvi INSERT níž (brána
+  -- upsert-vychozi-hodnota-jen-pri-zalozeni).
   IF p_id IS NOT NULL THEN
     -- UPDATE existing
     UPDATE public.public_chat_channels SET
@@ -83,12 +97,12 @@ BEGIN
       created_by, updated_by
     ) VALUES (
       p_slug, p_display_name,
-      p_channel_type::public_chat_channel_type,
-      p_status::public_chat_channel_status,
-      p_context_profile, p_model, p_temperature, p_max_tokens, p_system_prompt,
+      COALESCE(p_channel_type, 'web_widget')::public_chat_channel_type,
+      COALESCE(p_status, 'draft')::public_chat_channel_status,
+      COALESCE(p_context_profile, 'public_chat'), COALESCE(p_model, 'gpt-4o-mini'), COALESCE(p_temperature, 0.7), COALESCE(p_max_tokens, 2048), COALESCE(p_system_prompt, ''),
       COALESCE(p_model_settings, '{}'::jsonb),
       COALESCE(p_vector_store_config, '{}'::jsonb),
-      p_personality_enabled, p_webhook_url, p_webhook_secret,
+      COALESCE(p_personality_enabled, true), p_webhook_url, p_webhook_secret,
       COALESCE(p_guardrails, '{}'::jsonb),
       COALESCE(p_routing_rules, '{}'::jsonb),
       COALESCE(p_allowed_tools, '[]'::jsonb),

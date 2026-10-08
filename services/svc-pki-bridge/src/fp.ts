@@ -10,8 +10,11 @@
  *
  * Usage:
  *   import { fp, fpJwt } from './fp.js';
- *   logger.info({ secret_fp: fp(client_secret) }, 'loaded client secret');
- *   logger.info({ jwt_sig_fp: fpJwt(token) }, 'received token');
+ *   logger.info({ client_fp: fp(client_secret) }, 'loaded client secret');
+ *   logger.info({ sig_fp: fpJwt(token) }, 'received token');
+ *
+ * Name the log key WITHOUT token / jwt / secret: the service logger redacts
+ * keys by name, so `secret_fp` would be logged as [redacted].
  *
  * Compare values across components by grepping for matching fp prefixes.
  *

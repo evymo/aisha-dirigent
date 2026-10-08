@@ -3,6 +3,11 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import { mergeMcpJson } from "../lib/mcp-json-merge.mjs";
+import {
+  JMENO_SERVERU_ZNALOSTI,
+  PROMENNA_ADRESY,
+  serverZnalostiZProstredi,
+} from "../lib/mcp-server-znalosti.mjs";
 import { ROOT, resolveDirigentConfig } from "./config.mjs";
 
 const args = new Set(process.argv.slice(2));
@@ -58,17 +63,23 @@ const localConfig = { ...existingLocal, ...managedLocal };
 writeFileSync(localConfigPath, JSON.stringify(localConfig, null, 2) + "\n");
 process.stdout.write(`Wrote ${path.relative(ROOT, localConfigPath)}\n`);
 
-if (args.has("--write-mcp") && config.mcpUrl) {
+if (args.has("--write-mcp")) {
   const localMcpPath = path.join(ROOT, ".mcp.json");
   const existingMcp = existsSync(localMcpPath) ? readFileSync(localMcpPath, "utf-8") : "";
 
   // mergeMcpJson upserts ONLY the aisha-knowledge entry and preserves every
   // other mcpServers entry (and unrelated top-level keys) the user added.
-  const merged = mergeMcpJson(existingMcp, "aisha-knowledge", {
-    type: "http",
-    url: config.mcpUrl,
-  });
+  //
+  // ⛔ Záznam NENESE rozřešenou adresu (dřív `config.mcpUrl`): `.mcp.json` je v repu
+  // a adresa jedné instance v něm mířila z každého klonu jinam, než kde klon běží.
+  // Adresu čte klient z prostředí; přihlašuje se přes OAuth u Keycloaku instance, takže
+  // záznam nenese ani token — viz lib/mcp-server-znalosti.mjs.
+  const merged = mergeMcpJson(existingMcp, JMENO_SERVERU_ZNALOSTI, serverZnalostiZProstredi());
 
   writeFileSync(localMcpPath, merged);
   process.stdout.write(`Wrote ${path.relative(ROOT, localMcpPath)}\n`);
+  process.stdout.write(
+    `  Klient MCP čte adresu z proměnné ${PROMENNA_ADRESY} — musí být v prostředí, ze kterého se ` +
+      "klient spouští. Přihlášení proběhne v prohlížeči (OAuth u Keycloaku instance); token se do souboru nepíše.\n",
+  );
 }

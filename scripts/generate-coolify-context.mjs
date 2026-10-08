@@ -70,6 +70,7 @@ import { fileURLToPath } from 'node:url';
 import { resolveProjectName } from './lib/coolify-project-scope.mjs';
 import { createCoolifyClient } from './lib/coolify-http.mjs';
 import { pbJeProd, pbPrefix } from './lib/prostredi-behu.mjs';
+import { nactiSloty, slotyVProvozu, vyzadujeVyslovnouVazbu } from './lib/sloty-serveru.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
@@ -304,23 +305,16 @@ emit('COOLIFY_PROJECT_UUID', projectUuid);
 
 // ── Load slot definitions from coolify/servers.json (canonical slot names +
 // per-slot metadata used for structural matching, e.g. is_build_server) ─────
-const DEFAULT_SLOT_DEFS = {
-  frontend: { is_build_server: false, has_traefik: true },
-  backend: { is_build_server: false, has_traefik: false },
-  experimental: { is_build_server: false, has_traefik: false },
-  build: { is_build_server: true, has_traefik: false },
-};
-function loadServerSlotDefs() {
-  const path = resolve(REPO_ROOT, 'coolify/servers.json');
-  if (!existsSync(path)) return DEFAULT_SLOT_DEFS;
-  try {
-    const json = JSON.parse(readFileSync(path, 'utf8'));
-    return json.servers && Object.keys(json.servers).length ? json.servers : DEFAULT_SLOT_DEFS;
-  } catch {
-    return DEFAULT_SLOT_DEFS;
-  }
+// Jeden domov: lib/sloty-serveru.mjs. Nečitelný nebo prázdný registr je CHYBA —
+// dřív ho tiše nahradila vestavěná kopie čtyř slotů (DEFAULT_SLOT_DEFS) a discovery
+// pak běžela nad jiným seznamem slotů, než jaký instance deklaruje.
+let SLOT_DEFS;
+try {
+  SLOT_DEFS = nactiSloty(REPO_ROOT);
+} catch (err) {
+  console.error(`FATAL: registr slotů coolify/servers.json nejde přečíst — ${String(err?.message ?? err)}`);
+  process.exit(2);
 }
-const SLOT_DEFS = loadServerSlotDefs();
 const SLOTS = Object.keys(SLOT_DEFS);
 
 // ── Profile-declared slot -> server-name bindings ────────────────────────────
@@ -455,8 +449,15 @@ async function resolveServerSlot(slot, slotDef) {
     if (m?.uuid) return m.uuid;
   }
 
+  // ⛔ SLOT S VÝSLOVNOU VAZBOU (has_gpu, lib/sloty-serveru.mjs) SE NEHÁDÁ. Platí jen
+  // deklarace — (0)/(0b) výš, (1) jméno/IP z ${SLOT}_HOSTNAME/_IP a (3) server_bindings
+  // profilu. Heuristiky (2) jméno == slot, (4) build, (5) Traefik a hlavně (6)
+  // „jediný server" by GPU slot posadily na produkční hostitel — a s ním firewall
+  // hostitele (accel-hostfw), který tam nemá co dělat.
+  const jenVyslovne = vyzadujeVyslovnouVazbu(slotDef);
+
   // (2) server.name == slot ID
-  const byName = coolifyServers.find((s) => s?.name?.toLowerCase() === slot.toLowerCase());
+  const byName = jenVyslovne ? null : coolifyServers.find((s) => s?.name?.toLowerCase() === slot.toLowerCase());
   if (byName?.uuid) return byName.uuid;
 
   // (3) Profile-declared binding: slot -> server NAME, resolved against the
@@ -476,6 +477,8 @@ async function resolveServerSlot(slot, slotDef) {
     );
     process.exit(2);
   }
+
+  if (jenVyslovne) return '';
 
   // (4) is_build_server flag pairing — structural signal present on both
   // sides (coolify/servers.json slot metadata + Coolify server.settings).
@@ -620,10 +623,27 @@ process.stderr.write(
 // pair every slot when Coolify's server names follow no convention AISHA
 // recognises. Print the live server list so the operator can pick the right
 // ${SLOT_UPPER}_HOSTNAME values rather than guessing UUIDs by hand.
-if (unmatchedSlots.length > 0 && coolifyServers.length > 1) {
+//
+// Hlásí se jen slot, který je POTŘEBA: build server, nebo slot V PROVOZU
+// (lib/sloty-serveru.mjs — hostí aspoň jednu katalogovou službu s otevřenou
+// lane). Volitelný slot bez své lane (GPU uzel `gpu` bez otevřené lane) nemá
+// co hledat; hlásit ho by bylo varování bez vady na každé instanci bez GPU.
+// Nezměřené „v provozu" se nehádá — pak se hlásí všechny, s poznámkou proč.
+let potrebneNenamapovane = unmatchedSlots;
+try {
+  const vProvozu = new Set(slotyVProvozu({ servers: SLOT_DEFS }));
+  potrebneNenamapovane = unmatchedSlots.filter(
+    (s) => SLOT_DEFS[s]?.is_build_server === true || vProvozu.has(s),
+  );
+} catch (err) {
   process.stderr.write(
-    `[generate-coolify-context] unmatched slot(s): ${unmatchedSlots.join(', ')}. ` +
-    `Set ${unmatchedSlots.map((s) => `${s.toUpperCase()}_HOSTNAME`).join('/')} in .env-prod-backup ` +
+    `[generate-coolify-context] note: sloty v provozu NEZMĚŘENY (${String(err).slice(0, 160)}) — hlásím všechny nenamapované\n`,
+  );
+}
+if (potrebneNenamapovane.length > 0 && coolifyServers.length > 1) {
+  process.stderr.write(
+    `[generate-coolify-context] unmatched slot(s): ${potrebneNenamapovane.join(', ')}. ` +
+    `Set ${potrebneNenamapovane.map((s) => `${s.toUpperCase()}_HOSTNAME`).join('/')} in .env-prod-backup ` +
     `to one of the Coolify server names below (matched case-insensitively):\n`,
   );
   for (const s of coolifyServers) {

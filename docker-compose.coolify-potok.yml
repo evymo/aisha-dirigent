@@ -53,7 +53,7 @@ services:
       start_period: 60s
     networks:
       internal:
-        aliases: ["${APP_NAME_PREFIX:?identita instance}-svc-potok", "svc-potok"]
+        aliases: ["${APP_NAME_PREFIX:?identita instance}-svc-potok", "${APP_NAME_PREFIX:?identita instance}-potok", "svc-potok"]
       mesh-dns:
         aliases:
           - ${APP_NAME_PREFIX:?identita instance}-svc-potok
@@ -147,9 +147,7 @@ services:
       retries: 8
     restart: unless-stopped
     networks:
-      internal:
-        aliases:
-          - ${APP_NAME_PREFIX:?identita instance}-potok
+      - internal
 
   potok-mesh-ingress:
     # Mesh komponenta — bez meshe nemá co dělat. Profil "mesh" zapíná

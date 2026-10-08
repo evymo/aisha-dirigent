@@ -1,4 +1,6 @@
 @import url('/fonts/nunito-sans/fonts.css');
+/* Ikony šablon webu (`ti ti-…`) jako SVG — viz soubor. */
+@import './styles/ikony-sablon.css';
 
 @tailwind base;
 @tailwind components;

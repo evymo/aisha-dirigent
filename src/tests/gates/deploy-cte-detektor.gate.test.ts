@@ -72,12 +72,32 @@ describe("nasazovací úlohy čtou detektor (brána)", () => {
     ).toContain(`contains(needs.detect.outputs.deploy_apps, ',${suffix},')`);
   });
 
-  test.each(["deploy-koren", "deploy-stacky"])("%s nasazuje podle detektoru (deploy_apps), ne podle ručního seznamu", (job) => {
-    const uloha = WF.jobs?.[job] as unknown as { if?: string; steps?: Array<{ run?: string; env?: Record<string, string> }> } | undefined;
+  type Uloha = { if?: string; needs?: string[]; steps?: Array<{ run?: string; env?: Record<string, string> }> };
+  // Stacky jedou od 2026-10-01 v řetězu úloh po vlnách; podmínku „detektor něco
+  // vydal“ nese jeho začátek (deploy-zacatek) a vlnové úlohy na něm visí.
+  test.each(["deploy-koren", "deploy-zacatek"])("%s se spouští jen, když detektor něco vydal", (job) => {
+    const uloha = WF.jobs?.[job] as unknown as Uloha | undefined;
     expect(uloha, `úloha ${job} ve workflow není`).toBeTruthy();
     expect(uloha!.if ?? "", "úloha se musí spouštět jen, když detektor něco vydal").toContain("needs.detect.outputs.deploy_apps != ',,'");
-    const krok = (uloha!.steps ?? []).find((st) => /nasad-podle-vln\.sh/.test(st.run ?? ""));
-    expect(krok, `${job} nevolá nasad-podle-vln.sh`).toBeTruthy();
+  });
+
+  const VLNOVE = Object.entries((WF.jobs ?? {}) as unknown as Record<string, Uloha>).filter(([, u]) =>
+    (u.steps ?? []).some((st) => /nasad-podle-vln\.sh/.test(st.run ?? "")),
+  );
+  test("úlohy nasazující po vlnách existují (jinak test nic neměří)", () => {
+    expect(VLNOVE.map(([j]) => j)).toEqual(expect.arrayContaining(["deploy-koren", "deploy-stacky-vlna-7"]));
+  });
+  test.each(VLNOVE.map(([j]) => [j]))("%s nasazuje podle detektoru (deploy_apps), ne podle ručního seznamu", (job) => {
+    const uloha = WF.jobs?.[job] as unknown as Uloha;
+    if (job === "deploy-koren-pokracovani") {
+      // Pokračování Kořene běží jen po pádu Kořene, který podmínku detektoru nese sám.
+      expect(uloha.needs ?? [], `${job} musí viset na deploy-koren (nese podmínku detektoru)`).toContain("deploy-koren");
+      expect(uloha.if ?? "", `${job} se smí spustit jen po pádu deploy-koren`).toContain("needs.deploy-koren.result == 'failure'");
+    } else if (job !== "deploy-koren") {
+      expect(uloha.needs ?? [], `${job} musí viset na deploy-zacatek (nese podmínku detektoru)`).toContain("deploy-zacatek");
+      expect(uloha.if ?? "", `${job} se smí spustit jen po úspěšném deploy-zacatek`).toContain("needs.deploy-zacatek.result == 'success'");
+    }
+    const krok = (uloha.steps ?? []).find((st) => /nasad-podle-vln\.sh/.test(st.run ?? ""));
     expect(krok!.env?.DEPLOY_APPS, "seznam appek jde z detektoru přes env, ne z textu").toBe("${{ needs.detect.outputs.deploy_apps }}");
     expect(krok!.run).toMatch(/--aplikace "\$DEPLOY_APPS"/);
   });

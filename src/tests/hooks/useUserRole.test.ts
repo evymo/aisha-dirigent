@@ -216,6 +216,58 @@ describe('useUserRole', () => {
     });
   });
 
+  // 2026-10-01 (na instanci): tichá obnova tokenu (každé ~3 min) přinese tentýž účet
+  // v novém objektu. Role se nesmí znovu načítat ani přepnout `loading` —
+  // ochrana adminu by jinak odmontovala otevřený editor stránek.
+  it('nový objekt téhož účtu (tichá obnova) nenačítá role znovu ani nepřepne loading', async () => {
+    mockRpc.mockResolvedValue({ data: [mockAdminRole], error: null });
+    const { result, rerender } = renderHook(() => useUserRole());
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+
+    mockUseAuth.mockReturnValue({
+      user: { ...mockUser },
+      loading: false,
+      isAuthenticated: true,
+      session: { user: { ...mockUser } },
+      signOut: vi.fn(),
+    });
+    act(() => {
+      rerender();
+    });
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.isAdmin).toBe(true);
+    expect(mockRpc).toHaveBeenCalledTimes(1);
+  });
+
+  it('jiný účet (jiné id) role načte znovu', async () => {
+    mockRpc.mockResolvedValue({ data: [mockAdminRole], error: null });
+    const { result, rerender } = renderHook(() => useUserRole());
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    mockRpc.mockResolvedValue({ data: [mockMemberRole], error: null });
+    mockUseAuth.mockReturnValue({
+      user: { ...mockUser, id: 'jiny-ucet' },
+      loading: false,
+      isAuthenticated: true,
+      session: { user: { ...mockUser, id: 'jiny-ucet' } },
+      signOut: vi.fn(),
+    });
+    act(() => {
+      rerender();
+    });
+
+    await waitFor(() => {
+      expect(result.current.isAdmin).toBe(false);
+    });
+    expect(mockRpc).toHaveBeenCalledTimes(2);
+  });
+
   it('should call rpc with correct function name', async () => {
     mockRpc.mockResolvedValue({ data: [], error: null });
 

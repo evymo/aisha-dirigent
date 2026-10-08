@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { aisha } from "@/integrations/db/client";
 import { useAuth } from "./useAuth";
 import { safeError } from "@/lib/security/safeLogger";
@@ -64,6 +64,13 @@ export function useUserRole() {
   const { user, loading: authLoading } = useAuth();
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
+  // Role patří ÚČTU, ne objektu uživatele: klíčovat podle id. Tichá obnova
+  // tokenu nesmí znovu načítat role ani přepnout `loading` — ochrana adminu by
+  // jinak na chvíli schovala obsah a odmontovala otevřený editor (2026-10-01).
+  const userId = user?.id ?? null;
+  // Pro koho už role známe; `loading` se zapne jen pro uživatele, jehož role
+  // ještě neznáme (první načtení, přihlášení jiného účtu).
+  const naceteneProRef = useRef<string | null>(null);
 
   const fetchRoles = useCallback(async (isMounted = { current: true }) => {
     // Don't fetch until auth is complete
@@ -71,14 +78,15 @@ export function useUserRole() {
       return;
     }
 
-    if (!user) {
+    if (!userId) {
+      naceteneProRef.current = null;
       setRoles([]);
       setLoading(false);
       return;
     }
 
-    // Set loading true when starting fetch
-    if (isMounted.current) {
+    // Loading jen když role tohoto účtu ještě neznáme (refetch je tichý).
+    if (isMounted.current && naceteneProRef.current !== userId) {
       setLoading(true);
     }
     
@@ -96,10 +104,11 @@ export function useUserRole() {
       }
     } finally {
       if (isMounted.current) {
+        naceteneProRef.current = userId;
         setLoading(false);
       }
     }
-  }, [user, authLoading]);
+  }, [userId, authLoading]);
 
   useEffect(() => {
     const isMounted = { current: true };

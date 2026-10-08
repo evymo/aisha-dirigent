@@ -23,9 +23,7 @@
 import { useTranslation } from "react-i18next";
 import { useSupportedLanguages } from "@/hooks/useSupportedLanguages";
 import type { RuntimeBlockProps } from "@/lib/builder/runtimeBlockRegistry";
-
-/** ISO 639-1, volitelně s regionem (`cs`, `pt-BR`). `global` tím propadne. */
-const KOD_JAZYKA = /^[a-z]{2}(-[a-z]{2})?$/i;
+import { jeKodJazyka } from "@/lib/i18n/kodJazyka";
 
 interface Jazyk {
   code: string;
@@ -43,7 +41,7 @@ export function LanguageSwitcherBlock({ config }: RuntimeBlockProps) {
   const popisek = typeof config?.popisek === "string" ? config.popisek : "Language";
 
   const jazyky = ((data ?? []) as Jazyk[]).filter(
-    (j) => typeof j?.code === "string" && KOD_JAZYKA.test(j.code) && j.name_native,
+    (j) => typeof j?.code === "string" && jeKodJazyka(j.code) && j.name_native,
   );
 
   // ⛔ NEZNÁMÝ SEZNAM SE NENAHRAZUJE DOMNĚNKOU. Dokud jazyky nedorazí — nebo
@@ -64,10 +62,15 @@ export function LanguageSwitcherBlock({ config }: RuntimeBlockProps) {
         klávesnici i čtečku bez jediného řádku navíc a nepotřebuje portál ani
         platformní komponentu. Vzhled dodá CSS plátna (`.nav__lang`), takže
         prvek patří webu, ne Studiu.
+        Jediná výjimka je zarovnání textu (2026-10-01, z instance: „English“
+        sedělo vlevo v pilulce, jejíž šířku dává nejdelší jazyk). Je to vlastnost
+        prvku, ne vzhled webu, a CSS plátna ji nenastavuje — inline styl tak nic
+        nepřebíjí. `text-align-last` je to, co v selectu opravdu centruje.
       */}
       <select
         aria-label={popisek}
         className="nav__lang-vyber"
+        style={{ textAlign: "center", textAlignLast: "center" }}
         onChange={(e) => void i18n.changeLanguage(e.target.value)}
         value={aktualni}
       >

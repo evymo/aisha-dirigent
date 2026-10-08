@@ -242,6 +242,18 @@ if (deviceJmeno) {
   const novy = volejRoster(["--kid", kid, "--scope", scope]);
   zapis("SPA_OPERATORS_B64", novy);
   rosterHlaska = `roster založen pro kid „${kid}" — týž kód zadáš v appce`;
+} else if (!stavajici && process.env.AISHA_STACK_EXISTS === "1") {
+  // ⛔ ZÁVORA (2026-10-03, konvergence existující instance): nad EXISTUJÍCÍM stackem
+  // prázdný roster neznamená „instance ho nemá“, ale „vstup se ztratil“ (krok 2
+  // cold-startu ho zapsal prázdný, záloha ho nenesla). Vygenerovat nový = vyměnit
+  // pověření, se kterými zařízení dnes klepou — dveře by jim přestaly odpovídat.
+  // Táž třída jako mintování stavového tajemství bez vstupu (generate-secrets ODMÍTÁM).
+  console.error(
+    "⛔ knock-provision: stack EXISTUJE a SPA_OPERATORS_B64 je prázdný — nový roster NEVYRÁBÍM.\n" +
+      "   Obnov SPA_OPERATORS_B64 z trezoru (.env-prod-backup / minulý .env.coolify), nebo vědomě:\n" +
+      "   node scripts/knock-provision.mjs --operator   (vlastní kód)   |   --device <jméno>   (zařízení)",
+  );
+  process.exit(3);
 } else if (!stavajici) {
   // ⭐ VÝCHOZÍ CESTA: kód se VYGENERUJE a vypíše (dořešeno 2026-08-19).
   // Dřív tu bylo jen „chybí lidský vstup, exit 3". Jenže `svc-knock` je

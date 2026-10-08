@@ -70,8 +70,11 @@ describe('Contextual retrieval gate (Step 1)', () => {
     test('creates fn_get_chunks_needing_context with security pattern', () => {
       const sql = readFileSync(MIGRATION, 'utf-8');
       expect(sql).toMatch(/CREATE OR REPLACE FUNCTION public\.fn_get_chunks_needing_context/);
-      expect(sql).toMatch(/SECURITY DEFINER/);
-      expect(sql).toMatch(/SET search_path TO 'public'/);
+      // Hlavička TÉTO funkce (po `AS $$`), ne celá baseline — tu by splnila kterákoli jiná funkce.
+      // Tvar cesty hlídá domovská brána definer-search-path; tady jen to, že cesta připnutá JE.
+      const hlavicka = (sql.split(/CREATE OR REPLACE FUNCTION public\.fn_get_chunks_needing_context/)[1] ?? '').split(/\nAS \$\$/)[0];
+      expect(hlavicka).toMatch(/SECURITY DEFINER/);
+      expect(hlavicka).toMatch(/SET search_path TO /);
       expect(sql).toMatch(/REVOKE ALL ON FUNCTION public\.fn_get_chunks_needing_context.*FROM PUBLIC/);
       expect(sql).toMatch(/GRANT EXECUTE ON FUNCTION public\.fn_get_chunks_needing_context.*TO service_role/);
     });

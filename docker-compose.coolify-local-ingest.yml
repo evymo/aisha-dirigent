@@ -81,7 +81,8 @@ services:
             fi
             printf '%s\n' "$$pat" | tr ',' '\n' > /tmp/$$lane.filter
             echo "[docs-sync] $$lane — start"
-            rclone copy "nc:" /docs --filter-from /tmp/$$lane.filter \
+            rclone copy "nc:" /karantena --compare-dest /docs --no-update-dir-modtime \
+              --filter-from /tmp/$$lane.filter \
               --update --use-server-modtime --transfers 4 --checkers 8 \
               --log-level NOTICE 2>&1 | tail -5 || echo "[docs-sync] $$lane selhal — dalsi cyklus to zkusi znovu"
             [ "$$lane" = SMLOUVY ] && { sleep "$${DOCS_SYNC_OFFSET}" & wait "$$!" || true; }
@@ -92,11 +93,47 @@ services:
       # Pojmenovaný svazek v TÉMŽE compose (sdílí ho local-ingest níž) — ne hostitelská
       # cesta z `${VAR}`: Coolify 4.3.16 z holého `${VAR}` udělá tiše pojmenovaný svazek
       # `<uuid>_<slug>` bez ohledu na hodnotu (sourceIsLocal, naměřeno 2026-09-28).
-      - ingest-docs:/docs
+      - ingest-quarantine:/karantena
+      - ingest-docs:/docs:ro
     healthcheck:
       disable: true
     networks:
       - internal
+  docs-scan:
+    build:
+      context: .
+      dockerfile: Dockerfile.docs-scan
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-local-ingest--docs-scan
+    restart: unless-stopped
+    user: "0:0"
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    network_mode: "service:ingest-drop-push-netns"
+    depends_on:
+      ingest-drop-push-netns:
+        condition: service_healthy
+        restart: true
+    environment:
+      CLAMD_HOST: ${CLAMD_HOST:?doručuje env-doctor CONTRACT z identity instance}
+      CLAMD_PORT: "3310"
+      DOCS_SCAN_INTERVAL: "60"
+      DOCS_SCAN_QUARANTINE: /karantena
+      DOCS_SCAN_TARGET: /docs
+      DOCS_SCAN_STATE: /stav
+    volumes:
+      - ingest-quarantine:/karantena
+      - ingest-docs:/docs
+      - ingest-scan-state:/stav
+    healthcheck:
+      test: ["CMD-SHELL", "[ $$(( $$(date +%s) - $$(cat /stav/tep) )) -lt 900 ]"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=false"
   money-sync:
     image: ${IMAGE_NODE:-node:22-alpine}
     container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-local-ingest--money-sync
@@ -228,7 +265,7 @@ services:
       retries: 5
     networks:
       internal:
-        aliases: ["svc-local-ingest", "${APP_NAME_PREFIX:?identita instance}-svc-local-ingest"]
+        aliases: ["svc-local-ingest", "${APP_NAME_PREFIX:?identita instance}-svc-local-ingest", "${APP_NAME_PREFIX:?identita instance}-local-ingest"]
       mesh-dns: {}
     labels:
       - "coolify.managed=true"
@@ -318,9 +355,7 @@ services:
       retries: 8
     restart: unless-stopped
     networks:
-      internal:
-        aliases:
-          - ${APP_NAME_PREFIX:?identita instance}-local-ingest
+      - internal
 
   local-ingest-mesh-ingress:
     profiles: ["mesh"]
@@ -370,7 +405,6 @@ services:
       start_period: 30s
   ingest-drop-push-netns:
     image: ${REGISTRY_PROXY}library/caddy:2.8.4-alpine
-    profiles: ["mesh"]
     container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-ingest-drop-push-netns
     restart: unless-stopped
     read_only: true
@@ -502,6 +536,10 @@ volumes:
   # (týž vzor jako ostatní svazky) — dvě instance na jednom stroji se nepotkají.
   ingest-docs:
     name: ${APP_NAME_PREFIX:?}_local-ingest-docs
+  ingest-quarantine:
+    name: ${APP_NAME_PREFIX:?}_local-ingest-karantena
+  ingest-scan-state:
+    name: ${APP_NAME_PREFIX:?}_local-ingest-docs-scan-stav
   ingest-bundle:
     name: ${APP_NAME_PREFIX:?}_local-ingest-bundle
   ingest-input:

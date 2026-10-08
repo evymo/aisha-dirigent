@@ -187,6 +187,15 @@ describe("mesh lane míří jménem cíle, ne hopem", () => {
       "svc-web-render nemá inline routu do mesh (nebo se rozešla s kanonickým souborem)",
     ).toBe(jadro(kanon));
 
+    // Web (nginx v edge) jde k web-renderu přímo meshem (d-ii, 2026-10-02). Jeho
+    // vstup je skript v obrazu, ne compose — kopie routy žije v docker/web-start.sh
+    // a platí pro ni tatáž povinnost: jeden domov textu.
+    const webStart = readFileSync(join(ROOT, "docker/web-start.sh"), "utf-8");
+    expect(
+      jadro(webStart),
+      "docker/web-start.sh nemá routu do mesh (nebo se rozešla s kanonickým souborem)",
+    ).toBe(jadro(kanon));
+
     const zCompose = jadro(edge);
     const zeSouboru = jadro(kanon);
     expect(zeSouboru, "kanonický skript nemá rozpoznatelné jádro routy").toBeTruthy();
@@ -548,6 +557,7 @@ const MESH_ADRESA_JEN_HODNOTA: Record<string, { klice: string[]; proc: string }>
 
 type SluzbaCompose = {
   image?: unknown;
+  build?: unknown;
   network_mode?: unknown;
   cap_add?: unknown;
   environment?: unknown;
@@ -555,10 +565,42 @@ type SluzbaCompose = {
   command?: unknown;
 };
 
+/**
+ * Text, kterým startuje OBRAZ služby, když compose vstup nepřebíjí.
+ *
+ * ⛔ (d-ii, 2026-10-02) Web (nginx v edge) dostal routu do meshe ve svém
+ * startovním skriptu obrazu (docker/web-start.sh, CMD v Dockerfile.web) — compose
+ * `entrypoint`/`command` nemá. Brána, která čte jen compose, by routu neviděla
+ * a hlásila by vadu, která neexistuje; opačně by ale propustila službu, jejíž
+ * routu obraz NEMÁ. Měří se proto VLASTNOST „služba při startu staví routu“
+ * tam, kde start opravdu je: CMD/ENTRYPOINT cílové fáze (`build.target`, jinak
+ * poslední) a skripty, které do ní fáze `COPY` z repa a vstup je spouští.
+ */
+export function textVstupuObrazu(build: unknown, cti: (cesta: string) => string | null): string {
+  const b = build as { dockerfile?: unknown; target?: unknown } | undefined;
+  if (typeof b?.dockerfile !== "string") return "";
+  const dockerfile = cti(b.dockerfile);
+  if (!dockerfile) return "";
+  const faze = dockerfile.split(/^(?=FROM\s)/m).filter((f) => /^FROM\s/.test(f));
+  const cilova =
+    typeof b.target === "string"
+      ? faze.find((f) => new RegExp(`^FROM\\s+\\S+\\s+AS\\s+${b.target}\\s*$`, "im").test(f))
+      : faze[faze.length - 1];
+  if (!cilova) return "";
+  const vstup = [...cilova.matchAll(/^(?:CMD|ENTRYPOINT)\s+(.+)$/gm)].map((m) => m[1]).join(" ");
+  let text = vstup;
+  for (const m of cilova.matchAll(/^COPY\s+(?:--\S+\s+)*(\S+)\s+(\S+)\s*$/gm)) {
+    const [, zdroj, cil] = m;
+    if (vstup.includes(cil)) text += "\n" + (cti(zdroj) ?? "");
+  }
+  return text;
+}
+
 export function konzumentiMeshAdresBezRouty(
   soubory: Array<{ soubor: string; text: string }>,
   meshKlice: string[],
   jenHodnota: Record<string, { klice: string[] }> = {},
+  vstupObrazu: (sluzba: SluzbaCompose) => string = () => "",
 ): string[] {
   const vadne: string[] = [];
   for (const { soubor, text } of soubory) {
@@ -573,7 +615,10 @@ export function konzumentiMeshAdresBezRouty(
       if (klice.length === 0) continue;
       const drzitel = /^service:(.+)$/.exec(String(s?.network_mode ?? ""))?.[1];
       const sit = drzitel ? sluzby[drzitel] : s;
-      const routa = /ip route replace/.test(JSON.stringify({ p: sit?.entrypoint, c: sit?.command }));
+      // Compose vstup přebíjí obraz; bez něj startuje to, co určuje Dockerfile.
+      const startCompose = sit?.entrypoint !== undefined || sit?.command !== undefined;
+      const start = JSON.stringify({ p: sit?.entrypoint, c: sit?.command }) + (startCompose || !sit ? "" : vstupObrazu(sit));
+      const routa = /ip route replace/.test(start);
       const netAdmin = Array.isArray(sit?.cap_add) && (sit!.cap_add as unknown[]).includes("NET_ADMIN");
       if (!(routa && netAdmin)) vadne.push(`${soubor}:${jmeno} ← ${klice.join(", ")}`);
     }
@@ -612,7 +657,15 @@ describe("mesh adresa z derivace ⇒ routa do rozsahu peerů (vlastnost nad comp
 
   test("žádná služba nemíří na mesh adresu bez routy a NET_ADMIN", () => {
     expect(
-      konzumentiMeshAdresBezRouty(soubory, meshKlice, MESH_ADRESA_JEN_HODNOTA),
+      konzumentiMeshAdresBezRouty(soubory, meshKlice, MESH_ADRESA_JEN_HODNOTA, (sl) =>
+        textVstupuObrazu(sl.build, (cesta) => {
+          try {
+            return readFileSync(join(ROOT, cesta), "utf-8");
+          } catch {
+            return null;
+          }
+        }),
+      ),
       "Služba míří na mesh jméno bez routy do rozsahu peerů — jméno se PŘELOŽÍ a NESPOJÍ (timeout,\n" +
         "ne chyba). Vzor: gateway v docker-compose.coolify.yml (cap_add NET_ADMIN + `ip route replace\n" +
         "$${NETBIRD_PEER_CIDR:?} via $${NETBIRD_DNS_IP:?}` + `exec su-exec node …`), obraz bez `USER node`\n" +
@@ -641,5 +694,22 @@ describe("mesh adresa z derivace ⇒ routa do rozsahu peerů (vlastnost nad comp
     expect(konzumentiMeshAdresBezRouty([{ soubor: "t.yml", text: drz }], ["POSTGREST_URL"])).toEqual([]);
     expect(konzumentiMeshAdresBezRouty([{ soubor: "t.yml", text: beh }], ["POSTGREST_URL"])).toEqual([]);
     expect(konzumentiMeshAdresBezRouty([{ soubor: "t.yml", text: peer }], ["POSTGREST_URL"])).toEqual([]);
+
+    // Start z OBRAZU: routa ve skriptu, který CMD poslední fáze spouští → projde;
+    // týž obraz se skriptem BEZ routy → chytí se; compose vstup obraz přebíjí.
+    const soubory: Record<string, string> = {
+      "Dockerfile.t": "FROM a AS build\nRUN x\nFROM b AS web\nCOPY docker/start.sh /usr/local/bin/start.sh\nCMD [\"/bin/sh\", \"/usr/local/bin/start.sh\"]\n",
+      "Dockerfile.bez": "FROM b AS web\nCOPY docker/bez.sh /usr/local/bin/start.sh\nCMD [\"/bin/sh\", \"/usr/local/bin/start.sh\"]\n",
+      "docker/start.sh": "ip route replace a via b\nexec nginx\n",
+      "docker/bez.sh": "exec nginx\n",
+    };
+    const cti = (c: string) => soubory[c] ?? null;
+    const obraz = (df: string, extra = "") =>
+      `services:\n  a:\n    build:\n      context: .\n      dockerfile: ${df}\n    cap_add: [NET_ADMIN]\n${extra}    environment:\n      POSTGREST_URL: \${POSTGREST_URL:?x}\n`;
+    const zObrazu = (text: string) =>
+      konzumentiMeshAdresBezRouty([{ soubor: "t.yml", text }], ["POSTGREST_URL"], {}, (sl) => textVstupuObrazu(sl.build, cti));
+    expect(zObrazu(obraz("Dockerfile.t"))).toEqual([]);
+    expect(zObrazu(obraz("Dockerfile.bez"))).toEqual(["t.yml:a ← POSTGREST_URL"]);
+    expect(zObrazu(obraz("Dockerfile.t", "    command: [\"nginx\"]\n"))).toEqual(["t.yml:a ← POSTGREST_URL"]);
   });
 });

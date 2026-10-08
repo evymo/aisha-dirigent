@@ -1,6 +1,6 @@
 {
   "name": "@aisha/design-language",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The surface design language: tokens, utility classes and presentational components every extranet surface composes. Two first-class themes (carbon/daylight), semantic tokens as the single instance-override point, provenance-first data display. Not to be confused with @aisha/design-tokens, which brands the stack's INTERNAL surfaces — this package is the customer-facing design system, and an instance re-brands it by overriding semantic tokens in its public/tokens.css overlay, never by forking components.",
   "type": "module",
   "main": "src/index.ts",

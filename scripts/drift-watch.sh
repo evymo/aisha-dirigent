@@ -74,7 +74,8 @@ format_slack() {
            "*Orphaned:* " + ($drift.orphaned | length | tostring) + "\n" +
            "*Missing:* " + ($drift.missing | length | tostring) + "\n" +
            "*Compose drift:* " + ($drift.composeDrift | length | tostring) + "\n" +
-           "*Server drift:* " + ($drift.serverDrift | length | tostring))}}
+           "*Server drift:* " + ($drift.serverDrift | length | tostring) + "\n" +
+           "*Server nezměřen:* " + (($drift.serverUnmeasured // []) | length | tostring))}}
       ]
     }'
 }
@@ -121,6 +122,7 @@ run_one() {
       | .missing    |= map(select(.name as $n | $ig | index($n) | not))
       | .composeDrift |= map(select(.name as $n | $ig | index($n) | not))
       | .serverDrift  |= map(select(.name as $n | $ig | index($n) | not))
+      | .serverUnmeasured |= ((. // []) | map(select(.name as $n | $ig | index($n) | not)))
     ')
   fi
 
@@ -128,14 +130,19 @@ run_one() {
   local missing=$(echo "$drift_json" | jq '.missing | length')
   local compose=$(echo "$drift_json" | jq '.composeDrift | length')
   local server=$(echo "$drift_json" | jq '.serverDrift | length')
+  # Nezměřený server aplikace (slot mimo registr / nenastavené UUID) NENÍ shoda.
+  # Dokud se nepočítal, zapsal drift-watch „no drift" nad stavem, který nikdo
+  # neporovnal (drift-check to od 2026-10-03 hlásí i kódem 3).
+  local unmeasured=$(echo "$drift_json" | jq '(.serverUnmeasured // []) | length')
 
   log_info "drift summary" \
     orphaned "$orphaned" \
     missing "$missing" \
     compose "$compose" \
-    server "$server"
+    server "$server" \
+    unmeasured "$unmeasured"
 
-  local total=$(( orphaned + missing + compose + server ))
+  local total=$(( orphaned + missing + compose + server + unmeasured ))
   if [[ "$total" -eq 0 ]]; then
     log_info "no drift — Coolify state matches manifest"
     return 0

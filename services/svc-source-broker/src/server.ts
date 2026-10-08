@@ -9,7 +9,7 @@
  */
 
 import Fastify from 'fastify';
-import { applySecurity } from '@aisha/security';
+import { applySecurity, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import rawBody from 'fastify-raw-body';
@@ -37,7 +37,7 @@ bootstrapOtel({ serviceName: 'svc-source-broker' });
 
 async function main(): Promise<void> {
   const config = loadConfig();
-  const logger = pino({ level: process.env.LOG_LEVEL ?? 'info' });
+  const logger = pino(safeLoggerOptions({ level: process.env.LOG_LEVEL ?? 'info' }));
 
   // Auth manager — owns service-level JWT acquisition + HMAC webhook verify.
   // (Webhook route uses verifyWebhookSignature + verifyAuthHandshake; auth route uses
@@ -83,7 +83,7 @@ async function main(): Promise<void> {
 
   // Fastify 5 accepts logger as boolean or options object (not pino instance).
   const app = Fastify({
-    logger: { level: config.logLevel },
+    logger: safeLoggerOptions({ level: config.logLevel }),
     bodyLimit: 1_048_576, // 1MB
     trustProxy: true,
   });

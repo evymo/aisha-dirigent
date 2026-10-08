@@ -17,6 +17,7 @@ import type {
   ToolCall,
 } from "./types.js";
 import { recordLlmCall } from "./metrics.js";
+import { chybiKlic, resolveProviderKey } from "../credentialSource.js";
 
 import { createSafeLogger } from '@aisha/security';
 const log = createSafeLogger('svc-ai-chat');
@@ -39,22 +40,29 @@ export class OpenAIBackend implements InferenceBackend {
   readonly defaultTimeoutMs = 60_000;
   priority = 50;
 
-  private readonly apiKey: string;
+  /** Pevný klíč, když ho volající předal výslovně; jinak se klíč bere při volání (credentialSource). */
+  private readonly fixedKey?: string;
 
   constructor(apiKey?: string) {
-    this.apiKey = apiKey ?? process.env.OPENAI_API_KEY ?? "";
+    this.fixedKey = apiKey || undefined;
+  }
+
+  /** Klíč v okamžiku volání: pevný → zdroj pověření služby (trezor instance) → bez zdroje env. */
+  private key(): Promise<string | null> {
+    return resolveProviderKey("OPENAI_API_KEY", this.fixedKey);
   }
 
   // ---------------------------------------------------------------------------
   // InferenceBackend: healthCheck
   // ---------------------------------------------------------------------------
   async healthCheck(): Promise<HealthResult> {
-    if (!this.apiKey) return { available: false };
+    const key = await this.key();
+    if (!key) return { available: false };
     const start = performance.now();
     try {
       const res = await fetch("https://api.openai.com/v1/models", {
         signal: AbortSignal.timeout(5_000),
-        headers: { "Authorization": `Bearer ${this.apiKey}` },
+        headers: { "Authorization": `Bearer ${key}` },
       });
       if (!res.ok) return { available: false };
 
@@ -114,9 +122,10 @@ export class OpenAIBackend implements InferenceBackend {
   // InferenceBackend: chat
   // ---------------------------------------------------------------------------
   async chat(request: ChatRequest): Promise<ChatResponse> {
-    if (!this.apiKey) throw new Error("[openai] OPENAI_API_KEY not configured");
+    const key = await this.key();
+    if (!key) throw chybiKlic("openai", "OPENAI_API_KEY");
 
-    const openai = new OpenAI({ apiKey: this.apiKey });
+    const openai = new OpenAI({ apiKey: key });
 
     // Build input for Responses API format
     const input: Array<Record<string, unknown>> = [];
@@ -266,9 +275,13 @@ export class OpenAIBackend implements InferenceBackend {
   }
 }
 
-/** Create an OpenAI backend from env */
+/**
+ * Create an OpenAI backend when THIS process has the key in env (synchronní start
+ * registru). Klíč se do backendu NEPŘIPÍNÁ — bere se při volání (credentialSource),
+ * takže hodnota z trezoru instance má přednost před env. Backendy s klíčem jen
+ * v trezoru doplní BackendRegistry.reconcileCredentialBackends().
+ */
 export function createOpenAIBackend(): OpenAIBackend | null {
-  const key = process.env.OPENAI_API_KEY;
-  if (!key) return null;
-  return new OpenAIBackend(key);
+  if (!process.env.OPENAI_API_KEY) return null;
+  return new OpenAIBackend();
 }

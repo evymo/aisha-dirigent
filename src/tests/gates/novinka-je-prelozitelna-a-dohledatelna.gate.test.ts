@@ -117,7 +117,8 @@ describe("texty obsahu smí zapsat i staff", () => {
     const src = cti(UPSERT);
     expect(src).toMatch(/is_admin_or_staff/);
     expect(src, "seznam obsahových namespacu musí být deklarovaný").toMatch(
-      /ARRAY\['web',\s*'news',\s*'pages',\s*'extranet'\]/,
+      // 'news-tags' = zobrazované názvy štítků novinek (2026-10-02) — obsah, ne texty UI.
+      /ARRAY\['web',\s*'news',\s*'news-tags',\s*'pages',\s*'extranet'\]/,
     );
     expect(
       src,

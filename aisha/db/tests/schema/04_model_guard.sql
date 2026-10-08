@@ -22,6 +22,13 @@
 --       right model) → 0 rows (cross-model reject).
 --   (e) v3 with p_query_model = the RIGHT model id → returns the chunk.
 --   (f) v3 with p_query_model NULL → returns the chunk (back-compat, no filter).
+--   P2 IDENTITA VAH (2026-10-06) — jméno modelu nestačí, rozhoduje identita vah:
+--   (j) v3 s modelem vrací JEN vektor deklarované identity; vektor téhož jména modelu se
+--       starou identitou (jiný runtime) se s dotazem nesrovná (1 řádek, ne 2).
+--   (k) model bez deklarované identity → 22023 embedding_identity_undeclared (ne prázdno).
+--   (l) zpráva je JEDNOTNÁ, bez hodnot (ani jméno modelu, ani deklarace) — revize 2026-10-07.
+--   (m) cizí uživatel s příběhem a NEdeklarovaným modelem dostane 42501 — přístup se měří PŘED
+--       deklarací, takže z odpovědi nic o identitě vah nevyčte (žádné orákulum).
 --   (g) insert_knowledge_embedding with an UNREGISTERED p_model → 23503
 --       (fail-loud; never silently writes a NULL model_registry_id).
 --   (h) insert_knowledge_embedding with a registered model → writes a row whose
@@ -32,10 +39,11 @@
 BEGIN;
 SET search_path = public, extensions;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(9);
+SELECT plan(13);
 
 -- ── Parametric identities / keys / a query vector sized from the column ─────
 SELECT set_config('mg.owner',       gen_random_uuid()::text, true);
+SELECT set_config('mg.cizi',        gen_random_uuid()::text, true);
 SELECT set_config('mg.story',       gen_random_uuid()::text, true);
 SELECT set_config('mg.item',        gen_random_uuid()::text, true);
 SELECT set_config('mg.chunk',       gen_random_uuid()::text, true);
@@ -44,6 +52,12 @@ SELECT set_config('mg.prov_v1',     gen_random_uuid()::text, true);
 SELECT set_config('mg.prov_v2',     gen_random_uuid()::text, true);
 SELECT set_config('mg.reg_v1',      gen_random_uuid()::text, true);
 SELECT set_config('mg.reg_v2',      gen_random_uuid()::text, true);
+SELECT set_config('mg.reg_undecl',  gen_random_uuid()::text, true);
+SELECT set_config('mg.chunk_old',   gen_random_uuid()::text, true);
+-- P2: deklarované identity vah (`<formát>:<sha256>`) — živá v1, stará v1 (jiný runtime téhož
+-- jména), v2. Hodnoty jsou jen fixture; formát i sha se NEDOSAZUJÍ, deklarují je data.
+SELECT set_config('mg.id_v1',  'pytorch:' || repeat('a', 64), true);
+SELECT set_config('mg.id_old', 'gguf:'    || repeat('b', 64), true);
 -- Non-zero vector ([1,0,…,0]); query == chunk embedding ⇒ cosine = 1.
 -- Rozměr se NEDEKLARUJE — test si ho vezme ze SLOUPCE (pgvector nese dimenzi
 -- v atttypmod). Napsaný natvrdo zastaral ve chvíli, kdy v1 prostor přešel
@@ -66,10 +80,15 @@ VALUES
 -- OTHER dimension routes nowhere — which is why the old 1536 fixture stopped
 -- resolving when the v1 space moved off the cloud model.
 INSERT INTO ai_model_registry
-  (id, provider, model_id, is_embedding, embedding_dimensions, is_available, is_deprecated, provider_registry_id)
+  (id, provider, model_id, is_embedding, embedding_dimensions, is_available, is_deprecated, provider_registry_id, provider_metadata)
 VALUES
-  (current_setting('mg.reg_v1')::uuid, 'mg-prov-v1', 'mg-embed-1024', true, 1024, true, false, current_setting('mg.prov_v1')::uuid),
-  (current_setting('mg.reg_v2')::uuid, 'mg-prov-v2', 'mg-embed-2560', true, 2560, true, false, current_setting('mg.prov_v2')::uuid);
+  (current_setting('mg.reg_v1')::uuid, 'mg-prov-v1', 'mg-embed-1024', true, 1024, true, false, current_setting('mg.prov_v1')::uuid,
+   jsonb_build_object('declared', jsonb_build_object('weights_format', 'pytorch', 'weights_sha256', repeat('a', 64), 'max_tokens', 512))),
+  (current_setting('mg.reg_v2')::uuid, 'mg-prov-v2', 'mg-embed-2560', true, 2560, true, false, current_setting('mg.prov_v2')::uuid,
+   jsonb_build_object('declared', jsonb_build_object('weights_format', 'safetensors', 'weights_sha256', repeat('c', 64), 'max_tokens', 512))),
+  -- P2 (k): embedding model BEZ deklarace vah (discovery ho zná, data instance identitu neuvedla).
+  (current_setting('mg.reg_undecl')::uuid, 'mg-prov-v1', 'mg-embed-undeclared', true, 1024, true, false, current_setting('mg.prov_v1')::uuid,
+   '{}'::jsonb);
 
 -- ── Language fixture: the 'global' sentinel the Brick3 locale FK requires ────
 -- knowledge_items/_chunks/_embeddings default locale='global'; this suite runs
@@ -85,7 +104,7 @@ INSERT INTO supported_languages (code, name_native, name_key, is_active, is_defa
     is_active = EXCLUDED.is_active, is_default = EXCLUDED.is_default, sort_order = EXCLUDED.sort_order;
 
 -- ── Story + owner + corpus fixtures ─────────────────────────────────────────
-INSERT INTO aisha_auth.users (id) VALUES (current_setting('mg.owner')::uuid);
+INSERT INTO aisha_auth.users (id) VALUES (current_setting('mg.owner')::uuid), (current_setting('mg.cizi')::uuid);
 INSERT INTO partner_stories (id, user_id, title)
   VALUES (current_setting('mg.story')::uuid, current_setting('mg.owner')::uuid, 'Model guard test story');
 
@@ -97,13 +116,21 @@ INSERT INTO knowledge_items (id, item_type, title, body_markdown, story_id, visi
 ALTER TABLE public.knowledge_items ENABLE TRIGGER USER;
 
 INSERT INTO knowledge_chunks (id, knowledge_item_id, chunk_index, chunk_text)
-  VALUES (current_setting('mg.chunk')::uuid, current_setting('mg.item')::uuid, 0, 'model guard chunk text');
+  VALUES (current_setting('mg.chunk')::uuid, current_setting('mg.item')::uuid, 0, 'model guard chunk text'),
+         (current_setting('mg.chunk_old')::uuid, current_setting('mg.item')::uuid, 2, 'old runtime chunk text');
 
 -- The corpus chunk is embedded by the v1 model ('mg-embed-1024'): its `model`
 -- text mirror is what the v3 p_query_model HARD WHERE compares against.
-INSERT INTO knowledge_embeddings (chunk_id, knowledge_item_id, embedding, model, model_registry_id)
+-- P2: model_version nese identitu vah (`<formát>:<sha>;recipe=…`, jak ji zapisuje dopočet v1).
+-- Druhý chunk nese TOTÉŽ jméno modelu a týž vektor, ale STAROU identitu (jiný runtime) — přesně
+-- stav korpusu po přepočtu na GPU: podle jména by se oba srovnaly s dotazem.
+INSERT INTO knowledge_embeddings (chunk_id, knowledge_item_id, embedding, model, model_version, model_registry_id)
   VALUES (current_setting('mg.chunk')::uuid, current_setting('mg.item')::uuid,
-          current_setting('mg.qvec')::vector, 'mg-embed-1024', current_setting('mg.reg_v1')::uuid);
+          current_setting('mg.qvec')::vector, 'mg-embed-1024',
+          current_setting('mg.id_v1') || ';recipe=chunk_text_v1', current_setting('mg.reg_v1')::uuid),
+         (current_setting('mg.chunk_old')::uuid, current_setting('mg.item')::uuid,
+          current_setting('mg.qvec')::vector, 'mg-embed-1024',
+          current_setting('mg.id_old') || ';recipe=embed_text_v1', current_setting('mg.reg_v1')::uuid);
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- (a)+(b) RESOLVER dim-routing: space 'v2' ⇒ 2560 model, 'v1' ⇒ 1024 model.
@@ -175,15 +202,57 @@ SELECT is(
   current_setting('mg.chunk')::uuid,
   '(e) v3 with the RIGHT p_query_model returns the chunk');
 
--- (f) NULL model id ⇒ no filter (back-compat) → chunk returned.
-SELECT is(
-  (SELECT chunk_id FROM mcp_search_knowledge_v3(
+-- (f) NULL model id ⇒ no filter (back-compat) → the chunk is among the results (bez filtru
+--     modelu i identity: vrátí i chunk staré identity — proto ho produkční volající nesmí použít).
+SELECT ok(
+  current_setting('mg.chunk')::uuid IN (SELECT chunk_id FROM mcp_search_knowledge_v3(
             p_query_embedding_v1 := current_setting('mg.qvec')::vector,
             p_story_id := current_setting('mg.story')::uuid,
             p_model_pref := 'v1',
             p_query_model := NULL)),
-  current_setting('mg.chunk')::uuid,
   '(f) v3 with p_query_model NULL returns the chunk (back-compat, no model filter)');
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- (j)–(m) P2 IDENTITA VAH: s modelem se dotaz srovná jen s vektory DEKLAROVANÉ identity.
+-- ════════════════════════════════════════════════════════════════════════════
+-- (j) Totéž jméno modelu, stará identita → nesrovná se; vrátí se jen živý chunk (1 řádek, ne 2).
+SELECT is(
+  (SELECT array_agg(chunk_id) FROM mcp_search_knowledge_v3(
+            p_query_embedding_v1 := current_setting('mg.qvec')::vector,
+            p_story_id := current_setting('mg.story')::uuid,
+            p_model_pref := 'v1',
+            p_query_model := 'mg-embed-1024')),
+  ARRAY[current_setting('mg.chunk')::uuid],
+  '(j) v3 s modelem vrací JEN vektor deklarované identity (stará identita téhož jména se nemíchá)');
+
+-- (k) Model bez deklarace vah → výjimka, ne prázdný výsledek.
+SELECT throws_like(
+  format($$ SELECT * FROM mcp_search_knowledge_v3(p_query_embedding_v1 := %L::vector,
+            p_story_id := %L::uuid, p_model_pref := 'v1', p_query_model := 'mg-embed-undeclared') $$,
+         current_setting('mg.qvec'), current_setting('mg.story')),
+  '%embedding_identity_undeclared%',
+  '(k) model bez deklarované identity vah → embedding_identity_undeclared (ne tiché prázdno)');
+
+-- (l) Zpráva je jednotná a bez hodnot: přesně tento text (žádné jméno modelu ani deklarace).
+SELECT throws_ok(
+  format($$ SELECT * FROM mcp_search_knowledge_v3(p_query_embedding_v1 := %L::vector,
+            p_story_id := %L::uuid, p_model_pref := 'v1', p_query_model := 'mg-embed-undeclared') $$,
+         current_setting('mg.qvec'), current_setting('mg.story')),
+  '22023',
+  'vektorové hledání nedostupné (embedding_identity_undeclared)',
+  '(l) nedeklarovaná identita: jednotná zpráva bez jména modelu a bez hodnot deklarace');
+
+-- (m) Cizí uživatel (k příběhu nesmí) s NEdeklarovaným modelem → 42501, ne chyba identity.
+SELECT set_config('request.jwt.claims',
+  json_build_object('sub', current_setting('mg.cizi'), 'role', 'authenticated')::text, true);
+SELECT throws_ok(
+  format($$ SELECT * FROM mcp_search_knowledge_v3(p_query_embedding_v1 := %L::vector,
+            p_story_id := %L::uuid, p_model_pref := 'v1', p_query_model := 'mg-embed-undeclared') $$,
+         current_setting('mg.qvec'), current_setting('mg.story')),
+  '42501', NULL,
+  '(m) cizí uživatel: přístup k příběhu se měří PŘED deklarací (42501, ne chyba identity)');
+SELECT set_config('request.jwt.claims',
+  json_build_object('sub', current_setting('mg.owner'), 'role', 'authenticated')::text, true);
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- (g)+(h) WRITER fail-loud + PIN. insert_knowledge_embedding requires service_role

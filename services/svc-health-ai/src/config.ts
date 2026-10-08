@@ -33,7 +33,8 @@ export const config = {
   llmGatewayKey: process.env.AISHA_LLM_GATEWAY_KEY ?? '',
 
   // ── Direct-mode fallback (opt-in only, HEALTH_AI_LLM_MODE=direct) ──
-  openaiApiKey: process.env.OPENAI_API_KEY ?? '',
+  // Klíč OpenAI se tu NEČTE (2026-10-02): bere ho route za běhu z trezoru instance
+  // (credentials.ts, administrace „Poskytovatelé AI a tokeny").
   openaiApiUrl: process.env.OPENAI_API_URL ?? '',
   openaiModel: process.env.HEALTH_AI_MODEL ?? 'gpt-4o-mini',
 

@@ -18,9 +18,12 @@
  *   4. User-facing story/context tools must run user-scoped (rpcUserClaims with the
  *      caller's claims), so PostgREST RLS applies — not a blanket service_role call.
  *
- * search RPCs legitimately run via rpcService (the DB function is SECURITY DEFINER
- * and pins the passed audience/story), so this gate does NOT ban rpcService — it
- * bans deriving the identity keys from anything but the verified token.
+ * ⛔ B8 (2026-10-01): this header used to say search RPCs "legitimately run via
+ * rpcService (the DB function pins the passed audience/story)". It does NOT pin the
+ * story for service_role — v2/v3 SKIP the per-story guard for the service role, so a
+ * claim nobody verified opened another story's KB. The search path now runs under the
+ * user's identity (rpcUserClaims); kb-pribeh-jen-pod-uzivatelem.gate enforces that.
+ * This gate still bans deriving the identity keys from anything but the verified token.
  */
 
 import { describe, test, expect } from "vitest";
@@ -34,8 +37,8 @@ describe("KB MCP service-layer auth (routes/mcp.ts)", () => {
   const src = existsSync(MCP) ? readFileSync(MCP, "utf8") : "";
 
   // The tier-ACL / per-story identity binding matters in the SEARCH path
-  // (searchKnowledgeProd), which runs via service_role and so must derive the
-  // keys from the token. User-scoped tools (rpcUserClaims) legitimately pass
+  // (searchKnowledgeProd), which must derive the keys from the verified token
+  // (and since B8 runs under the user's identity). User-scoped tools (rpcUserClaims) legitimately pass
   // args.story_id because PostgREST RLS re-checks the caller — so the "not from
   // args" guards are scoped to the search function body only.
   const searchStart = src.indexOf("async function searchKnowledgeProd");
@@ -67,6 +70,16 @@ describe("KB MCP service-layer auth (routes/mcp.ts)", () => {
     expect(searchBody, "search p_audience_user_id must NOT come from client args").not.toMatch(
       /p_audience_user_id:\s*asString\(\s*args\./,
     );
+    // Čtení podle id (get_knowledge_item) běží taky servisní rolí a publikum předává stejně:
+    // z ověřeného tokenu, nikdy z argumentů. Do 2026-10-04 ho nepředávalo vůbec — každý
+    // uživatel MCP četl podle id jako anonym.
+    const getItemBody = /case 'get_knowledge_item':[\s\S]*?rpcService\('mcp_get_knowledge_item',[\s\S]*?\}\);/.exec(src)?.[0] ?? "";
+    expect(getItemBody.length, "větev get_knowledge_item se v route nenašla").toBeGreaterThan(0);
+    expect(getItemBody, "get_knowledge_item: audienceUserId must derive from auth.user.claims.sub").toMatch(
+      /audienceUserId\s*=\s*asString\(\(auth\.user\.claims[^)]*\)\.sub\)/,
+    );
+    expect(getItemBody, "get_knowledge_item must pass p_audience_user_id: audienceUserId").toMatch(/p_audience_user_id:\s*audienceUserId\b/);
+    expect(getItemBody, "get_knowledge_item p_audience_user_id must NOT come from client args").not.toMatch(/args\.[a-z_]*audience/i);
   });
 
   test("per-story key p_story_id comes from token claims (storyIdFromClaims), not client args", () => {

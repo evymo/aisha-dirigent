@@ -43,13 +43,13 @@ CREATE OR REPLACE FUNCTION public.upsert_story_knowledge_item_audited(
   p_id              uuid DEFAULT NULL,
   p_title           text DEFAULT NULL,
   p_body_markdown   text DEFAULT NULL,
-  p_item_type       text DEFAULT 'engineering_doc',
+  p_item_type       text DEFAULT NULL,
   p_summary         text DEFAULT NULL,
   p_category        text DEFAULT NULL,
-  p_ai_context_tags text[] DEFAULT '{}'::text[],
+  p_ai_context_tags text[] DEFAULT NULL,
   p_ai_instructions text DEFAULT NULL,
-  p_visibility      text DEFAULT 'public',
-  p_locale          text DEFAULT 'global',
+  p_visibility      text DEFAULT NULL,
+  p_locale          text DEFAULT NULL,
   p_source_type     text DEFAULT NULL,
   p_source_slug     text DEFAULT NULL,
   p_source_hash     text DEFAULT NULL
@@ -83,6 +83,14 @@ BEGIN
       USING ERRCODE = '42501';
   END IF;
 
+  -- Vyhrazené zdroje znalostí zapisuje JEN seed z repozitáře (prostý INSERT v seedu, nikdy
+  -- tahle funkce). source_type sem přichází od volajícího — i od služby, která ho bere
+  -- z nedůvěryhodného balíčku (ingest) — proto odmítnutí pro KAŽDÉHO volajícího.
+  IF p_source_type = ANY (ARRAY['platform_knowledge'::text, 'instance_knowledge'::text]) THEN
+    RAISE EXCEPTION 'upsert_story_knowledge_item_audited: source_type % is reserved for the repository seed — refused', p_source_type
+      USING ERRCODE = '22023';
+  END IF;
+
   IF NOT EXISTS (SELECT 1 FROM public.partner_stories WHERE id = p_story_id) THEN
     RAISE EXCEPTION 'Story not found: %', p_story_id USING ERRCODE = 'P0002';
   END IF;
@@ -90,12 +98,15 @@ BEGIN
   -- Identita zdroje má přednost před slepým INSERTem: volající, který ví, ODKUD
   -- záznam je, nemusí vědět, jestli už v KB leží. Hledá se přes (source_slug,
   -- locale) — přesně dvojice, nad kterou stojí partial unique index, takže je to
-  -- i rychlé a nemůže to vrátit dva řádky.
+  -- i rychlé a nemůže to vrátit dva řádky. Vyhrazené zdroje ('platform_knowledge',
+  -- 'instance_knowledge') ten index vynechává a mají vlastní jmenný prostor: položka
+  -- příběhu se stejným slugem vedle nich smí ležet a tady se na ně nenapojí.
   IF v_target_id IS NULL AND p_source_slug IS NOT NULL THEN
     SELECT ki.id INTO v_target_id
     FROM public.knowledge_items ki
     WHERE ki.source_slug = p_source_slug
-      AND ki.locale = COALESCE(p_locale, 'global');
+      AND ki.locale = COALESCE(p_locale, 'global')
+      AND ki.source_type <> ALL (ARRAY['platform_knowledge'::text, 'instance_knowledge'::text]);
   END IF;
 
   IF v_target_id IS NULL THEN
@@ -114,7 +125,7 @@ BEGIN
       ai_instructions, ai_context_tags, category, visibility,
       story_id, author_id, status, locale
     ) VALUES (
-      p_item_type::public.knowledge_item_type,
+      COALESCE(p_item_type, 'engineering_doc')::public.knowledge_item_type,
       -- 'manual' zůstává výchozí, aby se ruční kurátorská cesta nezměnila;
       -- strojový zapisovatel se ale teď MŮŽE představit.
       COALESCE(p_source_type, 'manual'),
@@ -126,7 +137,7 @@ BEGIN
       p_ai_instructions,
       COALESCE(p_ai_context_tags, '{}'::text[]),
       p_category,
-      p_visibility,
+      COALESCE(p_visibility, 'public'),
       p_story_id,
       v_user_id,
       'active',

@@ -18,6 +18,11 @@
  *   - fn_resolve_embedding_model_for_space exists and dim-routes (2560 ⇒ v2, else
  *     v1), gated on enabled+healthy provider serving an available embedding model.
  *   - the regenerated baseline carries all of the above.
+ *   - P2 (2026-10-06): jméno modelu NESTAČÍ — v3 srovnává dotaz jen s vektory, jejichž identita
+ *     vah (fn_identita_vektoru(model_version)) = DEKLAROVANÁ identita modelu
+ *     (fn_deklarace_vah_embeddingu, týž domov jako dopočet v1); nedeklarovaná identita je výjimka,
+ *     ne prázdný výsledek. Identitu volající nezadává (revize 2026-10-07: orákulum); identitu,
+ *     kterou ohlásila lane, ověří služba před voláním (overIdentituDotazu).
  *
  * Runtime proof of the behavior (resolver dim-routing, cross-model reject, writer
  * fail-loud + PIN, FK no-cascade) lives in the pgTAP suite
@@ -53,6 +58,14 @@ const V1_DIM = (() => {
   return Number(m[1]);
 })();
 const PGTAP = read('aisha/db/tests/schema/04_model_guard.sql');
+const DEKLARACE = read('aisha/db/sql/functions/fn_deklarace_vah_embeddingu.sql');
+const IDENTITA_VEKTORU = read('aisha/db/sql/functions/fn_identita_vektoru.sql');
+const ZIVA = read('aisha/db/sql/functions/fn_ziva_identita_v1.sql');
+const BEZ_ZIVE = read('aisha/db/sql/functions/fn_chunks_bez_zive_identity.sql');
+const HEALS = read('aisha/db/heals.sql');
+/** Podpis v3 (Brick6, 15 argumentů) — P2 ho NEMĚNÍ: identitu filtru počítá server, volající ji nezadává. */
+const V3_SIG = 'mcp_search_knowledge_v3(vector,halfvec,text,text[],text,text,text[],boolean,integer,numeric,uuid,text,text,text,uuid)';
+const esc = (x: string) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 describe('Brick2 guard — mcp_search_knowledge_v3 has the HARD p_query_model WHERE', () => {
   it('declares p_query_model text DEFAULT NULL as the 13th arg', () => {
@@ -93,10 +106,170 @@ describe('Brick2 guard — mcp_search_knowledge_v3 has the HARD p_query_model WH
     expect(V3).toMatch(
       /DROP FUNCTION IF EXISTS public\.mcp_search_knowledge_v3\(vector,halfvec,text,text\[\],text,text,text\[\],boolean,integer,numeric,uuid,text,text,text\)/,
     );
-    // The re-issued REVOKE/GRANT are at the new 15-arg arity (…uuid,text,text,text,uuid).
+    // The current 15-arg signature is NOT dropped (CREATE OR REPLACE replaces it in place).
+    expect(V3).not.toMatch(new RegExp(`DROP FUNCTION IF EXISTS public\\.${esc(V3_SIG)}`));
+    // The re-issued REVOKE/GRANT are at the 15-arg arity (…uuid,text,text,text,uuid).
+    for (const komu of ['authenticated', 'service_role']) {
+      expect(V3).toMatch(new RegExp(`GRANT EXECUTE ON FUNCTION ${esc(V3_SIG)} TO ${komu}`));
+    }
+    expect(V3).toMatch(new RegExp(`REVOKE ALL ON FUNCTION ${esc(V3_SIG)} FROM PUBLIC`));
+  });
+});
+
+describe('P2 guard — v3 filtruje podle IDENTITY VAH, ne jen podle jména modelu', () => {
+  it('⛔ identitu volající NEZADÁVÁ (revize 2026-10-07: parametr s identitou = orákulum deklarace)', () => {
+    expect(V3.replace(/^--.*$/gm, ''), 'v3 nesmí přijímat identitu vah od volajícího').not.toMatch(/p_query_identity/);
+    expect(V3).toMatch(/p_audience_user_id uuid DEFAULT NULL::uuid\)\s+RETURNS TABLE/);
+  });
+
+  it('⛔ pořadí: přihlášení a přístup k příběhu PŘED čtením deklarace (cizí volající nic nevyčte)', () => {
+    const telo = V3.slice(V3.indexOf('$function$'));
+    const pristup = telo.indexOf("RAISE EXCEPTION 'Access denied to story %'");
+    const publikum = telo.indexOf('v_story_ok :=');
+    const deklarace = telo.indexOf('fn_deklarace_vah_embeddingu(p_query_model)');
+    expect(pristup, 'kontrola příběhu nenalezena — měřidlo slepé').toBeGreaterThan(-1);
+    expect(deklarace).toBeGreaterThan(pristup);
+    expect(deklarace).toBeGreaterThan(publikum);
+  });
+
+  it('deklarovanou identitu čte JEDINÝ domov (fn_deklarace_vah_embeddingu) — v3 i dopočet v1', () => {
+    expect(V3).toMatch(/FROM public\.fn_deklarace_vah_embeddingu\(p_query_model\)/);
+    expect(ZIVA).toMatch(/FROM public\.fn_deklarace_vah_embeddingu\(v_model\)/);
+    // Žádná další funkce si deklaraci neskládá sama (čtení declared.weights_sha256 jen v domově).
+    expect(V3).not.toMatch(/weights_sha256/);
+    expect(ZIVA.replace(/^--.*$/gm, '')).not.toMatch(/'weights_sha256'/);
+    expect(DEKLARACE).toMatch(/provider_metadata->'declared'->>'weights_sha256'/);
+  });
+
+  it('tvrdý WHERE identity vektoru v OBOU větvích (v1 model_version, v2 model_v2_version)', () => {
+    expect(V3).toMatch(/\(p_query_model IS NULL OR public\.fn_identita_vektoru\(ke\.model_version\) = v_identita\)/);
+    expect(V3).toMatch(/\(p_query_model IS NULL OR public\.fn_identita_vektoru\(ke\.model_v2_version\) = v_identita\)/);
+    // Identita není člen skóre ani řazení.
+    const orderBy = (V3.match(/^\s*ORDER BY .*$/gm) ?? []).join('\n');
+    expect(orderBy).not.toMatch(/identit/);
+  });
+
+  it('dopočet i hledání rozumí „živému vektoru“ stejně (fn_identita_vektoru, jeden domov)', () => {
+    expect(BEZ_ZIVE).toMatch(/public\.fn_identita_vektoru\(e\.model_version\) = p_identita/);
+    expect(BEZ_ZIVE).not.toMatch(/split_part\(/);
+    expect(IDENTITA_VEKTORU).toMatch(/split_part\(coalesce\(p_model_version, ''\), ';', 1\)/);
+    // IMMUTABLE sql bez SET — jinak by ji plánovač nevložil a volal by ji pro každý vektor korpusu.
+    expect(IDENTITA_VEKTORU).toMatch(/LANGUAGE sql\s+IMMUTABLE/);
+    expect(IDENTITA_VEKTORU.replace(/^--.*$/gm, '')).not.toMatch(/\bSET\s+search_path/i);
+  });
+
+  it('nedeklarovaná identita je VÝJIMKA; volajícímu v3 JEDNOTNÁ zpráva bez hodnot', () => {
+    expect(DEKLARACE).toMatch(/embedding_identity_undeclared[\s\S]{0,400}USING ERRCODE = '22023'/);
+    // v3 čte deklaraci před větvením a podrobnou zprávu domova (jméno modelu, návod) nahradí jednotnou.
     expect(V3).toMatch(
-      /GRANT EXECUTE ON FUNCTION mcp_search_knowledge_v3\(vector,halfvec,text,text\[\],text,text,text\[\],boolean,integer,numeric,uuid,text,text,text,uuid\) TO service_role/,
+      /IF p_query_model IS NOT NULL THEN\s+BEGIN\s+SELECT d\.identita INTO v_identita FROM public\.fn_deklarace_vah_embeddingu\(p_query_model\) d;\s+EXCEPTION WHEN invalid_parameter_value THEN\s+RAISE EXCEPTION 'vektorové hledání nedostupné \(embedding_identity_undeclared\)'\s+USING ERRCODE = '22023';/,
     );
+    // Žádná zpráva v těle v3 nevypisuje deklaraci ani identitu.
+    const zpravy = [...V3.matchAll(/RAISE EXCEPTION '([^']*)'(,[^;]*)?/g)];
+    expect(zpravy.length).toBeGreaterThan(0);
+    for (const [, , argumenty] of zpravy) expect(argumenty ?? '').not.toMatch(/identita|p_query_model/);
+    // Deklarace se NEDOSAZUJE (žádný výchozí formát ani pin).
+    expect(DEKLARACE).not.toMatch(/coalesce\([^)]*weights_format[^)]*'gguf'/i);
+  });
+
+  it('pomocník deklarace: EXECUTE jen služba (ani authenticated na forku s výchozím EXECUTE)', () => {
+    expect(DEKLARACE).toMatch(/REVOKE ALL ON FUNCTION public\.fn_deklarace_vah_embeddingu\(text\) FROM PUBLIC, anon, authenticated;/);
+    expect(DEKLARACE).toMatch(/GRANT EXECUTE ON FUNCTION public\.fn_deklarace_vah_embeddingu\(text\) TO service_role;/);
+    expect(DEKLARACE.replace(/^--.*$/gm, '')).not.toMatch(/SECURITY DEFINER/);
+  });
+
+  it('heals.sql zapojuje pomocníky PŘED funkcemi, které je volají (dotečení na běžící DB)', () => {
+    const blok = HEALS.slice(HEALS.indexOf('P2 HLEDÁNÍ PODLE IDENTITY VAH'));
+    const i = (rel: string) => blok.indexOf(`\\ir sql/functions/${rel}.sql`);
+    for (const f of ['fn_identita_vektoru', 'fn_deklarace_vah_embeddingu', 'fn_ziva_identita_v1', 'fn_chunks_bez_zive_identity', 'mcp_search_knowledge_v3']) {
+      expect(i(f), `${f} chybí v bloku P2 v heals.sql`).toBeGreaterThan(-1);
+    }
+    expect(i('fn_deklarace_vah_embeddingu')).toBeLessThan(i('fn_ziva_identita_v1'));
+    expect(i('fn_identita_vektoru')).toBeLessThan(i('fn_chunks_bez_zive_identity'));
+    expect(i('fn_deklarace_vah_embeddingu')).toBeLessThan(i('mcp_search_knowledge_v3'));
+  });
+});
+
+describe('P2 guard — produkční volající v3 předávají model i identitu; žádná tichá textová záloha', () => {
+  /** Zdrojáky služeb (bez testů), které volají mcp_search_knowledge_v3. */
+  const volajici = (() => {
+    const out: Array<{ soubor: string; src: string }> = [];
+    const projdi = (dir: string) => {
+      if (!fs.existsSync(dir)) return;
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, e.name);
+        if (e.isDirectory()) {
+          if (['node_modules', 'dist', 'tests', '__tests__'].includes(e.name)) continue;
+          projdi(full);
+        } else if (/\.(ts|mts|js|mjs)$/.test(e.name) && !/\.test\./.test(e.name)) {
+          const src = fs.readFileSync(full, 'utf8');
+          if (src.includes("'mcp_search_knowledge_v3'")) out.push({ soubor: path.relative(ROOT, full), src });
+        }
+      }
+    };
+    projdi(p('services'));
+    return out;
+  })();
+
+  /** Objekt argumentů každého volání v3 (od jména RPC po uzavírací `}`). */
+  const argumentyVolani = (src: string): string[] =>
+    [...src.matchAll(/'mcp_search_knowledge_v3',\s*\{/g)].map((m) => {
+      let hloubka = 0;
+      const start = (m.index ?? 0) + m[0].length - 1;
+      for (let k = start; k < src.length; k++) {
+        if (src[k] === '{') hloubka++;
+        else if (src[k] === '}' && --hloubka === 0) return src.slice(start, k + 1);
+      }
+      return src.slice(start);
+    });
+
+  /** Těla `catch` bloků (vyvážené závorky). */
+  const telaCatch = (src: string): string[] =>
+    [...src.matchAll(/\bcatch\s*(\([^)]*\))?\s*\{/g)].map((m) => {
+      let hloubka = 0;
+      const start = (m.index ?? 0) + m[0].length - 1;
+      for (let k = start; k < src.length; k++) {
+        if (src[k] === '{') hloubka++;
+        else if (src[k] === '}' && --hloubka === 0) return src.slice(start, k + 1);
+      }
+      return src.slice(start);
+    });
+
+  it('sonda má co měřit: volající v3 existují (prod hledání i eval)', () => {
+    expect(volajici.map((v) => v.soubor)).toContain('services/svc-mcp-knowledge/src/routes/mcp.ts');
+    expect(volajici.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('každé volání v3 nese p_query_model; identitu z lane služba ověří PŘED voláním (overIdentituDotazu)', () => {
+    const vady: string[] = [];
+    for (const v of volajici) {
+      const prvniVolani = v.src.indexOf("'mcp_search_knowledge_v3'");
+      const overeni = v.src.indexOf('overIdentituDotazu(');
+      if (overeni < 0 || overeni > prvniVolani) vady.push(`${v.soubor}: identita dotazu se neověří před voláním v3`);
+      for (const a of argumentyVolani(v.src)) {
+        if (!/\bp_query_model\s*:/.test(a)) vady.push(`${v.soubor}: volání v3 bez p_query_model`);
+        if (/\bp_query_identity\s*:/.test(a)) vady.push(`${v.soubor}: volání v3 nese identitu od volajícího`);
+      }
+    }
+    expect(vady).toEqual([]);
+  });
+
+  it('žádný catch u vektorového hledání nepřechází na textové hledání (selhat nahlas, ne tichá záloha)', () => {
+    const vady: string[] = [];
+    for (const v of volajici) {
+      for (const telo of telaCatch(v.src)) {
+        if (/mcp_search_knowledge_v2|'mcp_search_knowledge'/.test(telo)) vady.push(`${v.soubor}: catch volá textové hledání`);
+      }
+    }
+    expect(vady).toEqual([]);
+  });
+
+  it('kotva měřidla: catch s textovou zálohou i volání bez modelu jsou nález', () => {
+    const vzor = `rpc('mcp_search_knowledge_v3', { p_query_model: m, p_query_text: q });
+      try { x(); } catch { return rpc('mcp_search_knowledge_v2', { p_query_text: q }); }`;
+    expect(telaCatch(vzor).some((t) => /mcp_search_knowledge_v2/.test(t))).toBe(true);
+    expect(argumentyVolani(vzor).every((a) => /\bp_query_model\s*:/.test(a))).toBe(true);
+    expect(argumentyVolani(`rpc('mcp_search_knowledge_v3', { p_query_text: q })`).every((a) => /\bp_query_model\s*:/.test(a))).toBe(false);
   });
 });
 
@@ -221,7 +394,13 @@ describe('Brick2 guard — pgTAP runtime proof exists', () => {
     expect(PGTAP).toMatch(/p_query_model := NULL/);
     // writer fail-loud (23503) + FK no-cascade (23503).
     expect(PGTAP).toMatch(/throws_ok[\s\S]{0,400}'23503'/);
+    // P2: identita vah — stará identita téhož jména se nemíchá, nedeklarovaná = jednotná výjimka,
+    // cizí volající dostane 42501 dřív, než se deklarace vůbec čte.
+    expect(PGTAP).toMatch(/throws_like[\s\S]{0,400}'%embedding_identity_undeclared%'/);
+    expect(PGTAP).toMatch(/'vektorové hledání nedostupné \(embedding_identity_undeclared\)'/);
+    expect(PGTAP).toMatch(/\(m\) cizí uživatel: přístup k příběhu se měří PŘED deklarací/);
+    expect(PGTAP).toMatch(/\(j\) v3 s modelem vrací JEN vektor deklarované identity/);
     // the plan count is declared (kept in lock-step with the assertion count).
-    expect(PGTAP).toMatch(/SELECT plan\(9\)/);
+    expect(PGTAP).toMatch(/SELECT plan\(13\)/);
   });
 });

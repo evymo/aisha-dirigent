@@ -155,10 +155,17 @@ export function requireOverlay(kdo) {
  *
  * ⛔ NALEZENO PŘI REVIZI 2026-09-20: první verze uměla jen ten zavináčový tvar,
  * takže token v dotazu prošel do hlášky nezakrytý.
+ *
+ * ⛔ NAMĚŘENO 2026-10-04 (rada d8): `[^@\s]*@` končil PRVNÍM zavináčem — z hesla
+ * s neescapovaným `@` (`https://u:p@ss@host/…`) zůstal v hlášce zbytek (`ss@host`).
+ * Zakrývá se proto až po POSLEDNÍ `@` adresy (v textu hlášky ji ohraničuje mezera;
+ * zakrýt víc je tu bezpečné, s hodnotou se nic dalšího nedělá). Totéž pravidlo
+ * posledního `@` drží `bezUdaju` v nasazovany-repozitar.mjs — ten ale vrací
+ * použitelnou adresu, proto ho ohraničuje konec autority, ne mezera.
  */
 function bezUdaju(text) {
   return String(text)
-    .replace(/https?:\/\/[^@\s]*@/g, 'https://<skryto>@')
+    .replace(/(https?:\/\/)\S*@/g, '$1<skryto>@')
     .replace(
       /([?&](?:token|access_token|private_token|api[-_]?key|key|password|passwd|pwd|secret)=)[^&\s]+/gi,
       '$1<skryto>',

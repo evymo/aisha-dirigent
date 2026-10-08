@@ -73,6 +73,9 @@ const ZAKLAD: Record<string, string> = {
   EDGE_DOOR_MODE: "off",
   // Compose ji vyžaduje (`:?`, kontrakt env-doktora static 30) — nasazení ji má vždy.
   EDGE_ACCESS_RETENTION_DAYS: "30",
+  // Taky `:?` v compose (generate-secrets z MESH_DNS_RESOLVER_IP); skript ji
+  // ověřuje jako IPv4 a bez ní skončí — mesh jména upstreamů jdou jen mesh DNS.
+  NETBIRD_DNS_IP: "100.64.0.53",
   MCP_DOMAIN: "mcp.verejna.example.test",
   API_DOMAIN_PUBLIC: "api.verejna.example.test",
   DIRIGENT_DOMAIN: "dirigent.verejna.example.test",
@@ -114,5 +117,50 @@ describe("veřejná tvář NetBirdu jde přes edge na přímou tvář", () => {
     expect(caddyfile, "sonda musí dojít až k zápisu Caddyfile").toContain("@auth host auth.verejna.example.test");
     expect(netbirdBlok(caddyfile)).toBeNull();
     expect(caddyfile).not.toContain("@netbird");
+  });
+});
+
+// ── Řídicí rovina MODELOVÉHO meshe forku (varianta C) ─────────────────────────
+// Týž tvar jako hlavní: edge jde na přímou tvář netbird-model-proxy (ověřený certifikát,
+// flush_interval -1 pro gRPC/relay). Je to JEDINÝ vstup uzlu na GPU slotu (TCP 443).
+const VEREJNA_MODEL = "mesh-model.verejna.example.test";
+const PRIMA_MODEL = "inst-mesh-model.backend.example.test";
+
+function modelBlok(caddyfile: string): string | null {
+  const m = /@modelovymesh host [^\n]+\n\s*handle @modelovymesh \{[\s\S]*?\n\s{2,}\}\n\s*\}/.exec(caddyfile);
+  return m ? m[0] : null;
+}
+
+describe("veřejná tvář MODELOVÉHO meshe jde přes edge na přímou tvář (varianta C)", () => {
+  test("s oběma jmény: mesh-model → přímá tvář, nebufferuje se, certifikát se ověřuje", () => {
+    const { caddyfile, log } = vyrenderujCaddyfile({ ...ZAKLAD, NETBIRD_MODEL_DOMAIN: VEREJNA_MODEL, NETBIRD_MODEL_DOMAIN_DIRECT: PRIMA_MODEL });
+    const blok = modelBlok(caddyfile);
+    expect(blok, `Caddyfile nemá blok @modelovymesh:\n${caddyfile}\n--- log ---\n${log}`).not.toBeNull();
+    expect(blok).toContain(`@modelovymesh host ${VEREJNA_MODEL}`);
+    expect(blok).toContain(`reverse_proxy https://${PRIMA_MODEL}`);
+    expect(blok).toContain(`header_up Host ${PRIMA_MODEL}`);
+    expect(blok).toContain("flush_interval -1");
+    expect(blok).not.toContain("tls_insecure_skip_verify");
+    expect(netbirdBlok(caddyfile), "modelový mesh nezakládá trasu hlavního").toBeNull();
+  });
+
+  test("oba meshe zároveň: dvě trasy, každá na svou přímou tvář", () => {
+    const { caddyfile } = vyrenderujCaddyfile({
+      ...ZAKLAD, NETBIRD_DOMAIN: VEREJNA, NETBIRD_DOMAIN_DIRECT: PRIMA,
+      NETBIRD_MODEL_DOMAIN: VEREJNA_MODEL, NETBIRD_MODEL_DOMAIN_DIRECT: PRIMA_MODEL,
+    });
+    expect(netbirdBlok(caddyfile)).toContain(`reverse_proxy https://${PRIMA}`);
+    expect(modelBlok(caddyfile)).toContain(`reverse_proxy https://${PRIMA_MODEL}`);
+  });
+
+  test.each([
+    ["bez přímé tváře", { NETBIRD_MODEL_DOMAIN: VEREJNA_MODEL, NETBIRD_MODEL_DOMAIN_DIRECT: "" }],
+    ["bez veřejného jména (instance modelový mesh nemá)", { NETBIRD_MODEL_DOMAIN: "", NETBIRD_MODEL_DOMAIN_DIRECT: "" }],
+    ["sentinel", { NETBIRD_MODEL_DOMAIN: "mesh-model-disabled.invalid", NETBIRD_MODEL_DOMAIN_DIRECT: PRIMA_MODEL }],
+    ["jedno jméno pro obě tváře", { NETBIRD_MODEL_DOMAIN: PRIMA_MODEL, NETBIRD_MODEL_DOMAIN_DIRECT: PRIMA_MODEL }],
+  ])("negativní sonda modelového meshe — %s: trasa nevznikne, Caddyfile ano", (_popis, nb) => {
+    const { caddyfile } = vyrenderujCaddyfile({ ...ZAKLAD, ...nb });
+    expect(caddyfile, "sonda musí dojít až k zápisu Caddyfile").toContain("@auth host auth.verejna.example.test");
+    expect(caddyfile).not.toContain("@modelovymesh");
   });
 });

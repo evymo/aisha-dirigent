@@ -46,8 +46,9 @@
  */
 
 import { describe, test, expect } from "vitest";
-import { readFileSync, readdirSync, existsSync } from "fs";
+import { readFileSync, readdirSync, existsSync, mkdtempSync, writeFileSync, rmSync } from "fs";
 import { join } from "path";
+import { tmpdir } from "os";
 
 const ROOT = process.cwd();
 const INFRA_SCRIPTS = join(ROOT, "scripts", "infra");
@@ -61,7 +62,14 @@ const COOLIFY_MANAGED = new Set(["coolify"]);
  * `"<net-name>:<subnet>"` entries and calls `docker network create` is provisioning them.
  */
 /**
- * Sítě, které zakládá WARMUP aplikace (docker-compose.coolify-netinit.yml).
+ * Sítě, které zakládá WARMUP aplikace — každý compose, který má docker.sock a volá
+ * `docker network create` (netinit instance, accel-konvergence operátora GPU uzlu).
+ *
+ * ROZŠÍŘENO 2026-10-05: dřív četla brána jen docker-compose.coolify-netinit.yml. Sítě
+ * společné lane na GPU uzlu (`<prefix>-lane`, `<vlastník>-accel-jadro`) zakládá stejným
+ * vzorem one-shot `accel-site` operátora — vázat uznání na jeden soubor by znamenalo, že
+ * každý další zakladatel sítí potřebuje výjimku. Rozhoduje vlastnost (docker.sock + create),
+ * ne jméno souboru.
  *
  * PŘIBYLO 2026-08-11. Do té doby uměla brána uznat jen dva plnitele slibu
  * `external: true` — jiný compose, který síť VYTVÁŘÍ, a skript v scripts/infra.
@@ -73,17 +81,33 @@ const COOLIFY_MANAGED = new Set(["coolify"]);
  * Třetí plnitel je warmup: kontejner s docker.sock, který běží NA HOSTU, sítě
  * založí přes CLI a skončí. Síť tím nikdo nevlastní, takže ji ani nikdo nemaže.
  */
-function warmupProvisionedVars(): Set<string> {
+function warmupProvisionedVars(root: string = ROOT): Set<string> {
   const vars = new Set<string>();
-  const f = join(ROOT, "docker-compose.coolify-netinit.yml");
-  if (!existsSync(f)) return vars;
-  const src = readFileSync(f, "utf-8");
-  if (!/docker\.sock/.test(src) || !/docker network create/.test(src)) return vars;
-  // Jména sítí přicházejí do warmupu proměnnými prostředí; posbírej, co dosazuje.
-  for (const m of src.matchAll(/^\s+([A-Z_][A-Z0-9_]*):\s*\$\{([A-Z_][A-Z0-9_]*)[:}]/gm)) {
-    vars.add(m[2]);           // proměnná, ze které se jméno bere
+  for (const f of readdirSync(root).filter((f) => /^docker-compose\.coolify.*\.ya?ml$/.test(f))) {
+    const src = readFileSync(join(root, f), "utf-8");
+    if (!/docker\.sock/.test(src) || !/docker network create/.test(src)) continue;
+    // Jména sítí přicházejí do warmupu proměnnými prostředí; posbírej, co dosazuje.
+    for (const m of src.matchAll(/^\s+([A-Z_][A-Z0-9_]*):\s*\$\{([A-Z_][A-Z0-9_]*)[:}]/gm)) {
+      vars.add(m[2]);           // proměnná, ze které se jméno bere
+    }
   }
   return vars;
+}
+
+/**
+ * Smlouva jmen sítě nájemce společné lane (GPU uzel). Síť `<vlastník>-lane-<nájemce>` ZAKLÁDÁ compose
+ * vstupu lane operátora jako `${ACCEL_OWNER_PREFIX}-lane-${ACCEL_NAJEMCE_<n>}` a tenký stack nájemce se
+ * na ni připojuje jako `external` `${LANE_VLASTNIK}-lane-${APP_NAME_PREFIX}`. Je to TÝŽ název ve dvou
+ * zápisech: vlastník = LANE_VLASTNIK (profil lane_gpu.vlastnik) ↔ ACCEL_OWNER_PREFIX (deklarace uzlu),
+ * nájemce = APP_NAME_PREFIX ↔ ACCEL_NAJEMCE_<n> (accel-uzel.mjs: jméno nájemce = prefix instance).
+ * Normalizace převede oba zápisy na jeden tvar; nic jiného se tím nepáruje.
+ */
+export function tvarSiteNajemce(n: string): string {
+  return n
+    .replace(/\$\{(?:LANE_VLASTNIK|ACCEL_OWNER_PREFIX)(?::\?[^}]*)?\}/g, "«vlastník»")
+    // parseNetworks bere `name:` do první mezery: `${APP_NAME_PREFIX:?identita instance}` dojde jako
+    // `${APP_NAME_PREFIX:?identita` (bez `}`) — konec řetězce se proto bere jako konec rozbalení.
+    .replace(/\$\{APP_NAME_PREFIX(?::\?[^}]*)?(?:\}|$)|\$\{ACCEL_NAJEMCE_[0-9]+\}/g, "«nájemce»");
 }
 
 function scriptProvisionedNetworks(): { names: Set<string>; vars: Set<string> } {
@@ -165,6 +189,39 @@ describe("compose — every external network must actually exist somewhere", () 
     expect(decls.length).toBeGreaterThan(0);
   });
 
+  test("zakladatel sítí = každý compose s docker.sock a `docker network create` (netinit)", () => {
+    const v = warmupProvisionedVars();
+    expect(v.has("MESH_DNS_NETWORK"), "netinit").toBe(true);
+  });
+
+  test("sítě společné lane zakládá compose vstupu SÁM (bez socketu Dockeru): jádro + 8 slotů nájemců", () => {
+    const vstup = decls.filter((d) => d.file === "docker-compose.coolify-accel-vstup.yml" && !d.external).map((d) => d.name);
+    expect(vstup).toContain("${ACCEL_OWNER_PREFIX}-accel-jadro");
+    for (let n = 1; n <= 8; n += 1) expect(vstup, `slot ${n}`).toContain(`\${ACCEL_OWNER_PREFIX}-lane-\${ACCEL_NAJEMCE_${n}}`);
+    expect(warmupProvisionedVars().has("ACCEL_OWNER_PREFIX"), "žádný compose vrstvy nemá docker.sock + network create").toBe(false);
+  });
+
+  test("smlouva jmen sítě nájemce: tenký stack a vstup lane jmenují TUTÉŽ síť; mutace bez zakladatele = nesplněný slib", () => {
+    const tenky = decls.find((d) => d.file === "docker-compose.coolify-model-gpu.yml" && d.key === "lane");
+    expect(tenky?.external, "tenký stack se na síť nájemce jen připojuje").toBe(true);
+    const zalozene = new Set(decls.filter((d) => !d.external).map((d) => tvarSiteNajemce(d.name)));
+    expect(zalozene.has(tvarSiteNajemce(tenky!.name)), `${tenky!.name} ↔ ${[...zalozene].filter((x) => x.includes("lane-«nájemce»")).join(", ")}`).toBe(true);
+    const bezVstupu = new Set(decls.filter((d) => !d.external && d.file !== "docker-compose.coolify-accel-vstup.yml").map((d) => tvarSiteNajemce(d.name)));
+    expect(bezVstupu.has(tvarSiteNajemce(tenky!.name)), "kotva: bez compose vstupu síť nájemce nikdo nezakládá").toBe(false);
+    expect(tvarSiteNajemce("${OTHER}-lane-${APP_NAME_PREFIX:?x}"), "jiný vlastník se nenormalizuje").not.toBe(tvarSiteNajemce(tenky!.name));
+  });
+
+  test("compose, který `docker network create` jen zmiňuje bez docker.sock, sítě nezakládá — kotva", () => {
+    const d = mkdtempSync(join(tmpdir(), "aisha-zakladatel-siti-"));
+    try {
+      writeFileSync(join(d, "docker-compose.coolify-a.yml"), "services:\n  a:\n    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock\n    environment:\n      SIT_A: ${SIT_A:?}\n    command: docker network create x\n");
+      writeFileSync(join(d, "docker-compose.coolify-b.yml"), "services:\n  b:\n    environment:\n      SIT_B: ${SIT_B:?}\n    command: echo docker network create y\n");
+      expect([...warmupProvisionedVars(d)]).toEqual(["SIT_A"]);
+    } finally {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
   test("no `external: true` network is a promise nobody keeps", () => {
     // Derived, not maintained: a network is referenceable if a compose file CREATES it
     // (declares it without external: true), a provisioning script creates it, or Coolify
@@ -195,13 +252,14 @@ describe("compose — every external network must actually exist somewhere", () 
     // Slib je splněný, když síť z TÉŽE proměnné zakládá skript v scripts/infra
     // NEBO warmup aplikace. Warmup je jediný plnitel, který funguje na VZDÁLENÉM
     // hostu — proto tu je; skript u operátora tam nedosáhne.
+    const createdByComposeTvar = new Set<string>(decls.filter((d) => !d.external).map((d) => tvarSiteNajemce(d.name)));
     const keptByVariable = (n: string): boolean => {
       const v = varOf(n);
       return v !== null && (createdByScript.vars.has(v) || createdByWarmup.has(v));
     };
 
     const offenders = decls
-      .filter((d) => d.external && !available.has(resolveDefault(d.name)) && !keptByVariable(d.name))
+      .filter((d) => d.external && !available.has(resolveDefault(d.name)) && !keptByVariable(d.name) && !createdByComposeTvar.has(tvarSiteNajemce(d.name)))
       .map(
         (d) =>
           `${d.file}: networks.${d.key} declares external network "${d.name}", but nothing in this repo ` +

@@ -43,7 +43,6 @@ vi.mock('../sandbox.js', () => ({
     config: {},
   })),
   validateCapabilities: (caps: string[], req: string[]) => req.every((r) => caps.includes(r)),
-  createSandboxContext: () => ({}),
   downloadAndVerifyArtifact: vi.fn(async () => 'module.exports = {}'),
 }));
 vi.mock('../runner-client.js', () => ({ runPluginInSandbox: h.runner }));

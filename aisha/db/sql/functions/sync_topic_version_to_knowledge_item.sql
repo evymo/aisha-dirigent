@@ -4,7 +4,7 @@ CREATE OR REPLACE FUNCTION public.sync_topic_version_to_knowledge_item()
  RETURNS trigger
  LANGUAGE plpgsql
  SECURITY DEFINER
- SET search_path TO 'public'
+ SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 AS $function$
 DECLARE
   v_topic RECORD;
@@ -81,7 +81,7 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION sync_topic_version_to_knowledge_item() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION sync_topic_version_to_knowledge_item() TO PUBLIC;
-GRANT EXECUTE ON FUNCTION sync_topic_version_to_knowledge_item() TO authenticated;
-GRANT EXECUTE ON FUNCTION sync_topic_version_to_knowledge_item() TO service_role;
+-- Funkci spouště nikdo nevolá napřímo (PostgreSQL ji mimo spoušť odmítne) a při spuštění
+-- spouště se EXECUTE volajícího nekontroluje — grant komukoli je zbytečný. Do 2026-10-04
+-- tu stálo REVOKE FROM PUBLIC a hned GRANT TO PUBLIC, authenticated, service_role.
+REVOKE ALL ON FUNCTION public.sync_topic_version_to_knowledge_item() FROM PUBLIC, anon, authenticated, service_role;

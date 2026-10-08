@@ -4196,7 +4196,36 @@
         "publish": "Uložit & publikovat",
         "savedDesc": "Branding profil byl uložen.",
         "publishedDesc": "Branding profil byl publikován a je aktivní.",
-        "saveError": "Nepodařilo se uložit branding profil."
+        "saveError": "Nepodařilo se uložit branding profil.",
+        "colorPrimary": "Primární",
+        "colorSecondary": "Sekundární",
+        "colorAccent": "Akcent",
+        "colorBackground": "Pozadí",
+        "colorForeground": "Text",
+        "colorMuted": "Tlumená",
+        "colorSurface": "Plocha",
+        "colorDestructive": "Destruktivní",
+        "icon": {
+          "title": "Složit ikonu okna",
+          "description": "Vyberte obrázek (i SVG), tvar pozadí a jeho barvu. Ikona se vykreslí jako PNG ve vašem prohlížeči a nahraje se.",
+          "source": "Obrázek",
+          "shape": "Pozadí",
+          "shapes": {
+            "kruh": "Kruh",
+            "ctverec": "Zaoblený čtverec",
+            "zadne": "Žádné"
+          },
+          "color": "Barva pozadí",
+          "padding": "Okraj",
+          "preview": "Náhled (záložka, záložky, plocha telefonu)",
+          "apply": "Použít ikonu",
+          "upload": "Nahrát obrázek",
+          "compose": "Složit ikonu",
+          "uploaded": "Nahráno — uložte nebo zveřejněte profil, aby se změna projevila.",
+          "uploadError": "Nahrání se nepodařilo.",
+          "loadError": "Tento obrázek nejde načíst.",
+          "unsupported": "Tento typ souboru nejde použít — použijte PNG, JPG, WebP nebo SVG."
+        }
       },
       "domainRouting": {
         "sectionTitle": "Směrování domén",
@@ -4246,7 +4275,34 @@
         }
       },
       "settingsSaved": "Nastavení uloženo",
-      "settingsError": "Nepodařilo se uložit nastavení"
+      "settingsError": "Nepodařilo se uložit nastavení",
+      "providerCredentials": {
+        "sectionTitle": "Poskytovatelé AI a tokeny",
+        "title": "Poskytovatelé AI a tokeny",
+        "description": "Vlastní tokeny a API klíče této instance. Ukládají se šifrovaně do jejího trezoru a služby je čtou odtud.",
+        "warning": "Hodnotu lze jen nastavit nebo nahradit — zpět se už nezobrazí. Pověření platí pro celou instanci.",
+        "empty": "Žádný poskytovatel, runtime ani MCP server nedeklaruje pověření.",
+        "loadError": "Pověření se nepodařilo načíst.",
+        "usedBy": "Používá",
+        "orphan": "Nikdo ho už nepoužívá",
+        "kind": {
+          "provider": "poskytovatel",
+          "runtime": "runtime",
+          "mcp_server": "MCP server"
+        },
+        "placeholder": "Vložte nový token nebo klíč",
+        "set": "Nastavit",
+        "replace": "Nahradit",
+        "deleteAria": "Smazat pověření {{name}}",
+        "sourceEnv": "Přesunuto z prostředí služby",
+        "sourceAdmin": "Nastaveno v administraci",
+        "saved": "Pověření {{name}} uloženo",
+        "saveError": "Pověření {{name}} se nepodařilo uložit",
+        "deleted": "Pověření {{name}} smazáno",
+        "deleteError": "Pověření {{name}} se nepodařilo smazat",
+        "deleteConfirmTitle": "Smazat pověření {{name}}?",
+        "deleteConfirmDescription": "Služby, které ho používají, ho přestanou dostávat. Dokud ho služba má v prostředí, bere přechodně hodnotu odtud a hlásí varování."
+      }
     },
     "notifications": {
       "title": "Notifikační kampaně",
@@ -4891,7 +4947,25 @@
         "restoreError": "Obnovení verze selhalo"
       },
       "publishedChanges": "Změny zveřejněny",
-      "draftDiscarded": "Koncept zahozen"
+      "draftDiscarded": "Koncept zahozen",
+      "tags": {
+        "manage": "Spravovat štítky",
+        "title": "Správa štítků",
+        "description": "Přejmenujte nebo slučte štítky a nastavte, jak se štítek na webu jmenuje v každém jazyce. Nový štítek vznikne tím, že ho napíšete k článku.",
+        "none": "Zatím žádné štítky.",
+        "counts": "{{count}} článků · {{published}} na webu",
+        "rename": "Přejmenovat",
+        "newValue": "Nový štítek",
+        "renameConfirm": "Přejmenovat",
+        "mergeQuestion": "Štítek „{{to}}“ už existuje. Sloučit do něj „{{from}}“? Články s oběma budou mít jeden.",
+        "mergeConfirm": "Sloučit",
+        "renamed": "Štítek „{{from}}“ je teď „{{to}}“ ({{count}} článků).",
+        "renameError": "Štítek se nepodařilo přejmenovat.",
+        "names": "Názvy podle jazyka",
+        "saveNames": "Uložit názvy",
+        "namesSaved": "Názvy uloženy.",
+        "namesError": "Názvy se nepodařilo uložit."
+      }
     },
     "vouchers": {
       "title": "Vouchery",
@@ -5886,6 +5960,7 @@
       "tooLarge": "Soubor je příliš velký (max {{mb}} MB)",
       "invalidType": "Tento typ souboru nelze nahrát ({{type}})",
       "heicHint": "Fotky z iPhonu (HEIC) se nahrají a webu se doručí převedené.",
+      "notImage": "Není obrázek ({{name}}) — jako obrázek ho použít nejde",
       "infected": "Soubor odmítl antivirus",
       "scanUnavailable": "Antivirus teď není dostupný, zkuste to za chvíli",
       "cancel": "Zrušit",

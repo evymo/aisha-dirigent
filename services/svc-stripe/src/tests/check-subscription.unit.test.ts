@@ -1,10 +1,10 @@
 /**
  * Unit tests for svc-stripe `POST /check-subscription`.
  *
- * Route čte předplatné UŽIVATELSKÝM tokenem (RLS/nárok vlastníka), ale
- * aktivaci po potvrzení u Stripe zapisuje SLUŽBA. Od 2026-10-04 DB odmítá
- * `update_subscription` pod uživatelským tokenem — kdyby route zůstala na
- * rpcUser, aktivace by tiše selhala (chyba se tu polyká jako „non-fatal").
+ * Route čte předplatné UŽIVATELSKÝM tokenem (nárok vlastníka), ale aktivaci po
+ * potvrzení u Stripe zapisuje SLUŽBA. Od 2026-10-06 DB odmítá `update_subscription`
+ * pod uživatelským tokenem (edge_subscriptions: zápis jen služba) — kdyby route
+ * zůstala na rpcUser, aktivace by tiše selhala (chyba se tu polyká jako „non-fatal").
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -40,7 +40,9 @@ async function route(): Promise<Handler> {
   const handlers = new Map<string, Handler>();
   const app = { post: (path: string, h: Handler) => handlers.set(path, h) };
   await checkSubscriptionRoute(app as unknown as Parameters<typeof checkSubscriptionRoute>[0]);
-  return handlers.get('/check-subscription')!;
+  const h = handlers.get('/check-subscription');
+  if (!h) throw new Error('route /check-subscription se nezaregistrovala');
+  return h;
 }
 
 function makeReply() {
@@ -64,6 +66,10 @@ describe('POST /check-subscription', () => {
       if (fn === 'edge_subscriptions' && params.p_action === 'get_user_subscriptions') {
         return { rows: [{ id: SUB, status: 'pending_payment', payment_type: 'recurring' }] };
       }
+      return null;
+    });
+    // edge_profiles je dispečer správy a služby — profil čte route službou (user_id z ověřeného tokenu).
+    mockRpcService.mockImplementation(async (fn: string) => {
       if (fn === 'edge_profiles') return { row: { stripe_customer_id: 'cus_1' } };
       return null;
     });
@@ -112,6 +118,17 @@ describe('POST /check-subscription', () => {
     const { reply } = makeReply();
     await (await route())({ headers: { authorization: 'Bearer jwt-1' } }, reply);
 
-    expect(mockRpcService).not.toHaveBeenCalled();
+    expect(mockRpcService).not.toHaveBeenCalledWith('edge_subscriptions', expect.objectContaining({ p_action: 'update_subscription' }));
+  });
+
+  it('⛔ profil (stripe_customer_id) čte služba pro uživatele z tokenu — uživatelským tokenem edge_profiles neprojde', async () => {
+    const { reply } = makeReply();
+    await (await route())({ headers: { authorization: 'Bearer jwt-1' } }, reply);
+
+    expect(mockRpcService).toHaveBeenCalledWith('edge_profiles', {
+      p_action: 'get_user_profile',
+      p_payload: { user_id: USER },
+    });
+    expect(mockRpcUser).not.toHaveBeenCalledWith('edge_profiles', expect.anything(), expect.anything());
   });
 });

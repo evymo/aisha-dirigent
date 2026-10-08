@@ -340,7 +340,10 @@ END $$;`);
     const P2 = "22222222-3333-4444-8555-000000000003";
     const P3 = "22222222-3333-4444-8555-000000000004";
     const odecet = (t: string, per: string, druh: string, v: number) =>
-      `('meter_reading', '${t}', now(), jsonb_build_object('period', '${per}', 'kind', '${druh}', 'value', ${v}, 'unit', 'kWh'), '${ZDROJ}', '${ZDROJ}:${t}:${per}:${druh}')`;
+      // Odečet je hodnota K DATU (G3, 2026-10-04): jako import sešitu leží na hranici období — počátek
+      // 1. dne měsíce, konec 1. dne následujícího (UTC = výchozí pásmo bloku). Čísla musí vyjít STEJNĚ
+      // jako dřív, kdy bilance četla nálepku `period`/`kind` (ta zůstává, bilance ji už nečte).
+      `('meter_reading', '${t}', (to_date('${per}', 'YYYY-MM')${druh === "konec" ? " + interval '1 month'" : ""})::timestamp at time zone 'UTC', jsonb_build_object('period', '${per}', 'kind', '${druh}', 'value', ${v}, 'unit', 'kWh'), '${ZDROJ}', '${ZDROJ}:${t}:${per}:${druh}')`;
     // Hlavní + dvě podružná (P2 s násobitelem 2) přes POTVRZENÉ hrany; P3 je jen NÁVRH.
     const priprava =
       `select set_config('request.jwt.claims', '{"role":"service_role"}', true); ` +
@@ -376,12 +379,21 @@ END $$;`);
     expect(v.ok, `maska: ${JSON.stringify(v)}`).toBe(true);
     const podle = Object.fromEntries(r.data.rows.map((x) => [x.obdobi as string, x]));
     // leden: (40−10) + (15−5)×2 = 50; P3 (jen návrh, 999) se NEPOČÍTÁ
-    expect(podle["2026-01"]).toMatchObject({ hlavni: 100, podruzne: 50, rozdil: 50, rozdil_pct: 50, chybi: 0,
+    expect(podle["2026-01"]).toMatchObject({ hlavni: 100, podruzne: 50, rozdil: 50, rozdil_pct: 50, chybi: 0, odhad: 0,
       stav: "app.meters.balance.state.measured" });
     // únor: výměna P1 → 20 − 0; P2 navazuje na lednový konec: (25−15)×2 = 20
     expect(podle["2026-02"]).toMatchObject({ hlavni: 40, podruzne: 40, rozdil: 0, stav: "app.meters.balance.state.measured" });
     // březen: P2 bez odečtu → součet NEÚPLNÝ, přizná se
     expect(podle["2026-03"]).toMatchObject({ chybi: 1, stav: "app.meters.balance.state.missing_readings" });
+
+    // Bez `multiplier_path` (hlavička: „volitelné, bez ní 1“) se bilance NESMÍ shodit: prázdná cesta
+    // dřív četla `metadata #>> '{}'` = celý objekt a `::numeric` spadl (naměřeno 2026-10-04).
+    // Násobitel P2 pak platí 1: leden (40−10) + (15−5) = 40.
+    const cfgBezNasobitele = `'{"twin_id":"${H}","relation_kind":"submeter_of","consumption_event":"meter_consumption"}'::jsonb`;
+    const bezNasobitele = jakoUzivatel(admin, `public.get_meter_balance_block(${cfgBezNasobitele})`, priprava) as {
+      data: { rows: Record<string, unknown>[] };
+    };
+    expect(bezNasobitele.data.rows.find((x) => x.obdobi === "2026-01")).toMatchObject({ hlavni: 100, podruzne: 40, rozdil: 60 });
 
     // Dopočet u hlavního: rozdíl je nulový z principu — stav to řekne.
     const sDopoctem = jakoUzivatel(admin, `public.get_meter_balance_block(${cfg})`,

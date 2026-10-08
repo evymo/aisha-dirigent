@@ -1,8 +1,8 @@
 import { hostname } from 'node:os';
 import pino from 'pino';
-import { createSafeLogger } from '@aisha/security';
+import { createSafeLogger, safeLoggerOptions } from '@aisha/security';
 
-const log = pino({ level: process.env['LOG_LEVEL'] ?? 'info' });
+const log = pino(safeLoggerOptions({ level: process.env['LOG_LEVEL'] ?? 'info' }));
 /**
  * OWASP A09 — redacted logger for any path that touches PG NOTIFY payloads.
  * Use this alongside `log` (pino) when the payload may contain user-supplied

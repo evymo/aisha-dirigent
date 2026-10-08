@@ -2,7 +2,7 @@
  * rpcService proti SKUTEČNÉMU tvaru odpovědí PostgRESTu.
  *
  * Testy tras (runs-and-docker) rpcService mockují, takže tvar odpovědi nikdy
- * neviděly. Naměřeno na riq 2026-09-29 09:55Z: `update_agent_run_status` je
+ * neviděly. Naměřeno na instanci 2026-09-29 09:55Z: `update_agent_run_status` je
  * RETURNS void → prázdné tělo → `res.json()` spadl, POST /runs vrátil 500 a běh
  * zůstal 'running' navždy. Tady se volá opravdový rpcService nad podvrženým fetch.
  */

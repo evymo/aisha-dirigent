@@ -18,14 +18,17 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const { mockRpcService } = vi.hoisted(() => ({ mockRpcService: vi.fn() }));
 
 vi.mock('@aisha/security', () => ({
-  constantTimeStringCompare(a: string, b: string): boolean {
+  // vi.fn kvůli testu volajícího místa: služba musí token předat sdílené
+  // kontrole se SVÝM tajemstvím. Vlastnosti porovnání (O(1) odmítnutí rozdílné
+  // délky, konstantní čas) drží SONDOU packages/security (jwt.test.ts).
+  constantTimeStringCompare: vi.fn((a: string, b: string): boolean => {
     if (a.length !== b.length) return false;
     let diff = 0;
     for (let i = 0; i < a.length; i++) {
       diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
     }
     return diff === 0;
-  },
+  }),
   // ⛔ Mock MUSÍ nést i `requireEnv` — config ho volá při importu. Chybějící
   // export se projeví jako pád CELÉHO souboru, ne jako chybějící hodnota.
   requireEnv: (name: string) => process.env[name] ?? `test-${name}`,
@@ -140,10 +143,18 @@ describe('webhook auth — happy + sad paths', () => {
     expect([...messages][0]).toBe(JSON.stringify({ error: 'Unauthorized' }));
   });
 
-  it('1MB token rejected in microseconds (length-fail fast — DoS protection)', async () => {
-    const t0 = performance.now();
-    await callWebhook('POST', { queryToken: 'A'.repeat(1_000_000) });
-    const elapsed = performance.now() - t0;
-    expect(elapsed).toBeLessThan(50);
+  it('1MB token: webhook ho předá sdílené kontrole se SVÝM tajemstvím → 401 (bez stopek)', async () => {
+    // ⛔ Dřív tu stály stopky (`performance.now()` < 50 ms) nad KOPIÍ porovnání
+    // z mocku. Pod zátěží pre-push (2026-10-02, load ~65) vyšlo 76 ms ve
+    // vedlejší službě a push padl na kódu, který se neměnil. Vlastnosti
+    // porovnání dokazuje SONDOU packages/security; tady jen volající místo.
+    const { constantTimeStringCompare: sdilene } = await import('@aisha/security');
+    const sdileneSpy = vi.mocked(sdilene);
+    sdileneSpy.mockClear();
+    const huge = 'A'.repeat(1_000_000);
+    const calls = await callWebhook('POST', { queryToken: huge });
+    expect(calls.status).toBe(401);
+    expect(sdileneSpy).toHaveBeenCalledTimes(1);
+    expect(sdileneSpy).toHaveBeenCalledWith(huge, 'hs-secret-token-from-synapse');
   });
 });

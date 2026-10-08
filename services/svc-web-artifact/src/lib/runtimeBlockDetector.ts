@@ -12,7 +12,7 @@
  *   page-body, hero-slides, news-list, contact-form, discussion-thread, archive-preview,
  *   knowledge-preview, faq-accordion, product-catalog, news-browser, knowledge-browser,
  *   archive-browser, studies-browser, guild-directory, aisha-pruvodce,
- *   community-counter, article-detail, language-switcher.
+ *   community-counter, article-detail, language-switcher, app-banner.
  */
 import type { RuntimeBlockSuggestion } from '../schemas.js';
 
@@ -35,6 +35,7 @@ const KNOWN_BLOCKS = new Set([
   'guild-directory',
   'aisha-pruvodce',
   'community-counter',
+  'app-banner',
 ]);
 
 interface DetectedPattern {

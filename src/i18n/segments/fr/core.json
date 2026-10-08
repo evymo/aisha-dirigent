@@ -883,6 +883,7 @@
     "searchPlaceholder": "Rechercher des articles…",
     "filter": {
       "tags": "Mots-clés",
+      "allTags": "Tous",
       "sort": "Trier",
       "label": "Filtre"
     },
@@ -963,5 +964,12 @@
     "posted": "Publié",
     "signIn": "Connectez-vous pour participer à la discussion",
     "unconfigured": "La discussion n'est pas encore disponible ici."
+  },
+  "appBanner": {
+    "title": "Téléchargez notre application",
+    "text": "Emportez-nous partout — téléchargez l’application mobile.",
+    "appStore": "Télécharger dans l’App Store",
+    "googlePlay": "Disponible sur Google Play",
+    "close": "Fermer"
   }
 }

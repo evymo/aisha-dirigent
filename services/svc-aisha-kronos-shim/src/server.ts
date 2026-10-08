@@ -21,7 +21,7 @@
  * Default port: 9625 (Alquist Kronos default — Maestro ho má jako fallback).
  */
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
-import { applySecurity } from '@aisha/security';
+import { applySecurity, safeLoggerOptions } from '@aisha/security';
 import { config } from './config.js';
 import { projectsRoutes } from './routes/projects.js';
 import { sessionsRoutes } from './routes/sessions.js';
@@ -30,7 +30,7 @@ import { knowledgeBaseRoutes } from './routes/knowledge-base.js';
 import { resourcesRoutes } from './routes/resources.js';
 
 const app = Fastify({
-  logger: { level: config.logLevel },
+  logger: safeLoggerOptions({ level: config.logLevel }),
   trustProxy: true,
 });
 

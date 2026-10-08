@@ -35,7 +35,8 @@ RUN --mount=type=cache,target=/root/.npm \
       --fetch-retries=5 --fetch-retry-mintimeout=20000 --fetch-retry-maxtimeout=120000 \
       --fetch-timeout=600000 --maxsockets=5
 # Build internal deps in dependency order, then the service.
-RUN npm run build --workspace=@aisha/security && \
+RUN npm run build --workspace=@aisha/accel-protokol && \
+    npm run build --workspace=@aisha/security && \
     npm run build --workspace=@aisha/observability && \
     npm run build --workspace=@aisha/cache-redis && \
     npm run build --workspace=@aisha/postgrest-client && \
@@ -59,6 +60,7 @@ ENV NODE_ENV=production
 # node_modules — e.g. @aisha/observability's @opentelemetry/* — travel along).
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/packages/accel-protokol packages/accel-protokol
 COPY --from=build /app/packages/security packages/security
 COPY --from=build /app/packages/observability packages/observability
 COPY --from=build /app/packages/cache-redis packages/cache-redis

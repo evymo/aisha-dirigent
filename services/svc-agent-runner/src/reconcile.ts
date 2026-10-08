@@ -1,11 +1,10 @@
-import { join } from 'node:path';
 import { config } from './config.js';
 import { rpcService } from './db.js';
 import {
   listManagedContainers,
   killContainer,
-  removeWorktree,
-  pruneWorktrees,
+  removeRunDir,
+  cestyBehu,
 } from './backends/claude-cli.js';
 
 interface ReconcileLog {
@@ -41,7 +40,8 @@ export async function reconcileOrphans(log: ReconcileLog): Promise<number> {
     try {
       await killContainer(id);
       if (runId) {
-        await removeWorktree(join(config.agentRunsDir, runId));
+        // Bez hostitelské cesty (AGENT_RUNS_DIR) nevznikl ani běh — nic k úklidu.
+        if (config.agentRunsHostDir) await removeRunDir(cestyBehu(runId).kontejner);
         await rpcService('update_agent_run_status', {
           p_error_summary: 'reconciled orphan on runner restart',
           p_exit_code: -1,
@@ -56,7 +56,6 @@ export async function reconcileOrphans(log: ReconcileLog): Promise<number> {
     }
   }
 
-  await pruneWorktrees().catch(() => {});
   if (reaped > 0) log.info({ reaped }, 'reconciled orphaned claude_cli_task containers on startup');
   return reaped;
 }

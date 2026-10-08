@@ -223,4 +223,31 @@ describe('translateAuthorizationForPostgrest', () => {
       error: 'keycloak_client_not_allowed',
     });
   });
+
+  it('token klienta MCP (z IDE) nevymění ani tehdy, když je klient v povoleném seznamu', async () => {
+    // Revize Guru 2026-10-07: sdílený KC_ALLOWED_CLIENTS nese aisha-mcp-client kvůli /mcp;
+    // gateway by jinak z tokenu IDE udělala JWT PostgRESTu = přístup k celému API.
+    const issuer = 'https://kc.example.test/realms/aisha';
+    const { publicKey, privateKey } = await generateKeyPair('RS256');
+    const publicJwk = await exportJWK(publicKey);
+    const jwks = createLocalJWKSet({ keys: [{ ...publicJwk, alg: 'RS256', kid: 'kc-test-key', use: 'sig' }] });
+    const podepis = (azp: string) => new SignJWT({ azp, sub: '33333333-3333-3333-3333-333333333333' })
+      .setProtectedHeader({ alg: 'RS256', kid: 'kc-test-key', typ: 'JWT' })
+      .setIssuer(issuer)
+      .setAudience(['aisha-mcp-knowledge', 'aisha-app'])
+      .setIssuedAt()
+      .setExpirationTime('5m')
+      .sign(privateKey);
+    const translate = createPostgrestJwtTranslator(jwks, {
+      allowedClients: ['aisha-app', 'aisha-mcp-client'],
+      issuer,
+      postgrestJwtSecret: TEST_HMAC_KEY,
+    });
+
+    expect(await translate(`Bearer ${await podepis('aisha-mcp-client')}`)).toEqual({
+      ok: false, status: 403, error: 'keycloak_client_not_allowed',
+    });
+    // Kotva: týž token od klienta webu projde — pravidlo míří jen na klienta MCP.
+    expect((await translate(`Bearer ${await podepis('aisha-app')}`)).ok).toBe(true);
+  });
 });

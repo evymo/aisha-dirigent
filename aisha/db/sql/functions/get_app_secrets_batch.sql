@@ -23,6 +23,7 @@ BEGIN
   SELECT DISTINCT ON (ds.name) ds.name::text, ds.decrypted_secret::text
   FROM vault.decrypted_secrets ds
   WHERE ds.name = ANY(p_keys)
+    AND ds.name NOT LIKE 'credential:%'
   ORDER BY ds.name, ds.updated_at DESC NULLS LAST;
 END;
 $$;

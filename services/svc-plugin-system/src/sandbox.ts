@@ -6,8 +6,7 @@ import {
   parseHostAllowlist,
 } from '@aisha/security';
 import { config } from './config.js';
-import { callGovernedLlm } from './llm-router.js';
-import { rpcSandboxed, rpcService } from './postgrest.js';
+import { rpcService } from './postgrest.js';
 
 // ── Types ──
 
@@ -56,25 +55,6 @@ interface PluginCatalogRow {
   status: string;
   artifact_url: string;
   artifact_sha256: string;
-}
-
-export interface SandboxContext {
-  /** RPC call (sandboxed to whitelist) */
-  rpc: <T = unknown>(fn: string, params: Record<string, unknown>) => Promise<T>;
-  /** Key-value store scoped to plugin */
-  kv: {
-    get: (key: string) => Promise<unknown>;
-    set: (key: string, value: unknown) => Promise<void>;
-    delete: (key: string) => Promise<void>;
-  };
-  /** Fetch with network allowlist enforcement */
-  fetch: (url: string, init?: RequestInit) => Promise<Response>;
-  /** LLM completion through the governed AISHA router */
-  llm: (prompt: string, options?: { model?: string; maxTokens?: number }) => Promise<string>;
-  /** Send push notification */
-  notify: (userId: string, title: string, body: string) => Promise<void>;
-  /** Log for plugin audit trail */
-  log: (level: 'info' | 'warn' | 'error', message: string, meta?: Record<string, unknown>) => void;
 }
 
 // ── Plugin resolution ──
@@ -128,73 +108,12 @@ export function validateCapabilities(
   );
 }
 
-// ── Sandbox context factory ──
-
-export function createSandboxContext(
-  pluginSlug: string,
-  userId: string,
-  logs: Array<{ level: string; message: string; meta?: Record<string, unknown> }>,
-): SandboxContext {
-  return {
-    rpc: <T = unknown>(fn: string, params: Record<string, unknown>) => rpcSandboxed<T>(fn, params),
-
-    kv: {
-      get: async (key: string) =>
-        rpcService<unknown>('plugin_kv_get', { p_key: key, p_plugin: pluginSlug }),
-      set: async (key: string, value: unknown) => {
-        await rpcService('plugin_kv_set', { p_key: key, p_plugin: pluginSlug, p_value: value });
-      },
-      delete: async (key: string) => {
-        await rpcService('plugin_kv_delete', { p_key: key, p_plugin: pluginSlug });
-      },
-    },
-
-    fetch: async (url: string, init?: RequestInit) => {
-      const parsedUrl = new URL(url);
-      if (parsedUrl.protocol !== 'https:') {
-        throw new Error(`Plugin network access to '${parsedUrl.protocol}' URLs is not allowed`);
-      }
-      if (config.networkAllowlist.length === 0) {
-        throw new Error('No network destinations are allowed for this plugin');
-      }
-      const allowed = config.networkAllowlist.some(
-        (pattern) => parsedUrl.hostname === pattern || parsedUrl.hostname.endsWith('.' + pattern),
-      );
-      if (!allowed) {
-        throw new Error(`Plugin network access to '${parsedUrl.hostname}' is not allowed`);
-      }
-      return fetch(url, { ...init, signal: AbortSignal.timeout(10_000) });
-    },
-
-    llm: async (prompt: string, options?: { model?: string; maxTokens?: number }) => {
-      return callGovernedLlm({
-        maxTokens: options?.maxTokens,
-        model: options?.model,
-        pluginSlug,
-        prompt,
-        userId,
-      });
-    },
-
-    notify: async (targetUserId: string, title: string, body: string) => {
-      await fetch(`${config.pushServiceUrl}/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: targetUserId,
-          title,
-          body,
-          source: `plugin:${pluginSlug}`,
-        }),
-        signal: AbortSignal.timeout(5_000),
-      });
-    },
-
-    log: (level: string, message: string, meta?: Record<string, unknown>) => {
-      logs.push({ level, message, meta });
-    },
-  };
-}
+// ── Sandbox context ──
+// ⛔ Kontext pluginu „v procesu" (createSandboxContext) byl odstraněn 2026-09-29: neměl
+// produkčního volajícího a jeho `rpc` šel přímo na `rpcSandboxed` BEZ vazby zdroje.
+// Jediná cesta pluginu je shim běhu → broker `/sandbox/rpc` a `/sandbox/fetch`
+// (routes/broker.ts), kde se politika i zdroj pluginu kontrolují. Mrtvá cesta s dírou
+// by se jednou zapojila i s dírou.
 
 // ── Artifact download & verification ──
 

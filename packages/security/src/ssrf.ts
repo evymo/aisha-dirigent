@@ -252,10 +252,13 @@ export function createSsrfGuard(opts: SsrfGuardOptions): SsrfGuard {
     try {
       parsed = new URL(url);
     } catch {
-      throw new SsrfBlockedError(`Invalid URL: ${url.slice(0, 80)}`, 'parse');
+      // The raw input is attacker-shaped and may carry credentials; the error
+      // message reaches callers and their logs, so it never echoes it.
+      throw new SsrfBlockedError(`Invalid URL (length ${url.length})`, 'parse');
     }
     if (!allowedSchemes.includes(parsed.protocol)) {
-      log.safeWarn('ssrf.scheme_blocked', { url: parsed.toString(), scheme: parsed.protocol });
+      // Scheme and host are enough to act on; path, query and userinfo are not logged.
+      log.safeWarn('ssrf.scheme_blocked', { scheme: parsed.protocol, host: parsed.hostname.toLowerCase() });
       throw new SsrfBlockedError(`Scheme not allowed: ${parsed.protocol}`, 'scheme');
     }
     const host = parsed.hostname.toLowerCase();

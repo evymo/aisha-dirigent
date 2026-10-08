@@ -1,6 +1,6 @@
 {
   "name": "@aisha/acs-sdk",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "license": "Elastic-2.0",
   "publishConfig": {
     "access": "restricted"

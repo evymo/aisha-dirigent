@@ -222,6 +222,28 @@ that svc-ai-chat uses to reach this very service.
 Free against the ARG_MAX gate: `${VAR:-default}` substitutes to its literal
 default at deploy time, so it does not count toward MAX_ENV_VARS.
 
+## `CLAMD_HOST: ${CLAMD_HOST:-}` (svc-mcp-knowledge)
+
+Antivir u nahrání do znalostní báze (2026-10-03). `/ragnarok/upload` předával soubor
+vyhledávacímu enginu bez skenu — antivirem procházely jen nahrávky přes storage-auth.
+Služba teď buffer pošle clamd (`@aisha/security/av-scan`, týž klient jako storage-auth)
+a dál pustí jen verdikt `clean`; nález = 422, neprovedený sken = 503.
+
+`:-` (prázdné), NE `:?`, a je to záměr: adresu doručuje env-doctor CONTRACT stejně jako
+storage-authu, ale povinná reference by při nedoručení nenasadila CELÉ jádro kvůli jedné
+nahrávací cestě. Prázdný cíl služba nezkouší uhodnout (protokol clamd nemá autentizaci —
+uhodnuté jméno by obsah souboru poslalo tomu, kdo na něm odpoví): sken se prohlásí za
+neprovedený a nahrání se odmítne. Fail-closed tedy drží na úrovni cesty, ne stacku.
+
+`CLAMD_PORT: "3310"` je literál, ne `${CLAMD_PORT:-3310}`: port není vlastnost instance, ale
+kontraktu stacku antiviru (`infra/clamav/clamd.conf`: `TCPSocket 3310`) — stejně jako porty
+ostatních vnitřních služeb. Výchozí hodnota nad proměnnou by byla nový fallback nad env
+(brána `zadny-fallback-nad-identitou`: snímek smí jen klesat).
+
+`AV_SCAN_ENABLED: ${AV_SCAN_ENABLED:-}` je týž vypínač jako u storage-auth; prázdné = nenastaveno.
+Výchozí stav nedrží compose, ale služba: sken je ZAPNUTÝ, dokud proměnná není doslovně `false`
+(neznámý nebo chybějící bezpečnostní přepínač = zavřeno), a v produkci vypnout nejde vůbec.
+
 ## `svc-web-artifact:`
 
 ─── svc-web-artifact — HTML→GrapesJS converter + URL scraper + seed-default ─
@@ -512,6 +534,12 @@ Komu brána věří při výměně KC tokenu za PostgREST JWT. Skládá to
 overlay); bez tohohle řádku by hodnota existovala v .env.coolify, brána
 by ji vyžadovala — a `coolify-sync-envs` by ji NEDORUČIL, protože sync
 posílá jen klíče, které compose zmiňuje. Naměřeno 2026-09-01.
+
+Týž řádek je i v bloku `svc-mcp-knowledge` (2026-10-04): koncový bod MCP
+věří týmž klientům. Do té doby službě proměnná nedorazila a platil výčet
+zapsaný v jejím kódu — druhý domov vedle deklarace realmu, do kterého se
+klient instance ani nový platformní klient nedostal (403 po přihlášení).
+Služba teď bez hodnoty nenastartuje a prázdný seznam nevěří nikomu.
 ```
 
 ### `SPA_DOOR_MODE: ${SPA_DOOR_MODE:-off}`

@@ -1,0 +1,41 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify-accel-hostfw.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+x-aisha-povinne-za-behu: [ACCEL_OWNER_PREFIX, ACCEL_FW_NODE_OWNER, ACCEL_FW_MODE, ACCEL_FW_SSH, ACCEL_FW_ADMIN_CIDRS, ACCEL_FW_CONFIRM_S, ACCEL_FW_INTERVAL_S]
+services:
+  accel-hostfw:
+    build:
+      context: .
+      dockerfile: Dockerfile.accel-hostfw
+      args:
+        REGISTRY_PROXY: ${REGISTRY_PROXY:-}
+    container_name: ${ACCEL_OWNER_PREFIX}-accel-hostfw
+    restart: unless-stopped
+    init: true
+    network_mode: host
+    cap_drop: [ALL]
+    cap_add: [NET_ADMIN, NET_RAW]
+    security_opt: ["no-new-privileges:true"]
+    read_only: true
+    tmpfs:
+      - /run:size=1m,mode=0755
+      - /tmp:size=4m,mode=1777
+    environment:
+      ACCEL_OWNER_PREFIX: ${ACCEL_OWNER_PREFIX}
+      ACCEL_FW_NODE_OWNER: ${ACCEL_FW_NODE_OWNER}
+      ACCEL_FW_MODE: ${ACCEL_FW_MODE}
+      ACCEL_FW_SSH: ${ACCEL_FW_SSH}
+      ACCEL_FW_ADMIN_CIDRS: ${ACCEL_FW_ADMIN_CIDRS}
+      ACCEL_FW_UDP_MESH_PORT: ${ACCEL_FW_UDP_MESH_PORT:-}
+      ACCEL_FW_CONFIRM_S: ${ACCEL_FW_CONFIRM_S}
+      ACCEL_FW_INTERVAL_S: ${ACCEL_FW_INTERVAL_S}
+      DRY_RUN: ${DRY_RUN:-}
+    healthcheck:
+      test: ["CMD", "/opt/aisha/infra/accel/hostfw.sh", "--zdravi"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: ${ACCEL_FW_CONFIRM_S}s
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=false"

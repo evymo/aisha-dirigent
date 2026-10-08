@@ -16,13 +16,21 @@ git commit
        └── 3. i18n segmenty (npm run i18n:segments:check)
 
 git push
-  └─ pre-push hook (<3min)
-       ├── 1. Gate testy (npx vitest run --config vitest.gates.config.ts src/tests/gates/)
-       ├── 2. SQL funkce validace (npm run func:validate)
-       ├── 3. i18n kontrola (npm run i18n:check)
-       ├── 4. Unit testy (npm run test:run)
-       └── 5. Build (npm run build)
+  └─ pre-push hook — CÍLENĚ (rozhodnutí majitele 2026-10-05: plné sady jen v CI)
+       ├── 1. preflight, tsc, lint, validate:static, i18n:check (vždy, celorepové)
+       └── 2. cílená dráha (scripts/ci/prepush-cilene.mjs)
+             ├── brány dotčené změnou (nebo celá lehká dráha, když je výběr nejistý)
+             ├── sady dotčených services/packages/plugins/extensions
+             └── unit a script testy, které změněné moduly přímo importují
+     plná sada jako dřív: AISHA_PREPUSH_VSE=1 git push …
+
+CI (Forgejo) — celé sady: Web: Brány, Web: Tests, Services: Tests, Web: Build, …
+     slučuje se jen podle závěrů jobů v CI: npm run ci:verdikt
 ```
+
+> Sekce „Pre-push kontroly" níž popisuje jednotlivé kontroly; které z nich pre-push
+> pustí, rozhoduje od 2026-10-05 výběr podle změny — viz
+> [deploy/CICD.md](deploy/CICD.md), oddíl „Plné sady jen v CI".
 
 ---
 

@@ -31,14 +31,58 @@ ale POUZE na úrovni aplikací. Generátor byl nedeklarovaný kontejner uvnitř
 aplikace `edge` (tier: required), takže zdědil maximální kritičnost, aniž by
 o tom kdo rozhodl. Tady se to napravuje: vlastní aplikace, `tier: optional`.
 
-⛔ SVAZKY SE SDÍLEJÍ JMÉNEM, NE PROJEKTEM. `web-static` i `web-shell` mají
-v obou souborech `name: ${APP_NAME_PREFIX}_…`, takže obě aplikace sahají na
-TÝŽ svazek. Proto musí generátor běžet na TÉMŽE stroji jako `web`
-(`placement: frontend`) — svazky Dockeru hranici hostitele nepřekročí.
+⛔ PŘEDÁNÍ PO SÍTI, NE PŘES DISK (varianta d-ii, rozhodnutí majitele 2026-10-02).
+`web` a generátor jsou DVĚ Coolify aplikace a disk sdílet neumějí: Coolify 4.3.16
+holý `${VAR}` ve zdroji svazku převede na pojmenovaný svazek KAŽDÉ aplikace zvlášť
+(rozbor 2026-09-28), takže `web` vždy četl prázdný `_static`. Teď:
+- generátor drží výstup i skořápku ve VLASTNÍCH svazcích (`web-render-out`,
+  `web-render-shell`) a výstup servíruje sám (Fastify :3040, `src/servirovani.ts`);
+- `web` si stránky TÁHNE přímo meshem — vlastní routa do rozsahu peerů, nginx
+  `upstream` s keepalive a krátkou cache (tvář v meshi: `netbird-agent` +
+  `web-render-mesh-ingress`, katalog `internal_url`);
+- skořápku `web` při startu POSÍLÁ `PUT /shell` toutéž cestou s vlastním tajemstvím
+  `WEB_RENDER_SHELL_TOKEN` (`src/skorapka.ts`, `docker/web-skorapka.sh`).
+Podmínka „týž stroj“ tím odpadla.
 
-Když generátor neběží, web se servíruje dál: nginx nenajde předgenerovaný
-soubor v `/_static` a spadne na SPA fallback (`docker/nginx.conf`). Tedy
-přesně dnešní chování — pomalejší první vykreslení, ale funkční web.
+Když generátor neběží, web se servíruje dál: nginx vydá poslední verzi z cache
+(stale-if-error), a co v cache není, padá po krátkém timeoutu na SPA skořápku
+(`docker/nginx.conf` `@spa`). Tedy nejhůř dnešní chování — pomalejší první
+vykreslení, ale funkční web.
+
+Servírování (`src/servirovani.ts`): globální limit požadavků na výdejních trasách
+NEPLATÍ (volá jen Edge; 60/min na klienta by návštěvníkům vracel 429), ETag
+a Last-Modified pro levnou revalidaci (304), obrázky jen v přesném tvaru
+`<16 hex>.<přípona>`, a 412, když Edge pošle otisk jiné skořápky, než ze které
+je výstup (`.skorapka-otisk` ve výstupu přežije restart). Zápisy stránek
+i obrázků jsou atomické (dočasný soubor + rename); obrázek se nepřepisuje.
+Bez `WEB_RENDER_SHELL_TOKEN` služba NEPADÁ (Coolify by ji po limitu restartů
+zastavil i se servírováním) — `PUT /shell` jen odmítá 503 a start to hlasitě hlásí.
+
+⛔ JMÉNA (naměřeno 2026-10-02 bránami při zavádění d-ii):
+- Cíl trasy mesh-ingressu skládá derivace z `container_name` služby, kdežto Coolify
+  `container_name` přepisuje a živý zůstává jen ALIAS. Proto `svc-web-render` nese
+  `container_name` i alias se STEJNÝM jménem `<prefix>-svc-web-render`. Bez
+  `container_name` se `WEB_RENDER_MESH_INGRESS_ROUTES` vůbec neodvodilo.
+- `netbird-agent` je hostitel netns ingressu a alias cíle mít NESMÍ: ingress by
+  cíl přeložil sám na sebe. Proto má jen holý seznam sítí.
+- Bloky agenta a ingressu vyrábí `scripts/mesh-conformance-apply.mjs` z kanonického
+  vzoru (`docker-compose.coolify-model.yml`). Do 2026-10-02 nástroj míjel identitní
+  tvar jmen vzoru a nový stack zdědil jména MODELU (`<prefix>-model--netbird`,
+  alias `<prefix>-svc-model`). Opraveno v nástroji.
+
+⛔ `WEB_RENDER_SHELL_TOKEN` je HOLÝ `${VAR}`, ne `${VAR:?}`. Fail-fast `:?`
+dělá z proměnné parse-required, a tím ji Coolify pošle i do buildu
+(`docker history`), což rohatka build-time tajemství zastavila. Doručení
+měří read-back v `coolify-sync-envs.sh` a služba bez tokenu nenaběhne
+(`requiredEnv`).
+
+⛔ MESH JMÉNO `<prefix>-web-render.<mesh>` vyrábí fáze F cold-startu
+(`netbird-dns-provision.mjs`), stejně jako u ostatních edge→mesh upstreamů.
+Na instanci, kde web-render přibyde běžným nasazením, je potřeba konvergence
+(`cold-start --skip-create`) nebo `netbird-dns-provision --apply`. Do té doby
+Edge servíruje SPA. Jméno PEERU (`frontend-web-render`) se nepoužívá záměrně:
+po re-enrollmentu dostane NetBird nový peer s příponou a staré jméno zůstane
+na odpojeném peerovi (`scripts/lib/mesh-peers.mjs`).
 
 ## `depends_on:`
 
@@ -120,44 +164,18 @@ Bere se proto rovnou jméno, které tenhle soubor už používá pro službu
 (`requiredEnv`) a bez ní nestartuje, takže se nikdy neloguje jinak,
 než co je tady napsané.
 
-## `- "${WEB_RENDER_STATIC_HOST_DIR}:/out"` (od 2026-09-24; dřív doslovné níž)
+## `- web-render-out:/out` a `- web-render-shell:/shell` (od 2026-10-02, d-ii)
 
-Hostitelský adresář TÉTO instance, `/var/lib/<identita>/web-render/static`, tutéž
-proměnnou mountuje `web` na `_static`. Doslovná cesta z nadpisu níž byla sdílená
-všemi instancemi na stroji (naměřeno 2026-09-23: renderery dvou instancí psaly do
-jednoho adresáře a `uklidOsirele` si navzájem mazaly stránky).
+Vlastní pojmenované svazky aplikace — Coolify je pojmenuje podle UUID, takže jsou
+per instance konstrukcí a nic se nesdílí. `/out` plní generátor, `/shell` zapisuje
+jen `PUT /shell` od webu. Vlastnictví srovnává entrypoint (`chown node`).
 
-### Historie: `- /var/lib/aisha/web-static:/out`
+### Historie: `${WEB_RENDER_STATIC_HOST_DIR}:/out`, `${WEB_RENDER_SHELL_HOST_DIR}:/shell:ro` (2026-09-24 → 10-02)
 
-⛔ VAZBA NA HOSTITELE, NE POJMENOVANÝ SVAZEK. Naměřeno 2026-08-31:
-Coolify jména svazků PŘEPISUJE podle UUID aplikace — `name:` v compose
-ignoruje. Dvě aplikace tak dostaly dva různé svazky
-(`ul7mwfes…_web-static` vs `zkcs5zu7…_web-static`) a generátor psal do
-prázdna, které nikdo neservíruje. Sdílení „jménem" tedy mezi aplikacemi
-NEFUNGUJE, ať je `name:` jakékoli.
-Absolutní cesta na hostiteli nemá co přepsat, a je to v tomhle repu
-zavedená praxe (viz /var/lib/aisha/agent-runs v compose-exec).
-Obě aplikace MUSÍ běžet na témž stroji — což zajišťuje `placement: frontend`.
-
-⛔ CESTA JE DOSLOVNÁ, BEZ ${APP_NAME_PREFIX}. Coolify nasazení se zdrojem
-svazku obsahujícím `${` ODMÍTNE („Invalid volume source: contains
-forbidden character") — a `docker compose config -q` to přitom přijme,
-takže se to projeví až v ostrém nasazení. Hlídá to brána
-`coolify-compose-compliance`, jinak bych to zjistil až selháním.
-
-Následek: dvě instance na TÉMŽE stroji by si tenhle adresář sdílely.
-Je to táž expozice jako u zavedeného `/var/lib/aisha/agent-runs`
-(compose-exec) a v tomhle uspořádání nenastane — každá instance má
-vlastní server. Kdyby se to změnilo, řeší se to serverem, ne cestou.
-
-## `- "${WEB_RENDER_SHELL_HOST_DIR}:/shell:ro"` (od 2026-09-24)
-
-Skořápku sem při startu kopíruje `web` (`Dockerfile.web`) — do téže proměnné.
-
-### Historie: `- /var/lib/aisha/web-shell:/shell:ro`
-
-Skořápka TÉHOŽ buildu — generátor z ní čte hashované značky skriptů
-a stylů. Hádat je nelze: Vite je při každém buildu přejmenuje.
+Hostitelské adresáře instance odvozené z identity, sdílené s `web`. Nefungovalo:
+Coolify holý `${VAR}` ve zdroji převedl na svazek každé aplikace zvlášť. Ještě dřív
+doslovné `/var/lib/aisha/web-{static,shell}` — sdílené všemi instancemi na stroji
+(naměřeno 2026-09-23: renderery dvou instancí psaly do jednoho adresáře).
 
 ## `- pki-certs:/certs/pki:ro`
 

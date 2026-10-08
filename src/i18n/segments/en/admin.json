@@ -4385,7 +4385,36 @@
         "publish": "Save & Publish",
         "savedDesc": "Branding profile saved.",
         "publishedDesc": "Branding profile published and active.",
-        "saveError": "Failed to save branding profile."
+        "saveError": "Failed to save branding profile.",
+        "colorPrimary": "Primary",
+        "colorSecondary": "Secondary",
+        "colorAccent": "Accent",
+        "colorBackground": "Background",
+        "colorForeground": "Text",
+        "colorMuted": "Muted",
+        "colorSurface": "Surface",
+        "colorDestructive": "Destructive",
+        "icon": {
+          "title": "Compose the browser icon",
+          "description": "Pick an image (SVG works too), the background shape and its colour. The icon is drawn as a PNG in your browser and uploaded.",
+          "source": "Image",
+          "shape": "Background",
+          "shapes": {
+            "kruh": "Circle",
+            "ctverec": "Rounded square",
+            "zadne": "None"
+          },
+          "color": "Background colour",
+          "padding": "Margin",
+          "preview": "Preview (tab, bookmark, home screen)",
+          "apply": "Use icon",
+          "upload": "Upload image",
+          "compose": "Compose icon",
+          "uploaded": "Uploaded — save or publish the profile to apply it.",
+          "uploadError": "Upload failed.",
+          "loadError": "This image cannot be read.",
+          "unsupported": "This file type cannot be used — please use PNG, JPG, WebP or SVG."
+        }
       },
       "domainRouting": {
         "sectionTitle": "Domain Routing",
@@ -4435,7 +4464,34 @@
         }
       },
       "settingsSaved": "Settings saved",
-      "settingsError": "Failed to save settings"
+      "settingsError": "Failed to save settings",
+      "providerCredentials": {
+        "sectionTitle": "AI providers and tokens",
+        "title": "AI providers and tokens",
+        "description": "This instance's own tokens and API keys. They are stored encrypted in the instance vault and services read them from there.",
+        "warning": "A value can only be set or replaced — it is never shown again. A credential applies to the whole instance.",
+        "empty": "No provider, runtime or MCP server declares a credential.",
+        "loadError": "Credentials could not be loaded.",
+        "usedBy": "Used by",
+        "orphan": "Nothing uses it any more",
+        "kind": {
+          "provider": "provider",
+          "runtime": "runtime",
+          "mcp_server": "MCP server"
+        },
+        "placeholder": "Paste a new token or key",
+        "set": "Set",
+        "replace": "Replace",
+        "deleteAria": "Delete credential {{name}}",
+        "sourceEnv": "Moved from the service environment",
+        "sourceAdmin": "Set in administration",
+        "saved": "Credential {{name}} saved",
+        "saveError": "Credential {{name}} could not be saved",
+        "deleted": "Credential {{name}} deleted",
+        "deleteError": "Credential {{name}} could not be deleted",
+        "deleteConfirmTitle": "Delete credential {{name}}?",
+        "deleteConfirmDescription": "Services that use it will stop receiving it. While a service still has it in its environment, it temporarily uses that value and logs a warning."
+      }
     },
     "notifications": {
       "title": "Notification Campaigns",
@@ -5080,7 +5136,25 @@
         "restoreError": "Restoring the version failed"
       },
       "publishedChanges": "Changes published",
-      "draftDiscarded": "Draft discarded"
+      "draftDiscarded": "Draft discarded",
+      "tags": {
+        "manage": "Manage tags",
+        "title": "Manage tags",
+        "description": "Rename or merge tags and set how each tag is called on the website in every language. New tags are created by adding them to an article.",
+        "none": "No tags yet.",
+        "counts": "{{count}} articles · {{published}} on the website",
+        "rename": "Rename",
+        "newValue": "New tag",
+        "renameConfirm": "Rename",
+        "mergeQuestion": "Tag “{{to}}” already exists. Merge “{{from}}” into it? Articles with both will keep one.",
+        "mergeConfirm": "Merge",
+        "renamed": "Tag “{{from}}” is now “{{to}}” ({{count}} articles).",
+        "renameError": "The tag could not be renamed.",
+        "names": "Names per language",
+        "saveNames": "Save names",
+        "namesSaved": "Names saved.",
+        "namesError": "The names could not be saved."
+      }
     },
     "vouchers": {
       "title": "Vouchers",
@@ -5886,6 +5960,7 @@
       "tooLarge": "File is too large (max {{mb}} MB)",
       "invalidType": "This file type cannot be uploaded ({{type}})",
       "heicHint": "iPhone photos (HEIC) upload as they are and are delivered converted.",
+      "notImage": "Not an image ({{name}}) — it can’t be used as a picture",
       "infected": "The file was rejected by the virus scanner",
       "scanUnavailable": "The virus scanner is unavailable right now, try again shortly",
       "cancel": "Cancel",

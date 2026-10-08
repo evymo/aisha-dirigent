@@ -9,7 +9,7 @@ CREATE OR REPLACE FUNCTION public.fn_get_run_extract_context(p_run_id uuid)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 STABLE
 AS $$
 DECLARE
@@ -60,6 +60,14 @@ BEGIN
         LEFT JOIN public.expert_rules er ON er.id = ka.rule_id
         LEFT JOIN public.knowledge_items ki ON ki.id = ka.knowledge_item_id
        WHERE ka.ai_run_id = p_run_id
+         -- Atribuce položky znalostí jen v čitelném stavu: řádek nese i úryvek
+         -- obsahu (context_used) a jde do promptu vytěžení. Atribuce pravidla
+         -- (bez položky) zůstává.
+         -- … a jen položky globální nebo z příběhu TOHOTO běhu: atribuce položky cizího
+         -- příběhu by její název a úryvek přenesla do vytěžení pro jiný příběh.
+         AND (ka.knowledge_item_id IS NULL
+              OR (public.knowledge_state_readable(ki.quarantine_status)
+                  AND (ki.story_id IS NULL OR ki.story_id = (v_run->>'story_id')::uuid)))
        ORDER BY ka.attribution_weight DESC NULLS LAST
        LIMIT 20
     ) t;

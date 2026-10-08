@@ -23,6 +23,18 @@ set -euo pipefail
 
 WORKTREE="${AISHA_WORKTREE:-/work}"
 cd "$WORKTREE"
+# Git přihlášení pro CELÝ běh jen přes env (GIT_CONFIG_*), nikdy do .git/config:
+# /work je samostatný klon (runner ho klonuje per běh, --filter=blob:none), takže
+# líné dotahování obsahu z historie i závěrečný push jdou na remote a potřebují
+# token. AGENT_GIT_TOKEN dítě dostává od runneru už dnes; tady se jen předá gitu.
+# The runner and agent use different UIDs; trust only this isolated clone.
+export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=safe.directory GIT_CONFIG_VALUE_0="$WORKTREE"
+if [ -n "${AGENT_GIT_TOKEN:-}" ]; then
+  export GIT_CONFIG_COUNT=2 GIT_CONFIG_KEY_1=http.extraHeader
+  export GIT_CONFIG_VALUE_1="Authorization: token ${AGENT_GIT_TOKEN}"
+fi
+umask 0000
+export GIT_TERMINAL_PROMPT=0
 
 # Link the live session back to its execution-plane run (E2 reads this in the relay).
 export AISHA_AGENT_RUN_ID="${AISHA_RUN_ID:-${AISHA_AGENT_RUN_ID:-}}"
@@ -36,9 +48,20 @@ emit() { printf '%s\n' "$1"; }
 # before the sentinel and a clean run (exit 0, commit-failed) would be recorded FAILED.
 CLAUDE_EXIT=1
 emit_result() {
+  local actual_exit=$?
+  if [ "$actual_exit" -ne 0 ]; then CLAUDE_EXIT=$actual_exit; fi
   emit "{\"__result\":true,\"value\":{\"ok\":$([ "$CLAUDE_EXIT" -eq 0 ] && echo true || echo false),\"run_id\":\"${AISHA_AGENT_RUN_ID:-}\",\"exit_code\":${CLAUDE_EXIT}}}"
 }
 trap emit_result EXIT
+
+# The publishing branch must belong to this run, including when a caller supplies a label.
+if [ "${AISHA_GIT_PUSH:-0}" = "1" ]; then
+  case "${AISHA_BRANCH:-}" in
+    "aisha/run/${AISHA_AGENT_RUN_ID}/"*|"aisha/run/${AISHA_AGENT_RUN_ID}") ;;
+    *) emit "[agent-claude] refusing a branch outside this run" >&2; exit 64 ;;
+  esac
+  [ -n "${AISHA_AGENT_RUN_ID}" ] && git check-ref-format --branch "$AISHA_BRANCH" >/dev/null
+fi
 
 # Resolve the prompt: explicit env wins, else the story brief in the worktree.
 PROMPT="${AISHA_PROMPT:-}"
@@ -64,9 +87,13 @@ TIMEOUT_S=$(( ${EXEC_TIMEOUT_MS:-3600000} / 1000 ))
 # the run, so we never hard-depend on coreutils being on PATH.
 TIMEOUT_PREFIX=""
 command -v timeout >/dev/null 2>&1 && TIMEOUT_PREFIX="timeout --signal=TERM --kill-after=30s ${TIMEOUT_S}s"
+CONTEXT_ARGS=()
+if [ -f "$WORKTREE/.aisha/run-context.md" ]; then
+  CONTEXT_ARGS=(--append-system-prompt "$(cat "$WORKTREE/.aisha/run-context.md")")
+fi
 set +e
 $TIMEOUT_PREFIX claude -p "$PROMPT" \
-  --output-format stream-json --verbose \
+  --output-format stream-json --verbose "${CONTEXT_ARGS[@]}" \
   --permission-mode "${CLAUDE_PERMISSION_MODE:-acceptEdits}" \
   ${CLAUDE_MODEL:+--model "$CLAUDE_MODEL"}
 CLAUDE_EXIT=$?
@@ -80,8 +107,7 @@ if [ "$CLAUDE_EXIT" -eq 0 ] && [ "${AISHA_GIT_PUSH:-0}" = "1" ]; then
     git -c user.name="AISHA Agent" -c user.email="agent@aisha.local" \
         commit -m "${AISHA_COMMIT_MSG:-chore(agent): automated changes by AISHA Claude run ${AISHA_AGENT_RUN_ID:-unknown}}"
   fi
-  git push origin "HEAD:${AISHA_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}" \
-    || emit "[agent-claude] git push failed (non-fatal)" >&2
+  git push origin "HEAD:refs/heads/${AISHA_BRANCH}"
 fi
 
 # The __result sentinel is emitted by the EXIT trap (emit_result) so it survives a

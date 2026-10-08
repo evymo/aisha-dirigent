@@ -3,8 +3,8 @@ import { rpcService } from './db.js';
 import { issueBrokerToken } from './broker-token.js';
 import { ClaudeCliBackend } from './backends/claude-cli.js';
 import { validateClaudeResult, buildRunOutputs } from './backends/claude-result.js';
-import { createEphemeralKey, revokePeer } from './netbird-client.js';
 import { getRunnerCaps, type RunnerCaps } from './runtime-config.js';
+import { odregistrujBeh, registrujBeh } from './broker-proxy.js';
 
 /**
  * Claude CLI poller — the producer→executor link. fn_spawn_claude_cli_run (called
@@ -60,12 +60,13 @@ export async function pollOnce(log: PollerLog, caps: RunnerCaps): Promise<boolea
   const host = config.runnerBackend + '@' + (process.env.HOSTNAME ?? 'unknown');
   const storyId = (inputs as Record<string, unknown>)['story_id'];
 
-  let nbKey: string | undefined;
-  let nbPeer: string | undefined;
-  if (config.netbirdEnabled) {
-    const nb = await createEphemeralKey(runId).catch(() => undefined);
-    if (nb) { nbKey = nb.setupKey; nbPeer = nb.peerId; }
-  }
+  // Klíč k mesh síti se pro běh nerazí (2026-10-06, volba A) — viz routes/runs.ts.
+  const brokerToken = await issueBrokerToken(
+    { sub: runId, kind: 'claude_cli_task', source_ref: run.source_ref ?? '', user_id: 'poller', tenant_id: '' },
+    timeoutMs,
+  );
+  // Proxy pustí jen token běhu, který právě běží; finalize ho zase odebere.
+  registrujBeh(brokerToken);
 
   const finalize = async (
     status: string,
@@ -74,16 +75,11 @@ export async function pollOnce(log: PollerLog, caps: RunnerCaps): Promise<boolea
     err: string | null,
     outputs: Record<string, unknown> | null = null,
   ): Promise<void> => {
-    if (config.netbirdEnabled && nbPeer) revokePeer(nbPeer).catch(() => {});
+    odregistrujBeh(brokerToken);
     await rpcService('update_agent_run_status', {
       p_error_summary: err, p_exit_code: exitCode, p_host: h, p_outputs: outputs, p_run_id: runId, p_status: status,
     }).catch(() => {});
   };
-
-  const brokerToken = await issueBrokerToken(
-    { sub: runId, kind: 'claude_cli_task', source_ref: run.source_ref ?? '', user_id: 'poller', tenant_id: '' },
-    timeoutMs,
-  );
 
   const cli = new ClaudeCliBackend();
   let ctx;
@@ -93,11 +89,9 @@ export async function pollOnce(log: PollerLog, caps: RunnerCaps): Promise<boolea
       kind: 'claude_cli_task',
       image: run.image || config.agentClaudeImage, // producer may omit image → runner default
       brokerToken,
-      brokerUrl: config.pluginBrokerUrl,
       payload: inputs,
       timeoutMs,
       memoryLimit: caps.execMemoryLimit, // dynamic per-container reservation
-      netbirdSetupKey: nbKey,
       profile: run.profile,
       inputs,
       branch: run.source_ref ?? undefined,

@@ -909,17 +909,69 @@ Přihlašovací údaj pro sentry-cli — NE build arg. Hodnota argu se zapíše
 do metadat obrazu a `docker history` ji vydá komukoli, kdo na obraz
 dosáhne. Do prohlížečového bundlu nepatří vůbec.
 
-## Web mountuje předrenderování z cest INSTANCE (obnoveno 2026-09-24)
+## Web si předrenderování TÁHNE po síti (od 2026-10-02, varianta d-ii)
 
-`"${WEB_RENDER_STATIC_HOST_DIR}:/usr/share/nginx/html/_static:ro"` a
-`"${WEB_RENDER_SHELL_HOST_DIR}:/shell"` — tytéž proměnné jako renderer, odvozené
-z identity (`/var/lib/<identita>/web-render/{static,shell}`). Premisa odstavce níž
-(„identita do cesty nejde, Coolify `${` odmítá") platila jen pro Coolify
-beta.441–442; dnešní Coolify `${VAR}` ve zdroji přijme (`${VAR:-x}` rozvine vždy
-na x, proto celá cesta v jedné proměnné). Jméno je záměrně jiné než legacy
-`/var/lib/aisha/web-*`, kam starý renderer jiné instance píše, dokud nenasadí
-nový compose. Hlídá `hostitelska-cesta-bez-identity-se-sdili` (web i renderer
-musí brát tutéž proměnnou).
+Web nic nemontuje a jde k web-renderu PŘÍMO MESHEM:
+- `docker/web-start.sh` postaví routu do rozsahu peerů (doslovná kopie jádra
+  `infra/mesh/mesh-client-route.sh`, proto `cap_add: NET_ADMIN`, `MESH_ENABLED`,
+  `NETBIRD_PEER_CIDR`, `NETBIRD_DNS_IP`) a z `WEB_RENDER_UPSTREAM_MESH` (derivace)
+  zapíše nginx `upstream` s `resolve` + keepalive. Když se routa nepostaví nebo cíl
+  nemá očekávaný tvar, předrender se NEZAPNE (fail-closed) a web servíruje SPA —
+  veřejná tvář kvůli předrenderu nespadne.
+- nginx táhne stránky (`@predrender`) a `/_img/` (vlastní přísná CSP) s krátkou
+  cache v kontejneru: 30 s + revalidace (ETag → 304), stale-while-revalidate
+  a stale-if-error; 404 1 min; 412 (výstup z jiné skořápky) se necachuje a jde na
+  SPA. Bezpečnostní hlavičky dává jen Edge (`proxy_hide_header` na helmet web-renderu).
+- Mesh jméno se překládá PŘÍMO mesh DNS (`resolver ${NETBIRD_DNS_IP}` v upstreamu,
+  `curl --dns-servers`), ne vestavěným DNS Dockeru: `127.0.0.11` dává přednost aliasům
+  ze sítí kontejneru včetně sdílené `coolify`, takže cizí kontejner s aliasem
+  `<prefix>-web-render.mesh.<tld>` by podstrčil vlastní HTML (naměřeno, revize RIQi
+  Detail firmy 2026-10-02).
+- `docker/web-skorapka.sh` pošle skořápku tohoto buildu `PUT /shell` toutéž cestou
+  (`WEB_RENDER_SHELL_TOKEN` přes `curl -K -`, ne v argv); otisk skořápky jde s každým
+  dotazem (`X-Skorapka-Otisk`).
+
+Proč ne relay přes edge-proxy (první tvar d-ii, posluchač `:8091`): edge-proxy je
+i na síti `coolify` s ostatními nájemníky hostitele, takže cizí kontejner by měl
+neověřený vstup do meshe, a jméno `<prefix>-edge-proxy` šlo na sdílené síti
+přivlastnit (token skořápky, podvržené HTML stránek). Nález nezávislé revize 2026-10-02.
+
+`WEB_RENDER_SHELL_TOKEN` je holý `${VAR}`, ne `${VAR:?}`: `:?` z něj dělá
+parse-required, tedy build-time tajemství (`docker history`), a to rohatka
+nepustí. Doručení hlídá read-back v `coolify-sync-envs.sh`; token přibyl změnou
+kontraktu proměnných → instance ho dostane konvergencí (`cold-start --skip-create`).
+
+Healthcheck webu sonduje `/index.html` (lokální), ne `/` — zdraví webu nesmí záviset
+na web-renderu. Hlídá `hostitelska-cesta-bez-identity-se-sdili` (žádný sdílený zdroj
+svazku mezi webem a rendererem, žádný relay na sdílené síti).
+
+## edge-proxy: mesh jména upstreamů jen přes mesh DNS (od 2026-10-02)
+
+Vestavěné DNS Dockeru (`127.0.0.11`) dává PŘEDNOST aliasům ze sítí kontejneru —
+i ze sdílené `coolify`, kde jsou kontejnery ostatních nájemníků hostitele. Cizí
+kontejner s aliasem `<prefix>-api.mesh.<tld>` by tak přebil mesh DNS a veřejnou
+trasu přesměroval na sebe (naměřeno e2e na skutečném startovním skriptu: bez
+opravy `api.*` vrátilo obsah „squattera“). Routa do rozsahu peerů nepomůže —
+adresa leží na sdílené síti.
+
+Proto každý `reverse_proxy` na upstream z proměnné nese
+`transport http { resolvers ${NETBIRD_DNS_IP} }`: snippet `(mesh_dns)` hned za
+globálním blokem; https upstream (API/AUTH v interní zóně) má `resolvers` ve
+vlastním transportu. `NETBIRD_DNS_IP` se ověřuje jako IPv4 (jde do konfigurace),
+jinak FATAL — týž předpoklad má už routa do meshe. Ve veřejném režimu mesh DNS
+přeloží i veřejná jména (ostatní předává resolveru hostitele), takže závislost
+se nemění: kontejner ho jako `dns:` používal i dřív.
+
+Výjimky (nejsou mesh jména): netbird (`https://` přímá tvář řídicí roviny —
+bootstrap) a `extranet-auth:4180` / dveře `KNOCK_UPSTREAM` (kontejnery téže
+aplikace na síti instance). Hlídá `edge-mesh-jmena-jen-mesh-dns` (vlastnost nad
+skriptem, negativní sonda, mutace).
+
+### Historie: mount předrenderování z cest instance `${WEB_RENDER_*_HOST_DIR}` (2026-09-24 → 10-02)
+
+Tytéž proměnné jako renderer, odvozené z identity. Premisa „Coolify `${VAR}` ve
+zdroji rozvine z env aplikace“ neplatila: Coolify 4.3.16 z holého `${VAR}` udělá
+pojmenovaný svazek každé aplikace zvlášť (rozbor 2026-09-28), `_static` byl prázdný.
 
 ### Historie: web nemountoval předrenderované stránky (`_static`, `/shell`), 2026-09-14 → 09-24
 

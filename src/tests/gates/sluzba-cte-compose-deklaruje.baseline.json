@@ -1,6 +1,6 @@
 {
   "$comment": "ROHATKA třídy „služba čte proměnnou, její blok v docker-compose.coolify*.yml ji neuvádí“ — do kontejneru se tedy nedostane (compose je jediná cesta). Seznam DLUHU po službách: smí jen ubývat; nová čtená proměnná bez řádku v compose = ČERVENÁ; co compose doplní nebo kód přestane číst, musí zmizet i odtud. `bez_bloku` = služby, jejichž blok compose nenašlo (měřidlo bez dosahu) — také jen ubývá.",
-  "$proc": "Naměřeno 2026-09-29: 273 proměnných v 29 službách (měřidlo počítá i pomocníky čtoucí process.env[parametr], komentáře ne). Spouštěč: riq kolo 11 — gateway bez KNOCK_UPSTREAM (ohlášení tabletů vždy 403). Klasifikace dluhu gatewaye je v popisu PR.",
+  "$proc": "Naměřeno 2026-10-06: 267 proměnných v 29 službách (měřidlo počítá i pomocníky čtoucí process.env[parametr], komentáře ne). Spouštěč: kolo forku 11 — gateway bez KNOCK_UPSTREAM (ohlášení tabletů vždy 403); klasifikace dluhu gatewaye je v popisu PR. Rozšířeno 2026-10-06: každý blok se měří zvlášť a blok, který službu staví z jejího Dockerfilu, je také její blok (domain-services-blockchain).",
   "sluzby": {
     "event-worker": [
       "ACS_TRUSTED_KEYS"
@@ -134,7 +134,17 @@
       "SSRF_HOST_ALLOWLIST"
     ],
     "svc-blockchain": [
-      "CIRCUIT_BREAKER_TIMEOUT_MS"
+      "ALLOWED_ORIGINS",
+      "CIRCUIT_BREAKER_TIMEOUT_MS",
+      "COSMOS_ADDRESS_PREFIX",
+      "COSMOS_CHAIN_ID",
+      "COSMOS_GAS_DENOM",
+      "COSMOS_REST_URL",
+      "COSMOS_RPC_URL",
+      "COSMOS_SIGNER_ADDRESS",
+      "COSMOS_SIGNER_MNEMONIC",
+      "RABBITMQ_URL",
+      "SSRF_HOST_ALLOWLIST"
     ],
     "svc-communications": [
       "MESSAGEBIRD_API_KEY",
@@ -168,7 +178,6 @@
       "AISHA_LLM_GATEWAY_URL",
       "HEALTH_AI_LLM_MODE",
       "HEALTH_AI_MODEL",
-      "OPENAI_API_KEY",
       "OPENAI_API_URL",
       "SSRF_HOST_ALLOWLIST"
     ],
@@ -213,7 +222,6 @@
       "CORS_ALLOWLIST",
       "INSIGHT_DEFAULT_LANG",
       "INSIGHT_DEFAULT_PROJECT_ID",
-      "KC_ALLOWED_CLIENTS",
       "LOG_LEVEL",
       "MAESTRO_API_KEY",
       "MAESTRO_URL",
@@ -225,7 +233,6 @@
       "RATE_LIMIT_ENABLED",
       "SSRF_HOST_ALLOWLIST",
       "TRANSLATE_MODEL",
-      "VLLM_API_KEY",
       "VLLM_GENERATION_URL"
     ],
     "svc-money": [

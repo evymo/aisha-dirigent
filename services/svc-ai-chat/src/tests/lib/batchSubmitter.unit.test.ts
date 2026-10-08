@@ -10,6 +10,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const rpcServiceMock = vi.hoisted(() => vi.fn());
+// Čtečka pověření (2026-10-02): v testu trezor = prostředí procesu (tvar createCredentialReader).
+vi.mock('../../lib/credentials.js', () => ({
+  credentials: {
+    get: async (n: string) => process.env[n] ?? null,
+    getMany: async (ns: readonly string[]) => Object.fromEntries(ns.map((n) => [n, process.env[n] ?? null])),
+    migrateEnvCredentials: async () => ({ moved: [], kept: [], absent: [], failed: [] }),
+    invalidate: () => undefined,
+  },
+  POVERENI_Z_PROSTREDI: [],
+}));
 vi.mock('../../postgrest.js', () => ({
   rpcService: rpcServiceMock,
   postgRESTConfig: {},

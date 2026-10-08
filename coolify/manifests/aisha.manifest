@@ -55,13 +55,17 @@ app: registry:frontend:docker-compose.coolify-registry.yml
 app: edge:frontend:docker-compose.coolify-prebuilt.yml
 # web-render: předgenerování publikovaných stránek do statického HTML.
 # VLASTNÍ aplikace, ne kontejner v edge — tier:optional, vlna 10 (za edge).
-# Sdílí s `edge` hostitelské adresáře TÉTO instance (WEB_RENDER_STATIC_HOST_DIR,
-# WEB_RENDER_SHELL_HOST_DIR — odvozené z identity), proto MUSÍ běžet na témže
-# stroji (frontend): hostitelský adresář hranici stroje nepřekročí.
+# S `edge` si předává PO SÍTI (d-ii, 2026-10-02): web táhne stránky a posílá
+# skořápku přímo meshem (vlastní routa webu). Žádný sdílený disk, takže
+# podmínka „týž stroj“ odpadla; placement frontend zůstává jen jako výchozí.
 # Jako kontejner uvnitř edge by po limitu restartů shodil přes StopApplication
 # celou veřejnou tvář — web, api, auth i extranet (naměřeno 2026-08-31, 2×).
 app: web-render:frontend:docker-compose.coolify-web-render.yml
 app: netbird:backend:docker-compose.coolify-netbird.yml
+# netbird-model: řídicí rovina MODELOVÉHO meshe forku (varianta C). Zakládá se jen
+# s lane MODEL_MESH, kterou derivace vydá, když model forku stojí na GPU slotu.
+# SOFT: na hlavním meshi nic nestojí, selhání nesmí zastavit vlny.
+app: netbird-model:backend:docker-compose.coolify-netbird-model.yml
 # monitoring: Dozzle log viewer + dozzle-auth (Keycloak OIDC via studio-proxy).
 # tier:optional ops surface; https://${DOZZLE_DOMAIN} → dozzle-auth:4181. Waved in
 # wave 6 (self-contained) + SOFT_DEPLOY_APPS in aisha-redeploy.mjs.
@@ -144,6 +148,9 @@ app: extranet:frontend:docker-compose.coolify-extranet.yml
 # provisioned only when CHAT_GGUF_URL is set (services.json provision_when_env).
 # SOFT: failure doesn't block waves.
 app: model:experimental:docker-compose.coolify-model.yml
+# model-most: MOST modelového meshe (varianta C, C4) — v hlavním meshi drží jméno
+# modelu, když model stojí na GPU slotu; zakládá se jen s lane MODEL_MESH. SOFT.
+app: model-most:backend:docker-compose.coolify-model-most.yml
 # svc-potok: flow-definition runtime (FDL → verification gates + budgets +
 # provenance ledger). Generace jde přes governed Omni /v1 (svc-ai-chat za
 # core gateway), learning triggeruje WF_FINE_TUNE_JOB — nikdy netrénuje
@@ -178,6 +185,20 @@ app: netinit-experimental:experimental:docker-compose.coolify-netinit.yml
 # HOSTITELE, takže se rozpadá po rolích. Soubory generuje scripts/gen-mesh-router.mjs.
 app: mesh-router-backend:backend:docker-compose.coolify-mesh-router-backend.yml
 app: mesh-router-experimental:experimental:docker-compose.coolify-mesh-router-experimental.yml
+
+# Akcelerační vrstva uzlu `gpu` (GPU) — opt-in: story-init ji založí JEN s deklarací
+# uzlu v datech instance (accel/uzel.json → derive-accel-uzel.mjs → provision_when_env
+# v services.json). Bez deklarace řádky nic nedělají. Na slotu gpu nasazuje Coolify RAW.
+# Firewall hostitele (vlna 1) — chrání uzel dřív, než na něj přijde cokoli dalšího. Viz
+# docs/compose-notes/docker-compose.coolify-accel-hostfw.yml.md. SOFT.
+app: accel-hostfw:gpu:docker-compose.coolify-accel-hostfw.yml
+# Vstup lane (vlna 1, za firewallem): VB, hlídač členství, váhy; zakládá sítě jádra a slotů.
+app: accel-vstup:gpu:docker-compose.coolify-accel-vstup.yml
+# Enginy (vlna 2): slot enginu na nájemce, model z deklarace uzlu. SOFT.
+app: accel-embed-1:gpu:docker-compose.coolify-accel-embed-1.yml
+app: accel-embed-2:gpu:docker-compose.coolify-accel-embed-2.yml
+# Chat (vlna 2): generate s LoRA adaptéry nájemců. SOFT.
+app: accel-chat-1:gpu:docker-compose.coolify-accel-chat-1.yml
 
 # Phase 12 — observability stack (Loki + Prometheus + Grafana behind OAuth2 Proxy).
 # Tier=optional opt-in: surfaces logs + metrics for the rest of the stack; not

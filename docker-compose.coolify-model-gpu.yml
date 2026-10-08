@@ -1,0 +1,108 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify-model-gpu.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+services:
+  model-mesh-agent:
+    image: ${IMAGE_NETBIRD:?pinned netbird image (generate-secrets)}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-model-mesh-agent
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    sysctls:
+      net.ipv4.ip_forward: "0"
+      net.ipv6.conf.all.disable_ipv6: "1"
+    security_opt: ["no-new-privileges:true"]
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        if [ -z "$${NB_MANAGEMENT_URL:-}" ] || [ -z "$${NB_HOSTNAME:-}" ]; then
+          echo "[model-mesh-agent] FATAL: MODEL_MESH_MANAGEMENT_URL / MODEL_MESH_GPU_PEER prázdné — odvozuje topologie forku" >&2
+          exit 1
+        fi
+        CONFIG_FILE=/etc/netbird/config.json
+        for _nb_stav in "$$CONFIG_FILE" /etc/netbird/default.json /var/lib/netbird/default.json; do
+          if [ -s "$$_nb_stav" ]; then CONFIG_FILE="$$_nb_stav"; break; fi
+        done
+        if [ -s "$$CONFIG_FILE" ]; then
+          echo "[model-mesh-agent] state found at $$CONFIG_FILE — reconnecting without setup key"
+          set -- --management-url "$${NB_MANAGEMENT_URL}" --hostname "$${NB_HOSTNAME}"
+        elif [ -n "$${NB_SETUP_KEY:-}" ]; then
+          echo "[model-mesh-agent] enrolling as $${NB_HOSTNAME} via model mesh of the fork"
+          set -- --management-url "$${NB_MANAGEMENT_URL}" --hostname "$${NB_HOSTNAME}" --setup-key "$${NB_SETUP_KEY}"
+        else
+          echo "[model-mesh-agent] State: PENDING_BOOTSTRAP — no config and no setup key"
+          trap 'exit 0' TERM INT
+          while :; do sleep 3600 & wait "$$!" || true; done
+        fi
+        trap 'echo "[model-mesh-agent] received TERM — exiting"; exit 0' TERM INT
+        while :; do
+          netbird up --foreground-mode --disable-dns --disable-client-routes --disable-server-routes --block-lan-access "$$@" || true
+          echo "[model-mesh-agent] netbird up exited — retry in 15s"
+          sleep 15 & wait "$$!" || true
+        done
+    environment:
+      NB_SETUP_KEY: ${MODEL_MESH_SETUP_KEY:-}
+      NB_MANAGEMENT_URL: ${MODEL_MESH_MANAGEMENT_URL:-}
+      NB_HOSTNAME: ${MODEL_MESH_GPU_PEER:-}
+    volumes:
+      - model-mesh-data:/etc/netbird
+      - model-mesh-data:/var/lib/netbird
+    healthcheck:
+      test: ["CMD", "netbird", "status", "--check", "ready"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+    networks:
+      ven: {}
+      lane: {}
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=false"
+
+  svc-model:
+    build:
+      context: .
+      dockerfile: services/svc-lane-klient/Dockerfile
+      args:
+        REGISTRY_PROXY: ${REGISTRY_PROXY:-}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-model-klient
+    restart: unless-stopped
+    network_mode: "service:model-mesh-agent"
+    depends_on:
+      model-mesh-agent:
+        condition: service_started
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ulimits:
+      core: 0
+    environment:
+      LANE_KLIENT_UPSTREAM: ${LANE_VSTUP_URL:-}
+      LANE_KLIENT_ROZHRANI: wt0
+      LANE_KLIENT_PORT: ${MODEL_MESH_PORT}
+      LANE_KLIENT_SPRAVA_PORT: "8081"
+      OTEL_SDK_DISABLED: "true"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8081/__klient/zdravi').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 120s
+      retries: 3
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=false"
+
+networks:
+  ven:
+    name: ${APP_NAME_PREFIX:?identita instance}-model-ven
+  lane:
+    external: true
+    name: ${LANE_VLASTNIK}-lane-${APP_NAME_PREFIX:?identita instance}
+
+volumes:
+  model-mesh-data: {}

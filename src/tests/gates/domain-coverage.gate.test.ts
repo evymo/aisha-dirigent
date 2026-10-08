@@ -34,6 +34,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
+import { verejneDomenyWebu } from "../../../scripts/lib/domeny-webu.mjs";
 
 const ROOT = process.cwd();
 const DERIVE_SCRIPT = join(ROOT, "scripts/lib/derive-domains.mjs");
@@ -340,23 +341,33 @@ describe("Apex redirect — env-derived contract (resolver + templates)", () => 
 
   test("deploy-init and domain doctor register the apex under the same condition", () => {
     const deployInit = readFileSync(join(ROOT, "scripts/coolify-deploy-init.sh"), "utf-8");
+    // Režim apexu vykládá od 2026-10-05 jediný normalizátor (lib/domeny-webu.mjs →
+    // derive-domains normalizeApexMode) — deploy-init ho dostane z CLI domova.
+    expect(deployInit, "deploy-init čte režim apexu z domova").toContain('WEB_APEX_REZIM="$(node "$_di_dir/lib/domeny-webu.mjs" --rezim-apexu)"');
     expect(deployInit, "deploy-init routes apex to edge only in redirect mode").toContain(
-      '[ "${AISHA_WEB_APEX_MODE:-redirect}" != "serve" ] && [ -n "${PUBLIC_TLD:-}" ] && [ "${PUBLIC_TLD}" != "${APP_DOMAIN:-}" ]',
+      '[ "${WEB_APEX_REZIM}" != "serve" ] && [ -n "${PUBLIC_TLD:-}" ] && [ "${PUBLIC_TLD}" != "${APP_DOMAIN:-}" ]',
     );
     expect(deployInit, "deploy-init appends the apex to edge-proxy domains").toContain(
       'EDGE_PROXY_DOMAINS="${EDGE_PROXY_DOMAINS},https://${PUBLIC_TLD}"',
     );
-    expect(deployInit, "deploy-init can route apex to the web app in serve mode").toContain(
-      'WEB_DOMAINS="${WEB_DOMAINS},https://${PUBLIC_TLD}"',
-    );
+    // Apex na WEB v režimu serve: od 2026-10-04 ho pro deploy-init i doktor skládá
+    // JEDINÝ domov domén webu (lib/domeny-webu.mjs). Měří se proto chování domova
+    // a to, že ho oba zapisovatelé volají (úplnou vlastnost hlídá
+    // domeny-webu-jeden-domov.gate.test.ts).
+    expect(deployInit, "deploy-init skládá web domény domovem").toContain('lib/domeny-webu.mjs" --csv');
+    const vstup = { WEB_FQDNS: "", APP_DOMAIN: "web.zona.example", PUBLIC_TLD: "zona.example" };
+    expect(verejneDomenyWebu({ ...vstup, AISHA_WEB_APEX_MODE: "serve" }), "serve: apex patří webu").toMatchObject({
+      domeny: ["https://web.zona.example", "https://zona.example"],
+    });
+    expect(verejneDomenyWebu({ ...vstup, AISHA_WEB_APEX_MODE: "redirect" }), "redirect: apex webu nepatří").toMatchObject({
+      domeny: ["https://web.zona.example"],
+    });
 
     const doctor = readFileSync(join(ROOT, "scripts/coolify-domain-doctor.mjs"), "utf-8");
     expect(doctor, "doctor contract carries the edge redirect mode condition").toMatch(
       /apexMode !== "serve"[\s\S]{0,240}https:\/\/\$\{env\.PUBLIC_TLD\}/,
     );
-    expect(doctor, "doctor contract can assign apex to web in serve mode").toMatch(
-      /apexMode === "serve"[\s\S]{0,240}https:\/\/\$\{env\.PUBLIC_TLD\}/,
-    );
+    expect(doctor, "doktor skládá kontrakt web domovem").toMatch(/verejneDomenyWebu\(env\)/);
   });
 
   test("apex mode keys are registered in both generated .env.coolify sources", () => {

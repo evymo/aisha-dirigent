@@ -219,8 +219,12 @@ done
 case "\${a[0]:-}" in
   --version|rev-parse|ls-files|remote|config|status|diff|log|show) exec /usr/bin/git "$@" ;;
   ls-remote)
-    # jen lokální origin postroje (holé repo na disku), nikdy síť
-    url=$(/usr/bin/git "\${kde[@]}" remote get-url origin 2>/dev/null)
+    # Jen holé repo postroje na disku, nikdy síť. Měří se SKUTEČNÝ cíl dotazu (jméno
+    # remote nebo adresa, po přepisu insteadOf) — ne remote jménem origin: dotaz na
+    # jinou adresu by jinak prošel, jakmile je origin lokální.
+    cil=""
+    for x in "\${a[@]:1}"; do case "$x" in -*) ;; *) cil="$x"; break ;; esac; done
+    url=$(/usr/bin/git "\${kde[@]}" ls-remote --get-url "$cil" 2>/dev/null)
     case "$url" in /*) exec /usr/bin/git "$@" ;; esac ;;
 esac
 exit 128
@@ -262,6 +266,9 @@ export function pripravPostroj(koren: string): { repo: string; home: string; shi
   return { repo, home, shimy, log, hak };
 }
 
+/** Forgejo syntetické instance postroje — odtud a z `repo:` manifestu plyne adresa, ze které se staví. */
+export const FORGEJO_DOMENA_POSTROJE = "repo.inst.invalid";
+
 /**
  * Domény stagingu v kopii repa: syntetické, na `.invalid` (placeholder-scan je propouští).
  * Skutečný soubor instance (je-li v repu) se v kopii PŘEPÍŠE — běh tak nezávisí na
@@ -273,6 +280,9 @@ export function zapisDomenyStagingu(repo: string): void {
     APP_NAME_PREFIX: "inst",
     PUBLIC_TLD: "inst.invalid",
     INTERNAL_TLD: "inst.invalid",
+    // Pin obsluhy (config/domains.env ho ctí): Forgejo instance, ze kterého se staví.
+    // Stejnou adresu nese remote kopie repa — viz zalozGitOrigin().
+    FORGEJO_DOMAIN: FORGEJO_DOMENA_POSTROJE,
     MESH_TLD: "mesh.inst.invalid",
     KEYCLOAK_DOMAIN: "auth.inst.invalid",
     KEYCLOAK_REALM: "inst",
@@ -292,10 +302,11 @@ export function zapisDomenyStagingu(repo: string): void {
 
 /**
  * Kopie repa jako pracovní strom operátora: git repo, jehož HEAD = origin/main
- * (origin je holé repo na disku). Cold-start si to ověřuje, než nasadí (krok 2b2).
+ * (origin je holé repo na disku). Cold-start si to ověřuje, než nasadí (krok 2b2) —
+ * proti repozitáři, ze kterého se staví; `deklarovanaUrl` je jeho adresa.
  * Volat PO úpravách konfigurace a PŘED zápisem .env souborů (ty zůstanou mimo git).
  */
-export function zalozGitOrigin(repo: string): void {
+export function zalozGitOrigin(repo: string, deklarovanaUrl?: string): void {
   // ⛔ NAMĚŘENO 2026-09-25 (fork, pre-push): uvnitř git hooku git exportuje GIT_DIR a
   // GIT_INDEX_FILE. Se ZDĚDĚNÝM prostředím šly `init/add/commit/push origin main` do
   // SKUTEČNÉHO repa: 4 commity „postroj" na větvi, přepsaný index, `core.bare=true`
@@ -313,7 +324,15 @@ export function zalozGitOrigin(repo: string): void {
   }
   git("add", "-A");
   git("-c", "user.email=postroj@invalid", "-c", "user.name=postroj", "commit", "-q", "--no-verify", "-m", "postroj");
-  git("remote", "add", "origin", origin);
+  if (deklarovanaUrl) {
+    // Remote nese ADRESU repozitáře, ze kterého se staví — podle ní ho cold-start
+    // (krok 2b2) pozná, na jménu remote nezáleží. Na holé repo na disku ji přepíše
+    // insteadOf, takže dotaz nikdy neopustí stroj.
+    git("remote", "add", "origin", deklarovanaUrl);
+    git("config", `url.${origin}.insteadOf`, deklarovanaUrl);
+  } else {
+    git("remote", "add", "origin", origin);
+  }
   git("push", "-q", origin, "HEAD:refs/heads/main");
 }
 

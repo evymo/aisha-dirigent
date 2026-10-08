@@ -254,7 +254,8 @@ export const intranetRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
     const { user } = identity;
 
     const jwt = await mintUserJwt(user.id, user.email, user.roles);
-    req.log.info({ email: user.email, userId: user.id }, 'intranet token exchange');
+    // Kdo: userId (DB id). E-mail je PII — logger z továrny ho stejně skryje.
+    req.log.info({ userId: user.id }, 'intranet token exchange');
 
     return reply.send({ jwt, expires_in: 900, user_id: user.id });
   });
@@ -293,7 +294,7 @@ export const intranetRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
       signal: AbortSignal.timeout(30_000),
     });
 
-    req.log.info({ fn_name, email: user.email, status: upstream.status }, 'intranet RPC proxy');
+    req.log.info({ fn_name, userId: user.id, status: upstream.status }, 'intranet RPC proxy');
 
     const contentType = upstream.headers.get('content-type') ?? 'application/json';
     reply.code(upstream.status).header('content-type', contentType);
@@ -313,6 +314,9 @@ export const intranetRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
       return sendError(reply, identity.status, identity.error);
     }
     const email = identity.user.email;
+    // Do logu jde userId: e-mail je PII a logger ho redaktuje, takže by u
+    // zablokovaného nástroje chybělo, kdo to byl.
+    const userId = identity.user.id;
 
     // Parse JSON-RPC body
     const body = req.body as Record<string, unknown> | undefined;
@@ -322,7 +326,7 @@ export const intranetRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
 
     // Only allowlisted JSON-RPC methods may pass through
     if (!MCP_METHOD_ALLOWLIST.has(body.method)) {
-      req.log.warn({ method: body.method, email }, 'intranet MCP method blocked');
+      req.log.warn({ method: body.method, userId }, 'intranet MCP method blocked');
       return sendError(reply, 403, `mcp_method_not_allowed: ${body.method}`);
     }
 
@@ -331,7 +335,7 @@ export const intranetRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
       const params = body.params as Record<string, unknown> | undefined;
       const toolName = params?.name;
       if (typeof toolName !== 'string' || !MCP_TOOL_ALLOWLIST.has(toolName)) {
-        req.log.warn({ tool: toolName, email }, 'intranet MCP tool blocked');
+        req.log.warn({ tool: toolName, userId }, 'intranet MCP tool blocked');
         return sendError(reply, 403, `mcp_tool_not_allowed: ${toolName}`);
       }
     }
@@ -349,7 +353,7 @@ export const intranetRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
       signal: AbortSignal.timeout(30_000),
     });
 
-    req.log.info({ method: body.method, email, status: upstream.status }, 'intranet MCP proxy');
+    req.log.info({ method: body.method, userId, status: upstream.status }, 'intranet MCP proxy');
 
     const contentType = upstream.headers.get('content-type') ?? 'application/json';
     reply.code(upstream.status).header('content-type', contentType);

@@ -85,8 +85,6 @@ export const KNOWN_NO_AUTH_FUNCTIONS = [
   'fn_notify_rule_change',
   'fn_recalculate_ruleset_fingerprint',
   'notify_expert_rules_changed',
-  'sync_expert_rule_to_knowledge_item',
-  'sync_topic_version_to_knowledge_item',
   'trg_production_batch_release_tokens',
   'trigger_knowledge_post_translation',
   'trg_update_training_dataset_counts',
@@ -110,11 +108,14 @@ export const KNOWN_NO_AUTH_FUNCTIONS = [
   'handle_auth_send_email',
   'handle_new_user',
   'handle_order_payment_completed',
+  // edge_blockchain_audit, edge_mobile_notifications, edge_payment_sessions,
+  // edge_public_partners_directory a edge_subscriptions tu byly jako „volá je jen
+  // služba" — premisa, kterou jejich GRANT pro authenticated popíral: kdokoli
+  // přihlášený je volal přímým /rpc/ (nález 2026-10-06). Od té doby mají stráž
+  // před dispečerem (is_service_role / vlastnictví), analyzátor je nehlásí a třídu
+  // per akci hlídá definer-dispecer-autorizuje-kazdou-akci.gate. Zbylé tři
+  // klientský grant nemají (jen service_role) — premisa u nich platí.
   'edge_app_secrets',
-  'edge_blockchain_audit',
-  'edge_database_dump_table',
-  'edge_payment_sessions',
-  'edge_public_partners_directory',
   'edge_sms_otp',
   'edge_stripe_disputes',
   'log_ai_trace_event',
@@ -242,7 +243,6 @@ export const KNOWN_NO_AUTH_FUNCTIONS = [
   'get_translation_value_with_fallback',
   'get_translations_with_status',
   'get_umbrella_study',
-  'mcp_get_story_context',
   'consult_decision_tree',
   'fn_create_improvement_proposal',
   'get_adaptive_model_tiers',
@@ -349,7 +349,6 @@ export const KNOWN_NO_AUTH_FUNCTIONS = [
   'get_guild_members',
   'get_guild_members_marketplace',
   'mcp_get_expertise_areas',
-  'mcp_get_knowledge_stats',
   'mcp_get_rule_detail',
   'mcp_match_experts',
   'register_plugin_event',

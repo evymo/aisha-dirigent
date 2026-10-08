@@ -262,16 +262,20 @@ export async function verifyToken(authHeader: string | undefined): Promise<Verif
       jose_message: cause?.message,
       // Echo the claims our verifier compared against (no PII) so operators
       // can see the precise mismatch without decoding the token manually.
+      // ⛔ Key names carry no token/jwt/secret: the service logger redacts keys
+      // by NAME (@aisha/security safeLoggerOptions), and `token_aud` would come
+      // out as [redacted] — the mismatch diagnostics would keep only expected_*.
+      // These values are claims and fingerprints, not credentials.
       expected_iss: expectedIssuer,
       expected_aud: expectedAudience,
-      token_iss: inspectedClaims['iss'],
-      token_aud: inspectedClaims['aud'],
-      token_azp: inspectedClaims['azp'],
-      token_kid: inspectedHeader['kid'],
-      token_alg: inspectedHeader['alg'],
+      presented_iss: inspectedClaims['iss'],
+      presented_aud: inspectedClaims['aud'],
+      presented_azp: inspectedClaims['azp'],
+      presented_kid: inspectedHeader['kid'],
+      presented_alg: inspectedHeader['alg'],
       // Fingerprints (compare with cert script side-channel log)
-      token_sig_fp: fpJwt(token),
-      token_kid_fp: fpKid(inspectedHeader['kid'] as string | undefined),
+      sig_fp: fpJwt(token),
+      kid_fp: fpKid(inspectedHeader['kid'] as string | undefined),
       // JWKS reachability from container — present only on signature errors
       ...(jwks_state && {
         jwks_reachable_from_container: jwks_state.reachable,

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { readFileSync } from "fs";
+import { existsSync, readFileSync } from "fs";
 import { join } from "path";
 
 const ROOT = process.cwd();
@@ -130,18 +130,15 @@ describe("NetBird bootstrap contract", () => {
     expect(deployInit, "self-heal hook must be skippable via NETBIRD_SELFHEAL_SKIP for fresh installs").toContain("NETBIRD_SELFHEAL_SKIP");
   });
 
-  test("runner uses Keycloak Bearer auth and NetBird auto_groups", () => {
+  test("runner správu meshe nevolá — klíč běhu se nerazí (2026-10-06, majitel „síť zavřít“ = volba A)", () => {
+    // Dřív tu brána hlídala, JAK runner volá správu NetBirdu (Keycloak Bearer, auto_groups)
+    // kvůli klíči pro každý běh. Klíč žádný obraz nepoužil, jen ležel v prostředí kontejneru
+    // pluginu; volba A ho ruší i s pověřením runneru ke správě meshe. Invariant se proto
+    // obrací: runner nemá klienta správy meshe ani NETBIRD_* pověření. Tvar kontejneru běhu
+    // a uzavřenost sítě běhů hlídá `beh-kontejneru-tvar.gate.test.ts`.
     const config = read("services/svc-agent-runner/src/config.ts");
-    const client = read("services/svc-agent-runner/src/netbird-client.ts");
-
-    expect(config).toContain("NETBIRD_AUTH_SCHEME");
-    expect(config).toContain("NETBIRD_KEYCLOAK_CLIENT_ID");
-    expect(config).toContain("NETBIRD_KEYCLOAK_CLIENT_SECRET");
-    expect(client).toContain("client_credentials");
-    expect(client).toContain("Bearer");
-    expect(client).toContain("Token");
-    expect(client).toContain("auto_groups");
-    expect(client).not.toContain("groups: [config.netbirdSandboxGroup]");
+    expect(existsSync(join(ROOT, "services/svc-agent-runner/src/netbird-client.ts"))).toBe(false);
+    expect(config).not.toMatch(/process\.env\.NETBIRD_/);
   });
 
   test("netbird-backend service account emits netbird audience", () => {

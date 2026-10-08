@@ -9,6 +9,10 @@
     "_comment": { "type": "string" },
     "servers": {
       "type": "object",
+      "description": "Klíč = slot (role serveru). Seznam slotů má JEDEN domov — klíče tohoto souboru (scripts/lib/sloty-serveru.mjs). Výčet v propertyNames je opis, který brána sloty-maji-jeden-seznam měří proti klíčům registru i proti výčtům ve services.schema.json a profiles.schema.json.",
+      "propertyNames": {
+        "enum": ["frontend", "build", "backend", "experimental", "gpu"]
+      },
       "additionalProperties": {
         "$ref": "#/definitions/Server"
       }
@@ -17,7 +21,7 @@
   "definitions": {
     "Server": {
       "type": "object",
-      "required": ["hostname", "role", "coolify_uuid", "cpu", "ram_gb", "stacks"],
+      "required": ["hostname", "role", "coolify_uuid", "stacks"],
       "properties": {
         "hostname": {
           "type": "string",
@@ -29,8 +33,8 @@
         },
         "role": {
           "type": "string",
-          "enum": ["production", "build", "backend", "staging"],
-          "description": "Server role determines what workloads can be placed here"
+          "enum": ["production", "build", "backend", "staging", "gpu"],
+          "description": "Server role determines what workloads can be placed here. `gpu` = GPU uzel (stroj s kartou; bydlí na něm vrstva accel i firewall hostitele)."
         },
         "coolify_uuid": {
           "type": "string",
@@ -40,16 +44,6 @@
           "type": "boolean",
           "default": false,
           "description": "If true, server is used only for Docker builds (no runtime)"
-        },
-        "cpu": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Number of CPU cores"
-        },
-        "ram_gb": {
-          "type": "integer",
-          "minimum": 1,
-          "description": "Total RAM in GB"
         },
         "disk_gb": {
           "type": "integer",
@@ -61,10 +55,15 @@
           "default": false,
           "description": "Whether Traefik runs on this server (public HTTP routing)"
         },
+        "proxy": {
+          "type": "string",
+          "enum": ["traefik", "caddy", "none"],
+          "description": "Deklarovaný typ proxy SERVERU v Coolify (vlastnost stroje, ne aplikace). Čte ho scripts/coolify-server-proxy.mjs (porovná, s --apply nastaví a zpětně přečte; cold-start ho volá před vlnami) a doktor (fáze F a vnější expozice). `none` = na serveru neběží proxy Coolify, veřejně na 80/443 nic neodpovídá — služby slotu jsou dosažitelné jen meshem. `none` i `caddy` vylučují has_traefik:true (posudek lib/sloty-serveru.mjs proxySlotu). Slot bez deklarace se neměří ani nemění — nic se nedosazuje. Výčet je opis PROXY_SERVERU v lib/sloty-serveru.mjs (test scripts/coolify-server-proxy.test.mjs je měří proti sobě)."
+        },
         "has_gpu": {
           "type": "boolean",
           "default": false,
-          "description": "Whether the server has GPU available for ML inference"
+          "description": "Whether the server has GPU available for ML inference. Slot s has_gpu discovery serverů NEHÁDÁ (žádné párování podle jména slotu, Traefiku ani jediného serveru v Coolify): vyžaduje výslovnou vazbu — na GPU uzel patří i firewall hostitele, který na jiném stroji nemá co dělat."
         },
         "stacks": {
           "type": "array",

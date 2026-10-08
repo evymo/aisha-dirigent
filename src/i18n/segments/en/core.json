@@ -883,6 +883,7 @@
     "searchPlaceholder": "Search articles…",
     "filter": {
       "tags": "Tags",
+      "allTags": "All",
       "sort": "Sort",
       "label": "Filter"
     },
@@ -963,5 +964,12 @@
       "deleteSuccess": "Document deleted.",
       "deleteError": "Delete failed"
     }
+  },
+  "appBanner": {
+    "title": "Get our app",
+    "text": "Take us with you — download the mobile app.",
+    "appStore": "Download on the App Store",
+    "googlePlay": "Get it on Google Play",
+    "close": "Close"
   }
 }

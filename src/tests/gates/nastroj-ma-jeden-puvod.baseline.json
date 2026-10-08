@@ -1,0 +1,15 @@
+{
+  "$komentar": "RATCHET, ne allowlist: dluh smí jen KLESAT. Klíč = <zdroj>:<jméno> (kanal-vychozi | kanal-seed | agent:<slug>). Jméno v allowed_tools, které není v agent_tools ani v MCP (TOOL_DEFINITIONS svc-mcp-knowledge), executor /chat nespustí (K-35). Naměřeno 2026-10-01 na main 8640db9ac. search_ragnarok: nástroj MCP zmizel při přechodu z edge funkce na svc-mcp-knowledge (gateway ho proto vyřadila); backend /ragnarok/search existuje — obnovit jako nástroj MCP, nebo jméno vyjmout (rozhodne majitel). dirigent (6×): nástroje, které most aisha-mcp-stdio-bridge přeposílá na MCP, ale server je nikdy neimplementoval. occipitum upsert_design_profile / store_agent_memory: RPC existují, nástroj MCP ne. Opravený záznam odsud smaž.",
+  "fantomy": [
+    "kanal-vychozi:search_ragnarok",
+    "agent:dirigent:moderate_flow",
+    "agent:dirigent:evaluate_tests",
+    "agent:dirigent:assess_quality",
+    "agent:dirigent:suggest_next_step",
+    "agent:dirigent:estimate_effort",
+    "agent:dirigent:check_pr_compliance",
+    "agent:occipitum:upsert_design_profile",
+    "agent:occipitum:store_agent_memory",
+    "agent:occipitum:search_ragnarok"
+  ]
+}

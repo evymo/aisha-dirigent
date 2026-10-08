@@ -14,11 +14,13 @@ CREATE OR REPLACE FUNCTION public.fn_record_embedding_vynechani(
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 AS $$
 BEGIN
-  IF public.get_jwt_role() IS DISTINCT FROM 'service_role' THEN
-    RAISE EXCEPTION 'Service role required';
+  -- Jen role služby — týž tvar stráže jako zbytek rodiny dopočtu v1 (is_service_role je domov
+  -- platformy: claim role NEBO SET ROLE service_role; „je někdo přihlášen“ nárok není).
+  IF NOT public.is_service_role() THEN
+    RAISE EXCEPTION 'fn_record_embedding_vynechani: jen role služby' USING ERRCODE = '42501';
   END IF;
   INSERT INTO public.knowledge_embedding_vynechani (chunk_id, locale, identita, duvod, tokenu)
   VALUES (p_chunk_id, COALESCE(p_locale, 'global'), p_identita, p_duvod, p_tokenu)
@@ -27,5 +29,7 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.fn_record_embedding_vynechani(uuid, text, text, text, integer) FROM PUBLIC;
+-- I od anon/authenticated: fork s výchozím EXECUTE pro authenticated (Supabase) by ho jinak dal
+-- každé nové funkci a REVOKE FROM PUBLIC by ho neodebral.
+REVOKE ALL ON FUNCTION public.fn_record_embedding_vynechani(uuid, text, text, text, integer) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.fn_record_embedding_vynechani(uuid, text, text, text, integer) TO service_role;

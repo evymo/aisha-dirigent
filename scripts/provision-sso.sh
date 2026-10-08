@@ -30,6 +30,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+# shellcheck source=scripts/lib/kc-modelovy-mesh.sh
+source "$PROJECT_ROOT/scripts/lib/kc-modelovy-mesh.sh"
 
 # ─── Colors ───────────────────────────────────────────────────
 RED='\033[0;31m'
@@ -644,16 +646,18 @@ assign_scope_to_client() {
 # view-users, query-users) to sync users/groups from Keycloak.
 ensure_netbird_admin_roles() {
   local token="$1"
+  # Klient se předává VÝSLOVNĚ: hlavní mesh `netbird-backend`, modelový `netbird-model-backend`.
+  local klient="${2:?ensure_netbird_admin_roles: chybí klient (netbird-backend | netbird-model-backend)}"
 
-  # Get netbird-backend client UUID
+  # Get ${klient} client UUID
   local nb_json nb_uuid
-  if ! nb_json=$(kc_api GET "/admin/realms/${REALM}/clients?clientId=netbird-backend"); then
-    fail "netbird-backend: na Keycloak se nepodařilo zeptat (HTTP $(kc_code)) — role SA tím nejsou ověřené"
+  if ! nb_json=$(kc_api GET "/admin/realms/${REALM}/clients?clientId=${klient}"); then
+    fail "${klient}: na Keycloak se nepodařilo zeptat (HTTP $(kc_code)) — role SA tím nejsou ověřené"
     return 1
   fi
   nb_uuid=$(printf '%s' "$nb_json" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
   if [[ -z "$nb_uuid" ]]; then
-    warn "netbird-backend client not found — skipping admin role setup"
+    warn "${klient} client not found — skipping admin role setup"
     return 1
   fi
 
@@ -661,9 +665,9 @@ ensure_netbird_admin_roles() {
   kc_api PUT "/admin/realms/${REALM}/clients/${nb_uuid}" '{"fullScopeAllowed": true}' >/dev/null || true
   local http_code="$(kc_code)"
   if [[ "$http_code" == "204" || "$http_code" == "200" ]]; then
-    ok "netbird-backend fullScopeAllowed=true"
+    ok "${klient} fullScopeAllowed=true"
   else
-    warn "Failed to set fullScopeAllowed on netbird-backend (HTTP ${http_code})"
+    warn "Failed to set fullScopeAllowed on ${klient} (HTTP ${http_code})"
   fi
 
   # Get realm-management client UUID
@@ -681,12 +685,12 @@ ensure_netbird_admin_roles() {
   # Get SA user ID
   local sa_json sa_user_id
   if ! sa_json=$(kc_api GET "/admin/realms/${REALM}/clients/${nb_uuid}/service-account-user"); then
-    fail "netbird-backend SA: na Keycloak se nepodařilo zeptat (HTTP $(kc_code))"
+    fail "${klient} SA: na Keycloak se nepodařilo zeptat (HTTP $(kc_code))"
     return 1
   fi
   sa_user_id=$(printf '%s' "$sa_json" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
   if [[ -z "$sa_user_id" ]]; then
-    warn "netbird-backend service account user not found"
+    warn "${klient} service account user not found"
     return 1
   fi
 
@@ -713,7 +717,7 @@ ensure_netbird_admin_roles() {
         "${KC_URL}/admin/realms/${REALM}/users/${sa_user_id}/role-mappings/clients/${rm_uuid}" \
         -H "Authorization: Bearer ${token}" 2>/dev/null || echo "[]")
       if grep -q "\"name\":\"${role_name}\"" <<< "$effective"; then
-        skip "Role '${role_name}' already assigned to netbird-backend SA"
+        skip "Role '${role_name}' already assigned to ${klient} SA"
       else
         warn "Role '${role_name}' not found in realm-management"
       fi
@@ -729,7 +733,7 @@ ensure_netbird_admin_roles() {
       -H "Content-Type: application/json" \
       -d "$roles_payload" 2>/dev/null || true)
     if [[ "$http_code" == "204" || "$http_code" == "200" ]]; then
-      ok "realm-management roles assigned to netbird-backend SA"
+      ok "realm-management roles assigned to ${klient} SA"
     else
       warn "Failed to assign realm-management roles (HTTP ${http_code})"
     fi
@@ -852,7 +856,19 @@ else
   assign_scope_to_client "roles" "netbird-backend" "$KC_TOKEN"
 
   info "Provisioning NetBird admin API access..."
-  ensure_netbird_admin_roles "$KC_TOKEN"
+  ensure_netbird_admin_roles "$KC_TOKEN" netbird-backend
+
+  # ── Modelový mesh forku (varianta C) — klienti JEN s lane MODEL_MESH ─────
+  if [[ -n "${MODEL_MESH:-}" ]]; then
+    section "Modelový mesh forku: klienti Keycloaku"
+    if ! kc_zajisti_klienty_modeloveho_meshe "${NETBIRD_MODEL_DOMAIN:-}" \
+         "${NETBIRD_MODEL_OIDC_SECRET:-}" "${NETBIRD_MODEL_MGMT_SECRET:-}" "${NETBIRD_MODEL_BOOTSTRAP_SECRET:-}"; then
+      fail "Modelový mesh: klienti Keycloaku nejsou v pořádku — řídicí rovina by neověřila žádný token"
+      exit 1
+    fi
+  else
+    info "Modelový mesh: instance ho nemá (MODEL_MESH prázdná) — klienti netbird-model* se nezakládají"
+  fi
 fi
 
 # ═══════════════════════════════════════════════════════════════

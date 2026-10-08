@@ -25,7 +25,7 @@
       "parameters": {
         "category": "custom",
         "functionName": "get_retryable_integration_events",
-        "rpcParams": "={{ JSON.stringify({ p_limit: 20 }) }}",
+        "rpcParams": "={{ JSON.stringify({ p_sources: ['github_webhook'], p_limit: 20 }) }}",
         "authMode": "service_role",
         "options": {
           "timeout": 10000,

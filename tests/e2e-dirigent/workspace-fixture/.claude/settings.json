@@ -247,6 +247,10 @@
           },
           {
             "type": "command",
+            "command": "echo '--- AISHA work (pull) ---' && echo 'Before starting work, pull it from AISHA under your own MCP login (server aisha-knowledge): call my_next_steps, then get_story_context for the story in .aisha/story.json. Report with report_progress and close steps with complete_step — see /aisha-next. If aisha-knowledge needs a login, ask the user to run /mcp.'"
+          },
+          {
+            "type": "command",
             "command": "node ${CLAUDE_PROJECT_DIR}/.claude/hooks/aisha-supervisor-relay.mjs session_start",
             "_aisha": {
               "kind": "relay",

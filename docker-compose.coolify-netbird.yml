@@ -1,6 +1,6 @@
-# Prose lives in docs/compose-notes/docker-compose.coolify-netbird.yml.md — this file is shipped to the
-# server as a command-line argument and competes with ARG_MAX, so it carries
-# configuration only. Add explanations there, anchored to the line they explain.
+# GENEROVÁNO scripts/gen-netbird-instance.mjs ze šablony coolify/netbird/*.tpl a deklarace config/netbird-instances.json — NEEDITOVAT RUČNĚ.
+# Próza: docs/compose-notes/docker-compose.coolify-netbird.yml.md (soubor jde na server jako argument příkazu a soutěží s ARG_MAX).
+# Vysvětlení patří tam, ukotvené k řádku; změna konfigurace patří do šablony nebo deklarace.
 x-netbird-common: &netbird-common
   restart: unless-stopped
   networks:
@@ -17,29 +17,7 @@ services:
     environment:
       NETBIRD_MESH_HOST: ${NETBIRD_MESH_HOST}
       PKI_BRIDGE_URL: ${PKI_BRIDGE_URL}
-      # Odvozuje cold-start z manifestu (pki nasazeno ⇒ true); bez PKI se vypíná
-      # POŽADAVEK, ne jen adresa — výklad: docs/compose-notes/docker-compose.coolify.yml.md
       PKI_BUNDLE_REQUIRED: ${PKI_BUNDLE_REQUIRED:?odvozuje cold-start z manifestu; bez něj pki-init trvá na bundlu i bez PKI}
-      # ⛔ NAMĚŘENO 2026-08-19: tady stálo `https://${KEYCLOAK_DOMAIN_DIRECT}`
-      # (<fork>-auth.backend.<fork>.internal). To jméno se ze sítě `internal` NEROZLIŠÍ
-      # a pki-init nemá žádné extra_hosts — pokus o ně skončil VENKU na cizím
-      # stroji s certem *.evymo.com, takže TLS verify padl a cert pro netbird-mesh
-      # se nikdy nevydal. Následek: internal-tls běžel se self-signed, agenti
-      # neprošli TLS, nikdo neměl wt0, mesh-router neměl cíl → api 502.
-      #
-      # Keycloak je přitom hned vedle: aliasy `<fork>-keycloak`/`keycloak` na
-      # <fork>-shared-net, ověřeno `http://<fork>-keycloak:80/realms/<realm>/
-      # .well-known/openid-configuration` → 200. Hodnota pro tenhle případ už
-      # v SoT JE — `KEYCLOAK_INTERNAL_URL`; nic se nevymýšlí.
-      #
-      # ⭐ PROČ HTTP A NE TLS: pki-init je ten, kdo certifikáty teprve VYDÁVÁ.
-      # Kdyby sám vyžadoval TLS ověřené naší PKI, potřeboval by cert, který ještě
-      # neexistuje — bootstrap kruh. Bezpečné je to tím, že provoz NEOPOUŠTÍ
-      # docker síť; po vydání certů jede všechno ostatní přes TLS a mesh.
-      #
-      # ⛔ NE `extra_hosts: ${KEYCLOAK_DOMAIN}: host-gateway`, jak to dělají jiné
-      # stacky — to je cesta VEN NA HOSTITELE a zpátky, tedy obcházení izolace.
-      # Do mesh sítě má vykukovat jen edge.
       KEYCLOAK_URL: ${KEYCLOAK_INTERNAL_URL:?pki-init volá Keycloak VNITŘNĚ (http://<prefix>-keycloak:80) — jméno z jiné sítě se nerozliší a skončí venku}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:?realm je identita instance, nedosazuje se}
       PKI_BOOTSTRAP_CLIENT_ID: ${PKI_BOOTSTRAP_CLIENT_ID:?PKI_BOOTSTRAP_CLIENT_ID must be delivered by cold-start env — the client constant lives in keycloak/aisha-realm.json}
@@ -55,8 +33,6 @@ services:
       - "traefik.enable=false"
       - "traefik.docker.network=coolify"
     networks:
-      # `internal` = ${APP_NAME_PREFIX}-shared-net, a právě tam má <fork>-keycloak
-      # alias — síť byla celou dobu správná, chybná byla jen ADRESA (viz výše).
       - internal
 
   netbird-db:
@@ -105,28 +81,7 @@ services:
         echo "[netbird-init] management.json rendered ($(wc -c </config/management.json) bytes)"
     environment:
       KEYCLOAK_DOMAIN_PUBLIC: ${KEYCLOAK_DOMAIN_PUBLIC}
-      # ⛔ NAMĚŘENO 2026-08-19 na riqi. Tady stála DOMÉNA a šablona si před ni
-      # lepila `https://` natvrdo — tedy TLS na jméno pod vnitřní TLD, pro které
-      # nevydá certifikát žádná veřejná CA. Management proto neověřil ŽÁDNÝ token:
-      #   Error when validating JWT: Post "https://<fork>-auth.backend.<fork>.internal/…"
-      #   x509: certificate is valid for *.evymo.com, not <fork>-auth.backend.<fork>.internal
-      # Následek byl celý řetěz: bootstrap dostal 401 → nevznikl účet ani setup key
-      # (accounts=0, setup_keys=0) → agenti „setup key is invalid" → nikde wt0 →
-      # mesh-router DNAT bez cíle → api 502.
-      #
-      # ⭐ TÝŽ DŮVOD JAKO U pki-init VÝŠ: kdo Keycloak potřebuje ZEVNITŘ, jde
-      # NAPŘÍMO kontejnerovou sítí. Vnitřní jména se ven nepublikují a mesh je
-      # jediná cesta dovnitř — auth je z ní vyjmutý, protože mesh enrollment
-      # Keycloak sám potřebuje (chicken-and-egg). Ověřeno: management je na
-      # `${APP_NAME_PREFIX}-shared-net` a rozliší `<fork>-keycloak`.
-      #
-      # Předává se CELÁ URL, ne doména — jinak si schéma zase někdo dolepí.
       KEYCLOAK_URL_FROM_CLUSTER: ${KEYCLOAK_INTERNAL_URL:?management ověřuje tokeny VNITŘNĚ (http://<prefix>-keycloak:80) — přes vnitřní jméno s https neexistuje ověřitelný certifikát a odmítne KAŽDÝ token}
-      # ⛔ MUSÍ TU BÝT: šablona se dosazuje `envsubst`, a ten za NEDEKLAROVANOU
-      # proměnnou dosadí PRÁZDNO — ne chybu. Bez tohohle řádku by v
-      # management.json vznikly adresy `/realms//protocol/...` a management by
-      # odmítl každý token, aniž by kdokoli viděl proč. Realm byl do 2026-08-25
-      # v šabloně natvrdo (`aisha`) na 9 místech.
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:?realm vydává topologie; prázdno by envsubst tiše dosadil do všech adres v management.json}
       NETBIRD_DOMAIN: ${NETBIRD_DOMAIN}
       NETBIRD_MESH_HOST: ${NETBIRD_MESH_HOST}
@@ -296,8 +251,6 @@ services:
     <<: *netbird-common
     image: ${REGISTRY_PROXY}library/caddy:2.8.4-alpine
     environment:
-      # TÝŽ seznam, jaký dostává gateway — jeden zdroj (`lib/derive-subnets.mjs`).
-      # Bez něj Caddy `x-forwarded-for` PŘEPÍŠE a klientská adresa se ztratí.
       GATEWAY_TRUSTED_PROXIES: ${GATEWAY_TRUSTED_PROXIES:-}
     container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-netbird--proxy
     expose:
@@ -402,25 +355,6 @@ services:
     labels:
       - "coolify.managed=true"
       - "traefik.docker.network=coolify"
-      # ⛔ ZDE BYLY DVA LABELY POJMENOVÁVAJÍCÍ TRAEFIK SLUŽBU PŘES ${APP_NAME_PREFIX}
-      # a stály celodenní výpadek mesh (naměřeno 2026-08-18).
-      #
-      # Coolify ručně psané labely NEINTERPOLUJE — svoje vlastní generované ano
-      # (`caddy_0=…`, routery s UUID aplikace), ale tenhle propustil beze změny.
-      # Do kontejneru se dostal LITERÁL `${APP_NAME_PREFIX:?…}-netbird-proxy` —
-      # a cizí nájemník na témže hostiteli má týž literál. Traefik proto dva
-      # kontejnery považoval za dvě instance JEDNÉ služby a rozkládal mezi ně
-      # zátěž: 12 požadavků s týmž tokenem → 200 401 200 401 … Router směroval
-      # správně (každý má svůj Host); rozpadlo se to až na službě.
-      #
-      # Jednoznačnost NEDODÁVÁ tenhle label — dodává ji Coolify, které svoje
-      # routery i služby odlišuje UUID aplikace. `scheme=h2c` byla optimalizace,
-      # ne podmínka: Caddy uvnitř má `protocols h1 h2 h2c`, takže po HTTP/1.1
-      # odpoví taky. Port si Coolify bere z mapování domény.
-      #
-      # Hlídá to orákulum jmen (vlastnost 3): jméno Traefik služby nesmí záviset
-      # na interpolaci. Táž třída jako #139 — šablona doručená místo hodnoty.
-
   netbird-internal-tls:
     image: ${REGISTRY_PROXY}library/caddy:2.8-alpine
     container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-netbird--internal-tls
@@ -436,8 +370,6 @@ services:
       netbird-relay:
         condition: service_started
     environment:
-      # TÝŽ seznam, jaký dostává gateway — jeden zdroj (`lib/derive-subnets.mjs`).
-      # Bez něj Caddy `x-forwarded-for` PŘEPÍŠE a klientská adresa se ztratí.
       GATEWAY_TRUSTED_PROXIES: ${GATEWAY_TRUSTED_PROXIES:-}
       NETBIRD_INTERNAL_CERT_B64: ${NETBIRD_INTERNAL_CERT_B64:-}
       NETBIRD_INTERNAL_KEY_B64: ${NETBIRD_INTERNAL_KEY_B64:-}

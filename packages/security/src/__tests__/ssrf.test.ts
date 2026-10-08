@@ -15,6 +15,7 @@
 
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createSsrfGuard, SsrfBlockedError, parseHostAllowlist } from '../ssrf.js';
+import { setLogSink, resetLogSink, type SafeLogEntry } from '../logger.js';
 
 // Stub global fetch to avoid real network calls.
 const fetchSpy = vi.fn();
@@ -159,6 +160,39 @@ describe('createSsrfGuard() — URL parsing edge cases', () => {
     mockedLookup.mockResolvedValueOnce({ address: '93.184.216.34', family: 4 });
     const guard = createSsrfGuard(baseOpts);
     await expect(guard.check('https://API.EXAMPLE.COM/x')).resolves.toBeTruthy();
+  });
+});
+
+describe('createSsrfGuard() — a blocked URL never lands in logs or error messages', () => {
+  const secret = 'Zq8-only-in-the-url';
+  let captured: SafeLogEntry[];
+  beforeEach(() => {
+    captured = [];
+    setLogSink((e) => captured.push(e));
+  });
+  afterEach(() => resetLogSink());
+
+  test('scheme block logs scheme and host only', async () => {
+    const guard = createSsrfGuard(baseOpts);
+    const err = await guard
+      .check(`http://user:${secret}@api.example.com/private/path?token=${secret}`)
+      .catch((e: unknown) => e as SsrfBlockedError);
+    expect(err).toMatchObject({ reason: 'scheme' });
+    const entry = captured.find((e) => e.msg === 'ssrf.scheme_blocked');
+    expect(entry?.ctx).toEqual({ scheme: 'http:', host: 'api.example.com' });
+    expect(JSON.stringify(captured)).not.toContain(secret);
+    expect(JSON.stringify(captured)).not.toContain('/private/path');
+    expect(String(err)).not.toContain(secret);
+  });
+
+  test('parse failure does not echo the raw input', async () => {
+    const guard = createSsrfGuard(baseOpts);
+    const raw = `https://user:${secret}@ not a url`;
+    const err = await guard.check(raw).catch((e: unknown) => e as SsrfBlockedError);
+    expect(err).toMatchObject({ reason: 'parse' });
+    expect(err.message).not.toContain(secret);
+    expect(err.message).toBe(`Invalid URL (length ${raw.length})`);
+    expect(JSON.stringify(captured)).not.toContain(secret);
   });
 });
 

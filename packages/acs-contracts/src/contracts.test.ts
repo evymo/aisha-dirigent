@@ -16,12 +16,27 @@ describe('contract registry', () => {
     expect(() => getSchema('acs.nonsense@9.9')).toThrow(/unknown schema ref/);
   });
 
+  /**
+   * ⛔ VLASTNÍ STROP: tenhle test měří PRÁCI, která roste s vytížením stroje.
+   *
+   * NAMĚŘENO 2026-09-20 při pre-push na sdíleném Macu (osm relací souběžně,
+   * load 60–86): krok skončil na „Test timed out in 5000ms" a trval 11,6 s,
+   * celý soubor 26,2 s. Ostatní čtyři testy v souboru přitom prošly
+   * (0,4 / 3,0 / 4,4 / 2,6 s) — nešlo tedy o zaseknutí, ale o kompilaci všech
+   * schémat pod `ajv strict`, tedy čistou práci CPU. Výchozích 5 s je strop,
+   * který za takové zátěže měří STROJ, ne vlastnost schématu: pre-push se tím
+   * stával loterií a padal i na větvi, jejíž CI byla zelená.
+   *
+   * Strop je proto jen U TOHOTO testu (globální default zůstává 5 s, aby se
+   * skutečné zaseknutí pořád projevilo rychle) a je řádový: 30 s je ~2,6×
+   * nejhorší naměřené trvání.
+   */
   it('every schema compiles under ajv strict mode (2020-12)', () => {
     const ajv = freshAjv();
     for (const ref of SCHEMA_REFS) {
       expect(() => ajv.compile(getSchema(ref)), ref).not.toThrow();
     }
-  });
+  }, 30_000);
 
   it('envelope: accepts a canonical message and rejects control-plane noise', () => {
     const ajv = freshAjv();

@@ -237,3 +237,98 @@ describe('fakta hned, AISHA doplní (majitel 2026-09-29: model uvnitř je pomal�
     expect(b).toEqual([{ errorKey: 'app.ask.error', refining: false }]);
   });
 });
+
+describe('znalosti v Asku (P2 2026-10-06: vyhledávání vlastními modely, selhání nahlas)', () => {
+  /**
+   * Pinuje se SIGNÁL, ne slova: úseky znalostí s odkazy a zdroji, a výpadek vyhledávání,
+   * který se NIKDY nesmí tvářit jako „nic nenalezeno“ ani jako obecný výpadek řetězu.
+   */
+  const fakta = { answer: 'V datech to není.', figures: [], sources: ['answer_verified_facts'] };
+  const odpovedSeZnalostmi = {
+    message: { content: 'Výpovědní lhůta je 90 dní [K1].' },
+    metadata: {
+      run_id: 'abcdef12-3456',
+      grounding: { verdict: 'model', reason: 'model' },
+      knowledge: {
+        hits: 2,
+        citations: [
+          { ref: 'K1', knowledge_item_id: 'i-1', chunk_id: 'c-1', chunk_slug: 'smlouvy:0', similarity: 0.8, cited: true, excerpt: 'Lhůta 90 dní…' },
+          { ref: 'K2', knowledge_item_id: 'i-2', chunk_id: 'c-2', chunk_slug: null, similarity: 0.7, cited: false, excerpt: 'Dodatek…' },
+          { ref: 'K3', excerpt: 'bez zdroje — zahodit' }
+        ]
+      }
+    }
+  };
+
+  it('úseky z citací serveru: odkaz, zdroj (slug, jinak id položky), ukázka; odkázané jsou i zdrojem odpovědi', async () => {
+    const { readChainAnswer } = await import('../src/components/Ask.js');
+    const r = readChainAnswer(odpovedSeZnalostmi);
+    expect(r?.passages).toEqual([
+      { ref: 'K1', source: 'smlouvy:0', excerpt: 'Lhůta 90 dní…', cited: true },
+      { ref: 'K2', source: 'i-2', excerpt: 'Dodatek…', cited: false }
+    ]);
+    expect(r?.sources).toEqual(['ai_runs:abcdef12', 'knowledge:smlouvy:0']);
+  });
+
+  it('úseky dojdou až do panelu a vykreslí se se zdrojem', async () => {
+    const { odpovedVeDvouKrocich, readChainAnswer } = await import('../src/components/Ask.js');
+    const zmeny: Array<Record<string, unknown>> = [];
+    await odpovedVeDvouKrocich(async () => fakta, async () => readChainAnswer(odpovedSeZnalostmi), (z) => zmeny.push(z));
+    expect(zmeny[1]).toMatchObject({ answer: 'Výpovědní lhůta je 90 dní [K1].', refining: false });
+    const posledni = zmeny[1] ?? {};
+    expect((posledni.passages as unknown[]).length).toBe(2);
+    const { AskPanel } = await import('@aisha/design-language');
+    const html = renderToStaticMarkup(
+      <AskPanel question="q" answer="a" passages={posledni.passages as never} passagesLabel="Ze znalostí" notice={undefined} />
+    );
+    expect(html).toContain('[K1]');
+    expect(html).toContain('smlouvy:0');
+    expect(html).toContain('Ze znalostí');
+  });
+
+  it('503 KNOWLEDGE_SEARCH_UNAVAILABLE → hlasitý stav: fakta zůstanou, upozornění + značka SEARCH_DOWN', async () => {
+    const { odpovedVeDvouKrocich, readChainFailure, SEARCH_DOWN, CHAIN_DOWN } = await import('../src/components/Ask.js');
+    const r = readChainFailure({ error: 'Knowledge search unavailable', code: 'KNOWLEDGE_SEARCH_UNAVAILABLE', reason: 'embedding_selhal' });
+    expect(r).toEqual({ hledaniNedostupne: true });
+    const zmeny: Array<Record<string, unknown>> = [];
+    await odpovedVeDvouKrocich(async () => fakta, async () => r, (z) => zmeny.push(z));
+    expect(zmeny[1]).toEqual({ sources: ['answer_verified_facts', SEARCH_DOWN], noticeKey: 'app.ask.searchUnavailable', refining: false });
+    // není to obecný výpadek řetězu ani „nic nenalezeno“
+    expect((zmeny[1] ?? {}).sources).not.toContain(CHAIN_DOWN);
+    // bez faktů: výpadek vyhledávání je chyba panelu (vlastní klíč), ne prázdná odpověď
+    const bez: Array<Record<string, unknown>> = [];
+    await odpovedVeDvouKrocich(async () => { throw new Error('x'); }, async () => r, (z) => bez.push(z));
+    expect(bez).toEqual([{ errorKey: 'app.ask.searchUnavailable', refining: false }]);
+  });
+
+  it('jiné selhání řetězu zůstává obecným výpadkem (kontrolní vzorek)', async () => {
+    const { readChainFailure } = await import('../src/components/Ask.js');
+    expect(readChainFailure({ error: 'Grounded answer unavailable', code: 'GROUNDED_UNAVAILABLE' })).toBeNull();
+    expect(readChainFailure(null)).toBeNull();
+  });
+
+  it('upozornění se vykreslí nahlas (role=status), úseky bez dat nic nekreslí', async () => {
+    const { AskPanel } = await import('@aisha/design-language');
+    const html = renderToStaticMarkup(<AskPanel question="q" answer="a" notice="Vyhledávání nedostupné" />);
+    expect(html).toContain('role="status"');
+    expect(html).toContain('Vyhledávání nedostupné');
+    expect(html).not.toContain('rdl-ask__passages');
+  });
+
+  it('řetěz dostane jazyk čtenáře (bez něj server odpovídal anglicky)', async () => {
+    const src = await import('node:fs/promises').then((fs) =>
+      fs.readFile(new URL('../src/components/Ask.tsx', import.meta.url), 'utf8')
+    );
+    expect(src).toMatch(/language: getLocale\(\)/);
+    expect(src).toMatch(/if \(!res\.ok\) return readChainFailure\(/);
+  });
+
+  it('texty upozornění a nadpisu úseků existují ve všech jazycích extranetu', async () => {
+    const fs = await import('node:fs/promises');
+    for (const loc of ['cs', 'de', 'en', 'fr', 'ru', 'th']) {
+      const d = JSON.parse(await fs.readFile(new URL(`../../../src/i18n/content/${loc}/extranet.json`, import.meta.url), 'utf8')) as Record<string, string>;
+      expect(d['app.ask.searchUnavailable'], loc).toBeTruthy();
+      expect(d['app.ask.passages'], loc).toBeTruthy();
+    }
+  });
+});

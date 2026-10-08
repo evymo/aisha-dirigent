@@ -310,6 +310,40 @@ AS $$ BEGIN END; $$;
     expect(grants.authenticated).toBe(false);
     expect(grants.service_role).toBe(false);
   });
+
+  // ⛔ NAMĚŘENO 2026-10-04: všechny případy výš jmenují funkci BEZ signatury. Vzor
+  // `ON FUNCTION \S+ TO` proto testy prošel a přitom neviděl grant u 1005 funkcí SoT,
+  // jejichž signatura nese mezeru. Tvary níž jsou opsané ze SoT.
+  it.each([
+    ["typy oddělené čárkou a mezerou", "GRANT EXECUTE ON FUNCTION public.f(uuid, uuid) TO service_role;"],
+    ["pojmenované parametry", "GRANT EXECUTE ON FUNCTION public.f(p_product_id uuid, p_quantity integer) TO service_role;"],
+    ["typ o dvou slovech", "GRANT EXECUTE ON FUNCTION f(vector,text,double precision) TO service_role;"],
+    ["typ s rozměrem", "GRANT EXECUTE ON FUNCTION public.f(uuid, vector(1024), integer) TO service_role;"],
+    ["příkaz přes víc řádků", "GRANT EXECUTE\n  ON FUNCTION public.f(\n    uuid,\n    text\n  )\n  TO service_role;"],
+    ["parametr se jménem končícím na _to", "GRANT EXECUTE ON FUNCTION public.f(p_from date, p_to date) TO service_role;"],
+    ["GRANT ALL", "GRANT ALL ON FUNCTION public.f(uuid, text) TO service_role;"],
+  ])("vidí grant, když signatura nese mezeru: %s", (_nazev, sql) => {
+    expect(parser.extractGrants(sql)).toEqual({ anon: false, authenticated: false, service_role: true, public: false });
+  });
+
+  it("zakomentovaný GRANT není grant", () => {
+    const sql = `
+-- GRANT EXECUTE ON FUNCTION public.f(uuid) TO anon;
+/* GRANT EXECUTE ON FUNCTION public.f(uuid) TO authenticated; */
+GRANT EXECUTE ON FUNCTION public.f(uuid) TO service_role;
+`;
+    expect(parser.extractGrants(sql)).toEqual({ anon: false, authenticated: false, service_role: true, public: false });
+  });
+
+  it("roli porovnává celým jménem, ne podřetězcem", () => {
+    const sql = `GRANT EXECUTE ON FUNCTION public.f(uuid) TO anon_reader, "authenticated";`;
+    expect(parser.extractGrants(sql)).toEqual({ anon: false, authenticated: true, service_role: false, public: false });
+  });
+
+  it("PUBLIC jako příjemce pozná, schéma public v signatuře za příjemce nebere", () => {
+    expect(parser.extractGrants("GRANT EXECUTE ON FUNCTION public.f(uuid) TO PUBLIC;").public).toBe(true);
+    expect(parser.extractGrants("GRANT EXECUTE ON FUNCTION public.f(uuid) TO service_role;").public).toBe(false);
+  });
 });
 
 /* ====================================================================

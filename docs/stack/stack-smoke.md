@@ -12,7 +12,7 @@ Three phases, each independent, each skip-able:
 | Phase | What runs | Needs |
 |---|---|---|
 | **1 — preflight** | `git submodule update --init`, `npm run db-mgr:source` if the source-of-truth report is missing | git, repo write access |
-| **2 — offline (no keys, no stack)** | tsc + lint + test:gates + validate:static + i18n:check + test:run (5400+ unit tests) + test:services + build. **Mirrors what pre-push runs** — green here means push is green. | node deps installed (`npm install`) |
+| **2 — offline (no keys, no stack)** | tsc + lint + test:gates + validate:static + i18n:check + test:run (5400+ unit tests) + test:services + build. Odpovídá **plné** sadě pre-pushe (`AISHA_PREPUSH_VSE=1`); běžný pre-push je od 2026-10-05 cílený (pouští ji s `AISHA_SMOKE_SKIP_GATES/UNIT/SERVICES=1` a dotčené brány a testy pustí zvlášť) — celé sady měří CI. | node deps installed (`npm install`) |
 | **3 — warmup smoke** | Detects which LLM backend the operator wired into env. If postgrest + svc-ai-chat + svc-web-artifact are reachable, exercises `/functions/v1/ai-generate` (echo prompt) and `/functions/v1/web-artifact-seed-default` (idempotent — proves whole pipeline) | running stack + service-role token |
 
 ### Three npm scripts
@@ -20,7 +20,7 @@ Three phases, each independent, each skip-able:
 | Script | What runs | When to use |
 |---|---|---|
 | `npm run test:stack` | All three phases | Operator validating a warm stack |
-| `npm run test:stack:full` | Phase 1 + full Phase 2 (incl. build + services) | Pre-push hook; pre-merge gate |
+| `npm run test:stack:full` | Phase 1 + full Phase 2 (incl. build + services) | Ruční plná kontrola; pre-push ji nepouští (viz docs/deploy/CICD.md, „Plné sady jen v CI") |
 | `npm run test:stack:ci` | Phase 1 + Phase 2 minus build + services (≈ 1 min) | CI fast lane; quick local sanity |
 
 `test:stack:ci` and `test:stack:full` differ only in the optional Phase 2

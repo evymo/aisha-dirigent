@@ -33,10 +33,13 @@ COMMENT ON VIEW public.audience_admin_twin_composition_v IS
   'Složení komunity: dvojčata po druhu a zdroji, kolik z nich má aktivitu,
    vazby a nedávný dotek. Odpovídá na otázku "kdo tu je".';
 
--- ⛔ Pohled s právy vlastníka (mimo RLS podkladu) — čte se JEN přes DEFINER
--- blokové funkce get_audience_view_*_block (is_admin_or_staff + jmenný prostor
--- audience_admin_*_v). Přímý grant klientské roli tu stráž obchází (nález
--- 2026-10-04); REVOKE i z authenticated kvůli explicitním grantům z heals
--- a default privileges na běžící DB.
+-- ⛔ Pohled s právy VLASTNÍKA (bez security_invoker) čte podklad MIMO jeho RLS.
+-- Čte se JEN přes DEFINER blokové funkce get_audience_view_*_block (stráž
+-- is_admin_or_staff + jmenný prostor audience_admin_*_v). Přímý grant klientské
+-- roli tu stráž obcházel přes /rest/v1/ (naměřeno na čisté DB main 0f992f647:
+-- authenticated SELECT, u followup_queue/twin_directory i DML z default privileges).
+-- REVOKE i z anon/authenticated: na běžící DB žijí explicitní granty z dřívějších
+-- bloků heals a z ALTER DEFAULT PRIVILEGES při každém DROP+CREATE pohledu.
+-- Třídu hlídá src/tests/db/pohled-s-pravy-vlastnika-bez-klientskeho-grantu.runtime.test.ts.
 REVOKE ALL ON public.audience_admin_twin_composition_v FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.audience_admin_twin_composition_v TO service_role;

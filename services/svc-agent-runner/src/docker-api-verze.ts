@@ -1,7 +1,7 @@
 /**
  * Verze Docker Engine API jako SEGMENT CESTY: `v1.45` → `/v1.45/networks`.
  *
- * ⛔ DVA ZÁPISY TÉŽE HODNOTY (naměřeno 2026-09-30 na riq). Doktor prostředí
+ * ⛔ DVA ZÁPISY TÉŽE HODNOTY (naměřeno 2026-09-30 na instanci). Doktor prostředí
  * zapisuje `DOCKER_API_VERSION=1.45` podle konvence Dockeru (tak ji čte i
  * docker CLI), výchozí hodnota v compose i tady nesla `v1.46`. Kód skládal
  * `'/' + hodnota`, takže z env vznikla cesta `/1.45/networks` a Docker vrátil

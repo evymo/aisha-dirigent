@@ -34,6 +34,7 @@ import { join } from "node:path";
 import { referenceCompose, jmenaReferenci } from "../../../scripts/lib/compose-env-refs.mjs";
 import { RESOLVER_ENV_INPUTS } from "../../../scripts/lib/derive-domains.mjs";
 import { DECLARATION_ENV, OVERLAY_ENV, REQUIRED_ENV } from "../../../scripts/lib/instance-overlay.mjs";
+import { envDoktorDokoncil } from "./_env-doktor-dokoncil";
 
 const ROOT = process.cwd();
 const DOCKERFILE = readFileSync(join(ROOT, "Dockerfile.svc-source-broker"), "utf8");
@@ -234,7 +235,7 @@ describe("zdrojové adaptéry z instančního overlaye", () => {
         encoding: "utf8",
         timeout: 60_000,
       });
-      expect(r.status, r.stderr.slice(-600)).toBe(0);
+      expect(envDoktorDokoncil(r.status), r.stderr.slice(-600)).toBe(true);
       const po = readFileSync(soubor, "utf8");
       expect(po).toMatch(/^SOURCE_ADAPTER_OVERLAY_GIT_URL=https:\/\/repo\.example\.invalid\/org\/instance-data\.git$/m);
       expect(po).toMatch(/^SOURCE_ADAPTER_OVERLAY_REF=main$/m);

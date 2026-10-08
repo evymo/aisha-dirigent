@@ -28,9 +28,15 @@ export type AitgStatus = z.infer<typeof aitgStatusSchema>;
 export const aitgTriggerSchema = z.enum(['pr-gate', 'nightly', 'manual', 'sentinel', 'self']);
 export type AitgTrigger = z.infer<typeof aitgTriggerSchema>;
 
+/**
+ * Tvar ID testu AITG — jediný zdroj. Staví z něj schéma zde (zod v3) i vstupní schémata
+ * nástrojů MCP v svc-mcp-knowledge (zod v4 kvůli z.toJSONSchema).
+ */
+export const AITG_TEST_ID_PATTERN = /^AITG-(APP|MOD|INF|DAT)-\d{2}$/;
+
 export const aitgTestIdSchema = z
   .string()
-  .regex(/^AITG-(APP|MOD|INF|DAT)-\d{2}$/, 'AITG_INVALID_TEST_ID');
+  .regex(AITG_TEST_ID_PATTERN, 'AITG_INVALID_TEST_ID');
 export type AitgTestId = z.infer<typeof aitgTestIdSchema>;
 
 export const aitgRunRecordSchema = z.object({

@@ -1,9 +1,20 @@
 -- Function: public.get_story_detail_audited
 -- Arguments: p_story_id uuid
 -- Description: Get story detail with entries, labels, reminders. Supports admin/staff,
---              partner, member, and story_participants access modes.
+--              partner, member, story_participants and stack_default access modes.
 -- Security: SECURITY DEFINER, authenticated only.
--- Updated: 2026-03-31
+-- Updated: 2026-10-07
+--
+-- ⛔ NAMĚŘENO 2026-10-06 (měření F9, tři lidé ve třech IDE): výchozí story stacku
+--    (is_stack_default, partner_id NULL) skončila 'Story not found' — existenci příběhu
+--    funkce poznávala podle partner_id. get_story_context z IDE tak padal právě na příběhu,
+--    který RLS dává každému přihlášenému („Stack default story visible to all authenticated“).
+--    Teď: existence = řádek existuje; režim stack_default má přednost jen před odmítnutím.
+--    Režim stack_default čte jen to, co RLS dává každému přihlášenému, a ještě méně: záznamy
+--    bez interních poznámek (jako člen; RLS by interní pustila), bez náhledu dokumentu člena,
+--    bez jména vlastníka příběhu; štítky a připomínky prázdné (RLS je dává jen adminovi).
+--    Jméno autora záznamu (křestní + iniciála) zůstává jako u účastníka — bez něj kontext
+--    společné práce nedává smysl.
 
 CREATE OR REPLACE FUNCTION public.get_story_detail_audited(p_story_id uuid)
  RETURNS TABLE(id uuid, partner_id uuid, user_id uuid, study_id uuid, title text, status text, priority text, is_starred boolean, is_read boolean, unread_count integer, last_activity_at timestamptz, created_at timestamptz, updated_at timestamptz, user_display_name text, study_name text, labels jsonb, entries jsonb, reminders jsonb)
@@ -19,6 +30,7 @@ DECLARE
   v_story_user_id UUID;
   v_owner_mode TEXT;
   v_audit_area public.journal_area;
+  v_story_is_stack_default BOOLEAN;
 BEGIN
   v_user_id := auth.uid();
   IF v_user_id IS NULL THEN
@@ -28,12 +40,12 @@ BEGIN
   v_partner_id := public.get_current_partner_id();
 
   -- Load story ownership once.
-  SELECT ps.partner_id, ps.user_id
-  INTO v_story_partner_id, v_story_user_id
+  SELECT ps.partner_id, ps.user_id, ps.is_stack_default
+  INTO v_story_partner_id, v_story_user_id, v_story_is_stack_default
   FROM public.partner_stories ps
   WHERE ps.id = p_story_id;
 
-  IF v_story_partner_id IS NULL THEN
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'Story not found' USING ERRCODE = 'P0002';
   END IF;
 
@@ -49,6 +61,8 @@ BEGIN
     WHERE sp.story_id = p_story_id AND sp.user_id = v_user_id
   ) THEN
     v_owner_mode := 'participant';
+  ELSIF v_story_is_stack_default IS TRUE THEN
+    v_owner_mode := 'stack_default';
   ELSE
     RAISE EXCEPTION 'Unauthorized: Story access denied' USING ERRCODE = '42501';
   END IF;
@@ -95,6 +109,7 @@ BEGIN
     ps.updated_at,
     -- Display name: member sees partner/business, others see user name
     CASE
+      WHEN v_owner_mode = 'stack_default' THEN NULL
       WHEN v_owner_mode = 'member' THEN (
         SELECT pp.business_name
         FROM public.partner_profiles pp
@@ -111,7 +126,7 @@ BEGIN
     -- Labels
     COALESCE(
       (SELECT jsonb_agg(jsonb_build_object('id', sl.id, 'label', sl.label, 'color', sl.color))
-       FROM public.story_labels sl WHERE sl.story_id = ps.id),
+       FROM public.story_labels sl WHERE sl.story_id = ps.id AND v_owner_mode <> 'stack_default'),
       '[]'::jsonb
     ) AS labels,
     -- Entries (hierarchical). Members never see internal notes.
@@ -133,7 +148,7 @@ BEGIN
             SELECT COALESCE(p.first_name || ' ' || LEFT(p.last_name, 1) || '.', 'System')
             FROM public.profiles p WHERE p.id = se.created_by
           ),
-          'document_preview', CASE WHEN se.document_id IS NOT NULL THEN (
+          'document_preview', CASE WHEN se.document_id IS NOT NULL AND v_owner_mode <> 'stack_default' THEN (
             SELECT jsonb_build_object(
               'file_name', mhd.file_name,
               'mime_type', mhd.mime_type,
@@ -160,7 +175,7 @@ BEGIN
         ) ORDER BY sr.remind_at ASC
        )
        FROM public.story_reminders sr
-       WHERE sr.story_id = ps.id AND sr.is_completed = false),
+       WHERE sr.story_id = ps.id AND sr.is_completed = false AND v_owner_mode <> 'stack_default'),
       '[]'::jsonb
     ) AS reminders
   FROM public.partner_stories ps

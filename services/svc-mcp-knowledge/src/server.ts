@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { applySecurity } from '@aisha/security';
+import { applySecurity, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import multipart from '@fastify/multipart';
@@ -13,6 +13,7 @@ import { mcpRoutes } from './routes/mcp.js';
 import { translateRoutes } from './routes/translate.js';
 import { ragEvalRoutes } from './routes/rag-eval.js';
 import { graphExtractRoutes } from './routes/graph-extract.js';
+import { credentials, POVERENI_Z_PROSTREDI } from './lib/credentials.js';
 
 // MUST be first executable line — OTel auto-instrumentations attach to
 // http/fetch/pg before Fastify or any provider client builds connection pools.
@@ -21,7 +22,7 @@ import { graphExtractRoutes } from './routes/graph-extract.js';
 bootstrapOtel({ serviceName: 'svc-mcp-knowledge' });
 
 const app = Fastify({
-  logger: { level: config.logLevel },
+  logger: safeLoggerOptions({ level: config.logLevel }),
   trustProxy: true,
 });
 
@@ -52,3 +53,9 @@ try {
   app.log.fatal(err);
   process.exit(1);
 }
+
+// Pověření z prostředí → trezor instance (jen kde trezor nic nemá; hodnotu z administrace
+// nepřepíše). Selhání jednotlivých jmen hlásí čtečka nahlas sama; obsluhu neblokuje.
+void credentials()
+  .migrateEnvCredentials(POVERENI_Z_PROSTREDI)
+  .catch((e: unknown) => app.log.error({ err: e instanceof Error ? e.message : String(e) }, 'přesun pověření z prostředí selhal'));

@@ -1,0 +1,33 @@
+{
+  "$comment": [
+    "Co workflow PŘEDPOKLÁDÁ o runnerech instance: dráhy (štítky) a jejich stropy jobu v minutách.",
+    "Strop runneru je TVRDÝ — přebíjí timeout-minutes. Úloha s vyšším timeout-minutes, než má strop jejího runneru, se utne uprostřed (2026-09-30: nasazení stacků utnuto v 60. min).",
+    "vychozi.strop_min = výchozí `runner.timeout` forgejo-runneru: změřeno 2026-10-01 na v12.10.0 příkazem `forgejo-runner generate-config` → `timeout: 3h` (táž konfigurace uvádí i výchozí strop jobu na straně instance Forgejo: 3h). GitHub Actions má výchozí 360 min, takže 180 je pod oběma.",
+    "lehka = volitelná lehká dráha (krátké joby a nasazení). Zapíná ji proměnná repa `promenna`; bez ní běží tytéž joby na výchozím štítku (výraz v runs-on). Vyhodnocení výrazu změřeno na Forgejo 16.0.2. `stitek` = štítek, pod kterým se runner lehké dráhy registruje: proměnnou nenastavuje člověk, ODVODÍ ji doktor CI kontraktu z měření (žije runner s tímhle štítkem → proměnná má být; nežije → nemá) a doplní `ci-kontrakt.mjs --dopln`.",
+    "Instance smí deklarovat SKUTEČNÉ stropy svých runnerů v overlayi (ci-drahy.json téhož tvaru, + nespousti_se: [{soubor, job, promenna}] pro joby, které instance nespouští — úloha pak MUSÍ nést `if: vars.<promenna> == 'on'`) — brána lehka-draha-nese-jen-lehke-joby měří workflow proti oběma.",
+    "Nasazovací joby mají timeout 60 = jeden pokus: fronta Coolify 25 + práce 30 + rezerva 5 min (REZERVA_S v deploy-and-verify.sh) — skript skončí dřív než strop 1 h sdíleného runneru; úlohy po vlnách mají měkký termín 8 min před stropem. ⚠️ Změřeno JEN na hardwaru jedné instance forku (66 úloh 09-22…10-01: práce max 22 min, fronta max 17 min, režie max 45 s; Kořen ≤ 10 min). Pomalejší studený build jinde neřeší delší timeout, ale pokračovací úloha (vzor Stacky po vlnách).",
+    "izolovany_pr / izolovany_push = izolovaný runner (VM libvirt, joby jako sourozenecké kontejnery bez socketu a privileged; 2026-10-03). Zapíná ho instance proměnnými `promenna`; bez nich běží tytéž joby na výchozím štítku. PR → izolovany_pr (bez trvalé cache), push do main → izolovany_push (cache rw); PR z forku NIKDY. Na tyto dráhy smí jen joby bez secrets.*, services, container, dockeru a throwaway DB (brána izolovany-runner-nese-jen-ciste-joby). Strop 60 = runner.timeout 1h. Aktivace až po měřeních (declare štítků, práva tokenu jobu, síť z jobu, bez GPU/vah) a po revizi."
+  ],
+  "vychozi": {
+    "stitky": [
+      "ubuntu-latest",
+      "ubuntu-22.04",
+      "docker",
+      "self-hosted"
+    ],
+    "strop_min": 180
+  },
+  "lehka": {
+    "promenna": "CI_LIGHT_LABEL",
+    "stitek": "ci-light",
+    "strop_min": 240
+  },
+  "izolovany_pr": {
+    "promenna": "CI_IZOLOVANY_PR_LABEL",
+    "strop_min": 60
+  },
+  "izolovany_push": {
+    "promenna": "CI_IZOLOVANY_PUSH_LABEL",
+    "strop_min": 60
+  }
+}

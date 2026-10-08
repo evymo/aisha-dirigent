@@ -1,0 +1,374 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify-accel-vstup.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+x-aisha-povinne-za-behu: [ACCEL_OWNER_PREFIX, ACCEL_JADRO_PODSIT, ACCEL_JADRO_VSTUP_IP, ACCEL_NAJEMCE_1, ACCEL_NAJEMCE_1_PODSIT, ACCEL_NAJEMCE_1_ROZSAH, ACCEL_NAJEMCE_1_IP, ACCEL_NAJEMCE_2, ACCEL_NAJEMCE_2_PODSIT, ACCEL_NAJEMCE_2_ROZSAH, ACCEL_NAJEMCE_2_IP, ACCEL_NAJEMCE_3, ACCEL_NAJEMCE_3_PODSIT, ACCEL_NAJEMCE_3_ROZSAH, ACCEL_NAJEMCE_3_IP, ACCEL_NAJEMCE_4, ACCEL_NAJEMCE_4_PODSIT, ACCEL_NAJEMCE_4_ROZSAH, ACCEL_NAJEMCE_4_IP, ACCEL_NAJEMCE_5, ACCEL_NAJEMCE_5_PODSIT, ACCEL_NAJEMCE_5_ROZSAH, ACCEL_NAJEMCE_5_IP, ACCEL_NAJEMCE_6, ACCEL_NAJEMCE_6_PODSIT, ACCEL_NAJEMCE_6_ROZSAH, ACCEL_NAJEMCE_6_IP, ACCEL_NAJEMCE_7, ACCEL_NAJEMCE_7_PODSIT, ACCEL_NAJEMCE_7_ROZSAH, ACCEL_NAJEMCE_7_IP, ACCEL_NAJEMCE_8, ACCEL_NAJEMCE_8_PODSIT, ACCEL_NAJEMCE_8_ROZSAH, ACCEL_NAJEMCE_8_IP, ACCEL_VAHY_B64, ACCEL_DEKLARACE_B64, ACCEL_JADRO_API_KEY]
+services:
+  accel-vahy:
+    image: ${IMAGE_VLLM:?pinned vLLM image (digest)}
+    container_name: ${ACCEL_OWNER_PREFIX}-accel-vahy
+    restart: "no"
+    healthcheck:
+      disable: true
+    user: "1000:1000"
+    depends_on:
+      accel-prava:
+        condition: service_completed_successfully
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs:
+      - /tmp:size=64m
+    entrypoint:
+      - python3
+      - -c
+      - |
+        import base64, hashlib, json, os, pathlib, shutil, sys
+        try: seznam = json.loads(base64.b64decode(os.environ.get("ACCEL_VAHY_B64", "")))
+        except Exception: sys.exit("[accel-vahy] NEDEKLAROVÁNO: ACCEL_VAHY_B64 (adresáře vah z deklarace uzlu)")
+        if not isinstance(seznam, list) or not seznam: sys.exit("[accel-vahy] NEDEKLAROVÁNO: ACCEL_VAHY_B64 je prázdné")
+        def sha(p):
+            h = hashlib.sha256()
+            with open(p, "rb") as f:
+                for b in iter(lambda: f.read(1 << 20), b""): h.update(b)
+            return h.hexdigest()
+        def identita_vah(d, soubor):
+            # `@vse`: identita CELÉHO adresáře revize — sha256 seřazeného seznamu `relativní/cesta:sha256`
+            # všech souborů (váhy, config.json, tokenizér, šablona chatu, adapter_config.json …), mimo
+            # vlastní aisha-identita.json a mezipaměť .cache. vLLM z adresáře čte všechno, měří se všechno.
+            if soubor == "@vse":
+                radky = sorted(f"{p.relative_to(d).as_posix()}:{sha(p)}" for p in d.rglob("*") if p.is_file() and p.name != "aisha-identita.json" and ".cache" not in p.relative_to(d).parts)
+                if not radky: sys.exit(f"[accel-vahy] {d.name} je prázdný")
+                return hashlib.sha256("\n".join(radky).encode()).hexdigest()
+            return sha(d / soubor)
+        def priprav(e):
+            for k in ("repo", "revize", "soubor_vah", "format_vah", "sha256"):
+                if not e.get(k): sys.exit(f"[accel-vahy] NEDEKLAROVÁNO: {k}")
+            if len(e["revize"]) != 40 or len(e["sha256"]) != 64 or any(c not in "0123456789abcdef" for c in e["revize"] + e["sha256"]):
+                sys.exit("[accel-vahy] revize musí mít 40 hex, sha256 64 hex")
+            if e["format_vah"] not in ("pytorch", "safetensors"): sys.exit("[accel-vahy] format_vah: pytorch | safetensors")
+            identita = {"format": e["format_vah"], "sha256": e["sha256"], "revize": e["revize"]}
+            cil = pathlib.Path("/vahy") / (e["repo"].replace("/", "--") + "@" + e["revize"])
+            if cil.exists():
+                stara = json.loads((cil / "aisha-identita.json").read_text()) if (cil / "aisha-identita.json").exists() else None
+                if stara == identita and identita_vah(cil, e["soubor_vah"]) == e["sha256"]:
+                    print(f"[accel-vahy] {cil.name} ověřeno ({e['format_vah']}:{e['sha256']})"); return
+                sys.exit(f"[accel-vahy] {cil.name} existuje a neodpovídá deklaraci — neměnný adresář nepřepisuji")
+            from huggingface_hub import list_repo_files, snapshot_download
+            soubory = list_repo_files(e["repo"], revision=e["revize"])
+            if e["soubor_vah"] == "@vse":
+                if e["format_vah"] == "safetensors" and not any(f.endswith(".safetensors") for f in soubory): sys.exit("[accel-vahy] revize nemá žádný *.safetensors")
+            elif e["soubor_vah"] not in soubory: sys.exit("[accel-vahy] deklarovaný soubor vah v revizi není")
+            if e["format_vah"] == "pytorch" and any(f.endswith(".safetensors") for f in soubory):
+                sys.exit("[accel-vahy] revize nese i safetensors — vLLM by nahrál jiný artefakt, než deklarace jmenuje")
+            tmp = pathlib.Path("/vahy") / f".tmp-{cil.name}-{os.getpid()}"
+            snapshot_download(e["repo"], revision=e["revize"], local_dir=tmp)
+            zmereno = identita_vah(tmp, e["soubor_vah"])
+            if zmereno != e["sha256"]:
+                shutil.rmtree(tmp, ignore_errors=True)
+                sys.exit(f"[accel-vahy] NESHODA vah: deklarováno {e['sha256']}, změřeno {zmereno}")
+            shutil.rmtree(tmp / ".cache", ignore_errors=True)
+            zmereno = identita_vah(tmp, e["soubor_vah"])  # po úklidu mezipaměti: měří se to, co zůstane
+            if zmereno != e["sha256"]:
+                shutil.rmtree(tmp, ignore_errors=True)
+                sys.exit(f"[accel-vahy] NESHODA po úklidu: deklarováno {e['sha256']}, změřeno {zmereno}")
+            (tmp / "aisha-identita.json").write_text(json.dumps(identita))
+            tmp.rename(cil)
+            print(f"[accel-vahy] {cil.name} staženo a změřeno ({e['format_vah']}:{zmereno})")
+        for e in seznam: priprav(e)
+    environment:
+      ACCEL_VAHY_B64: ${ACCEL_VAHY_B64}
+      HF_HOME: /tmp/hf
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      HF_TOKEN: ${HF_READ_TOKEN}
+    volumes:
+      - vahy:/vahy
+    networks:
+      ven: {}
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=false"
+
+  accel-prava:
+    build:
+      context: .
+      dockerfile: services/svc-accel-vstup/Dockerfile
+      args:
+        REGISTRY_PROXY: ${REGISTRY_PROXY:-}
+    container_name: ${ACCEL_OWNER_PREFIX}-accel-prava
+    restart: "no"
+    healthcheck:
+      disable: true
+    user: "0:0"
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    cap_add: [CHOWN]
+    security_opt: ["no-new-privileges:true"]
+    entrypoint: ["chown", "-R", "1000:1000", "/vahy", "/deklarace", "/clenstvi", "/hlidac"]
+    volumes:
+      - vahy:/vahy
+      - deklarace:/deklarace
+      - clenstvi:/clenstvi
+      - hlidac:/hlidac
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=false"
+
+  accel-deklarace:
+    build:
+      context: .
+      dockerfile: services/svc-accel-vstup/Dockerfile
+      args:
+        REGISTRY_PROXY: ${REGISTRY_PROXY:-}
+    container_name: ${ACCEL_OWNER_PREFIX}-accel-deklarace
+    restart: "no"
+    healthcheck:
+      disable: true
+    depends_on:
+      accel-prava:
+        condition: service_completed_successfully
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        [ -n "$${ACCEL_DEKLARACE_B64:-}" ] || { echo "[accel-deklarace] FATAL: ACCEL_DEKLARACE_B64 prázdné" >&2; exit 1; }
+        printf '%s' "$$ACCEL_DEKLARACE_B64" | base64 -d > /deklarace/.uzel.tmp
+        node -e 'JSON.parse(require("fs").readFileSync("/deklarace/.uzel.tmp","utf8"))' || { echo "[accel-deklarace] FATAL: deklarace není JSON" >&2; exit 1; }
+        mv /deklarace/.uzel.tmp /deklarace/uzel.json
+        echo "[accel-deklarace] uzel.json zapsán ($(wc -c < /deklarace/uzel.json) B)"
+    environment:
+      ACCEL_DEKLARACE_B64: ${ACCEL_DEKLARACE_B64}
+    volumes:
+      - deklarace:/deklarace
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=false"
+
+  accel-vstup:
+    build:
+      context: .
+      dockerfile: services/svc-accel-vstup/Dockerfile
+      args:
+        REGISTRY_PROXY: ${REGISTRY_PROXY:-}
+    container_name: ${ACCEL_OWNER_PREFIX}-accel-vstup
+    restart: unless-stopped
+    depends_on:
+      accel-deklarace:
+        condition: service_completed_successfully
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ulimits:
+      core: 0
+    sysctls:
+      net.ipv4.ip_forward: "0"
+      net.ipv4.conf.all.rp_filter: "1"
+      net.ipv4.conf.all.arp_ignore: "1"
+      net.ipv4.conf.all.arp_announce: "2"
+      net.ipv6.conf.all.disable_ipv6: "1"
+    environment:
+      ACCEL_VB_PORT: "8000"
+      ACCEL_VB_SPRAVA_PORT: "8081"
+      ACCEL_VB_DEKLARACE: /deklarace/uzel.json
+      ACCEL_VB_CLENSTVI: /clenstvi/clenstvi.json
+      ACCEL_JADRO_KLIC: ${ACCEL_JADRO_API_KEY}
+      OTEL_SDK_DISABLED: "true"
+    volumes:
+      - deklarace:/deklarace:ro
+      - clenstvi:/clenstvi:ro
+      - vahy:/vahy:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8081/__vb/zdravi').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 120s
+      retries: 3
+    networks:
+      jadro:
+        ipv4_address: ${ACCEL_JADRO_VSTUP_IP}
+      n1: { ipv4_address: "${ACCEL_NAJEMCE_1_IP}" }
+      n2: { ipv4_address: "${ACCEL_NAJEMCE_2_IP}" }
+      n3: { ipv4_address: "${ACCEL_NAJEMCE_3_IP}" }
+      n4: { ipv4_address: "${ACCEL_NAJEMCE_4_IP}" }
+      n5: { ipv4_address: "${ACCEL_NAJEMCE_5_IP}" }
+      n6: { ipv4_address: "${ACCEL_NAJEMCE_6_IP}" }
+      n7: { ipv4_address: "${ACCEL_NAJEMCE_7_IP}" }
+      n8: { ipv4_address: "${ACCEL_NAJEMCE_8_IP}" }
+    command: ["node", "dist/server.js"]
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=false"
+
+  accel-docker-proxy:
+    image: ${IMAGE_DOCKER_SOCKET_PROXY:?pin proxy socketu (config/image-versions.env)}
+    container_name: ${ACCEL_OWNER_PREFIX}-accel-docker-proxy
+    restart: unless-stopped
+    user: "0:0"
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command:
+      - -socketpath=/var/run/docker.sock
+      - -proxysocketendpoint=/proxy/docker.sock
+      - -proxysocketendpointfilemode=438
+      - -allowGET=^(/v1\.[0-9]+)?/(containers/json|containers/[A-Za-z0-9_.-]+/json|networks/[A-Za-z0-9_.-]+|events|info)$$
+      - -watchdoginterval=30
+      - -stoponwatchdog
+      - -allowhealthcheck
+      - -loglevel=INFO
+    healthcheck:
+      test: ["CMD", "/healthcheck"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - dockerproxy:/proxy
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=false"
+
+  accel-hlidac:
+    build:
+      context: .
+      dockerfile: services/svc-accel-vstup/Dockerfile
+      args:
+        REGISTRY_PROXY: ${REGISTRY_PROXY:-}
+    container_name: ${ACCEL_OWNER_PREFIX}-accel-hlidac
+    restart: unless-stopped
+    depends_on:
+      accel-prava:
+        condition: service_completed_successfully
+      accel-docker-proxy:
+        condition: service_started
+    network_mode: none
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    ulimits:
+      core: 0
+    environment:
+      ACCEL_OWNER_PREFIX: ${ACCEL_OWNER_PREFIX}
+      ACCEL_VB_DEKLARACE: /deklarace/uzel.json
+      ACCEL_VB_CLENSTVI: /clenstvi/clenstvi.json
+      ACCEL_HLIDAC_INCIDENTY: /hlidac/incidenty.json
+      ACCEL_HLIDAC_POTVRZENI: /hlidac/potvrzeni.jsonl
+      DOCKER_SOCKET: /proxy/docker.sock
+    volumes:
+      - deklarace:/deklarace:ro
+      - clenstvi:/clenstvi
+      - hlidac:/hlidac
+      - dockerproxy:/proxy:ro
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(Date.now()-require('fs').statSync('/clenstvi/clenstvi.json').mtimeMs<60000?0:1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    command: ["node", "dist/hlidac-main.js"]
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=false"
+
+networks:
+  ven:
+    name: ${ACCEL_OWNER_PREFIX}-accel-ven
+  jadro:
+    name: ${ACCEL_OWNER_PREFIX}-accel-jadro
+    driver: bridge
+    internal: true
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${ACCEL_JADRO_PODSIT}
+  n1:
+    name: ${ACCEL_OWNER_PREFIX}-lane-${ACCEL_NAJEMCE_1}
+    driver: bridge
+    internal: true
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${ACCEL_NAJEMCE_1_PODSIT}
+          ip_range: ${ACCEL_NAJEMCE_1_ROZSAH}
+  n2:
+    name: ${ACCEL_OWNER_PREFIX}-lane-${ACCEL_NAJEMCE_2}
+    driver: bridge
+    internal: true
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${ACCEL_NAJEMCE_2_PODSIT}
+          ip_range: ${ACCEL_NAJEMCE_2_ROZSAH}
+  n3:
+    name: ${ACCEL_OWNER_PREFIX}-lane-${ACCEL_NAJEMCE_3}
+    driver: bridge
+    internal: true
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${ACCEL_NAJEMCE_3_PODSIT}
+          ip_range: ${ACCEL_NAJEMCE_3_ROZSAH}
+  n4:
+    name: ${ACCEL_OWNER_PREFIX}-lane-${ACCEL_NAJEMCE_4}
+    driver: bridge
+    internal: true
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${ACCEL_NAJEMCE_4_PODSIT}
+          ip_range: ${ACCEL_NAJEMCE_4_ROZSAH}
+  n5:
+    name: ${ACCEL_OWNER_PREFIX}-lane-${ACCEL_NAJEMCE_5}
+    driver: bridge
+    internal: true
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${ACCEL_NAJEMCE_5_PODSIT}
+          ip_range: ${ACCEL_NAJEMCE_5_ROZSAH}
+  n6:
+    name: ${ACCEL_OWNER_PREFIX}-lane-${ACCEL_NAJEMCE_6}
+    driver: bridge
+    internal: true
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${ACCEL_NAJEMCE_6_PODSIT}
+          ip_range: ${ACCEL_NAJEMCE_6_ROZSAH}
+  n7:
+    name: ${ACCEL_OWNER_PREFIX}-lane-${ACCEL_NAJEMCE_7}
+    driver: bridge
+    internal: true
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${ACCEL_NAJEMCE_7_PODSIT}
+          ip_range: ${ACCEL_NAJEMCE_7_ROZSAH}
+  n8:
+    name: ${ACCEL_OWNER_PREFIX}-lane-${ACCEL_NAJEMCE_8}
+    driver: bridge
+    internal: true
+    enable_ipv6: false
+    ipam:
+      config:
+        - subnet: ${ACCEL_NAJEMCE_8_PODSIT}
+          ip_range: ${ACCEL_NAJEMCE_8_ROZSAH}
+
+volumes:
+  vahy:
+    name: ${ACCEL_OWNER_PREFIX}-accel-vahy
+  deklarace:
+    name: ${ACCEL_OWNER_PREFIX}-accel-deklarace
+  clenstvi:
+    name: ${ACCEL_OWNER_PREFIX}-accel-clenstvi
+  hlidac:
+    name: ${ACCEL_OWNER_PREFIX}-accel-hlidac
+  dockerproxy:
+    name: ${ACCEL_OWNER_PREFIX}-accel-docker-proxy

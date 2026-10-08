@@ -50,6 +50,9 @@ function cekej(o: { fronta: number; prace: number; konecny?: string; frontaS: nu
       : `curl() { local t; t=$(cat "${dir}/t"); if [ "$t" -lt ${q} ]; then echo '{"status":"queued"}'; elif [ "$t" -lt ${w} ]; then echo '{"status":"in_progress"}'; else echo '{"status":"${o.konecny ?? "finished"}"}'; fi; }`,
     "diagnostikuj_neuplny_prenos() { :; }",
     o.opakovat ? "dalsi_pokus() { return 0; }" : "dalsi_pokus() { return 1; }",
+    // Třída pádu jde jen do souhrnu; její měření (klasifikátor naostro) má brána opakovani-nasazeni-se-vejde-do-ulohy.
+    'trida_padu() { TRIDA_PADU="(podstrčeno)"; }',
+    "NAV_AKCE=",
     `APP=x-svc; NASAZENI=NAS1XXXXXXXX; COOLIFY_URL=https://coolify.invalid; COOLIFY_API_TOKEN=x; TIMEOUT_S=${o.timeoutS}; FRONTA_S=${o.frontaS}`,
     fn,
     'cekej_na_nasazeni; echo "NAVRAT STAV=$STAV"',

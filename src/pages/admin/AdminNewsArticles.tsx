@@ -47,6 +47,7 @@ import { NahravaciPole } from "@/components/admin/media/NahravaciPole";
 import { GalerieMedii } from "@/components/admin/media/GalerieMedii";
 import { OhniskoObrazku } from "@/components/admin/media/OhniskoObrazku";
 import { StitkyInput } from "@/components/admin/StitkyInput";
+import { SpravaStitkuDialog } from "@/components/admin/news/SpravaStitkuDialog";
 import { NewsArticleDraftSchema } from "@/schemas/rpcResponseSchemas";
 import { jeKonfliktUlozeni } from "@/lib/novinky/konflikt";
 import { klicRozepsaneho, nactiRozepsane, smazRozepsane, ulozRozepsane } from "@/lib/novinky/rozepsanyText";
@@ -167,6 +168,7 @@ export default function AdminNewsArticles() {
   // Seznam: hledání, štítky, řazení.
   const [hledani, setHledani] = useState("");
   const [vybraneStitky, setVybraneStitky] = useState<string[]>([]);
+  const [spravaStitku, setSpravaStitku] = useState(false);
   const [razeni, setRazeni] = useState<Razeni>("newest");
 
   const { mutateAsync: fetchTranslationsForKeys } = useFetchTranslationsForKeys();
@@ -711,8 +713,12 @@ export default function AdminNewsArticles() {
                   </button>
                 );
               })}
+              <Button type="button" size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setSpravaStitku(true)}>
+                {t("admin.newsArticles.tags.manage")}
+              </Button>
             </div>
           ) : null}
+          <SpravaStitkuDialog open={spravaStitku} onOpenChange={setSpravaStitku} />
 
           {isLoading ? (
             <div className="flex items-center justify-center py-8">

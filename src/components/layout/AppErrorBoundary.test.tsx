@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import AppErrorBoundary from "./AppErrorBoundary";
 
@@ -63,6 +64,33 @@ describe("AppErrorBoundary", () => {
       if (!meta.env) meta.env = {};
       meta.env.DEV = originalDev;
       meta.env.MODE = originalMode;
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  // 2026-10-01 (na instanci): hranice obaluje celou aplikaci; bez resetu zůstala
+  // chybová stránka na každé další trase až do plného načtení.
+  it("po přechodu na jinou trasu se chybová stránka sama zavře", () => {
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      render(
+        <MemoryRouter initialEntries={["/spadla"]}>
+          <Link to="/jina">jinam</Link>
+          <AppErrorBoundary>
+            <Routes>
+              <Route path="/spadla" element={<ProblemChild />} />
+              <Route path="/jina" element={<p>Jiná stránka</p>} />
+            </Routes>
+          </AppErrorBoundary>
+        </MemoryRouter>,
+      );
+      expect(screen.getByText(/Something went wrong/i)).toBeInTheDocument();
+
+      fireEvent.click(screen.getByText("jinam"));
+
+      expect(screen.queryByText(/Something went wrong/i)).not.toBeInTheDocument();
+      expect(screen.getByText("Jiná stránka")).toBeInTheDocument();
+    } finally {
       consoleErrorSpy.mockRestore();
     }
   });

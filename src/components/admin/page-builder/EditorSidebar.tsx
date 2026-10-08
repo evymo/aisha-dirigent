@@ -12,7 +12,8 @@
  * @module
  */
 
-import { useState } from "react";
+import { Component as ReactComponent, useEffect, useReducer, useState, type ReactNode } from "react";
+import type { Component as GjsComponent, Editor } from "grapesjs";
 import DOMPurify from "dompurify";
 import { useTranslation } from "react-i18next";
 import {
@@ -30,6 +31,7 @@ import {
   Languages,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { safeError } from "@/lib/security/safeLogger";
 import { useEditorI18nResolver } from "@/lib/builder/useEditorI18nResolver";
 import type { I18nKeyStatus } from "@/lib/builder/useEditorI18nResolver";
 import type { LocaleCode } from "@/hooks/useDynamicTranslations";
@@ -222,22 +224,24 @@ export function EditorSidebar() {
         )}
 
         {activeTab === "layers" && (
-          <LayersProvider>
-            {(layerProps) => {
-              const root = layerProps?.root;
-              return (
-              <div className="gjs-layers-panel p-2">
-                {root ? (
-                  <LayerItem layer={root as unknown as LayerType} level={0} />
-                ) : (
-                  <p className="text-xs text-muted-foreground p-2">
-                    {t("builder.sidebar.emptyCanvas")}
-                  </p>
-                )}
-              </div>
-              );
-            }}
-          </LayersProvider>
+          <ChybaPanelu nazev="layers" text={t("builder.sidebar.panelError", "This panel could not be displayed.")} znovu={t("common.retry", "Retry")}>
+            <LayersProvider>
+              {(layerProps) => {
+                const root = layerProps?.root;
+                return (
+                <div className="gjs-layers-panel p-2">
+                  {root && editor ? (
+                    <PanelVrstev editor={editor} root={root} />
+                  ) : (
+                    <p className="text-xs text-muted-foreground p-2">
+                      {t("builder.sidebar.emptyCanvas")}
+                    </p>
+                  )}
+                </div>
+                );
+              }}
+            </LayersProvider>
+          </ChybaPanelu>
         )}
 
         {activeTab === "i18n" && (
@@ -431,16 +435,6 @@ type StylePropType = Record<string, unknown> & {
 type SectorType = {
   getName: () => string;
   getProperties?: () => StylePropType[];
-};
-
-/** Layer Manager component shape (subset used by the sidebar) */
-type LayerType = Record<string, unknown> & {
-  getName: () => string;
-  isSelected: () => boolean;
-  isVisible: () => boolean;
-  setVisible: (v: boolean) => void;
-  select: () => void;
-  getComponents: () => LayerType[];
 };
 
 /**
@@ -676,40 +670,111 @@ function TraitField({ trait }: { trait: Record<string, unknown> & { getId: () =>
 }
 
 /**
- * Renders a single layer in the component tree.
+ * Strom vrstev. Stav každé vrstvy se čte přes Layer Manager editoru
+ * (`editor.Layers.getLayerData`), ne z komponenty.
+ *
+ * ⛔ NAMĚŘENO 2026-10-01 (na instanci): dřív se tu volalo `layer.isSelected()`,
+ * `layer.select()`, `layer.isVisible()` přímo na komponentě GrapesJS — ta je
+ * (0.22) nemá. Kořen dodává LayersProvider hned po připojení, takže KAŽDÉ
+ * otevření záložky Vrstvy skončilo TypeError a chybovou stránkou celé
+ * administrace, která zůstala až do nového načtení.
  */
-function LayerItem({ layer, level }: { layer: LayerType; level: number }) {
-  const children = layer.getComponents?.() ?? [];
+/** @public Strom vrstev nad API GrapesJS (exportováno kvůli testu proti skutečnému editoru). */
+export function PanelVrstev({ editor, root }: { editor: Editor; root: GjsComponent }) {
+  const { t } = useTranslation();
+  // Výběr, viditelnost i struktura se mění mimo React — překreslit na událost.
+  const [, prekresli] = useReducer((n: number) => n + 1, 0);
+  useEffect(() => {
+    const udalosti = "component:toggled component:add component:remove layer:component";
+    editor.on(udalosti, prekresli);
+    return () => {
+      editor.off(udalosti, prekresli);
+    };
+  }, [editor]);
+  const popisekViditelnosti = t("builder.sidebar.toggleVisibility", "Show or hide");
+  // Zničený editor (odchod z editoru) už modul vrstev nemá a zničení ještě
+  // vyšle události, které panel překreslí — pak není co kreslit.
+  if (!editor.Layers) return null;
+  return <PolozkaVrstvy editor={editor} komponenta={root} uroven={0} popisekViditelnosti={popisekViditelnosti} />;
+}
 
+function PolozkaVrstvy({
+  editor,
+  komponenta,
+  uroven,
+  popisekViditelnosti,
+}: {
+  editor: Editor;
+  komponenta: GjsComponent;
+  uroven: number;
+  popisekViditelnosti: string;
+}) {
+  const data = editor.Layers.getLayerData(komponenta);
   return (
     <div>
       <div
         className={cn(
           "flex items-center gap-1 py-0.5 px-1 rounded text-xs cursor-pointer hover:bg-muted/30",
-          layer.isSelected() && "bg-primary/10 text-primary",
+          data.selected && "bg-primary/10 text-primary",
         )}
-        style={{ paddingLeft: `${level * 12 + 4}px` }}
-        onClick={() => layer.select()}
+        style={{ paddingLeft: `${uroven * 12 + 4}px` }}
+        onClick={() => editor.select(komponenta)}
       >
         <button
           type="button"
+          aria-label={`${popisekViditelnosti}: ${data.name}`}
+          aria-pressed={data.visible}
           className={cn(
             "w-3 h-3 rounded-sm border text-[8px] leading-none flex items-center justify-center",
-            layer.isVisible() ? "border-primary bg-primary/10" : "border-border bg-muted",
+            data.visible ? "border-primary bg-primary/10" : "border-border bg-muted",
           )}
           onClick={(e) => {
             e.stopPropagation();
-            layer.setVisible(!layer.isVisible());
+            editor.Layers.setVisible(komponenta, !data.visible);
           }}
         >
-          {layer.isVisible() ? "●" : "○"}
+          {data.visible ? "●" : "○"}
         </button>
-        <span className="truncate">{layer.getName()}</span>
+        <span className="truncate">{data.name}</span>
       </div>
-      {children.length > 0 &&
-        children.map((child) => (
-          <LayerItem key={(child as unknown as { getId: () => string }).getId()} layer={child} level={level + 1} />
-        ))}
+      {data.components.map((potomek) => (
+        <PolozkaVrstvy
+          key={potomek.getId()}
+          editor={editor}
+          komponenta={potomek}
+          uroven={uroven + 1}
+          popisekViditelnosti={popisekViditelnosti}
+        />
+      ))}
     </div>
   );
+}
+
+/**
+ * Chyba jednoho panelu editoru nesmí shodit celou administraci (2026-10-01):
+ * spadlý panel ukáže hlášku s „Zkusit znovu“, plátno a rozpracovaná stránka
+ * zůstanou. Chyba se zapíše přes safeError (v produkci do Sentry).
+ */
+class ChybaPanelu extends ReactComponent<{ nazev: string; text: string; znovu: string; children: ReactNode }, { chyba: boolean }> {
+  state = { chyba: false };
+
+  static getDerivedStateFromError() {
+    return { chyba: true };
+  }
+
+  componentDidCatch(error: unknown) {
+    safeError(`EditorSidebar.panel.${this.props.nazev}`, error instanceof Error ? error : new Error(String(error)));
+  }
+
+  render() {
+    if (!this.state.chyba) return this.props.children;
+    return (
+      <div className="p-3 text-xs text-muted-foreground space-y-2">
+        <p>{this.props.text}</p>
+        <button type="button" className="underline" onClick={() => this.setState({ chyba: false })}>
+          {this.props.znovu}
+        </button>
+      </div>
+    );
+  }
 }

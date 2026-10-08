@@ -83,6 +83,19 @@ files=("${standalone[@]}")
 #
 # Bez manifestu (upstreamový checkout, CI bez instance) platí původní chování:
 # interpoluje se všechno. Prázdné univerzum by byla brána, která nic neměří.
+#
+# ⛔ NASAZUJE = I LANE OPT-IN SLUŽBY JE OTEVŘENÁ (naměřeno 2026-10-06, konvergence
+# guru). Manifest instance nese i opt-in služby (katalog `provision_when_env`),
+# které story-init bez deklarace NEZALOŽÍ — guru tak nese firewall hostitele GPU
+# uzlu (accel-hostfw), jehož uzel provozuje jiná instance. Preflight ho přesto
+# interpoloval: holý `start_period: ${ACCEL_FW_CONFIRM_S}s` (hodnotu vede env-doktor
+# jen za lane) vyšel jako `s` a cold-start spadl ve 2b — i doktor v kroku 0 — za
+# službu, která se nenasazuje. Táž třída jako 2026-06-29 (source-broker) a totéž
+# pravidlo jako mapa env (load_app_compose_map) a resolver topologie. Které compose
+# nese JEN služba se zavřenou lane, říká jeden domov (lib/provision-gate.mjs
+# --compose-zavrenych) nad TÍMŽ env souborem, který se tu validuje — řádky `app:`
+# se kvůli tomu podruhé nečtou. Nejde-li brány vyhodnotit, interpoluje se celý
+# manifest (přísnější strana) a řekne se to — neměřeno se nevydává za „vypnuto“.
 structural_only=()
 _manifest_path="$(node "$ROOT/scripts/lib/coolify-instance-scope.mjs" --manifest-path 2>/dev/null || true)"
 if [ -n "${_manifest_path:-}" ] && [ -f "$_manifest_path" ]; then
@@ -101,6 +114,23 @@ if [ -n "${_manifest_path:-}" ] && [ -f "$_manifest_path" ]; then
     if [ ${#mimo[@]} -gt 0 ]; then
       echo -e "   ${Y}Mimo manifest instance (${#mimo[@]}) — jen struktura, env se neinterpoluje:${N}"
       for f in "${mimo[@]}"; do echo "     - ${f#"$ROOT"/}"; done
+    fi
+    if _zavrene_txt="$(node "$ROOT/scripts/lib/provision-gate.mjs" --compose-zavrenych --env-file "$ENV_FILE" 2>/dev/null)"; then
+      _zavrene=" $(printf '%s' "$_zavrene_txt" | tr '\n' ' ') "
+      nasazovane=(); zavrena=()
+      for f in ${keep[@]+"${keep[@]}"}; do
+        case "$_zavrene" in
+          *" $(basename "$f") "*) zavrena+=("$f"); structural_only+=("$f") ;;
+          *) nasazovane+=("$f") ;;
+        esac
+      done
+      if [ ${#zavrena[@]} -gt 0 ]; then
+        echo -e "   ${Y}Opt-in se zavřenou lane (${#zavrena[@]}) — nenasadí se, jen struktura:${N}"
+        for f in "${zavrena[@]}"; do echo "     - ${f#"$ROOT"/}"; done
+      fi
+      keep=(${nasazovane[@]+"${nasazovane[@]}"})
+    else
+      warn "brány opt-in služeb (provision-gate) nejdou vyhodnotit — interpoluji celý manifest, i služby, které se možná nenasadí"
     fi
     files=(${keep[@]+"${keep[@]}"})
     echo -e "   ${G}Univerzum z manifestu:${N} $(basename "$_manifest_path") → ${#files[@]} stack(ů) s envem"
@@ -160,7 +190,7 @@ for f in ${structural_only[@]+"${structural_only[@]}"}; do
     failed+=("$rel")
   fi
 done
-for f in "${files[@]}"; do
+for f in ${files[@]+"${files[@]}"}; do
   rel="${f#"$ROOT"/}"
   printf '   %-48s ' "$rel"
   # Use docker compose --env-file to load values; suppress stdout, capture

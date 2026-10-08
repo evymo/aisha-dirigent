@@ -14,7 +14,7 @@ CREATE OR REPLACE FUNCTION public.extract_training_pairs_from_kb(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 AS $$
 DECLARE
   v_user_id uuid;
@@ -50,6 +50,8 @@ BEGIN
       FROM public.knowledge_items ki
       WHERE ki.status = 'active'
         AND ki.is_verified = true
+        -- Jen čitelný stav: obsah v karanténě se nesmí stát tréninkovým příkladem.
+        AND public.knowledge_state_readable(ki.quarantine_status)
         AND (array_length(p_domain_tags, 1) IS NULL OR ki.ai_context_tags && p_domain_tags)
         -- Skip already-extracted items for this dataset
         AND NOT EXISTS (

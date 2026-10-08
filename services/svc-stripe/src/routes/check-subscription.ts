@@ -22,11 +22,11 @@ export async function checkSubscriptionRoute(app: FastifyInstance): Promise<void
       const subscriptions = subsResult?.rows ?? [];
 
       // Get Stripe customer
-      const profileResult = await rpcUser<{ row?: { stripe_customer_id?: string | null } | null } | null>(
-        'edge_profiles',
-        { p_action: 'get_user_profile', p_payload: { user_id: user.userId } },
-        jwt,
-      );
+      // ⛔ edge_profiles je dispečer SPRÁVY a SLUŽBY — uživatelským tokenem ho člen
+      // nezavolá (DB: „Unauthorized“), takže tahle cesta padala každému členovi.
+      // user_id pochází z ověřeného tokenu (verifyToken), ne od klienta → službou.
+      const profileResult = await rpcService<{ row?: { stripe_customer_id?: string | null } | null } | null>('edge_profiles',
+        { p_action: 'get_user_profile', p_payload: { user_id: user.userId } });
       const profile = profileResult?.row ?? null;
 
       // Sync with Stripe
@@ -44,8 +44,9 @@ export async function checkSubscriptionRoute(app: FastifyInstance): Promise<void
               const dbSub = subscriptions.find((s) => s.id === dbSubId);
               if (dbSub && dbSub.status !== 'active') {
                 // Aktivaci zapisuje SLUŽBA: stav potvrdil Stripe a dbSub pochází
-                // z předplatných tohoto uživatele. Uživatelský token zápis
-                // nesmí — jinak by si předplatné aktivoval kdokoli přímým RPC.
+                // z předplatných TOHOTO uživatele (čtených jeho tokenem výš).
+                // Uživatelský token zápis nesmí (edge_subscriptions, 2026-10-06) —
+                // jinak by si předplatné aktivoval kdokoli přímým RPC.
                 await rpcService('edge_subscriptions', {
                   p_action: 'update_subscription',
                   p_payload: {

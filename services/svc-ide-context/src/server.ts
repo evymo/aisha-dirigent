@@ -18,7 +18,7 @@
  * is_story_participant() helpers from P7.
  */
 import Fastify from "fastify";
-import { applySecurity } from "@aisha/security";
+import { applySecurity, safeLoggerOptions } from "@aisha/security";
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import { config } from "./config.js";
@@ -36,7 +36,7 @@ bootstrapOtel({ serviceName: 'svc-ide-context' });
 // není (změřeno 2026-09-26: v logu jen healthcheck, Prometheus a nikdo další). S `true` si
 // volající volil počítadlo limitu hlavičkou X-Forwarded-For (ověřeno živě na svc-money).
 const app = Fastify({
-  logger: { level: config.logLevel },
+  logger: safeLoggerOptions({ level: config.logLevel }),
   trustProxy: false,
 });
 

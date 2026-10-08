@@ -238,6 +238,40 @@ for c in d.get('clients',[]):
           PC_CREATED=$((PC_CREATED + 1)) ;;
       *)  echo "[AISHA] ⚠️ platform client '${CID}': HTTP ${HTTP}"; exit 1 ;;
     esac
+    # ── Mapování realm rolí klienta (`scopeMappings` deklarace) ─────────────────
+    # Klient s `fullScopeAllowed: false` (2026-10-07: aisha-mcp-client, nejmenší oprávnění) nese
+    # v tokenu JEN role, které má výslovně namapované. Import prázdného realmu je vezme ze sekce
+    # `scopeMappings`; reprezentace klienta je ale nenese, takže při založení do ŽIVÉHO realmu by
+    # chyběly a admin by v tokenu ztratil roli `admin` (poučení z konvergence guru 2026-10-07).
+    # Proto je hned po založení doplníme. Chybějící role = chyba nasazení, ne tiché přeskočení.
+    PC_ROLE=$(python3 -c "
+import json,sys
+d=json.load(open(sys.argv[1]))
+for m in d.get('scopeMappings',[]) or []:
+    if m.get('client')==sys.argv[2]:
+        for r in m.get('roles',[]) or []: print(r)
+" "$REALM_IMPORT" "$CID" 2>/dev/null) || PC_ROLE=""
+    if [ -n "$PC_ROLE" ]; then
+      PC_UUID=$(curl -sf -H "${AUTH}" \
+        "${KC_URL}/admin/realms/${APP_REALM}/clients?clientId=${CID}" \
+        | python3 -c "import sys,json; a=json.load(sys.stdin); print(a[0]['id'] if a else '')" 2>/dev/null) || PC_UUID=""
+      [ -n "$PC_UUID" ] || { echo "[AISHA] ⚠️ platform client '${CID}': po založení nenalezen — role nenamapovány"; exit 1; }
+      PC_REPRE="["
+      for ROLE in $PC_ROLE; do
+        R_JSON=$(curl -sf -H "${AUTH}" "${KC_URL}/admin/realms/${APP_REALM}/roles/${ROLE}") \
+          || { echo "[AISHA] ⚠️ platform client '${CID}': realm role '${ROLE}' neexistuje"; exit 1; }
+        [ "$PC_REPRE" = "[" ] || PC_REPRE="${PC_REPRE},"
+        PC_REPRE="${PC_REPRE}${R_JSON}"
+      done
+      PC_REPRE="${PC_REPRE}]"
+      HTTP=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+        "${KC_URL}/admin/realms/${APP_REALM}/clients/${PC_UUID}/scope-mappings/realm" \
+        -H "${AUTH}" -H "Content-Type: application/json" --data "$PC_REPRE" 2>/dev/null || true)
+      case "$HTTP" in
+        2*) echo "[AISHA] ✅ platform client '${CID}': namapovány realm role ($(echo $PC_ROLE | tr '\n' ' '))" ;;
+        *)  echo "[AISHA] ⚠️ platform client '${CID}': mapování rolí HTTP ${HTTP}"; exit 1 ;;
+      esac
+    fi
   done
   echo "[AISHA] Platform clients: ${PC_CREATED} založeno, ${PC_SKIPPED} už existovalo"
 else

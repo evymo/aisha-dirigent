@@ -15,6 +15,7 @@ import { useNewsArticlesBrowser, useNewsTags } from "@/hooks/useNewsArticles";
 import type { NewsSort } from "@/hooks/useNewsArticles";
 import { useDynamicTranslationsMap } from "@/hooks/useDynamicTranslations";
 import { useDebounce } from "@/hooks/useDebounce";
+import { NAMESPACE_STITKU, popisekStitku } from "@/lib/novinky/stitky";
 
 import type { RuntimeBlockProps } from "@/lib/builder/runtimeBlockRegistry";
 
@@ -98,6 +99,15 @@ export default function NewsBrowserBlock({ config }: RuntimeBlockProps) {
     }, NAVIGACE);
   };
 
+  // „All“ ve filtru štítků = zrušit jen výběr štítků (hledání a řazení zůstanou).
+  const zrusStitky = () => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("tag");
+      return next;
+    }, NAVIGACE);
+  };
+
   const clearAll = () => setSearchParams({}, NAVIGACE);
 
   // A pinned tag is always applied on top of the user's selection.
@@ -117,9 +127,17 @@ export default function NewsBrowserBlock({ config }: RuntimeBlockProps) {
   );
   const translations = useDynamicTranslationsMap(translationKeys, "news", "en");
 
+  // Názvy štítků: překlad z administrace (namespace news-tags), jinak čitelná
+  // podoba hodnoty — návštěvník vidí „People“, ne `people` (2026-09-30).
+  const zobrazeneStitky = [
+    ...new Set([...tagCatalog.map((tc) => tc.tag), ...selectedTags, ...articles.flatMap((a) => a.tags ?? [])]),
+  ];
+  const prekladyStitku = useDynamicTranslationsMap(zobrazeneStitky, NAMESPACE_STITKU, "en");
+  const nazevStitku = (stitek: string) => popisekStitku(stitek, prekladyStitku);
+
   const tagOptions = tagCatalog
     .filter((tc) => tc.tag !== pinnedTag)
-    .map((tc) => ({ label: `${tc.tag} (${tc.usage_count})`, value: tc.tag }));
+    .map((tc) => ({ label: `${nazevStitku(tc.tag)} (${tc.usage_count})`, value: tc.tag }));
   const sortOptions = SORTS.map((s) => ({
     label: t(`news.sort.${s}`, s),
     value: s,
@@ -230,6 +248,8 @@ export default function NewsBrowserBlock({ config }: RuntimeBlockProps) {
                 onToggle={toggleTag}
                 placeholder={t("news.filter.tags", "Tags")}
                 options={tagOptions}
+                allLabel={t("news.filter.allTags", "All")}
+                onClearAll={zrusStitky}
               />
               <FilterDropdown
                 value={sort !== "recent" ? sort : null}
@@ -254,7 +274,7 @@ export default function NewsBrowserBlock({ config }: RuntimeBlockProps) {
               <div className="flex flex-wrap gap-1.5">
                 {selectedTags.map((tag) => (
                   <Badge key={tag} variant="secondary" className="gap-1">
-                    {tag}
+                    {nazevStitku(tag)}
                     <X
                       className="h-3 w-3 cursor-pointer"
                       onClick={() => toggleTag(tag)}
@@ -328,7 +348,7 @@ export default function NewsBrowserBlock({ config }: RuntimeBlockProps) {
                     <div className="flex flex-wrap gap-1 pt-1">
                       {article.tags.slice(0, 3).map((tag) => (
                         <Badge key={tag} variant="outline" className="text-xs">
-                          {tag}
+                          {nazevStitku(tag)}
                         </Badge>
                       ))}
                     </div>

@@ -100,16 +100,14 @@ describe('Brick4 — clear_knowledge_item_chunks is per-locale', () => {
 });
 
 describe('Brick4 — get_knowledge_items_for_embedding surfaces locale', () => {
-  it('RETURNS TABLE carries locale + source_hash, SELECT projects ki.locale, DROP precedes CREATE', () => {
+  it('RETURNS TABLE carries locale + source_hash, SELECT projects ki.locale, bez DROP téže signatury', () => {
     expect(GET_EMB.length, 'get_knowledge_items_for_embedding SoT must exist').toBeGreaterThan(0);
     expect(GET_EMB).toMatch(/RETURNS TABLE\([\s\S]*item_type text, locale text, source_hash text\)/);
     expect(GET_EMB).toMatch(/ki\.locale/);
-    const dropIdx = GET_EMB.search(
-      /DROP FUNCTION IF EXISTS public\.get_knowledge_items_for_embedding\(integer, boolean, uuid, text, text\)/,
-    );
-    const createIdx = GET_EMB.search(/CREATE OR REPLACE FUNCTION public\.get_knowledge_items_for_embedding/);
-    expect(dropIdx).toBeGreaterThan(-1);
-    expect(dropIdx).toBeLessThan(createIdx);
+    // Soubor je v heals: DROP téže signatury (zbytek z doby, kdy přibyly sloupce) by běžel při každém
+    // migrate. Návratový tvar má i nejstarší podporovaná databáze — CREATE OR REPLACE stačí.
+    expect(GET_EMB).toMatch(/CREATE OR REPLACE FUNCTION public\.get_knowledge_items_for_embedding/);
+    expect(GET_EMB).not.toMatch(/^\s*DROP FUNCTION/m);
   });
 });
 

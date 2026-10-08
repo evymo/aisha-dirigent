@@ -8,6 +8,10 @@ export default defineConfig({
     env: {
       KEYCLOAK_REALM: 'testrealm',
       KEYCLOAK_URL: 'http://test-keycloak.invalid:8080',
+      // Komu `/mcp` věří. V provozu to skládá env-doctor z deklarovaných OIDC klientů;
+      // test si deklaruje vlastní, protože chybějící hodnota službu ZÁMĚRNĚ shodí
+      // (`requireEnv`) — hádat, kdo se smí ověřovat, nesmí.
+      KC_ALLOWED_CLIENTS: 'testclient-app,testclient-device',
       ...postgrestVstupTestu(process.env),
     },
     environment: "node",

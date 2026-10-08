@@ -1,0 +1,340 @@
+# GENEROVÁNO scripts/gen-netbird-instance.mjs ze šablony coolify/netbird/*.tpl a deklarace config/netbird-instances.json — NEEDITOVAT RUČNĚ.
+# Próza: docs/compose-notes/docker-compose.coolify-netbird.yml.md (soubor jde na server jako argument příkazu a soutěží s ARG_MAX).
+# Vysvětlení patří tam, ukotvené k řádku; změna konfigurace patří do šablony nebo deklarace.
+x-netbird-common: &netbird-common
+  restart: unless-stopped
+  networks:
+    - internal
+
+services:
+  netbird-model-db:
+    build:
+      context: .
+      dockerfile: Dockerfile.netbird-db
+      args:
+        REGISTRY_PROXY: ${REGISTRY_PROXY:-}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-netbird-model-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: netbird
+      POSTGRES_USER: netbird_app
+      POSTGRES_PASSWORD: ${NETBIRD_MODEL_DB_PASSWORD:?NETBIRD_MODEL_DB_PASSWORD required}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - netbird-model-db-data-v5:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netbird_app -d netbird"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-netbird-model-db
+    labels:
+      - "coolify.managed=true"
+
+  netbird-model-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.netbird-init
+      args:
+        NETBIRD_MGMT_SABLONA: coolify/netbird-model-management.json.template
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-netbird-model-init
+    restart: "no"
+    command:
+      - sh
+      - -c
+      - |
+        set -e
+        envsubst < /staging/management.json.template > /config/management.json
+        chmod 0644 /config/management.json
+        echo "[netbird-init] management.json rendered ($(wc -c </config/management.json) bytes)"
+    environment:
+      KEYCLOAK_DOMAIN_PUBLIC: ${KEYCLOAK_DOMAIN_PUBLIC}
+      KEYCLOAK_URL_FROM_CLUSTER: ${KEYCLOAK_INTERNAL_URL:?management ověřuje tokeny VNITŘNĚ (http://<prefix>-keycloak:80) — přes vnitřní jméno s https neexistuje ověřitelný certifikát a odmítne KAŽDÝ token}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:?realm vydává topologie; prázdno by envsubst tiše dosadil do všech adres v management.json}
+      NETBIRD_DOMAIN: ${NETBIRD_MODEL_DOMAIN}
+      NETBIRD_OIDC_CLIENT_ID: ${NETBIRD_MODEL_OIDC_CLIENT_ID:?NETBIRD_MODEL_OIDC_CLIENT_ID doručuje cold-start — modelový mesh nemá výchozí klient}
+      NETBIRD_MGMT_SECRET: ${NETBIRD_MODEL_MGMT_SECRET}
+      NETBIRD_RELAY_SECRET: ${NETBIRD_MODEL_RELAY_SECRET}
+      NETBIRD_DATASTORE_ENC_KEY: ${NETBIRD_MODEL_DATASTORE_ENC_KEY:?NETBIRD_MODEL_DATASTORE_ENC_KEY required for management.json (must be standard base64)}
+    volumes:
+      - netbird-model-config-v5:/config
+    healthcheck:
+      disable: true
+    networks:
+      - internal
+
+  netbird-model-management:
+    <<: *netbird-common
+    build:
+      context: .
+      dockerfile: Dockerfile.netbird-runtime
+      args:
+        NETBIRD_BASE_IMAGE: ${IMAGE_NETBIRD_MANAGEMENT:?IMAGE_NETBIRD_MANAGEMENT doručuje cold-start — žádný literál obrazu}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-netbird-model--management
+    depends_on:
+      netbird-model-db:
+        condition: service_healthy
+      netbird-model-init:
+        condition: service_completed_successfully
+    command:
+      - --port=443
+      - --log-file=console
+      - --log-level=info
+      - --disable-anonymous-metrics=true
+      - --single-account-mode-domain=${NETBIRD_MODEL_DOMAIN}
+      - --dns-domain=${NETBIRD_MODEL_DNS_DOMAIN}
+    environment:
+      AUTH_CLIENT_ID: ${NETBIRD_MODEL_OIDC_CLIENT_ID:?NETBIRD_MODEL_OIDC_CLIENT_ID doručuje cold-start — modelový mesh nemá výchozí klient}
+      AUTH_AUDIENCE: ${NETBIRD_MODEL_OIDC_CLIENT_ID:?NETBIRD_MODEL_OIDC_CLIENT_ID doručuje cold-start — modelový mesh nemá výchozí klient}
+      AUTH_CLIENT_SECRET: ${NETBIRD_MODEL_OIDC_SECRET}
+      AUTH_AUTHORITY: https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}
+      AUTH_SUPPORTED_KID_ALGS: RS256
+      NETBIRD_IDP_MANAGER_TYPE: keycloak
+      NETBIRD_IDP_MANAGER_CLIENT_ID: netbird-model-backend
+      NETBIRD_IDP_MANAGER_CLIENT_SECRET: ${NETBIRD_MODEL_MGMT_SECRET}
+      NETBIRD_IDP_MANAGER_KEYCLOAK_BASE_URL: https://${KEYCLOAK_DOMAIN_DIRECT:?topologie ji emituje pro KAŽDÝ profil (cloud-multi/cloud-single/local-dev) — bez ní management nestáhne JWKS a odmítne každý token}
+      NETBIRD_IDP_MANAGER_KEYCLOAK_REALM: ${KEYCLOAK_REALM:?realm je DEKLAROVANÁ konstanta (keycloak/*-realm.json), ne literál ve stack kódu — doručuje cold-start env}
+      NB_STORE_ENGINE: postgres
+      NB_STORE_ENGINE_POSTGRES_DSN: postgres://netbird_app:${NETBIRD_MODEL_DB_PASSWORD}@${APP_NAME_PREFIX:?identita instance}-netbird-model-db:5432/netbird?sslmode=disable
+      NETBIRD_RELAY_AUTH_SECRET: ${NETBIRD_MODEL_RELAY_SECRET}
+    volumes:
+      - netbird-model-mgmt-v5:/var/lib/netbird
+      - netbird-model-config-v5:/etc/netbird:ro
+    expose:
+      - "443"
+      - "10000"
+    healthcheck:
+      test: ["CMD", "/bin/busybox", "nc", "-z", "127.0.0.1", "443"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      coolify:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-netbird-model-management
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-netbird-model-management
+    labels:
+      - "coolify.managed=true"
+
+  netbird-model-signal:
+    <<: *netbird-common
+    build:
+      context: .
+      dockerfile: Dockerfile.netbird-runtime
+      args:
+        NETBIRD_BASE_IMAGE: ${IMAGE_NETBIRD_SIGNAL:?IMAGE_NETBIRD_SIGNAL doručuje cold-start — žádný literál obrazu}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-netbird-model--signal
+    command:
+      - --log-level=info
+      - --log-file=console
+    volumes:
+      - netbird-model-signal-v5:/var/lib/netbird-signal
+    expose:
+      - "10000"
+    healthcheck:
+      test: ["CMD", "/bin/busybox", "nc", "-z", "127.0.0.1", "10000"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 10s
+    networks:
+      coolify:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-netbird-model-signal
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-netbird-model-signal
+    labels:
+      - "coolify.managed=true"
+
+  netbird-model-dashboard:
+    <<: *netbird-common
+    image: ${IMAGE_NETBIRD_DASHBOARD}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-netbird-model--dashboard
+    environment:
+      AUTH_AUTHORITY: https://${KEYCLOAK_DOMAIN_PUBLIC}/realms/${KEYCLOAK_REALM}
+      AUTH_CLIENT_ID: ${NETBIRD_MODEL_OIDC_CLIENT_ID:?NETBIRD_MODEL_OIDC_CLIENT_ID doručuje cold-start — modelový mesh nemá výchozí klient}
+      AUTH_AUDIENCE: ${NETBIRD_MODEL_OIDC_CLIENT_ID:?NETBIRD_MODEL_OIDC_CLIENT_ID doručuje cold-start — modelový mesh nemá výchozí klient}
+      AUTH_SUPPORTED_KID_ALGS: RS256
+      AUTH_SUPPORTED_SCOPES: "openid profile email offline_access api"
+      AUTH_REDIRECT_URI: https://${NETBIRD_MODEL_DOMAIN}/auth
+      AUTH_SILENT_REDIRECT_URI: https://${NETBIRD_MODEL_DOMAIN}/silent-auth
+      NETBIRD_MGMT_API_ENDPOINT: https://${NETBIRD_MODEL_DOMAIN}
+      NETBIRD_MGMT_GRPC_API_ENDPOINT: https://${NETBIRD_MODEL_DOMAIN}
+      USE_AUTH0: "false"
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://localhost:80/ || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-netbird-model-dashboard
+    labels:
+      - "coolify.managed=true"
+
+  netbird-model-relay:
+    <<: *netbird-common
+    build:
+      context: .
+      dockerfile: Dockerfile.netbird-runtime
+      args:
+        NETBIRD_BASE_IMAGE: ${IMAGE_NETBIRD_RELAY:?IMAGE_NETBIRD_RELAY doručuje cold-start — žádný literál obrazu}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-netbird-model--relay
+    environment:
+      NB_LOG_LEVEL: info
+      NB_LISTEN_ADDRESS: ":33080"
+      NB_EXPOSED_ADDRESS: "rels://${NETBIRD_MODEL_DOMAIN}:443/relay"
+      NB_AUTH_SECRET: ${NETBIRD_MODEL_RELAY_SECRET}
+    expose:
+      - "33080"
+    healthcheck:
+      test: ["CMD", "/bin/busybox", "nc", "-z", "127.0.0.1", "33080"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    labels:
+      - "coolify.managed=true"
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-netbird-model-relay
+
+  netbird-model-proxy:
+    <<: *netbird-common
+    image: ${REGISTRY_PROXY}library/caddy:2.8.4-alpine
+    environment:
+      GATEWAY_TRUSTED_PROXIES: ${GATEWAY_TRUSTED_PROXIES:-}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-netbird-model--proxy
+    expose:
+      - "80"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        mkdir -p /etc/caddy
+        # ⛔ NAMĚŘENO 2026-09-01: Caddy bez `trusted_proxies` příchozímu
+        # `x-forwarded-for` NEDŮVĚŘUJE a přepíše ho adresou souseda. HAProxy na
+        # pfSense hlavičku nastavuje autoritativně (`del-header` + `set-header
+        # X-Forwarded-For %[src]`), takže klientská adresa k nám dorazí — a náš
+        # skok ji zahodil. Seznam je TÝŽ, jaký dostává gateway; nedoručený se
+        # hlásí NAHLAS a Caddyfile se staví bez něj (prázdný `static` by Caddy
+        # neustartoval).
+        # ⛔ JEDEN globální blok, a musí být PRVNÍ. Caddy druhý `{` neumí odlišit
+        # od bloku bez adresy a skončí hláškou „server block without any key" —
+        # ta pojmenovává příznak, ne příčinu, takže vede hledání jinam.
+        #
+        # ⛔ NAMĚŘENO 2026-09-02. `trusted_proxies` se emitoval PODMÍNĚNĚ jako
+        # první blok, `protocols` VŽDY jako druhý. Konfigurace se tedy rozbila
+        # PRÁVĚ TEHDY, KDYŽ BYL SEZNAM DORUČENÝ — čím správněji nastaveno, tím
+        # hůř. A protože ten seznam vyžadují DVEŘE, jejich zapnutí shodilo
+        # řídicí rovinu meshe: agenti se po restartu neměli kde přihlásit,
+        # mesh jména přestala existovat a edge vracel 502 na všechno.
+        #
+        # Oba parametry proto emituje JEDEN blok; nedoručený seznam ubere
+        # řádek, nikdy nepřidá blok.
+        {
+          printf '{\n  servers {\n'
+          if [ -n "$${GATEWAY_TRUSTED_PROXIES:-}" ]; then
+            printf '    trusted_proxies static %s\n' "$$(echo "$${GATEWAY_TRUSTED_PROXIES}" | tr ',' ' ')"
+          else
+            echo "[caddy] GATEWAY_TRUSTED_PROXIES NEDORUČEN — x-forwarded-for bude PŘEPSÁN" >&2
+          fi
+          printf '    protocols h1 h2 h2c\n  }\n}\n\n'
+        } > /etc/caddy/Caddyfile
+        cat >> /etc/caddy/Caddyfile <<'CADDY'
+        :80 {
+          # Local liveness — never depends on upstreams.
+          handle /__netbird_health {
+            respond "ok" 200
+          }
+
+          # Management REST API. netbird management serves REST + gRPC on one
+          # h2c port (cmux). Canonical idiom (same as netbird-internal-tls):
+          # bare upstream + transport block — `h2c://…:443` is a hard error in
+          # current Caddy ("conflicting scheme and port"), which crash-looped
+          # this proxy from its first deploy.
+          @api path /api /api/*
+          handle @api {
+            reverse_proxy ${APP_NAME_PREFIX:?identita instance}-netbird-model-management:443 {
+              transport http {
+                versions h2c
+              }
+            }
+          }
+
+          # gRPC is demultiplexed here behind the tenant-specific Host router.
+          # A host-less Traefik PathPrefix router would match every tenant on a
+          # shared ingress and could send a peer to the wrong control plane.
+          @grpcMgmt path /management.ManagementService/*
+          handle @grpcMgmt {
+            reverse_proxy ${APP_NAME_PREFIX:?identita instance}-netbird-model-management:443 {
+              transport http {
+                versions h2c
+              }
+            }
+          }
+          @grpcSignal path /signalexchange.SignalExchange/*
+          handle @grpcSignal {
+            reverse_proxy h2c://${APP_NAME_PREFIX:?identita instance}-netbird-model-signal:10000
+          }
+
+          # Relay WebSocket (rels://<host>:443/relay).
+          @relay path /relay /relay/*
+          handle @relay {
+            reverse_proxy ${APP_NAME_PREFIX:?identita instance}-netbird-model-relay:33080
+          }
+
+          # Everything else: dashboard SPA.
+          handle {
+            reverse_proxy ${APP_NAME_PREFIX:?identita instance}-netbird-model-dashboard:80
+          }
+        }
+        CADDY
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:80/__netbird_health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      internal:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-netbird-model--management
+      coolify:
+        aliases:
+          - ${APP_NAME_PREFIX:?identita instance}-netbird-model--management
+    labels:
+      - "coolify.managed=true"
+      - "traefik.docker.network=coolify"
+volumes:
+  netbird-model-mgmt-v5:
+    driver: local
+  netbird-model-signal-v5:
+    driver: local
+  netbird-model-config-v5:
+    driver: local
+  netbird-model-db-data-v5:
+    driver: local
+networks:
+  internal:
+    external: true
+    name: ${APP_NAME_PREFIX:?identita instance}-shared-net
+  coolify:
+    external: true
+    name: coolify

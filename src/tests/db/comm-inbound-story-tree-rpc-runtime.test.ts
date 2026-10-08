@@ -24,9 +24,9 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { psqlQuery, psqlMultiline } from "./validation-utils";
 import { isPgReachable, reportTestCapabilities } from "./test-env-probe";
 
-const APPEND_SIG = "public.append_inbound_comm_entry_audited(uuid,text,text,text,text,text,uuid,jsonb)";
+// Od příjmu pošty (2026-10-06) má append devátý parametr p_event_id (e-mail jen po skenu).
+const APPEND_SIG = "public.append_inbound_comm_entry_audited(uuid,text,text,text,text,text,uuid,jsonb,uuid)";
 const PROMOTE_SIG = "public.promote_entry_to_story_audited(uuid,text,jsonb)";
-const INGEST_SIG = "public.ingest_inbound_comm_audited(text,text,uuid,text,text,text,uuid,text,jsonb)";
 const MOVE_SIG = "public.move_story_entry_audited(uuid,uuid)";
 const AV_SIG = "public.record_comm_av_scan_audited(uuid,text,text,text,text,jsonb)";
 const MERGE_SIG = "public.merge_stories_audited(uuid,uuid)";
@@ -57,7 +57,7 @@ describe("comm-inbound + recursive story-tree RPC runtime (local DB)", () => {
   );
 
   it.skipIf(!dbAvailable)(
-    "append ingests an inbound_email entry (system provenance) + dedups by external_id; promote branches a child story with link + graph edge",
+    "append ingests an inbound entry (system provenance) + dedups by external_id; promote branches a child story with link + graph edge (e-mail: posta-email-jen-po-skenu)",
     () => {
       psqlMultiline(`
 \\set ON_ERROR_STOP on
@@ -79,14 +79,14 @@ BEGIN
   PERFORM set_config('role', 'service_role', true);
 
   v_res   := public.append_inbound_comm_entry_audited(
-               v_story, 'email', 'msg-rt-1', 'sender@example.test', 'Hello', 'Body text', NULL, '{}'::jsonb);
+               v_story, 'chat', 'msg-rt-1', 'sender@example.test', 'Hello', 'Body text', NULL, '{}'::jsonb);
   v_entry := (v_res->>'entry_id')::uuid;
   IF v_entry IS NULL THEN RAISE EXCEPTION 'append returned no entry_id'; END IF;
   IF (v_res->>'deduped')::boolean THEN RAISE EXCEPTION 'first ingest was unexpectedly deduped'; END IF;
 
   -- idempotency: the same provider message must dedup (no second entry)
   IF (public.append_inbound_comm_entry_audited(
-        v_story, 'email', 'msg-rt-1', 'sender@example.test', 'Hello', 'Body text', NULL, '{}'::jsonb)->>'deduped')::boolean
+        v_story, 'chat', 'msg-rt-1', 'sender@example.test', 'Hello', 'Body text', NULL, '{}'::jsonb)->>'deduped')::boolean
      IS NOT TRUE
     THEN RAISE EXCEPTION 'duplicate external_id was not deduped'; END IF;
 
@@ -97,16 +97,16 @@ BEGIN
   -- restore the connection role for assertions (avoids graph_* RLS read gating)
   PERFORM set_config('role', v_orig, true);
 
-  IF (SELECT entry_type FROM public.story_entries WHERE id = v_entry) <> 'inbound_email'
-    THEN RAISE EXCEPTION 'inbound entry_type must be inbound_email'; END IF;
+  IF (SELECT entry_type FROM public.story_entries WHERE id = v_entry) <> 'inbound_chat'
+    THEN RAISE EXCEPTION 'inbound entry_type must be inbound_chat'; END IF;
   IF (SELECT metadata->>'external_id' FROM public.story_entries WHERE id = v_entry) <> 'msg-rt-1'
     THEN RAISE EXCEPTION 'external_id not persisted on the entry'; END IF;
-  IF (SELECT metadata->>'channel' FROM public.story_entries WHERE id = v_entry) <> 'email'
+  IF (SELECT metadata->>'channel' FROM public.story_entries WHERE id = v_entry) <> 'chat'
     THEN RAISE EXCEPTION 'channel not persisted on the entry'; END IF;
   IF (SELECT created_by FROM public.story_entries WHERE id = v_entry) IS NOT NULL
     THEN RAISE EXCEPTION 'inbound entry must have system provenance (created_by NULL)'; END IF;
   IF (SELECT count(*) FROM public.story_entries
-        WHERE entry_type = 'inbound_email' AND metadata->>'external_id' = 'msg-rt-1') <> 1
+        WHERE entry_type = 'inbound_chat' AND metadata->>'external_id' = 'msg-rt-1') <> 1
     THEN RAISE EXCEPTION 'dedup must leave exactly one entry'; END IF;
 
   IF (SELECT origin FROM public.partner_stories WHERE id = v_child) <> 'promoted_entry'
@@ -139,76 +139,9 @@ ROLLBACK;
       expect(() =>
         psqlQuery(
           `SET ROLE authenticated; SELECT public.append_inbound_comm_entry_audited(` +
-            `gen_random_uuid(),'email','x','a@b.test','s','b',NULL,'{}'::jsonb)`,
+            `gen_random_uuid(),'chat','x','a@b.test','s','b',NULL,'{}'::jsonb)`,
         ),
       ).toThrow();
-    },
-  );
-
-  it.skipIf(!dbAvailable)(
-    "ingest_inbound_comm_audited: anon blocked, service_role allowed; enqueues + creates the linked story entry once; queue is the authoritative dedup",
-    () => {
-      const g = psqlQuery(
-        `SELECT has_function_privilege('anon','${INGEST_SIG}','EXECUTE') , ` +
-          `has_function_privilege('service_role','${INGEST_SIG}','EXECUTE')`,
-      );
-      const [anon, svc] = g.split("|");
-      expect(anon).toBe("f");
-      expect(svc).toBe("t");
-
-      psqlMultiline(`
-\\set ON_ERROR_STOP on
-BEGIN;
-DO $$
-DECLARE
-  v_orig  text := current_user;
-  v_story uuid;
-  v_res   jsonb;
-  v_event uuid;
-  v_entry uuid;
-  v_res2  jsonb;
-BEGIN
-  INSERT INTO public.partner_stories (title, status, origin)
-  VALUES ('ingest-rt parent story', 'inbox', 'manual')
-  RETURNING id INTO v_story;
-
-  PERFORM set_config('role', 'service_role', true);
-
-  v_res   := public.ingest_inbound_comm_audited('email', 'evt-rt-1', v_story, 'x@y.test', 'Subj', 'Body', NULL, 'mail.inbound', '{}'::jsonb);
-  v_event := (v_res->>'event_id')::uuid;
-  v_entry := (v_res->>'entry_id')::uuid;
-  IF (v_res->>'deduped')::boolean THEN RAISE EXCEPTION 'first ingest must not be deduped'; END IF;
-  IF v_event IS NULL OR v_entry IS NULL THEN RAISE EXCEPTION 'ingest returned no event/entry id'; END IF;
-
-  -- the QUEUE is the authoritative dedup: re-ingest the same external_id must dedup,
-  -- return the SAME entry, and create NO second event/entry.
-  v_res2 := public.ingest_inbound_comm_audited('email', 'evt-rt-1', v_story, 'x@y.test', 'Subj', 'Body', NULL, 'mail.inbound', '{}'::jsonb);
-  IF (v_res2->>'deduped')::boolean IS NOT TRUE THEN RAISE EXCEPTION 're-ingest of same external_id must dedup'; END IF;
-  IF (v_res2->>'entry_id')::uuid IS DISTINCT FROM v_entry THEN RAISE EXCEPTION 'dedup must return the same entry'; END IF;
-
-  PERFORM set_config('role', v_orig, true);
-
-  -- queue event: completed + linked to the story
-  IF (SELECT status FROM public.integration_events WHERE id = v_event) <> 'completed'
-    THEN RAISE EXCEPTION 'ingest event must be marked completed'; END IF;
-  IF (SELECT event_source FROM public.integration_events WHERE id = v_event) <> 'email_inbound'
-    THEN RAISE EXCEPTION 'event_source must be email_inbound'; END IF;
-  IF (SELECT story_id FROM public.integration_events WHERE id = v_event) IS DISTINCT FROM v_story
-    THEN RAISE EXCEPTION 'queue event must link to the story'; END IF;
-  IF (SELECT count(*) FROM public.integration_events WHERE event_source = 'email_inbound' AND external_id = 'evt-rt-1') <> 1
-    THEN RAISE EXCEPTION 'queue dedup must leave exactly one event'; END IF;
-
-  -- story entry: linked back to the queue event, exactly one (no second on dedup)
-  IF (SELECT metadata->>'integration_event_id' FROM public.story_entries WHERE id = v_entry) <> v_event::text
-    THEN RAISE EXCEPTION 'story entry must reference integration_event_id'; END IF;
-  IF (SELECT count(*) FROM public.story_entries WHERE entry_type = 'inbound_email' AND metadata->>'external_id' = 'evt-rt-1') <> 1
-    THEN RAISE EXCEPTION 'dedup must leave exactly one story entry'; END IF;
-
-  RAISE NOTICE 'ingest queue+story integration assertions passed';
-END $$;
-ROLLBACK;
-`);
-      expect(true).toBe(true);
     },
   );
 
@@ -241,7 +174,7 @@ BEGIN
   INSERT INTO public.partner_stories (title, status, origin) VALUES ('move target B', 'inbox', 'manual') RETURNING id INTO v_b;
 
   PERFORM set_config('role', 'service_role', true);
-  v_root := (public.append_inbound_comm_entry_audited(v_a, 'email', 'mv-1', 'a@b.test', 'S', 'Body', NULL, '{}'::jsonb)->>'entry_id')::uuid;
+  v_root := (public.append_inbound_comm_entry_audited(v_a, 'chat', 'mv-1', 'a@b.test', 'S', 'Body', NULL, '{}'::jsonb)->>'entry_id')::uuid;
   PERFORM set_config('role', v_orig, true);
 
   -- a reply under the root, still in story A (the thread)
@@ -367,8 +300,8 @@ BEGIN
   INSERT INTO public.story_participants (story_id, user_id, role) VALUES (v_src, v_uid, 'partner');
 
   PERFORM set_config('role', 'service_role', true);
-  PERFORM public.append_inbound_comm_entry_audited(v_src, 'email', 'mg-1', 'a@b.test', 'S1', 'B1', NULL, '{}'::jsonb);
-  PERFORM public.append_inbound_comm_entry_audited(v_src, 'email', 'mg-2', 'a@b.test', 'S2', 'B2', NULL, '{}'::jsonb);
+  PERFORM public.append_inbound_comm_entry_audited(v_src, 'chat', 'mg-1', 'a@b.test', 'S1', 'B1', NULL, '{}'::jsonb);
+  PERFORM public.append_inbound_comm_entry_audited(v_src, 'chat', 'mg-2', 'a@b.test', 'S2', 'B2', NULL, '{}'::jsonb);
   v_res := public.merge_stories_audited(v_src, v_tgt);
   PERFORM set_config('role', v_orig, true);
 

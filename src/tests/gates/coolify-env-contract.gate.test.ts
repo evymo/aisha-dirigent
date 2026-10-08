@@ -335,12 +335,13 @@ describe("Coolify env contract", () => {
       "VITE_KC_URL",
       "GIT_SHA",
     ]);
-    expectAll(execCompose, "docker-compose.coolify-exec.yml", [
-      "NETBIRD_API_URL",
-      "NETBIRD_AUTH_SCHEME",
-      "NETBIRD_KEYCLOAK_CLIENT_SECRET",
-      "NETBIRD_SANDBOX_GROUP",
-    ]);
+    // Exec: runner pověření ke správě meshe NEDOSTÁVÁ — klíč běhu se nerazí
+    // (2026-10-06, majitel „síť zavřít“ = volba A; hlídá i beh-kontejneru-tvar).
+    // Mesh stacku exec drží jen jeho agent (NETBIRD_STACK_KEY_EXPERIMENTAL).
+    expectAll(execCompose, "docker-compose.coolify-exec.yml", ["NETBIRD_STACK_KEY_EXPERIMENTAL"]);
+    for (const klic of ["NETBIRD_KEYCLOAK_CLIENT_SECRET", "NETBIRD_MGMT_SECRET", "NETBIRD_SANDBOX_GROUP", "NETBIRD_API_TOKEN"]) {
+      expect(execCompose, `docker-compose.coolify-exec.yml nesmí runneru doručit ${klic}`).not.toContain(klic);
+    }
     expectAll(integrationCompose, "docker-compose.coolify-integration.yml", [
       "NETBIRD_STACK_KEY_INTEGRATION",
       "RABBITMQ_DEFAULT_PASS",

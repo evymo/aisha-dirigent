@@ -1,5 +1,7 @@
 -- Function: public.edge_mobile_notifications
 -- Purpose: Edge-safe mobile session + notification reads/writes.
+--   služba (svc-push, gateway auth-email — service token): všechny akce kromě
+--   správa (admin UI useAdminNotificationCampaigns):   get_campaign_notification_deliveries_admin
 
 CREATE OR REPLACE FUNCTION public.edge_mobile_notifications(
   p_action text,
@@ -15,17 +17,17 @@ DECLARE
   v_inserted bigint;
   v_user_id uuid;
 BEGIN
-  -- ⛔ SECURITY DEFINER vypíná RLS, takže nárok musí vymáhat tělo. Do 2026-10-04
-  -- tu stráž měla jen admin akce a funkce má GRANT pro `authenticated` (admin UI
-  -- čte doručení kampaně). Kdokoli přihlášený si tak přímým
-  -- /rpc/edge_mobile_notifications mohl přečíst FCM tokeny cizích zařízení
-  -- (get_mobile_sessions → push komukoli mimo platformu), poslat in-app
-  -- notifikaci s odkazem libovolnému účtu (insert_notifications_bulk → phishing),
-  -- vynulovat tokeny VŠEM (null_mobile_session_token bez user_id) a číst
-  -- preference cizích účtů. Všechno kromě admin čtení doručení je práce služby
-  -- (svc-push, gateway — volají service tokenem).
+  -- ⛔ NÁROK PŘED DISPEČEREM, VÝCHOZÍ ODMÍTNUTÍ (nález 2026-10-06; ve stagingu
+  -- opraveno 10-04, upstream to nedostal). SECURITY DEFINER vypíná RLS a funkce má
+  -- GRANT pro authenticated (admin UI čte doručení kampaně), stráž ale měla jen
+  -- admin akce. Kdokoli přihlášený si přímým /rpc/edge_mobile_notifications přečetl
+  -- push tokeny cizích zařízení (get_mobile_sessions → push komukoli mimo platformu),
+  -- poslal in-app notifikaci s odkazem libovolnému účtu (insert_notifications_bulk →
+  -- phishing), vynuloval tokeny VŠEM (null_mobile_session_token bez user_id) a četl
+  -- preference cizích účtů. Všechno kromě admin čtení doručení je práce služby.
+  -- `IS NOT TRUE`, ne `NOT (…)`: NULL nesmí stráž přeskočit.
   IF p_action IS DISTINCT FROM 'get_campaign_notification_deliveries_admin'
-     AND NOT public.is_service_role() THEN
+     AND public.is_service_role() IS NOT TRUE THEN
     RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
   END IF;
 
@@ -200,8 +202,8 @@ BEGIN
   END IF;
 
   IF p_action = 'get_campaign_notification_deliveries_admin' THEN
-    IF NOT public.is_admin_or_staff() THEN
-      RAISE EXCEPTION 'Access denied';
+    IF public.is_admin_or_staff() IS NOT TRUE THEN
+      RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
     END IF;
 
     RETURN jsonb_build_object(

@@ -79,6 +79,7 @@ services:
       GOOGLE_AI_API_KEY: ${GOOGLE_AI_API_KEY:-}
       AISHA_LLM_MOCK: ${AISHA_LLM_MOCK:-}
       VLLM_GENERATION_URL: ${VLLM_GENERATION_URL:-}
+      VLLM_API_KEY: ${VLLM_API_KEY:-}
       INTERNAL_TLD: ${INTERNAL_TLD:?zóna instance — bez ní vLLM backend odmítne odvozenou http adresu modelu}
       MESH_TLD: ${MESH_TLD:?MESH_TLD required — generate-secrets emits the mesh TLD}
       OLLAMA_URL: ${OLLAMA_URL:-}

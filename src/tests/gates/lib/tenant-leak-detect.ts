@@ -23,8 +23,10 @@
  * "Lose nothing": operators keep exact detection via the private list; the
  * public tree keeps structural detection; no real tenant name lives in git.
  */
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  loadTenantSentinels as loadTenantSentinelsZ,
+  privateSentinelHits as privateSentinelHitsZ,
+} from "../../../../scripts/lib/tenant-sentinels.mjs";
 
 const ROOT = process.cwd();
 
@@ -67,6 +69,10 @@ export const PLATFORM_KC_CLIENTS = [
   // (gateway POST /admin/users/invite). Potřebuje ho KAŽDÁ instance, která
   // pouští lidi dovnitř heslem — platformní, ne tenantský.
   "aisha-user-admin",
+  // aisha-mcp-client: veřejný klient, přes který se klienti MCP (IDE, CLI) přihlašují
+  // v prohlížeči k serveru znalostí (autorizační kód + PKCE). Server znalostí má KAŽDÁ
+  // instance — platformní, ne tenantský.
+  "aisha-mcp-client",
   "appsmith-intranet-proxy", "appsmith-proxy", "langfuse", "n8n-proxy",
   "netbird", "netbird-backend", "nocodb-proxy", "openclaw-proxy", "pki-proxy", "studio-proxy",
   // extranet-proxy: oauth2-proxy před extranetem, aby se bundle nevydal
@@ -133,25 +139,16 @@ export function seedProfile(content: string): string | null {
  * (`{ "sentinels": [...] }`, gitignored) and the `AISHA_TENANT_SENTINELS` env
  * var (comma/space separated). Empty in the public repo and in forks. Never
  * committed.
+ *
+ * ONE implementation for gates and Node tools: the reading lives in
+ * scripts/lib/tenant-sentinels.mjs (the knowledge seed generator needs the very
+ * same list outside vitest). A second copy here would drift.
  */
 export function loadTenantSentinels(): string[] {
-  const out: string[] = [];
-  const env = process.env.AISHA_TENANT_SENTINELS;
-  if (env) out.push(...env.split(/[\s,]+/));
-  const p = join(ROOT, "config/tenant.json");
-  if (existsSync(p)) {
-    try {
-      const j = JSON.parse(readFileSync(p, "utf8")) as { sentinels?: unknown };
-      if (Array.isArray(j.sentinels)) out.push(...j.sentinels.map(String));
-    } catch {
-      /* malformed private config → ignore; the structural layer still applies */
-    }
-  }
-  return [...new Set(out.map((s) => s.trim().toLowerCase()).filter(Boolean))];
+  return loadTenantSentinelsZ(ROOT) as string[];
 }
 
 /** Case-insensitive substring hits of `sentinels` in `content`. */
 export function privateSentinelHits(content: string, sentinels: string[]): string[] {
-  const lc = content.toLowerCase();
-  return sentinels.filter((s) => lc.includes(s));
+  return privateSentinelHitsZ(content, sentinels) as string[];
 }

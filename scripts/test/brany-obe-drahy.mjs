@@ -17,7 +17,7 @@
 // „624 prošlo" a „9 prošlo" četlo jako dvě nesouvisející zprávy.
 // =============================================================================
 import { spawnSync } from "node:child_process";
-import { readFileSync, statSync, mkdtempSync } from "node:fs";
+import { readFileSync, statSync, mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { KOD_NEZMERENO, popisDrahy } from "./verdikt-kody.mjs";
@@ -85,7 +85,15 @@ function drahu(jmeno, lane) {
       },
     },
   );
-  return { kod: r.status ?? 1, verdikt: precetVerdikt(adresar, zacatek) };
+  const kod = r.status ?? 1;
+  const verdikt = precetVerdikt(adresar, zacatek);
+  // ⛔ NAMĚŘENO 2026-10-03: adresáře reportů drah v $TMPDIR zůstávaly po každém
+  // běhu (aisha-drahy-light/heavy: 100 + 100 za den). Zelená dráha je po přečtení
+  // verdiktu nepotřebuje; padlá je nechá — reportér vypsal jejich cestu a slouží
+  // k diagnóze — a řekne, kde leží.
+  if (kod === 0) rmSync(adresar, { recursive: true, force: true });
+  else process.stderr.write(`  reporty dráhy ${lane} ponechány k diagnóze: ${adresar}\n`);
+  return { kod, verdikt };
 }
 
 const lehka = drahu("lehká (rychlé brány, poctivý timeout 30 s)", "light");

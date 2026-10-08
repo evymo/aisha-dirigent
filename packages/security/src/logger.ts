@@ -36,12 +36,21 @@ const PII_KEY_PATTERNS = [
 ];
 
 const PII_VALUE_PATTERNS: Array<{ pattern: RegExp; replacement: string }> = [
-  { pattern: /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g, replacement: '[email-redacted]' },
+  // Local part bounded to 64 (RFC 5321): unbounded `[\w.+-]+@` rescans the rest
+  // of the input from every word boundary — quadratic on attacker-shaped text
+  // (`a.a.a…`: 14 s per 100 kB, now 29 ms; same matches on real addresses).
+  { pattern: /\b[\w.+-]{1,64}@[\w-]+\.[\w.-]+\b/g, replacement: '[email-redacted]' },
   { pattern: /\b\+?\d{9,15}\b/g, replacement: '[phone-redacted]' },
   // JWT shape: 3 base64url segments separated by dots. Real JWTs always start
   // with `eyJ` (JSON header begins with `{`). Even short test fixtures match.
   { pattern: /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, replacement: '[jwt-redacted]' },
   { pattern: /\bBearer\s+[\w.-]+/gi, replacement: 'Bearer [redacted]' },
+  // An Authorization header written out as text (`Authorization: Basic dXN…`,
+  // `"authorization":"Digest …"`): the scheme stays, the credential does not.
+  {
+    pattern: /\b((?:Proxy-)?Authorization)(["']?\s*[:=]\s*["']?)(Basic|Digest|Negotiate|NTLM|Token|ApiKey)\s+[^\s"',;]+/gi,
+    replacement: '$1$2$3 [redacted]',
+  },
   { pattern: /\bsk-[A-Za-z0-9]{20,}\b/g, replacement: '[api-key-redacted]' },
 ];
 
@@ -57,13 +66,83 @@ const DEFAULT_REDACT: Required<RedactOptions> = {
   maxStringLength: 500,
 };
 
+// Credentials travel inside URLs too: `https://user:pass@host/…`, `//u:p@h`,
+// `…?access_token=…&sig=…`, `#id_token=…` and URL-encoded inside a parameter
+// (`redirect_uri=https%3A%2F%2Fu%3Ap%40h`). A logged URL keeps its shape
+// (scheme, host, path, harmless params) but never the userinfo or a sensitive
+// param value.
+//
+// Every pattern here is linear: logged strings are attacker-shaped (a 16 kB
+// Origin header reaches `cors.deny` unauthenticated). The userinfo match starts
+// only at `//` and stops at the next `/ ? #` or whitespace; a parameter name
+// cannot contain a separator, so no position rescans the rest of the input.
+// Greedy up to the LAST `@` before the path, so a raw `@` in the password does
+// not leave its tail behind.
+const URL_USERINFO = /(\/\/)[^\s/?#]*@/g;
+const URL_USERINFO_ENCODED = /(%2F%2F)(?:[^\s&#%]|%(?!2F)[0-9A-F]{2})*%40/gi;
+const URL_QUERY_PARAM = /([?&;#])([^=&#;?\s]+)=([^&#\s]*)/g;
+// URL-only names on top of SENSITIVE_KEY_PATTERNS (signed URLs, OAuth code and
+// PKCE verifier, short password and one-time-code names).
+const SENSITIVE_QUERY_NAME_PATTERNS = [
+  /^key$/i,
+  /sig/i,
+  /credential/i,
+  /^code/i,
+  /verifier/i,
+  /auth/i,
+  /pass/i,
+  /^pwd$/i,
+  /otp/i,
+];
+// An authority cut by the work window (`https://user:pa`) has no `@` left to
+// anchor on; it is dropped rather than shown.
+const URL_TAIL_AUTHORITY = /\/\/[^\s/?#]*$/;
+// Patterns run on at most maxLength + this many characters: enough for a token
+// that straddles the cut to be recognised whole, never enough for any pattern
+// to become expensive.
+const REDACT_WINDOW_SLACK = 2048;
+
+const PERCENT_ESCAPE = /%([0-9A-Fa-f]{2})/g;
+// A parameter name may arrive percent-encoded (`%74oken=` is `token=`), once or
+// twice. Decoded byte-wise, never throws; sensitive names are ASCII.
+const NAME_DECODE_ROUNDS = 2;
+
+function decodedNames(name: string): string[] {
+  const names = [name];
+  let current = name;
+  for (let i = 0; i < NAME_DECODE_ROUNDS && current.includes('%'); i++) {
+    current = current.replace(PERCENT_ESCAPE, (_m: string, hex: string) => String.fromCharCode(parseInt(hex, 16)));
+    names.push(current);
+  }
+  return names;
+}
+
+function isSensitiveQueryName(name: string): boolean {
+  return decodedNames(name).some(
+    (n) => isSensitiveKey(n) || SENSITIVE_QUERY_NAME_PATTERNS.some((p) => p.test(n)),
+  );
+}
+
+function redactUrlCredentials(value: string): string {
+  return value
+    .replace(URL_USERINFO, '$1[userinfo-redacted]@')
+    .replace(URL_USERINFO_ENCODED, '$1[userinfo-redacted]%40')
+    .replace(URL_QUERY_PARAM, (whole: string, sep: string, name: string) =>
+      isSensitiveQueryName(name) ? `${sep}${name}=[redacted]` : whole,
+    );
+}
+
 function redactString(value: string, maxLength: number): string {
-  let s = value;
+  const window = maxLength + REDACT_WINDOW_SLACK;
+  let s = value.length > window ? value.slice(0, window).replace(URL_TAIL_AUTHORITY, '//[truncated]') : value;
+  // Before the PII patterns: the email pattern would otherwise eat only the
+  // `pass@host` part of userinfo and leave the user name behind.
+  s = redactUrlCredentials(s);
   for (const { pattern, replacement } of PII_VALUE_PATTERNS) {
     s = s.replace(pattern, replacement);
   }
-  if (s.length > maxLength) {
-    s = `${s.slice(0, maxLength)}…[truncated:${value.length - maxLength}]`;
+  if (value.length > maxLength) {
+    s = `${s.slice(0, maxLength).replace(URL_TAIL_AUTHORITY, '//[truncated]')}…[truncated:${value.length - maxLength}]`;
   }
   return s;
 }

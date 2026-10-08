@@ -1,24 +1,23 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { verifyToken, AuthError } from '../auth.js';
 import { createStripeClient } from '../lib/stripe-client.js';
-import { rpcUser } from '../postgrest.js';
+import { rpcService } from '../postgrest.js';
 
 export async function customerPortalRoute(app: FastifyInstance): Promise<void> {
   app.post('/customer-portal', async (req: FastifyRequest, reply: FastifyReply) => {
     try {
       const user = await verifyToken(req.headers.authorization);
-      const jwt = (req.headers.authorization as string).slice(7);
 
       const stripe = await createStripeClient();
       if (!stripe) {
         return reply.status(500).send({ error: 'Stripe not configured' });
       }
 
-      const profileResult = await rpcUser<{ row?: { stripe_customer_id?: string | null } | null } | null>(
-        'edge_profiles',
-        { p_action: 'get_user_profile', p_payload: { user_id: user.userId } },
-        jwt,
-      );
+      // ⛔ edge_profiles je dispečer SPRÁVY a SLUŽBY — uživatelským tokenem ho člen
+      // nezavolá (DB: „Unauthorized“), takže tahle cesta padala každému členovi.
+      // user_id pochází z ověřeného tokenu (verifyToken), ne od klienta → službou.
+      const profileResult = await rpcService<{ row?: { stripe_customer_id?: string | null } | null } | null>('edge_profiles',
+        { p_action: 'get_user_profile', p_payload: { user_id: user.userId } });
       const profile = profileResult?.row ?? null;
 
       if (!profile?.stripe_customer_id) {

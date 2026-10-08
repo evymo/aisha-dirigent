@@ -479,3 +479,73 @@ na každém hostu PŘED vlnami a cold-start ji po rolloutu smaže. Kdyby ji
 compose VLASTNIL, pokusil by se ji při teardownu smazat — a když na ní visí
 kontejner jiného projektu, spadne celé nasazení (naměřeno 2026-08-11 na
 aisha-clamav: "network ... has active endpoints").
+
+## `PKI_BUNDLE_REQUIRED: ${PKI_BUNDLE_REQUIRED:?odvozuje cold-start z manifestu; bez něj pki-init trvá na bundlu i bez PKI}`
+
+Odvozuje cold-start z manifestu (pki nasazeno ⇒ true); bez PKI se vypíná
+POŽADAVEK, ne jen adresa — výklad: docs/compose-notes/docker-compose.coolify.yml.md
+
+## `KEYCLOAK_URL: ${KEYCLOAK_INTERNAL_URL:?pki-init volá Keycloak VNITŘNĚ (http://<prefix>-keycloak:80) — jméno z jiné sítě se nerozliší a skončí venku}`
+
+⛔ NAMĚŘENO 2026-08-19: tady stálo `https://${KEYCLOAK_DOMAIN_DIRECT}`
+(<fork>-auth.backend.<fork>.internal). To jméno se ze sítě `internal` NEROZLIŠÍ
+a pki-init nemá žádné extra_hosts — pokus o ně skončil VENKU na cizím
+stroji s certem cizí domény (*.<cizí doména>), takže TLS verify padl a cert pro netbird-mesh
+se nikdy nevydal. Následek: internal-tls běžel se self-signed, agenti
+neprošli TLS, nikdo neměl wt0, mesh-router neměl cíl → api 502.
+
+Keycloak je přitom hned vedle: aliasy `<fork>-keycloak`/`keycloak` na
+<fork>-shared-net, ověřeno `http://<fork>-keycloak:80/realms/<realm>/
+.well-known/openid-configuration` → 200. Hodnota pro tenhle případ už
+v SoT JE — `KEYCLOAK_INTERNAL_URL`; nic se nevymýšlí.
+
+⭐ PROČ HTTP A NE TLS: pki-init je ten, kdo certifikáty teprve VYDÁVÁ.
+Kdyby sám vyžadoval TLS ověřené naší PKI, potřeboval by cert, který ještě
+neexistuje — bootstrap kruh. Bezpečné je to tím, že provoz NEOPOUŠTÍ
+docker síť; po vydání certů jede všechno ostatní přes TLS a mesh.
+
+⛔ NE `extra_hosts: ${KEYCLOAK_DOMAIN}: host-gateway`, jak to dělají jiné
+stacky — to je cesta VEN NA HOSTITELE a zpátky, tedy obcházení izolace.
+Do mesh sítě má vykukovat jen edge.
+
+## `- internal`
+
+`internal` = ${APP_NAME_PREFIX}-shared-net, a právě tam má <fork>-keycloak
+alias — síť byla celou dobu správná, chybná byla jen ADRESA (viz výše).
+
+## `KEYCLOAK_URL_FROM_CLUSTER: ${KEYCLOAK_INTERNAL_URL:?management ověřuje tokeny VNITŘNĚ (http://<prefix>-keycloak:80) — přes vnitřní jméno s https neexistuje ověřitelný certifikát a odmítne KAŽDÝ token}`
+
+⛔ NAMĚŘENO 2026-08-19 na forku. Tady stála DOMÉNA a šablona si před ni
+lepila `https://` natvrdo — tedy TLS na jméno pod vnitřní TLD, pro které
+nevydá certifikát žádná veřejná CA. Management proto neověřil ŽÁDNÝ token:
+  Error when validating JWT: Post "https://<fork>-auth.backend.<fork>.internal/…"
+  x509: certificate is valid for *.<cizí doména>, not <fork>-auth.backend.<fork>.internal
+Následek byl celý řetěz: bootstrap dostal 401 → nevznikl účet ani setup key
+(accounts=0, setup_keys=0) → agenti „setup key is invalid" → nikde wt0 →
+mesh-router DNAT bez cíle → api 502.
+
+⭐ TÝŽ DŮVOD JAKO U pki-init VÝŠ: kdo Keycloak potřebuje ZEVNITŘ, jde
+NAPŘÍMO kontejnerovou sítí. Vnitřní jména se ven nepublikují a mesh je
+jediná cesta dovnitř — auth je z ní vyjmutý, protože mesh enrollment
+Keycloak sám potřebuje (chicken-and-egg). Ověřeno: management je na
+`${APP_NAME_PREFIX}-shared-net` a rozliší `<fork>-keycloak`.
+
+Předává se CELÁ URL, ne doména — jinak si schéma zase někdo dolepí.
+
+## `KEYCLOAK_REALM: ${KEYCLOAK_REALM:?realm vydává topologie; prázdno by envsubst tiše dosadil do všech adres v management.json}`
+
+⛔ MUSÍ TU BÝT: šablona se dosazuje `envsubst`, a ten za NEDEKLAROVANOU
+proměnnou dosadí PRÁZDNO — ne chybu. Bez tohohle řádku by v
+management.json vznikly adresy `/realms//protocol/...` a management by
+odmítl každý token, aniž by kdokoli viděl proč. Realm byl do 2026-08-25
+v šabloně natvrdo (`aisha`) na 9 místech.
+
+## `GATEWAY_TRUSTED_PROXIES: ${GATEWAY_TRUSTED_PROXIES:-}`
+
+TÝŽ seznam, jaký dostává gateway — jeden zdroj (`lib/derive-subnets.mjs`).
+Bez něj Caddy `x-forwarded-for` PŘEPÍŠE a klientská adresa se ztratí.
+
+## `GATEWAY_TRUSTED_PROXIES: ${GATEWAY_TRUSTED_PROXIES:-}`
+
+TÝŽ seznam, jaký dostává gateway — jeden zdroj (`lib/derive-subnets.mjs`).
+Bez něj Caddy `x-forwarded-for` PŘEPÍŠE a klientská adresa se ztratí.

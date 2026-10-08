@@ -107,7 +107,10 @@ describe("doručení povinných proměnných compose (brána)", () => {
       expect(i).toBeGreaterThan(-1);
       const blok = sync.slice(i, sync.indexOf("# ── Souhrn", i));
       const iStraz = blok.indexOf("${FAILED[*]:-}");
-      const iPost = blok.indexOf("/deploy?uuid=");
+      // Od 2026-10-04 nasazení neodesílá sync sám: jde přes jediný domov mutace
+      // (lib/coolify-mutace.sh → coolify_mutace deploy), který se ptá na deklarované držení.
+      const iPost = blok.indexOf("coolify_mutace deploy ");
+      expect(iPost, "REDEPLOY nenasazuje přes domov mutace (coolify_mutace deploy)").toBeGreaterThan(-1);
       expect(iStraz, "redeploy nekontroluje FAILED — nasadil by aplikaci, o které sync ví, že spadne").toBeGreaterThan(-1);
       expect(iStraz).toBeLessThan(iPost);
     });

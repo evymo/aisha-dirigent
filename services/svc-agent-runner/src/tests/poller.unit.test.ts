@@ -10,15 +10,11 @@ const {
   mockIssueBrokerToken,
   mockClaudePrepare,
   mockClaudeMonitor,
-  mockCreateEphemeralKey,
-  mockRevokePeer,
 } = vi.hoisted(() => ({
   mockRpcService: vi.fn(),
   mockIssueBrokerToken: vi.fn(),
   mockClaudePrepare: vi.fn(),
   mockClaudeMonitor: vi.fn(),
-  mockCreateEphemeralKey: vi.fn(),
-  mockRevokePeer: vi.fn(),
 }));
 
 vi.mock('../db.js', () => ({ rpcService: mockRpcService }));
@@ -32,15 +28,10 @@ vi.mock('../backends/claude-cli.js', () => {
   }
   return { ClaudeCliBackend };
 });
-vi.mock('../netbird-client.js', () => ({
-  createEphemeralKey: mockCreateEphemeralKey,
-  revokePeer: mockRevokePeer,
-}));
 vi.mock('../config.js', () => ({
   config: {
     runnerBackend: 'docker',
     pluginBrokerUrl: 'http://broker:3000',
-    netbirdEnabled: false,
     claudeCliTimeoutMs: 1_000,
     claudePollGraceSeconds: 10,
     claudePollEnabled: true,
@@ -66,8 +57,6 @@ beforeEach(() => {
   mockIssueBrokerToken.mockReset().mockResolvedValue('broker-jwt');
   mockClaudePrepare.mockReset();
   mockClaudeMonitor.mockReset();
-  mockCreateEphemeralKey.mockReset();
-  mockRevokePeer.mockReset();
 });
 
 describe('claude poller — pollOnce', () => {

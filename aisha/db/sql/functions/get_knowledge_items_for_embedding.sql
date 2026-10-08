@@ -4,9 +4,9 @@
 -- chunks were built from a different content key (see WHERE below).
 -- Brick4: surface ki.locale (+ source_hash) so the embedding worker can thread the
 -- item's locale into chunk/embedding writes and the language-aware contextual prefix.
--- Adding result columns changes the return type — DROP before CREATE (CREATE OR
--- REPLACE cannot change a function's RETURNS TABLE shape).
-DROP FUNCTION IF EXISTS public.get_knowledge_items_for_embedding(integer, boolean, uuid, text, text);
+-- Bez DROP: návratový tvar s locale a source_hash (poslední změna 2026-07-10) má i nejstarší
+-- podporovaná databáze (dno 2026-07-29), takže CREATE OR REPLACE stačí. Soubor je v heals —
+-- DROP téže signatury by běžel při každém migrate a nic nepřidal.
 
 CREATE OR REPLACE FUNCTION public.get_knowledge_items_for_embedding(p_batch_size integer DEFAULT 10, p_force boolean DEFAULT false, p_item_id uuid DEFAULT NULL::uuid, p_item_type text DEFAULT NULL::text, p_source_slug text DEFAULT NULL::text)
  RETURNS TABLE(id uuid, title text, summary text, body_markdown text, ai_instructions text, source_slug text, item_type text, locale text, source_hash text)

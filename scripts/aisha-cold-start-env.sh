@@ -124,8 +124,8 @@ COOLIFY_SERVER_UUID_FRONTEND=$(get_env_var "SERVER_UUID_FRONTEND" "$TARGET_ENV")
 COOLIFY_SERVER_UUID_BACKEND=$(get_env_var "SERVER_UUID_BACKEND" "$TARGET_ENV")
 COOLIFY_SERVER_UUID_EXPERIMENTAL=$(get_env_var "SERVER_UUID_EXPERIMENTAL" "$TARGET_ENV")
 COOLIFY_SERVER_UUID_BUILD=$(get_env_var "SERVER_UUID_BUILD" "$TARGET_ENV")
+COOLIFY_SERVER_UUID_GPU=$(get_env_var "SERVER_UUID_GPU" "$TARGET_ENV")
 ENV_BACKUP=$(get_env_var "ENV_BACKUP" "$TARGET_ENV")
-DOMAINS_FILE=$(get_env_var "DOMAINS_FILE" "$TARGET_ENV")
 
 # ── Story-slot pointer derivation ─────────────────────────────────────────────
 # A story slot (<story>-{staging,prod}) needs NO entry in coolify-environments.env.
@@ -145,10 +145,15 @@ if [[ -z "$ENV_BACKUP" ]]; then
   log_info "derived env backup (slot undeclared — instance data stays out of the shared SoT)" \
     file "$ENV_BACKUP"
 fi
-if [[ -z "$DOMAINS_FILE" && -f "$REPO_ROOT/config/domains-${TARGET_ENV}.env" ]]; then
-  DOMAINS_FILE="config/domains-${TARGET_ENV}.env"
-  log_info "derived domains overlay" file "$DOMAINS_FILE"
+# Požadovaný doménový overlay — JEDEN výpočet (scripts/lib/domenovy-overlay.mjs
+# --pozadovany): COOLIFY_<ENV>_DOMAINS_FILE, jinak config/domains-<env>.env,
+# existuje-li v repu (dřív tady inline). Týž výpočet dělá env-doktor mimo
+# cold-start (redeploy), aby znal deklaraci domén webu (WEB_FQDNS).
+if ! DOMAINS_FILE="$(node "$SCRIPT_DIR/lib/domenovy-overlay.mjs" --pozadovany "$TARGET_ENV")"; then
+  log_error "domains overlay: požadovaný soubor nejde určit" env "$TARGET_ENV"
+  exit 1
 fi
+[[ -n "$DOMAINS_FILE" ]] && log_info "domains overlay" file "$DOMAINS_FILE"
 # Coolify environment name inside the project (e.g. "production", "development",
 # "staging"). Forks with multi-env projects (legacy + new AISHA stack side by
 # side) MUST set this — otherwise cold-start defaults to "production" and may
@@ -177,6 +182,7 @@ if [[ -f "$_env_backup_path" ]]; then
   [[ -z "$COOLIFY_SERVER_UUID_BACKEND" ]]      && COOLIFY_SERVER_UUID_BACKEND=$(read_backup_key COOLIFY_SERVER_UUID_BACKEND)
   [[ -z "$COOLIFY_SERVER_UUID_EXPERIMENTAL" ]] && COOLIFY_SERVER_UUID_EXPERIMENTAL=$(read_backup_key COOLIFY_SERVER_UUID_EXPERIMENTAL)
   [[ -z "$COOLIFY_SERVER_UUID_BUILD" ]]        && COOLIFY_SERVER_UUID_BUILD=$(read_backup_key COOLIFY_SERVER_UUID_BUILD)
+  [[ -z "$COOLIFY_SERVER_UUID_GPU" ]]        && COOLIFY_SERVER_UUID_GPU=$(read_backup_key COOLIFY_SERVER_UUID_GPU)
   [[ -z "$COOLIFY_PROJECT_ENVIRONMENT" ]]      && COOLIFY_PROJECT_ENVIRONMENT=$(read_backup_key COOLIFY_ENVIRONMENT)
 fi
 # ── Env-backup file: required, but auto-bootstrap from Coolify if missing ───
@@ -230,11 +236,22 @@ fi
 # auto-discovers them from Coolify (Iter 19 — name-match per slot, or single-server
 # fan-out). Only warn when they are absent so the wrapper accepts legacy/minimal
 # backups and defers slot resolution to discovery, matching the direct-script path.
-for slot_key in COOLIFY_SERVER_UUID_FRONTEND COOLIFY_SERVER_UUID_BACKEND COOLIFY_SERVER_UUID_EXPERIMENTAL; do
+#
+# Které sloty: ty V PROVOZU (lib/sloty-serveru.mjs — slot hostí aspoň jednu
+# katalogovou službu s otevřenou lane), ne opsaný výčet. Volitelný slot (GPU uzel
+# `gpu`) se tím bez své lane nehlásí; povinné sloty vycházejí tytéž jako dřív.
+# Nezměřený seznam je STOP — prázdná smyčka by vypadala jako „vše nastaveno".
+if ! _sloty_v_provozu="$(node "$REPO_ROOT/scripts/lib/sloty-serveru.mjs" --v-provozu --env-soubor "$REPO_ROOT/$ENV_BACKUP")"; then
+  log_error "slots in use NOT derived (coolify/servers.json + config/services.json)" env "$TARGET_ENV"
+  exit 1
+fi
+for _slot in $_sloty_v_provozu; do
+  slot_key="COOLIFY_SERVER_UUID_$(printf '%s' "$_slot" | tr '[:lower:]' '[:upper:]')"
   if [[ -z "${!slot_key:-}" ]]; then
     log_warn "Coolify slot UUID unset — will auto-discover" key "$slot_key" env "$TARGET_ENV"
   fi
 done
+unset _slot _sloty_v_provozu
 
 # Resolve story name. Priority:
 #   1) COOLIFY_<ENV>_STORY in env file (explicit per-env override — needed
@@ -324,6 +341,7 @@ export COOLIFY_SERVER_UUID_FRONTEND
 export COOLIFY_SERVER_UUID_BACKEND
 export COOLIFY_SERVER_UUID_EXPERIMENTAL
 export COOLIFY_SERVER_UUID_BUILD
+export COOLIFY_SERVER_UUID_GPU
 export ENV_PROD_BACKUP="$REPO_ROOT/$ENV_BACKUP"  # cold-start.sh reads this var
 export AISHA_ENV="$TARGET_ENV"
 export AISHA_STORY="$TARGET_STORY"
@@ -359,6 +377,7 @@ export "${_slot_prefix}SERVER_UUID_FRONTEND=$COOLIFY_SERVER_UUID_FRONTEND"
 export "${_slot_prefix}SERVER_UUID_BACKEND=$COOLIFY_SERVER_UUID_BACKEND"
 export "${_slot_prefix}SERVER_UUID_EXPERIMENTAL=$COOLIFY_SERVER_UUID_EXPERIMENTAL"
 export "${_slot_prefix}SERVER_UUID_BUILD=$COOLIFY_SERVER_UUID_BUILD"
+export "${_slot_prefix}SERVER_UUID_GPU=$COOLIFY_SERVER_UUID_GPU"
 export "${_slot_prefix}ENV_BACKUP=$ENV_BACKUP"
 
 # Forward all CLI args to cold-start.sh

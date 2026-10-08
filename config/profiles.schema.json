@@ -101,6 +101,24 @@
       },
       "description": "Role serverů, které tenhle tvar má. Jednouzlová instalace uvádí jednu."
     },
+    "lane_gpu": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["vlastnik", "vstup_url"],
+      "properties": {
+        "vlastnik": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{1,30}$",
+          "description": "Vlastník GPU uzlu (jeho `vlastnik` v deklaraci uzlu, ACCEL_OWNER_PREFIX). Síť nájemce je v jeho jmenném prostoru: `<vlastnik>-lane-<prefix instance>` — zakládá ji compose vstupu lane operátora, tenký stack se na ni jen připojuje."
+        },
+        "vstup_url": {
+          "type": "string",
+          "pattern": "^http://(10\\.[0-9]{1,3}|172\\.(1[6-9]|2[0-9]|3[01])|192\\.168)\\.[0-9]{1,3}\\.[0-9]{1,3}:[0-9]{1,5}$",
+          "description": "Adresa vynucovacího bodu lane na síti nájemce `<vlastnik>-lane-<prefix>` — IP z deklarace GPU uzlu (ne jméno: vestavěný DNS Dockeru by jméno řešil přes všechny sítě agenta)."
+        }
+      },
+      "description": "Nájemce společné lane na GPU uzlu (varianta C). Jen s modelem na slotu has_gpu; derivace z ní vydá LANE_VLASTNIK a LANE_VSTUP_URL pro tenký stack. Bez ní derivace modelu na GPU slotu selže."
+    },
     "server_bindings": {
       "type": "object",
       "additionalProperties": {
@@ -315,8 +333,8 @@
   "definitions": {
     "Role": {
       "type": "string",
-      "pattern": "^(frontend|backend|experimental|local|\\$\\{[^}]+\\})$",
-      "description": "Role serveru. Krom tří cloudových rolí i `local` (dev mirror) a odkaz na proměnnou `${VAR}` nebo `${VAR:-default}` — jednouzlový profil tím nechává výběr stroje na instanci, místo aby ho zapekl. Enum by tuhle legální podobu zakázal; naměřeno 2026-08-13, kdy schéma odvozené jen z katalogu neznalo ani `local`, ani `${SINGLE_HOST_SERVER:-backend}`."
+      "pattern": "^(frontend|backend|experimental|gpu|local|\\$\\{[^}]+\\})$",
+      "description": "Role serveru. Krom cloudových slotů (klíče coolify/servers.json kromě build serveru — výčet měří brána sloty-maji-jeden-seznam) i `local` (dev mirror) a odkaz na proměnnou `${VAR}` nebo `${VAR:-default}` — jednouzlový profil tím nechává výběr stroje na instanci, místo aby ho zapekl. Enum by tuhle legální podobu zakázal; naměřeno 2026-08-13, kdy schéma odvozené jen z katalogu neznalo ani `local`, ani `${SINGLE_HOST_SERVER:-backend}`."
     },
     "Prose": {
       "type": [

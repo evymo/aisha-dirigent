@@ -66,6 +66,7 @@ BEGIN
       END AS risk_boost
     FROM expert_rules er
     WHERE er.status = 'published'
+      AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid())
       AND er.ai_context_tags IS NOT NULL
       AND array_length(er.ai_context_tags, 1) > 0
   ),

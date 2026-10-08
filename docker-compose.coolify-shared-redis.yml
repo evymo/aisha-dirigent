@@ -159,9 +159,7 @@ services:
       retries: 8
     restart: unless-stopped
     networks:
-      internal:
-        aliases:
-          - ${APP_NAME_PREFIX:?identita instance}-svc-model
+      - internal
 
   shared-redis-mesh-tcp:
     # Mesh komponenta — bez meshe nemá co dělat. Profil "mesh" zapíná

@@ -180,4 +180,54 @@ describe('useAuth', () => {
       expect(result.current.user?.email).toBe('new@example.com');
     });
   });
+
+  // 2026-10-01 (na instanci): tichá obnova tokenu každé ~3 min vyrobila nový objekt
+  // uživatele → useUserRole přepnul do načítání → ochrana adminu odmontovala
+  // otevřený editor stránek. Tentýž účet musí zůstat TÝMŽ objektem.
+  it('tichá obnova tokenu se stejnou identitou ponechá tentýž objekt uživatele', async () => {
+    mockMapOidcUser.mockImplementation(() => ({
+      ...mockKcUser,
+      raw_claims: { ...mockKcUser.raw_claims, iat: Math.random(), exp: Math.random(), jti: String(Math.random()) },
+    }));
+    mockMapOidcSession.mockReturnValue(mockKcSession);
+
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    act(() => {
+      eventHandlers.userLoaded.forEach((fn) => fn({ profile: { sub: 'user-123' } }));
+    });
+    const poPrvniObnove = result.current.user;
+
+    act(() => {
+      eventHandlers.userLoaded.forEach((fn) => fn({ profile: { sub: 'user-123' } }));
+    });
+
+    expect(result.current.user).toBe(poPrvniObnove);
+  });
+
+  it('obnova se změněným nárokem (must_change_password) vyrobí nový objekt', async () => {
+    mockMapOidcUser
+      .mockImplementationOnce(() => ({ ...mockKcUser, raw_claims: { ...mockKcUser.raw_claims, iat: 1 } }))
+      .mockImplementationOnce(() => ({ ...mockKcUser, raw_claims: { ...mockKcUser.raw_claims, iat: 2, must_change_password: true } }));
+    mockMapOidcSession.mockReturnValue(mockKcSession);
+
+    const { result } = renderHook(() => useAuth());
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    act(() => {
+      eventHandlers.userLoaded.forEach((fn) => fn({ profile: { sub: 'user-123' } }));
+    });
+    const prvni = result.current.user;
+    act(() => {
+      eventHandlers.userLoaded.forEach((fn) => fn({ profile: { sub: 'user-123' } }));
+    });
+
+    expect(result.current.user).not.toBe(prvni);
+    expect(result.current.user?.raw_claims.must_change_password).toBe(true);
+  });
 });

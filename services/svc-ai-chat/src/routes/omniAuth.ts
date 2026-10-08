@@ -7,6 +7,7 @@
  * is bound FAIL-CLOSED:
  *   - scoped PAT + body story ≠ scope → 403 story_mismatch (body NEVER overrides)
  *   - unscoped PAT + no body story     → 403 unscoped_token (no inference)
+ *   - unscoped PAT + body story the PAT owner cannot access → 403 story_forbidden (B8)
  * The resolved story comes from the TOKEN scope (never authoritatively from body);
  * the user comes from the PAT (`req.user.sub` = user_id), never from body (§16).
  *
@@ -14,6 +15,7 @@
  */
 import { createHash } from "node:crypto";
 import { rpcService } from "../postgrest.js";
+import { userCanAccessStory } from "../lib/storyAccess.js";
 
 export type AuthClass = "pat" | "legacy-pat" | "passthrough" | "jwt" | "none";
 
@@ -147,6 +149,11 @@ export async function authenticateOmni(
   } else if (!bodyStory) {
     // unscoped PAT + no body story → cannot infer a story → hard fail-closed.
     return { ok: false, http: 403, body: { error: "unscoped_token" } };
+  } else if (!(await userCanAccessStory(identity.userId, bodyStory))) {
+    // B8: příběh z těla jen OVĚŘENÝ (can_access_story pod vlastníkem PATu). Dřív šel
+    // neověřeně do tokenu pro MCP, ensureTurnRun, admitClow i reflexe → KB cizího příběhu.
+    // Stejná odpověď pro „neexistuje“ i „cizí“ — žádné orákulum existence příběhu.
+    return { ok: false, http: 403, body: { error: "story_forbidden" } };
   }
 
   return {

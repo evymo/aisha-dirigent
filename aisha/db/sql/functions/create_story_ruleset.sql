@@ -29,6 +29,18 @@ BEGIN
   END IF;
 
   -- Sort rule IDs for deterministic fingerprint
+  -- Do rulesetu jen pravidlo, které volající SMÍ vidět (2026-10-05, revize B1). Do té doby šlo přidat
+  -- jakékoli publikované pravidlo podle id — i soukromé nebo jen pro gildu — a přečíst ho pak čtenáři
+  -- rulesetu. Pravidlo, které volající nevidí, se nepřeskakuje potichu: celé volání skončí 42501.
+  IF EXISTS (
+    SELECT 1 FROM public.expert_rules er
+     WHERE er.id = ANY(p_rule_ids)
+       AND NOT public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid())
+  ) THEN
+    RAISE EXCEPTION 'Rule not visible to the caller — cannot be pinned to the story ruleset'
+      USING ERRCODE = '42501';
+  END IF;
+
   SELECT array_agg(id ORDER BY id) INTO v_sorted_ids
   FROM unnest(p_rule_ids) AS id;
 
@@ -41,6 +53,7 @@ BEGIN
     FROM public.expert_rules er
     LEFT JOIN public.expert_rule_versions erv ON erv.rule_id = er.id AND erv.version_no = er.version
     WHERE er.id = ANY(v_sorted_ids) AND er.status = 'published'
+      AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid())
     ORDER BY er.id
   LOOP
     v_versions := v_versions || jsonb_build_object(v_rule.id::text, v_rule.version);

@@ -20,8 +20,9 @@ IMPORTANT: This stack assumes Experimental has been provisioned with:
   - Docker daemon backed by containerd
   - kata-runtime + kata-fc + kata-dragonball runtimes registered in
     /etc/docker/daemon.json runtimes section
-  - aisha-exec-net Docker network (created by the runner on first boot
-    or pre-created via the Ansible playbook).
+  - the runs network `<prefix>-exec-runs` (DOCKER_EXEC_NETWORK) is created by the
+    runner at run time as `Internal: true`; an existing open network of that name
+    is REFUSED (see `## DOCKER_EXEC_NETWORK` below).
 ==============================================================================
 
 ## `container_name: aisha-svc-agent-runner`
@@ -52,9 +53,88 @@ Host RAM budget for claude_cli_task = EXEC_MEMORY_LIMIT × MAX_CONCURRENT_CLAUDE
 Size MAX_CONCURRENT_CLAUDE_RUNS so the product stays under host RAM minus
 daemon+OS headroom. Isolation bounds blast radius per run; this bounds the COUNT.
 
-## `NETBIRD_ENABLED: ${NETBIRD_ENABLED:-true}`
+## `DOCKER_EXEC_NETWORK: …-exec-runs` — síť běhů UZAVŘENÁ (2026-10-06, majitel „síť zavřít“ = volba A)
 
-── Netbird (peer ephemeral keys for sandboxed runs) ──────────────────
+Síť běhů zakládá runner (`backends/docker-http.ts` `ensureExecNetwork`) s `Internal: true`
+a `com.docker.network.bridge.inhibit_ipv4=true`: žádná výchozí trasa, žádný NAT ven a hostitel
+v ní nemá adresu. ⛔ NAMĚŘENO 2026-10-07 místní sondou (Docker 29.7.2): z `Internal` sítě BEZ
+`inhibit_ipv4` se běh spojil s posluchačem hostitele na adrese brány bridge (172.x.0.1:port) —
+tedy s čímkoli, co na hostiteli poslouchá na 0.0.0.0; s volbou bridge adresu nemá. Runner
+proto odmítne i uzavřenou síť, která má v IPAM bránu nebo volbu nenese (starší Docker ji nezná). Kontejner běhu (plugin i claude_cli_task) dosáhne jen
+na sousedy v téže síti — a jediný soused, který v ní něco obsluhuje, je runner s broker-proxy
+(`BROKER_PROXY_ALIAS` : `BROKER_PROXY_PORT`, viz níž „broker-proxy na exec síti“):
+
+- `POST /sandbox/*` + `GET /beh/payload` → broker / runner, jen s tokenem běžícího běhu,
+- `CONNECT host:port` (výstup claude_cli_task) jen s tokenem běhu v `Proxy-Authorization`,
+  jen na hostitele, které runner TOMU běhu povolil z jeho konfigurace (ANTHROPIC_BASE_URL /
+  AGENT_LOCAL_LLM_URL, AGENT_GATEWAY_URL, AGENT_GIT_REMOTE, NPM_REGISTRY_URL — jen `https:`),
+  a jen na veřejnou adresu (ochrana SSRF z `@aisha/security`: ne RFC1918, ne mesh 100.64/10,
+  ne metadata). Běh pluginu výčet nemá → CONNECT nikam.
+
+Runner síť MĚŘÍ před KAŽDÝM během (žádná paměť „ověřeno“): síť toho jména, která uzavřená
+NENÍ, má adresu hostitele, chybí po založení, nebo odpověď Dockeru nejde přečíst → běh se nespustí (chyba se jménem
+sítě, `containers/create` se nezavolá). Otevřenou síť nikdy tiše nepoužije.
+
+**Proč nové jméno `-exec-runs` (dřív `-exec-net`):** starou síť `-exec-net` zakládal runner
+jako otevřený `bridge` a na existujících hostitelích dál leží — pod starým jménem by ji runner
+správně odmítl a běhy by stály na ručním `docker network rm`. Nové jméno = runner založí čistou
+uzavřenou síť sám a nasazení zůstává automatické; stará síť zůstane bez kontejnerů a smí se
+odstranit kdykoli.
+
+Zbytkové riziko (vědomé): běhy v téže síti se vidí navzájem na L3 (`enable_icc=false` by
+odřízlo i proxy runneru). Obrazy běhů nic neposlouchají; oddělení běhu od běhu = samostatná
+síť na běh.
+
+## `EXEC_PIDS_LIMIT` · `CLAUDE_PIDS_LIMIT` · `EXEC_RUN_USER` · `CLAUDE_RUN_USER`
+
+Prázdno (`${X:-}`) = výchozí hodnota v `services/svc-agent-runner/src/config.ts` (jediný domov
+výchozích hodnot): strop procesů 128 (plugin) / 1024 (claude), uživatel 1000 (`USER node`
+obrazu plugin-exec) / 10001 (`agent` v Dockerfile.agent-claude). Uživatel je ČÍSELNÝ uid[:gid]
+≠ 0 — jméno by si obraz mohl namapovat na root. Nečitelná hodnota = runner NENASTARTUJE
+(neznámý bezpečnostní přepínač = fail-closed); totéž platí pro `BROKER_PROXY_PORT`.
+
+## `ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}` — model claude_cli_task (2026-10-07, revize D6)
+
+Síť běhů je uzavřená, takže claude běh potřebuje adresu modelu, kterou broker-proxy pustí:
+veřejnou `https`. Env-doktor ji ODVOZUJE (`modelBehuAgenta()`): veřejná tvář „AISHA jako
+model“ `https://<GATEWAY_DOMAIN_PUBLIC>` (= `ask.<public_tld>` z derive-domains, core gateway
+/v1). Operátor ji smí přepsat v `.env-prod-backup` (jiný model / vlastní endpoint). Instance bez
+veřejné tváře modelu dostane prázdno a claude běhy hlasitě odmítne (fail-closed) — doktor ji
+vypíše mezi „Odvozené a PRÁZDNÉ“. „Jen redeploy exec“ tak hodnotu doručí: doktor v APPLY ji
+zapíše do `.env.coolify`, `coolify-sync-envs` ji pošle aplikaci exec (compose ji čte).
+
+Výčet výstupu a ochrana SSRF proxy jsou jedno rozhodnutí: příprava claude běhu změří KAŽDOU
+deklarovanou adresu (model, AGENT_GATEWAY_URL, AGENT_GIT_REMOTE, NPM_REGISTRY_URL) toutéž
+ochranou SSRF, jakou ji pak pustí CONNECT. Adresa do meshe nebo soukromé sítě (např.
+AGENT_LOCAL_LLM_URL na interní LLM, AGENT_GATEWAY_URL na interní bránu) shodí přípravu s názvem
+proměnné — ne až první volání modelu uprostřed běhu. Interní endpoint se do claude běhu dostane
+jen přes jeho veřejnou tvář (edge), ne bokem.
+
+Autentizace k modelu je mimo tuto změnu: na veřejné tváři ji ověřuje Omni (PAT,
+`validate_mcp_token`) — `ANTHROPIC_API_KEY` / `AGENT_CLAUDE_OAUTH_TOKEN` dodává operátor.
+
+## API runneru (port 3030) — jen změřené adresy runneru mimo síť běhů
+
+Hák API (`server.ts`, `pristupKApi` v `broker-proxy.ts`) obsluhuje JEN smyčku (healthcheck) a
+adresy runneru v sítích MIMO síť běhů, změřené přes Docker při každém `zajistiCestuKBrokeru`.
+Dokud změřené nejsou (start, výpadek Dockeru, neprošlé měření sítě), API mimo smyčku odpovídá
+503 `runner_site_nezmereny` a runner měření opakuje každých 30 s. Adresa, která přibude
+později (náhrada sítě běhů), ve výčtu není → 404. Dřív hák odmítal jen ZNÁMOU adresu v síti
+běhů a do jejího zjištění pouštěl vše (osiřelý běh z minulé generace runneru na API dosáhl).
+
+## `NPM_REGISTRY_URL: ${NPM_REGISTRY_URL:-}`
+
+Registr balíčků pro claude_cli_task: runner ho předá běhu jako `npm_config_registry` a jeho
+hostitel přidá do výčtu brány. Hodnotu instance deklaruje env-doktor (`NPM_REGISTRY_URL`).
+
+## Bez `NETBIRD_*` (2026-10-06)
+
+Runner dřív pro KAŽDÝ běh razil klíč k mesh síti (NetBird setup key) a předával ho do prostředí
+kontejneru (`NB_SETUP_KEY`), kde ho žádný obraz nepoužil — jen ležel na dosah pluginu, který
+vystoupí z VM. Volba A: klíč se nerazí vůbec, a runner proto nedostává ani pověření ke správě
+mesh sítě (`NETBIRD_MGMT_SECRET` jako `NETBIRD_KEYCLOAK_CLIENT_SECRET`, `NETBIRD_API_*`,
+`NETBIRD_SANDBOX_GROUP`). Mesh trasa samotného runneru (`NETBIRD_PEER_CIDR` přes
+`NETBIRD_DNS_IP`) zůstává — tou vede broker-proxy k brokeru.
 
 ## `AISHA_DB_URL: ${AISHA_DB_URL}`
 
@@ -96,9 +176,9 @@ Containerd-backed Docker socket on Experimental.
 
 ⛔ Namontovaný socket NESTAČÍ. Proces runneru běží přes `su-exec node` (uid/gid
 1000) a su-exec mu dá jen skupiny z `/etc/group` — skupina vlastníka socketu mezi
-nimi nebyla. Naměřeno na riq po nasazení opravy void RPC (kolo 12): každý běh
+nimi nebyla. Naměřeno na instanci po nasazení opravy void RPC (kolo 12): každý běh
 pluginu v :55 skončil `connect EACCES /var/run/docker.sock` (socket `root:989 660`,
-proces `uid=1000 groups=1000`), surová data T-CARS/WD zůstala 0.
+proces `uid=1000 groups=1000`), surová data konektorů zůstala 0.
 
 Proto entrypoint (ještě jako root, po trase do meshe) přečte GID VLASTNÍKA socketu
 (`stat -c %g`), založí pro něj skupinu, pokud v obrazu není, a přidá do ní `node`.
@@ -117,18 +197,29 @@ build-time-mnozina-vsech-compose) — přitom jde o proměnnou kontejneru. Změn
 
 PKI bundle synced from Backend out-of-band (rsync) or fetched at boot.
 
-## `- /var/lib/aisha/agent-runs:/var/lib/aisha/agent-runs:rw`
+## `- "${AGENT_RUNS_DIR}:/var/lib/agent-runs:rw"`
 
-Per-run git worktrees (claude_cli_task): the runner creates worktrees here
-and bind-mounts each into its agent container THROUGH the docker socket, so
-the host path must equal the in-container path. It MUST be a literal, not
-${VAR}: Coolify rejects '${' in a volume source (command-injection guard),
-and the sibling bind-mount only resolves when source==target==a fixed host
-path. Keep these literals in sync with AGENT_RUNS_DIR / AGENT_REPO_PATH above.
+Adresář běhů claude_cli_task (od 2026-09-24). Runner si pro KAŽDÝ běh naklonuje
+repo z `AGENT_GIT_REMOTE` do `/var/lib/agent-runs/<runId>` (pevný cíl — Coolify
+`${` v cíli svazku odmítá) a dítěti přes docker socket dá TENTÝŽ adresář pod
+hostitelskou cestou instance `${AGENT_RUNS_DIR}` (`Binds: <hostitel>/<runId>:/work`).
+Runner tedy rozlišuje cestu v kontejneru (fs, git) a na hostiteli (Binds) —
+`config.agentRunsContainerDir` / `agentRunsHostDir`; brána claude-cli-backend
+čte cíl z configu, aby compose a kód neměly dva domovy.
 
-## `- /srv/aisha/base-repo:/srv/aisha/base-repo:ro`
+`AGENT_RUNS_DIR` odvozuje generate-secrets z identity (`/var/lib/<identita>/agent-runs`),
+takže exec dvou instancí na jednom stroji nesdílí adresář. Ve zdroji stojí `${VAR}`
+s celou cestou bez výchozí hodnoty (`${VAR:-x}` Coolify rozvine vždy na x).
 
-Read-only base repo the worktrees branch from.
+### Historie: doslovné `/var/lib/aisha/agent-runs` a `:ro` `/srv/aisha/base-repo` (do 2026-09-24)
+
+Doslovné cesty (premisa „Coolify `${` ve zdroji odmítá" platila jen pro Coolify
+beta.441–442) sdílel exec tří instancí na jednom stroji (naměřeno 2026-09-23).
+Sdílený base-repo nikdo neplnil (prázdný od 2026-06-30) a byl `:ro`, takže
+`git worktree add` do něj zapsat nemohl — claude_cli_task nefungoval nikde.
+Dítě navíc vidělo jen `/work`, jehož `.git` ukazoval do repa runneru, takže
+commit/push v dítěti selhával. Klon per běh řeší obojí: `/work` má vlastní `.git`
+a přihlášení jde gitu jen přes env (`GIT_CONFIG_*` → `http.extraHeader`).
 
 ## `internal:`
 
@@ -242,3 +333,25 @@ je tam **záměrně**: jednorázová služba, která selže, jinak projde jako z
 500 na `execute`. Naměřeno 2026-09-05: nasazení hlásilo `healthy`, přeznačovač
 přitom skončil s `exit 1` a obraz na hostiteli nebyl. Radši ať stack nenaběhne,
 než aby předstíral, že je v pořádku.
+
+## svc-agent-runner: broker-proxy na exec síti (rozhodnutí majitele 2026-10-01, varianta C)
+
+- **Naměřeno 2026-09-30 na instanci:** běhy pluginů (konektory) končily hodinu co
+  hodinu `Exit code 255`. Z exec sítě se `PLUGIN_BROKER_URL` (jméno v meshi) nepřeloží —
+  sandbox v meshi není, obraz plugin-exec nemá klienta NetBird a per-run klíč NetBird
+  padal na „fetch failed“ (KEYCLOAK_URL v meshi runner nepřeložil).
+- **Řešení:** runner, který v meshi je (DNS mesh-routeru + trasa `NETBIRD_PEER_CIDR`),
+  se za běhu SÁM připojí k exec síti pod aliasem `BROKER_PROXY_ALIAS`
+  (`<prefix>-plugin-broker`, GwPriority −1 → exec síť nikdy není výchozí trasou) a na
+  `BROKER_PROXY_PORT` pustí jen `/sandbox/*` s tokenem běhu, který právě běží. Ven jde jen
+  `authorization` a `content-type`. Běh dostane `BROKER_URL` na proxy; per-run NetBird se
+  od 2026-10-06 nevydává vůbec (volba A).
+- API runneru (docker.sock) na exec síti odmítá vše (404) — sandbox smí jen na proxy.
+- Síť se nedeklaruje v compose: zakládá ji runner až za běhu (`ensureExecNetwork`), na
+  čisté instanci by při nasazení ještě neexistovala. Od 2026-10-06 (volba A) s `Internal: true`
+  a proxy je POVINNÁ (`BROKER_PROXY_ALIAS` chybí = runner nenastartuje) — viz
+  `## DOCKER_EXEC_NETWORK` výš.
+- `AISHA_DB_URL` odebrán: kód runneru ho nepoužívá (do DB jde přes PostgREST), proměnná jen
+  zbytečně držela přímý přístup do databáze.
+- Neúspěšný běh nese v `error_summary` konec výstupu kontejneru (posledních 5 řádků, tokeny
+  maskované, strop 600 znaků) — dřív jen „Exit code N“.

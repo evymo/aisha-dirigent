@@ -36,7 +36,8 @@ BEGIN
            ) AS relevance
     FROM expert_rules er
     WHERE er.status = 'published'
-      AND er.visibility = 'public'
+      -- rada dirigenta čte jen veřejná pravidla (bez identity)
+      AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, NULL::uuid)
     ORDER BY relevance DESC NULLS LAST, er.rating_avg DESC NULLS LAST
     LIMIT 5
   )

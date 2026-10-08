@@ -27,6 +27,8 @@ import { fileURLToPath } from "node:url";
 import { overlayDirOrRequired } from "./instance-overlay.mjs";
 import { isDirectRun } from "./cli-entry.mjs";
 import { podminkaSplnena } from "./provision-gate.mjs";
+import { isMeshHost } from "./mesh-host.mjs";
+import { composeProUmisteni, slotModelovehoMeshe, SLUZBA_MODELU } from "./umisteni-sluzeb.mjs";
 import { PROFIL_DVERI, knockUpstream } from "./dvere-deklarace.mjs";
 import { gatewayRestPrefix, nesouladyPovrchu } from "./povrch-shoda-s-derivaci.mjs";
 
@@ -261,6 +263,16 @@ function profileCandidates(profileId) {
  * šli TÝMIŽ dveřmi, ne vlastní kopií hledání.
  */
 export function loadProfile(profileId) {
+  return deepSubstitute(loadProfileRaw(profileId));
+}
+
+/**
+ * Týž profil TÝMIŽ dveřmi, ale BEZ dosazení `${VAR}`. Pro čtenáře, kterým na rozdílu
+ * „proměnná nenastavená“ × „nastavená prázdná“ záleží: `substitute()` z obou dělá "",
+ * takže z dosazeného profilu se nedá poznat, jestli prostředí odpověď DEKLAROVALO
+ * (domov vlastnictví: nenastavená proměnná v `external_domain` = „nevím“, ne „vlastní“).
+ */
+export function loadProfileRaw(profileId) {
   const candidates = profileCandidates(profileId);
   const path = candidates.find((p) => existsSync(p));
   if (!path) {
@@ -273,7 +285,17 @@ export function loadProfile(profileId) {
         `not in this public repository.`,
     );
   }
-  return deepSubstitute(readJSON(path));
+  return readJSON(path);
+}
+
+/**
+ * Čtečka lane pro `podminkaSplnena`: lane modelového meshe (`MODEL_MESH`) je
+ * ODVOZENÁ z umístění modelu, ostatní lane deklaruje prostředí. Jedna čtečka pro
+ * celou derivaci — kdyby některé místo četlo `MODEL_MESH` z prostředí, rozešlo
+ * by se s topologií hned, jak operátor model přesune.
+ */
+function ctiLaneTopologie(modelovyMesh) {
+  return (k) => (k === "MODEL_MESH" ? modelovyMesh : process.env[k]);
 }
 
 function loadCatalog() {
@@ -463,6 +485,23 @@ export function containerNameFrom(composeFile, serviceKey, prefix) {
   if (!/\$\{APP_NAME_PREFIX/.test(raw)) return raw; // jméno bez identity (sdílená infra) — bere se, jak stojí
   if (!prefix) return null;
   return raw.replace(/\$\{APP_NAME_PREFIX[^}]*\}/g, prefix);
+}
+
+/**
+ * Kde služba bydlí v HLAVNÍM meshi: compose, jehož peer nese její jména, a compose služba,
+ * na kterou míří trasy. Obvykle služba sama; model na slotu modelového meshe (varianta C)
+ * ale do hlavního meshe nepatří a jeho jména drží MOST (`mesh_most` z topologie, katalog
+ * `mesh_most_pro`). Jeden domov pro trasy ingressu (derive-domains) i záznam mesh DNS
+ * (netbird-dns-provision) — kdyby si to každý odvodil sám, jméno by mířilo jinam než trasa.
+ *
+ * @returns {{compose: string|null, sluzba: string|null, most: string|null}}
+ */
+export function domovVHlavnimMeshi(topo, id) {
+  const svc = topo?.services?.[id];
+  if (!svc) return { compose: null, sluzba: null, most: null };
+  if (!svc.mesh_most) return { compose: svc.compose ?? null, sluzba: svc.internal_url?.service ?? null, most: null };
+  const most = topo.services[svc.mesh_most];
+  return { compose: most?.compose ?? null, sluzba: most?.internal_url?.service ?? null, most: svc.mesh_most };
 }
 
 // B6: the catalog's internal HTTP URL for a service — http://<container>:<port>. PROFILE-
@@ -661,20 +700,21 @@ const DOCKER_ALIAS = /^[a-zA-Z0-9][a-zA-Z0-9_.-]*$/;
  * ne na llm-gateway (viz komentář u GATEWAY_DOMAIN_PUBLIC ve formatShellExports).
  */
 export const EDGE_VEREJNE_TVARE = Object.freeze([
-  Object.freeze({ klic: "API_DOMAIN_PUBLIC", sluzba: "core" }),
-  Object.freeze({ klic: "GATEWAY_DOMAIN_PUBLIC", sluzba: "core" }),
-  Object.freeze({ klic: "MCP_DOMAIN", sluzba: "orchestration" }),
-  Object.freeze({ klic: "DIRIGENT_DOMAIN", sluzba: "orchestration" }),
-  Object.freeze({ klic: "KEYCLOAK_DOMAIN_PUBLIC", sluzba: "keycloak" }),
-  Object.freeze({ klic: "LIVE_DOMAIN_PUBLIC", sluzba: "realtime" }),
-  Object.freeze({ klic: "COMPANION_DOMAIN_PUBLIC", sluzba: "openclaw" }),
-  Object.freeze({ klic: "INGEST_DOMAIN_PUBLIC", sluzba: "local-ingest" }),
-  Object.freeze({ klic: "POTOK_DOMAIN_PUBLIC", sluzba: "potok" }),
-  Object.freeze({ klic: "EXTRANET_DOMAIN_PUBLIC", sluzba: "extranet" }),
+  Object.freeze({ klic: "API_DOMAIN_PUBLIC", sluzba: "core", upstream: "API_UPSTREAM_MESH" }),
+  Object.freeze({ klic: "GATEWAY_DOMAIN_PUBLIC", sluzba: "core", upstream: "GATEWAY_UPSTREAM_MESH" }),
+  Object.freeze({ klic: "MCP_DOMAIN", sluzba: "orchestration", upstream: "MCP_UPSTREAM_MESH" }),
+  Object.freeze({ klic: "DIRIGENT_DOMAIN", sluzba: "orchestration", upstream: "DIRIGENT_UPSTREAM_MESH" }),
+  Object.freeze({ klic: "KEYCLOAK_DOMAIN_PUBLIC", sluzba: "keycloak", upstream: "AUTH_UPSTREAM_MESH" }),
+  Object.freeze({ klic: "LIVE_DOMAIN_PUBLIC", sluzba: "realtime", upstream: "LIVE_UPSTREAM_MESH" }),
+  Object.freeze({ klic: "COMPANION_DOMAIN_PUBLIC", sluzba: "openclaw", upstream: "COMPANION_UPSTREAM_MESH" }),
+  Object.freeze({ klic: "INGEST_DOMAIN_PUBLIC", sluzba: "local-ingest", upstream: "INGEST_UPSTREAM_MESH" }),
+  Object.freeze({ klic: "POTOK_DOMAIN_PUBLIC", sluzba: "potok", upstream: "POTOK_UPSTREAM_MESH" }),
+  Object.freeze({ klic: "EXTRANET_DOMAIN_PUBLIC", sluzba: "extranet", upstream: "EXTRANET_UPSTREAM_MESH" }),
 ]);
 
 /**
- * Veřejná jména, která na svém uzlu vlastní EDGE — hodnota `EDGE_OWNED_HOSTS`.
+ * Veřejná jména, která vlastní EDGE — hodnota `EDGE_OWNED_HOSTS`: tváře na uzlu
+ * edge A tváře, ke kterým edge jde meshem (na jakémkoli uzlu).
  *
  * ⛔ NAMĚŘENO 2026-09-27 (jednouzlová instance s meshem — server_bindings všech
  * slotů na jeden stroj; cold-start krok 4): edge-proxy i backendy
@@ -712,9 +752,17 @@ export function edgeOwnedHosts(topo, hodnota) {
   const uzel = (slot) => bindings[slot] ?? slot;
   const edgeUzel = uzel(edgePlacement);
   const hosts = new Set();
-  for (const { klic, sluzba } of EDGE_VEREJNE_TVARE) {
+  for (const { klic, sluzba, upstream } of EDGE_VEREJNE_TVARE) {
     const placement = topo.services?.[sluzba]?.placement;
-    if (!placement || uzel(placement) !== edgeUzel) continue;
+    if (!placement) continue;
+    // ⛔ (2026-10-02, „vše jen přes edge“) Jméno vlastní edge i na JINÉM uzlu,
+    // když k tváři jde MESHEM: pak backend router nikdo nepotřebuje a byl by to
+    // jen boční vstup mimo dveře a evidenci edge (naměřeno: n8n-auth dál
+    // registroval veřejné mcp/dirigent na backendovém Traefiku). Kde edge jde
+    // přes Traefik backendu (auth na rozdělené flotile — přímá tvář Keycloaku,
+    // bootstrap meshe), jméno zůstává backendu: převzetí by vyrobilo smyčku.
+    const meshem = isMeshHost(String(hodnota(upstream) ?? "").trim());
+    if (uzel(placement) !== edgeUzel && !meshem) continue;
     const host = String(hodnota(klic) ?? "").trim().toLowerCase();
     if (!host || host.includes("${") || host.endsWith(".invalid")) continue;
     hosts.add(host);
@@ -983,6 +1031,15 @@ export function buildTopology({ profileId, meshEnabled } = {}) {
   const catalog = loadCatalog();
   const servers = loadServers();
 
+  // ⭐ MODELOVÝ MESH FORKU (varianta C, aisha.decision 2026-10-05 03:17:54Z).
+  // Řídicí rovinu modelového meshe (`netbird-model`) instance nese PRÁVĚ TEHDY,
+  // když svůj model skutečně nasazuje na GPU slot. Lane `MODEL_MESH` se proto
+  // NEČTE z prostředí — vydává ji tahle derivace (doktor ji jako `derived` zapíše
+  // do .env.coolify, odkud ji čte story-init). Operátor ji nepřepíná: přepíná
+  // umístění modelu v profilu instance.
+  const modelovyMesh = slotModelovehoMeshe({ servers: servers.servers, sluzby: catalog.services, profil: profile });
+  const ctiLane = ctiLaneTopologie(modelovyMesh);
+
   // Determine which services to include based on profile filter
   const tierFilter = new Set(profile.tier_filter || ["required", "important"]);
   const exclude = new Set(profile.exclude || []);
@@ -1003,7 +1060,7 @@ export function buildTopology({ profileId, meshEnabled } = {}) {
     // permanently FAILed on the expected-absent service.
     // „Zapnuto?" rozhoduje JEDEN domov (lib/provision-gate.mjs) — i `false`
     // je vypínač, ne deklarace lane.
-    if (!podminkaSplnena(svc.provision_when_env)) continue;
+    if (!podminkaSplnena(svc.provision_when_env, ctiLane)) continue;
     const isLocalOnly = svc.tier === "local-only";
     const tierOk = tierFilter.has(svc.tier);
     const includedExplicitly = include.has(id);
@@ -1161,7 +1218,8 @@ export function buildTopology({ profileId, meshEnabled } = {}) {
       role: svc.role,
       tier: svc.tier,
       placement,
-      compose: svc.compose,
+      // Na slotu s has_gpu tenký stack forku (`compose_gpu`) — jediný domov volby.
+      compose: composeProUmisteni(svc, placement, servers.servers),
       canonical_scope: svc.canonical_scope ?? "internal",
       // Musí projít až k emisi domén — tam se rozhoduje, jestli je veřejná tvář
       // armovaná (viz `public_when_env` níže). Bez protažení by pole tiše zmizelo
@@ -1194,6 +1252,32 @@ export function buildTopology({ profileId, meshEnabled } = {}) {
     };
   }
 
+  // ⭐ MOST modelového meshe (varianta C, krok C4). Model na slotu modelového meshe do
+  // HLAVNÍHO meshe nepatří — jeho jméno tam drží služba, která to deklaruje
+  // (`mesh_most_pro`). Trasy ingressu i záznam mesh DNS pak míří na peer mostu, takže
+  // konzumenti (`SVC_MODEL_URL`, `VLLM_GENERATION_URL`) zůstávají beze změny. Bez
+  // mostu by jméno modelu v hlavním meshi nemířilo nikam a návrat na CPU model není
+  // (MM8) → výjimka. Most poslouchá na portu modelu: konzumenti volají ten.
+  if (modelovyMesh && enabled[SLUZBA_MODELU]) {
+    const mosty = Object.keys(enabled).filter((id) => catalog.services[id]?.mesh_most_pro === SLUZBA_MODELU);
+    if (mosty.length !== 1) {
+      throw new Error(
+        `[derive-domains] model forku stojí na slotu '${modelovyMesh}' (modelový mesh), ale jeho jméno ` +
+        `v hlavním meshi ${mosty.length ? `drží víc mostů (${mosty.join(", ")})` : "nedrží žádný most — služba s `mesh_most_pro: \"model\"` není v topologii (profil ji vyřadil?)"}. ` +
+        "Bez právě jednoho mostu by SVC_MODEL_URL mířila nikam.",
+      );
+    }
+    const portModelu = Number(enabled[SLUZBA_MODELU].internal_url?.port);
+    const portMostu = Number(enabled[mosty[0]].internal_url?.port);
+    if (!portModelu || portMostu !== portModelu) {
+      throw new Error(
+        `[derive-domains] most '${mosty[0]}' poslouchá na portu ${portMostu || "(žádném)"}, model na ${portModelu || "(žádném)"} — ` +
+        "konzumenti volají port modelu, most ho musí převzít beze změny.",
+      );
+    }
+    enabled[SLUZBA_MODELU].mesh_most = mosty[0];
+  }
+
   return {
     profile: profile.id,
     profile_description: profile.description,
@@ -1202,6 +1286,10 @@ export function buildTopology({ profileId, meshEnabled } = {}) {
     public_tld: profile.domain.public_tld,
     internal_tld: profile.domain.internal_tld,
     referencni_domeny: referencniDomeny,
+    // Slot modelového meshe forku, nebo "" (viz výš u `modelovyMesh`).
+    model_mesh: modelovyMesh,
+    // Deklarace nájemce společné lane na GPU uzlu (profil instance) — z ní LANE_VSTUP_URL.
+    lane_gpu: profile.lane_gpu ?? null,
     // Normalized instance namespace, exposed so the few emit sites that build a
     // hostname by hand cannot silently skip it (GATEWAY_DOMAIN_PUBLIC did).
     // POZOR: tohle je VÝSLOVNÁ volba forku — platí i ve veřejné zóně. Identita
@@ -1387,7 +1475,8 @@ export function checkManifestCoverage(topo, manifestText, catalogServiceIds, cat
    * byly PLANÉ — právě ty s uzavřenou lane. Skill to popisuje jako pravidlo
    * „opt-in stack replikuj na všech čtyřech místech najednou"; tohle je čtvrté.
    */
-  const laneZavrena = (id) => !podminkaSplnena(catalogServices?.[id]?.provision_when_env);
+  const laneZavrena = (id) =>
+    !podminkaSplnena(catalogServices?.[id]?.provision_when_env, ctiLaneTopologie(topo?.model_mesh ?? ""));
   for (const app of apps) {
     if (topo.services?.[app]) continue;
     if (laneZavrena(app)) continue;
@@ -1410,7 +1499,8 @@ export function checkManifestCoverage(topo, manifestText, catalogServiceIds, cat
 export function manifestCoverageOffenders(topo, manifestText, catalogServices) {
   const bezKatalogu = [];
   const mimoProfil = [];
-  const laneZavrena = (id) => !podminkaSplnena(catalogServices?.[id]?.provision_when_env);
+  const laneZavrena = (id) =>
+    !podminkaSplnena(catalogServices?.[id]?.provision_when_env, ctiLaneTopologie(topo?.model_mesh ?? ""));
   for (const line of String(manifestText ?? "").split(/\r?\n/)) {
     const m = /^app:\s*([a-z0-9-]+):/.exec(line.trim());
     if (!m) continue;
@@ -1717,6 +1807,62 @@ export function formatShellExports(topo) {
   lines.push(`PUBLIC_TLD=${topo.public_tld}`);
   lines.push(`INTERNAL_TLD=${topo.internal_tld}`);
   lines.push(`MESH_TLD=${topo.mesh_tld}`);
+  // ── Modelový mesh forku (varianta C) ──────────────────────────────────────
+  // Lane vychází VŽDY (prázdná = instance modelový mesh nemá) — doktor ji tak
+  // jako `derived` smíří i ve chvíli, kdy model z GPU slotu odejde.
+  lines.push(`MODEL_MESH=${topo.model_mesh ?? ""}`);
+  if (topo.model_mesh) {
+    // Mesh SÁM je vnitřní (majitel přes infra 2026-10-05): jména peerů a DNS
+    // doména nikdy pod veřejnou zónou, jen pod mesh zónou instance.
+    lines.push(`NETBIRD_MODEL_DNS_DOMAIN=model.${topo.mesh_tld}`);
+    // Uzel na GPU slotu se do modelového meshe zapisuje přes VEŘEJNÝ vstup
+    // (edge forku, TCP 443) — do hlavního meshe nepatří, jinou cestu nemá.
+    const verejna = topo.services?.["netbird-model"]?.urls?.public?.[0]?.url;
+    if (!verejna) {
+      throw new Error(
+        `[derive-domains] model forku stojí na slotu '${topo.model_mesh}' (modelový mesh), ` +
+        "ale řídicí rovina `netbird-model` nemá veřejné jméno — profil ji do topologie nepustil " +
+        "(tier_filter/exclude). Bez ní se uzel na GPU slotu nemá kam zapsat.",
+      );
+    }
+    lines.push(`MODEL_MESH_MANAGEMENT_URL=https://${verejna}:443`);
+    // Jména peerů modelového meshe — JEDEN zdroj pro obě strany: bootstrap je čte
+    // jako deklarovanou identitu (rada cb P1: ve skupině uzlu PRÁVĚ JEDEN peer s tímto
+    // jménem, jinak STOP), tenký stack na GPU slotu a most je nesou jako NB_HOSTNAME.
+    // Bez identity instance by jméno nerozlišilo forky na sdíleném uzlu → selhat.
+    if (!identitaInstance) {
+      throw new Error("[derive-domains] modelový mesh potřebuje identitu instance (APP_NAME_PREFIX) — z ní je jméno peeru uzlu");
+    }
+    lines.push(`MODEL_MESH_GPU_PEER=${identitaInstance}-model`);
+    lines.push(`MODEL_MESH_MOST_PEER=${identitaInstance}-model-most`);
+    // Port, na který most smí do uzlu (jediná politika meshe) = vnitřní port modelu z katalogu.
+    const portModelu = topo.services?.model?.internal_url?.port;
+    if (!portModelu) {
+      throw new Error("[derive-domains] modelový mesh bez portu modelu — služba `model` není v topologii nebo nemá internal_url.port");
+    }
+    lines.push(`MODEL_MESH_PORT=${portModelu}`);
+    // Vstup lane nájemce na síti `<prefix>-lane` (tenký stack: LANE_KLIENT_UPSTREAM). IP, ne jméno
+    // (DNS Dockeru by jméno řešil přes všechny sítě agenta); deklaruje ji profil instance podle
+    // deklarace GPU uzlu. Upstream žádnou adresu nezná — bez deklarace by tenký stack neměl kam.
+    const vstup = topo.lane_gpu?.vstup_url ?? "";
+    if (!/^http:\/\/(10\.\d{1,3}|172\.(1[6-9]|2\d|3[01])|192\.168)\.\d{1,3}\.\d{1,3}:\d{1,5}$/.test(vstup)) {
+      throw new Error(
+        `[derive-domains] model forku stojí na slotu '${topo.model_mesh}' (modelový mesh), ale profil instance nedeklaruje ` +
+          "vstup lane (`lane_gpu.vstup_url` = http://<privátní IP vstupu na síti nájemce>:<port>) — tenký stack by neměl kam předávat",
+      );
+    }
+    lines.push(`LANE_VSTUP_URL=${vstup}`);
+    // Vlastník uzlu: síť nájemce `<vlastník>-lane-<prefix>` je v JEHO jmenném prostoru (zakládá ji
+    // compose vstupu lane operátora). Bez deklarace by tenký stack nevěděl, ke které síti patří.
+    const vlastnik = topo.lane_gpu?.vlastnik ?? "";
+    if (!/^[a-z][a-z0-9-]{1,30}$/.test(vlastnik)) {
+      throw new Error(
+        `[derive-domains] model forku stojí na slotu '${topo.model_mesh}' (modelový mesh), ale profil instance nedeklaruje ` +
+          "vlastníka GPU uzlu (`lane_gpu.vlastnik` = `vlastnik` z deklarace uzlu) — tenký stack by neznal jméno své sítě",
+      );
+    }
+    lines.push(`LANE_VLASTNIK=${vlastnik}`);
+  }
   lines.push(`AISHA_WEB_APEX_MODE=${normalizeApexMode(process.env.AISHA_WEB_APEX_MODE)}`);
   lines.push(`SERVICE_ALIAS_PREFIX=${serviceAliasPrefix()}`);
   // SHARED_REDIS_HOST se tu UŽ NEVYDÁVÁ. Do 2026-08-22 tu stál zvláštní řádek,
@@ -2048,6 +2194,13 @@ export function formatShellExports(topo) {
   if (topo.services.netbird) {
     lines.push(`NETBIRD_DOMAIN_DIRECT=${requireServiceDomain(topo, "netbird", "direct", "netbird")}`);
   }
+  // NETBIRD_MODEL_DOMAIN_DIRECT — týž vzor pro řídicí rovinu MODELOVÉHO meshe forku
+  // (varianta C): edge-proxy jde na přímou tvář netbird-model-proxy (veřejná zóna míří na
+  // uzel edge, řídicí rovina bydlí u keycloaku), doktor domén ji registruje. Jen když
+  // je řídicí rovina v topologii (lane MODEL_MESH).
+  if (topo.services["netbird-model"]) {
+    lines.push(`NETBIRD_MODEL_DOMAIN_DIRECT=${requireServiceDomain(topo, "netbird-model", "direct", "mesh-model")}`);
+  }
   // realtime: mesh lane míří JMÉNEM na ingress stacku (ws přes mesh; Caddy
   // upgrade zvládne na obou hopech). Do 2026-08-21 tu stálo `https://<jméno>`
   // bez portu a bez cesty — viz edgeMeshUpstream. Guarded on realtime presence
@@ -2099,6 +2252,13 @@ export function formatShellExports(topo) {
   if (topo.services.potok) {
     lines.push(`POTOK_UPSTREAM_PUBLIC=https://${requireServiceDomain(topo, "potok", "internal", "potok")}`);
     lines.push(`POTOK_UPSTREAM_MESH=${edgeMeshUpstream(topo, "potok")}`);
+  }
+  // web-render (svc-web-render, d-ii 2026-10-02) — tier:optional, BEZ veřejné tváře.
+  // Web (nginx v edge) si předrenderované stránky táhne PŘÍMO MESHEM (vlastní routa
+  // do rozsahu peerů) a posílá tam skořápku; vydává se jen mesh cíl. Bez web-renderu
+  // v topologii nic — web předrender nezapne a servíruje SPA.
+  if (topo.services["web-render"]) {
+    lines.push(`WEB_RENDER_UPSTREAM_MESH=${edgeMeshUpstream(topo, "web-render")}`);
   }
   // Apex host routed by edge-proxy (308 → https://${APP_DOMAIN}${uri}).
   // Sentinel (.invalid) when PUBLIC_TLD is unset or equal to APP_DOMAIN —
@@ -2365,8 +2525,13 @@ export function formatShellExports(topo) {
       // (`aisha-openclaw` na instanci, která se „aisha" nejmenuje), nebo byl
       // holý (`minio`), tedy nárok na sdílené síti, o který se přetahují všichni
       // nájemníci. Ingress pak posílal provoz ke kontejneru JINÉ instance.
+      // Jména modelu na slotu modelového meshe drží most (C4): VŠECHNY trasy služby míří
+      // na jeho síťový koncový bod, ne do compose modelu (ten na hlavním meshi není).
+      const domov = domovVHlavnimMeshi(topo, id);
       const cilKontejneru = (serviceKey) => {
-        const jmeno = containerNameFrom(svc.compose, serviceKey, appPrefixProCile);
+        const jmeno = domov.most
+          ? containerNameFrom(domov.compose, domov.sluzba, appPrefixProCile)
+          : containerNameFrom(svc.compose, serviceKey, appPrefixProCile);
         if (jmeno) return jmeno;
         // Prázdno není „nic k routování" — je to nedoručená identita nebo
         // odkaz na compose službu, která neexistuje. Obojí je vada, ne stav.
@@ -2417,7 +2582,7 @@ export function formatShellExports(topo) {
         return `${port}|${[...new Set(jmena)].filter(Boolean).join(",")}|${target}`;
       });
       if (unique.length) {
-        const peer = jmenoPeeru(svc.compose);
+        const peer = jmenoPeeru(domov.compose);
         if (peer) trasyPeeru.set(peer, [...(trasyPeeru.get(peer) ?? []), ...unique]);
       }
 

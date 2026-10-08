@@ -27,6 +27,8 @@
 #   SEND_ALL=1 bash scripts/coolify-sync-envs.sh         # legacy (vše do všeho)
 #   KEYS=PKI_BRIDGE_URL bash scripts/coolify-sync-envs.sh core edge   # jen ten klíč
 #   REDEPLOY=1 bash scripts/coolify-sync-envs.sh core    # po sync spustí deploy
+#        (nasazení odesílá jediný domov mutace, lib/coolify-mutace.mjs — drženou
+#        aplikaci nenasadí; je-li JMENOVANÁ, skončí běh kódem 100 = DRŽENO)
 #   PRUNE_EXTRA=1 bash scripts/coolify-sync-envs.sh core  # + odstraní proměnné,
 #        na které compose NEODKAZUJE. Coolify si spravuje své: `is_coolify`
 #        a `is_shared` se nikdy nedotýká. Naměřeno 2026-08-23 na `core`:
@@ -395,6 +397,32 @@ APP_COUNT=$(echo "$SELECTED" | wc -l | tr -d ' ')
 info "Nalezeno $APP_COUNT apps:"
 echo "$SELECTED" | awk -F'\t' '{ printf "   %-24s %s\n", $1, $2 }'
 
+# ── Deklarované držení: držené aplikaci se env NEDORUČUJE ────────────────────
+# ⛔ ZMĚŘENO ČTENÍM 2026-10-04: sync roznášel env VŠEM aplikacím instance, i těm,
+# které overlay deklaruje jako držené (nasazeni-drzene.json). Sync sám nenasazuje —
+# jenže mění, s čím aplikace naběhne při PŘÍŠTÍM nasazení nebo restartu, a u držené
+# aplikace doručí i proměnné, jejichž nepřítomnost dnes její nasazení zastavuje
+# (preflight povinných proměnných). Co Coolify s novým env udělá při restartu
+# nasazené aplikace, změřeno NENÍ — proto se držené aplikace nedotýkáme vůbec.
+#
+# Deklaraci čte jediný domov (lib/nasazeni-drzene.mjs přes lib/drzeni.sh); overlay
+# si obstará sám, deklaraci overlaye vezme z prostředí, jinak z TÉHOŽ souboru,
+# který se synchronizuje (ten soubor JE instance). Nečitelná nebo neplatná
+# deklarace = STOP dřív, než se cokoli odešle. Nasazení při REDEPLOY=1 odesílá
+# jediný domov mutace (lib/coolify-mutace.mjs) — na držení se před voláním ptá sám.
+# shellcheck source=lib/drzeni.sh
+. "$ROOT/scripts/lib/drzeni.sh"
+# shellcheck source=lib/coolify-mutace.sh
+. "$ROOT/scripts/lib/coolify-mutace.sh"
+if ! drzeni_nacti "coolify-sync-envs" "$ENV_FILE"; then
+  err "Deklaraci držení aplikací nejde přečíst nebo je neplatná (důvod výš) — nevím, komu smím env doručit. Nic jsem neodeslal."
+  exit 1
+fi
+DRZENE_PRESKOCENE=()
+DRZENE_NENASAZENE=()
+EXTERNI_PRESKOCENE=()
+EXTERNI_NENASAZENE=()
+
 # ── Sestav bulk payload (jednou pro všechny apps) ─────────────────────────────
 banner "Parse $ENV_FILE"
 ENV_PAIRS=$(parse_env_file)
@@ -485,7 +513,9 @@ fi
 # Vytvoř lookup soubor pro rýchle filtrování klíčů (jeden klíč na řádek)
 ENV_KEYS_FILE=$(mktemp -t coolify-env-keys.XXXXXX)
 echo "$ENV_PAIRS" | awk -F'\t' 'NF>0 {print $1}' > "$ENV_KEYS_FILE"
-trap 'rm -f "$ENV_KEYS_FILE"' EXIT
+# chybový výstup domova mutace u REDEPLOY — jde do řádku výsledku, ne doprostřed výpisu
+MUTACE_CHYBA_FILE=$(mktemp -t coolify-mutace-chyba.XXXXXX)
+trap 'rm -f "$ENV_KEYS_FILE" "$MUTACE_CHYBA_FILE"' EXIT
 
 # ── Seznamy klíčů se řadí i porovnávají JEDNOU kolací: bajtovou ──────────────
 # `comm` předpokládá, že oba vstupy jsou seřazené TOUŽ kolací, jakou sám
@@ -754,6 +784,21 @@ for line in $SELECTED; do :; done  # noop: keep shellcheck happy
 while IFS=$'\t' read -r NAME UUID; do
   [ -z "$NAME" ] && continue
   printf "   %-24s " "$NAME"
+
+  # Držená aplikace: env se nedoručuje, nevaliduje ani neuklízí — a řekne se to.
+  if drzena "${NAME#"${PREFIX}"-}"; then
+    echo -e "${Y}SKIP${N} ($(drzeni_hlaska "${NAME#"${PREFIX}"-}"). Env se NEDORUČUJE.)"
+    DRZENE_PRESKOCENE+=("$NAME")
+    continue
+  fi
+  # Externí služba (profil prostředí: external_domain) v tomhle prostředí není naše —
+  # env se jí nedoručuje, i když aplikace jejího jména v projektu je. Vlastnictví
+  # načetl load_app_compose_map (per-app režim; legacy SEND_ALL=1 ho nezná).
+  if [ "${VLASTNICTVI_NACTENO:-}" = "1" ] && externi "${NAME#"${PREFIX}"-}"; then
+    echo -e "${Y}SKIP${N} ($(vlastnictvi_hlaska "${NAME#"${PREFIX}"-}"). Env se NEDORUČUJE.)"
+    EXTERNI_PRESKOCENE+=("$NAME")
+    continue
+  fi
 
   # Sestav per-app payload (nebo plný BULK_PAYLOAD při SEND_ALL=1)
   # Strip the story prefix (e.g. acme-core → core) so the discovered app name
@@ -1046,20 +1091,59 @@ if [ "$REDEPLOY" = "1" ]; then
       echo -e "${R}NENASAZENO${N} (sync výš selhal — viz jeho výpis)"
       continue
     fi
-    RESP=$(API -X POST "$COOLIFY_API/deploy?uuid=$UUID&force=true" | tr -d '\000-\037' || true)
-    DUUID=$(echo "$RESP" | jq -r '.deployments[0].deployment_uuid // empty' 2>/dev/null)
+    if [[ " ${EXTERNI_PRESKOCENE[*]:-} " == *" $NAME "* ]]; then
+      echo -e "${Y}NENASAZENO${N} ($(vlastnictvi_hlaska "${NAME#"${PREFIX}"-}"))"
+      EXTERNI_NENASAZENE+=("$NAME")
+      continue
+    fi
+    # Nasazení odesílá JEDINÝ domov mutace; ten se před voláním zeptá na držení.
+    # Kód 100 = DRŽENO: nic se neodeslalo a v RESP je hláška, ne odpověď Coolify.
+    # (Pověření dostane jen tohle volání — exportuje se v podslupce substituce.)
+    MUTACE_RC=0
+    RESP=$(export COOLIFY_URL="${COOLIFY_API%/api/v1}" COOLIFY_API_TOKEN="$TOKEN"
+      coolify_mutace deploy "$NAME" "$UUID" --kdo coolify-sync-envs --prefix "$PREFIX" --force true --env-soubor "$ENV_FILE" 2>"$MUTACE_CHYBA_FILE") || MUTACE_RC=$?
+    if [ "$MUTACE_RC" -eq "$COOLIFY_MUTACE_DRZENO" ]; then
+      echo -e "${Y}NENASAZENO${N} (${RESP})"
+      DRZENE_NENASAZENE+=("$NAME")
+      continue
+    fi
+    if [ "$MUTACE_RC" -eq "$COOLIFY_MUTACE_EXTERNI" ]; then
+      echo -e "${Y}NENASAZENO${N} (${RESP})"
+      EXTERNI_NENASAZENE+=("$NAME")
+      continue
+    fi
+    # Jiný nenulový kód = domov mutaci neodeslal nebo ji Coolify odmítl (nečitelná
+    # deklarace, chybějící pověření, chyba API). Vypsat a skončit nenulou — „?“
+    # s kódem 0 by obsluze řeklo, že redeploy proběhl.
+    if [ "$MUTACE_RC" -ne 0 ]; then
+      echo -e "${R}NENASAZENO${N} (kód ${MUTACE_RC}) $(tr '\n' ' ' < "$MUTACE_CHYBA_FILE" | head -c 300)$(head -c 200 <<< "$RESP")"
+      FAILED+=("$NAME")
+      continue
+    fi
+    DUUID=$(jq -r '.deployments[0].deployment_uuid // .deployment_uuid // empty' <<< "$RESP" 2>/dev/null || true)
     if [ -n "$DUUID" ]; then
       echo -e "${G}queued${N} $DUUID"
     else
-      echo -e "${Y}?${N} $(echo "$RESP" | head -c 120)"
+      echo -e "${Y}?${N} $(head -c 120 <<< "$RESP")"
     fi
   done <<< "$SELECTED"
 fi
 
 # ── Souhrn ────────────────────────────────────────────────────────────────────
 banner "Souhrn"
+# „Všech N zesynchronizováno“ nesmí zahrnout aplikace, kterým se env nedoručil.
+if [ ${#DRZENE_PRESKOCENE[@]} -gt 0 ]; then
+  warn "DRŽENO (${#DRZENE_PRESKOCENE[@]}) — env NEDORUČEN: ${DRZENE_PRESKOCENE[*]} (deklarace v overlayi instance)"
+  APP_COUNT=$((APP_COUNT - ${#DRZENE_PRESKOCENE[@]}))
+fi
+if [ ${#EXTERNI_PRESKOCENE[@]} -gt 0 ]; then
+  warn "EXTERNÍ (${#EXTERNI_PRESKOCENE[@]}) — v tomhle prostředí nejsou naše, env NEDORUČEN: ${EXTERNI_PRESKOCENE[*]} (profil prostředí: external_domain)"
+  APP_COUNT=$((APP_COUNT - ${#EXTERNI_PRESKOCENE[@]}))
+fi
 if [ ${#FAILED[@]} -eq 0 ]; then
-  if [ "$SEND_ALL" = "1" ]; then
+  if [ "$APP_COUNT" -eq 0 ]; then
+    warn "Nezesynchronizováno NIC — všechny vybrané aplikace jsou držené nebo externí."
+  elif [ "$SEND_ALL" = "1" ]; then
     ok "Všech $APP_COUNT apps zesynchronizováno (legacy SEND_ALL: $SENT_KEYS klíčů každé)"
   else
     ok "Všech $APP_COUNT apps zesynchronizováno (per-app filtr aktivní)"
@@ -1068,4 +1152,16 @@ else
   # Jedna aplikace může selhat víc kontrolami (tajemství i povinné) — jméno jednou.
   warn "Selhaly: $(printf '%s\n' "${FAILED[@]}" | awk '!videno[$0]++' | tr '\n' ' ')"
   exit 1
+fi
+# Držená aplikace JMENOVANÁ k nasazení (REDEPLOY=1 + jméno): požadavek se odmítl.
+# Kód 100 = DRŽENO — volající ho nezamění s úspěšným nasazením ani s chybou sítě.
+# (Hromadný běh bez jmen je výčet s výjimkou, ne odmítnutý požadavek → 0.)
+# Externí služba JMENOVANÁ k nasazení: odmítnuto kódem 101 (EXTERNÍ), ne 0.
+if [ ${#EXTERNI_NENASAZENE[@]} -gt 0 ] && [ ${#FILTER_NAMES[@]} -gt 0 ]; then
+  err "REDEPLOY jmenuje službu, která v tomhle prostředí není naše (${EXTERNI_NENASAZENE[*]}) — ODMÍTNUTO, nenasazena (profil prostředí: external_domain)."
+  exit "$COOLIFY_MUTACE_EXTERNI"
+fi
+if [ ${#DRZENE_NENASAZENE[@]} -gt 0 ] && [ ${#FILTER_NAMES[@]} -gt 0 ]; then
+  err "REDEPLOY jmenuje drženou aplikaci (${DRZENE_NENASAZENE[*]}) — ODMÍTNUTO, nenasazena. Držení se ruší v overlayi instance, ne přepínačem."
+  exit "$COOLIFY_MUTACE_DRZENO"
 fi

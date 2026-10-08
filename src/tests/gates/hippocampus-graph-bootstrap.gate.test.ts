@@ -110,7 +110,8 @@ describe('Step 7.1 hippocampus graph bootstrap + owner_user_id typo fix', () => 
       const sql = readFileSync(FIX_MIG, 'utf-8');
       const hlavicka = hlavickaFunkce(sql, 'fn_get_run_citations');
       expect(hlavicka).toMatch(/SECURITY DEFINER/);
-      expect(hlavicka).toMatch(/SET search_path TO 'public'/);
+      // Cesta hledání je zpevněná: pg_temp poslední, dočasný objekt volajícího relaci nezastíní.
+      expect(hlavicka).toMatch(/SET search_path TO 'pg_catalog', 'public', 'pg_temp'/);
       expect(hlavicka).toMatch(/STABLE/);
     });
 

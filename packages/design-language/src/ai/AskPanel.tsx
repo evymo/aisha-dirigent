@@ -26,6 +26,18 @@ export interface AskPanelProps {
   submitLabel?: ReactNode;
   /** Answer in flight: the control disables itself rather than queueing questions. */
   busy?: boolean;
+  /**
+   * Knowledge passages the answer drew on — reference (`K1`), source name and a short excerpt.
+   * `cited` marks the passages the answer actually referenced.
+   */
+  passages?: ReadonlyArray<{ ref: string; source: string; excerpt: ReactNode; cited?: boolean }>;
+  /** Heading of the passages list — a prop, never baked in: this package ships no locale. */
+  passagesLabel?: ReactNode;
+  /**
+   * A LOUD state the reader must see (e.g. knowledge search unavailable). Never rendered as
+   * an empty result: an outage that reads as "nothing found" is worse than an error.
+   */
+  notice?: ReactNode;
 }
 
 /**
@@ -46,6 +58,9 @@ export const AskPanel = ({
   onSubmit,
   submitLabel = 'Ask',
   busy = false,
+  passages = [],
+  passagesLabel,
+  notice,
 }: AskPanelProps) => (
   <div className="rdl-ask">
     <div className="rdl-ask__head">
@@ -66,6 +81,25 @@ export const AskPanel = ({
             ))}
           </div>
         ) : null}
+      </div>
+    ) : null}
+    {notice ? (
+      <div className="rdl-ask__notice" role="status">
+        {notice}
+      </div>
+    ) : null}
+    {passages.length ? (
+      <div className="rdl-ask__passages">
+        {passagesLabel ? <div className="rdl-overline">{passagesLabel}</div> : null}
+        <ol>
+          {passages.map((p) => (
+            <li key={p.ref} className={p.cited ? 'rdl-ask__passage rdl-ask__passage--cited' : 'rdl-ask__passage'}>
+              <span className="rdl-ask__ref">[{p.ref}]</span>
+              <ProvenanceBadge source={p.source} />
+              <span className="rdl-ask__excerpt">{p.excerpt}</span>
+            </li>
+          ))}
+        </ol>
       </div>
     ) : null}
     {sources.length || disclaimer ? (

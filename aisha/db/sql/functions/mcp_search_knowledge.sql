@@ -1,5 +1,11 @@
 -- Function: mcp_search_knowledge
 -- Word-level search: splits query into individual words, matches ANY word (OR logic)
+--
+-- Viditelnost (2026-10-05, revize B1): public.expert_rule_visible_to pro toho, PRO KOHO se hledá.
+-- Do 2026-10-05 vlastní výčet ('public' / 'members' přihlášenému) a nástroj MCP volal servisní rolí bez
+-- publika. Teď publikum předává z ověřeného tokenu; služba bez publika = jen `public`.
+-- Signatura se mění výměnou (přibyl parametr s výchozí hodnotou).
+DROP FUNCTION IF EXISTS public.mcp_search_knowledge(text, text, text, text[], boolean, integer);
 
 CREATE OR REPLACE FUNCTION public.mcp_search_knowledge(
   p_query text DEFAULT NULL::text,
@@ -7,19 +13,23 @@ CREATE OR REPLACE FUNCTION public.mcp_search_knowledge(
   p_expertise_slug text DEFAULT NULL::text,
   p_context_tags text[] DEFAULT '{}'::text[],
   p_include_ai_instructions boolean DEFAULT true,
-  p_limit integer DEFAULT 20
+  p_limit integer DEFAULT 20,
+  p_audience_user_id uuid DEFAULT NULL::uuid
 )
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 AS $function$
 DECLARE
   v_results jsonb;
   v_words text[];
-  v_is_authenticated boolean;
+  v_audience_user uuid;  -- pro koho se hledá (služba smí říct; jinak volající sám; bez identity NULL)
 BEGIN
-  v_is_authenticated := (auth.uid() IS NOT NULL);
+  v_audience_user := CASE
+    WHEN public.get_jwt_role() = 'service_role' THEN COALESCE(p_audience_user_id, auth.uid())
+    ELSE auth.uid()
+  END;
 
   -- Split query into individual words (min 2 chars), for word-level matching
   IF p_query IS NOT NULL AND trim(p_query) != '' THEN
@@ -83,7 +93,8 @@ BEGIN
     JOIN partner_profiles pp ON pp.id = er.author_partner_id
     LEFT JOIN guild_expertise_areas gea ON gea.id = er.expertise_area_id
     WHERE er.status = 'published'
-      AND (er.visibility = 'public' OR (er.visibility = 'members' AND v_is_authenticated))
+      -- Viditelnost pro toho, pro koho se hledá (autor své, správa vše, ostatní podle domova).
+      AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, v_audience_user)
       AND (p_category IS NULL OR er.category::text = p_category)
       AND (p_expertise_slug IS NULL OR gea.slug = p_expertise_slug)
       AND (
@@ -126,7 +137,7 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION mcp_search_knowledge(text, text, text, text[], boolean, integer) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION mcp_search_knowledge(text,text,text,text[],boolean,integer) TO anon;
-GRANT EXECUTE ON FUNCTION mcp_search_knowledge(text,text,text,text[],boolean,integer) TO authenticated;
-GRANT EXECUTE ON FUNCTION mcp_search_knowledge(text,text,text,text[],boolean,integer) TO service_role;
+REVOKE ALL ON FUNCTION public.mcp_search_knowledge(text, text, text, text[], boolean, integer, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.mcp_search_knowledge(text,text,text,text[],boolean,integer,uuid) TO anon;
+GRANT EXECUTE ON FUNCTION public.mcp_search_knowledge(text,text,text,text[],boolean,integer,uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.mcp_search_knowledge(text,text,text,text[],boolean,integer,uuid) TO service_role;

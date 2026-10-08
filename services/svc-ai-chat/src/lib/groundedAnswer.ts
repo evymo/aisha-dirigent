@@ -19,14 +19,22 @@
  * bez nich — model by formuloval jiná čísla, než uživatel vidí. Tatáž cesta =
  * tatáž fakta, pod týmž oprávněním (token uživatele).
  *
- * Pořadí: fakta z bloku → (deklarované „bez formulace" / model obsazený / fakta
- * příliš dlouhá → rovnou fakta) → jedno volání modelu bez nástrojů → hlídač čísel
- * → text modelu, nebo deterministická odpověď faktů. Chyba bloku nebo modelu se
- * NEMASKUJE — route ji vrátí jako chybu a klient ukáže fakta, která už má.
+ * Pořadí: fakta z bloku → [znalosti, deklaruje-li kanál knowledge_search] → (deklarované
+ * „bez formulace" / model obsazený / fakta příliš dlouhá → rovnou fakta) → jedno volání
+ * modelu bez nástrojů → hlídač čísel → text modelu, nebo deterministická odpověď faktů.
+ * Chyba bloku, hledání nebo modelu se NEMASKUJE — route ji vrátí jako chybu a klient ukáže
+ * fakta, která už má.
+ *
+ * ZNALOSTI (P2, 2026-10-06): s `deps.hledej` jdou modelu i úseky znalostí (vlastní modely,
+ * identita uživatele, nedůvěryhodná data — lib/knowledgeRetrieval.ts). Hlídač čísel bere za
+ * zdroj fakta I úseky (číslo z úseku není vymyšlené). `skip_model_when` platí jen BEZ úseků:
+ * deklarace říká „u tohohle řádku faktů model nic nepřidá“ — s nalezenými znalostmi přidá.
+ * Hledání nedostupné = výjimka (nikdy odpověď bez znalostí, která by vypadala jako se znalostmi).
  *
  * @module
  */
 import { hlidejCisla } from "./factNumberGuard.js";
+import { citaceZeZnalosti, znalostiDoPromptu, type KnowledgeCitation, type KnowledgeHit } from "./knowledgeRetrieval.js";
 
 /** Deklarace kanálu po ověření. */
 export interface GroundingConfig {
@@ -90,6 +98,11 @@ export interface GroundedDeps {
   rpcUser: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown; error: { message: string } | null }>;
   /** Jedno volání modelu bez nástrojů. */
   llm: (systemPrompt: string, question: string) => Promise<{ text: string; inputTokens: number; outputTokens: number; model: string }>;
+  /**
+   * Hledání ve znalostech (kanál deklaruje knowledge_search) — pod identitou uživatele.
+   * Nedostupné = výjimka KnowledgeSearchUnavailableError; prázdný seznam = nic nenalezeno.
+   */
+  hledej?: (otazka: string) => Promise<KnowledgeHit[]>;
 }
 
 export type GroundedReason =
@@ -115,7 +128,12 @@ export interface GroundedResult {
   };
   usage: { inputTokens: number; outputTokens: number };
   model: string | null;
+  /** Znalosti, které hledání našlo (null = kanál znalosti nehledá). */
+  knowledge: { hits: number; citations: KnowledgeCitation[] } | null;
 }
+
+/** Odkaz na úsek znalostí v odpovědi modelu (citace), např. `[K2]`. */
+const ODKAZ_NA_USEK = /\[K\d+\]/g;
 
 /** Počet právě běžících formulací v tomhle procesu (ochrana CPU, fáze 2). */
 let bezi = 0;
@@ -144,16 +162,25 @@ export async function odpovedZFaktu(
   const fakta = radek as Record<string, unknown>;
   const zdroj = typeof blok?.provenance?.source_slug === "string" ? blok.provenance.source_slug : null;
 
+  // Znalosti hned po faktech: nedostupné hledání je chyba (propadne do route), ne tiché „bez“.
+  const hits = deps.hledej ? await deps.hledej(vstup.question) : null;
+  const znalosti = (odpovedModelu: string | null) =>
+    hits ? { hits: hits.length, citations: citaceZeZnalosti(hits, odpovedModelu) } : null;
+
   const zFaktu = (reason: GroundedReason, cizi: string[] = [], usage = { inputTokens: 0, outputTokens: 0 }, model: string | null = null): GroundedResult => ({
     content: odpoved,
     factsAnswer: odpoved,
     grounding: { block: cfg.factsBlock, source: zdroj, verdict: "fakta", reason, cizi },
     usage,
     model,
+    knowledge: znalosti(null),
   });
 
-  for (const [sloupec, hodnoty] of Object.entries(cfg.skipModelWhen)) {
-    if (hodnoty.includes(String(fakta[sloupec]))) return zFaktu("bez_formulace");
+  // „Model nic nepřidá“ platí jen bez nalezených znalostí — s nimi přidá (viz hlavička).
+  if (!hits || hits.length === 0) {
+    for (const [sloupec, hodnoty] of Object.entries(cfg.skipModelWhen)) {
+      if (hodnoty.includes(String(fakta[sloupec]))) return zFaktu("bez_formulace");
+    }
   }
   const faktaJson = JSON.stringify(fakta);
   if (cfg.maxFactsChars !== null && faktaJson.length > cfg.maxFactsChars) return zFaktu("fakta_prilis_dlouha");
@@ -162,14 +189,23 @@ export async function odpovedZFaktu(
   bezi++;
   let r: Awaited<ReturnType<GroundedDeps["llm"]>>;
   try {
-    r = await deps.llm(`${vstup.systemPrompt}\n\n## FAKTA (jediný zdroj čísel, dat a jmen)\n${faktaJson}`, vstup.question);
+    const blokZnalosti = hits ? znalostiDoPromptu(hits) : "";
+    const zdroje = blokZnalosti
+      ? "## FAKTA (ověřená data; čísla, data a jména ber z faktů nebo z úryvků znalostí níž)"
+      : "## FAKTA (jediný zdroj čísel, dat a jmen)";
+    r = await deps.llm(
+      `${vstup.systemPrompt}\n\n${zdroje}\n${faktaJson}${blokZnalosti ? `\n\n${blokZnalosti}` : ""}`,
+      vstup.question,
+    );
   } finally {
     bezi--;
   }
   const usage = { inputTokens: r.inputTokens, outputTokens: r.outputTokens };
   const text = r.text.trim();
   if (!text) return zFaktu("prazdna_odpoved", [], usage, r.model);
-  const verdikt = hlidejCisla(text, fakta, vstup.question);
+  // Zdrojem čísel jsou fakta, otázka a nalezené úseky znalostí — nic jiného. Odkazy na úseky
+  // ([K1] …) nejsou hodnoty: hlídač by „1“ z odkazu jinak hlásil jako cizí číslo.
+  const verdikt = hlidejCisla(text.replace(ODKAZ_NA_USEK, " "), fakta, vstup.question, ...(hits ?? []).map((h) => h.text));
   if (!verdikt.ok) return zFaktu("cizi_cisla", verdikt.cizi, usage, r.model);
   return {
     content: text,
@@ -177,5 +213,6 @@ export async function odpovedZFaktu(
     grounding: { block: cfg.factsBlock, source: zdroj, verdict: "model", reason: "model", cizi: [] },
     usage,
     model: r.model,
+    knowledge: znalosti(text),
   };
 }

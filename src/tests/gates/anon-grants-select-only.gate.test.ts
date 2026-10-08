@@ -34,6 +34,20 @@
  *
  * If a genuinely new anon privilege class is ever needed, extend this gate
  * consciously in the same commit that introduces it — never delete the gate.
+ *
+ * ⛔ POHLEDY (doplněno 2026-10-06). „anon smí SELECT" NEPLATÍ pro pohled s právy
+ * VLASTNÍKA (bez security_invoker): ten čte podklad MIMO jeho RLS, takže SELECT
+ * pro klienta tam není „RLS-gated read", ale zadní vrátka kolem všech policies.
+ * Naměřeno na čisté DB main 0f992f647: 11 takových pohledů četl anon (souhrny stavu
+ * ze snímačů každého vlastníka, kohorty, zásilky…), dalších 12 authenticated.
+ * Pravidla (SoT: grant soubory, soubory pohledů, heals, baseline):
+ *   - anon smí SELECT jen na pohled VYJMENOVANÝ v pohledy-verejne-pro-cteni.json,
+ *   - authenticated smí SELECT na pohled s právy vlastníka jen tamtéž,
+ *   - DML na pohled s právy vlastníka nesmí klient NIKDY (auto-updatable pohled
+ *     zapisuje mimo RLS podkladu).
+ * Statická brána nevidí ALTER DEFAULT PRIVILEGES ani pořadí GRANT/REVOKE — to měří
+ * katalog živé DB v src/tests/db/pohled-s-pravy-vlastnika-bez-klientskeho-grantu
+ * .runtime.test.ts nad týmž výčtem. Tady jde o rychlou zpětnou vazbu v PR.
  */
 import { describe, test, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
@@ -115,6 +129,79 @@ function findBroadAnonDefaultPrivileges(sql: string): string[] {
   return offenders;
 }
 
+// ── Pohledy s právy vlastníka (doplněno 2026-10-06) ─────────────────────────
+const VEREJNE_JSON = "src/tests/gates/pohledy-verejne-pro-cteni.json";
+const HEALS = "aisha/db/heals.sql";
+const POHLEDY_DIRS = ["aisha/db/sql/views", "aisha/db/sql/materialized_views"];
+
+interface Pohled {
+  invoker: boolean;
+}
+
+/** Pohledy ze SoT (jméno → security_invoker?) a výčet vědomě veřejných. */
+function pohledyZeSoT(): {
+  pohledy: Map<string, Pohled>;
+  verejne: Map<string, string[]>;
+  duvody: Map<string, string>;
+} {
+  const pohledy = new Map<string, Pohled>();
+  for (const dir of POHLEDY_DIRS) {
+    for (const f of readdirSync(join(ROOT, dir))) {
+      if (!f.endsWith(".sql")) continue;
+      const sql = stripLineComments(read(`${dir}/${f}`));
+      const re =
+        /CREATE\s+(?:OR\s+REPLACE\s+)?(?:MATERIALIZED\s+)?VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:public\.)?"?([a-z0-9_]+)"?([^;]*?)\bAS\b/gi;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(sql)) !== null) {
+        const invoker =
+          /security_invoker\s*=\s*(?:true|on|1)/i.test(m[2]) ||
+          new RegExp(`ALTER\\s+VIEW\\s+(?:public\\.)?${m[1]}\\s+SET\\s*\\([^)]*security_invoker\\s*=\\s*(?:true|on|1)`, "i").test(sql);
+        pohledy.set(m[1].toLowerCase(), { invoker });
+      }
+    }
+  }
+  const json = JSON.parse(read(VEREJNE_JSON)) as {
+    verejne: Record<string, { role: string[]; duvod: string }>;
+  };
+  const verejne = new Map(Object.entries(json.verejne).map(([k, v]) => [k, v.role]));
+  const duvody = new Map(Object.entries(json.verejne).map(([k, v]) => [k, v.duvod ?? ""]));
+  return { pohledy, verejne, duvody };
+}
+
+/** Odkud granty na běžící / čerstvou DB přicházejí (bez ALTER DEFAULT PRIVILEGES — to měří runtime). */
+function zdrojeGrantu(): string[] {
+  const out = [HEALS, BASELINE];
+  for (const dir of [GRANTS_DIR, ...POHLEDY_DIRS]) {
+    for (const f of readdirSync(join(ROOT, dir))) if (f.endsWith(".sql")) out.push(`${dir}/${f}`);
+  }
+  return out;
+}
+
+/** GRANTy (příkaz po příkazu) mířící na známý pohled: jméno, práva, role. */
+function grantyNaPohledy(
+  sql: string,
+  pohledy: Map<string, Pohled>,
+): Array<{ pohled: string; prava: string[]; role: string[] }> {
+  const out: Array<{ pohled: string; prava: string[]; role: string[] }> = [];
+  for (const rawStmt of stripLineComments(sql).split(";")) {
+    const stmt = rawStmt.replace(/\s+/g, " ").trim();
+    const m = stmt.match(/^GRANT\s+(.+?)\s+ON\s+(?:TABLE\s+)?(.+?)\s+TO\s+(.+)$/i);
+    if (!m) continue;
+    const [, privs, objs, grantees] = m;
+    if (/^(FUNCTION|SCHEMA|SEQUENCE|ALL\s)/i.test(objs)) continue;
+    const prava = privs.split(",").map((p) => p.trim().toUpperCase()).filter(Boolean);
+    const role = grantees
+      .replace(/\s+WITH\s+GRANT\s+OPTION$/i, "")
+      .split(",")
+      .map((r) => r.trim().toLowerCase().replace(/"/g, ""));
+    for (const o of objs.split(",")) {
+      const jmeno = o.trim().replace(/^public\./i, "").replace(/"/g, "").toLowerCase();
+      if (pohledy.has(jmeno)) out.push({ pohled: jmeno, prava, role });
+    }
+  }
+  return out;
+}
+
 describe("anon grants — SELECT-only least-privilege floor", () => {
   test("no SoT grant file grants anon anything beyond SELECT on a relation", () => {
     const offenders: string[] = [];
@@ -145,6 +232,52 @@ describe("anon grants — SELECT-only least-privilege floor", () => {
     const sql = read(`${GRANTS_DIR}/fix_missing_table_grants.sql`);
     expect(findBroadDynamicAnonGrants(sql), "DO-loop must grant anon SELECT only").toHaveLength(0);
     expect(findBroadAnonDefaultPrivileges(sql)).toHaveLength(0);
+  });
+
+  test("klient nečte pohled s právy vlastníka, který není vyjmenovaný jako veřejný (SoT + heals + baseline)", () => {
+    const { pohledy, verejne } = pohledyZeSoT();
+    expect(pohledy.size, "měřidlo nenašlo žádný pohled — měří nad ničím").toBeGreaterThan(40);
+
+    const offenders: string[] = [];
+    for (const zdroj of zdrojeGrantu()) {
+      for (const g of grantyNaPohledy(read(zdroj), pohledy)) {
+        const p = pohledy.get(g.pohled)!;
+        const povoleno = verejne.get(g.pohled) ?? [];
+        for (const role of g.role) {
+          if (role !== "anon" && role !== "authenticated") continue;
+          const jenCteni = g.prava.every((x) => x === "SELECT");
+          if (!jenCteni && !p.invoker) {
+            offenders.push(`${zdroj}: ${g.prava.join(",")} ON ${g.pohled} TO ${role} — DML na pohled s právy vlastníka`);
+            continue;
+          }
+          if (role === "anon" && !povoleno.includes("anon")) {
+            offenders.push(`${zdroj}: SELECT ON ${g.pohled} TO anon — pohled není vyjmenovaný jako veřejný`);
+          }
+          if (role === "authenticated" && !p.invoker && !povoleno.includes("authenticated")) {
+            offenders.push(`${zdroj}: SELECT ON ${g.pohled} TO authenticated — pohled s právy vlastníka mimo výčet veřejných`);
+          }
+        }
+      }
+    }
+    expect(
+      offenders,
+      `Pohled bez security_invoker čte podklad MIMO RLS — klientský grant je zadní vrátka.\n` +
+        `Oprav: security_invoker = true (platí RLS podkladu), nebo REVOKE z klientů a čtení přes ` +
+        `SECURITY DEFINER funkci se strážemi; veřejná projekce jen vědomě do ${VEREJNE_JSON}.\n  ${offenders.join("\n  ")}`,
+    ).toEqual([]);
+  });
+
+  test("výčet veřejných pohledů je živý: každá položka existuje, běží s právy vlastníka a má důvod", () => {
+    const { pohledy, verejne, duvody } = pohledyZeSoT();
+    const vady: string[] = [];
+    for (const [jmeno, role] of verejne) {
+      const p = pohledy.get(jmeno);
+      if (!p) vady.push(`${jmeno}: pohled v SoT neexistuje — smaž položku`);
+      else if (p.invoker) vady.push(`${jmeno}: má security_invoker, výjimku nepotřebuje — smaž položku`);
+      if (role.some((r) => r !== "anon" && r !== "authenticated")) vady.push(`${jmeno}: neznámá role ${role.join(",")}`);
+      if ((duvody.get(jmeno) ?? "").length < 60) vady.push(`${jmeno}: důvod musí vysvětlit, proč je čtení klientem účel`);
+    }
+    expect(vady).toEqual([]);
   });
 
   test("generated baseline carries no anon grant beyond SELECT (regen drift guard)", () => {

@@ -204,6 +204,49 @@ describe("No :latest images in Coolify compose files", () => {
   });
 });
 
+/**
+ * Pin DIGESTEM musí být celý digest — a obraz, který se tak pinuje kvůli
+ * naměřené rozbité variantě, digestem ZŮSTÁVÁ.
+ *
+ * ⛔ 2026-10-01: obraz vLLM pro GPU uzel měl v téže verzi rozbitou variantu pro
+ * jinou CUDA; tag se navíc dá v registru přepsat. Proto `IMAGE_VLLM` jde digestem
+ * (obraz, který prošel ručním testem na cílové GPU). Bump na tag by ten test tiše
+ * zneplatnil — tahle aserce ho zastaví.
+ */
+/** Hodnota pinu je „digestem": `<obraz>@sha256:<64 hex>` (případně `obraz:tag@sha256:…`), nic za ním. */
+export const pinDigestem = (hodnota: string): boolean => /^[^\s@]+@sha256:[0-9a-f]{64}$/.test(hodnota);
+
+describe("piny digestem v config/image-versions.env", () => {
+  const piny = readFileSync(join(ROOT, "config/image-versions.env"), "utf-8")
+    .split("\n")
+    .map((l) => /^(IMAGE_[A-Z0-9_]+)=(.*)$/.exec(l.trim()))
+    .filter((m): m is RegExpExecArray => Boolean(m))
+    .map((m) => ({ klic: m[1], hodnota: m[2] }));
+
+  test("každý pin s `@sha256:` nese celý digest (64 hex) a nic za ním", () => {
+    const s = piny.filter((p) => p.hodnota.includes("@sha256:"));
+    expect(s.length, "žádný pin digestem — aserce níž by neměřila nic").toBeGreaterThan(0);
+    expect(s.filter((p) => !pinDigestem(p.hodnota)).map((p) => `${p.klic}=${p.hodnota}`)).toEqual([]);
+  });
+
+  test("IMAGE_VLLM je pinnutý digestem", () => {
+    const vllm = piny.find((p) => p.klic === "IMAGE_VLLM");
+    expect(vllm, "IMAGE_VLLM chybí v config/image-versions.env").toBeTruthy();
+    expect(pinDigestem(vllm!.hodnota), `IMAGE_VLLM=${vllm!.hodnota} není pin digestem`).toBe(true);
+    // KUDY se obraz tahá (mimo centrální cache), tu záměrně neměří — to pravidlo má
+    // jeden domov: registry-proxy-centralni-domov. Dvě brány s vlastním názorem na
+    // tentýž řádek si při příští změně odporují.
+  });
+
+  test("měřidlo pinu rozezná tag od digestu (kontrolní vzorek)", () => {
+    expect(pinDigestem(`\${REGISTRY_PROXY}vllm/vllm-openai@sha256:${"a".repeat(64)}`)).toBe(true);
+    expect(pinDigestem(`docker.io/vllm/vllm-openai@sha256:${"a".repeat(64)}`)).toBe(true);
+    expect(pinDigestem(`\${REGISTRY_PROXY}vllm/vllm-openai:v1.2.3`)).toBe(false);
+    expect(pinDigestem(`\${REGISTRY_PROXY}vllm/vllm-openai@sha256:${"a".repeat(63)}`)).toBe(false);
+    expect(pinDigestem(`\${REGISTRY_PROXY}vllm/vllm-openai@sha256:${"A".repeat(64)}`)).toBe(false);
+  });
+});
+
 describe("No unpinned FROM in dockerfile_inline blocks (compose)", () => {
   // The blind spot that let element-call:latest drift (PR #373): the image:
   // scan above never sees FROM lines inside build.dockerfile_inline. A

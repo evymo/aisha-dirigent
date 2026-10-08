@@ -1316,6 +1316,10 @@ ALTER TABLE public.ai_runtime_registry ADD COLUMN IF NOT EXISTS supports_tools b
 ALTER TABLE public.ai_runtime_registry ADD COLUMN IF NOT EXISTS is_in_process_executor boolean NOT NULL DEFAULT false;
 ALTER TABLE public.ai_runtime_registry ADD COLUMN IF NOT EXISTS side_effect_class text NOT NULL DEFAULT 'read_only';
 ALTER TABLE public.ai_runtime_registry ADD COLUMN IF NOT EXISTS autonomy_class text NOT NULL DEFAULT 'supervised';
+-- Pověření runtime (2026-10-02): JMÉNO proměnné, které runtime potřebuje — sebe-popis jako
+-- ai_provider_registry.auth_env_var; hodnotu plní seed 18_ai_runtime_catalog (běží po heals).
+ALTER TABLE public.ai_runtime_registry ADD COLUMN IF NOT EXISTS credential_env_var text
+  CHECK (credential_env_var IS NULL OR credential_env_var ~ '^[A-Z][A-Z0-9_]{2,63}$');
 ALTER TABLE public.ai_runtime_registry ADD COLUMN IF NOT EXISTS notes text;
 ALTER TABLE public.ai_runtime_registry ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE public.ai_runtime_registry ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
@@ -3591,7 +3595,11 @@ BEGIN
     SELECT id,
            row_number() OVER (PARTITION BY source_slug, locale ORDER BY created_at, id) AS rn
     FROM public.knowledge_items
+    -- Same predicate as the index below: reserved knowledge sources live in their own
+    -- namespace (idx_knowledge_items_reserved_slug_unique) and may share a slug with an
+    -- ordinary item — collapsing across the two would delete a legitimate row.
     WHERE source_slug IS NOT NULL
+      AND source_type <> ALL (ARRAY['platform_knowledge'::text, 'instance_knowledge'::text])
   ) ranked WHERE rn > 1;
 
   IF v_losers IS NOT NULL THEN
@@ -3604,6 +3612,13 @@ BEGIN
   END IF;
 END $$;
 \ir sql/indexes/idx_knowledge_items_source_slug_locale_unique.sql
+-- Reserved knowledge sources (repository seed only): own slug namespace + write guard.
+-- Order: the unique index before the seed (heals runs before db:seed); the trigger body
+-- reads only session settings (request.method, request.jwt.claims, role), so its position
+-- needs nothing defined earlier.
+\ir sql/indexes/idx_knowledge_items_reserved_slug_unique.sql
+\ir sql/functions/fn_protect_reserved_knowledge.sql
+\ir sql/triggers/trg_protect_reserved_knowledge.sql
 
 -- ── heal brick5: source_concept_id (source-node identity for cross-lingual dedup) ──
 -- The column + trigger + index ship in the baseline (fresh DBs), but the baseline is
@@ -3741,6 +3756,18 @@ END $$;
 -- UNGATED body (minimum_tier ACL absent from the WHERE): a security-regression class,
 -- not just a compile error. v3 moves up here from the former brick-1c slot so the
 -- whole RAG RPC surface converges in one place, AFTER its column + helper deps.
+-- Pomocník čitelného stavu PŘED prvním volajícím (v2, v3 i warmup níž ho volají).
+\ir sql/functions/knowledge_state_readable.sql
+-- Totéž pro viditelnost: jeden domov pro VŠECHNY cesty čtení, `guild` jen gildě (změřeno
+-- 2026-10-04: interní téma správy, zapisované jako guild, našel hledáním i anonym), `members`
+-- jen přihlášenému (rozhodnutí majitele 2026-10-04). Domov dostal vstup „je přihlášen“ —
+-- výměna signatury, žádný obal vedle; dvouvstupový tvar (jen z vývoje této větve) pryč.
+DROP FUNCTION IF EXISTS public.knowledge_visibility_searchable(text, boolean);
+\ir sql/functions/knowledge_visibility_searchable.sql
+-- „Je v gildě“ má jeden domov (volají ho v2, v3 i ostatní čtenáři níž) a politiky tabulek se ptají
+-- množiny štítků pro volajícího (spočítá se jednou za dotaz). Politiky se přehrávají níž.
+\ir sql/functions/knowledge_audience_in_guild.sql
+\ir sql/functions/knowledge_visibilities_for_caller.sql
 \ir sql/functions/mcp_search_knowledge_v2.sql
 \ir sql/functions/mcp_search_knowledge_v3.sql
 
@@ -8426,6 +8453,10 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/functions/submit_test_attempt.sql
 \ir sql/functions/get_my_pending_consents.sql
 \ir sql/functions/guard_partner_profile_privilege_columns.sql
+-- 2026-10-05 (revize 2, N2): spoušť hlídá i INSERT — přihlášený si dřív založil vlastní profil rovnou
+-- s is_certified = true (na tom stojí gilda G1 i úroveň publika). Soubor spouště do heals nikdy nedotekl,
+-- běžící databáze měly jen BEFORE UPDATE z doby založení.
+\ir sql/triggers/partner_profiles_privilege_guard.sql
 \ir sql/functions/tc_list_sync_vehicle_ids.sql
 \ir sql/functions/tc_record_import_audited.sql
 \ir sql/functions/tc_upsert_drivers_audited.sql
@@ -8825,7 +8856,8 @@ NOTIFY pgrst, 'reload schema';
 -- Funkce PŘED policies — policy ji volá.
 \ir sql/functions/is_admin_or_staff.sql
 \ir sql/policies/Admins_and_staff_can_view_audit_journal.sql
-\ir sql/policies/knowledge_items_Per_story_KB_visible_to_participants.sql
+-- (politika „Per-story KB visible to participants“ zanikla 2026-10-04 — nahrazují ji čtyři
+--  politiky cílené na role, přehrávané na konci tohoto souboru)
 \ir sql/policies/translations__Admin_can_manage_translations.sql
 
 -- Funkční index pro TEXTOVÝ join generických review bloků na registr
@@ -9521,8 +9553,8 @@ drop view if exists public.audience_admin_twin_directory_v;
 \ir sql/views/audience_admin_activity_monthly_v.sql
 \ir sql/views/audience_admin_twin_composition_v.sql
 \ir sql/views/audience_admin_relation_kinds_v.sql
--- (Granty těchto pohledů nese jejich SoT — jen service_role; přímý grant pro
---  authenticated obcházel stráž blokových funkcí, viz blok 2026-10-04 níž.)
+-- (2026-10-06: dřív i TO authenticated — přímý grant pohledům s právy vlastníka obcházel
+--  stráž blokových funkcí; granty nese SoT pohledů, viz blok „POHLEDY S PRÁVY VLASTNÍKA“ níž.)
 GRANT SELECT ON public.audience_admin_followup_queue_v, public.audience_admin_twin_directory_v,
                 public.audience_admin_twin_relations_v, public.audience_admin_activity_monthly_v,
                 public.audience_admin_twin_composition_v, public.audience_admin_relation_kinds_v
@@ -9564,7 +9596,7 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/functions/get_audience_view_timeline_block.sql
 \ir sql/functions/get_audience_view_kpi_block.sql
 \ir sql/views/audience_admin_twin_timeline_v.sql
--- (Granty pohledu nese jeho SoT; přímý GRANT pro authenticated byl únik — viz blok 2026-10-04.)
+-- (2026-10-06: dřív TO authenticated, service_role — granty nese SoT pohledu, jen služba.)
 
 NOTIFY pgrst, 'reload schema';
 
@@ -10362,7 +10394,8 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/views/audience_admin_source_stats_monthly_v.sql
 \ir sql/views/audience_admin_source_topic_monthly_v.sql
 \ir sql/views/audience_admin_source_event_monthly_v.sql
--- (Jen service_role — čte se přes DEFINER blokové funkce, viz blok 2026-10-04 níž.)
+-- (2026-10-06: dřív i TO authenticated — čte se jen přes DEFINER blokové funkce,
+--  viz blok „POHLEDY S PRÁVY VLASTNÍKA“ níž.)
 GRANT SELECT ON public.audience_admin_source_topic_stats_v,
                 public.audience_admin_source_event_stats_v,
                 public.audience_admin_source_stats_monthly_v,
@@ -11380,6 +11413,10 @@ NOTIFY pgrst, 'reload schema';
 -- vidět, zda součty na podružných měřidlech odpovídají hlavnímu). Podružná jen přes
 -- POTVRZENÉ hrany — neschválený návrh do bilance nevstupuje. Slovník (druh hrany,
 -- událost spotřeby, cesta k násobiteli) nese konfigurace bloku, ne platforma.
+-- Odečet je hodnota k datu: spotřebu mezi okamžiky odvozuje pravidlo (data) — bilance ji volá,
+-- proto obě funkce PŘED ní (pomocník stavu k okamžiku před svým volajícím).
+\ir sql/functions/meter_usage_stav_k.sql
+\ir sql/functions/meter_usage_between.sql
 \ir sql/functions/get_meter_balance_block.sql
 
 -- ⭐ HROMADNÉ SCHVÁLENÍ NÁVRHŮ IDENTIT (rozhodnutí majitele 2026-09-28): „teprve dva zdroje
@@ -11416,8 +11453,8 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/functions/request_data_sharing_consent.sql
 \ir sql/functions/sync_health_data_with_conflict_resolution.sql
 -- ⭐ RAG VEKTORY — PLATFORMNÍ DOPOČET (2026-09-29, rozhodnutí majitele: přepočítat
--- staré vektory „samo na serveru"). Chunky bez vektoru ŽIVÉ identity (model z resolveru
--- v1 + deklarovaný pin vah `gguf:<sha>`) dopočítá POST /embeddings/v1-backfill týmž
+-- staré vektory „samo na serveru"). Chunky bez vektoru ŽIVÉ identity (fn_ziva_identita_v1:
+-- model z resolveru v1 + deklarovaná identita vah `<formát>:<sha>`) dopočítá POST /embeddings/v1-backfill týmž
 -- svc-model, kterým se kódují dotazy; text nad declared.max_tokens se nekóduje (tichý
 -- ořez llama.cpp) a zapíše se do knowledge_embedding_vynechani. upsert_discovered_model
 -- nově zachovává provider_metadata.declared (pin by jinak smazal první discovery sken);
@@ -11425,6 +11462,7 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/tables/knowledge_embedding_vynechani.sql
 \ir sql/policies/knowledge_embedding_vynechani_service_all.sql
 \ir sql/functions/fn_chunks_bez_zive_identity.sql
+\ir sql/functions/fn_ziva_identita_v1.sql
 \ir sql/functions/fn_get_chunks_needing_v1.sql
 \ir sql/functions/fn_record_embedding_vynechani.sql
 -- ⭐ POLOŽKY DOKLADU (2026-09-29, majitel: „u faktury detail POLOŽEK, ne co je ke schválení").
@@ -11465,6 +11503,70 @@ NOTIFY pgrst, 'reload schema';
 -- li_doc_slugs drží MATERIALIZED plot, ne COST. CREATE OR REPLACE bez klauzule COST
 -- vrací výchozí 100 (ověřuje runtime test predikat-naroku-vychozi-cost).
 \ir sql/functions/workflow_step_visible_to.sql
+
+NOTIFY pgrst, 'reload schema';
+
+-- ⛔ POHLEDY S PRÁVY VLASTNÍKA A EDGE DISPEČERY BEZ NÁROKU (2026-10-06, větev
+-- fix/pohledy-a-edge-jen-opravneni). Opravy existovaly jen v GitHub stagingu
+-- (evymo/aisha-orchestrator PR #2, 10-04/05); sem přeneseny po přeměření na main.
+-- Naměřeno na čisté DB main 0f992f647 (baseline + heals) katalogem:
+--  · 23 pohledů / mat. pohledů BEZ security_invoker (čtou podklad mimo jeho RLS)
+--    čitelných klientskou rolí, 11 z nich i anon (+ plné DML pro authenticated):
+--    v_health_weekly/monthly_summary (souhrny stavu ze snímačů KAŽDÉHO vlastníka
+--    bez přihlášení), study_cohort_* , distribution_*, batch_inventory_overview,
+--    expedition_overview, shipment_statistics; 12× audience_admin_*_v a
+--    ai_agent_metrics_hourly pro authenticated (obchází stráž DEFINER bloků).
+--    partner_profiles_public (veřejný adresář) měl DML pro authenticated.
+--  · 6 SECURITY DEFINER dispečerů (p_action) s GRANT authenticated, kde část akcí
+--    nemá žádnou stráž: edge_bank_transactions (zaplacení vlastní objednávky,
+--    falešná platba, účty plátců), edge_subscriptions (aktivace bez platby, cizí
+--    předplatné), edge_mobile_notifications (cizí push tokeny, phishing notifikace,
+--    vynulování tokenů všem), edge_blockchain_audit (podvržený auditní řetězec),
+--    edge_payment_sessions (stav cizí platební relace), edge_public_partners_directory
+--    (aktivita cizích účtů z audit_journal).
+-- Volající (změřeno v repu): pohledy čtou jen SECURITY DEFINER funkce (právy
+-- vlastníka — revoke je nezasáhne); edge_* volá svc-fio-bank/svc-push/svc-blockchain/
+-- gateway service tokenem, svc-stripe zápis předplatného nově service tokenem,
+-- admin UI (useBankReconciliation, useAdminNotificationCampaigns) jako admin,
+-- člen jen get_order_bank_transfer / get_user_subscriptions (sám za sebe).
+-- Pořadí: funkce → pohledy (SoT pohledů nese REVOKE — DROP+CREATE z dřívějších
+-- bloků je rodí s default privileges) → grant soubory. Granty v dřívějších blocích
+-- heals (audience_admin) jsou zúžené na service_role; tady se odebere, co na běžící
+-- DB zůstalo. Třídu hlídají: src/tests/db/pohled-s-pravy-vlastnika-bez-klientskeho-
+-- grantu.runtime.test.ts (katalog) a src/tests/gates/definer-dispecer-autorizuje-
+-- kazdou-akci.gate.test.ts (SoT).
+\ir sql/functions/edge_bank_transactions.sql
+\ir sql/functions/edge_subscriptions.sql
+\ir sql/functions/edge_mobile_notifications.sql
+\ir sql/functions/edge_blockchain_audit.sql
+\ir sql/functions/edge_payment_sessions.sql
+\ir sql/functions/edge_public_partners_directory.sql
+\ir sql/views/v_health_weekly_summary.sql
+\ir sql/views/v_health_monthly_summary.sql
+\ir sql/views/audience_admin_activity_monthly_v.sql
+\ir sql/views/audience_admin_followup_queue_v.sql
+\ir sql/views/audience_admin_relation_kinds_v.sql
+\ir sql/views/audience_admin_source_stats_monthly_v.sql
+\ir sql/views/audience_admin_source_event_monthly_v.sql
+\ir sql/views/audience_admin_source_event_stats_v.sql
+\ir sql/views/audience_admin_source_topic_monthly_v.sql
+\ir sql/views/audience_admin_source_topic_stats_v.sql
+\ir sql/views/audience_admin_twin_composition_v.sql
+\ir sql/views/audience_admin_twin_directory_v.sql
+\ir sql/views/audience_admin_twin_relations_v.sql
+\ir sql/views/audience_admin_twin_timeline_v.sql
+\ir sql/grants/v_health_weekly_summary.sql
+\ir sql/grants/v_health_monthly_summary.sql
+\ir sql/grants/batch_inventory_overview.sql
+\ir sql/grants/distribution_adjustments_overview.sql
+\ir sql/grants/distribution_overview.sql
+\ir sql/grants/expedition_overview.sql
+\ir sql/grants/shipment_statistics.sql
+\ir sql/grants/study_cohort_lab_trends.sql
+\ir sql/grants/study_cohort_statistics.sql
+\ir sql/grants/study_cohort_trends.sql
+\ir sql/grants/partner_profiles_public.sql
+\ir sql/materialized_views/ai_agent_metrics_hourly.sql
 
 NOTIFY pgrst, 'reload schema';
 
@@ -11670,6 +11772,50 @@ BEGIN
   END;
 END $$;
 
+-- Schéma public: právo CREATE jen jmenovitě (SoT: grants/schema_public_create.sql).
+-- Změřeno 2026-10-03 na živé instanci: ACL {vlastník=UC, postgres=UC, =UC} — reset
+-- schématu při studeném startu dával CREATE všem rolím (PUBLIC) a smazal výslovný
+-- grant roli, která v public své tabulky zakládá. Baseline se na běžící databázi
+-- nepřehraje, takže odebrání musí přijít tudy. Jeden blok: nejdřív grant té roli,
+-- pak REVOKE pro PUBLIC po jednotlivých udělovatelích, pak změření. Co odebrat
+-- nejde, ohlásí VAROVÁNÍ (migrace běží dál); natvrdo to hlídá ověření po nasazení.
+\ir sql/grants/schema_public_create.sql
+
+-- Čtyři mrtvé funkce SECURITY DEFINER pryč. Zdroj je smazaný a baseline je už
+-- nenese, ale na databázi založené dřív existují dál — a dokud existují, jdou volat:
+--   raw_query_admin          libovolné SQL právy vlastníka (jen service_role); služby
+--                            ho volat nesmějí (brána no-raw-query-admin-in-services)
+--                            a žádná ho nevolá
+--   edge_database_dump_table výpis celé tabulky z pevného seznamu; volající žádný
+--   fn_rollback_agent_config pracuje s tabulkami, které neexistují
+--   get_story_basic_info     čte tabulku, která neexistuje; volal ho jen nepoužívaný hook
+-- Přesná signatura, bez CASCADE: kdyby na funkci něco záviselo, má migrace spadnout
+-- nahlas, ne závislost mlčky smazat.
+DROP FUNCTION IF EXISTS public.raw_query_admin(text, text[]);
+DROP FUNCTION IF EXISTS public.edge_database_dump_table(uuid, text);
+DROP FUNCTION IF EXISTS public.fn_rollback_agent_config(uuid, uuid, text, integer);
+DROP FUNCTION IF EXISTS public.get_story_basic_info(uuid);
+
+-- Příjem pošty (mail-sync, revize integrátora 2026-10-05): e-mail do story JEN přes sken.
+--   append_inbound_comm_entry_audited  nový parametr p_event_id; pro kanál email povinný —
+--                                      zamčený event fronty s čistým verdiktem (metadata.av),
+--                                      záznam interní, event uzavřen. Soubor sám zahodí starou
+--                                      osmiparametrovou signaturu (jinak by zůstala volatelná a
+--                                      kontrolu obešla).
+--   ingest_inbound_comm_audited        jednorázový ingest BEZ skenu; jediný zapojený kanál byl
+--                                      email, takže by po změně jen házel — mrtvý povrch pryč.
+--                                      Volající mimo funkci, migrace, typy a testy nemá upstream
+--                                      ani forky (automotive, riq, cheers, cleenack, sangha;
+--                                      změřeno 2026-10-06). Přesná signatura, bez CASCADE.
+--   get_retryable_integration_events   volající jmenuje zdroje, které jeho opakování umí
+--                                      (p_sources, povinný); neznámý zdroj se nevrátí — dřív šel
+--                                      každý failed event do github-webhook-bridge. Soubor zahodí
+--                                      starou signaturu (jen p_limit).
+DROP FUNCTION IF EXISTS public.append_inbound_comm_entry_audited(uuid, text, text, text, text, text, uuid, jsonb);
+\ir sql/functions/append_inbound_comm_entry_audited.sql
+DROP FUNCTION IF EXISTS public.ingest_inbound_comm_audited(text, text, uuid, text, text, text, uuid, text, jsonb);
+DROP FUNCTION IF EXISTS public.get_retryable_integration_events(integer);
+\ir sql/functions/get_retryable_integration_events.sql
 NOTIFY pgrst, 'reload schema';
 
 -- ⛔ edge_bank_transactions BEZ STRÁŽE (2026-10-04, bezpečnostní nález z revize SQL).
@@ -11813,3 +11959,591 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/functions/is_consultant_for_user.sql
 
 NOTIFY pgrst, 'reload schema';
+
+-- Znalosti: čitelný stav má jeden domov a tabulka se napřímo čte jen podle něj.
+-- Změřeno 2026-10-04: dvě PERMISSIVE politiky SELECT TO public se sčítaly a druhá
+-- pouštěla každou globální položku (koncept, soukromou, s úrovní, v karanténě) komukoli
+-- přihlášenému; anonyma zastavila jen chyba na funkci, kterou nesmí spustit. První
+-- soubor politik obě staré politiky zahazuje. Pomocníka STAVU politiky nevolají (vyhodnocují
+-- se právy tazatele a ten ho spustit nesmí) — nesou týž výčet doslova; shodu obou míst
+-- drží brána znalosti-citelny-stav-jeden-seznam. Domov VIDITELNOSTI se politiky ptají přes
+-- množinu knowledge_visibilities_for_caller() (přehrává se výš) — `members` jen přihlášenému,
+-- `guild` jen gildě (2026-10-05).
+\ir sql/functions/knowledge_state_readable.sql
+\ir sql/policies/knowledge_items_global_anon_read.sql
+\ir sql/policies/knowledge_items_global_authenticated_read.sql
+\ir sql/policies/knowledge_items_story_participants_read.sql
+\ir sql/policies/knowledge_items_admin_read.sql
+-- Pomocník s voláním na řádek (jen z vývoje této větve) — politiky výš na něm už nezávisí.
+DROP FUNCTION IF EXISTS public.knowledge_visibility_for_caller(text);
+
+-- Expertní pravidla: viditelnost má týž domov jako znalosti (revize B1, 2026-10-05). Pomocník pro čtenáře
+-- (definer funkce) PŘED nimi; politiky čtení napřímo se ptají množiny štítků (přehrává se výš). Soubor
+-- politik dosud v heals nebyl — politiky do běžících databází nedotekly vůbec.
+\ir sql/functions/expert_rule_visible_to.sql
+\ir sql/policies/expert_rules_visibility.sql
+-- Čtenáři expertních pravidel přes public.expert_rule_visible_to (revize B1). Tyto soubory v heals dosud
+-- nebyly — oprava by na běžící databázi zůstala jen v repu. Čtyři mění signaturu (přibyl parametr publika
+-- s výchozí hodnotou): starý tvar pryč PŘED novým, žádný obal vedle.
+\ir sql/functions/assess_code_quality.sql
+\ir sql/functions/create_story_ruleset.sql
+\ir sql/functions/evaluate_test_strategy.sql
+\ir sql/functions/generate_default_copilot_instructions.sql
+DROP FUNCTION IF EXISTS public.get_expert_rule_detail(text);
+\ir sql/functions/get_expert_rule_detail.sql
+\ir sql/functions/get_expert_rules.sql
+\ir sql/functions/get_expertise_areas.sql
+\ir sql/functions/get_guild_member_detail.sql
+\ir sql/functions/get_guild_members.sql
+\ir sql/functions/get_instruction_payload.sql
+\ir sql/functions/get_my_rule_subscriptions.sql
+\ir sql/functions/get_story_knowledge_context.sql
+\ir sql/functions/get_story_rulesets.sql
+\ir sql/functions/list_agent_kb_bindings.sql
+\ir sql/functions/mcp_consult_dirigent.sql
+DROP FUNCTION IF EXISTS public.mcp_get_agent_knowledge(text, text);
+\ir sql/functions/mcp_get_agent_knowledge.sql
+\ir sql/functions/mcp_get_expertise_areas.sql
+DROP FUNCTION IF EXISTS public.mcp_get_rule_detail(text);
+\ir sql/functions/mcp_get_rule_detail.sql
+\ir sql/functions/mcp_get_story_context.sql
+\ir sql/functions/mcp_match_experts.sql
+\ir sql/functions/mcp_propose_improvement.sql
+\ir sql/functions/mcp_request_unblock.sql
+DROP FUNCTION IF EXISTS public.mcp_search_knowledge(text, text, text, text[], boolean, integer);
+\ir sql/functions/mcp_search_knowledge.sql
+\ir sql/functions/recommend_ruleset_for_story.sql
+\ir sql/functions/subscribe_to_expert_rule.sql
+
+-- Hledání rysů osobnosti vydá jen rys v čitelném stavu — v OBOU větvích (s embeddingem
+-- i bez). Změřeno 2026-10-04: funkce stav položky nefiltrovala vůbec, takže rys
+-- v karanténě šel agentovi do osobnosti. Soubor dosud v heals nebyl: na běžící
+-- databázi by oprava zůstala jen v repu. Za knowledge_state_readable — volá ji.
+\ir sql/functions/fn_search_personality_context.sql
+
+-- Druhý index (Ragnarok) nese jen to, co smí vrátit hledání: položku aktivní A
+-- v čitelném stavu. Změřeno 2026-10-04: spoušť brala změnu POUZE stavu karantény jako
+-- nevýznamnou (položka označená po nahrání v indexu zůstala), INSERT nahrával bez
+-- ohledu na stav, UPDATE konceptu poslal „nahrát“ a sestavení dokumentu stav ani
+-- status nečetlo. Rozhodnutí je nově v čisté funkci; spoušť i sestavení dokumentu
+-- dosud v heals nebyly. Pořadí: rozhodovací funkce PŘED spouští, která ji volá.
+\ir sql/functions/knowledge_ragnarok_action.sql
+\ir sql/functions/fn_notify_knowledge_change.sql
+\ir sql/functions/fn_build_ragnarok_document.sql
+
+-- Citace běhu: funkce končila při KAŽDÉM volání chybou 42702 — sloupce bez aliasu tabulky
+-- kolidují s výstupními parametry RETURNS TABLE (změřeno 2026-10-04 na PG 18). Soubor
+-- dosud v heals nebyl: oprava by na běžící databázi zůstala jen v repu.
+\ir sql/functions/fn_get_run_citations.sql
+-- Graf běhu: táž vada — závěrečný dotaz četl výstupní sloupce bez aliasu a funkce spadla
+-- (42702) pokaždé, když běh nějaké citace měl. Ani tenhle soubor v heals dosud nebyl.
+\ir sql/functions/fn_get_run_graph_context.sql
+-- Fronty zpracování a graf běhu stav položky nečetly vůbec: obsah položky v karanténě dál chodil
+-- modelu, který píše kontext úryvku, a poskytovateli vektorů. Dvě fronty v heals dosud nebyly
+-- (fn_chunks_bez_zive_identity je zapojená výš, graf běhu o řádek výš).
+\ir sql/functions/fn_get_chunks_needing_context.sql
+\ir sql/functions/fn_get_embeddings_needing_v2.sql
+-- Statistiky znalostí (pohled správy na celý korpus) měly EXECUTE pro anon i authenticated a žádnou
+-- kontrolu volajícího. Zdroj pravdy je odebírá výslovně (REVOKE … FROM anon, authenticated) — bez
+-- přehrání by na běžící databázi zůstaly.
+\ir sql/functions/mcp_get_knowledge_stats.sql
+
+-- Čtecí funkce znalostí: allowlist stavu místo výčtu zakázaných. Změřeno 2026-10-04:
+-- hledání v2 (obě přetížení), v3 (obě větve) a warmup pouštěly položku nezměřenou
+-- i v neznámém stavu (warmup navíc NULL); sedm dalších čtení stav nefiltrovalo vůbec.
+-- v2, v3 a warmup se přehrávají výš (pomocník je tam před nimi), citace běhu o blok
+-- výš; těchto šest souborů v heals dosud nebylo — oprava by na běžící databázi
+-- zůstala jen v repu.
+-- Čtení podle id dostalo parametr publika (výměna signatury — viz hlavička souboru).
+DROP FUNCTION IF EXISTS public.mcp_get_knowledge_item(uuid, text);
+\ir sql/functions/mcp_get_knowledge_item.sql
+-- Vrstva mozku (rysy, zásady) dostala parametr publika a viditelnost z domova (2026-10-05) —
+-- výměna signatury; soubory nesou DROP bezargumentového tvaru, compose_context se přehrává níž.
+DROP FUNCTION IF EXISTS public.fn_get_psyche_traits();
+\ir sql/functions/fn_get_psyche_traits.sql
+DROP FUNCTION IF EXISTS public.fn_get_tao_principles();
+\ir sql/functions/fn_get_tao_principles.sql
+\ir sql/functions/fn_get_run_extract_context.sql
+\ir sql/functions/extract_training_pairs_from_kb.sql
+\ir sql/functions/compose_context.sql
+
+-- Seznam položek příběhu: vlastník příběhu je tu jako všude jinde (vlastník, účastník, správa) —
+-- do 2026-10-05 ho funkce bez řádku účastníka odmítla. Soubor v heals dosud nebyl: oprava by na
+-- běžící databázi zůstala jen v repu.
+\ir sql/functions/list_story_knowledge_items.sql
+
+-- Dvě funkce spouští, které zakládají položky znalostí, měly GRANT EXECUTE TO PUBLIC
+-- (+ authenticated, service_role). Zbytečný, ne zneužitelný — funkci spouště napřímo volat
+-- nejde — ale je to grant navíc; pryč. Funkce tématu dosud v heals nebyla (funkce pravidla
+-- se přehrává výš), a jen přehráním se REVOKE dostane na běžící databázi.
+\ir sql/functions/sync_expert_rule_to_knowledge_item.sql
+\ir sql/functions/sync_topic_version_to_knowledge_item.sql
+
+-- Čtení podle id příběhu a běhu jen s přístupem, nepřihlášený jen `public` (2026-10-06). Stráž příběhu
+-- v mcp_get_story_context, kontrola běhu v compose_context a politika graph_nodes (uzel jen se zdrojem,
+-- který smí tazatel číst) se přehrávají výš. Transparentnost produktu vydávala anonymovi témata
+-- `members` (vlastní výčet místo domova viditelnosti); soubor v heals dosud nebyl — oprava by na běžící
+-- databázi zůstala jen v repu. Za domovem viditelnosti a gildou (přehrávají se výš).
+\ir sql/functions/get_product_transparency.sql
+
+NOTIFY pgrst, 'reload schema';
+
+-- ⭐ 2026-10-02: webové stránky — KONCEPT vs. živá verze; verze a šablony bez 403.
+-- Naměřeno (na instanci): veřejný web čte `canvas_html` zveřejněné stránky přímo a editor
+-- plátna ukládá 5 s po poslední změně — každý rozpracovaný pokus tak šel na web
+-- („the page got all messed up"). Uložení zveřejněné stránky jde nově do KONCEPTU
+-- (web_page_versions kind='draft'); „Zveřejnit změny" ho přelije do web_pages a zapíše
+-- verzi 'published' na serveru. Zrcadlí koncept novinek (2026-09-24).
+-- Současně: create_web_page_version / restore_web_page_version / apply_web_page_template
+-- byly SECURITY INVOKER s INSERTem do audit_journal (RLS jen čtení) → správci/staffovi
+-- padaly 403; zveřejnění tak nemělo historii a šablona nešla použít. Nyní DEFINER se
+-- stráží admin/staff; obnova a šablona u zveřejněné stránky jdou do konceptu.
+-- Pořadí: tabulka → trigger → index → pomocník → zapisovatelé → delegát → čtenáři.
+\ir sql/tables/web_page_versions.sql
+\ir sql/triggers/set_web_page_versions_updated_at.sql
+\ir sql/indexes/uq_web_page_versions_draft.sql
+\ir sql/functions/web_page_edit_stamp.sql
+\ir sql/functions/create_web_page_version.sql
+\ir sql/functions/save_web_page_draft_admin.sql
+\ir sql/functions/publish_web_page_admin.sql
+\ir sql/functions/discard_web_page_draft_admin.sql
+\ir sql/functions/restore_web_page_version.sql
+\ir sql/functions/apply_web_page_template.sql
+-- Nový parametr / návratový typ = nový podpis. DROP starých přetížení je v SoT
+-- souborech a zrcadlí se tady (heals-signature-drift).
+DROP FUNCTION IF EXISTS public.update_web_page_canvas_admin(uuid, jsonb, text, text, jsonb, boolean);
+\ir sql/functions/update_web_page_canvas_admin.sql
+DROP FUNCTION IF EXISTS public.get_web_page_admin(uuid);
+\ir sql/functions/get_web_page_admin.sql
+\ir sql/functions/get_web_page_versions.sql
+
+NOTIFY pgrst, 'reload schema';
+
+-- ⭐ 2026-10-02: správa štítků novinek (z instance — správkyně webu spravuje štítky sama).
+-- get_news_tags_admin: všechny štítky i z nezveřejněných článků a konceptů (veřejné
+-- get_news_tags vidí jen zveřejněné). rename_news_tag_admin: přejmenování/sloučení
+-- v živých článcích i v konceptech + přesun zobrazovaných názvů (namespace news-tags).
+-- upsert_translations: staff smí psát i 'news-tags' (názvy štítků jsou obsah).
+\ir sql/functions/get_news_tags_admin.sql
+\ir sql/functions/rename_news_tag_admin.sql
+\ir sql/functions/upsert_translations.sql
+
+NOTIFY pgrst, 'reload schema';
+-- ⭐ P2 HLEDÁNÍ PODLE IDENTITY VAH (2026-10-06, absolutní priorita majitele: extranet hledá nad KB
+-- vlastními modely). NAMĚŘENO na riq (jen čtení): mcp_search_knowledge_v3 filtrovala podle JMÉNA
+-- modelu, ne podle identity vah — 126 443 starých vektorů ve 3 identitách (gguf · hf · MLX) nese
+-- totéž model_id jako cílové váhy na GPU, takže po přepočtu by se tiše míchaly do pořadí.
+-- Teď: deklarace vah má jeden domov (fn_deklarace_vah_embeddingu — čte ji dopočet v1 přes
+-- fn_ziva_identita_v1 i hledání), identitu uloženého vektoru čte fn_identita_vektoru (dopočet
+-- i hledání rozumí „živému vektoru“ stejně) a v3 (podpis beze změny) srovnává dotaz jen s vektory
+-- deklarované identity, kterou počítá server — volající ji nezadává (revize bezpečnosti 2026-10-07:
+-- identita od volajícího by byla orákulum deklarace); nedeklarovaná = jednotná 22023
+-- embedding_identity_undeclared bez hodnot, ne prázdný výsledek. Pomocníky před funkcemi, které je volají.
+\ir sql/functions/fn_identita_vektoru.sql
+\ir sql/functions/fn_deklarace_vah_embeddingu.sql
+\ir sql/functions/fn_ziva_identita_v1.sql
+\ir sql/functions/fn_chunks_bez_zive_identity.sql
+\ir sql/functions/mcp_search_knowledge_v3.sql
+
+NOTIFY pgrst, 'reload schema';
+-- ⭐ SEED BEZ DUPLICIT (2026-10-05). Seed běží při KAŽDÉM nasazení (migrate → compile-seed →
+-- db:seed) a dva jeho bloky vkládaly řádky bez stabilního klíče s `ON CONFLICT DO NOTHING`
+-- bez cíle — konflikt nikdy nenastal a každé nasazení přidalo kopie. Naměřeno na čisté DB
+-- (seed 1×/2×/3×): knowledge_items occipitum (seed/core/30) 18 → 36 → 54, ai_golden_examples
+-- (seed/core/22 §22.3) 5 → 10 → 15. Seed teď nese přirozený klíč a stabilní id; tenhle blok
+-- sloučí kopie, které už na běžících DB jsou. Běží před seedem.
+--
+-- CO JE KOPIE SEEDU: řádek přesně tvaru, jaký seed vkládal, a se STEJNÝM OBSAHEM jako seed
+-- (otisk těla / odpovědi níž). Tvar = co seed nastavil a uživatel ani zapisovatel znalostí
+-- nenastaví: bez autora (author_id, author_display_name), bez source_id a source_hash,
+-- is_verified = true (zápis přes upsert_story_knowledge_item_audited nese autora a výchozí
+-- is_verified = false); u vzorů bez zprávy, konverzace a created_by. Doslovná kopie obsahu
+-- seedu, kterou založil uživatel, kopie seedu NENÍ — nesahá se na ni, ani když nese
+-- embeddingy (naměřeno v revizi 2026-10-05: bez tohoto filtru by ji heal vybral za
+-- ponechanou a přepsal jí slug). Nic mimo kopie seedu se nemění: jiné zdroje (instance,
+-- uživatelské položky, příběhy) mají jiný tvar a do výběru nespadnou.
+--
+-- SLOUČENÍ: z kopií jedné položky zůstane ta, která nese slug (už sloučená dřív), jinak ta
+-- s embeddingy a chunky, jinak nejstarší. Vazby kopií se přepojí na ni (atribuce, trénovací
+-- příklady, uzly grafu, citace chunků v ai_runs / ai_run_critic_iterations / rag_eval_runs
+-- na shodný chunk ponechané položky; u vzorů výsledky hodnocení), usage_count se sečte,
+-- odvozená data kopie (chunky, embeddingy, záznamy vynechání) se smažou s ní. Ponechané
+-- položce se doplní slug, aby ji seed poznal i pod jejím původním id.
+--
+-- KDY SE NESLUČUJE: kopie s odlišným stavem (status, viditelnost, karanténa, hodnocení,
+-- aktivita — cokoli, co mohl změnit člověk nebo sken), kopie s multimodálními stránkami
+-- a kopie s citovaným chunkem, ke kterému ponechaná položka shodný chunk nemá. Takové
+-- zůstanou, ohlásí se WARNINGem a záznamem `seed.duplicates_left` v audit_journal
+-- (výstup heals.sql se při nasazení nezobrazuje) — rozhodne člověk.
+--
+-- ZÁZNAMY JEN Z BĚHU, KTERÝ DATA ZMĚNIL. Heal NEČTE audit_journal: do něj smí zapsat
+-- libovolnou akci každý přihlášený (log_audit_event je definer bez stráže — změřeno
+-- 2026-10-05) i služba, takže „poslední záznam" je podvrhnutelný a nesmí být zdrojem
+-- rozhodnutí. Sada ponechaných kopií se mění jen akcí healu (sloučení, převzetí) nebo
+-- zásahem člověka; nové kopie tvaru seedu nevzniknou — seed je už nezakládá a globální
+-- položku tvaru seedu nezapíše anon ani authenticated (RLS bez zápisové politiky, RPC
+-- razí autora nebo příběh — změřeno), jen service_role, která smí do knowledge_items
+-- zapsat cokoli i bez healu. Proto: běh, který sloučil nebo převzal, zapíše výsledek
+-- i se sadou ponechaných; běh, který nic nezměnil, nezapíše nic (audit neroste
+-- s nasazeními). WARNING se vypíše při každém běhu s ponechanými kopiemi.
+-- Idempotentní: na DB bez kopií nic nenajde, nic nezmění a nic nezapíše.
+-- >>> seed-bez-duplicit
+DO $heal$
+DECLARE
+  v_sk         record;
+  v_mapa       record;
+  v_keeper     uuid;
+  v_kopie      uuid;
+  v_duvod      text;
+  v_usage      integer;
+  v_n          integer;
+  v_ki_slouceno   integer := 0;
+  v_ki_adopce     integer := 0;
+  v_ki_chunky     integer := 0;
+  v_ki_embeddingy integer := 0;
+  v_ki_citace     integer := 0;
+  v_gx_slouceno   integer := 0;
+  v_ponechane  jsonb := '[]'::jsonb;
+BEGIN
+  -- ── knowledge_items: seed/core/30_occipitum_design_kb.sql ────────────────────────────
+  FOR v_sk IN
+    WITH seed(source_slug, title, otisk_tela) AS (VALUES
+      ('occipitum-editorial-grid-layout', 'Editorial Grid Layout', '995d6aaf2a4c89bfa16276ead7b8107b'),
+      ('occipitum-kinetic-typography-hero', 'Kinetic Typography Hero', 'e41d82788917f5b12187f82bad5505e5'),
+      ('occipitum-scroll-driven-storytelling', 'Scroll-Driven Storytelling', 'dbd148f766f1e516adbb596ec5cdd8cb'),
+      ('occipitum-brutalist-authenticity', 'Brutalist Authenticity', '6d9cca74aa46f7b2c96aaa39002b0f3b'),
+      ('occipitum-bento-grid-dashboard', 'Bento Grid Dashboard', 'ada8efcfe00a85ed83a2417f5c584063'),
+      ('occipitum-immersive-color-gradient-flow', 'Immersive Color Gradient Flow', '0f37f2fa4d70df4c74c329b17fa712bc'),
+      ('occipitum-split-screen-dialogue', 'Split-Screen Dialogue', '808aab5b1d1ec1ee99dba3e13d1ab3fb'),
+      ('occipitum-micro-interaction-personality', 'Micro-Interaction Personality', '3b6e92f68e6fa72e7552adfeb142e74e'),
+      ('occipitum-full-bleed-photography-narrative', 'Full-Bleed Photography Narrative', 'c9617a4df0bb8d8971647f72799c3805'),
+      ('occipitum-conversational-interface-landing', 'Conversational Interface Landing', '589d9aa2ccfca3f8a597804d957ca7a7'),
+      ('occipitum-organic-shapes-and-blob-morphing', 'Organic Shapes and Blob Morphing', '652a7a4d5991077b6559130c0325b63b'),
+      ('occipitum-dark-mode-first-luxury', 'Dark Mode First Luxury', 'a5ffc60721f3f1e75a7e3bc59a7dc375'),
+      ('occipitum-antipattern-generic-hero-cta-button', 'ANTIPATTERN: Generic Hero + CTA Button', '1be35c62f19a12512d7896ca7cd903a8'),
+      ('occipitum-antipattern-hamburger-menu-everywhere', 'ANTIPATTERN: Hamburger Menu Everywhere', '77df5f283f5cd54af5d08ead6ba0d9b0'),
+      ('occipitum-antipattern-cookie-cutter-card-grid', 'ANTIPATTERN: Cookie-Cutter Card Grid', '274aaafde8e0660a789ebbced477db8b'),
+      ('occipitum-antipattern-popup-flow-pro-everything', 'ANTIPATTERN: Popup Flow pro Everything', 'c5d81dde5e83703c9188e2361b0428e9'),
+      ('occipitum-antipattern-breadcrumb-navigation-clutter', 'ANTIPATTERN: Breadcrumb Navigation Clutter', 'fc13ecb3c6f05d5805fece03dddd8125'),
+      ('occipitum-antipattern-stock-photo-hero', 'ANTIPATTERN: Stock Photo Hero', '0835fca59458b7994b479d893075a427')
+    ),
+    kopie AS (
+      SELECT s.source_slug, k.id, k.created_at,
+             (k.source_slug IS NOT NULL) AS nese_slug,
+             (SELECT count(*) FROM public.knowledge_embeddings e WHERE e.knowledge_item_id = k.id) AS n_emb,
+             (SELECT count(*) FROM public.knowledge_chunks c WHERE c.knowledge_item_id = k.id) AS n_chunk,
+             -- stav, který mohl změnit člověk nebo sken: liší-li se, kopie se neslučuje
+             md5(jsonb_build_array(
+               k.summary, k.ai_instructions, k.ai_context_tags, k.expertise_area_id, k.status,
+               k.visibility, k.version, k.author_id, k.author_display_name, k.rating_avg,
+               k.is_verified, k.published_at, k.quarantine_status, k.quarantine_reason,
+               CASE WHEN k.quarantine_status <> 'clear' THEN k.quarantine_metadata END,
+               k.minimum_tier, k.has_multimodal, k.multimodal_provider, k.source_hash
+             )::text) AS otisk_stavu
+        FROM seed s
+        JOIN public.knowledge_items k
+          ON k.title = s.title
+         AND md5(k.body_markdown) = s.otisk_tela
+         AND k.category = 'occipitum' AND k.item_type = 'playbook' AND k.source_type = 'manual'
+         AND k.story_id IS NULL AND k.locale = 'global'
+         AND (k.source_slug IS NULL OR k.source_slug = s.source_slug)
+         -- tvar seedu: bez autora a zdroje, ověřená (uživatelská doslovná kopie sem nespadne)
+         AND k.author_id IS NULL AND k.author_display_name IS NULL
+         AND k.source_id IS NULL AND k.source_hash IS NULL AND k.is_verified
+    )
+    SELECT source_slug,
+           array_agg(id ORDER BY nese_slug DESC, n_emb DESC, n_chunk DESC, created_at, id) AS ids,
+           array_agg(otisk_stavu ORDER BY nese_slug DESC, n_emb DESC, n_chunk DESC, created_at, id) AS otisky
+      FROM kopie
+     GROUP BY source_slug
+  LOOP
+    v_keeper := v_sk.ids[1];
+    FOR i IN 2 .. coalesce(array_length(v_sk.ids, 1), 1) LOOP
+      v_kopie := v_sk.ids[i];
+      v_duvod := NULL;
+      IF v_sk.otisky[i] IS DISTINCT FROM v_sk.otisky[1] THEN
+        v_duvod := 'jiny_stav';
+      ELSIF EXISTS (SELECT 1 FROM public.knowledge_multimodal_pages p WHERE p.knowledge_item_id = v_kopie) THEN
+        v_duvod := 'multimodalni_stranky';
+      ELSIF EXISTS (
+        SELECT 1 FROM public.knowledge_chunks lc
+         WHERE lc.knowledge_item_id = v_kopie
+           AND (EXISTS (SELECT 1 FROM public.ai_runs r WHERE lc.id = ANY (r.citation_chunk_ids))
+             OR EXISTS (SELECT 1 FROM public.ai_run_critic_iterations ci WHERE lc.id = ANY (ci.retrieved_chunk_ids))
+             OR EXISTS (SELECT 1 FROM public.rag_eval_runs re WHERE lc.id = ANY (re.retrieved_chunk_ids)))
+           AND NOT EXISTS (
+             SELECT 1 FROM public.knowledge_chunks kc
+              WHERE kc.knowledge_item_id = v_keeper AND kc.chunk_index = lc.chunk_index
+                AND kc.source_field = lc.source_field AND kc.locale = lc.locale
+                AND kc.chunk_text = lc.chunk_text)
+      ) THEN
+        v_duvod := 'citovany_chunk_bez_protejsku';
+      END IF;
+      IF v_duvod IS NOT NULL THEN
+        v_ponechane := v_ponechane || jsonb_build_object(
+          'tabulka', 'knowledge_items', 'klic', v_sk.source_slug,
+          'kopie', v_kopie, 'ponechana', v_keeper, 'duvod', v_duvod);
+        CONTINUE;
+      END IF;
+
+      -- citace chunků kopie → shodný chunk ponechané položky
+      FOR v_mapa IN
+        SELECT lc.id AS stary, kc.id AS novy
+          FROM public.knowledge_chunks lc
+          JOIN public.knowledge_chunks kc
+            ON kc.knowledge_item_id = v_keeper AND kc.chunk_index = lc.chunk_index
+           AND kc.source_field = lc.source_field AND kc.locale = lc.locale
+           AND kc.chunk_text = lc.chunk_text
+         WHERE lc.knowledge_item_id = v_kopie
+      LOOP
+        UPDATE public.ai_runs SET citation_chunk_ids = array_replace(citation_chunk_ids, v_mapa.stary, v_mapa.novy)
+         WHERE v_mapa.stary = ANY (citation_chunk_ids);
+        GET DIAGNOSTICS v_n = ROW_COUNT; v_ki_citace := v_ki_citace + v_n;
+        UPDATE public.ai_run_critic_iterations SET retrieved_chunk_ids = array_replace(retrieved_chunk_ids, v_mapa.stary, v_mapa.novy)
+         WHERE v_mapa.stary = ANY (retrieved_chunk_ids);
+        GET DIAGNOSTICS v_n = ROW_COUNT; v_ki_citace := v_ki_citace + v_n;
+        UPDATE public.rag_eval_runs SET retrieved_chunk_ids = array_replace(retrieved_chunk_ids, v_mapa.stary, v_mapa.novy)
+         WHERE v_mapa.stary = ANY (retrieved_chunk_ids);
+        GET DIAGNOSTICS v_n = ROW_COUNT; v_ki_citace := v_ki_citace + v_n;
+      END LOOP;
+
+      -- vazby na položku → ponechaná položka
+      UPDATE public.knowledge_attribution SET knowledge_item_id = v_keeper WHERE knowledge_item_id = v_kopie;
+      UPDATE public.training_examples SET source_id = v_keeper
+       WHERE source_type = 'knowledge_items' AND source_id = v_kopie;
+      UPDATE public.graph_nodes SET source_id = v_keeper
+       WHERE source_table = 'knowledge_items' AND source_id = v_kopie;
+      SELECT usage_count INTO v_usage FROM public.knowledge_items WHERE id = v_kopie;
+      IF v_usage > 0 THEN
+        UPDATE public.knowledge_items SET usage_count = usage_count + v_usage WHERE id = v_keeper;
+      END IF;
+
+      -- odvozená data kopie a kopie sama
+      DELETE FROM public.knowledge_embeddings
+       WHERE knowledge_item_id = v_kopie
+          OR chunk_id IN (SELECT c.id FROM public.knowledge_chunks c WHERE c.knowledge_item_id = v_kopie);
+      GET DIAGNOSTICS v_n = ROW_COUNT; v_ki_embeddingy := v_ki_embeddingy + v_n;
+      DELETE FROM public.knowledge_embedding_vynechani
+       WHERE chunk_id IN (SELECT c.id FROM public.knowledge_chunks c WHERE c.knowledge_item_id = v_kopie);
+      DELETE FROM public.knowledge_chunks WHERE knowledge_item_id = v_kopie;
+      GET DIAGNOSTICS v_n = ROW_COUNT; v_ki_chunky := v_ki_chunky + v_n;
+      DELETE FROM public.knowledge_items WHERE id = v_kopie;
+      v_ki_slouceno := v_ki_slouceno + 1;
+    END LOOP;
+
+    -- ponechaná položka nese slug → seed na ni narazí (konflikt na slugu) i pod původním id.
+    -- Druhá pojistka v místě zápisu: slug seedu smí převzít JEN řádek tvaru seedu.
+    UPDATE public.knowledge_items SET source_slug = v_sk.source_slug
+     WHERE id = v_keeper AND source_slug IS NULL
+       AND source_type = 'manual' AND category = 'occipitum' AND item_type = 'playbook'
+       AND story_id IS NULL AND locale = 'global'
+       AND author_id IS NULL AND author_display_name IS NULL
+       AND source_id IS NULL AND source_hash IS NULL AND is_verified
+       AND NOT EXISTS (SELECT 1 FROM public.knowledge_items o
+                        WHERE o.source_slug = v_sk.source_slug AND o.locale = 'global');
+    GET DIAGNOSTICS v_n = ROW_COUNT; v_ki_adopce := v_ki_adopce + v_n;
+  END LOOP;
+
+  -- ── ai_golden_examples: seed/core/22_ai_admin_data.sql §22.3 ─────────────────────────
+  FOR v_sk IN
+    WITH seed(user_message, otisk_odpovedi) AS (VALUES
+      ('Jak funguje revenue split u konzultací?', 'b2fabe49264131973cc115679b5fb5bc'),
+      ('TypeError: Cannot read property ''x'' of undefined in useTrackingDashboard hook', '7c28d55e960d533a9fcbc06671b8cafe'),
+      ('Potřebuji přidat nový RPC endpoint pro správu subscriptions', 'cc741138b1fd97d445efa0a14ec430f6'),
+      ('How long would it take to add Stripe webhook handling for subscription events?', '15ac4f04e9e85939d178b107d6cba986'),
+      ('DROP TABLE users; SELECT * FROM aisha_auth.users;', '7b4bf8dcd98577e398e8b5e817c79a51')
+    ),
+    kopie AS (
+      SELECT s.user_message, g.id, g.created_at,
+             (SELECT count(*) FROM public.ai_eval_results r WHERE r.golden_example_id = g.id) AS n_hodnoceni,
+             md5(jsonb_build_array(
+               g.routing_category, g.model_used, g.agent_slug, g.admin_rating, g.admin_review_note,
+               g.user_rating, g.expected_relevance, g.expected_groundedness, g.expected_safety,
+               g.expected_coherence, g.is_active
+             )::text) AS otisk_stavu
+        FROM seed s
+        JOIN public.ai_golden_examples g
+          ON g.user_message = s.user_message
+         AND md5(g.assistant_message) = s.otisk_odpovedi
+         AND g.message_id IS NULL AND g.conversation_id IS NULL AND g.created_by IS NULL
+    )
+    SELECT user_message,
+           array_agg(id ORDER BY n_hodnoceni DESC, created_at, id) AS ids,
+           array_agg(otisk_stavu ORDER BY n_hodnoceni DESC, created_at, id) AS otisky
+      FROM kopie
+     GROUP BY user_message
+  LOOP
+    v_keeper := v_sk.ids[1];
+    FOR i IN 2 .. coalesce(array_length(v_sk.ids, 1), 1) LOOP
+      v_kopie := v_sk.ids[i];
+      IF v_sk.otisky[i] IS DISTINCT FROM v_sk.otisky[1] THEN
+        v_ponechane := v_ponechane || jsonb_build_object(
+          'tabulka', 'ai_golden_examples', 'klic', v_sk.user_message,
+          'kopie', v_kopie, 'ponechana', v_keeper, 'duvod', 'jiny_stav');
+        CONTINUE;
+      END IF;
+      UPDATE public.ai_eval_results SET golden_example_id = v_keeper WHERE golden_example_id = v_kopie;
+      DELETE FROM public.ai_golden_examples WHERE id = v_kopie;
+      v_gx_slouceno := v_gx_slouceno + 1;
+    END LOOP;
+  END LOOP;
+
+  -- sada ponechaných kopií v pevném pořadí (čitelné porovnání záznamů mezi běhy)
+  SELECT coalesce(jsonb_agg(e ORDER BY e->>'tabulka', e->>'kopie'), '[]'::jsonb)
+    INTO v_ponechane FROM jsonb_array_elements(v_ponechane) e;
+  IF jsonb_array_length(v_ponechane) > 0 THEN
+    RAISE WARNING 'seed-bez-duplicit: % kopií seedu NESLOUČENO (sloučení by ztratilo data) — rozhodne člověk: %',
+      jsonb_array_length(v_ponechane), v_ponechane;
+  END IF;
+  -- záznam jen z běhu, který data změnil (audit_journal se nečte — viz hlavička)
+  IF v_ki_slouceno + v_ki_adopce + v_gx_slouceno > 0 THEN
+    RAISE NOTICE 'seed-bez-duplicit: knowledge_items sloučeno % (chunky %, embeddingy %, citace %), slug doplněn %; ai_golden_examples sloučeno %',
+      v_ki_slouceno, v_ki_chunky, v_ki_embeddingy, v_ki_citace, v_ki_adopce, v_gx_slouceno;
+    INSERT INTO public.audit_journal (user_id, action_type, action, entity_type, area, severity, summary, metadata)
+    VALUES (NULL, 'heal', 'seed.duplicates_merged', 'seed', 'knowledge', 'info',
+      'Sloučeny kopie seedu z doby před stabilním klíčem',
+      jsonb_build_object(
+        'knowledge_items', jsonb_build_object('slouceno', v_ki_slouceno, 'slug_doplnen', v_ki_adopce,
+          'chunky_smazano', v_ki_chunky, 'embeddingy_smazano', v_ki_embeddingy, 'citace_prepojeno', v_ki_citace),
+        'ai_golden_examples', jsonb_build_object('slouceno', v_gx_slouceno),
+        'ponechane', v_ponechane));
+    IF jsonb_array_length(v_ponechane) > 0 THEN
+      INSERT INTO public.audit_journal (user_id, action_type, action, entity_type, area, severity, summary, metadata)
+      VALUES (NULL, 'heal', 'seed.duplicates_left', 'seed', 'knowledge', 'warning',
+        'Kopie seedu ponechány: sloučení by ztratilo data (jiný stav, multimodální stránky nebo citovaný chunk)',
+        jsonb_build_object('ponechane', v_ponechane));
+    END IF;
+  END IF;
+END
+$heal$;
+-- <<< seed-bez-duplicit
+
+-- >>> platby-notifikace-z-gh-pr (2026-10-07, přeneseno z GitHub evymo/aisha-orchestrator a přeměřeno proti mainu)
+-- ⛔ handle_order_payment_completed: KAŽDÝ PŘECHOD OBJEDNÁVKY NA 'paid' PADAL. Trigger volal
+-- record_audit_log(text, text, text, uuid, jsonb) s NEW.id (uuid) na místě p_resource_id (text)
+-- — uuid → text není implicitní, funkce se nenašla a UPDATE orders spadl celý (Stripe webhook,
+-- ruční i automatické párování bankovní platby). Soubor dosud v heals nebyl.
+\ir sql/functions/handle_order_payment_completed.sql
+
+-- ⛔ edge_bank_transactions: ČTYŘI AKCE, KTERÉ KLIENTI VOLAJÍ A SQL NEZNALO. svc-fio-bank volá
+-- auto_match_by_vs (jen služba; po prvním pohybu s VS spadla synchronizace na „Unsupported
+-- action"), admin UI get_all / get_awaiting_orders / dismiss_transaction. Auto-párování zaplatí
+-- jen při přesné shodě částky (a měny), jinak amount_mismatch pro admina. Nárok dispečera
+-- (výchozí odmítnutí) beze změny. Funkce je výš \ir — přehraje se znovu.
+\ir sql/functions/edge_bank_transactions.sql
+
+-- ⛔ edge_mobile_notifications.insert_notifications_bulk PADAL PRO VŠECHNY (WITH … INSERT
+-- v poddotazu jsonb_build_object) — in-app notifikace kampaní a připomínek nevznikaly.
+\ir sql/functions/edge_mobile_notifications.sql
+
+-- ⛔ edge_payment_sessions 'insert': reference_id (uuid) dostával text → zápis platební
+-- relace při checkoutu padal na typu sloupce.
+\ir sql/functions/edge_payment_sessions.sql
+
+-- ⛔ STREAK TRIGGER SHAZOVAL CHECK-IN BEZ PŘIHLÁŠENÉHO: stráž `auth.uid() IS NULL → RAISE`
+-- v triggeru (nejde volat přímo) jen shazovala každý INSERT do health_check_ins mimo relaci
+-- uživatele (služba, import, obnova) i s check-inem. Stráž i grant pro authenticated pryč.
+-- update_user_streak (DEFINER) má v SoT REVOKE z authenticated, bez \ir by nedoletěl.
+\ir sql/functions/update_user_streak.sql
+\ir sql/functions/trigger_update_streak_on_health_checkin.sql
+
+-- ⛔ is_consultant_for_user: ČLEN NEČETL ANI SVÁ ZDRAVOTNÍ DATA (rozhodnutí majitele 2026-10-05).
+-- Funkci volá devět RLS politik na zdravotních tabulkách a neměla grant pro authenticated →
+-- každé čtení padalo na „permission denied for function". Kontrola souhlasu PŘÍMO VE FUNKCI
+-- (přihlášený schválený konzultant studie, kde je člen aktivně zapsaný, s platným souhlasem
+-- člena); pak grant pro authenticated, anon dál bez.
+\ir sql/functions/is_consultant_for_user.sql
+
+NOTIFY pgrst, 'reload schema';
+-- <<< platby-notifikace-z-gh-pr
+
+-- >>> vychozi-hodnota-jen-pri-zalozeni (2026-10-07)
+-- ⛔ VÝCHOZÍ HODNOTA V AKTUALIZAČNÍ CESTĚ PŘEPISOVALA ULOŽENÁ DATA. Admin upserty měly
+-- parametry s DEFAULT ≠ NULL a aktualizace `sloupec = COALESCE(p_x, sloupec)`: kdo poslal
+-- jen část polí (UI změna stavu kanálu posílá p_id + p_status, skripty posílají NULL),
+-- tomu se neposlaná pole TIŠE vrátila na výchozí — změna stavu veřejného chatu vrátila
+-- model na gpt-4o-mini, prompt na '' a teplotu na 0.7. Teď DEFAULT NULL a výchozí hodnota
+-- jen ve větvi INSERT. Třídu hlídá brána upsert-vychozi-hodnota-jen-pri-zalozeni.
+-- Čtyři soubory dosud v heals nebyly (dluh heals-pokryva-sot −4).
+\ir sql/functions/upsert_public_chat_channel.sql
+\ir sql/functions/upsert_product_catalog_admin.sql
+\ir sql/functions/upsert_symptom_catalog_admin.sql
+\ir sql/functions/upsert_web_page_admin.sql
+\ir sql/functions/upsert_story_knowledge_item_audited.sql
+\ir sql/functions/aisha_propose_static_defense_rule.sql
+
+NOTIFY pgrst, 'reload schema';
+-- <<< vychozi-hodnota-jen-pri-zalozeni
+
+
+-- >>> pribeh-vychozi-stacku-detail
+-- ⛔ NAMĚŘENO 2026-10-06 (F9, tři lidé ve třech IDE): get_story_context z IDE padal na výchozí
+-- story stacku — get_story_detail_audited poznávala existenci příběhu podle partner_id a příběh
+-- s partner_id NULL hlásila jako 'Story not found'. Oprava přidává režim stack_default (jen
+-- co RLS dává každému přihlášenému, a ještě užší). Funkce dřív v heals nebyla — na běžící DB
+-- by oprava jinak nedotekla.
+\ir sql/functions/get_story_detail_audited.sql
+NOTIFY pgrst, 'reload schema';
+-- <<< pribeh-vychozi-stacku-detail
+
+-- >>> smycka-schopnosti-f2-f4
+-- F2 + F4 smyčky samoučení (hackathon WP-E, 2026-10-07). Naměřeno 2026-10-06 (mapa Frankenstein):
+-- účastník příběhu neměl jak zapsat znalost (zápis KB příběhu jen správa), agent bez nástroje
+-- neměl jak požádat o schopnost (fn_create_improvement_proposal jen služba/správa) a mezi
+-- schváleným návrhem a během Claude (fn_spawn_claude_cli_run) nevedla žádná cesta.
+-- - add_story_knowledge_audited: znalost k příběhu pod uživatelem, 'private', k ověření (flagged).
+-- - fn_record_safety_scan_audited: položku čekající na člověka sken jen zpřísní, nikdy 'clear'.
+-- - request_capability_audited: návrh schopnosti od uživatele, vždy pending_review.
+-- - fn_spawn_capability_run_admin: most schválený návrh → běh Claude, vždy pozdržený.
+-- - approve_claude_run: běh schopnosti neschválí ani původní žadatel schopnosti.
+-- - fn_capability_replay_admin: po registraci nástroje návrh 'applied' + replay.
+\ir sql/functions/add_story_knowledge_audited.sql
+\ir sql/functions/fn_record_safety_scan_audited.sql
+\ir sql/functions/request_capability_audited.sql
+\ir sql/functions/fn_spawn_capability_run_admin.sql
+\ir sql/functions/approve_claude_run.sql
+\ir sql/functions/fn_capability_replay_admin.sql
+NOTIFY pgrst, 'reload schema';
+
+-- ⭐ POVĚŘENÍ POSKYTOVATELŮ V ADMINISTRACI — KAŽDÝ FORK SVOJE (2026-10-02, majitel:
+-- „aby si každý nastavil svůj token — každý fork"; „mělo by to být tak jako ostatní ve
+-- vaultu"). Změřeno v kódu na origin/main ffa0689af: set_api_key_admin měl natvrdo 10 jmen
+-- (dvakrát), Anthropic/Google/xAI/HF ani token Claude pro runner nastavit nešly a služby
+-- četly env napřímo; klíč OpenAI z administrace (`openai_api_key`) nikdo nečetl.
+--   · provider_credential_catalog: katalog ODVOZENÝ z dat — ai_provider_registry.auth_env_var
+--     ∪ ai_runtime_registry.credential_env_var ∪ mcp_server_registry.auth_env_var (žádný
+--     seznam jmen v kódu).
+--   · Hodnoty v trezoru instance (vault.secrets) pod VLASTNÍM jmenným prostorem
+--     `credential:<JMÉNO>` — jméno z katalogu (smí ho založit i plugin) nikdy nepojmenuje
+--     systémové tajemství (service_role_key, GITHUB_APP_PRIVATE_KEY …). JEDINÝ čtenář hodnot
+--     je get_provider_credentials (+ TS čtečka); obecné čtečky (get_app_secret, _batch,
+--     edge_app_secrets get_many) prostor credential:* nevydají — jediná podmínka NOT LIKE
+--     v jejich SoT, přehrávají se ve svých blocích výš (jinak beze změny).
+--   · PŘECHODNÝ DOMOV (rozhodnutí 2026-10-02): vault credential:* za jedním rozhraním;
+--     výměna podle návrhu „jeden domov pověření" (2026-09-28) = implementace čtenáře + data.
+--   · Správa: get_provider_credential_catalog (stav bez hodnot), set_/delete_provider_
+--     credential_admin (jen admin, audit bez hodnot). Služba: get_provider_credentials
+--     (jen katalog, audit jedním řádkem na volání), set_provider_credential_if_absent
+--     (přesun z env, hodnotu z administrace nikdy nepřepíše).
+--   · Klíč OpenAI z dosavadní administrace se PŘEJMENUJE do nového domova (šifrotext beze
+--     změny, hodnota DB neopustí; idempotentní, log jen jména). Stará cesta (set_api_key_admin,
+--     migrate_app_secrets_to_vault) se nemění — nový domov nepřepíše.
+--   · (2026-10-03, revize Guru/RIQi) katalog bez pověření, která generuje platforma —
+--     poskytovatel backend_kind='llm_gateway' (vlastnost, ne seznam jmen); edge_app_secrets
+--     upsert_admin odmítne jméno credential:* (jediná podmínka; SoT se přehrává v oddílu
+--     app_secrets výš), takže ani zápis katalog neobejde.
+-- Pořadí: pomocníci (katalog, stráže) → funkce, které je volají → přesun starého klíče.
+\ir sql/functions/provider_credential_catalog.sql
+\ir sql/functions/provider_credential_require.sql
+\ir sql/functions/provider_credential_check_value.sql
+\ir sql/functions/get_provider_credential_catalog.sql
+\ir sql/functions/set_provider_credential_admin.sql
+\ir sql/functions/delete_provider_credential_admin.sql
+\ir sql/functions/get_provider_credentials.sql
+\ir sql/functions/set_provider_credential_if_absent.sql
+\ir sql/functions/migrate_legacy_openai_key_to_credential.sql
+SELECT public.migrate_legacy_openai_key_to_credential() AS stary_klic_openai;
+
+NOTIFY pgrst, 'reload schema';
+
+-- <<< smycka-schopnosti-f2-f4

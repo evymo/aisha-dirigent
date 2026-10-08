@@ -119,7 +119,7 @@ describe("zápis: jen celá zelená sada a jen beze změny vstupu během běhu",
     expect(najdi(d, klic(zaklad()), { ted: TED + 120000 }).hit).toBe(false);
   });
 
-  test.each([["chybí", undefined], ["prázdný", ""], ["cizí hodnota", "VSE"]])(
+  test.each([["chybí", undefined], ["prázdný", ""], ["cizí hodnota", "VSE"], ["širší cílená dráha", "sirsi"]])(
     "⛔ režim %s → nezapíše se (fail-closed)", (_popis, rezim) => {
       const d = uloziste();
       ulozStart(d, "123", klic(zaklad()), TED);
@@ -178,7 +178,7 @@ describe("hook: cache obaluje CELOU sadu", () => {
     expect(over).toBeGreaterThan(-1);
     expect(over).toBeLessThan(bezKomentaru.indexOf("npm run test:stack:ci"));
     expect(zapisI).toBeGreaterThan(bezKomentaru.indexOf("npm run build"));
-    expect(zapisI).toBeLessThan(bezKomentaru.indexOf("OK Pre-push: vse OK"));
+    expect(zapisI).toBeLessThan(bezKomentaru.indexOf("OK Pre-push:"));
   });
 
   test("--zapis předává režim výběru a ten je v hooku PŘIŘAZENÝ (jinak by šel prázdný)", () => {
@@ -190,20 +190,10 @@ describe("hook: cache obaluje CELOU sadu", () => {
     expect(prirazeni).toBeLessThan(bezKomentaru.indexOf("ci-zelene.mjs --zapis"));
   });
 
-  test("při REZIM != vyber hook nastaví VŠECHNY příznaky výběru na plný běh (jinak by „vse“ v záznamu lhalo)", () => {
-    // příznaky = klíče, které hook bere jen jako true|false (`app|services_change|…)`),
-    // přeložené na proměnné, do kterých je plní (`app) APP=$hodnota`)
-    const klice = [...bezKomentaru.matchAll(/^\s*([a-z0-9_]+(?:\|[a-z0-9_]+)+)\)\s*$/gm)]
-      .map((m) => m[1].split("|"))
-      .find((k) => k.some((x) => x !== "true" && x !== "false")) ?? [];
-    const priznaky = klice.map((k) => bezKomentaru.match(new RegExp(`\\b${k}\\)\\s+([A-Z0-9_]+)=\\$hodnota`))?.[1] ?? `?${k}`);
-    expect(priznaky.length, "v hooku se nenašly příznaky výběru — test by nic neměřil").toBeGreaterThan(3);
-    const zacatek = bezKomentaru.indexOf('if [ "$REZIM" != "vyber" ]; then');
-    expect(zacatek).toBeGreaterThan(-1);
-    const vetev = bezKomentaru.slice(zacatek, bezKomentaru.indexOf("\nelse", zacatek));
-    const chybi = priznaky.filter((v) => !new RegExp(`\\b${v}=${v === "DOCS_ONLY" ? "false" : "true"}\\b`).test(vetev));
-    expect(chybi, "tyhle příznaky ve větvi celé sady nejsou nastavené na plný běh").toEqual([]);
-  });
+  // Že se do cache dostane JEN plná sada (`--rezim vse` jen s AISHA_PREPUSH_VSE=1, cílený
+  // i širší běh zapisují `vyber`/`sirsi`), měří CHOVÁNÍM háku nad podstrčeným node/npm brána
+  // prepush-vyber-je-cileny. Dřívější textová kontrola příznaků zanikla s nimi: od 2026-10-05
+  // hák příznaky směrování nečte, cílenou dráhu skládá scripts/ci/prepush-cilene.mjs.
 
   test("NEZMĚŘENO a červená sada končí DŘÍV, než se k zápisu dojde", () => {
     const zapisI = bezKomentaru.indexOf("ci-zelene.mjs --zapis");

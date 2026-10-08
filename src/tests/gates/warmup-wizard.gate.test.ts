@@ -71,7 +71,9 @@ describe('Step W1 platform warmup wizard', () => {
         expect(next).toBeGreaterThan(start);
         const section = sql.slice(start, next);
         expect(section).toMatch(/SECURITY DEFINER/);
-        expect(section).toMatch(/SET search_path TO 'public'/);
+        // Tady jen to, že cesta hledání JE připnutá. Její tvar (pg_temp poslední) má jeden
+        // domov — bránu definer-search-path; starý tvar tu vyžadovat nesmí žádná brána.
+        expect(section).toMatch(/SET search_path TO /);
       });
 
       test(`${fn}: REVOKE ALL FROM PUBLIC explicit`, () => {
@@ -111,7 +113,13 @@ describe('Step W1 platform warmup wizard', () => {
       const sql = readFileSync(SOT_READ, 'utf-8');
       const section = sql.split(/CREATE OR REPLACE FUNCTION public\.fn_get_platform_warmup_state/)[1] ?? '';
       expect(section).toMatch(/ki\.status = 'active'/);
-      expect(section).toMatch(/quarantine_status.*NOT IN \('flagged', 'quarantined'\)/s);
+      expect(section).toMatch(/public\.knowledge_state_readable\(ki\.quarantine_status\)/);
+      // NULL ani neznámý stav nesmí projít: dřívější tvar `IS NULL OR NOT IN (…)` je pouštěl.
+      const STARY_TVAR = /quarantine_status\s+IS\s+NULL|quarantine_status\s+NOT\s+IN/i;
+      expect(section).not.toMatch(STARY_TVAR);
+      // Kotva zákazu: dřívější podmínka funkce je nález, dnešní není.
+      expect("AND (ki.quarantine_status IS NULL OR ki.quarantine_status NOT IN ('flagged', 'quarantined'))").toMatch(STARY_TVAR);
+      expect('AND public.knowledge_state_readable(ki.quarantine_status)').not.toMatch(STARY_TVAR);
     });
 
     test('write RPC validates step against the 5-value enum', () => {

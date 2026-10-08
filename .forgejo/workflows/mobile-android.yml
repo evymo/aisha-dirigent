@@ -39,6 +39,12 @@ jobs:
   android:
     name: "Android: APK"
     runs-on: ubuntu-latest
+    # Strop 90 min je NEZMĚŘENÝ (úloha zatím neproběhla celá ani jednou) — proto
+    # se nesnižuje naslepo. Instance, jejíž výchozí dráha má strop nižší, si build
+    # ZAPÍNÁ proměnnou repa ANDROID_BUILD=on; bez ní je úloha viditelně skipped,
+    # ne utnutá runnerem uprostřed. Brána lehka-draha-nese-jen-lehke-joby měří
+    # deklaraci instance („nespouští se“) proti téhle podmínce.
+    if: vars.ANDROID_BUILD == 'on'
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4

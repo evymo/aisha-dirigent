@@ -40,6 +40,7 @@ BEGIN
   INTO v_quality_rules
   FROM expert_rules er
   WHERE er.status = 'published'
+    AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, v_user_id)
     AND er.category IN ('quality', 'compliance', 'security', 'patterns')
   LIMIT 25;
 

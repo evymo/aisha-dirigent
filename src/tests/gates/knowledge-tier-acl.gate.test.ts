@@ -53,15 +53,22 @@ describe('#27 Brick6 — tier-ACL', () => {
   it('single-item retrieval (mcp_get_knowledge_item) hard-filters by minimum_tier too', () => {
     // The by-id/slug accessor must not be a tier bypass around the search filter.
     expect(GETITEM, 'mcp_get_knowledge_item must hard-filter by minimum_tier').toMatch(
-      /ki\.minimum_tier IS NULL\s+OR public\.audience_user_meets_tier_requirement\(ki\.minimum_tier, auth\.uid\(\)\)/,
+      /ki\.minimum_tier IS NULL\s+OR public\.audience_user_meets_tier_requirement\(ki\.minimum_tier, v_audience_user\)/,
     );
+    // Publikum určuje stejně jako hledání: služba smí říct, za koho čte; ostatní jsou připnutí na sebe.
+    expect(GETITEM).toMatch(/WHEN v_caller_role = 'service_role' THEN COALESCE\(p_audience_user_id, auth\.uid\(\)\)/);
+    expect(GETITEM).toMatch(/ELSE auth\.uid\(\)/);
+    // A nástroj MCP mu publikum opravdu předá — bez něj by každý uživatel MCP četl jako anonym.
+    expect(ROUTE).toMatch(/rpcService\('mcp_get_knowledge_item', \{\s+p_audience_user_id: audienceUserId,/);
   });
 
   it('the audience user is service-overridable but spoof-safe (authenticated pinned to self)', () => {
     expect(V3).toMatch(/WHEN v_caller_role = 'service_role' THEN COALESCE\(p_audience_user_id, auth\.uid\(\)\)/);
     expect(V3).toMatch(/ELSE auth\.uid\(\)/);
-    // the v2 GLOBAL overload pins to auth.uid() (no arg → no collision with the story signature).
-    expect(V2).toMatch(/GLOBAL overload pins the audience user to auth\.uid\(\)/);
+    // v2 (a single function) resolves the audience user the same way — asserted on the CODE.
+    // (This used to match a comment inside the 9-arg "global" overload, which could never be called.)
+    expect(V2).toMatch(/WHEN v_caller_role = 'service_role' THEN COALESCE\(p_audience_user_id, auth\.uid\(\)\)/);
+    expect(V2).toMatch(/ELSE auth\.uid\(\)/);
   });
 
   it('the live callers pass the end-user id', () => {

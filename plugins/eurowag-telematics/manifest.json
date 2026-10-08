@@ -1,6 +1,6 @@
 {
   "id": "eurowag-telematics",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "name": "Eurowag Telematics",
   "description": "Reads vehicles, drivers, vehicle states and trips from the Eurowag Telematics customer API (the successor to the Webdispečink SOAP endpoint) and stores what the vendor claims on the generic raw lane (audience_sync_source_catalog, source eurowag-telematics) — no positions. It creates no twins: the platform proposes identity bindings (ew_propose_identity) and projects onto twins through CONFIRMED bindings only (ew_project_catalog). Only the CONFIG (endpoint, credentials, schedule) is administrable — the time-series values go straight to the database. Optional by construction: a deployment that never touches Eurowag simply does not install it. See README.md for the ways this API departs from its vendor documentation.",
   "author": "Evymo",

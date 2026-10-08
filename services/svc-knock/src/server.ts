@@ -19,7 +19,7 @@
  * člověk, řeší Keycloak — až za dveřmi.
  */
 import Fastify from 'fastify';
-import { applySecurity, createSafeLogger, createSsrfGuard } from '@aisha/security';
+import { applySecurity, createSafeLogger, createSsrfGuard, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import { createNamespacedRedis } from '@aisha/cache-redis/client';
@@ -59,7 +59,7 @@ export async function buildHealthApp(
   /** Správa nájmu adresy — TÝŽ `door`, který mapu píše. Ne druhé spojení. */
   najem?: { prodluz: (ip: string) => Promise<boolean>; zavri: (ip: string) => Promise<boolean> },
 ) {
-  const app = Fastify({ logger: { level: cfg.logLevel }, trustProxy: true });
+  const app = Fastify({ logger: safeLoggerOptions({ level: cfg.logLevel }), trustProxy: true });
   await applySecurity(app, {
     service: 'svc-knock',
     // Žádný cizí původ: na tohle rozhraní sahá healthcheck kontejneru, ne prohlížeč.
@@ -268,7 +268,9 @@ function guardProUrl(url: string) {
   // proměnnou: dvě místa s toutéž znalostí se rozejdou, a rozejdou se tiše.
   // Chybný tvar adresy se odmítne hned — ne až prvním podnětem, který se ztratí.
   const host = (() => { try { return new URL(url).hostname; } catch { return ''; } })();
-  if (!host) throw new Error(`SPA_ALERT_WEBHOOK není adresa: ${url.slice(0, 60)}`);
+  // Hodnota se do chyby NEopisuje: webhook nese klíč v cestě nebo v dotazu a
+  // chyba končí v logu. Délka stačí k poznání prázdné/useknuté hodnoty.
+  if (!host) throw new Error(`SPA_ALERT_WEBHOOK není adresa (délka ${url.length})`);
   return createSsrfGuard({
     service: 'svc-knock',
     hostAllowlist: [host],

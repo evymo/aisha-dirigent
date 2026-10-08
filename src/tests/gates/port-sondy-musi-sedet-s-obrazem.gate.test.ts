@@ -31,7 +31,8 @@
  *
  * CO BRÁNA TVRDÍ
  * Deklaruje-li Dockerfile `EXPOSE N`, pak služba, která se z něj staví, musí
- * mít `expose: N` a sondu na port N. Odvozeno z repa, žádný seznam.
+ * mít `expose: N` a sondu na port N; deklaruje-li víc portů, `expose` i sonda míří na
+ * některý z nich. Odvozeno z repa, žádný seznam.
  */
 import { describe, it, expect } from "vitest";
 import { readFileSync, existsSync } from "node:fs";
@@ -50,7 +51,7 @@ function composeSoubory(): string[] {
     .filter((p) => /(?:^|\/)docker-compose[^/]*\.ya?ml$/.test(p));
 }
 
-/** `EXPOSE N` z Dockerfilu — víc portů znamená, že brána o té službě mlčí. */
+/** `EXPOSE N…` z Dockerfilu — všechny porty, které obraz deklaruje. */
 function exposeZDockerfilu(cesta: string): number[] {
   if (!existsSync(join(ROOT, cesta))) return [];
   const porty: number[] = [];
@@ -118,21 +119,23 @@ describe("port sondy a `expose` musí sedět s tím, co obraz otvírá", () => {
         const df = typeof build === "string" ? "Dockerfile" : (build.dockerfile ?? "Dockerfile");
         const cesta = zaklad ? join(zaklad, df) : df;
         const porty = exposeZDockerfilu(cesta);
-        // Žádný nebo víc než jeden EXPOSE → brána o té službě nic netvrdí.
-        // Hádat, který z několika portů je „ten hlavní", by vyrábělo nálezy.
-        if (porty.length !== 1) continue;
-        const port = porty[0];
+        // Žádný EXPOSE → brána o té službě nic netvrdí. Víc portů → sonda i `expose` musí
+        // mířit na JEDEN Z NICH. Hádat, který je „ten hlavní", by vyrábělo nálezy; port,
+        // který obraz nedeklaruje vůbec, je vada vždy (2026-10-06: dřív brána u víc portů
+        // mlčela úplně — cosmos, knock i tenký klient lane byly nezměřené).
+        if (porty.length === 0) continue;
+        const otvira = porty.join(", ");
         porovnano++;
 
         for (const e of def?.expose ?? []) {
           const n = parseInt(String(e).split("/")[0], 10);
-          if (Number.isFinite(n) && n !== port) {
-            nalezy.push(`${soubor} → ${jmeno}: expose ${n}, ale ${cesta} otvírá ${port}`);
+          if (Number.isFinite(n) && !porty.includes(n)) {
+            nalezy.push(`${soubor} → ${jmeno}: expose ${n}, ale ${cesta} otvírá ${otvira}`);
           }
         }
         for (const { host, port: p } of portySondy(def?.healthcheck?.test)) {
-          if (p !== port) {
-            nalezy.push(`${soubor} → ${jmeno}: sonda na :${p}, ale ${cesta} otvírá ${port}`);
+          if (!porty.includes(p)) {
+            nalezy.push(`${soubor} → ${jmeno}: sonda na :${p}, ale ${cesta} otvírá ${otvira}`);
           } else if (host === "localhost" && jenIPv4(cesta)) {
             // ⛔ Druhá polovina naměřené vady — ale JEN u obrazu, který je podle
             // vlastní konfigurace IPv4-only. První verze téhle brány pravidlo

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Loader2, Trash2, Search } from "lucide-react";
+import { FileText, Loader2, Trash2, Search } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,15 +79,27 @@ export function GalerieMedii({ open, onOpenChange, onPick }: GalerieMediiProps) 
             <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4" aria-label={t("admin.media.title")}>
               {data.map((m) => {
                 const url = verejnaAdresaMedia(m);
+                // Galerie vybírá OBRÁZEK (editor, titulní obrázek). PDF a jiné soubory
+                // (např. převzaté dokumenty GDPR, 2026-10-03) se ukážou, ale vybrat nejdou —
+                // jinak by výřez přes imgproxy dal rozbitý náhled a do <img> by šlo PDF.
+                const jeObrazek = m.content_type.startsWith("image/");
+                const jmeno = m.original_name ?? m.object_key.split("/").pop() ?? "";
                 return (
                   <li key={m.id} className="group relative overflow-hidden rounded-md border bg-muted">
                     <button
                       type="button"
-                      className="block w-full"
+                      className="block w-full disabled:cursor-not-allowed disabled:opacity-60"
                       onClick={() => onPick(url, m)}
-                      title={m.original_name ?? m.object_key}
+                      disabled={!jeObrazek}
+                      title={jeObrazek ? (m.original_name ?? m.object_key) : t("admin.media.notImage", { name: jmeno })}
                     >
-                      <img src={vyrezObrazku(url, { w: 240, h: 160 }) ?? url} alt={m.original_name ?? ""} className="aspect-[3/2] w-full object-cover" loading="lazy" />
+                      {jeObrazek ? (
+                        <img src={vyrezObrazku(url, { w: 240, h: 160 }) ?? url} alt={m.original_name ?? ""} className="aspect-[3/2] w-full object-cover" loading="lazy" />
+                      ) : (
+                        <span className="flex aspect-[3/2] w-full items-center justify-center bg-background" aria-hidden="true">
+                          <FileText className="h-10 w-10 text-muted-foreground" />
+                        </span>
+                      )}
                       <span className="block truncate px-2 py-1 text-left text-xs">{m.original_name ?? m.object_key.split("/").pop()}</span>
                       <span className="block px-2 pb-1 text-left text-[11px] text-muted-foreground">{t("admin.media.bytes", { kb: Math.max(1, Math.round(m.bytes / 1024)) })}</span>
                     </button>

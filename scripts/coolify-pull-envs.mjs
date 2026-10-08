@@ -37,8 +37,15 @@
  *   - The vault is written mode 0600.
  *
  * Usage:
- *   node scripts/coolify-pull-envs.mjs [--dry-run] [--out=<path>]
+ *   node scripts/coolify-pull-envs.mjs [--dry-run | --check] [--out=<path>]
  * Exit codes: 0 ok · 1 API/IO failure · 2 no managed secrets found
+ *
+ * `--check` — KONTROLA před konvergencí existující instance (cold-start
+ * `--skip-create`, krok 2): nic nezapisuje a odpoví, jestli trezor odpovídá tomu,
+ * s čím stack běží. Krok 2 bere hodnoty z trezoru a krok 4 je pošle do Coolify —
+ * trezor starší než živá hodnota by tajemství TIŠE přetočil zpátky.
+ *   0 shoda · 3 ROZCHOD (spravované tajemství živě jiné nebo jen živě) ·
+ *   4 NEZMĚŘENO (env některé aplikace nešlo přečíst) · 1/2 jako výš.
  */
 import { readFileSync, writeFileSync, existsSync, chmodSync } from "node:fs";
 import { resolve, dirname } from "node:path";
@@ -51,10 +58,12 @@ import { DERIVED_NETWORK_KEYS } from "./lib/derive-subnets.mjs";
 import { createProjectScope } from "./lib/coolify-project-scope.mjs";
 import { readConfigKey } from "./lib/config-env-files.mjs";
 import { isDirectRun } from "./lib/cli-entry.mjs";
+import { odUvozovkuj } from "./lib/env-hodnota.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
-const DRY_RUN = argv.includes("--dry-run");
+const CHECK = argv.includes("--check");
+const DRY_RUN = argv.includes("--dry-run") || CHECK;
 const OUT = (argv.find((a) => a.startsWith("--out=")) || "").split("=")[1] || resolve(ROOT, ".env-prod-backup");
 
 const fp = (v) => (v ? createHash("sha256").update(String(v)).digest("hex").slice(0, 12) : "empty");
@@ -157,7 +166,9 @@ function parseVaultKeys(path) {
   const lines = readFileSync(path, "utf8").split(/\r?\n/);
   for (const line of lines) {
     const m = line.match(/^([A-Za-z_][A-Za-z0-9_]*)=(.*)$/);
-    if (m) { keys.add(m[1]); values.set(m[1], m[2].trim().replace(/^['"]|['"]$/g, "")); }
+    // Hodnota jako po `source` (escapy \\ \" \$ \` v "…"), ne jen odříznuté uvozovky —
+    // jinak by hodnota s escapem vyšla jako falešný rozchod se živou.
+    if (m) { keys.add(m[1]); values.set(m[1], odUvozovkuj(m[2].trim())); }
   }
   return { keys, values, lines };
 }
@@ -168,17 +179,21 @@ async function main() {
   const scope = await createProjectScope(store.raw); // fail-loud without COOLIFY_PROJECT_UUID
   const apps = scope.filter(await store.listAishaApps());
   if (apps.length === 0) fatal("no project-scoped aisha-* apps found — refusing to pull");
-  process.stdout.write(`Reverse-sync from ${apps.length} project apps → ${OUT}${DRY_RUN ? " (dry-run)" : ""}\n`);
+  process.stdout.write(`Reverse-sync from ${apps.length} project apps → ${OUT}${CHECK ? " (kontrola)" : DRY_RUN ? " (dry-run)" : ""}\n`);
 
   // Union all production key→realValue across the project's apps.
   const pulled = new Map(); // key → value
   const conflicts = new Set();
+  const nezmerene = [];
   for (const app of apps) {
     let envs;
     try {
       envs = await store.getAppEnv(app.uuid);
     } catch (err) {
-      process.stderr.write(`  WARN ${app.name}: env fetch failed (${err.message}) — skipping\n`);
+      // Zpětná synchronizace před wipem je best-effort; KONTROLA ne — aplikace, jejíž env
+      // nejde přečíst, je nezměřená, a „shoda“ by bez ní byla tvrzení bez měření.
+      process.stderr.write(`  WARN ${app.name}: env fetch failed (${err.message}) — ${CHECK ? "NEZMĚŘENO" : "skipping"}\n`);
+      nezmerene.push(app.name);
       continue;
     }
     if (!Array.isArray(envs)) continue;
@@ -262,6 +277,21 @@ async function main() {
     process.stdout.write(`  - ${key} (odvozený, fp=${fp(existingValues.get(key))}) — odvození si ho spočítá samo\n`);
   }
 
+  if (CHECK) {
+    if (nezmerene.length) {
+      process.stdout.write(`NEZMĚŘENO: env ${nezmerene.length} aplikací nešlo přečíst (${nezmerene.join(", ")}) — shodu trezoru se živým stackem nevím\n`);
+      process.exit(4);
+    }
+    if (toAdd.length || refreshed.length) {
+      process.stdout.write(
+        `ROZCHOD: trezor ${OUT} neodpovídá živému stacku — ${refreshed.length} spravovaných tajemství živě jiných, ` +
+          `${toAdd.length} jen živě (výpis výš, jen otisky)\n`,
+      );
+      process.exit(3);
+    }
+    process.stdout.write("SHODA: spravovaná tajemství v trezoru odpovídají živému stacku\n");
+    return;
+  }
   if (DRY_RUN) { process.stdout.write("dry-run: vault not modified\n"); return; }
   if (toAdd.length === 0 && refreshed.length === 0 && toRemove.length === 0) {
     process.stdout.write("vault already complete — no changes\n");

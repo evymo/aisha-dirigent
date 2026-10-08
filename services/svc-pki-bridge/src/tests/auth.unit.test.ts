@@ -213,16 +213,16 @@ describe('verifyToken — jose failure → AuthError(401) with diagnostic detail
         jose_code: 'ERR_JWT_EXPIRED',
         expected_iss: 'https://auth.backend.id3a.cz/realms/aisha',
         expected_aud: 'pki-proxy',
-        token_iss: 'https://auth.backend.id3a.cz/realms/aisha',
-        token_aud: 'pki-proxy',
-        token_azp: 'aisha-pki-bootstrap',
-        token_kid: 'old-key',
-        token_alg: 'RS256',
+        presented_iss: 'https://auth.backend.id3a.cz/realms/aisha',
+        presented_aud: 'pki-proxy',
+        presented_azp: 'aisha-pki-bootstrap',
+        presented_kid: 'old-key',
+        presented_alg: 'RS256',
       });
     }
   });
 
-  it('wrong-audience failure: token_aud shows what was actually presented', async () => {
+  it('wrong-audience failure: presented_aud shows what was actually presented', async () => {
     mockDecodeJwt.mockReturnValue({ iss: 'x', aud: 'wrong-audience', azp: 'svc' });
     mockDecodeProtectedHeader.mockReturnValue({ alg: 'RS256', kid: 'k1' });
     const joseErr = Object.assign(new Error('audience claim mismatch'), {
@@ -238,7 +238,7 @@ describe('verifyToken — jose failure → AuthError(401) with diagnostic detail
       expect(err.detail).toMatchObject({
         jose_claim: 'aud',
         jose_reason: 'mismatch',
-        token_aud: 'wrong-audience',
+        presented_aud: 'wrong-audience',
         expected_aud: 'pki-proxy',
       });
     }
@@ -255,7 +255,7 @@ describe('verifyToken — jose failure → AuthError(401) with diagnostic detail
     try { await verifyToken('Bearer not.a.jwt'); } catch (e) {
       const err = e as { statusCode: number; detail: Record<string, unknown> };
       expect(err.statusCode).toBe(401);
-      // Decode threw → inspectedClaims is empty object → token_iss is undefined,
+      // Decode threw → inspectedClaims is empty object → presented_iss is undefined,
       // but the error envelope still goes out without crashing.
       expect(err.detail.jose_code).toBe('ERR_JWS_INVALID');
     }
@@ -294,8 +294,55 @@ describe('verifyToken — jose failure → AuthError(401) with diagnostic detail
       expect(err.message).not.toContain('evil-audience-value');
       // The structured detail IS available for the SERVER LOG (operator-only)
       expect(err.detail).toBeDefined();
-      expect(err.detail?.token_aud).toBe('evil-audience-value');
+      expect(err.detail?.presented_aud).toBe('evil-audience-value');
       expect(err.detail?.jose_message).toBe('aud mismatch internal');
     }
+  });
+});
+
+// ── Diagnostika nesouladu se v logu ZOBRAZÍ ──────────────────
+// Logger služby (safeLoggerOptions) redaktuje klíče podle JMÉNA. Klíče
+// `token_aud`, `token_sig_fp`… by z diagnostiky nesouladu issuer/audience
+// nechaly jen expected_*. Test loguje AuthError tvarem server.ts
+// (`app.log.warn({ msg, ...detail }, 'auth rejected')`) a čte zápis.
+
+describe('AuthError.detail — readable in the service log', () => {
+  it('presented_* claims and fingerprints survive the redacting logger; a token_* key would not', async () => {
+    const { Writable } = await import('node:stream');
+    const { default: pino } = await import('pino');
+    const { safeLoggerOptions } = await import('@aisha/security');
+    const kusy: string[] = [];
+    const proud = new Writable({ write(k: Buffer, _e, hotovo) { kusy.push(k.toString('utf8')); hotovo(); } });
+    const log = pino(safeLoggerOptions({ level: 'info' }), proud);
+
+    mockDecodeJwt.mockReturnValue({ iss: 'https://issuer.example.test/realms/r', aud: 'wrong-audience', azp: 'svc-client' });
+    mockDecodeProtectedHeader.mockReturnValue({ alg: 'RS256', kid: 'kid-1' });
+    mockJwtVerify.mockRejectedValue(Object.assign(new Error('unexpected "aud" claim value'), {
+      code: 'ERR_JWT_CLAIM_VALIDATION_FAILED', claim: 'aud', reason: 'check_failed',
+    }));
+    const { verifyToken, AuthError } = await import('../auth.js');
+    const err = await verifyToken('Bearer aaa.bbb.ccc').catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(AuthError);
+    const detail = (err as InstanceType<typeof AuthError>).detail ?? {};
+
+    log.warn({ msg: (err as Error).message, ...detail }, 'auth rejected');
+    const radek = JSON.parse(kusy.join('').trim().split('\n').pop() as string) as Record<string, unknown>;
+    expect(radek).toMatchObject({
+      presented_iss: 'https://issuer.example.test/realms/r',
+      presented_aud: 'wrong-audience',
+      presented_azp: 'svc-client',
+      presented_kid: 'kid-1',
+      presented_alg: 'RS256',
+      expected_aud: 'pki-proxy',
+      jose_claim: 'aud',
+    });
+    expect(radek.sig_fp).toBe(detail.sig_fp);
+    expect(radek.kid_fp).toBe(detail.kid_fp);
+    expect(String(radek.sig_fp)).toMatch(/^[0-9a-f]{12}\/\d+$/);
+
+    // kotva: proč přejmenování — tentýž logger klíč se slovem token skryje
+    log.warn({ token_aud: 'wrong-audience' }, 'stary tvar');
+    const stary = JSON.parse(kusy.join('').trim().split('\n').pop() as string) as Record<string, unknown>;
+    expect(stary.token_aud).toBe('[redacted]');
   });
 });

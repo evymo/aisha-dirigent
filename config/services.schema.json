@@ -40,6 +40,11 @@
           "description": "Jméno služby v topologii. Z něj se skládá vnitřní i veřejná adresa. Služba s vnitřní adresou ho MUSÍ mít — bez něj by derivace neměla co vydat a spadla by (dřív tiše propadla na plochou adresu <kontejner>:<port>)."
         },
         "public": { "type": "boolean", "description": "Má služba veřejnou tvář?" },
+        "compose_gpu": {
+          "type": "string",
+          "pattern": "^docker-compose\\.",
+          "description": "Compose služby, když stojí na slotu s has_gpu (sdílený GPU uzel): tenký stack forku místo obsahu, který patří na vlastní uzel instance. Jediný domov volby — derivace (topologie), manifest instance i krok 0 doktora čtou odsud; na slotu s has_gpu smí služba s `compose_gpu` nasazovat JEN jej, jinak krok 0 ZASTAVÍ."
+        },
         "compose": {
           "type": "string",
           "pattern": "^docker-compose\\.",
@@ -47,8 +52,8 @@
         },
         "placement": {
           "type": "string",
-          "enum": ["frontend", "backend", "experimental"],
-          "description": "Role serveru, na kterém služba bydlí. Konkrétní stroj přiřazuje profil."
+          "enum": ["frontend", "backend", "experimental", "gpu"],
+          "description": "Role serveru (slot), na kterém služba bydlí. Konkrétní stroj přiřazuje profil. Sloty mají JEDEN domov — klíče coolify/servers.json kromě build serveru; tenhle výčet je opis, který měří brána sloty-maji-jeden-seznam."
         },
         "depends_on": {
           "type": "array",
@@ -85,9 +90,35 @@
           "description": "Opt-in lane: služba se nasadí jen když je proměnná neprázdná."
         },
         "ephemeral": { "type": "boolean", "description": "Jednorázový job, ne dlouhoběžící služba." },
+        "cesty_hostitele": {
+          "type": "object",
+          "additionalProperties": { "type": "string", "minLength": 20 },
+          "description": "POJMENOVANÁ VÝJIMKA: na slotu s GPU smí služba připojit tyto cesty hostitele (klíč = přesný zdroj bindu, hodnota = důvod). Platí jen s compose z katalogu. Kritické cesty (sokety, /var/lib/docker, /proc, /sys, /dev, /etc a jejich předci) výjimkou otevřít nejde (lib/umisteni-slotu.mjs)."
+        },
+        "schopnosti": {
+          "type": "object",
+          "propertyNames": { "pattern": "^(CAP_)?[A-Z_]+$" },
+          "additionalProperties": { "type": "string", "minLength": 20 },
+          "description": "POJMENOVANÁ VÝJIMKA: na slotu s GPU smí služba přidat tyto schopnosti (klíč = cap_add, hodnota = důvod) navíc k NET_ADMIN. Platí jen s compose z katalogu. Schopnosti jádra, hodin, paměti a procesů uzlu (NIKDY_SCHOPNOSTI: ALL, SYS_ADMIN, SYS_MODULE, SYS_PTRACE, SYS_RAWIO, SYS_BOOT, SYS_TIME, …) výjimkou otevřít nejde (lib/umisteni-slotu.mjs)."
+        },
+        "socket_dockeru": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "additionalProperties": { "type": "string", "minLength": 20 },
+          "description": "POJMENOVANÁ VÝJIMKA: na slotu s GPU smí služba compose (klíč = služba, hodnota = důvod) připojit socket démona Dockeru — jen pro čtení, bez sítě (network_mode: none) a bez přidaných schopností. Patří jen proxy socketu operátorské vrstvy (hlídač členství čte Docker API přes ni). Platí jen s compose z katalogu (lib/umisteni-slotu.mjs)."
+        },
+        "sit_hostitele": {
+          "type": "string",
+          "minLength": 20,
+          "description": "POJMENOVANÁ VÝJIMKA: služba smí na slotu s GPU běžet v síti hostitele (network_mode: host). Hodnota = důvod. Patří jen operátorské službě uzlu (firewall hostitele); tenký stack forku ji nikdy nemá (lib/umisteni-slotu.mjs)."
+        },
         "external_connectivity": {
           "enum": ["egress", "ingress", "both"],
           "description": "Služba se DOTÝKÁ VNĚJŠKU — a v kterém směru. `egress` = volá ven sama (registry tahá obrazy). `ingress` = přijímá zvenčí (edge obsluhuje veřejnost). CHYBÍ-LI, služba na vnějšek nesahá a MÁ BÝT NEVIDITELNÁ: dosažitelná jen meshem, nikdy jinudy. ⛔ Doplněno 2026-08-22: schéma mělo 11 síťových vlastností a všechny popisovaly, JAK JE SLUŽBA DOSAŽITELNÁ — o směru, kterým se připojuje ona sama, model nevěděl nic. Bez toho se nedalo vyjmenovat, co se vnějšku dotýkat MUSÍ, a tedy ani vynutit, že zbytek je skrytý; třídilo se podle 'kdo koho potřebuje' a rostl seznam výjimek. Majitel 2026-08-22: 'kc můžeme mít na privátní síti, protože nepotřebuje se vůbec nikam připojovat; to musí jen registry a později edge' + 'jde mi o to to vše dělat de facto skrytě, ve smyslu bezpečnosti'."
+        },
+        "mesh_most_pro": {
+          "type": "string",
+          "description": "MOST modelového meshe (varianta C, krok C4): id služby, jejíž jméno v HLAVNÍM meshi tahle služba drží, když ta stojí na slotu modelového meshe (has_gpu — do hlavního meshe nepatří). Trasy mesh-ingressu i záznam mesh DNS té služby pak míří na peer mostu, takže její konzumenti (SVC_MODEL_URL…) se nemění. Model na GPU slotu bez právě jednoho mostu = výjimka derivace (žádný návrat na CPU, MM8)."
         },
         "mesh_bootstrap_dependency": {
           "type": "boolean",

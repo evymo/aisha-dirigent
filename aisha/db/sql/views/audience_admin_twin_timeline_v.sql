@@ -70,12 +70,13 @@ WHERE te.twin_id IS NOT NULL
 COMMENT ON VIEW public.audience_admin_twin_timeline_v IS
   'Typed records and ingested events on one twin''s axis (subject twin, or the account bound to it). Filter by twin_id for the extranet twin detail (ADR-003).';
 
--- ⛔ ŽÁDNÝ PŘÍMÝ GRANT KLIENTSKÝM ROLÍM (nález 2026-10-04). Pohled se čte právy
--- VLASTNÍKA, tedy mimo RLS story_entries a twin_events — včetně interních
--- záznamů (`is_internal`) a obsahu e-mailů z ingestu. S GRANT SELECT pro
--- `authenticated` si ho kdokoli přihlášený přečetl celý přes /rest/v1/,
--- a obešel tak stráž is_admin_or_staff() v get_audience_view_timeline_block.
--- Jediná cesta ke čtení je ta DEFINER funkce; REVOKE ALL i z authenticated,
--- protože na běžící DB žije explicitní grant z heals i default privileges.
+-- ⛔ Pohled s právy VLASTNÍKA (bez security_invoker) čte podklad MIMO jeho RLS.
+-- Čte se JEN přes DEFINER blokové funkce get_audience_view_*_block (stráž
+-- is_admin_or_staff + jmenný prostor audience_admin_*_v). Přímý grant klientské
+-- roli tu stráž obcházel přes /rest/v1/ (naměřeno na čisté DB main 0f992f647:
+-- authenticated SELECT, u followup_queue/twin_directory i DML z default privileges).
+-- REVOKE i z anon/authenticated: na běžící DB žijí explicitní granty z dřívějších
+-- bloků heals a z ALTER DEFAULT PRIVILEGES při každém DROP+CREATE pohledu.
+-- Třídu hlídá src/tests/db/pohled-s-pravy-vlastnika-bez-klientskeho-grantu.runtime.test.ts.
 REVOKE ALL ON public.audience_admin_twin_timeline_v FROM PUBLIC, anon, authenticated;
 GRANT SELECT ON public.audience_admin_twin_timeline_v TO service_role;

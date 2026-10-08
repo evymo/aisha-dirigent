@@ -20,7 +20,6 @@ const { mockRpcService, mockIssueBrokerToken, fake } = vi.hoisted(() => ({
 
 vi.mock('../db.js', () => ({ rpcService: mockRpcService }));
 vi.mock('../broker-token.js', () => ({ issueBrokerToken: mockIssueBrokerToken }));
-vi.mock('../netbird-client.js', () => ({ createEphemeralKey: vi.fn(), revokePeer: vi.fn() }));
 // Dynamic caps resolved to a fixed value — the cap (3) is what this test enforces.
 vi.mock('../runtime-config.js', () => ({
   getRunnerCaps: vi.fn(async () => ({
@@ -57,7 +56,6 @@ vi.mock('../config.js', () => ({
     runnerBackend: 'docker',
     pluginBrokerUrl: 'http://broker:3000',
     agentClaudeImage: 'aisha-agent-claude:test',
-    netbirdEnabled: false,
     claudeCliTimeoutMs: 1_000,
     claudePollGraceSeconds: 10,
     claudePollEnabled: true,

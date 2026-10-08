@@ -12,6 +12,7 @@
     "docker-compose.coolify-llm-gateway.yml": 2,
     "docker-compose.coolify-matrix.yml": 6,
     "docker-compose.coolify-n8n.yml": 2,
+    "docker-compose.coolify-netbird-model.yml": 2,
     "docker-compose.coolify-netbird.yml": 2,
     "docker-compose.coolify-openclaw.yml": 2,
     "docker-compose.coolify-pki.yml": 4,

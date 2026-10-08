@@ -4,7 +4,7 @@
  */
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { verifyToken, isAdminOrStaff, AuthError } from '../auth.js';
-import { config } from '../config.js';
+import { credentials } from '../lib/credentials.js';
 
 interface TranslateBody {
   texts: Array<{ key?: string; text: string }>;
@@ -34,7 +34,8 @@ export async function translateRoutes(app: FastifyInstance): Promise<void> {
       return reply.code(400).send({ error: 'Max 100 texts per request' });
     }
 
-    if (!config.openaiApiKey) {
+    const openaiApiKey = await credentials().get('OPENAI_API_KEY');
+    if (!openaiApiKey) {
       return reply.code(503).send({ error: 'Translation service not configured' });
     }
 
@@ -52,7 +53,7 @@ export async function translateRoutes(app: FastifyInstance): Promise<void> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.openaiApiKey}`,
+        'Authorization': `Bearer ${openaiApiKey}`,
       },
       body: JSON.stringify({
         model: process.env.TRANSLATE_MODEL ?? 'gpt-4o-mini',

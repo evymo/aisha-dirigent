@@ -2,14 +2,14 @@
 /**
  * Guard: no developer / account codes in the repo.
  *
- * Blocks Apple Team IDs, App Store Connect key ids, the personal account email,
+ * Blocks Apple Team IDs, App Store Connect key ids, personal account emails,
  * and real `AuthKey_<id>.p8` filenames from entering git. These must come from
  * the environment (e.g. `${env:APPLE_TEAM_ID}`, `$APPLE_TEAM_ID`) or use a
  * neutral placeholder (`XXXXXXXXXX`) — never a literal in a tracked file.
  *
  * The detection regexes are written so env-driven / placeholder forms do NOT
- * match, so there is no allowlist to maintain beyond the two files that contain
- * these patterns as detection strings (this script + its gate test).
+ * match. The rules are STRUCTURAL — this file names no real identifier; exact
+ * values live outside the tree (see RULES below and config/dev-codes.json.example).
  *
  * Usage:
  *   node scripts/verify-no-dev-codes.mjs            # scan all tracked files (CI / gate)
@@ -24,7 +24,9 @@ import { execFileSync } from "node:child_process";
 import { readFileSync, existsSync, statSync } from "node:fs";
 import { isDirectRun } from "./lib/cli-entry.mjs";
 
-// The only files that legitimately contain these literals (as detection strings).
+// The guard and its gate test describe the SHAPES (with fictional values), so the structural rules do
+// not apply to them. The EXACT layer does: until 2026-10-03 a blanket skip of these two files was the
+// very place where the real values lived — the guard never read itself.
 export const SELF_ALLOW = new Set([
   "scripts/verify-no-dev-codes.mjs",
   "src/tests/gates/no-developer-account-codes.gate.test.ts",
@@ -32,18 +34,37 @@ export const SELF_ALLOW = new Set([
 
 // Each regex is crafted to NOT match env refs (`${env:…}`, `$VAR`, `process.env`)
 // or the `XXXXXXXXXX` placeholder.
+//
+// ⛔ ŽÁDNÁ SKUTEČNÁ HODNOTA V TOMHLE SOUBORU (2026-10-03). Do té doby tu jako detekční
+// řetězce stály přesně ty hodnoty, které má stráž držet mimo git: Apple Team ID, id klíče
+// App Store Connect a osobní adresy — a soubor šel do veřejného snímku. Seznam zakázaných
+// hodnot ve veřejném repu je sám únikem (táž třída, jakou `tenant-leak-detect` řeší
+// u jmen nájemců). Proto dvě vrstvy:
+//   1. STRUKTURÁLNÍ (vždy, veřejně bezpečná): pravidla níž poznají TVAR — nejmenují nikoho.
+//   2. PŘESNÁ (volitelná, soukromá): doslovné hodnoty z `AISHA_DEV_CODE_SENTINELS`
+//      (oddělené čárkou) nebo z gitignorovaného `config/dev-codes.json` — viz
+//      `config/dev-codes.json.example`. Ve veřejném repu a ve forcích chybí; že chybí,
+//      stráž řekne ve výpisu (žádné tiché přeskočení).
+
+/** Adresy rolí na doméně dodavatele — funkce, ne člověk. Cokoli jiného na té doméně je osobní účet. */
+const ROLE_ALIASES = ["admin", "ops", "dev", "pki", "dirigent", "security", "noreply", "legal"];
+
 export const RULES = [
   {
     // Personal / named account emails. NOT a blanket ban — functional service
-    // addresses (admin@, ops@, dev@, pki@, dirigent@, security@, noreply@) and
+    // addresses (admin@, ops@, dev@, pki@, dirigent@, security@, noreply@, legal@) and
     // the LEGAL DPO / privacy contact (a role address in the privacy policy) are kept.
-    // The platform-admin identity is now env-driven (render-realm-and-start.sh),
-    // so the personal accounts that used to be baked in can be enforced-out here.
+    // Structural: any local part at the vendor domain that is not a role alias —
+    // the rule names the roles, never the people.
     name: "personal account email",
-    re: /\b(?:info|zdenek|zdenbe)@evymo\.com\b|\bpremma@gmail\.com\b/,
+    re: new RegExp(`\\b(?!(?:${ROLE_ALIASES.join("|")})@)[A-Za-z0-9._-]+@evymo\\.com\\b`),
   },
-  { name: "Apple Team ID (leaked literal)", re: /\b8N4327J6T3\b/ },
-  { name: "App Store Connect key id (leaked literal)", re: /\b5PJ3Y2UVV9\b/ },
+  {
+    // A personal mailbox at a free-mail provider — also when written inside a regex
+    // (escaped dot), which is how the previous version of this very file carried one.
+    name: "personal free-mail address",
+    re: /\b[A-Za-z0-9._%+-]+@(?:gmail|googlemail|seznam|centrum|yahoo|hotmail|outlook|icloud|protonmail)\\?\.(?:com|cz|net)\b/,
+  },
   {
     name: "hardcoded Apple Team ID",
     // `KEY = ABCDE12345` but not `KEY = ${env:…}` / `$VAR` (those aren't 10 upper-alnum).
@@ -63,18 +84,58 @@ export const RULES = [
   },
 ];
 
+/**
+ * PŘESNÁ vrstva: doslovné hodnoty, které drží provozovatel MIMO strom. Vrací pole řetězců
+ * (prázdné, když vrstva není nastavená). Krátké hodnoty se odmítnou — sentinel o třech
+ * znacích by hlásil půl repa a někdo by ho „pro klid" smazal.
+ */
+export function loadSentinels(env = process.env, root = process.cwd()) {
+  const out = [];
+  for (const v of String(env.AISHA_DEV_CODE_SENTINELS ?? "").split(/[,\n]/)) if (v.trim()) out.push(v.trim());
+  const soubor = `${root}/config/dev-codes.json`;
+  if (existsSync(soubor)) {
+    const data = JSON.parse(readFileSync(soubor, "utf8"));
+    for (const v of data.sentinels ?? []) if (typeof v === "string" && v.trim()) out.push(v.trim());
+  }
+  const kratke = out.filter((v) => v.length < 8);
+  if (kratke.length) throw new Error(`dev-code sentinel kratší než 8 znaků (${kratke.length}×) — příliš obecný, hlásil by všude`);
+  return [...new Set(out)];
+}
+
+const escapeRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+/** Sentinely → pravidla. Hodnota se hledá jako celé slovo; jméno pravidla ji NEVYPISUJE. */
+export function sentinelRules(sentinels) {
+  return sentinels.map((v, i) => ({ name: `private dev-code sentinel #${i + 1}`, re: new RegExp(`(?<![A-Za-z0-9])${escapeRe(v)}(?![A-Za-z0-9])`) }));
+}
+
 const BINARY =
   /\.(png|jpe?g|gif|webp|ico|svg|pdf|zip|gz|tgz|bz2|woff2?|ttf|otf|eot|mp[34]|wav|webm|p8|p12|pem|key|crt|jks|keystore|lockb?)$/i;
 
-/** Return the rule names that match any line of `text`. */
-export function scanText(text) {
+let nacteneSentinely = null;
+/** Pravidla pro tenhle běh: strukturální (pokud platí) + přesná vrstva (načtená jednou). */
+function pravidla(sentinels, structural) {
+  if (!sentinels && nacteneSentinely === null) nacteneSentinely = loadSentinels();
+  return [...(structural ? RULES : []), ...sentinelRules(sentinels ?? nacteneSentinely)];
+}
+
+/**
+ * Return the rule names that match any line of `text`. `sentinels` overrides the private layer (tests);
+ * `structural: false` applies the exact layer alone.
+ */
+export function scanText(text, { sentinels, structural = true } = {}) {
   const hits = [];
+  const rules = pravidla(sentinels, structural);
   text.split("\n").forEach((line, i) => {
-    for (const rule of RULES) {
+    for (const rule of rules) {
       if (rule.re.test(line)) hits.push({ line: i + 1, rule: rule.name, text: line.trim() });
     }
   });
   return hits;
+}
+
+/** Scan one tracked file: every file gets the exact layer; SELF_ALLOW is exempt from the shapes only. */
+export function scanFile(file, text, opts = {}) {
+  return scanText(text, { ...opts, structural: !SELF_ALLOW.has(file) });
 }
 
 function listFiles(staged) {
@@ -125,11 +186,12 @@ const MAX_TEXT_BYTES = 32_000_000;
  */
 export function scanRepoDetailed({ staged = false } = {}) {
   const offenders = [];
+  if (nacteneSentinely === null) nacteneSentinely = loadSentinels();
   const modes = trackedModes();
-  const coverage = { scanned: 0, submodules: [], symlinks: [], oversize: [], unreadable: [] };
+  const coverage = { scanned: 0, submodules: [], symlinks: [], oversize: [], unreadable: [], sentinels: nacteneSentinely.length };
 
   for (const file of listFiles(staged)) {
-    if (SELF_ALLOW.has(file) || BINARY.test(file)) continue;
+    if (BINARY.test(file)) continue;
     const mode = modes.get(file);
     if (mode === "160000") { coverage.submodules.push(file); continue; }
     if (!existsSync(file)) continue;
@@ -143,7 +205,7 @@ export function scanRepoDetailed({ staged = false } = {}) {
       continue;
     }
     coverage.scanned += 1;
-    for (const hit of scanText(text)) {
+    for (const hit of scanFile(file, text)) {
       offenders.push(`  ${file}:${hit.line}  [${hit.rule}]  ${hit.text.slice(0, 100)}`);
     }
   }
@@ -193,6 +255,9 @@ if (isDirectRun(import.meta.url)) {
     `✓ no developer/account codes in ${staged ? "staged" : "tracked"} files ` +
       `— prohlédnuto ${coverage.scanned}; přeskočeno ${coverage.submodules.length} submodul(ů) ` +
       `(obsah v jejich vlastních repech), ${coverage.symlinks.length} symlink(ů) ` +
-      `(cíle skenovány zvlášť), ${coverage.oversize.length} nad ${MAX_TEXT_BYTES / 1e6} MB`,
+      `(cíle skenovány zvlášť), ${coverage.oversize.length} nad ${MAX_TEXT_BYTES / 1e6} MB; ` +
+      (coverage.sentinels
+        ? `přesná vrstva: ${coverage.sentinels} soukromých sentinelů`
+        : `přesná vrstva NENASTAVENA — měřila jen strukturální pravidla (config/dev-codes.json.example)`),
   );
 }

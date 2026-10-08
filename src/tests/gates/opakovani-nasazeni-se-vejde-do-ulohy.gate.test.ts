@@ -15,6 +15,15 @@
  *      stav `queued`) a TIMEOUT_S (práce, běží až po opuštění fronty) — strop
  *      úlohy musí pojmout oba (naměřeno: fronta 36–43 min u appek, které se
  *      postavily za 7 min).
+ *      ⛔ 2026-10-01: rozpočet úlohy = JEDEN pokus. Tvrdý strop sdíleného runneru
+ *      (1 h) přebíjí timeout-minutes, takže druhý pokus (125 min) se do úlohy
+ *      nevešel nikdy — runner ji utnul dřív (naměřeno: Core 15–20 min, nikdy přes
+ *      60). Opakování přechodného pádu patří do POKRAČOVACÍ úlohy (vzor Stacky po
+ *      vlnách), ne do téže úlohy; skript má proto OPAKOVANI=0 a brána to drží.
+ *      Úloha navíc pojme REZERVA_S (checkout, setup, kroky před čekáním a po něm):
+ *      skript má VŽDY skončit dřív než runner a říct, co se stalo (2026-10-01).
+ *      Rezerva se skládá z naměřené režie a ohraničených kroků po čekání, které
+ *      brána vyčte ze skriptu; úlohy po vlnách mají měkký termín ze svého stropu.
  *   2. MODUL JE V ŘÍDKÉM CHECKOUTU. Úlohy nasazení si stahují jen vyjmenované
  *      soubory; chybějící modul = `node` spadne = „klasifikace selhala" = tiché
  *      vypnutí celého mechanismu (skript pak správně NEopakuje, ale nikdo neví proč).
@@ -40,29 +49,102 @@ function cislo(re: RegExp, co: string): number {
   return Number(m[1]);
 }
 
+/** Úlohy ci.yml jako text BEZ komentářových řádků — zmínka v komentáři není volání (naměřeno: komentář
+ *  „--fronta-s 1500“ nad úlohou přebil skutečný argument a brána měřila komentář). */
 function ulohy(yml: string): Array<{ jmeno: string; telo: string }> {
   const starty = [...yml.matchAll(/^ {2}([a-z0-9-]+):\s*$/gm)].map((m) => ({ jmeno: m[1], at: m.index ?? 0 }));
-  return starty.map((s, i) => ({ jmeno: s.jmeno, telo: yml.slice(s.at, i + 1 < starty.length ? starty[i + 1].at : yml.length) }));
+  return starty.map((s, i) => ({
+    jmeno: s.jmeno,
+    telo: yml
+      .slice(s.at, i + 1 < starty.length ? starty[i + 1].at : yml.length)
+      .split("\n")
+      .filter((r) => !/^\s*#/.test(r))
+      .join("\n"),
+  }));
 }
 
 const OPAKOVANI = cislo(/^OPAKOVANI=(\d+)\s*$/m, "OPAKOVANI");
 const TIMEOUT_S = cislo(/^TIMEOUT_S=(\d+)\s*$/m, "výchozí TIMEOUT_S");
 const PRODLEVA_S = cislo(/^PRODLEVA_S=(\d+)\s*$/m, "PRODLEVA_S");
 const FRONTA_S = cislo(/^FRONTA_S=(\d+)\s*$/m, "výchozí FRONTA_S");
+const REZERVA_S = cislo(/^REZERVA_S=(\d+)\s*$/m, "REZERVA_S");
+const REZIE_NAMERENA_S = cislo(/^REZIE_NAMERENA_S=(\d+)\s*$/m, "REZIE_NAMERENA_S");
+const DOBEH_S = cislo(/^DOBEH_S=(\d+)\s*$/m, "DOBEH_S");
+
+/** Nejhorší případ ohraničených kroků PO čekání — vyčtený ze skriptu, ne opsaný. */
+function poCekaniMax(): { sonda: number; verify: number } {
+  // Smyček `for pokus in …` je ve skriptu víc — sonda zdraví je ta, která volá $HEALTH_URL.
+  const smycka = [...SKRIPT.matchAll(/for pokus in ((?:\d+ ?)+); do([\s\S]*?)\n {2}done/g)].find((m) => m[2].includes('"$HEALTH_URL"'));
+  if (!smycka) throw new Error("smyčka sondy zdraví ve skriptu chybí — rezervu nejde změřit");
+  const pokusu = smycka[1].trim().split(/\s+/).length;
+  const curl = Number(/--max-time (\d+) "\$HEALTH_URL"/.exec(smycka[2])?.[1] ?? NaN);
+  const spanek = Number(/\n\s*sleep (\d+)\s*$/m.exec(smycka[2])?.[1] ?? NaN);
+  const verify = Number(/--max-time (\d+) "\$VERIFY_URL"/.exec(SKRIPT)?.[1] ?? NaN);
+  return { sonda: pokusu * curl + (pokusu - 1) * spanek, verify };
+}
 
 const PRIME = ulohy(CI).filter((u) => /^\s*(?:run:\s*)?bash scripts\/ci\/deploy-and-verify\.sh\b/m.test(u.telo));
 
 describe("automatické dotažení nasazení", () => {
   it("úlohy volající skript přímo existují (jinak brána nic neměří)", () => {
-    expect(PRIME.map((u) => u.jmeno).sort()).toEqual(["deploy-core", "deploy-edge", "deploy-extranet"]);
+    expect(PRIME.map((u) => u.jmeno).sort()).toEqual([
+      "deploy-core",
+      "deploy-core-pokracovani",
+      "deploy-edge",
+      "deploy-edge-pokracovani",
+      "deploy-extranet",
+      "deploy-extranet-pokracovani",
+    ]);
   });
 
-  it.each(PRIME.map((u) => [u.jmeno, u.telo]))("%s: strop úlohy pojme (1 + opakování) pokusů (fronta + práce) a prodlevu", (_j, telo) => {
+  it("uvnitř úlohy se neopakuje — rozpočet úlohy je JEDEN pokus", () => {
+    expect(
+      OPAKOVANI,
+      "Druhý pokus v téže úloze se pod tvrdý strop sdíleného runneru nevejde (2 × (fronta + práce) + prodleva > 1 h). " +
+        "Opakování přechodného pádu = pokračovací úloha (vzor Stacky po vlnách, `--navazat-od`, jen jednou).",
+    ).toBe(0);
+  });
+
+  it.each(PRIME.map((u) => [u.jmeno, u.telo]))("%s: strop úlohy pojme jeden pokus (fronta + práce) a rezervu", (_j, telo) => {
     const strop = Number(/^ {4}timeout-minutes:\s*(\d+)/m.exec(telo)?.[1] ?? NaN);
     const prace = Number(/--timeout-s[ =](\d+)/.exec(telo)?.[1] ?? TIMEOUT_S);
     const fronta = Number(/--fronta-s[ =](\d+)/.exec(telo)?.[1] ?? FRONTA_S);
-    const potreba = Math.ceil(((1 + OPAKOVANI) * (fronta + prace) + OPAKOVANI * PRODLEVA_S) / 60);
-    expect(strop).toBeGreaterThanOrEqual(potreba);
+    const potreba = (1 + OPAKOVANI) * (fronta + prace) + OPAKOVANI * PRODLEVA_S + REZERVA_S;
+    expect(
+      strop * 60,
+      `strop ${strop} min nepojme fronta ${fronta} s + práce ${prace} s + rezerva ${REZERVA_S} s = ${potreba} s — ` +
+        "runner by úlohu utnul dřív, než skript řekne, co se stalo. Snižte frontu (--fronta-s), ne práci.",
+    ).toBeGreaterThanOrEqual(potreba);
+  });
+
+  it("rezerva pojme naměřenou režii i ohraničené kroky po čekání (krok 5, sonda, --verify-url)", () => {
+    const { sonda, verify } = poCekaniMax();
+    expect(REZIE_NAMERENA_S, "naměřená režie chybí — rezerva by nebyla změřená").toBeGreaterThan(0);
+    const dno = REZIE_NAMERENA_S + DOBEH_S + sonda + verify;
+    expect(REZERVA_S, `REZERVA_S ${REZERVA_S} < režie ${REZIE_NAMERENA_S} + krok 5 ${DOBEH_S} + sonda ${sonda} + verify ${verify} = ${dno} s`).toBeGreaterThanOrEqual(dno);
+  });
+
+  it("krok 5 (dočkání po finished) má vlastní strop DOBEH_S, ne strop práce", () => {
+    const krok5 = /node scripts\/coolify-deploy-watch\.mjs[\s\S]*?; then/.exec(SKRIPT)?.[0] ?? "";
+    expect(krok5, "volání coolify-deploy-watch ve skriptu chybí").not.toBe("");
+    expect(krok5).toContain('--timeout-s="$DOBEH_S"');
+  });
+
+  it("úlohy po vlnách (nasad-podle-vln.sh) mají měkký termín ze SVÉHO stropu — skript skončí dřív než runner", () => {
+    const vlnove = ulohy(CI).filter((u) => /^\s*bash scripts\/ci\/nasad-podle-vln\.sh\b/m.test(u.telo));
+    expect(vlnove.map((u) => u.jmeno), "nenašel jsem úlohy po vlnách — změnilo se volání?").toContain("deploy-koren");
+    const bez = vlnove
+      .filter((u) => {
+        const strop = /^ {4}timeout-minutes:\s*(\d+)/m.exec(u.telo)?.[1];
+        return (
+          !strop ||
+          !new RegExp(`STROP_ULOHY_MIN: "${strop}"`).test(u.telo) ||
+          !/TERMIN=\$\(\( \$\(date \+%s\) \+ \(STROP_ULOHY_MIN - \d+\) \* 60 \)\)/.test(u.telo) ||
+          !/--mekky-termin "\$TERMIN"/.test(u.telo)
+        );
+      })
+      .map((u) => u.jmeno);
+    expect(bez, "Bez měkkého termínu ze stropu úlohy ji runner utne uprostřed nasazení a nikdo neřekne, co zůstalo.").toEqual([]);
   });
 
   it.each(PRIME.map((u) => [u.jmeno, u.telo]))("%s: modul posouzení je v řídkém checkoutu", (_j, telo) => {
@@ -125,6 +207,23 @@ function dalsiPokus(o: {
   return `${r.stdout}${r.stderr}`;
 }
 
+/** `trida_padu` ze SKUTEČNÉHO skriptu s podstrčeným curl; klasifikátor běží naostro. */
+function tridaPadu(log: string, neniJson = false) {
+  const fn = /(trida_padu\(\) \{[\s\S]*?\n\})/.exec(SKRIPT)?.[1];
+  if (!fn) throw new Error("funkce trida_padu ve skriptu není");
+  const dir = mkdtempSync(join(tmpdir(), "trida-padu-"));
+  writeFileSync(join(dir, "nasazeni.json"), neniJson ? "<html>502</html>" : JSON.stringify({ created_at: new Date().toISOString(), logs: JSON.stringify([{ output: log }]) }));
+  const harness = [
+    "set -uo pipefail",
+    `curl() { cat "${dir}/nasazeni.json"; }`,
+    "COOLIFY_URL=https://coolify.invalid; COOLIFY_API_TOKEN=x",
+    fn,
+    'trida_padu NAS1; echo "TRIDA=$TRIDA_PADU"',
+  ].join("\n");
+  const r = spawnSync("bash", ["-c", harness], { cwd: ROOT, encoding: "utf8", timeout: 60_000 });
+  return (/^TRIDA=.*$/m.exec(r.stdout)?.[0] ?? `${r.stdout}${r.stderr}`).trim();
+}
+
 describe("dalsi_pokus — chování", () => {
   it("doložená přechodná chyba a volná appka → opakovat a vyslovit proč", () => {
     const out = dalsiPokus({ log: SELHANI_SITE });
@@ -160,8 +259,11 @@ describe("dalsi_pokus — chování", () => {
     expect(out).toContain("klasifikace pádu selhala");
   });
 
-  it("opakování vypnuté (OPAKOVANI=0 ⇒ max 1) → STOP", () => {
-    expect(dalsiPokus({ log: SELHANI_SITE, pokus: 1, max: 1 })).toContain("ROZHODNUTI=stop");
+  it("opakování vypnuté (OPAKOVANI=0 ⇒ max 1) → STOP a řekne, kdo pád zopakuje — bez jediného dotazu", () => {
+    const out = dalsiPokus({ log: SELHANI_SITE, pokus: 1, max: 1 });
+    expect(out).toContain("ROZHODNUTI=stop");
+    expect(out).toContain("Uvnitř úlohy se neopakuje");
+    expect(out).not.toContain("neočekávané volání");
   });
 
   it("větev se mezitím posunula → STOP (novější revizi nasadí její vlastní běh)", () => {
@@ -180,6 +282,18 @@ describe("dalsi_pokus — chování", () => {
       '#14 ERROR: process "/bin/sh -c npm run build" did not complete successfully: exit code: 2',
     ].join("\n");
     expect(dalsiPokus({ log: smiseny })).toContain("ROZHODNUTI=stop");
+  });
+
+  it("třída pádu (jen do souhrnu): přechodná, nepřechodná, neposouzeno — klasifikátor běží naostro", () => {
+    expect(tridaPadu(SELHANI_SITE)).toMatch(/^TRIDA=sit-registru \(přechodná\): /);
+    expect(tridaPadu("Error type: App\\Exceptions\\DeploymentException")).toMatch(/^TRIDA=\S+ \(nepřechodná\): /);
+    expect(tridaPadu("", true)).toBe("TRIDA=neposouzeno (klasifikace pádu selhala)");
+  });
+
+  it("⛔ pád v pokračování, které už nasadilo znovu, se vysloví jako „pád i po opakování“ s třídou", () => {
+    const vetev = /failed\|cancelled\|canceled\|error\)([\s\S]*?)exit 1 ;;/.exec(SKRIPT)?.[1] ?? "";
+    expect(vetev).toContain('trida_padu "$NASAZENI"');
+    expect(vetev).toMatch(/if \[ "\$\{NAV_AKCE:-\}" = "nasadit" \]; then\s*\n(\s*#.*\n)*\s*echo "::error title=pád i po opakování::[^"]*Třída: \$\{TRIDA_PADU\}"/);
   });
 
   it("bez GITHUB_REF (běh mimo CI) → STOP, větev se nedosazuje", () => {

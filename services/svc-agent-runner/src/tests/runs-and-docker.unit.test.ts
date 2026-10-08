@@ -33,8 +33,6 @@ const {
   mockClaudePrepare,
   mockClaudeMonitor,
   mockClaudeCancel,
-  mockCreateEphemeralKey,
-  mockRevokePeer,
 } = vi.hoisted(() => ({
   mockVerifyToken: vi.fn(),
   mockRequireRunnerOperator: vi.fn(),
@@ -45,8 +43,6 @@ const {
   mockClaudePrepare: vi.fn(),
   mockClaudeMonitor: vi.fn(),
   mockClaudeCancel: vi.fn(),
-  mockCreateEphemeralKey: vi.fn(),
-  mockRevokePeer: vi.fn(),
 }));
 
 vi.mock('../auth.js', () => ({
@@ -83,17 +79,12 @@ vi.mock('../backends/claude-cli.js', () => {
   }
   return { ClaudeCliBackend };
 });
-vi.mock('../netbird-client.js', () => ({
-  createEphemeralKey: mockCreateEphemeralKey,
-  revokePeer: mockRevokePeer,
-}));
 vi.mock('../config.js', () => ({
   config: {
     runnerBackend: 'docker',
     pluginBrokerUrl: 'http://broker:3000',
     defaultTimeoutMs: 60_000,
     maxTimeoutMs: 300_000, // 5 min cap
-    netbirdEnabled: false,
     dockerSocket: '/var/run/docker.sock',
     dockerApiVersion: 'v1.46',
     dockerExecNetwork: 'aisha-exec',
@@ -160,8 +151,6 @@ beforeEach(() => {
   mockClaudePrepare.mockReset();
   mockClaudeMonitor.mockReset();
   mockClaudeCancel.mockReset().mockResolvedValue(false);
-  mockCreateEphemeralKey.mockReset();
-  mockRevokePeer.mockReset();
 });
 
 async function postRuns(body: unknown) {
@@ -626,5 +615,52 @@ describe('runsRoutes — broker token nese tenanta plugin-exec', () => {
     pripravit();
     await postRuns({ ...VALID_BODY, payload: { tenant_id: "x' OR 1=1" } });
     expect(mockIssueBrokerToken).toHaveBeenCalledWith(expect.objectContaining({ tenant_id: '' }), expect.any(Number));
+  });
+});
+
+// ── K1 / T1-A: klíč k mesh síti se pro běh nerazí (2026-10-06, volba A) ──────
+
+describe('runsRoutes — běh nenese klíč k mesh síti a správa meshe nedostane žádné volání', () => {
+  // Dřív se tu pro KAŽDÝ běh volala správa NetBirdu (createEphemeralKey → fetch na
+  // /api/setup-keys) a klíč šel do RunInput.netbirdSetupKey → NB_SETUP_KEY v prostředí.
+  // Měří se oba konce: žádné odchozí volání během POST /runs a RunInput bez klíče i bez
+  // volajícím zvolené adresy brokeru (BROKER_URL určuje broker-proxy runneru, ne požadavek).
+  it('plugin-exec: žádný fetch během POST /runs; RunInput bez netbirdSetupKey a brokerUrl (kotva: brokerToken je)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('žádné odchozí volání se nečeká'));
+    try {
+      mockRpcService.mockResolvedValueOnce('run-mesh').mockResolvedValue(undefined);
+      mockDockerBackendExecute.mockResolvedValue({ exitCode: 0, result: undefined, logs: [], host: 'h', durationMs: 1 });
+      const calls = await postRuns(VALID_BODY);
+      expect(calls.status).toBe(200);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      const runInput = mockDockerBackendExecute.mock.calls[0]![0] as Record<string, unknown>;
+      expect(runInput['brokerToken']).toBe('broker-jwt-token'); // kotva
+      expect(Object.keys(runInput)).not.toContain('netbirdSetupKey');
+      expect(Object.keys(runInput)).not.toContain('brokerUrl');
+      expect(JSON.stringify(runInput)).not.toMatch(/NB_/);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it('claude_cli_task: žádný fetch během POST /runs; RunInput bez netbirdSetupKey (kotva: brokerToken je)', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('žádné odchozí volání se nečeká'));
+    try {
+      mockRpcService
+        .mockResolvedValueOnce('run-mesh-claude')
+        .mockResolvedValueOnce([{ approval_required: false, approved_at: null }])
+        .mockResolvedValue(undefined);
+      mockClaudePrepare.mockResolvedValue({ runId: 'run-mesh-claude', containerId: 'c', worktree: '/w', startedAt: 0, host: 'h', timeoutMs: 1 });
+      mockClaudeMonitor.mockResolvedValue({ exitCode: 0, result: undefined, logs: [], host: 'h', durationMs: 1 });
+      const calls = await postRuns({ kind: 'claude_cli_task', source: 'dirigent:test', payload: { prompt: 'x' } });
+      expect(calls.status).toBe(202);
+      await new Promise((r) => setTimeout(r, 0));
+      expect(fetchSpy).not.toHaveBeenCalled();
+      const runInput = mockClaudePrepare.mock.calls[0]![0] as Record<string, unknown>;
+      expect(runInput['brokerToken']).toBe('broker-jwt-token'); // kotva
+      expect(Object.keys(runInput)).not.toContain('netbirdSetupKey');
+    } finally {
+      fetchSpy.mockRestore();
+    }
   });
 });

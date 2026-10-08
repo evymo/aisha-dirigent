@@ -12,13 +12,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { chatCompletion, chatCompletionWithRetry, LlmCompletionError } from '../lib/llm-completion.js';
 
-vi.mock('../config.js', () => ({
-  config: {
-    openaiApiKey: 'cfg-default-key',
-  },
+// Čtečka pověření (2026-10-02): trezor instance (tady mapa), přechodně prostředí —
+// tvar jako @aisha/security createCredentialReader. Klíč OpenAI dřív z configu.
+const { trezor } = vi.hoisted(() => ({ trezor: new Map<string, string>() }));
+vi.mock('../lib/credentials.js', () => ({
+  credentials: () => ({ get: async (n: string) => trezor.get(n) ?? process.env[n] ?? null }),
 }));
 
 const ORIGINAL_ENV = { ...process.env };
+beforeEach(() => {
+  trezor.clear();
+  trezor.set('OPENAI_API_KEY', 'cfg-default-key');
+});
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -89,20 +94,14 @@ describe('llm-completion — base URL + API key resolution', () => {
     fetchMock.mockRestore();
   });
 
-  it('throws 503 when no API key resolvable (no env, no config, no override)', async () => {
+  it('throws 503 when no API key resolvable (no env, no vault, no override)', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch');
-    // override config to empty
-    vi.doMock('../config.js', () => ({ config: { openaiApiKey: '' } }));
-    vi.resetModules();
-    // Re-import BOTH chatCompletion AND LlmCompletionError from the same module
-    // identity — after resetModules, the class identity changes, so the original
-    // top-of-file import would fail instanceof.
-    const reloaded = await import('../lib/llm-completion.js');
-    const { chatCompletion: cc, LlmCompletionError: LlmErr } = reloaded;
+    trezor.clear();
+    delete process.env.OPENAI_API_KEY;
 
     await expect(
-      cc({ model: 'm', messages: [{ role: 'user', content: 'hi' }] }),
-    ).rejects.toBeInstanceOf(LlmErr);
+      chatCompletion({ model: 'm', messages: [{ role: 'user', content: 'hi' }] }),
+    ).rejects.toBeInstanceOf(LlmCompletionError);
     expect(fetchMock).not.toHaveBeenCalled();
     fetchMock.mockRestore();
   });

@@ -95,6 +95,7 @@ BEGIN
            er.id = ANY(v_pinned) AS pinned
     FROM expert_rules er
     WHERE er.status = 'published'
+      AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, v_user_id)
       AND (
         v_categories IS NULL
         OR er.category = ANY(v_categories)

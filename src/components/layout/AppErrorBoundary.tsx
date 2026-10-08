@@ -1,4 +1,5 @@
-import { ReactNode, useCallback } from "react";
+import { ReactNode, useCallback, useEffect, useRef } from "react";
+import { useInRouterContext, useLocation } from "react-router-dom";
 import * as Sentry from "@sentry/react";
 import { Button } from "@/components/ui/button";
 import { safeError } from "@/lib/security/safeLogger";
@@ -44,6 +45,25 @@ const FallbackContent = ({ error, onRetry }: FallbackProps) => {
 };
 
 /**
+ * ⛔ CHYBOVÁ STRÁNKA SE PO PŘECHODU JINAM SAMA ZAVŘE (2026-10-01, naměřeno na instanci).
+ * Hranice obaluje celou aplikaci a bez resetu zůstala chybová stránka na
+ * KAŽDÉ další trase — autorka ji viděla, dokud se znovu nepřihlásila (plné
+ * načtení). Mimo router (testy, izolované vykreslení) se nesleduje nic.
+ */
+function ResetPriNavigaci({ reset }: { reset: () => void }) {
+  return useInRouterContext() ? <SledovaniCesty reset={reset} /> : null;
+}
+
+function SledovaniCesty({ reset }: { reset: () => void }) {
+  const { pathname } = useLocation();
+  const cestaPriChybe = useRef(pathname);
+  useEffect(() => {
+    if (pathname !== cestaPriChybe.current) reset();
+  }, [pathname, reset]);
+  return null;
+}
+
+/**
  * Safely converts unknown error to Error instance.
  */
 function toError(error: unknown): Error {
@@ -81,10 +101,13 @@ const AppErrorBoundary = ({ children }: AppErrorBoundaryProps) => {
   return (
     <Sentry.ErrorBoundary
       fallback={({ error, resetError }) => (
-        <FallbackContent
-          error={toError(error)}
-          onRetry={resetError}
-        />
+        <>
+          <ResetPriNavigaci reset={resetError} />
+          <FallbackContent
+            error={toError(error)}
+            onRetry={resetError}
+          />
+        </>
       )}
       onError={handleError}
       onReset={handleReset}

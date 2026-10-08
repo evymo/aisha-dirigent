@@ -1,6 +1,8 @@
 import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { config } from '../config.js';
 import { clientIpFrom, parseTrusted } from '@aisha/knock-protocol';
+import { urlHostForLog } from '@aisha/security';
+import { CESTA_SERVERU_ZNALOSTI, vyzvaKPrihlaseni } from '../lib/chraneny-zdroj.js';
 
 /**
  * /functions/v1/* → Fastify microservices router
@@ -262,6 +264,37 @@ export function hlavickyProUpstream(req: FastifyRequest): Record<string, string>
   return headers;
 }
 
+/**
+ * Hlavičky odpovědi pro klienta: co poslala služba, bez hlaviček jednoho skoku.
+ * Jedno místo pro obě proxy cesty — dvě kopie téhož výčtu se rozejdou.
+ *
+ * 401 z koncového bodu serveru znalostí (MCP) navíc nese výzvu k přihlášení:
+ * `WWW-Authenticate: Bearer resource_metadata="…"` (RFC 9728 §5.1). Podle ní klient MCP
+ * najde metadata zdroje a v nich autorizační server instance — bez ní neví, kde se
+ * přihlásit, a 401 je pro něj slepá ulička.
+ *
+ *   - jen 401: 403 znamená „přihlášený, ale nesmí" a nové přihlášení ho nespraví;
+ *   - jen server znalostí: ostatní funkce chráněným zdrojem OAuth nejsou a výzva by
+ *     klienta poslala přihlašovat se kvůli něčemu, co přihlášení neřeší;
+ *   - výzva, kterou poslala sama služba, se NEPŘEPISUJE — služba ví o důvodu odmítnutí víc;
+ *   - bez veřejné adresy gatewaye se neposílá nic (adresa se nehádá, viz lib/chraneny-zdroj.ts).
+ *
+ * @param cestaFunkce veřejná cesta volané funkce bez podcesty (`<prefix proxy>/<jméno>`)
+ */
+function hlavickyOdpovedi(upstreamRes: Response, cestaFunkce: string): Record<string, string> {
+  const hlavicky: Record<string, string> = {};
+  upstreamRes.headers.forEach((v, k) => {
+    if (!['transfer-encoding', 'connection'].includes(k.toLowerCase())) {
+      hlavicky[k] = v;
+    }
+  });
+  if (upstreamRes.status === 401 && cestaFunkce === CESTA_SERVERU_ZNALOSTI && !('www-authenticate' in hlavicky)) {
+    const vyzva = vyzvaKPrihlaseni(config.publicUrl);
+    if (vyzva) hlavicky['www-authenticate'] = vyzva;
+  }
+  return hlavicky;
+}
+
 export const functionsProxy: FastifyPluginAsync = async (app: FastifyInstance) => {
 
   /**
@@ -295,12 +328,7 @@ export const functionsProxy: FastifyPluginAsync = async (app: FastifyInstance) =
       });
 
       // Stream response back
-      const responseHeaders: Record<string, string> = {};
-      upstreamRes.headers.forEach((v, k) => {
-        if (!['transfer-encoding', 'connection'].includes(k.toLowerCase())) {
-          responseHeaders[k] = v;
-        }
-      });
+      const responseHeaders = hlavickyOdpovedi(upstreamRes, `${app.prefix}/${functionName}`);
 
       const body = await upstreamRes.arrayBuffer();
       return reply
@@ -308,7 +336,9 @@ export const functionsProxy: FastifyPluginAsync = async (app: FastifyInstance) =
         .headers(responseHeaders)
         .send(Buffer.from(body));
     } catch (err) {
-      req.log.error({ err, functionName, upstream: upstreamUrl }, 'Functions proxy error');
+      // The upstream URL carries the caller's query string; the host is what
+      // tells which service did not answer.
+      req.log.error({ err, functionName, upstreamHost: urlHostForLog(upstreamUrl) }, 'Functions proxy error');
       return reply.status(502).send({
         error: 'upstream_error',
         message: `Failed to reach service for ${functionName}`,
@@ -347,12 +377,7 @@ export const functionsProxy: FastifyPluginAsync = async (app: FastifyInstance) =
         signal: AbortSignal.timeout(route.timeoutMs ?? VYCHOZI_TIMEOUT_MS),
       });
 
-      const responseHeaders: Record<string, string> = {};
-      upstreamRes.headers.forEach((v, k) => {
-        if (!['transfer-encoding', 'connection'].includes(k.toLowerCase())) {
-          responseHeaders[k] = v;
-        }
-      });
+      const responseHeaders = hlavickyOdpovedi(upstreamRes, `${app.prefix}/${functionName}`);
 
       const body = await upstreamRes.arrayBuffer();
       return reply

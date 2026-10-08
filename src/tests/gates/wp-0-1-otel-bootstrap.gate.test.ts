@@ -77,6 +77,12 @@ const REQUIRED_SERVICES: ReadonlyArray<RequiredService> = [
   { name: 'svc-stripe', kind: 'http' },
   { name: 'svc-web-artifact', kind: 'http' },
   { name: 'ws-gateway', kind: 'http' },
+  // Thin client of the shared GPU lane (fork side): metrics only on its loopback
+  // management listener; OTel export disabled by declaration in its compose.
+  { name: 'svc-lane-klient', kind: 'http' },
+  // Enforcement point of the shared GPU lane (operator side): metrics only on its loopback
+  // management listener; OTel export disabled by declaration in its compose.
+  { name: 'svc-accel-vstup', kind: 'http' },
 ];
 
 function readFileOrEmpty(p: string): string {

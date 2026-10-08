@@ -34,7 +34,7 @@
 --   date_field      POVINNÉ   klíč v li_source_registry.fields (např. valid_to)
 --   direction       volitelné 'upcoming' (výchozí: datum ≥ dnes, nejbližší první)
 --                             | 'expired' (datum < dnes, naposledy skončené první,
---                             se sloupcem počtu dní po skončení)
+--                             se sloupcem počtu dní po skončení); jiná hodnota → `bad_config`
 --   owner_company   volitelné pohled podle firmy — TÝŽ parametr, jaký posílá
 --                             přepínač nad sekcí registru dokladů
 --   date_label_key  volitelné klíč překladu hlavičky data (výchozí app.cols.valid_to)
@@ -124,15 +124,23 @@ AS $$
           'row_kind', 'document'),
         'provenance', jsonb_build_object(
           'source_slug', 'li-source-registry',
-          'trace_id', 'doc-expiry:unauthenticated',
+          'trace_id', 'doc-expiry:unauthorized',
           'freshness_at', to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))
-    when (select dtype from cfg) is null or (select dfield from cfg) is null
-      or (select dir from cfg) is null then
+    when (select dtype from cfg) is null or (select dfield from cfg) is null then
       jsonb_build_object('data', jsonb_build_object('columns', '[]'::jsonb, 'rows', '[]'::jsonb,
           'row_kind', 'document'),
         'provenance', jsonb_build_object(
           'source_slug', 'li-source-registry',
           'trace_id', 'doc-expiry:missing_config',
+          'freshness_at', to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))
+    -- `direction` v datech JE, ale hodnota není ze slovníku → vadná konfigurace (`bad_config`),
+    -- ne „chybí“ a nikdy tichý výchozí směr (slovník důvodů: brána cerstvost-z-dat).
+    when (select dir from cfg) is null then
+      jsonb_build_object('data', jsonb_build_object('columns', '[]'::jsonb, 'rows', '[]'::jsonb,
+          'row_kind', 'document'),
+        'provenance', jsonb_build_object(
+          'source_slug', 'li-source-registry',
+          'trace_id', 'doc-expiry:bad_config',
           'freshness_at', to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))
     else jsonb_build_object(
       'data', jsonb_build_object(

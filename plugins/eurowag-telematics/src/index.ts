@@ -221,13 +221,41 @@ async function syncFleet(ctx: Ctx): Promise<{ vehicles: number; drivers: number;
   const client = clientFor(ctx);
   const vehicles = neprazdne(rows<EwVehicleState>(await client.vehiclesStates()).map(mapVehicle));
   const drivers = neprazdne((await client.drivers<EwDriver>()).map(mapDriver));
+  const filtr = await client.filterIds();
   await zapsat(ctx, KIND.vehicle, 'snapshot', vehicles);
   await zapsat(ctx, KIND.driver, 'snapshot', drivers);
   await ctx.kv.set(KV_LAST_FLEET_SYNC, new Date().toISOString());
-  ctx.log('info', 'eurowag: číselník zapsán', { vehicles: vehicles.length, drivers: drivers.length });
+  ctx.log('info', 'eurowag: číselník zapsán', {
+    vehicles: vehicles.length,
+    drivers: drivers.length,
+    filterObjects: filtr === null ? 'bez filtru' : filtr.length,
+  });
   const identity = await vedlejsiKrok(ctx, 'ew_propose_identity', {});
   selhatNahlas(ctx, identity, 'eurowag: číselník uložen, ale návrhy vazeb identity selhaly');
+  overitSoupis(ctx, filtr, vehicles.map((v) => v.externalId));
   return { vehicles: vehicles.length, drivers: drivers.length, identity };
+}
+
+/**
+ * Soupis vozidel proti FILTRU API klíče. API vidí jen objekty, které dodavatel
+ * klíči povolil (`configuration.filter`), a neumí říct, co leží mimo něj —
+ * 27. 9. filtr pouštěl 6 vozů a jeden z flotily chyběl, aniž co selhalo.
+ * Rozdíl mezi filtrem a tím, co /vehicles-states vrátí, by jinak zmizel potichu:
+ * číselník je uložený, běh skončí CHYBOU, která říká, co s tím.
+ */
+function overitSoupis(ctx: Ctx, filtr: string[] | null, vraceno: string[]): void {
+  if (filtr === null) return; // dodavatel filtr neposlal — není s čím porovnat
+  const maji = new Set(vraceno);
+  const veFiltru = new Set(filtr);
+  const chybi = filtr.filter((id) => !maji.has(id)).length;
+  const navic = vraceno.filter((id) => !veFiltru.has(id)).length;
+  if (chybi === 0 && navic === 0) return;
+  const zprava =
+    `eurowag: číselník uložen, ale soupis vozidel nesedí s filtrem API klíče — filtr ${filtr.length} objektů, ` +
+    `/vehicles-states vrátil ${vraceno.length} (ve filtru a nevráceno: ${chybi}, vráceno mimo filtr: ${navic}). ` +
+    'Oprava není v kódu: filtr klíče upravuje dodavatel (Eurowag) — požádat o jeho rozšíření/opravu.';
+  ctx.log('error', zprava);
+  throw new Error(zprava);
 }
 
 /**

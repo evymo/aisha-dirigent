@@ -27,6 +27,7 @@ BEGIN
     ers.last_used_at
   FROM expert_rule_subscriptions ers
   JOIN expert_rules er ON er.id = ers.rule_id
+    AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid())
   JOIN partner_profiles pp ON pp.id = er.author_partner_id
   WHERE ers.user_id = auth.uid() AND ers.is_active = true
   ORDER BY ers.subscribed_at DESC;

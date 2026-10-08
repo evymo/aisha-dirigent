@@ -171,10 +171,10 @@ describe('Brick3 locale — touched fns surface locale (behavior-neutral)', () =
     expect(dropIdx).toBeLessThan(createIdx);
   });
 
-  it('mcp_search_knowledge_v2 surfaces locale in the jsonb (both overloads), no WHERE/score change', () => {
-    // Both overloads add the jsonb field; count = 2.
+  it('mcp_search_knowledge_v2 surfaces locale in the jsonb, no WHERE/score change', () => {
+    // v2 is a single function since the unreachable 9-arg overload was dropped; count = 1.
     const matches = V2.match(/'locale',\s*kc\.locale/g) ?? [];
-    expect(matches.length, "both v2 overloads must surface 'locale'").toBe(2);
+    expect(matches.length, "v2 must surface 'locale' (one function, one jsonb field)").toBe(1);
     expect(V2, 'v2 must not filter by locale').not.toMatch(/\bWHERE\b[^;]*\.locale\s*=/);
     expect(V2, 'v2 must not multiply a locale column into the score').not.toMatch(
       /\.locale[\s\S]{0,20}\*\s*\d/,
@@ -222,20 +222,18 @@ describe('Brick3 locale — touched fns surface locale (behavior-neutral)', () =
     );
   });
 
-  it('fn_get_chunks_needing_context: locale in RETURNS TABLE + SELECT, DROP+CREATE', () => {
+  // Obě fronty jsou v heals: DROP téže signatury (zbytek z Brick3) by tam běžel při každém migrate.
+  // Návratový tvar s locale má i nejstarší podporovaná databáze, CREATE OR REPLACE stačí.
+  it('fn_get_chunks_needing_context: locale in RETURNS TABLE + SELECT, bez DROP téže signatury', () => {
     expect(GET_CHUNKS).toMatch(/RETURNS TABLE\s*\([\s\S]*\blocale\s+text/);
     expect(GET_CHUNKS).toMatch(/kc\.locale/);
-    expect(GET_CHUNKS).toMatch(
-      /DROP FUNCTION IF EXISTS public\.fn_get_chunks_needing_context\(integer, uuid\)/,
-    );
+    expect(GET_CHUNKS).not.toMatch(/^\s*DROP FUNCTION/m);
   });
 
-  it('fn_get_embeddings_needing_v2: locale in RETURNS TABLE + SELECT, DROP+CREATE', () => {
+  it('fn_get_embeddings_needing_v2: locale in RETURNS TABLE + SELECT, bez DROP téže signatury', () => {
     expect(GET_EMB_V2).toMatch(/RETURNS TABLE\s*\([\s\S]*\blocale\s+text/);
     expect(GET_EMB_V2).toMatch(/ke\.locale/);
-    expect(GET_EMB_V2).toMatch(
-      /DROP FUNCTION IF EXISTS public\.fn_get_embeddings_needing_v2\(integer, uuid\)/,
-    );
+    expect(GET_EMB_V2).not.toMatch(/^\s*DROP FUNCTION/m);
   });
 
   it('upsert_story_knowledge_item_audited threads p_locale (Brick4 superseded the global-sentinel stub)', () => {

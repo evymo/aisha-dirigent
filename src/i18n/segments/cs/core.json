@@ -883,6 +883,7 @@
     "searchPlaceholder": "Vyhledat články…",
     "filter": {
       "tags": "Štítky",
+      "allTags": "Vše",
       "sort": "Seřadit",
       "label": "Filtr"
     },
@@ -963,5 +964,12 @@
     "posted": "Zveřejněno",
     "signIn": "Přihlaste se a zapojte se do diskuze",
     "unconfigured": "Diskuse zde zatím není k dispozici."
+  },
+  "appBanner": {
+    "title": "Stáhněte si naši aplikaci",
+    "text": "Mějte nás po ruce — stáhněte si mobilní aplikaci.",
+    "appStore": "Stáhnout v App Store",
+    "googlePlay": "Stáhnout na Google Play",
+    "close": "Zavřít"
   }
 }

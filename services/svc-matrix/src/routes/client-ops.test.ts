@@ -2,8 +2,8 @@
  * Unit tests for the svc-matrix USER-facing client-ops proxy.
  *
  * Locks in that each action maps request → Synapse CS-API call → the exact
- * response shape the web/mobile hooks parse (useMatrixMessages,
- * useStoryMatrixAutoMap), plus auth-reject and unknown-action-reject.
+ * response shape the web/mobile hooks parse (useMatrixMessages), plus
+ * auth-reject and unknown-action-reject.
  *
  * Boundaries mocked: verifyToken (KC JWT), resolveMatrixIdentity (KC→Matrix
  * token exchange), and global fetch (the Synapse CS API).

@@ -118,7 +118,7 @@ AS $$
       jsonb_build_object('data', jsonb_build_object('entity_kind', 'twin_identity', 'items', '[]'::jsonb,
           'actions', (select a from akce)),
         'provenance', jsonb_build_object('source_slug', 'twin-identity',
-          'trace_id', 'twin-ref-review:unauthenticated', 'freshness_at', now()))
+          'trace_id', 'twin-ref-review:unauthorized', 'freshness_at', now()))
     when (select src from cfg) is null
       or (select t_tpl from cfg) is null or (select q_tpl from cfg) is null then
       jsonb_build_object('data', jsonb_build_object('entity_kind', 'twin_identity', 'items', '[]'::jsonb,

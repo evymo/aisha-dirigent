@@ -57,8 +57,6 @@ export const SSRF_FETCH_EXEMPTIONS: Readonly<Record<string, string>> = {
     "pre-existing outbound call to a fixed / operator-configured host (baseline; NOT a URL from untrusted LLM/user input)",
   "services/svc-agent-runner/src/db.ts":
     "pre-existing outbound call to a fixed / operator-configured host (baseline; NOT a URL from untrusted LLM/user input)",
-  "services/svc-agent-runner/src/netbird-client.ts":
-    "pre-existing outbound call to a fixed / operator-configured host (baseline; NOT a URL from untrusted LLM/user input)",
   "services/svc-ai-chat/src/lib/batchSubmitter.ts":
     "pre-existing outbound call to a fixed / operator-configured host (baseline; NOT a URL from untrusted LLM/user input)",
   "services/svc-ai-chat/src/lib/mcpToolProxy.ts":
@@ -132,8 +130,6 @@ export const SSRF_FETCH_EXEMPTIONS: Readonly<Record<string, string>> = {
   "services/svc-plugin-system/src/routes/broker.ts":
     "pre-existing outbound call to a fixed / operator-configured host (baseline; NOT a URL from untrusted LLM/user input)",
   "services/svc-plugin-system/src/runner-client.ts":
-    "pre-existing outbound call to a fixed / operator-configured host (baseline; NOT a URL from untrusted LLM/user input)",
-  "services/svc-plugin-system/src/sandbox.ts":
     "pre-existing outbound call to a fixed / operator-configured host (baseline; NOT a URL from untrusted LLM/user input)",
   "services/svc-push/src/lib/fcm.ts":
     "pre-existing outbound call to a fixed / operator-configured host (baseline; NOT a URL from untrusted LLM/user input)",

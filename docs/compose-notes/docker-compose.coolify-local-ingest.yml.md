@@ -179,6 +179,66 @@ allowed_sensitivities: internal|public). Tenhle sidecar táhne z vlastního
 ⭐ `--checksum` ne, `--update` ano: hlídač enginu porovnává (velikost, mtime),
 takže stažený soubor MUSÍ nést čas zdroje — jinak by se změna neprojevila.
 
+⛔ OD 2026-10-03 PÍŠE JEN DO KARANTÉNY (`/karantena`), ne do vstupu enginu. Do té doby
+stahoval rovnou do svazku, který engine čte — bez antiviru (skenovaly se jen nahrávky
+přes storage-auth). Vstup plní až `docs-scan` po čistém skenu, viz níž.
+`--compare-dest /docs` = co ve vstupu už leží beze změny (velikost + čas), se znovu
+nestahuje; do karantény jde jen nové a změněné. `--no-update-dir-modtime` k tomu patří:
+bez něj rclone (≥ 1.66) nastavuje čas i adresářům, které v karanténě nevznikly, protože
+z nich nic stahovat nebylo — a končí chybou „chtimes … no such file or directory"
+(změřeno 2026-10-03 na pinu 1.68; s přepínačem rc=0 a druhý běh nepřenese nic).
+Vstup má tenhle sidecar jen ke čtení (`:ro`) — zapsat do něj smí jediný proces, a to ten,
+který skenuje.
+
+## `docs-scan:`
+
+ANTIVIROVÁ BRÁNA DOKUMENTŮ (2026-10-03). `docs-sync → /karantena → clamd → /docs → engine`.
+Soubor ze synchronizace se pošle clamd (INSTREAM) a do vstupu enginu se přesune až po
+verdiktu „clean" — dočasné jméno s tečkou + rename, engine tečkové soubory nečte, takže
+rozepsaný soubor nikdy nevidí; čas souboru se zachovává (dohoda se synchronizací i s
+hlídačem enginu). Nález zůstane v karanténě a pamatuje se (`/stav/stav.json`); zadržený soubor
+se zkouší znovu S ODSTUPEM (nález a „nad limit" za den, ostatní 15 min → dvojnásobek → den).
+Co ve vstupu leželo z doby před branou, se doskenuje na místě a nález se ze vstupu stáhne —
+do té doby je engine čte dál (vyprázdnit vstup by četl jako „dokumenty zmizely"); kolik jich
+na posouzení čeká, brána hlásí v logu.
+
+⭐ STAV A TEP VE VLASTNÍM SVAZKU (`ingest-scan-state:/stav`), který má připojený JEN brána.
+Dřív ležely v karanténě, kam píše synchronizace: soubor `.docs-scan/tep` z úložiště by
+zfalšoval zdraví a `stav.json` přehled ověřených (nález nezávislého čtení 2026-10-03).
+Skript: `infra/docs-scan/docs-scan.ts` (tam je celé zdůvodnění), obraz `Dockerfile.docs-scan`,
+testy `src/tests/security/docs-scan-karantena.test.ts`.
+
+⭐ FAIL-CLOSED: nedostupný clamd = do vstupu nejde nic. Rozdíl proti tichému zastavení je
+healthcheck níž. KDO JE VADNÝ — soubor, nebo platforma — brána rozlišuje: nález, „nad limit"
+a nečitelný soubor jsou vada souboru (zadržet, fronta jede dál); clamd bez odpovědi, clamd,
+který neposoudí ani kontrolní vzorek, a vstup, do kterého nejde zapsat, jsou stav platformy
+(nic se nezadržuje, kolo končí překážkou).
+
+⭐ SÍŤ = netns držitele `ingest-drop-push-netns` (`network_mode: service:…`), ne vlastní
+sítě. NAMĚŘENO 2026-10-03 na instanci s ingestem a antivirem na RŮZNÝCH strojích: z toho
+netns jméno `<prefix>-clamav` přeloží mesh resolver (search doména) a clamd odpoví přes
+routu do meshe (`PONG`, verze i datum signatur). Na instanci, kde vše běží na jednom
+stroji, totéž jméno přeloží Docker jako alias na sdílené síti instance — držitel je na obou.
+Adresa je TÁŽ proměnná, kterou dostává storage-auth (`CLAMD_HOST`, env-doctor CONTRACT);
+vlastní se tu neskládá (brána `adresa-ma-jeden-domov`).
+Port a interval jsou literály (`CLAMD_PORT: "3310"`, `DOCS_SCAN_INTERVAL: "60"`), ne proměnné
+s výchozí hodnotou: port patří kontraktu stacku antiviru (`TCPSocket 3310`), interval je vlastnost
+sidecaru — ani jedno nepopisuje instanci, takže není co doručovat a není nad čím hádat.
+
+`user: "0:0"`: svazky zakládá `docs-sync` jako root; brána do nich musí psát. Práva
+navíc nemá žádná (`cap_drop: ALL`, `read_only`, `no-new-privileges`).
+
+## `test: ["CMD-SHELL", "[ $$(( $$(date +%s) - $$(cat /stav/tep) )) -lt 900 ]"]`
+
+Zdraví = KDY naposledy kolo doběhlo, aniž nechalo práci stát kvůli platformě (clamd
+neodpovídá nebo neskenuje, do vstupu nejde zapsat).
+Tep se zapisuje i v kole, kdy není co skenovat — instance bez dokumentové lane (prázdné
+`NEXTCLOUD_URL`) je tedy zdravá i bez antiviru a nasazení neshodí. Nezdravý je kontejner
+teprve tehdy, když dokumenty ČEKAJÍ a brána je nemá jak posoudit nebo propustit (nebo nemá
+konfiguraci):
+příjem dokumentů stojí a má to být vidět, ne se dozvědět za týden z prázdné fronty.
+Práh 900 s = 15 kol; krátký výpadek antiviru (restart, aktualizace signatur) stack neshodí.
+
 ## `NEXTCLOUD_APP_PASSWORD: ${NEXTCLOUD_APP_PASSWORD:-}`
 
 ⛔ NAMĚŘENO 2026-08-29: rclone bere heslo JEN ve svém obfuskovaném tvaru a
@@ -363,6 +423,11 @@ Obraz rclone má BusyBox (`ip`, `date`, `cat`, `timeout`); `curl` ani `bash` ne 
 sonda proto jen čte otisk času (brána `sonda-vola-jen-co-obraz-ma`).
 
 ## `ingest-drop-push-netns:`
+
+⭐ BEZ `profiles: ["mesh"]` (od 2026-10-03): netns sdílí i `docs-scan`, a ta musí běžet
+VŽDY — jinak by na instanci bez meshe dokumenty zůstaly v karanténě a nikdo by neviděl
+proč (žádný kontejner, žádné zdraví). Držitel si s vypnutým meshem poradí sám: routu
+nestaví a je zdravý (`MESH_ENABLED` čte už dnes). `ingest-drop-push` profil `mesh` má dál.
 
 ⛔ NAMĚŘENO 2026-09-16 na guru: `ingest-drop-push` padal smyčkou s `ip: command not found`
 (exit 64). Obraz `minio/mc` nemá `ip`, takže inline routa do mesh v jeho entrypointu nikdy

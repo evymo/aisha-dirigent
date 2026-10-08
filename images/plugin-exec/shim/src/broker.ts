@@ -13,7 +13,14 @@ const brokerUrl = process.env.BROKER_URL ?? '';
 const brokerToken = process.env.BROKER_TOKEN ?? '';
 const runId = process.env.RUN_ID ?? '';
 
-async function brokerCall<T>(endpoint: string, body: unknown): Promise<T> {
+/** Horní mez každého volání brokeru. Signál pluginu ji smí ZKRÁTIT, nikdy prodloužit. */
+export const STROP_BROKERU_MS = 15_000;
+
+/** Klíče `init`, které ctx.fetch brokeru předá a broker uplatní. Cokoli jiného = chyba. */
+export const FETCH_INIT_KLICE: ReadonlySet<string> = new Set(['method', 'headers', 'body', 'redirect', 'signal']);
+
+async function brokerCall<T>(endpoint: string, body: unknown, signal?: AbortSignal): Promise<T> {
+  const strop = AbortSignal.timeout(STROP_BROKERU_MS);
   const res = await fetch(`${brokerUrl}/sandbox/${endpoint}`, {
     method: 'POST',
     headers: {
@@ -22,7 +29,7 @@ async function brokerCall<T>(endpoint: string, body: unknown): Promise<T> {
       'X-Run-Id': runId,
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(15_000),
+    signal: signal ? AbortSignal.any([strop, signal]) : strop,
   });
 
   if (!res.ok) {
@@ -123,6 +130,23 @@ export function createSandboxContext(
       // 'manual' hands the 3xx back here, 'error' rejects. Forwarding the mode
       // keeps fetch semantics — before, it was dropped and every redirect was
       // followed even when the plugin asked for 'manual' or 'error'.
+      //
+      // ⛔ SMLOUVA SANDBOXU (Guru 2026-10-04, bod 1): „přijmout a neuplatnit“ je tiché
+      // přeskočení. Klíč `init`, který broker neuplatní, je proto CHYBA — plugin, který
+      // spoléhá na `cache`, `keepalive` nebo `credentials`, se to dozví hned, ne chováním
+      // v provozu. `signal` platí pro KRATŠÍ lhůtu: zruší-li ho plugin, volání skončí
+      // AbortError; STROP_BROKERU_MS zůstává horní mezí — delším signálem ho prodloužit nejde.
+      const neznamy = Object.keys(init ?? {}).filter((k) => !FETCH_INIT_KLICE.has(k));
+      if (neznamy.length > 0) {
+        throw new TypeError(
+          `ctx.fetch: init.${neznamy.join(', init.')} broker neuplatní — povolené klíče: ${[...FETCH_INIT_KLICE].join(', ')}`,
+        );
+      }
+      const signal = init?.signal ?? undefined;
+      if (signal !== undefined && !(signal instanceof AbortSignal)) {
+        throw new TypeError('ctx.fetch: init.signal není AbortSignal');
+      }
+      signal?.throwIfAborted();
       const result = await brokerCall<{ status: number; headers: Record<string, string>; body: string }>(
         'fetch',
         {
@@ -135,6 +159,7 @@ export function createSandboxContext(
           body: init?.body ?? null,
           redirect: init?.redirect ?? 'follow',
         },
+        signal,
       );
       return new Response(result.body, {
         status: result.status,
@@ -164,6 +189,30 @@ export function createSandboxContext(
  * zdroj → dešifrovaná pověření → přepis tenanta) pro plugin a tenanta z tokenu.
  * Selhání = běh se nespustí: konektor bez pověření by jen selhal jinde a hůř.
  */
+/**
+ * Payload běhu, který se nevešel do ENV kontejneru.
+ *
+ * ⛔ NAMĚŘENO 2026-10-01 na instanci: kód pluginu (155 KB) v PLUGIN_PAYLOAD přesáhl strop
+ * jádra pro jeden řetězec env (128 KiB) a kontejner se nespustil („argument list too
+ * long“). Velký payload drží runner a vydá ho TOMUTO běhu na `/beh/payload` (proxy runneru,
+ * kterou běh zná jako BROKER_URL) na token běhu. Bez tokenu nebo URL se nic nehádá.
+ */
+export async function nactiPayloadZRunneru(): Promise<string> {
+  if (!brokerUrl || !brokerToken) {
+    throw new Error('PLUGIN_PAYLOAD v ENV chybí a BROKER_URL/BROKER_TOKEN taky — payload běhu nelze vyzvednout');
+  }
+  const res = await fetch(`${brokerUrl}/beh/payload`, {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${brokerToken}` },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    const detail = await res.text().catch(() => '');
+    throw new Error(`payload běhu: runner odpověděl ${res.status}: ${detail.slice(0, 200)}`);
+  }
+  return res.text();
+}
+
 export async function nactiKonfiguraci(): Promise<Record<string, unknown>> {
   if (!brokerUrl || !brokerToken) {
     throw new Error('BROKER_URL/BROKER_TOKEN chybí — konfiguraci běhu nelze vyzvednout');

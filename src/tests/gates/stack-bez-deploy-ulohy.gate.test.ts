@@ -35,6 +35,7 @@
  */
 import { describe, expect, test } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
+import { variantyCompose } from "../../../scripts/lib/compose-varianty.mjs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
 import yaml from "js-yaml";
@@ -136,8 +137,8 @@ const PORADI_VLN: Array<{ vlna: number; app: string }> = execFileSync(
  * `--vynech`). ⭐ 2026-09-16: CI nasazuje po vlnách podle detektoru, takže
  * jedna úloha pokrývá každou appku svého rozsahu — ne jen vyjmenované.
  */
-function volaniPodleVln(run: string): Array<{ od: number; do: number; vynech: string[]; nasadi: string[] }> {
-  const out: Array<{ od: number; do: number; vynech: string[]; nasadi: string[] }> = [];
+function volaniPodleVln(run: string): Array<{ od: number; do: number; vynech: string[]; nasadi: string[]; navazuje: boolean }> {
+  const out: Array<{ od: number; do: number; vynech: string[]; nasadi: string[]; navazuje: boolean }> = [];
   const text = run.replace(/\\\n\s*/g, " ");
   for (const m of text.matchAll(/(?:bash|sh)\s+scripts\/ci\/nasad-podle-vln\.sh([^\n]*)/g)) {
     const argy = m[1];
@@ -146,7 +147,9 @@ function volaniPodleVln(run: string): Array<{ od: number; do: number; vynech: st
     const d = vlny && vlny[2] ? Number(vlny[2]) : Number.MAX_SAFE_INTEGER;
     const vynech = (/--vynech\s+([a-z0-9,-]+)/.exec(argy)?.[1] ?? "").split(",").filter(Boolean);
     const nasadi = PORADI_VLN.filter((p) => p.vlna >= od && p.vlna <= d && !vynech.includes(p.app)).map((p) => p.app);
-    out.push({ od, do: d, vynech, nasadi });
+    // `--navazat-od` = pokračování vlnové úlohy (2026-10-01): dokončuje TENTÝŽ
+    // rozsah v témže běhu, nepokrývá ho podruhé (hlídá nasazeni-stacku-po-vlnach).
+    out.push({ od, do: d, vynech, nasadi, navazuje: /--navazat-od/.test(argy) });
   }
   return out;
 }
@@ -206,6 +209,7 @@ describe("stack bez deploy úlohy (brána)", () => {
     const volani = Object.values(wf.jobs ?? {})
       .filter((j) => String(j.name ?? "").startsWith("Deploy: "))
       .flatMap((j) => (j.steps ?? []).flatMap((st) => volaniPodleVln(st.run ?? "")))
+      .filter((v) => !v.navazuje)
       .sort((a, b) => a.od - b.od);
     expect(volani.length, "žádná úloha nevolá nasad-podle-vln.sh — CI nenasazuje po vlnách").toBeGreaterThan(0);
     expect(volani[0].od, "první rozsah musí začínat vlnou 0").toBe(0);
@@ -244,7 +248,14 @@ describe("stack bez deploy úlohy (brána)", () => {
   });
 
   test("každý stavějící compose je v manifestu (nebo je přiznaný jako dluh)", () => {
-    const nedeklarovane = composy.filter((c) => !mapa.has(c) && !baseline.mimo_manifest.includes(c));
+    // Varianta compose podle slotu (`compose_gpu`) se nasazuje aplikací služby, která ji nese —
+    // v manifestu musí být ta služba (její hlavní compose), ne varianta zvlášť.
+    const katalog = JSON.parse(readFileSync(join(ROOT, "config/services.json"), "utf8")).services ?? {};
+    const pokrytaVarianta = (c: string) => {
+      const id = variantyCompose().get(c);
+      return Boolean(id && katalog[id]?.compose && mapa.has(katalog[id].compose));
+    };
+    const nedeklarovane = composy.filter((c) => !mapa.has(c) && !pokrytaVarianta(c) && !baseline.mimo_manifest.includes(c));
     expect(
       nedeklarovane,
       `tyhle compose soubory něco staví, ale manifest o nich neví.\n` +

@@ -1,0 +1,8 @@
+{
+  "_comment": "VZOROVÝ zdroj pro brány — odkazuje na agendu z rosteru.",
+  "source_slug": "money-doklady",
+  "connection": {
+    "protocol": "graphql",
+    "agenda_key": "vzorova-alfa"
+  }
+}

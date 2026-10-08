@@ -9,8 +9,6 @@
       "coolify_uuid": "${COOLIFY_SERVER_UUID_FRONTEND}",
       "is_build_server": false,
       "has_traefik": true,
-      "cpu": 12,
-      "ram_gb": 24,
       "disk_gb": 200,
       "placement_rules": {
         "accepts": ["http-frontend", "api-gateway", "admin-ui", "observability"],
@@ -53,8 +51,6 @@
       "coolify_uuid": "${COOLIFY_SERVER_UUID_BUILD}",
       "is_build_server": true,
       "has_traefik": false,
-      "cpu": 4,
-      "ram_gb": 8,
       "disk_gb": 64,
       "stacks": [],
       "domains": [],
@@ -68,8 +64,6 @@
       "is_build_server": false,
       "has_traefik": false,
       "has_gpu": false,
-      "cpu": 6,
-      "ram_gb": 12,
       "disk_gb": 100,
       "placement_rules": {
         "accepts": ["database", "game-server", "headless-backend"],
@@ -91,8 +85,6 @@
       "is_build_server": false,
       "has_traefik": false,
       "has_gpu": false,
-      "cpu": 4,
-      "ram_gb": 8,
       "disk_gb": 80,
       "placement_rules": {
         "accepts": ["ai-inference", "ml-model", "staging"],
@@ -108,6 +100,18 @@
         "staging.internal.example.com"
       ],
       "notes": "Staging + AI hosting + Cosmos chain node — isolated from production"
+    },
+    "gpu": {
+      "hostname": "gpu.internal.example.com",
+      "role": "gpu",
+      "coolify_uuid": "${COOLIFY_SERVER_UUID_GPU}",
+      "is_build_server": false,
+      "has_traefik": false,
+      "has_gpu": true,
+      "proxy": "none",
+      "stacks": [],
+      "domains": [],
+      "notes": "Optional GPU node (one machine = one slot): hosts the accel layer (ACCEL_ENABLED lane) and the host firewall (accel-hostfw; switched on by the node declaration ACCEL_FW_NODE_OWNER / ACCEL_FW_SSH, deployable before the lane). Its services deploy only with an open lane. Server discovery never guesses a has_gpu slot: it needs an explicit binding (GPU_HOSTNAME, a per-environment SERVER_NAME/UUID, or the profile server_bindings)."
     }
   }
 }

@@ -157,6 +157,8 @@ describe("v2 Microservice Security Gates", () => {
       /preHandler\s*:\s*\[?\s*\w*auth/i,
       /verif(?:y|ied).*(?:signatur|hmac|hash)/i,
       /X-N8N-API-KEY|X-MCP-Token/i,
+      // API klíč porovnaný v konstantním čase (otisk klíče × timingSafeEqual), např. klíče nájemců lane.
+      /timingSafeEqual\s*\(/,
     ];
 
     for (const svc of ALL_SERVICES) {

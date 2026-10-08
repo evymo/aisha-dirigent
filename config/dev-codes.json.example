@@ -1,0 +1,7 @@
+{
+  "$note": "TEMPLATE. Copy to config/dev-codes.json (gitignored) on maintainer / CI hosts, or supply the same values in the AISHA_DEV_CODE_SENTINELS environment variable (comma-separated). It carries the EXACT developer/account identifiers (Apple Team ID, App Store Connect key id, …) that scripts/verify-no-dev-codes.mjs must find anywhere in the tree. It must NEVER be committed: a committed denylist of real identifiers is itself the disclosure the guard exists to prevent. In the public repository and in forks this file is absent and the guard applies its STRUCTURAL rules only (it says so in its output). Sentinels shorter than 8 characters are rejected. Values below are fictional.",
+  "sentinels": [
+    "QWERTY1234",
+    "ZXCVBN5678"
+  ]
+}

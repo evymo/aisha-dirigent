@@ -12,11 +12,20 @@
  */
 
 import { createContext, runInContext } from 'node:vm';
-import { createSandboxContext, nactiKonfiguraci, type LogLine, type ScheduleDeclaration } from './broker.js';
+import { createSandboxContext, nactiKonfiguraci, nactiPayloadZRunneru, type LogLine, type ScheduleDeclaration } from './broker.js';
+import { sandboxGlobals } from './sandbox-context.js';
 
 // ── Read inputs ──────────────────────────────────────────────────────────────
 
-const rawPayload = process.env.PLUGIN_PAYLOAD ?? '{}';
+// Malý payload jede v ENV; větší (kód pluginu nad strop env jádra) drží runner a běh si ho
+// vyzvedne na token běhu — viz nactiPayloadZRunneru.
+let rawPayload: string;
+try {
+  rawPayload = process.env.PLUGIN_PAYLOAD ?? (await nactiPayloadZRunneru());
+} catch (err) {
+  process.stderr.write(`Fatal: payload běhu nedostupný — ${err instanceof Error ? err.message : String(err)}\n`);
+  process.exit(1);
+}
 let payload: Record<string, unknown>;
 try {
   payload = JSON.parse(rawPayload) as Record<string, unknown>;
@@ -62,23 +71,9 @@ const ctx = createSandboxContext(logs, identity, declaredSchedules);
 
 // Sandbox: restrict globals available to plugin code.
 // The VM sandbox provides scope isolation; the container provides OS isolation.
-const sandbox = createContext({
-  ctx,
-  action,
-  params,
-  console: {
-    log: (...args: unknown[]) => ctx.log('info', args.map(String).join(' ')),
-    warn: (...args: unknown[]) => ctx.log('warn', args.map(String).join(' ')),
-    error: (...args: unknown[]) => ctx.log('error', args.map(String).join(' ')),
-  },
-  // Explicitly block dangerous globals
-  require: undefined,
-  process: undefined,
-  __dirname: undefined,
-  __filename: undefined,
-  global: undefined,
-  globalThis: undefined,
-});
+// WHAT the plugin sees is defined in sandbox-context.ts — one place, which the
+// gate also runs every bundled plugin through.
+const sandbox = createContext(sandboxGlobals(ctx, action, params));
 
 try {
   // Wrap plugin code in an async function and invoke with ctx, action, params

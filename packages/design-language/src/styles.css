@@ -336,6 +336,16 @@
   padding: 10px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; flex-wrap: wrap;
   align-items: center; background: var(--surface-raised);
 }
+.rdl-ask__notice {
+  margin: 0 16px 12px; padding: 8px 12px; border-left: 3px solid var(--warning);
+  background: var(--surface-raised); color: var(--text-strong); font-family: var(--font-sans); font-size: 13px;
+}
+.rdl-ask__passages { padding: 10px 16px; border-top: 1px solid var(--border); font-family: var(--font-sans); }
+.rdl-ask__passages ol { margin: 6px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.rdl-ask__passage { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 13px; color: var(--text-muted); }
+.rdl-ask__passage--cited { color: var(--text); }
+.rdl-ask__ref { font-family: var(--font-mono); font-size: 12px; color: var(--text-strong); }
+.rdl-ask__excerpt { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
 .rdl-ask__input { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
 .rdl-ask__input .rdl-input { flex: 1; }
 

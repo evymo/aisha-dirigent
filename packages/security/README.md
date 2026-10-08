@@ -23,6 +23,7 @@ Published to the AISHA private registry (Verdaccio).
 | `@aisha/security/cors`, `/helmet`, `/rate-limit` | A05 — secure headers + limits |
 | `@aisha/security/ssrf` | A10 — SSRF-safe fetch |
 | `@aisha/security/audit`, `/logger` | A09 — logging + audit |
+| `@aisha/security/log-options` | A09 — `safeLoggerOptions()`: the only way a service builds a Fastify / pino logger (redacted `req` / `err` serializers + message hook) |
 | `@aisha/security/secrets`, `/errors` | A02/A04 — secrets + safe errors |
 
 ## License

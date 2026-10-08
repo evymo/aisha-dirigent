@@ -1,0 +1,30 @@
+/*
+ * Ikony šablon webu jako SVG (2026-10-02).
+ *
+ * Šablony webu (a předloha, ze které vznikly) píší ikony jako `<i class="ti ti-…">`
+ * — třídy písma Tabler Icons. To písmo se na web nikdy nenačítalo (žádný odkaz,
+ * a CSP `font-src 'self' data:` by cizí CDN stejně zablokovala). Ikona tak měla
+ * nulovou šířku, ale mezera tlačítka zůstala — „Download“ v hero webu instance proto
+ * nešel vystředit stylem (naměřeno 2026-10-02: text vlevo 35 px, vpravo 27 px).
+ *
+ * Tady se tytéž třídy vykreslí jako SVG z lucide (jediná knihovna ikon platformy,
+ * ISC licence) přes CSS masku: ikona má barvu textu (`currentColor`), velikost
+ * písma (1em) a nic se nenačítá zvenku. Obsah stránek se nemění — funguje to
+ * i na stránkách, které autor už upravil.
+ *
+ * Styl platí JEN pro známé ikony: neznámá třída nesmí vykreslit plný čtverec.
+ * Novou ikonu přidáš řádkem níž (tvar z node_modules/lucide-react/dist/esm/icons).
+ * Načítá ho src/index.css (web) i plátno editoru (editorConfig, canvasCss).
+ */
+.ti.ti-download, .ti.ti-users {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+  vertical-align: -0.125em;
+  background-color: currentColor;
+  -webkit-mask: var(--ti-ikona) center / contain no-repeat;
+  mask: var(--ti-ikona) center / contain no-repeat;
+}
+.ti.ti-download { --ti-ikona: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpolyline points='7 10 12 15 17 10'/%3E%3Cline x1='12' x2='12' y1='15' y2='3'/%3E%3C/svg%3E"); }
+.ti.ti-users { --ti-ikona: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2'/%3E%3Ccircle cx='9' cy='7' r='4'/%3E%3Cpath d='M22 21v-2a4 4 0 0 0-3-3.87'/%3E%3Cpath d='M16 3.13a4 4 0 0 1 0 7.75'/%3E%3C/svg%3E"); }

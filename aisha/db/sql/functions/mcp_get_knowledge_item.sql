@@ -1,14 +1,44 @@
 -- Function: mcp_get_knowledge_item
 
-CREATE OR REPLACE FUNCTION public.mcp_get_knowledge_item(p_item_id uuid DEFAULT NULL::uuid, p_source_slug text DEFAULT NULL::text)
+-- PRO KOHO se čte (stejný vzor jako hledání v2/v3): jen služba smí říct, za koho čte
+-- (p_audience_user_id); přihlášený je připnutý na sebe a cizí publikum od něj se ignoruje;
+-- anonym a služba bez publika jsou bez identity. Do 2026-10-04 funkce parametr publika neměla
+-- a četla auth.uid() — nástroj MCP ji ale volá servisní rolí, takže KAŽDÝ uživatel MCP četl
+-- podle id jako anonym: úroveň členství se neuznala a položku vlastního příběhu nedostal.
+--
+-- Viditelnost (2026-10-05): jeden domov public.knowledge_visibility_searchable pro toho, PRO KOHO
+-- se čte — bez identity jen `public`, přihlášenému `members`, gildě `guild`. Správa (podle publika)
+-- čte i `private`: do 2026-10-05 tu stál vlastní výčet ('public', 'members') pro všechny, takže
+-- `members` šlo anonymovi a správa soukromou položku podle id nedostala (změřeno: 0).
+-- Položka příběhu podle pravidel příběhu (vlastník, účastník, správa) — viditelnost u ní nerozhoduje,
+-- stejně jako v hledání v2 a v politice tabulky pro účastníky.
+--
+-- Signatura se mění výměnou: dvě přetížení lišící se jen parametrem s výchozí hodnotou by
+-- znamenala, že volání dvěma jmennými parametry skončí „is not unique“ (poučení z hledání v2).
+DROP FUNCTION IF EXISTS public.mcp_get_knowledge_item(uuid, text);
+
+CREATE OR REPLACE FUNCTION public.mcp_get_knowledge_item(p_item_id uuid DEFAULT NULL::uuid, p_source_slug text DEFAULT NULL::text, p_audience_user_id uuid DEFAULT NULL::uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
- SET search_path TO 'public'
+ SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 AS $function$
 DECLARE
   v_result jsonb;
+  v_caller_role text;
+  v_audience_user uuid;  -- pro koho se čte (služba smí říct; jinak volající sám; bez identity NULL)
+  v_in_guild boolean;    -- má ten, pro koho se čte, profil partnera (viditelnost `guild`)
+  v_is_admin boolean;    -- je ten, pro koho se čte, správa (čte vše, i soukromé)
 BEGIN
+  v_caller_role := public.get_jwt_role();
+  v_audience_user := CASE
+    WHEN v_caller_role = 'service_role' THEN COALESCE(p_audience_user_id, auth.uid())
+    ELSE auth.uid()
+  END;
+  -- Počítá se JEDNOU a z toho, PRO KOHO se čte; bez identity obojí false.
+  v_in_guild := public.knowledge_audience_in_guild(v_audience_user);
+  v_is_admin := COALESCE(public.is_admin_or_staff(v_audience_user), false);
+
   SELECT jsonb_build_object(
     'id', ki.id,
     'item_type', ki.item_type::text,
@@ -58,35 +88,31 @@ BEGIN
   FROM knowledge_items ki
   LEFT JOIN guild_expertise_areas gea ON gea.id = ki.expertise_area_id
   WHERE ki.status = 'active'
-    AND ki.visibility IN ('public', 'members')
-    -- Brick6 tier-ACL. Gate single-item retrieval by the caller's audience tier,
-    -- mirroring the HARD filter in mcp_search_knowledge_v2/v3 — an under-tier caller
-    -- must never fetch a gated item by id/slug. Pinned to auth.uid() with NO
-    -- service_role override, same rationale as the story-isolation block below: the
-    -- MCP get_knowledge_item tool dispatches this as service_role (auth.uid() NULL),
-    -- so tier-gated items collapse to ungated-only there — fail-closed is correct.
+    -- Jen čitelný stav: položku v karanténě ani nezměřenou nevydá ani dotaz na id/slug.
+    AND public.knowledge_state_readable(ki.quarantine_status)
+    -- Brick6 tier-ACL: úroveň členství se měří u toho, PRO KOHO se čte — tvrdý filtr jako
+    -- v hledání v2/v3. Bez identity (anonym, služba bez publika) projde jen položka bez úrovně.
     AND (
       ki.minimum_tier IS NULL
-      OR public.audience_user_meets_tier_requirement(ki.minimum_tier, auth.uid())
+      OR public.audience_user_meets_tier_requirement(ki.minimum_tier, v_audience_user)
     )
-    -- Per-story isolation. Story-scoped items default to visibility='public'
-    -- (upsert_story_knowledge_item_audited), so the visibility filter alone would
-    -- hand any anon/authenticated caller another story's full body_markdown +
-    -- ai_instructions + chunk_text by id/slug. Global items (story_id IS NULL)
-    -- stay public; story-scoped items only go to owner/participant/admin.
-    -- Deliberately NO service_role bypass: the MCP get_knowledge_item tool
-    -- dispatches this as service_role (auth.uid() NULL), so story items collapse
-    -- to global-only there — the correct behaviour for a global KB accessor.
+    -- Kdo položku dostane — podle toho, PRO KOHO se čte:
+    --  · správa: vše (i `private`);
+    --  · globální položka: podle viditelnosti z JEDNOHO domova (žádný vlastní výčet);
+    --  · položka příběhu: vlastník a účastník. Položka příběhu má výchozí viditelnost 'public'
+    --    (upsert_story_knowledge_item_audited), takže viditelnost u ní rozhodovat NESMÍ — vydala by
+    --    komukoli celé tělo, pokyny i úryvky cizího příběhu.
+    -- Servisní role tu ŽÁDNOU výjimku nemá: bez publika zbývají jen globální položky `public`.
     AND (
-      ki.story_id IS NULL
-      OR public.is_admin_or_staff(auth.uid())
+      v_is_admin
+      OR (ki.story_id IS NULL AND public.knowledge_visibility_searchable(ki.visibility, v_audience_user IS NOT NULL, v_in_guild))
       OR EXISTS (
         SELECT 1 FROM partner_stories ps
-        WHERE ps.id = ki.story_id AND ps.user_id = auth.uid()
+        WHERE ps.id = ki.story_id AND ps.user_id = v_audience_user
       )
       OR EXISTS (
         SELECT 1 FROM story_participants sp
-        WHERE sp.story_id = ki.story_id AND sp.user_id = auth.uid()
+        WHERE sp.story_id = ki.story_id AND sp.user_id = v_audience_user
       )
     )
     AND (
@@ -104,7 +130,7 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION mcp_get_knowledge_item(uuid, text) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION mcp_get_knowledge_item(uuid,text) TO anon;
-GRANT EXECUTE ON FUNCTION mcp_get_knowledge_item(uuid,text) TO authenticated;
-GRANT EXECUTE ON FUNCTION mcp_get_knowledge_item(uuid,text) TO service_role;
+REVOKE ALL ON FUNCTION mcp_get_knowledge_item(uuid, text, uuid) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION mcp_get_knowledge_item(uuid, text, uuid) TO anon;
+GRANT EXECUTE ON FUNCTION mcp_get_knowledge_item(uuid, text, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION mcp_get_knowledge_item(uuid, text, uuid) TO service_role;

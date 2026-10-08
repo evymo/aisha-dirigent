@@ -190,7 +190,7 @@ function projdi(dir) {
       neprectene.push({ cesta: rel, duvod: `soubor nelze číst: ${e.code ?? e.message}` });
       continue;
     }
-    if (text.indexOf(" ") !== -1) continue; // binárka
+    if (text.indexOf("\0") !== -1) continue; // binárka
 
     // Klíče služeb (`^  <jmeno>:`) jsou jména platná jen uvnitř souboru.
     const kliceSluzeb = new Set(

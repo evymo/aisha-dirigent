@@ -12,33 +12,28 @@
  * @module svc-mcp-knowledge/lib/flowboard-tools
  */
 
-import { z } from 'zod';
 import { createSafeLogger } from '@aisha/security';
 import type { JWTPayload } from 'jose';
 import { draftHelpInboxFlow } from '@aisha/flowboard-core';
 import { rpcUserClaims } from '../postgrest.js';
+import { draftArgsSchema, FLOWBOARD_TOOL_INPUTS } from './flowboard-tool-inputs.js';
 
 const log = createSafeLogger('flowboard-mcp');
 
-const draftArgsSchema = z.object({
-  recipe: z.string().default('help_inbox'),
-  agent_slug: z.string().optional(),
-  mailbox: z.string().optional(),
-});
-
 export async function flowboardDispatch(
   name: string,
-  args: Record<string, unknown>,
+  rawArgs: Record<string, unknown>,
   claims: JWTPayload,
 ): Promise<unknown> {
   switch (name) {
     case 'get_flowboard_registry': {
+      FLOWBOARD_TOOL_INPUTS.get_flowboard_registry.parse(rawArgs ?? {});
       const agents = await rpcUserClaims('get_flowboard_agent_catalog', {}, claims);
       log.safeInfo('flowboard.registry.read');
       return { agents };
     }
     case 'draft_flow': {
-      const parsed = draftArgsSchema.parse(args ?? {});
+      const parsed = draftArgsSchema.parse(rawArgs ?? {});
       log.safeInfo('flowboard.draft', { recipe: parsed.recipe });
       // Canonical recipe lives in @aisha/flowboard-core — no local duplicate.
       return draftHelpInboxFlow({ storyAgentSlug: parsed.agent_slug, mailbox: parsed.mailbox });

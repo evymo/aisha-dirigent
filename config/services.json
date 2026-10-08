@@ -55,6 +55,93 @@
     "promotion/demotion, and per-service env without touching this catalog."
   ],
   "services": {
+    "accel-chat-1": {
+      "role": "accel-engine",
+      "tier": "optional",
+      "subdomain": null,
+      "public": false,
+      "provision_when_env": "ACCEL_CHAT_1_REPO",
+      "compose": "docker-compose.coolify-accel-chat-1.yml",
+      "placement": "gpu",
+      "depends_on": ["accel-vstup"],
+      "_comment": [
+        "Chatový slot operátorské lane (vLLM generate) s LoRA adaptéry nájemců (lens) na síti jádra.",
+        "Model, adaptéry a meze LoRA rozhoduje deklarace uzlu (data instance vlastníka vrstvy);",
+        "adaptéry se načítají staticky (--lora-modules), načítání za běhu je vypnuté. Slot bez",
+        "enginu v deklaraci = zavřená lane. Bez `internal_url`: oslovuje ho jen vstup lane."
+      ]
+    },
+    "accel-embed-1": {
+      "role": "accel-engine",
+      "tier": "optional",
+      "subdomain": null,
+      "public": false,
+      "provision_when_env": "ACCEL_EMBED_1_REPO",
+      "compose": "docker-compose.coolify-accel-embed-1.yml",
+      "placement": "gpu",
+      "depends_on": ["accel-vstup"],
+      "_comment": [
+        "Slot enginu 1 operátorské lane (vLLM pooling) na interní síti jádra vlastníka uzlu.",
+        "Který model servíruje a komu, rozhoduje deklarace uzlu (data instance vlastníka vrstvy,",
+        "accel/uzel.json → derive-accel-uzel.mjs). Slot bez enginu v deklaraci = zavřená lane.",
+        "Engine na nájemce (O-4): slot slouží jedinému nájemci, sdílet smí jen diagnostika.",
+        "Bez `internal_url`: engine oslovuje jen vstup lane, jménem kontejneru na síti jádra."
+      ]
+    },
+    "accel-embed-2": {
+      "role": "accel-engine",
+      "tier": "optional",
+      "subdomain": null,
+      "public": false,
+      "provision_when_env": "ACCEL_EMBED_2_REPO",
+      "compose": "docker-compose.coolify-accel-embed-2.yml",
+      "placement": "gpu",
+      "depends_on": ["accel-vstup"],
+      "_comment": ["Slot enginu 2 — týž kontrakt jako accel-embed-1."]
+    },
+    "accel-hostfw": {
+      "role": "accel-host-firewall",
+      "tier": "optional",
+      "subdomain": null,
+      "public": false,
+      "provision_when_env": ["ACCEL_FW_NODE_OWNER", "ACCEL_FW_SSH"],
+      "compose": "docker-compose.coolify-accel-hostfw.yml",
+      "placement": "gpu",
+      "sit_hostitele": "Firewall hostitele zapisuje pravidla do řetězců INPUT a DOCKER-USER jmenného prostoru hostitele; z vlastní sítě by je nezapsal.",
+      "schopnosti": { "NET_RAW": "iptables-legacy otevírá raw socket (IPT_SO_SET_REPLACE) na hostitelích, kde Docker drží DOCKER-USER v legacy tabulkách" },
+      "depends_on": [],
+      "_comment": [
+        "Hostitelský firewall uzlu `gpu` (řetězec DOCKER-USER + INPUT): dovnitř smí jen",
+        "správa po SSH z deklarovaných adres a UDP portu meshe, zbytek se zahodí; neznámý",
+        "režim nebo prázdné adresy správy = firewall nenaběhne (fail-closed). Nemá vnitřní",
+        "adresu — nic ho neoslovuje, proto `subdomain: null`. Přepínačem je SAMA deklarace",
+        "uzlu (accel/uzel.json v datech instance vlastníka vrstvy → ACCEL_FW_*): majitel",
+        "2026-10-05 — nejdřív firewall, lane až po něm (accel-vstup na něm závisí). Žádný nový",
+        "příznak: deklarace, kterou firewall stejně potřebuje, je i jeho plnič."
+      ]
+    },
+    "accel-vstup": {
+      "role": "accel-lane-vstup",
+      "tier": "optional",
+      "subdomain": null,
+      "public": false,
+      "provision_when_env": "ACCEL_DEKLARACE_B64",
+      "compose": "docker-compose.coolify-accel-vstup.yml",
+      "placement": "gpu",
+      "schopnosti": { "CHOWN": "accel-prava (one-shot, bez sítě) předá svazky vrstvy uživateli 1000, pod kterým běží všechny ostatní služby vrstvy" },
+      "socket_dockeru": { "accel-docker-proxy": "hlídač členství (O-2) čte přes proxy Docker API: jen GET vyjmenovaných cest, proxy i hlídač bez sítě (network_mode: none)" },
+      "depends_on": ["accel-hostfw"],
+      "_comment": [
+        "Vstup operátorské lane na GPU uzlu: vynucovací bod (VB) a jeho one-shoty (váhy, práva,",
+        "deklarace), hlídač členství a proxy socketu. Compose ZAKLÁDÁ sítě lane: interní jádro",
+        "`<vlastník>-accel-jadro` a 8 sítí slotů `<vlastník>-lane-<nájemce|volny-n>` (internal, bez",
+        "IPv6, podsíť a rozsah klientů z deklarace) — nikdo na uzlu nemá zapisovací socket Dockeru.",
+        "Přepínačem je deklarace uzlu (data instance vlastníka vrstvy, accel/uzel.json): z ní",
+        "derive-accel-uzel.mjs odvodí ACCEL_DEKLARACE_B64 i ostatní env vrstvy. Na GPU slotu",
+        "Coolify nasazuje compose RAW (síť aplikace ani env_file do služeb nepřidá, jména nemění).",
+        "Bez `internal_url`: nájemce oslovuje vstup IP adresou na své síti (profil lane_gpu)."
+      ]
+    },
     "admin": {
       "role": "admin-ui",
       "tier": "optional",
@@ -135,7 +222,7 @@
       "compose": "docker-compose.coolify-clamav.yml",
       "placement": "backend",
       "depends_on": [],
-      "_comment": "Shared ClamAV (clamd) antivirus sidecar. Non-HTTP TCP 3310, reachable on the shared coolify network as `clamd`. Flow-through malware scanner for the upload path (storage-auth / svc-web-artifact) BEFORE an object is promoted to a durable bucket or vectorized, and (later) mailserver attachments. clamd.conf with scan limits + AlertEncrypted is baked into the image (bake-not-bind). Verdicts persisted via record_comm_av_scan_audited (fail-closed)."
+      "_comment": "Shared ClamAV (clamd) antivirus sidecar. Non-HTTP TCP 3310, reachable on the shared coolify network as `clamd`. Flow-through malware scanner for the upload path (storage-auth / svc-web-artifact) BEFORE an object is promoted to a durable bucket or vectorized, and (later) mailserver attachments. Since 2026-10-03 the same client (@aisha/security/av-scan) also guards the two file intakes that bypassed the upload path: documents synced from external storage into local-ingest (docs-scan sidecar: quarantine → scan → engine input) and admin uploads into the knowledge base (svc-mcp-knowledge /ragnarok/upload). All consumers get the address from the same delivered CLAMD_HOST; unreachable clamd is fail-closed everywhere. clamd.conf with scan limits + AlertEncrypted is baked into the image (bake-not-bind). Verdicts persisted via record_comm_av_scan_audited (fail-closed)."
     },
     "core": {
       "external_connectivity": "ingress",
@@ -572,8 +659,9 @@
       "subdomain": "model",
       "public": false,
       "canonical_scope": "internal",
-      "provision_when_env": "CHAT_GGUF_URL",
+      "provision_when_env": ["CHAT_GGUF_URL", "MODEL_MESH"],
       "compose": "docker-compose.coolify-model.yml",
+      "compose_gpu": "docker-compose.coolify-model-gpu.yml",
       "placement": "experimental",
       "depends_on": [],
       "_comment": "svc-model — generic OpenAI-compat local model serving (llama.cpp: chat + embeddings). Opt-in (tier=optional, placement experimental): runs only when the instance supplies its model weights via CHAT_GGUF_URL (compose fails loud otherwise). The DNA — which model/lens (MODEL_ALIAS) and the GGUF weights — lives in the instance overlay, never in the stack. Mirrors the local-ingest contract: generic engine, instance supplies the data.",
@@ -599,6 +687,42 @@
         "logs"
       ],
       "_comment": "Dozzle log viewer. Optional ops surface."
+    },
+    "netbird-model": {
+      "external_connectivity": "ingress",
+      "role": "model-mesh-control",
+      "tier": "optional",
+      "subdomain": "mesh-model",
+      "public": true,
+      "canonical_scope": "public",
+      "provision_when_env": "MODEL_MESH",
+      "compose": "docker-compose.coolify-netbird-model.yml",
+      "mesh_bootstrap_dependency": true,
+      "placement": "backend",
+      "depends_on": [
+        "keycloak"
+      ],
+      "_comment_mesh": "Řídicí rovina MODELOVÉHO meshe — předpoklad zápisu jeho peerů (uzel na GPU slotu), takže na mesh stát nemůže; do hlavního meshe forku nepatří vůbec (varianta C: oddělené meshe, most je jediné místo styku).",
+      "_comment": "Modelový mesh forku (varianta C, aisha.decision 2026-10-05 03:17:54Z): druhá instance stacku NetBird z téhož generátoru (scripts/gen-netbird-instance.mjs, config/netbird-instances.json). Lane MODEL_MESH ODVOZUJE derive-domains z umístění modelu (`model` na slotu s has_gpu) — nečte se z prostředí. Veřejně jen přes edge forku (TCP 443, Signal/Relay pod týmž jménem, D2); peery jen jednorázovým klíčem (C1); DNS doména meshe pod mesh zónou instance. depends_on keycloak: management si při startu tahá OIDC konfiguraci jako hlavní mesh."
+    },
+    "model-most": {
+      "role": "model-mesh-bridge",
+      "tier": "optional",
+      "subdomain": "model-most",
+      "public": false,
+      "canonical_scope": "internal",
+      "provision_when_env": "MODEL_MESH",
+      "compose": "docker-compose.coolify-model-most.yml",
+      "placement": "backend",
+      "depends_on": [
+        "netbird-model"
+      ],
+      "mesh_most_pro": "model",
+      "internal_url": {
+        "service": "model-mesh-agent",
+        "port": 8000
+      },
+      "_comment": "Most modelového meshe forku (varianta C, krok C4) — JEDINÉ místo, kde se hlavní mesh potká s modelovým. V hlavním meshi drží jméno modelu (`mesh_most_pro`), takže dispatch volá SVC_MODEL_URL beze změny; ve svém druhém jmenném prostoru je peerem modelového meshe (skupina model-most, jednorázový klíč z bootstrapu) a most-proxy předává JEN hlavní → modelový na uzel na GPU slotu (IP z bootstrapu, port modelu). Mezi jmennými prostory jen L7 proxy, ip_forward=0. internal_url.service = agent modelového meshe: most-proxy bydlí v jeho netns, takže síťový koncový bod (jméno na síti mostu) nese agent. Port = port modelu (derivace to vynucuje)."
     },
     "netbird": {
       "external_connectivity": "ingress",
@@ -934,7 +1058,12 @@
       "depends_on": [
         "edge"
       ],
-      "_comment": "Předgenerování publikovaných stránek do statického HTML (svc-web-render). Výstup a skořápka jsou hostitelské adresáře TÉTO instance (WEB_RENDER_STATIC_HOST_DIR / WEB_RENDER_SHELL_HOST_DIR, generátor je odvozuje z identity) — dřív doslovné /var/lib/aisha/web-{static,shell}, do kterých zapisovaly renderery dvou instancí na jednom stroji (naměřeno 2026-09-23). Kdo je s rendererem sdílí, MUSÍ běžet na témže stroji (placement: frontend) — hostitelský adresář hranici stroje nepřekročí. Vlastní aplikace ZÁMĚRNĚ: jako kontejner uvnitř `edge` (tier: required) by po dosažení limitu restartů shodila `StopApplication` celou veřejnou tvář — web, api, auth i extranet naráz (naměřeno 2026-08-31, dvakrát). Když neběží, nginx nenajde předgenerovaný soubor a spadne na SPA fallback: pomalejší první vykreslení, funkční web."
+      "internal_url": {
+        "service": "svc-web-render",
+        "port": 3040,
+        "_comment": "Předání po síti (varianta d-ii, rozhodnutí majitele 2026-10-02): web (Edge) si předrenderované stránky TÁHNE přímo MESHEM (vlastní routa do rozsahu peerů, WEB_RENDER_UPSTREAM_MESH z derivace) a skořápku posílá `PUT /shell` toutéž cestou. Žádný relay na sdílené síti `coolify` (revize 2026-10-02). Bez mesh tváře by na web-render nebylo jak dosáhnout bez sdílené sítě mezi aplikacemi."
+      },
+      "_comment": "Předgenerování publikovaných stránek do statického HTML (svc-web-render). Výstup i skořápka leží ve VLASTNÍCH pojmenovaných svazcích této aplikace (per instance konstrukcí — Coolify je pojmenuje podle UUID). Dřív se sdílely hostitelské adresáře WEB_RENDER_*_HOST_DIR s webem, jenže Coolify 4.3.16 holý `${VAR}` ve zdroji svazku převede na pojmenovaný svazek KAŽDÉ aplikace zvlášť, takže web četl prázdný `_static` (rozbor 2026-09-28). Vlastní aplikace ZÁMĚRNĚ: jako kontejner uvnitř `edge` (tier: required) by po dosažení limitu restartů shodila `StopApplication` celou veřejnou tvář — web, api, auth i extranet naráz (naměřeno 2026-08-31, dvakrát). Když neodpovídá, Edge servíruje SPA skořápku: pomalejší první vykreslení, funkční web."
     }
   },
   "extras": {

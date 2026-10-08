@@ -55,5 +55,5 @@ jobs:
           node scripts/registry/obraz-jde-stahnout.mjs || rc=$?
           # 1 = aspoň jeden CHYBÍ → červeně. 2 = jen NEZMĚŘENO → varování, ne pád.
           if [ "$rc" -eq 1 ]; then exit 1; fi
-          if [ "$rc" -eq 2 ]; then echo "::warning title=obrazy NEZMĚŘENY::část pinů se nepodařilo změřit (síť/registr) — výsledek není „dostupné"."; fi
+          if [ "$rc" -eq 2 ]; then echo "::warning title=obrazy NEZMĚŘENY::část pinů se nepodařilo změřit (síť/registr) — výsledek není „dostupné“."; fi
           exit 0

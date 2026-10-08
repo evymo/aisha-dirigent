@@ -48,6 +48,7 @@ import { fileURLToPath } from "url";
 import { psqlPripojeni } from "./lib/psql-pripojeni.mjs";
 import { registryProxyBuildArgs } from "../lib/registry-proxy.mjs";
 import { argumentyTajemstvi } from "../lib/throwaway-db-tajemstvi.mjs";
+import { vychoziObrazDb } from "../lib/throwaway-db-obraz.mjs";
 import { postgresMajor, postgresMajorBuildArgs } from "../lib/postgres-major.mjs";
 import { jmenoKontejneru, mrtveKontejnery, procesZije } from "./lib/throwaway-kontejner.mjs";
 
@@ -61,8 +62,10 @@ if (process.env.AISHA_PG17_IMAGE) {
   process.exit(1);
 }
 const PG_MAJOR = postgresMajor();
-// Tag nese major verzi: obraz 17 z lokální cache se nesmí vzít, když se měří 18.
-const DEFAULT_IMAGE = `aisha-db-throwaway:pg${PG_MAJOR}`;
+// Tag nese major verzi A OTISK obsahu infra/postgres — týž jako testovací DB.
+// ⛔ Dřív proměnlivý `aisha-db-throwaway:pg<major>`: kdo ho přestavěl ze svého stromu,
+// změnil, co spouští typegen všech worktree (scripts/lib/throwaway-db-obraz.mjs).
+const DEFAULT_IMAGE = vychoziObrazDb(ROOT, PG_MAJOR);
 const IMAGE = process.env.AISHA_THROWAWAY_DB_IMAGE || DEFAULT_IMAGE;
 const PREFIX = "aisha-typegen-throwaway";
 const CONTAINER_EXPLICIT = Boolean(process.env.AISHA_TYPEGEN_CONTAINER?.trim());

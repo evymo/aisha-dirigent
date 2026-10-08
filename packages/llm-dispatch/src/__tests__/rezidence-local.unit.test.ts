@@ -25,6 +25,7 @@ const ENV_KLICE = [
   "OLLAMA_URL",
   "DOCKER_MODEL_RUNNER_URL",
   "VLLM_GENERATION_URL",
+  "VLLM_API_KEY",
   "MAESTRO_URL",
   "MAESTRO_API_KEY",
   "AISHA_LLM_GATEWAY_URL",
@@ -43,6 +44,7 @@ beforeEach(() => {
   process.env.OPENAI_API_KEY = "sk-test-atrapa";
   process.env.ANTHROPIC_API_KEY = "sk-ant-test-atrapa";
   process.env.VLLM_GENERATION_URL = "http://127.0.0.1:8000/v1";
+  process.env.VLLM_API_KEY = "k-test-atrapa";
 });
 
 afterEach(() => {

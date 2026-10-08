@@ -62,6 +62,13 @@ function atrapa(k,   s) {
   # jména — atrapa jiného typu, tedy měření nad jinak vyrenderovaným souborem.
   if (k ~ /(_IP$|_IP_|IPV4|_ADDRESS$)/)             return "192.0.2.2"
   if (k ~ /(PORT$|PORT_|_PORTS$)/)                  return "18080"
+  # Atrapa TYPU pro klíče DOB v sekundách (`*_S`): compose je skládá do doby
+  # (`start_period: ${X}s`) a typový parser by „orakulum-…s" odmítl jako
+  # neplatnou dobu — soubor by pak byl NEZMĚŘENO kvůli atrapě, ne kvůli sobě.
+  # Dnes se týká právě dvou holých klíčů firewallu hostitele: ACCEL_FW_CONFIRM_S
+  # (jde do `start_period`) a ACCEL_FW_INTERVAL_S; ostatní `*_S` v compose mají
+  # vlastní náhradu (`:-`), takže atrapu nedostávají.
+  if (k ~ /_S$/)                                    return "30"
   if (k ~ /(CPUS|_CPU$)/)                           return "1.0"
   if (k ~ /(_MEM$|MEMORY|_MEM_)/)                   return "512m"
   if (k ~ /^IMAGE_/ || k ~ /_IMAGE$/)               return "alpine:3"

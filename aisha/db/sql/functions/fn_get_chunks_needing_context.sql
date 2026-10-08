@@ -12,10 +12,10 @@
 -- Source migration: aisha/db/migrations/20260518210000_contextual_retrieval.sql
 -- ============================================================================
 
--- Brick3 locale axis: locale added to RETURNS TABLE. Appending an OUT column
--- changes the result shape, so the old definition must be DROPped before CREATE
--- (CREATE OR REPLACE cannot change the return type).
-DROP FUNCTION IF EXISTS public.fn_get_chunks_needing_context(integer, uuid);
+-- Brick3 locale axis: locale added to RETURNS TABLE.
+-- Bez DROP: návratový tvar s `locale` (Brick3, 2026-06-28) má i nejstarší podporovaná databáze
+-- (dno 2026-07-29), takže CREATE OR REPLACE stačí. Soubor je v heals — DROP téže signatury by
+-- běžel při každém migrate a nic nepřidal.
 
 CREATE OR REPLACE FUNCTION public.fn_get_chunks_needing_context(
   p_batch_size integer DEFAULT 20,
@@ -33,7 +33,7 @@ RETURNS TABLE (
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 STABLE
 AS $$
 BEGIN
@@ -48,6 +48,8 @@ BEGIN
     JOIN public.knowledge_items ki ON ki.id = kc.knowledge_item_id
    WHERE kc.contextual_prefix IS NULL
      AND ki.status = 'active'
+     -- Jen položka v čitelném stavu: úryvek i tělo položky jdou modelu, který kontext píše.
+     AND public.knowledge_state_readable(ki.quarantine_status)
      AND (p_item_id IS NULL OR kc.knowledge_item_id = p_item_id)
    ORDER BY kc.knowledge_item_id, kc.chunk_index
    LIMIT p_batch_size;
@@ -58,4 +60,4 @@ REVOKE ALL ON FUNCTION public.fn_get_chunks_needing_context(integer, uuid) FROM 
 GRANT EXECUTE ON FUNCTION public.fn_get_chunks_needing_context(integer, uuid) TO service_role;
 
 COMMENT ON FUNCTION public.fn_get_chunks_needing_context(integer, uuid) IS
-  'Backfill / new-chunk worker queue: returns up to p_batch_size chunks (from active items) whose contextual_prefix is NULL. Service-role only.';
+  'Backfill / new-chunk worker queue: returns up to p_batch_size chunks (from active items in a readable safety state) whose contextual_prefix is NULL. Service-role only.';

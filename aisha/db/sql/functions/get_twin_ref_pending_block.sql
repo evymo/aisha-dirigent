@@ -31,7 +31,7 @@ AS $$
       -- `value` je null, ne nula: nula by tvrdila měření, které nikdo neprovedl.
       jsonb_build_object('data', jsonb_build_object('value', null),
         'provenance', jsonb_build_object('source_slug', 'twin-identity',
-          'trace_id', 'twin-ref-pending:unauthenticated', 'freshness_at', to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))
+          'trace_id', 'twin-ref-pending:unauthorized', 'freshness_at', to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')))
     when p_params->>'source' is null then
       jsonb_build_object('data', jsonb_build_object('value', null),
         'provenance', jsonb_build_object('source_slug', 'twin-identity',

@@ -64,7 +64,7 @@ BEGIN
     FROM expert_rules er
     WHERE er.id = ANY(v_rule_ids)
       AND er.status = 'published'
-      AND er.visibility IN ('public', 'members');
+      AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid());
   ELSE
     SELECT COALESCE(jsonb_agg(
       jsonb_build_object(
@@ -79,7 +79,8 @@ BEGIN
     FROM expert_rules er
     WHERE er.is_default = true
       AND er.status = 'published'
-      AND er.visibility = 'public';
+      -- výchozí pravidla = veřejný artefakt: bez identity (jen `public`)
+      AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, NULL::uuid);
   END IF;
 
   -- 3. Extract distinct categories

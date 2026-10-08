@@ -18,6 +18,7 @@
 import { describe, expect, test } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import { isMeshHost, withoutMeshHosts } from "../../../scripts/lib/mesh-host.mjs";
 
 const ROOT = process.cwd();
@@ -54,10 +55,32 @@ describe("mesh jméno není Coolify doména (brána)", () => {
     expect(DOCTOR).toMatch(/report\.storedMeshRoutes = storedMesh/);
   });
 
-  test("nasazovací rovina mesh jména vynechává taky — obě roviny mluví stejně", () => {
-    const fn = /set_coolify_domains\(\) \{[\s\S]*?\n\}/.exec(DEPLOY_INIT);
-    expect(fn, "v coolify-deploy-init.sh chybí set_coolify_domains()").not.toBeNull();
-    expect(fn![0]).toMatch(/\*\.internal\|\*\.internal:\*\|\*\.internal\/\*\)/);
-    expect(fn![0]).toMatch(/continue/);
+  test("nasazovací rovina mesh jména vynechává taky — SPUŠTĚNO, ne čteno", () => {
+    // ⛔ (2026-10-02) Dřív se tu hledal TEXT `*.internal|…)` + `continue` uvnitř
+    // set_coolify_domains. Ten vzor ale chytal i podřetězec hodnoty s víc hosty
+    // a celou položku přeskočil — boční veřejný router tak v Coolify zůstal.
+    // Pravidlo má teď jeden domov (domena_pro_coolify, zrcadlo domenaProCoolify)
+    // a měří se CHOVÁNÍ: mesh host se do odesílané hodnoty nedostane nikdy.
+    const fn = /\ndomena_pro_coolify\(\) \{[\s\S]*?\n\}\n/.exec(DEPLOY_INIT);
+    expect(fn, "v coolify-deploy-init.sh chybí domena_pro_coolify()").not.toBeNull();
+    const set = /set_coolify_domains\(\) \{[\s\S]*?\n\}/.exec(DEPLOY_INIT);
+    expect(set![0], "set_coolify_domains musí hodnotu skládat přes domena_pro_coolify").toMatch(
+      /svc_domain_coolify="\$\(domena_pro_coolify "\$svc_name" "\$svc_domain"\)"/,
+    );
+    const vzorky = [
+      "https://svc.mesh.inst.internal:4180",
+      "https://svc.mesh.inst.internal:4180,https://pub.example.com:4180",
+      "https://pub.example.com, https://b.mesh.inst.internal/cesta",
+      "https://pub.example.com",
+    ];
+    for (const domena of vzorky) {
+      const r = spawnSync("bash", ["-c", `set -uo pipefail\n${fn![0]}\ndomena_pro_coolify svc '${domena}'`], {
+        encoding: "utf-8",
+        env: { PATH: process.env.PATH ?? "", APP_NAME_PREFIX: "inst", EDGE_OWNED_HOSTS: "" },
+      });
+      expect(r.status, r.stderr).toBe(0);
+      expect(r.stdout.split(",").some((h) => isMeshHost(h)), `${domena} → ${r.stdout}`).toBe(false);
+      expect(r.stdout, domena).not.toBe("");
+    }
   });
 });

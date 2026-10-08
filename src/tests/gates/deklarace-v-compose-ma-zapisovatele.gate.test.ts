@@ -97,6 +97,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readdirSync, readFileSync, rmSync, existsSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { envDoktorDokoncil } from "./_env-doktor-dokoncil";
 
 const ROOT = join(__dirname, "../../..");
 const COLD_START = join(ROOT, "scripts/aisha-cold-start.sh");
@@ -256,6 +257,12 @@ const JEN_COLD_START_DNES = new Set([
   "NETSEG_BACKEND_NET",
   "NETSEG_DATA_NET",
   "NETSEG_FRONTEND_NET",
+  // Hostitelský port managementu HLAVNÍHO meshe — adresní plán instance: deterministický
+  // z identity (cold-start, cksum APP_NAME_PREFIX → 33074..33873; primární instance 33073),
+  // po nasazení se nemění (změna = jiný port = cold-start). Cold-start ho píše od 2026-05,
+  // nasazené instance ho tedy v env mají. Čte ho most modelového meshe `:?` — dřívější
+  // `:-33073` by forku při redeployi bez klíče tiše dal port PRIMÁRNÍ instance.
+  "NETBIRD_MESH_PORT",
   // Vlastnost NASAZENÍ, kterou nelze odvodit: Ragnarok je vnitřní služba bez
   // veřejné tváře, ze které derivace staví mesh jména (aisha-env-doctor.mjs,
   // kontrakt `["RAGNAROK_URL", "placeholder"]`; generate-secrets
@@ -357,7 +364,7 @@ function zapisyDoktoraSpustenim(identita: { prefix: string; story: string }): Za
     });
     stderr = beh.stderr ?? "";
     if (beh.error) throw beh.error;
-    if (beh.status !== 0) {
+    if (!envDoktorDokoncil(beh.status)) {
       throw new Error(`env-doktor skončil s kódem ${beh.status}: ${stderr.trim().split("\n").slice(-3).join(" | ")}`);
     }
     if (!existsSync(envFile)) throw new Error(`env-doktor doběhl, ale ${envFile} nezapsal`);

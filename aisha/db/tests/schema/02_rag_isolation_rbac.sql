@@ -9,8 +9,10 @@
 --       (a) mcp_search_knowledge_v3 with a foreign p_story_id  → 42501
 --       (b) compose_context with a non-participant p_requester_id → 42501
 --       (c) owner / participant / admin succeed for both
---       (d) v3: service-role bypass by design — keyed on the JWT role claim
---           (get_jwt_role()), session SET ROLE alone gets no bypass;
+--       (d) v3: a service-role call is not refused — keyed on the JWT role claim
+--           (get_jwt_role()), session SET ROLE alone is still story-gated. Since 2026-10-05
+--           a service call WITHOUT an audience reads global `public` items only (as in v2); story
+--           items need p_audience_user_id with access — measured in the runtime tests;
 --           compose_context: story-scoped call with NO resolvable requester
 --           is fail-closed (42501) — hardened, no silent service-role bypass
 --   (2) DATA-level isolation — seed a story-scoped item + a global item and prove
@@ -22,9 +24,10 @@
 --       (D4) mcp_get_knowledge_item: anon caller cannot read a story item by id
 --       (D5) mcp_get_knowledge_item: a participant CAN read its story item
 --       (D6) mcp_get_knowledge_item: global items stay readable by anon
---   (The 9-arg mcp_search_knowledge_v2 `story_id IS NULL` fix cannot be invoked
---    unambiguously from raw SQL — both v2 overloads accept a 9-arg call — so it
---    is locked by the static gate + cold-start compile instead.)
+--   (mcp_search_knowledge_v2 called WITHOUT a story is measured per role in
+--    src/tests/db/znalosti-cteni-povoleny-stav.runtime.test.ts. Until 2026-10-04 that
+--    call could not be made at all: a 9-arg overload sat next to the 11-arg one and
+--    every call without p_story_id was ambiguous. The 9-arg overload is gone.)
 --
 -- Identities/keys live in session GUCs (parametric: gen_random_uuid). JWT identity
 -- is simulated via request.jwt.claims (read by auth.uid()/get_jwt_role()); the
@@ -195,14 +198,14 @@ SELECT lives_ok(
             p_story_id := current_setting('rbac.story')::uuid, p_model_pref := 'v1') $rbac$,
   '(c) v3: admin/staff is allowed');
 
--- (d) service_role bypass (JWT role + session role)
+-- (d) service_role (JWT role + session role): the call is not refused; the DATA scope is the audience's
 SELECT set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
 SET ROLE service_role;
 SELECT lives_ok(
   $rbac$ SELECT * FROM mcp_search_knowledge_v3(
             p_query_embedding_v1 := current_setting('rbac.qvec')::vector,
             p_story_id := current_setting('rbac.story')::uuid, p_model_pref := 'v1') $rbac$,
-  '(d) v3: service_role bypass is allowed');
+  '(d) v3: service_role call with a story is not refused');
 RESET ROLE;
 
 -- ════════════════════════════════════════════════════════════════════════════
@@ -267,8 +270,8 @@ SELECT isnt_empty(
          WHERE knowledge_item_id = current_setting('rbac.story_item')::uuid $rbac$,
   '(D2) v3 returns the story chunk to the owner (isolation is not a lockout)');
 
--- (D4) mcp_get_knowledge_item: an anon caller (auth.uid() NULL — also the MCP
---      service-role dispatch path) cannot fetch a story-scoped item by id.
+-- (D4) mcp_get_knowledge_item: an anon caller (no identity — the same as a service-role
+--      call WITHOUT an audience) cannot fetch a story-scoped item by id.
 SELECT set_config('request.jwt.claims', json_build_object('role', 'anon')::text, true);
 SELECT is(
   (SELECT mcp_get_knowledge_item(p_item_id := current_setting('rbac.story_item')::uuid)),
@@ -349,7 +352,8 @@ RESET ROLE;
 -- Testuje se bez vektoru (p_query_embedding NULL) právě proto, aby se měřila
 -- lexikální dráha samotná.
 --
--- Volá se 11-argumentově: 9-arg tvar je mezi oběma přetíženími nejednoznačný.
+-- Volá se všemi 11 argumenty (příběh + publikum). Do 2026-10-04 to byla i jediná cesta:
+-- vedle existovalo 9argumentové přetížení a kratší volání bylo nejednoznačné.
 SELECT set_config('request.jwt.claims',
   json_build_object('sub', current_setting('rbac.owner'), 'role', 'service_role')::text, true);
 SET LOCAL ROLE service_role;

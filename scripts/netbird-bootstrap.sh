@@ -192,6 +192,32 @@ jwt_claim() {
 
 # Issuer je TVRZENÍ O TOKENU, ne o cestě. Když nesedí, NetBird ho odmítne
 # o tři vrstvy dál — takže se ptám tady, kde ještě vím proč.
+# Nese token audienci `$2`? (aud je řetězec nebo pole)
+jwt_ma_audienci() {
+  local payload
+  payload="$(printf '%s' "$1" | cut -d. -f2 | tr '_-' '/+')"
+  case $(( ${#payload} % 4 )) in
+    2) payload="${payload}==" ;;
+    3) payload="${payload}=" ;;
+  esac
+  printf '%s' "$payload" | base64 -d 2>/dev/null \
+    | jq -e --arg a "$2" '(.aud | if type == "array" then . else [.] end) | index($a) != null' >/dev/null 2>&1
+}
+
+# Audience tokenu v OBOU směrech: povinná (je-li) musí být, zakázaná nesmí — token jedné
+# roviny meshe nesmí platit v druhé (bezpečnostní revize 2026-10-05, cross-mesh replay).
+bootstrap_token_audience_ok() {
+  local token="$1"
+  if [ -n "$BOOTSTRAP_AUD_MUSI" ] && ! jwt_ma_audienci "$token" "$BOOTSTRAP_AUD_MUSI"; then
+    err "Token bootstrap uživatele (klient ${BOOTSTRAP_CLIENT_ID}) NENESE audienci ${BOOTSTRAP_AUD_MUSI}."
+    return 1
+  fi
+  if [ -n "$BOOTSTRAP_AUD_NESMI" ] && jwt_ma_audienci "$token" "$BOOTSTRAP_AUD_NESMI"; then
+    err "Token bootstrap uživatele (klient ${BOOTSTRAP_CLIENT_ID}) nese audienci ${BOOTSTRAP_AUD_NESMI} — platil by i v druhé rovině meshe. Spusť provision-sso (odebere pozůstatek)."
+    return 1
+  fi
+}
+
 assert_issuer() {
   local token="$1" role="$2" videny cekany
   [ -n "$KEYCLOAK_EXPECTED_ORIGIN" ] || return 0
@@ -208,7 +234,31 @@ assert_issuer() {
 # Ponecháno pro hlášky a odvozeniny níž; už NEROZHODUJE o adrese sondy.
 KEYCLOAK_DOMAIN="${KEYCLOAK_PUBLIC_DOMAIN:-$(env_value KEYCLOAK_DOMAIN)}"
 
-NETBIRD_API_URL="$(required_env NETBIRD_API_URL)"
+# ── Instance stacku NetBird (config/netbird-instances.json) ────────────────────
+# hlavni = dosavadní chování beze změny; model = řídicí rovina MODELOVÉHO meshe forku
+# (varianta C). Instanci volí volající VÝSLOVNĚ (NETBIRD_INSTANCE=model); nezadaná je
+# hlavní, takže dnešní volání z cold-startu i deploy-initu se nemění.
+NETBIRD_INSTANCE_ZVOLENA="hlavni"
+if [ -n "${NETBIRD_INSTANCE+x}" ]; then NETBIRD_INSTANCE_ZVOLENA="$NETBIRD_INSTANCE"; fi
+case "$NETBIRD_INSTANCE_ZVOLENA" in
+  hlavni)
+    NETBIRD_ENV_PREDPONA="NETBIRD"
+    NETBIRD_API_URL="$(required_env NETBIRD_API_URL)" ;;
+  model)
+    NETBIRD_ENV_PREDPONA="NETBIRD_MODEL"
+    # Lane MODEL_MESH vydává topologie (model forku na slotu s has_gpu). Bez ní instance
+    # modelový mesh nemá — a neexistující řídicí rovině se nic nezakládá.
+    if [ -z "$(env_value MODEL_MESH)" ]; then
+      # Správný stav, ne chyba: bez lane není řídicí rovina, které by se něco zakládalo.
+      ok "Modelový mesh: instance ho nemá (MODEL_MESH prázdná) — bootstrap modelové instance nemá co dělat"
+      exit 0
+    fi
+    # Veřejný vstup přes edge forku (TCP 443) — jediná cesta, kudy se k ní dostane i uzel na GPU slotu.
+    NETBIRD_API_URL="https://$(required_env NETBIRD_MODEL_DOMAIN)" ;;
+  *)
+    err "neznámá instance stacku NetBird: '$NETBIRD_INSTANCE_ZVOLENA' (hlavni | model)"
+    exit 2 ;;
+esac
 NETBIRD_API_URL="${NETBIRD_API_URL%/}"
 
 # ⭐ TÝŽ KRUH JAKO U KEYCLOAKU, TÁŽ ODPOVĚĎ: MĚŘENÍ (2026-08-27).
@@ -224,7 +274,7 @@ NETBIRD_API_URL="${NETBIRD_API_URL%/}"
 case "$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 "${NETBIRD_API_URL}/api/peers" 2>/dev/null || true)" in
   200|401|403) : ;;   # živé (401/403 = chráněné, tedy správně směrované)
   *)
-    _nb_direct="$(env_value NETBIRD_DOMAIN_DIRECT)"
+    _nb_direct="$(env_value "${NETBIRD_ENV_PREDPONA}_DOMAIN_DIRECT")"
     if [ -n "$_nb_direct" ]; then
       info "NetBird na ${NETBIRD_API_URL} neodpovídá; zkouším PŘÍMOU tvář https://${_nb_direct}"
       _nb_kod="$(curl -s -o /dev/null -w '%{http_code}' --max-time 8 "https://${_nb_direct}/api/peers" 2>/dev/null || true)"
@@ -246,6 +296,30 @@ NETBIRD_API_TOKEN="$(env_value NETBIRD_API_TOKEN)"
 NETBIRD_MGMT_SECRET="$(env_value NETBIRD_MGMT_SECRET)"
 AISHA_BOOTSTRAP_PASSWORD="$(env_value AISHA_BOOTSTRAP_PASSWORD)"
 AISHA_BOOTSTRAP_CLIENT_SECRET="$(env_value AISHA_BOOTSTRAP_CLIENT_SECRET)"
+# ⛔ POVĚŘENÍ HLAVNÍHO MESHE SE MODELOVÉ ŘÍDICÍ ROVINĚ NEPOSÍLAJÍ (bezpečnostní revize
+# 2026-10-05). Modelová rovina je JINÁ služba na VEŘEJNÉM vstupu: statický token API
+# hlavního meshe (NETBIRD_API_TOKEN) ani tajemství jeho servisního účtu sem nepatří.
+# Jediná identita modelové instance je bootstrap uživatel s audiencí netbird-model —
+# tu nese jen token vyžádaný volitelným scope (běžné tokeny ji nenesou).
+# Token bootstrap uživatele razí klient TÉ instance, pro kterou je: hlavní `aisha-bootstrap`
+# (audience netbird), modelová VLASTNÍ `netbird-model-bootstrap` (JEN audience netbird-model).
+# Token jedné roviny tak druhá nepřijme — a obojí se tu ještě ověří (žádné přenesení tokenu).
+BOOTSTRAP_CLIENT_ID="aisha-bootstrap"
+BOOTSTRAP_CLIENT_SECRET_HODNOTA="$AISHA_BOOTSTRAP_CLIENT_SECRET"
+BOOTSTRAP_AUD_MUSI=""
+BOOTSTRAP_AUD_NESMI="netbird-model"
+if [ "$NETBIRD_INSTANCE_ZVOLENA" = "model" ]; then
+  if [ "$NETBIRD_AUTH_SCHEME" != "Bearer" ]; then
+    err "Modelový mesh: NETBIRD_AUTH_SCHEME=${NETBIRD_AUTH_SCHEME} — modelová instance se ověřuje JEN tokenem bootstrap uživatele (Bearer)"
+    exit 1
+  fi
+  NETBIRD_API_TOKEN=""
+  NETBIRD_MGMT_SECRET=""
+  BOOTSTRAP_CLIENT_ID="netbird-model-bootstrap"
+  BOOTSTRAP_CLIENT_SECRET_HODNOTA="$(env_value NETBIRD_MODEL_BOOTSTRAP_SECRET)"
+  BOOTSTRAP_AUD_MUSI="netbird-model"
+  BOOTSTRAP_AUD_NESMI="netbird"
+fi
 NETBIRD_SANDBOX_GROUP="$(env_value NETBIRD_SANDBOX_GROUP)"
 NETBIRD_SANDBOX_GROUP="${NETBIRD_SANDBOX_GROUP:-sandbox-run}"
 
@@ -272,19 +346,20 @@ keycloak_token() {
 bootstrap_user_token() {
   local _t
   [ -n "$AISHA_BOOTSTRAP_PASSWORD" ] || return 1
-  [ -n "$AISHA_BOOTSTRAP_CLIENT_SECRET" ] || return 1
+  [ -n "$BOOTSTRAP_CLIENT_SECRET_HODNOTA" ] || return 1
   _t="$(curl -fsS --http1.1 --max-time 30 \
     -X POST "${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token" \
     -H "Content-Type: application/x-www-form-urlencoded" \
     -d "grant_type=password" \
-    -d "client_id=aisha-bootstrap" \
-    --data-urlencode "client_secret=${AISHA_BOOTSTRAP_CLIENT_SECRET}" \
+    -d "client_id=${BOOTSTRAP_CLIENT_ID}" \
+    --data-urlencode "client_secret=${BOOTSTRAP_CLIENT_SECRET_HODNOTA}" \
     -d "username=aisha-bootstrap" \
     --data-urlencode "password=${AISHA_BOOTSTRAP_PASSWORD}" \
     -d "scope=openid" \
     | jq -r '.access_token // empty')"
   [ -n "$_t" ] || return 1
   assert_issuer "$_t" "aisha-bootstrap" || return 1
+  bootstrap_token_audience_ok "$_t" || return 1
   printf '%s' "$_t"
 }
 
@@ -571,20 +646,17 @@ netbird_env_stacks() {
     }
   fi
   [ -f "$manifest" ] || { err "manifest not found: $manifest"; return 1; }
-  local line rest name tail compose
-  while IFS= read -r line; do
-    case "$line" in "app:"*) ;; *) continue ;; esac
-    rest="${line#app:}"; rest="${rest# }"
-    name="${rest%%:*}"; tail="${rest#*:}"; compose="${tail#*:}"
-    # Manifest rows are name:slot:compose[:opt=val...] — keep ONLY the compose
-    # field. Taking the rest of the line silently dropped the one row that
-    # carries a trailing option (keycloak ... :bluegreen=on), because the path
-    # then failed the -f test and the row was skipped without a word.
-    compose="${compose%%:*}"
-    compose="${compose%%[[:space:]]*}"
+  # Jen VLASTNÍ aplikace (domov vlastnictví; profil prostředí: external_domain) —
+  # externí službě se NETBIRD_ env neposílá a redeploy ji nenasazuje. Řádky `app:`
+  # se tu nečtou (jediný parser je domov; volby za compose odřízne on).
+  # shellcheck source=lib/vlastnictvi.sh
+  . "$ROOT/scripts/lib/vlastnictvi.sh"
+  vlastnictvi_nacti "$manifest" || { err "vlastnictví aplikací v prostředí nejde určit — nevím, které stacky nesou NETBIRD_"; return 1; }
+  local name slot compose volby
+  while IFS=$'\t' read -r name slot compose volby; do
     [ -n "$name" ] && [ -f "$ROOT/$compose" ] || continue
     grep -q "NETBIRD_" "$ROOT/$compose" && printf '%s\n' "$name"
-  done < "$manifest" | sort -u
+  done < <(vlastni_aplikace) | sort -u
 }
 
 ensure_setup_key_env() {
@@ -668,6 +740,286 @@ ensure_setup_key_env() {
   SETUP_KEYS_REGENERATED=$((SETUP_KEYS_REGENERATED + 1))
   ok "$env_key (+ $id_key) written to $(basename "$ENV_FILE")"
 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MODELOVÝ MESH FORKU (varianta C, aisha.decision 2026-10-05 03:17:54Z)
+# ─────────────────────────────────────────────────────────────────────────────
+# Instance `model` (NETBIRD_INSTANCE=model) zakládá v řídicí rovině MODELOVÉHO
+# meshe jen to, co kontrakt meshe 0c v4 dovoluje:
+#   · skupiny `model-most` (most na hostiteli forku) a `model-gpu` (uzel na GPU slotu);
+#   · JEDNU politiku most → gpu na portu modelu, jednosměrně (O8: peer jen přijímá);
+#     cokoli jiného (výchozí „All“) pryč;
+#   · jednorázový registrační klíč pro uzel na GPU slotu (C1: peery jen klíčem).
+#
+# ⛔ O KLÍČI ROZHODUJE STAV PEERU, NE PLATNOST KLÍČE. Jednorázový klíč se zápisem
+# uzlu spotřebuje; samoléčba hlavní instance („klíč neplatí → vyrob nový“) by tu
+# při každém běhu razila nový klíč a env tenkého stacku by se točilo.
+#
+# ⛔ DŮVĚRNOST (rada cb P1, 2026-10-05): kdo je v `model-gpu`, dostává prompty forku.
+# Proto tam smí být PRÁVĚ JEDEN peer, a to s deklarovaným jménem (MODEL_MESH_GPU_PEER,
+# vydává ho topologie; tenký stack ho nese jako NB_HOSTNAME). Cizí peer = incident:
+# odebere se (přeruší přístup hned) a běh se ZASTAVÍ — nový klíč se nevydá, dokud
+# to neposoudí člověk. Dva peery s deklarovaným jménem = nerozhodnutelné → STOP.
+# Výměna uzlu (cb P2): odpojený deklarovaný peer starší než MODEL_MESH_ODPOJENY_LIMIT_S
+# se odebere a teprve potom vznikne nový klíč.
+
+# Výsledek posudku peerů ve skupině (stdout jeden řádek):
+#   ok <id> | chybi | ceka <id> | odebrat <id> | cizi <id…> | vic <id…>
+# Seznam z API modelového meshe. Ne-pole (chybová odpověď, 401, HTML) = SELHÁNÍ, nikdy
+# „prázdno“ — prázdný seznam peerů/klíčů by jinak vedl k vydání nového klíče (fail-open).
+model_seznam() {
+  local cesta="$1" odpoved
+  odpoved="$(netbird_api GET "$cesta")" || { err "Modelový mesh: ${cesta} nejde přečíst"; return 1; }
+  printf '%s' "$odpoved" | jq -e 'type == "array"' >/dev/null 2>&1 || {
+    err "Modelový mesh: ${cesta} nevrátil seznam — NEOVĚŘENO, nad chybovou odpovědí nejednám"; return 1; }
+  printf '%s' "$odpoved"
+}
+
+model_posudek_peeru() {
+  local skupina_id="$1" ocekavane="$2" pin="$3" limit_s="$4" peery
+  peery="$(model_seznam "/api/peers")" || return 1
+  # Jméno si peer volí sám (NB_HOSTNAME) — samo identitu nedokládá. Po prvním zápisu se
+  # proto připne i id peeru: jiný peer se stejným jménem je pak CIZÍ (bezpečnostní revize).
+  printf '%s' "$peery" | jq -r --arg g "$skupina_id" --arg o "$ocekavane" --arg pin "$pin" --argjson lim "$limit_s" '
+    [ .[] | select(any(.groups[]?; .id == $g)) ] as $v
+    | ($v | map(select(.name == $o and ($pin == "" or .id == $pin)))) as $nasi
+    | ($v | map(select((.name == $o and ($pin == "" or .id == $pin)) | not))) as $cizi
+    | if ($cizi | length) > 0 then "cizi " + ($cizi | map(.id) | join(" "))
+      elif ($nasi | length) > 1 then "vic " + ($nasi | map(.id) | join(" "))
+      elif ($nasi | length) == 0 then "chybi"
+      elif $nasi[0].connected == true then "ok " + $nasi[0].id
+      else
+        ( ($nasi[0].last_seen // "") | sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "Z") ) as $ls
+        | (if $ls == "" then 1e12 else (now - ($ls | fromdateiso8601)) end) as $stari
+        | if $stari > $lim then "odebrat " + $nasi[0].id else "ceka " + $nasi[0].id end
+      end'
+}
+
+# ⛔ `netbird_api` vrací stav roury, ne HTTP kód — odpověď 4xx by vypadala jako úspěch.
+# U odebrání (přerušení přístupu k promptům) proto rozhoduje ZPĚTNÉ ČTENÍ seznamu peerů.
+model_odeber_peery() {
+  local id zbyva
+  for id in "$@"; do
+    netbird_api DELETE "/api/peers/${id}" >/dev/null || true
+  done
+  zbyva="$(model_seznam "/api/peers" | jq -r --args '[.[] | select(.id as $i | $ARGS.positional | index($i))] | map(.id) | join(" ")' "$@")" || {
+    err "  po odebrání nejde přečíst seznam peerů — nevím, jestli přístup skončil"; return 1; }
+  if [ -n "$zbyva" ]; then
+    err "  peer(y) ${zbyva} se NEPODAŘILO odebrat — přístup ke skupině trvá"
+    return 1
+  fi
+  warn "  odebráno z modelového meshe: $*"
+}
+
+# Jednorázový klíč pro deklarovaný uzel; starý (podle uloženého ID) se odvolá.
+model_vydej_klic() {
+  local env_klic="$1" jmeno="$2" skupina_id="$3" platnost_s="$4"
+  local id_klic="${env_klic}_ID" stary_id odpoved klic klic_id payload seznam
+  stary_id="$(env_value "$id_klic")"
+  if [ -n "$stary_id" ]; then
+    netbird_api DELETE "/api/setup-keys/${stary_id}" >/dev/null 2>&1 || true
+    # ⛔ Zpětné čtení (netbird_api vrací stav roury): platný starý klíč vedle nového by byly
+    # DVA vstupy do skupiny uzlu (bezpečnostní revize 2026-10-05, fail-open).
+    seznam="$(model_seznam "/api/setup-keys")" || { err "  odvolání starého klíče NEOVĚŘENO"; return 1; }
+    if printf '%s' "$seznam" | jq -e --arg id "$stary_id" \
+         'any(.[]; .id == $id and (.revoked != true) and ((.state // "valid") == "valid"))' >/dev/null 2>&1; then
+      err "  starý klíč (id=$stary_id) je pořád PLATNÝ — nový nevydám (byly by dva vstupy do skupiny uzlu)"
+      return 1
+    fi
+    info "  starý klíč (id=$stary_id) neplatí"
+  fi
+  payload="$(jq -n --arg n "$jmeno" --arg g "$skupina_id" --argjson e "$platnost_s" \
+    '{name: $n, type: "one-off", expires_in: $e, usage_limit: 1, ephemeral: false, auto_groups: [$g]}')"
+  odpoved="$(netbird_api POST "/api/setup-keys" "$payload")"
+  klic="$(printf '%s' "$odpoved" | jq -r '.key // empty')"
+  klic_id="$(printf '%s' "$odpoved" | jq -r '.id // empty')"
+  [ -n "$klic" ] && [ -n "$klic_id" ] || { err "Jednorázový klíč '$jmeno' nevznikl (nebo bez id)"; return 1; }
+  # Zpětné čtení: klíč musí být jednorázový, s limitem 1 a JEN pro skupinu uzlu — jinak ho
+  # hned odvolat a selhat (širší klíč by pustil peery i jinam).
+  seznam="$(model_seznam "/api/setup-keys")" || { err "  nový klíč NEOVĚŘEN"; return 1; }
+  if ! printf '%s' "$seznam" | jq -e --arg id "$klic_id" --arg g "$skupina_id" '
+       any(.[]; .id == $id and .type == "one-off" and (.usage_limit // 0) == 1
+                and ([.auto_groups[]? | if type == "object" then .id else . end] == [$g])
+                and (.revoked != true) and ((.state // "valid") == "valid"))' >/dev/null 2>&1; then
+    netbird_api DELETE "/api/setup-keys/${klic_id}" >/dev/null 2>&1 || true
+    err "Nový klíč '$jmeno' (id=$klic_id) po zpětném čtení NESEDÍ (jednorázový, limit 1, jen skupina uzlu) — odvolán, NEUKLÁDÁM"
+    return 1
+  fi
+  upsert_env_file "$env_klic" "$klic"
+  upsert_env_file "$id_klic" "$klic_id"
+  SETUP_KEYS_REGENERATED=$((SETUP_KEYS_REGENERATED + 1))
+  ok "$env_klic (+ $id_klic) — jednorázový, platnost ${platnost_s} s"
+}
+
+# Uzel je v meshi → žádný platný klíč do jeho skupiny už nesmí zůstat (nepoužitý one-off by
+# do příštího běhu pustil dalšího peera). Odvolat a ověřit zpětným čtením.
+model_odvolej_zbyle_klice() {
+  local skupina_id="$1" seznam id zbyva
+  seznam="$(model_seznam "/api/setup-keys")" || return 1
+  for id in $(printf '%s' "$seznam" | jq -r --arg g "$skupina_id" '.[] | select((.revoked != true) and ((.state // "valid") == "valid")
+             and any(.auto_groups[]?; (if type == "object" then .id else . end) == $g)) | .id'); do
+    warn "  odvolávám zbylý platný klíč skupiny uzlu (id=$id) — uzel už je v meshi"
+    netbird_api DELETE "/api/setup-keys/${id}" >/dev/null 2>&1 || true
+  done
+  seznam="$(model_seznam "/api/setup-keys")" || return 1
+  zbyva="$(printf '%s' "$seznam" | jq -r --arg g "$skupina_id" '[.[] | select((.revoked != true) and ((.state // "valid") == "valid")
+             and any(.auto_groups[]?; (if type == "object" then .id else . end) == $g)) | .id] | join(" ")')"
+  if [ -n "$zbyva" ]; then
+    err "  platné klíče skupiny uzlu ($zbyva) se NEPODAŘILO odvolat — vstup do skupiny zůstává otevřený"
+    return 1
+  fi
+}
+
+# Klíč uzlu podle stavu peeru. Návrat: 0 hotovo, 3 STOP (incident / nerozhodnutelné), 1 chyba.
+model_zajisti_klic_uzlu() {
+  local env_klic="$1" jmeno="$2" skupina_id="$3" ocekavane="$4" limit_s="$5" platnost_s="$6" pin_klic="$7"
+  local posudek stav ids pin
+  pin="$(env_value "$pin_klic")"
+  posudek="$(model_posudek_peeru "$skupina_id" "$ocekavane" "$pin" "$limit_s")" || return 1
+  stav="${posudek%% *}"; ids="${posudek#* }"
+  case "$stav" in
+    ok)
+      if [ -z "$pin" ]; then
+        # První zápis uzlu: připnout jeho id (TOFU). Okno prvního zápisu kryje jednorázový
+        # klíč s krátkou platností doručený JEN tenkému stacku; doktor připnutí ukáže.
+        upsert_env_file "$pin_klic" "$ids"
+        warn "Modelový mesh: uzel '$ocekavane' poprvé v meshi — připínám id $ids ($pin_klic); ověř v doktorovi, že je to uzel z deklarace"
+      fi
+      model_odvolej_zbyle_klice "$skupina_id" || return 1
+      ok "Modelový mesh: uzel '$ocekavane' je v meshi a připojený — klíč se nevydává" ;;
+    ceka)  info "Modelový mesh: uzel '$ocekavane' je odpojený kratší dobu než limit — čekám, klíč se nevydává" ;;
+    chybi)
+      [ -z "$pin" ] || { upsert_env_file "$pin_klic" ""; warn "Modelový mesh: připnutý uzel $pin v meshi není — připnutí ruším, nový klíč"; }
+      model_vydej_klic "$env_klic" "$jmeno" "$skupina_id" "$platnost_s" || return 1 ;;
+    odebrat)
+      warn "Modelový mesh: uzel '$ocekavane' odpojený déle než ${limit_s} s (výměna uzlu?) — odebírám, pak nový klíč"
+      model_odeber_peery $ids || return 1
+      upsert_env_file "$pin_klic" ""
+      model_vydej_klic "$env_klic" "$jmeno" "$skupina_id" "$platnost_s" || return 1 ;;
+    cizi)
+      err "Modelový mesh: ve skupině uzlu je CIZÍ peer (ne '$ocekavane'${pin:+ s připnutým id $pin}): $ids — INCIDENT"
+      err "  Odebírám ho (přístup k promptům forku končí hned) a ZASTAVUJI: nový klíč nevydám,"
+      err "  dokud člověk neposoudí, odkud se peer zapsal (uniklý klíč? starý uzel?)."
+      model_odeber_peery $ids || true
+      return 3 ;;
+    vic)
+      err "Modelový mesh: ve skupině uzlu je VÍC peerů se jménem '$ocekavane': $ids — nerozhodnu, který je pravý."
+      err "  ZASTAVUJI; odeber nepravý ručně (podle id) a spusť znovu."
+      return 3 ;;
+    *) err "Modelový mesh: neznámý posudek peerů: $posudek"; return 1 ;;
+  esac
+}
+
+# Právě JEDNA politika: most → gpu, TCP na portu modelu, JEDNOSMĚRNĚ. Ostatní pryč.
+model_zajisti_politiku() {
+  local most_id="$1" gpu_id="$2" port="$3" jmeno="model-most-na-model-gpu" politiky chtena id
+  politiky="$(model_seznam "/api/policies")" || return 1
+  for id in $(printf '%s' "$politiky" | jq -r --arg n "$jmeno" '.[] | select(.name != $n) | .id'); do
+    warn "  odebírám politiku ${id} (v modelovém meshi smí být jen ${jmeno})"
+    netbird_api DELETE "/api/policies/${id}" >/dev/null || true
+  done
+  chtena="$(jq -n --arg n "$jmeno" --arg s "$most_id" --arg d "$gpu_id" --arg p "$port" '{
+    name: $n, description: "modelový mesh forku: most → uzel na GPU, jednosměrně (kontrakt 0c v4 O8)",
+    enabled: true,
+    rules: [{ name: $n, enabled: true, action: "accept", bidirectional: false,
+              protocol: "tcp", ports: [$p], sources: [$s], destinations: [$d] }] }')"
+  id="$(printf '%s' "$politiky" | jq -r --arg n "$jmeno" '[.[] | select(.name == $n)][0].id // empty')"
+  if [ -n "$id" ]; then
+    netbird_api PUT "/api/policies/${id}" "$chtena" >/dev/null || true
+  else
+    netbird_api POST "/api/policies" "$chtena" >/dev/null || true
+  fi
+  # ⛔ Výsledek rozhoduje ZPĚTNÉ ČTENÍ (netbird_api vrací stav roury, ne HTTP kód): v meshi
+  # smí být PRÁVĚ jedna politika, a to tato — jinak je otevřenější, než deklaruje (fail-open).
+  politiky="$(model_seznam "/api/policies")" || { err "Politiky po srovnání NEOVĚŘENY"; return 1; }
+  if ! printf '%s' "$politiky" | jq -e --arg n "$jmeno" --arg s "$most_id" --arg d "$gpu_id" --arg p "$port" '
+       length == 1 and .[0].name == $n and .[0].enabled == true and (.[0].rules | length) == 1
+       and (.[0].rules[0] | .enabled == true and .action == "accept" and .bidirectional == false
+            and .protocol == "tcp" and .ports == [$p]
+            and ([.sources[]? | if type == "object" then .id else . end] == [$s])
+            and ([.destinations[]? | if type == "object" then .id else . end] == [$d]))' >/dev/null 2>&1; then
+    err "Politiky modelového meshe po srovnání NESEDÍ (právě jedna ${jmeno}: tcp/${port}, most → gpu, jednosměrně) — mesh může být otevřenější, než smí"
+    return 1
+  fi
+  ok "Politika ${jmeno} ověřena: jediná, tcp/${port}, most → gpu, jednosměrně"
+}
+
+# IP uzlu na GPU slotu pro MOST (C4). Bere se z TÉHOŽ záznamu, který nese připnuté id, ve
+# skupině uzlu a s deklarovaným jménem — most tak nikdy nemíří na peer, kterého bootstrap
+# neověřil. Bez připnutého uzlu se IP vyprázdní: most odpoví 503 LANE_NEDOSTUPNA nahlas,
+# místo aby posílal prompty na adresu, kterou mezitím mohl dostat kdokoli jiný.
+# Změna nastaví MODEL_ZMENA_MOST=1 (doručit mostu). Návrat 1 = seznam nečitelný / vadná IP.
+model_zajisti_ip_uzlu() {
+  local skupina_id="$1" ocekavane="$2" pin_klic="$3" ip_klic="$4" pin stara ip="" peery
+  pin="$(env_value "$pin_klic")"
+  stara="$(env_value "$ip_klic")"
+  if [ -n "$pin" ]; then
+    peery="$(model_seznam "/api/peers")" || return 1
+    ip="$(printf '%s' "$peery" | jq -r --arg g "$skupina_id" --arg o "$ocekavane" --arg pin "$pin" '
+      [ .[] | select(.id == $pin and .name == $o and any(.groups[]?; .id == $g)) ]
+      | if length == 1 then (.[0].ip // "") else "" end')"
+    if [ -n "$ip" ] && ! [[ "$ip" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+      err "Modelový mesh: uzel '$ocekavane' (id $pin) má v API adresu '$ip', která není IPv4 — mostu ji NEDORUČÍM"
+      return 1
+    fi
+    # Most smí JEN do modelového meshe (výchozí rozsah NetBirdu 100.64.0.0/10; vlastní rozsah
+    # modelový mesh nedeklaruje) — adresa mimo něj by z mostu udělala proxy kamkoli.
+    if [ -n "$ip" ]; then
+      local o1="${ip%%.*}" zbytek="${ip#*.}" o2
+      o2="${zbytek%%.*}"
+      if [ "$o1" -ne 100 ] || [ "$o2" -lt 64 ] || [ "$o2" -gt 127 ]; then
+        err "Modelový mesh: uzel '$ocekavane' (id $pin) má adresu '$ip' mimo rozsah meshe 100.64.0.0/10 — mostu ji NEDORUČÍM"
+        return 1
+      fi
+    fi
+  fi
+  [ "$ip" = "$stara" ] && return 0
+  upsert_env_file "$ip_klic" "$ip"
+  MODEL_ZMENA_MOST=1
+  if [ -n "$ip" ]; then
+    ok "$ip_klic=$ip (uzel '$ocekavane', připnuté id $pin) — most ho dostane"
+  else
+    warn "$ip_klic vyprázdněna — uzel '$ocekavane' není připnutý v meshi; most odpoví 503 LANE_NEDOSTUPNA, dokud se nezapíše"
+  fi
+}
+
+# Bootstrap MODELOVÉ instance: skupiny, jediná politika (most → uzel), klíč uzlu na GPU slotu,
+# IP uzlu pro most, klíč mostu (C4, P7). Oba peery stejnou cestou: stav peeru rozhoduje,
+# připnuté id, jednorázový klíč jen do VLASTNÍ skupiny. Nastaví MODEL_ZMENA_UZEL /
+# MODEL_ZMENA_MOST (komu doručit). Návrat: 0 hotovo, 3 STOP (incident / nerozhodnutelné), 1 chyba.
+model_bootstrap_instance() {
+  local port uzel most most_id gpu_id rc=0 pred
+  port="$(required_env MODEL_MESH_PORT)"
+  uzel="$(required_env MODEL_MESH_GPU_PEER)"
+  most="$(required_env MODEL_MESH_MOST_PEER)"
+  if [ "$uzel" = "$most" ]; then
+    err "Modelový mesh: uzel a most mají totéž jméno peeru ('$uzel') — skupiny by se nedaly rozlišit"
+    return 1
+  fi
+  most_id="$(ensure_group model-most)"
+  gpu_id="$(ensure_group model-gpu)"
+  MODEL_ZMENA_UZEL=0
+  MODEL_ZMENA_MOST=0
+  model_zajisti_politiku "$most_id" "$gpu_id" "$port" || return 1
+  pred="$SETUP_KEYS_REGENERATED"
+  model_zajisti_klic_uzlu MODEL_MESH_SETUP_KEY "$uzel" "$gpu_id" "$uzel" \
+    "$MODEL_MESH_ODPOJENY_LIMIT_S" "$MODEL_MESH_KLIC_PLATNOST_S" MODEL_MESH_GPU_PEER_ID || rc=$?
+  [ "$rc" -eq 0 ] || return "$rc"
+  if [ "$SETUP_KEYS_REGENERATED" -gt "$pred" ]; then MODEL_ZMENA_UZEL=1; fi
+  model_zajisti_ip_uzlu "$gpu_id" "$uzel" MODEL_MESH_GPU_PEER_ID MODEL_MESH_GPU_PEER_IP || return 1
+  pred="$SETUP_KEYS_REGENERATED"
+  model_zajisti_klic_uzlu MODEL_MESH_MOST_SETUP_KEY "$most" "$most_id" "$most" \
+    "$MODEL_MESH_ODPOJENY_LIMIT_S" "$MODEL_MESH_KLIC_PLATNOST_S" MODEL_MESH_MOST_PEER_ID || rc=$?
+  [ "$rc" -eq 0 ] || return "$rc"
+  if [ "$SETUP_KEYS_REGENERATED" -gt "$pred" ]; then MODEL_ZMENA_MOST=1; fi
+  return 0
+}
+
+# Pevné hodnoty modelového meshe (deklarované tady, ne dosazované z prostředí):
+#   · odpojený deklarovaný uzel déle než 15 min = výměna uzlu (cb P2) → odebrat, nový klíč;
+#   · jednorázový klíč platí 24 h — uzel na GPU slotu se zapíše při nasazení tenkého stacku.
+MODEL_MESH_ODPOJENY_LIMIT_S=900
+MODEL_MESH_KLIC_PLATNOST_S=86400
 
 # Test seam: `NETBIRD_BOOTSTRAP_LIB_ONLY=1 . netbird-bootstrap.sh` loads the
 # functions above and stops before the first side effect, so a gate can drive
@@ -840,6 +1192,29 @@ elif [ "$_narok_rc" -ne 0 ]; then
   err "Zastavuji: nárok na vlastnictví účtu neprošel (rc=$_narok_rc)."
   err "  Bez vlastnictví by vlastníkem zůstal service-account-netbird-backend (známo jako rozbité)."
   exit 1
+fi
+
+# ── Modelová instance: skupiny, jediná politika, klíč uzlu a mostu, IP uzlu pro most ──
+if [ "$NETBIRD_INSTANCE_ZVOLENA" = "model" ]; then
+  banner "Modelový mesh: skupiny, politika, klíč uzlu a mostu"
+  _model_rc=0
+  model_bootstrap_instance || _model_rc=$?
+  [ "$_model_rc" -eq 0 ] || exit "$_model_rc"
+  if [ "$SYNC_COOLIFY" = "1" ]; then
+    # Každá hodnota jen své aplikaci (coolify-sync-envs posílá .env.coolify ∩ odkazy compose):
+    # klíč uzlu nese JEN tenký stack na GPU slotu (`model`), klíč mostu a IP uzlu JEN most.
+    for _model_app in model model-most; do
+      if [ "$_model_app" = "model" ]; then _zmena="$MODEL_ZMENA_UZEL"; else _zmena="$MODEL_ZMENA_MOST"; fi
+      [ "$_zmena" = "1" ] || continue
+      SKIP_ENV_PREFLIGHT=1 bash "$ROOT/scripts/coolify-sync-envs.sh" "$_model_app"
+      if ! (cd "$ROOT" && node scripts/aisha-redeploy.mjs --only="$_model_app" </dev/null); then
+        warn "přenasazení '$_model_app' s novou hodnotou neskončilo čistě — hodnota JE zapsaná a doručená;"
+        warn "  dokonči: node scripts/aisha-redeploy.mjs --only=$_model_app"
+      fi
+    done
+  fi
+  ok "Modelový mesh: bootstrap hotov"
+  exit 0
 fi
 
 FRONTEND_GROUP_ID="$(ensure_group aisha-frontend)"

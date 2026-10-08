@@ -33,6 +33,17 @@
  * deployments and even --only=<app> cannot reach it (incident 2026-06-12:
  * ai-chat, realtime, clamav).
  *
+ * Deklarované držení: aplikaci, kterou overlay instance vede v nasazeni-drzene.json
+ * (pravidla a validace: scripts/lib/nasazeni-drzene.mjs), tenhle nástroj NEnasadí ani
+ * NErestartuje žádným režimem (vlny, --only, --canary, --restart-validate, návrat po
+ * selhání) a vypíše „DRŽENO: <aplikace> — <důvod>“. Každé volání, které aplikaci
+ * v Coolify nasadí nebo restartuje, jde přes jediný domov mutace
+ * (scripts/lib/coolify-mutace.mjs) — ten se na držení ptá před KAŽDÝM voláním.
+ * Nečitelná nebo neplatná deklarace = STOP před prvním triggerem (kód 2).
+ * Výslovně jmenovaná držená aplikace (--only, --canary) se ODMÍTNE: nenasadí se
+ * a běh skončí kódem 100 (DRŽENO). Přepínač, který by držení přebil, ZÁMĚRNĚ
+ * neexistuje — držení se ruší tam, kde vzniklo: smazáním položky v overlayi.
+ *
  * Usage:
  *   node scripts/aisha-redeploy.mjs                  # full waves with health waits
  *   node scripts/aisha-redeploy.mjs --status         # only show state, exit
@@ -55,9 +66,13 @@ import { promisify } from "node:util";
 import { createProjectScope } from "./lib/coolify-project-scope.mjs";
 import { rozdelOnlyCile, dosazitelneVeVlnach } from "./lib/only-filter.mjs";
 import { toStoryApp, appPrefix } from "./lib/story-app.mjs";
-import { readConfigKey } from "./lib/config-env-files.mjs";
+import { CONFIG_ENV_FILES, parseEnvFile, readConfigKey } from "./lib/config-env-files.mjs";
+import { hlaskaDrzeno, KOD_DRZENO } from "./lib/nasazeni-drzene.mjs";
+import { drzenaPolozka, drzeniProcesu, externiPolozka, mutujAplikaci } from "./lib/coolify-mutace.mjs";
+import { vlastnictviProstredi, KOD_EXTERNI } from "./lib/vlastnictvi-aplikaci.mjs";
 import { createCoolifyClient, waitForDeploymentSlot } from "./lib/coolify-http.mjs";
 import { odvozeneKlice, otiskOdvozenych } from "./lib/otisk-odvozenych.mjs";
+import { KOD_ENV_DOKTORA_WEB_NEVIM } from "./lib/domenovy-overlay.mjs";
 import { resolveManifestPath } from "./lib/coolify-instance-scope.mjs";
 import { ctenarHodnot, klicePodminky, nactiKatalog, podminkaSplnena } from "./lib/provision-gate.mjs";
 import { spustSOmezenim, pockejNaDobehnuti } from "./lib/nasazeni-s-omezenim.mjs";
@@ -95,7 +110,7 @@ const argv = process.argv.slice(2);
 const ZNAME_PREPINACE = new Set([
   "--status", "--plan", "--skip-healthy", "--no-wait", "--auto-rollback",
   "--restart-validate", "--print-phases", "--print-waves",
-  "--only", "--from", "--until", "--canary", "--wave-timeout",
+  "--only", "--from", "--until", "--canary", "--wave-timeout", "--bez-domen",
 ]);
 const NAPOVEDA = `aisha-redeploy — nasazení stacku po vlnách
 
@@ -111,6 +126,8 @@ const NAPOVEDA = `aisha-redeploy — nasazení stacku po vlnách
   --auto-rollback při selhání zkus nasadit poslední známý dobrý stav
   --restart-validate  restartuje NASAZENÝ stav po vlnách a měří návrat do zdraví
   --wave-timeout=S    strop čekání na vlnu (výchozí 300)
+  --bez-domen    nesrovnávej domény v Coolify před první vlnou (cold-start
+                 je srovnal sám v kroku 4)
   --print-phases fáze pro cold-start, bez identity
   --print-waves  pořadí nasazení „vlna<TAB>role[<TAB>strop práce s]" pro CI, bez identity`;
 {
@@ -145,6 +162,10 @@ const FROM_WAVE = parseInt(arg("--from")?.replace(/^wave/, "") || "0", 10);
 const UNTIL_WAVE = parseInt(arg("--until")?.replace(/^wave/, "") || "999", 10);
 const CANARY = arg("--canary");  // single short app name (e.g. "keycloak"); deploys 1 app + extended verify
 const AUTO_ROLLBACK = flag("--auto-rollback");  // try Coolify API to redeploy last-known-good deployment on failure
+// Domény v Coolify srovná doktor domén PŘED první vlnou (viz srovnejDomeny).
+// Cold-start to dělá sám v kroku 4 (deploy-init + doktor) a svým fázím to
+// DEKLARUJE tímhle přepínačem — neodvozuje se „asi běžím z cold-startu".
+const BEZ_DOMEN = flag("--bez-domen");
 // Restart validace: NEROZDÁVÁ nový kód ani env — restartuje nasazený stav po
 // vlnách a měří, že se sám vrátí do zdraví. Odpovídá na jinou otázku než deploy:
 // ne "jde to postavit?", ale "vrátí se to po restartu?" (rodina from-zero zelené /
@@ -394,7 +415,15 @@ const WAVES = [
     // se jeho agent nemá kam zapojit (naměřeno 2026-08-22). Text výš popisuje
     // původní pořadí; ponechán, protože vysvětluje, PROČ na Redisu konzumenti
     // stojí. Jméno vlny zůstává historické.
-    apps: ["aisha-registry"],
+    // aisha-accel-hostfw: firewall hostitele uzlu `gpu` (GPU, opt-in deklarací uzlu ACCEL_FW_NODE_OWNER / ACCEL_FW_SSH, ne lane vrstvy).
+    // Na nic nečeká a nic na něm nestojí v téhle vlně; patří co nejdřív, aby uzel
+    // chránil dřív, než na něj přijde lane vrstvy. Bez lane v Coolify není a
+    // filterWaveApps ho přeskočí. MĚKKÝ (SOFT_DEPLOY_APPS): enforce čeká na
+    // potvrzení ze správy a jeho výpadek nesmí zastavit vlny instance.
+    // aisha-accel-vstup: vstup operátorské lane GPU uzlu (VB, hlídač, váhy) — ZA firewallem
+    // (katalog depends_on accel-hostfw) a PŘED enginy: jeho compose zakládá sítě jádra
+    // a slotů, na které se enginy (vlna 2) připojují jako external. Opt-in deklarací uzlu.
+    apps: ["aisha-registry", "aisha-accel-hostfw", "aisha-accel-vstup"],
     gates: [],
   },
   {
@@ -426,7 +455,9 @@ const WAVES = [
     // a ten závisí na `pki-init`, který volá pki-bridge — tedy přesně ta
     // závislost, kvůli které se tahle vlna rozdělila. Nechat ho vedle pki by
     // znamenalo vrátit závod, který komentář výš popisuje. Teď je ve vlně 3.
-    apps: ["aisha-pki"],
+    // aisha-accel-embed-<n>: enginy operátorské lane GPU uzlu (slot na nájemce, O-4) — až po
+    // vstupu (vlna 1), který zakládá síť jádra. S PKI nesouvisí; jen sdílí bránu registry.
+    apps: ["aisha-pki", "aisha-accel-embed-1", "aisha-accel-embed-2", "aisha-accel-chat-1"],
     gates: [
       // Fresh cold-start pulls Docker Hub images through ${REGISTRY_DOMAIN}.
       { app: "aisha-registry", hard: true },
@@ -505,7 +536,12 @@ const WAVES = [
     // má startovat rovnou v meshi místo aby se do něj přepojovalo dodatečně.
     //
     // Na `pki` závisí doopravdy: `netbird-internal-tls → pki-init`.
-    apps: ["aisha-netbird"],
+    // `aisha-netbird-model` (varianta C) je řídicí rovina MODELOVÉHO meshe: táž
+    // binárka, táž závislost na Keycloaku (OIDC při startu), žádná na pki (nemá
+    // vnitřní TLS). Patří do téže vlny, protože uzel na GPU slotu (`aisha-model`,
+    // vlna 7) se do ní zapisuje. Bez lane MODEL_MESH aplikace v Coolify není
+    // a `filterWaveApps()` ji přeskočí.
+    apps: ["aisha-netbird", "aisha-netbird-model"],
     gates: [
       // ⛔ `pki` JE ZÁMĚRNĚ MĚKKÁ — doloženo DEADLOCKEM 2026-08-23 (dvakrát).
       // Tvrdá brána tu byla s odůvodněním „bez BĚŽÍCÍHO pki nemá pki-init koho
@@ -659,7 +695,12 @@ const WAVES = [
     // `aisha-playwright` PŘIBYLO 2026-08-21: konverze na mesh mu dala pki-init
     // (`build:`) a brána stack-bez-deploy-ulohy správně chtěla manifest I vlnu.
     // Samostatný E2E runner se sidecar agentem — táž třída jako zbytek vlny.
-    apps: ["aisha-livekit", "aisha-integration", "aisha-ledger", "aisha-exec", "aisha-observability-stack", "aisha-monitoring", "aisha-model", "aisha-playwright"],
+    //
+    // `aisha-model-most` (varianta C, C4) je MOST modelového meshe: v hlavním meshi
+    // drží jméno modelu, když model stojí na GPU slotu. Patří k modelu do téže vlny
+    // (po `aisha-netbird-model` z vlny 5, do které se zapisuje); bez lane MODEL_MESH
+    // aplikace v Coolify není a `filterWaveApps()` ji přeskočí.
+    apps: ["aisha-livekit", "aisha-integration", "aisha-ledger", "aisha-exec", "aisha-observability-stack", "aisha-monitoring", "aisha-model", "aisha-model-most", "aisha-playwright"],
     gates: [
       // integration: own ES+RMQ, no aisha-db
       // ledger: cosmos validator, self-contained
@@ -700,10 +741,11 @@ const WAVES = [
     // a pak „Mesh warmup"), protože se po vzniku meshe musel přeenrollovat.
     // Když mesh existuje dřív než on, stačí jednou.
     apps: ["aisha-edge",
-        // Generátor statických stránek. ZA edge, protože čte skořápku,
-        // kterou `web` zapisuje při svém startu do hostitelského adresáře instance
-        // (WEB_RENDER_SHELL_HOST_DIR), a píše do WEB_RENDER_STATIC_HOST_DIR, který
-        // tentýž `web` servíruje. Vlastní aplikace
+        // Generátor statických stránek. ZA edge: web při startu posílá skořápku
+        // (`PUT /shell` přímo meshem, vlastní routa webu) a stránky si od
+        // něj táhne po síti (d-ii, 2026-10-02). Pořadí není podmínkou správnosti
+        // (web opakuje, dokud web-render nepřijme; do té doby servíruje SPA), jen
+        // zkracuje dobu bez předrenderu. Vlastní aplikace
         // (tier: optional) ZÁMĚRNĚ — jako kontejner uvnitř edge by po limitu
         // restartů shodil přes StopApplication celou veřejnou tvář.
         "aisha-web-render"],
@@ -988,6 +1030,10 @@ const KNOWN_BROKEN = new Set([
 const ZPETNY_TLAK_KOL = Number(process.env.AISHA_BACKPRESSURE_ROUNDS || 3);
 
 const SOFT_DEPLOY_APPS = new Set([
+  "aisha-model-most",            // most modelového meshe — opt-in (MODEL_MESH), na něm
+                                 //   stojí jen model forku, nesmí blokovat vlny
+  "aisha-netbird-model",         // řídicí rovina modelového meshe — opt-in (MODEL_MESH),
+                                 //   na hlavním meshi nic nestojí, nesmí blokovat vlny
   "aisha-ledger",                // Cosmos validator — self-contained chain
   "aisha-exec",                  // agent-runner — in-memory state
   "aisha-observability-stack",   // Phase 12 opt-in (Loki/Prometheus/Grafana)
@@ -1008,6 +1054,13 @@ const SOFT_DEPLOY_APPS = new Set([
                                  //   absent unless POTOK_ENABLED set, so it must
                                  //   not block waves
   "aisha-clamav",                // standalone clamd — consumers fail-closed, isolated
+  "aisha-accel-hostfw",          // firewall uzlu gpu — tier=optional, opt-in (deklarace uzlu);
+                                 //   enforce čeká na potvrzení ze správy, jeho výpadek
+                                 //   (unhealthy = nenaběhl, žádný DROP) nesmí zastavit vlny
+  "aisha-accel-vstup",           // vstup lane GPU uzlu — opt-in (deklarace uzlu); výpadek GPU
+  "aisha-accel-embed-1",         //   vrstvy nesmí zastavit vlny instance (forky jedou dál
+  "aisha-accel-embed-2",         //   s modelem vlastní instance); engine startuje až 600 s
+  "aisha-accel-chat-1",          //   chat: start až 900 s (váhy desítek GB + CUDA grafy)
   "aisha-playwright",            // E2E runner — tier=optional, nic na něm nestojí;
                                  //   do manifestu i vln přibyl 2026-08-21 (mesh)
   "aisha-ai-chat",               // sibling stack — core gateway routes TO it; nothing
@@ -1465,6 +1518,17 @@ async function waitForGates(wave) {
       // authority filterWaveApps() already uses for TARGETS (apps.has), applied to
       // gates. A creation failure is caught separately by cold-start step 3, which
       // verifies each manifest app exists before the waves run.
+      // Externí služba (profil prostředí) se nenasazuje ani nehlídá — na její
+      // aplikaci se nečeká, ani když jméno v projektu existuje.
+      const ciziBrana = gate.app ? mapaInstance().externi.get(gate.app) : undefined;
+      if (ciziBrana) {
+        const key = `${gate.app}:externi`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          log(`    ${C.dim("[gate]")} ${gate.app.padEnd(22)} ${C.dim(`skipped — ${ciziBrana.hlaska}`)}`);
+        }
+        continue;
+      }
       if (gate.app && !apps.has(gate.app)) {
         const key = `${gate.app}:not-deployed`;
         if (!seen.has(key)) {
@@ -1576,13 +1640,23 @@ const ENV_COOLIFY = join(ROOT, ".env.coolify");
 let mapaInstanceCache = null;
 function mapaInstance() {
   if (mapaInstanceCache) return mapaInstanceCache;
-  let manifest;
+  let vl;
   try {
     // Cold-start předává svůj inventář výslovně (story ≠ prefix aplikací);
-    // samostatný běh si ho odvodí z identity instance.
-    manifest = readFileSync(resolveManifestPath({ explicit: process.env.MANIFEST_FILE || undefined, explicitHint: "MANIFEST_FILE=<path>" }), "utf8");
+    // samostatný běh si ho odvodí z identity instance. Co z inventáře je v TOMHLE
+    // prostředí naše, říká domov vlastnictví (profil prostředí: external_domain) —
+    // řádky `app:` tenhle nástroj sám nečte. Profil: prostředí, jinak záloha trezoru
+    // (týž zdroj jako deploy_concurrency níž).
+    vl = vlastnictviProstredi({
+      manifest: resolveManifestPath({ explicit: process.env.MANIFEST_FILE || undefined, explicitHint: "MANIFEST_FILE=<path>" }),
+      profil: (process.env.AISHA_PROFILE || readBackupKey("AISHA_PROFILE") || "").trim() || undefined,
+      // `${VAR}` v external_domain profilu: samostatný běh nemá soubor domén vyexportovaný,
+      // hodnotu proto smí dodat i soubory prostředí instance (čteno jako data). Nenašel-li
+      // ji nikdo, domov řekne „nevím“ — ne „vlastní“ (revize integrátora, bod 2).
+      envSoubory: [ENV_COOLIFY, ENV_BACKUP].filter((f) => existsSync(f)),
+    });
   } catch (e) {
-    errLog(`Manifest instance nejde přečíst (${e.message.split("\n")[0]}) — nevím, co tahle instance nasazuje.`);
+    errLog(`Vlastnictví aplikací instance nejde určit (${e.message.split("\n")[0]}) — nevím, co tahle instance v tomhle prostředí nasazuje.`);
     process.exit(2);
   }
   let katalog;
@@ -1596,19 +1670,21 @@ function mapaInstance() {
   const ocekavane = new Set();
   const vypnute = new Map(); // jméno aplikace → podmínky, které nejsou splněné
   const compose = new Map(); // jméno aplikace → compose soubor (relativně k repu)
-  for (const radek of manifest.split(/\r?\n/)) {
-    const m = /^app:\s*([a-z0-9-]+):/.exec(radek.trim());
-    if (!m) continue;
-    const jmeno = `${APP_PREFIX_DASH}${m[1]}`;
-    // Řádek manifestu: `app: <jméno>:<slot>:<compose>[:<volba>=…]` — compose je
-    // pro diskovou bránu (stažené obrazy stacku); řádek bez něj se nevyřazuje.
-    const c = /^app:\s*[a-z0-9-]+:[^:]*:([^:\s]+)/.exec(radek.trim());
-    if (c) compose.set(jmeno, c[1]);
-    const podminka = katalog[m[1]]?.provision_when_env;
+  for (const a of vl.vlastni) {
+    const jmeno = `${APP_PREFIX_DASH}${a.role}`;
+    // compose je pro diskovou bránu (stažené obrazy stacku).
+    compose.set(jmeno, a.compose);
+    const podminka = katalog[a.role]?.provision_when_env;
     if (podminkaSplnena(podminka, cti)) ocekavane.add(jmeno);
     else vypnute.set(jmeno, klicePodminky(podminka).join(" | "));
   }
-  mapaInstanceCache = { ocekavane, vypnute, compose, cti };
+  // EXTERNÍ služby (plné jméno → { role, domena, hlaska }): nenasazují se, nečeká se
+  // na ně a výslovné cílení je odmítne kódem KOD_EXTERNI.
+  const externi = new Map(vl.externi.map((x) => [`${APP_PREFIX_DASH}${x.role}`, x]));
+  // Domov mutace dostane totéž (zjištěné) vlastnictví — nečte profil podruhé.
+  MUTACE.externi = new Map(vl.externi.map((x) => [x.role, x.domena]));
+  MUTACE.profil = vl.profil;
+  mapaInstanceCache = { ocekavane, vypnute, compose, cti, externi };
   return mapaInstanceCache;
 }
 // ⛔ PŘEPSÁNO 2026-09-06: pojistka měřila RIZIKO, KTERÉ UŽ NEEXISTUJE.
@@ -2309,6 +2385,63 @@ async function srovnejOdvozeneKlice() {
   return beh;
 }
 
+/**
+ * Srovná `docker_compose_domains` aplikací tohoto běhu s derivací DŘÍV, než je
+ * vlny nasadí — Coolify z nich při nasazení staví routery Traefiku.
+ *
+ * ⛔ NAMĚŘENO 2026-10-02 (boční vstupy mimo Edge). Domény srovnával JEN
+ * cold-start (deploy-init + doktor domén v kroku 4). Redeploy, kterým se fork
+ * po fast-forwardu srovnává, je nečetl: změna vlastnictví veřejného jména
+ * (edge jméno převezme, backend ho uvolní) zůstala v gitu a backend dál držel
+ * vlastní router — veřejný vstup mimo dveře a evidenci Edge.
+ *
+ * ⭐ SPOUŠTÍ SE VLASTNÍK, NEDĚLÁ SE DRUHÝ (jako u env-doktora výš): domény má
+ * jednoho zapisovatele, `coolify-domain-doctor.mjs`. Ten sám blokuje zápis
+ * s nerozvinutým `${VAR}`, s kolizí uvnitř projektu i s cizím držitelem a
+ * uvolnění řadí před převzetí. Tady jen dostane správné prostředí:
+ *   · nejdřív srovnané odvozené klíče (EDGE_OWNED_HOSTS vydává derivace),
+ *   · `.env.coolify` ROZPARSOVANÝ, nikdy `source` (hodnoty s mezerami),
+ *     i s prázdnými klíči — prázdné EDGE_OWNED_HOSTS znamená „edge nevlastní
+ *     nic" a nesmí ho přebít hodnota zděděná z prostředí volajícího.
+ * Bez `--restart` (vlny, které následují, aplikace nasadí) a bez sond (routy
+ * se změní až nasazením; 404 před vlnou je očekávaný stav).
+ *
+ * @param {string[]} cile plná jména aplikací tohoto běhu
+ * @returns {Promise<{ok: true} | {ok: false, error: string}>}
+ */
+async function srovnejDomeny(cile) {
+  if (readEnvCoolify() === null) {
+    return { ok: false, error: `${ENV_COOLIFY} chybí — domény není podle čeho srovnat` };
+  }
+  const odvozene = await srovnejOdvozeneKlice();
+  if (!odvozene.ok) return odvozene;
+  // Deklarace domén webu neznámá: doktor domén by bez ní edge zablokoval nebo —
+  // se starou hodnotou — srovnal podle ní. Nespouští se; běh skončí nenulou.
+  if (odvozene.webNevim) {
+    return { ok: false, error: `doktor domén NESPUŠTĚN — domény NESROVNÁNY: ${odvozene.webNevim}` };
+  }
+  const kratke = cile.map((n) => (n.startsWith(APP_PREFIX_DASH) ? n.slice(APP_PREFIX_DASH.length) : n));
+  try {
+    const { stdout } = await execFileP(
+      "node",
+      [join(ROOT, "scripts/coolify-domain-doctor.mjs"), "--apply", "--no-probe", `--only=${kratke.join(",")}`],
+      {
+        cwd: ROOT,
+        env: { ...process.env, ...parseEnvFile(ENV_COOLIFY, { keepEmpty: true }) },
+        maxBuffer: 16 * 1024 * 1024,
+      },
+    );
+    return { ok: true, vystup: String(stdout || "") };
+  } catch (e) {
+    // Doktor vypisuje, CO zablokoval a proč — volající to musí vidět celé.
+    const vystup = `${String(e?.stdout || "")}\n${String(e?.stderr || "")}`.trim();
+    return {
+      ok: false,
+      error: `doktor domén skončil ${e?.code ?? "?"} — domény NESROVNÁNY:\n${vystup || e.message}`,
+    };
+  }
+}
+
 async function spustDoktora() {
   // Holý běh = apply. Nenulový kód znamená, že doktor SPADL: chybějící
   // EXTERNAL klíče (které redeploy vědomě toleruje) končí nulou, protože
@@ -2320,8 +2453,20 @@ async function spustDoktora() {
     });
     return { ok: true };
   } catch (e) {
+    // „WEB_FQDNS neznám" (vlastní kód env-doktora): ostatní odvozené klíče JSOU
+    // zapsané, takže aplikace se nasadit smějí — rozpor s c2091fa48 („nasazení
+    // nezastaví") by byl blokovat kvůli doménám celé vlny. Srovnání domén ho
+    // vrátí jako nesrovnané (srovnejDomeny) a běh skončí nenulou.
+    if (e?.code === KOD_ENV_DOKTORA_WEB_NEVIM) {
+      const pricina = String(e?.stderr || "").trim().split("\n").filter((r) => /WEB_FQDNS/.test(r)).slice(-1)[0];
+      return { ok: true, webNevim: pricina || "WEB_FQDNS (domény webu) neznám — env-doktor neuvedl příčinu" };
+    }
     // Potomek píše příčinu na stderr; volající ji musí PŘEDAT, ne uříznout.
-    const stderr = String(e?.stderr || "").trim().split("\n").filter(Boolean).slice(0, 3).join(" | ");
+    // ⛔ NAMĚŘENO 2026-10-05: první tři řádky stderr env-doktora jsou jeho
+    // VAROVÁNÍ (git remote, referenční TLD derivace, manifest) — příčina pádu
+    // (`Fatal: …`, „WEB_FQDNS … NEZNÁM") stojí na KONCI a hláška ji uřízla.
+    // Bere se proto konec výpisu.
+    const stderr = String(e?.stderr || "").trim().split("\n").filter(Boolean).slice(-3).join(" | ");
     return {
       ok: false,
       error:
@@ -2419,6 +2564,18 @@ async function triggerDeploy(uuid, name, wave) {
   // on cold-start the var is already synced so this is a no-op refresh.
   const short = name.startsWith(APP_PREFIX_DASH) ? name.slice(APP_PREFIX_DASH.length) : name;
 
+  // ⛔ DRŽENÍ SE ČTE PRVNÍ — dřív než cokoli z přípravy nasazení. Kroky níž
+  // PÍŠOU (srovnání SoT, env-sync do aplikace); u držené aplikace nesmí proběhnout
+  // ani jeden, ne jen samotné volání nasazení na konci (to hlídá domov mutace).
+  // Výběr cílů drženou vyřazuje už dřív; tohle platí pro cestu, která by ho minula.
+  const drzena = drzenaPolozka({ jmeno: name, prefix: APP_PREFIX }, MUTACE);
+  if (drzena) return { ok: false, drzeno: true, error: `${hlaskaDrzeno(drzena)}. NENASAZENO (ani příprava nasazení neproběhla).` };
+  // Totéž pro EXTERNÍ službu (profil prostředí): v tomhle prostředí není naše — ani
+  // srovnání SoT, ani env-sync. Výsledek nese týž příznak „odmítnuto stráží, ne selhání“
+  // (`drzeno`), hláška říká EXTERNÍ. Výběr cílů ji vyřazuje už dřív.
+  const cizi = externiPolozka({ jmeno: name, prefix: APP_PREFIX }, MUTACE);
+  if (cizi) return { ok: false, drzeno: true, externi: true, error: `${cizi.hlaska}. NENASAZENO (ani příprava nasazení neproběhla).` };
+
   // Prázdné *_MESH_IP doplnit z discovery DŘÍV, než je env-sync roznese —
   // jinak env-sync přepíše i hodnotu, kterou mesh-sync mezitím nastavil na
   // Coolify (třetí výskyt: 07-29, 07-30, 07-31; detail u refreshMeshIps).
@@ -2510,7 +2667,9 @@ async function triggerDeploy(uuid, name, wave) {
     return { ok: true, deployment: rozdelane, prevzato: true };
   }
   try {
-    const r = await coolify(`/deploy?uuid=${uuid}&force=true`, { method: "POST" });
+    const m = await mutujAplikaci({ akce: "deploy", jmeno: name, prefix: APP_PREFIX, uuid, force: true }, MUTACE);
+    if (m.drzeno || m.externi) return { ok: false, drzeno: true, ...(m.externi ? { externi: true } : {}), error: `${m.hlaska}. NENASAZENO.` };
+    const r = m.odpoved;
     const d = r?.deployments?.[0]?.deployment_uuid || r?.deployment_uuid || "";
     // ⛔ Bez `deployment_uuid` se výsledek nasazení NEDÁ změřit: vlna by ho
     // posoudila podle zdraví STARÉHO kontejneru. Coolify požadavek přijal
@@ -2536,7 +2695,9 @@ async function triggerDeploy(uuid, name, wave) {
 // odlišit od tichého no-opu → fail-loud.
 async function triggerRestart(uuid, name, _wave) {
   try {
-    const r = await coolify(`/applications/${uuid}/restart`, { method: "POST", timeoutMs: 30_000 });
+    const m = await mutujAplikaci({ akce: "restart", jmeno: name, prefix: APP_PREFIX, uuid }, { ...MUTACE, timeoutMs: 30_000 });
+    if (m.drzeno || m.externi) return { ok: false, drzeno: true, ...(m.externi ? { externi: true } : {}), error: `${m.hlaska}. NERESTARTOVÁNO.` };
+    const r = m.odpoved;
     const d = r?.deployment_uuid || r?.deployments?.[0]?.deployment_uuid || "";
     if (!d) {
       return { ok: false, error: "restart bez deployment_uuid — nelze prokázat, že se vůbec zařadil (odpověď bez důkazu)" };
@@ -2759,19 +2920,25 @@ async function snapshotWave(waveNum, targetApps, allApps) {
 
 // Try multiple Coolify endpoint shapes for redeploy specific past deployment.
 // Returns { ok: true, endpoint } if any worked, { ok: false } if all failed.
-async function tryCoolifyRollback(appUuid, deploymentUuid) {
+async function tryCoolifyRollback(appName, appUuid, deploymentUuid) {
+  // Návrat na dřívější nasazení je taky mutace aplikace — jde přes domov mutace,
+  // takže drženou aplikaci nevrátí ani on (držení se čte před každým voláním).
+  const zadani = { jmeno: appName, prefix: APP_PREFIX, uuid: appUuid, nasazeni: deploymentUuid };
+  const jak = { ...MUTACE, timeoutMs: 15_000 };
   // Endpoint shape 1: direct deployment restart (Coolify v4 newer)
   try {
-    const r = await coolify(`/deployments/${deploymentUuid}/restart?force=true`, { method: "POST", timeoutMs: 15_000 });
-    if (r) return { ok: true, endpoint: `/deployments/${deploymentUuid}/restart` };
+    const m = await mutujAplikaci({ akce: "navrat", ...zadani }, jak);
+    if (m.drzeno || m.externi) return { ok: false, drzeno: m.hlaska };
+    if (m.odpoved) return { ok: true, endpoint: "návrat na dřívější nasazení" };
   } catch {
     // Endpoint shape mismatch — fall through to next variant
   }
 
   // Endpoint shape 2: application restart with deployment ref
   try {
-    const r = await coolify(`/applications/${appUuid}/restart?deployment_uuid=${deploymentUuid}&force=true`, { method: "POST", timeoutMs: 15_000 });
-    if (r) return { ok: true, endpoint: `/applications/${appUuid}/restart?deployment_uuid=...` };
+    const m = await mutujAplikaci({ akce: "restart", ...zadani }, jak);
+    if (m.drzeno || m.externi) return { ok: false, drzeno: m.hlaska };
+    if (m.odpoved) return { ok: true, endpoint: "restart aplikace s odkazem na nasazení" };
   } catch {
     // Endpoint shape mismatch — fall through to next variant
   }
@@ -2804,9 +2971,11 @@ async function printRollbackRecipe(snapshot, snapshotPath, failedApps, opts = {}
       }
       if (autoRollback) {
         info(`    Attempting auto-rollback via Coolify API...`);
-        const r = await tryCoolifyRollback(snap.uuid, snap.last_deployment_uuid);
+        const r = await tryCoolifyRollback(app, snap.uuid, snap.last_deployment_uuid);
         if (r.ok) {
           ok(`    Auto-rollback triggered: ${r.endpoint}`);
+        } else if (r.drzeno) {
+          warn(`    ${r.drzeno}. Návrat se NESPOUŠTÍ.`);
         } else {
           warn(`    Auto-rollback failed (Coolify API endpoint not accepted)`);
           log(`    ${C.dim("Fallback — manual rollback v Coolify UI:")}`);
@@ -2814,8 +2983,8 @@ async function printRollbackRecipe(snapshot, snapshotPath, failedApps, opts = {}
           log(`    ${C.dim(`  → klikni Re-Deploy na deployment ${snap.last_deployment_uuid}`)}`);
         }
       } else {
-        log(`    ${C.dim("Auto-rollback (--auto-rollback flag):")}`);
-        log(`    ${C.dim(`  POST ${COOLIFY_BASE}/api/v1/deployments/${snap.last_deployment_uuid}/restart`)}`);
+        log(`    ${C.dim("Auto-rollback: spusť znovu s --auto-rollback (návrat na nasazení")}`);
+        log(`    ${C.dim(`  ${snap.last_deployment_uuid} jde přes domov mutace, který ctí držení)`)}`);
         log(`    ${C.dim("Manual fallback v Coolify UI:")}`);
         log(`    ${C.dim(`  → ${COOLIFY_BASE}/applications/${snap.uuid}/deployments`)}`);
       }
@@ -2829,11 +2998,45 @@ async function printRollbackRecipe(snapshot, snapshotPath, failedApps, opts = {}
 // ── Filtering ────────────────────────────────────────────────────────────────
 /** Aplikace z manifestu instance, které v Coolify chybí (plní main, čte výsledek). */
 const CHYBI_V_COOLIFY = new Set();
+
+// ── Deklarované držení ───────────────────────────────────────────────────────
+// ⛔ ZMĚŘENO ČTENÍM 2026-10-04: deklaraci držení (overlay instance,
+// nasazeni-drzene.json) četlo jen nasazení z CI. Tenhle nástroj — a s ním studený
+// start, který ho volá po fázích — by drženou aplikaci přenasadil: na živé
+// instanci odpojení dat (Coolify převádí holý `${VAR}` zdroj svazku na prázdný
+// pojmenovaný svazek) a spuštění služby, kterou provozovatel zastavil.
+//
+// Pravidla, validace i text hlášky mají JEDEN domov (lib/nasazeni-drzene.mjs);
+// tady se jen čte a plní. Overlay si domov obstará sám — samostatně spuštěný
+// redeploy nesmí „nevím o overlayi“ přečíst jako „nic drženo“.
+//
+// STRÁŽ je v domově mutace (lib/coolify-mutace.mjs): každé volání deploy/restart
+// se na držení ptá samo, takže ho neobejde ani cesta, která by výběr cílů minula.
+// Tady se deklarace čte kvůli STOPu před prvním zásahem a kvůli výběru a výpisu.
+/** Jak tenhle nástroj volá domov mutace: vlastním klientem (zpětný tlak, opakování). */
+const MUTACE = { kdo: "aisha-redeploy", volej: (cesta, volby) => coolify(cesta, volby), envSoubory: CONFIG_ENV_FILES };
+/** @type {Map<string, {aplikace: string, duvod: string}>|null} plné jméno aplikace → položka deklarace */
+let DRZENE = null;
+function nactiDrzeni() {
+  try {
+    // Táž (jednou načtená) deklarace, které se před každým voláním ptá domov mutace.
+    const { polozky, popis } = drzeniProcesu(MUTACE.kdo, { envSoubory: MUTACE.envSoubory });
+    DRZENE = new Map(polozky.map((p) => [`${APP_PREFIX_DASH}${p.aplikace}`, p]));
+    info(`Držení aplikací: ${popis}`);
+  } catch (e) {
+    if (!Array.isArray(e?.chyby)) throw e;
+    for (const c of e.chyby) errLog(`${e.titulek}: ${c}`);
+    process.exit(2);
+  }
+}
+
 function filterWaveApps(wave, apps) {
   // Vypnutá lane se NENASAZUJE, i když aplikace v Coolify z dřívějška existuje —
   // hlásí se jednou na začátku běhu (viz ohlasMapuInstance), ne tady.
-  const { vypnute } = mapaInstance();
-  let names = wave.apps.filter((n) => apps.has(n) && !vypnute.has(n));
+  // Držená aplikace taky ne (hlásí se jednou na začátku běhu a v souhrnu).
+  // Externí služba (profil prostředí) taky ne — v tomhle prostředí není naše.
+  const { vypnute, externi } = mapaInstance();
+  let names = wave.apps.filter((n) => apps.has(n) && !vypnute.has(n) && !DRZENE.has(n) && !externi.has(n));
   if (ONLY) {
     const set = new Set(ONLY.split(",").map((s) => `${APP_PREFIX_DASH}${s.trim()}`));
     names = names.filter((n) => set.has(n));
@@ -2853,6 +3056,17 @@ function filterWaveApps(wave, apps) {
 // rozhodnutí, jestli pokračovat normálním cold-start.
 async function runCanary(shortName, apps) {
   const fullName = shortName.startsWith(APP_PREFIX_DASH) ? shortName : `${APP_PREFIX_DASH}${shortName}`;
+  const cizi = mapaInstance().externi.get(fullName);
+  if (cizi) {
+    errLog(`Kanárek ${fullName} ODMÍTNUT — ${cizi.hlaska}; verdikt se nevydává. Kód ${KOD_EXTERNI}.`);
+    process.exit(KOD_EXTERNI);
+  }
+  if (DRZENE.has(fullName)) {
+    // Důvod držení vypsal main („DRŽENO: …“). PROCEED ani ABORT tu nezazní:
+    // obojí by tvrdilo měření, které neproběhlo.
+    errLog(`Kanárek ${fullName} ODMÍTNUT — aplikace je držená; verdikt se nevydává. Držení se ruší v overlayi instance, ne přepínačem.`);
+    process.exit(KOD_DRZENO);
+  }
   const app = apps.get(fullName);
   if (!app) {
     errLog(`Canary target not found: ${fullName}`);
@@ -3030,6 +3244,10 @@ async function main() {
 
   if (STATUS_ONLY) return;
 
+  // Deklarované držení se čte DŘÍV, než se cokoli vybere k nasazení: nečitelná
+  // nebo neplatná deklarace je STOP (kód 2), ne „nic drženo“.
+  nactiDrzeni();
+
   // Co manifest nasazuje a co z toho v Coolify CHYBÍ / má vypnutou lane — nahlas,
   // jednou, pro vlny v rozsahu tohoto běhu. Chybějící se započítá do výsledku.
   const { ocekavane, vypnute } = mapaInstance();
@@ -3037,8 +3255,30 @@ async function main() {
   for (const [n, podminky] of vypnute) {
     if (vRozsahu.has(n)) info(`${n.padEnd(22)} lane vypnutá (${podminky || "?"} nesplněno) — nenasazuje se`);
   }
+  // Držené aplikace, na které by tenhle běh jinak sáhl (rozsah vln, případně --only):
+  // každá JEDNOU, nahlas, stejným textem jako v CI. Co se nenasadí, to se vypíše.
+  const plneJmeno = (s) => (s.startsWith(APP_PREFIX_DASH) ? s : `${APP_PREFIX_DASH}${s}`);
+  const jmenovane = CANARY
+    ? new Set([plneJmeno(CANARY)])
+    : ONLY
+      ? new Set(ONLY.split(",").map((s) => s.trim()).filter(Boolean).map(plneJmeno))
+      : null;
+  // Kanárek vlny nečte (jede mimo ně), takže u něj rozsah vln nerozhoduje.
+  const drzeneVBehu = [...DRZENE.keys()].filter((n) => (jmenovane ? jmenovane.has(n) : true) && (CANARY || vRozsahu.has(n)));
+  const coNedela = RESTART_VALIDATE ? "Nerestartuji" : "Nenasazuji";
+  for (const n of drzeneVBehu) {
+    warn(`${hlaskaDrzeno(DRZENE.get(n))}. ${coNedela}${apps.has(n) ? "" : " (v Coolify není)"}; ostatní aplikace pokračují.`);
+  }
+  // Externí služby, na které by tenhle běh jinak sáhl: každá jednou, nahlas.
+  const { externi } = mapaInstance();
+  const externiVBehu = [...externi.keys()].filter((n) => (jmenovane ? jmenovane.has(n) : true) && (CANARY || vRozsahu.has(n)));
+  for (const n of externiVBehu) {
+    warn(`${externi.get(n).hlaska}. ${coNedela}${apps.has(n) ? " (v projektu přesto existuje — nesahám na ni)" : ""}; ostatní aplikace pokračují.`);
+  }
   if (!ONLY) {
     for (const n of ocekavane) {
+      // Držená aplikace, která v Coolify není, NENÍ nález: studený start ji nezakládá.
+      if (DRZENE.has(n)) continue;
       if (vRozsahu.has(n) && !apps.has(n)) {
         errLog(`${n.padEnd(22)} manifest ji nasazuje, ale v Coolify NENÍ — nezaložila se (krok 3 / story-init)`);
         CHYBI_V_COOLIFY.add(n);
@@ -3068,7 +3308,10 @@ async function main() {
   // … Available: …`). Tohle ji jen dorovnává — nevymýšlí nové chování.
   if (ONLY) {
     const dosazitelne = dosazitelneVeVlnach(WAVES, apps);
-    const { mimoVlny, neexistuji, vypnuteLane } = rozdelOnlyCile(ONLY.split(","), APP_PREFIX_DASH, apps, dosazitelne, vypnute);
+    // Držené cíle už ohlásil výpis výš; do rozdělení nejdou (v Coolify být nemusí
+    // a „neexistuje“ by z držení udělalo chybu zadání).
+    const zadaneBezDrzenych = ONLY.split(",").filter((s) => !DRZENE.has(plneJmeno(s.trim())) && !externi.has(plneJmeno(s.trim())));
+    const { mimoVlny, neexistuji, vypnuteLane } = rozdelOnlyCile(zadaneBezDrzenych, APP_PREFIX_DASH, apps, dosazitelne, vypnute);
     for (const n of vypnuteLane) {
       info(`${n.padEnd(22)} --only ji jmenuje, ale lane je vypnutá (${vypnute.get(n) || "?"} nesplněno) — nenasazuje se`);
     }
@@ -3102,7 +3345,7 @@ async function main() {
       const target = `${APP_PREFIX_DASH}${CANARY}`;
       const a = apps.get(target);
       log(C.bold("Canary plan:"));
-      log(`  → ${target.padEnd(22)} ${a ? statusColor(classifyStatus(a.status))(a.status) : C.red("missing")}`);
+      log(`  → ${target.padEnd(22)} ${externi.has(target) ? C.yellow("EXTERNÍ — v tomhle prostředí není naše, kanárek ji nenasadí") : DRZENE.has(target) ? C.yellow("DRŽENO — kanárek ji nenasadí") : a ? statusColor(classifyStatus(a.status))(a.status) : C.red("missing")}`);
       log("");
       info("(plan-only — no deploys triggered)");
       return;
@@ -3159,7 +3402,31 @@ async function main() {
   // Profil (souběžnost) a mapa uzlů se čtou PŘED první vlnou: vadný profil
   // nesmí vyjít najevo až uprostřed běhu, po polovině nasazení.
   pripravHlidani();
-  const summary = { triggered: [], failed_trigger: [], deploy_failed: [], unhealthy: [], healthy: [], prijate: [], gate_aborted: [] };
+  const summary = { triggered: [], failed_trigger: [], deploy_failed: [], unhealthy: [], healthy: [], prijate: [], gate_aborted: [], domeny_nesrovnane: null };
+
+  // Domény JEDNOU, před první vlnou, nad aplikacemi celého plánu: převzetí
+  // jména edgem a jeho uvolnění backendem doktor seřadí jen tehdy, když vidí
+  // obě strany v jednom běhu (po vlnách by edge narazil na starý router
+  // backendu z pozdější vlny). Nesrovnané domény nasazení nezastaví — horší
+  // stav než před během nevznikne — ale běh NENÍ čistý (návratový kód 1).
+  if (!RESTART_VALIDATE && !BEZ_DOMEN) {
+    // Aplikace smí stát ve víc vlnách (warmup + vlastní vlna) — doktor ji chce jednou.
+    const cileBehu = [...new Set(WAVES
+      .filter((wave) => wave.num >= FROM_WAVE && wave.num <= UNTIL_WAVE)
+      .flatMap((wave) => filterWaveApps(wave, apps)))];
+    if (cileBehu.length > 0) {
+      info(`Srovnávám domény v Coolify (${cileBehu.length} aplikací) — doktor domén --apply…`);
+      const domeny = await srovnejDomeny(cileBehu);
+      if (domeny.ok) {
+        ok("Domény v Coolify srovnané s derivací");
+      } else {
+        summary.domeny_nesrovnane = domeny.error;
+        errLog(domeny.error);
+        errLog("Pokračuji ve vlnách (nasazení stav nezhorší), ale běh skončí 1. Celé srovnání: cold-start --skip-create.");
+      }
+    }
+  }
+
   for (const wave of WAVES) {
     if (wave.num < FROM_WAVE) continue;
     if (wave.num > UNTIL_WAVE) continue;
@@ -3501,8 +3768,14 @@ async function main() {
   if (summary.gate_aborted.length > 0) {
     log(`  ${C.red("✗")} gate aborted:     ${summary.gate_aborted.length} (${summary.gate_aborted.join(", ")})`);
   }
+  if (summary.domeny_nesrovnane) {
+    log(`  ${C.red("✗")} domény NESROVNÁNY (výpis doktora výš)`);
+  }
   if (hlidani.zastaveni) {
     log(`  ${C.red("✗")} ZASTAVENO:        ${hlidani.zastaveni.jmeno} — ${hlidani.zastaveni.duvod}`);
+  }
+  if (drzeneVBehu.length > 0) {
+    log(`  ${C.yellow("∅")} DRŽENO:           ${drzeneVBehu.length} (${drzeneVBehu.map((n) => DRZENE.get(n).aplikace).join(", ")}) — deklarace v overlayi instance; ${RESTART_VALIDATE ? "nerestartováno" : "nenasazeno"}`);
   }
   // NEZMĚŘENO není čisto: nasazení proběhlo bez pojistky, kterou má mít.
   const nezmereneUzly = [...new Set(hlidani.nezmereno.map((z) => z.uzel))];
@@ -3566,6 +3839,7 @@ async function main() {
     summary.deploy_failed.some((f) => !mekka(f.name)) ||
     summary.failed_trigger.some((n) => !mekka(n)) ||
     summary.gate_aborted.length > 0 ||
+    summary.domeny_nesrovnane !== null ||
     hlidani.zastaveni !== null ||
     [...CHYBI_V_COOLIFY].some((n) => !mekka(n)) ||
     summary.unhealthy.some((u) => !mekka(u.name) && !ocekavaneVOkne(u));
@@ -3581,6 +3855,18 @@ async function main() {
   if (mekkeNalezy.length > 0) {
     log(C.yellow(`  ⚠ nedokončeno jen u měkkých aplikací nebo v bootstrap okně před vlnou ${MESH_WARMUP_WAVE} (${mekkeNalezy.join(", ")}) — vracím 3, volající smí pokračovat, ale NENÍ to čisto`));
     process.exit(3);
+  }
+  // Držená aplikace v běhu PO VLNÁCH je deklarovaná výjimka — kód neovlivní (jinak
+  // by studený start instance s držením končil nečistě napořád). Když ji ale
+  // volající JMENOVAL (`--only`), požadavek se ODMÍTÁ: nenasadila se a kód je
+  // KOD_DRZENO — ne úspěch, ne chyba sítě. Ostatní jmenované doběhly výš.
+  if (jmenovane && externiVBehu.length > 0) {
+    errLog(`--only jmenuje službu, která v tomhle prostředí není naše (${externiVBehu.map((n) => externi.get(n).role).join(", ")}) — ODMÍTNUTO, nenasazena (profil prostředí: external_domain). Kód ${KOD_EXTERNI}.`);
+    process.exit(KOD_EXTERNI);
+  }
+  if (jmenovane && drzeneVBehu.length > 0) {
+    errLog(`--only jmenuje drženou aplikaci (${drzeneVBehu.map((n) => DRZENE.get(n).aplikace).join(", ")}) — ODMÍTNUTO, nenasazena. Držení se ruší v overlayi instance, ne přepínačem. Kód ${KOD_DRZENO}.`);
+    process.exit(KOD_DRZENO);
   }
   process.exit(0);
 }

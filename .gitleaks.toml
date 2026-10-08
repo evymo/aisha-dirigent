@@ -29,10 +29,10 @@ useDefault = true
 
 [[rules]]
 id = "aisha-service-role-jwt"
-description = "Supabase service_role JWT (bypasses RLS) — source from env / n8n credential, never commit. Real self-hosted tokens are role-first ({\"role\":\"service_role\",...}); the public demo fixtures are issuer-first and are NOT matched here."
-# base64url of `{"role":"service_role` followed by the rest of the JWT.
-regex = '''eyJyb2xlIjoic2VydmljZV9yb2xl[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{20,}'''
-keywords = ["eyJyb2xlIjoic2VydmljZV9yb2xl"]
+description = "service_role JWT (bypasses RLS) — source from env / n8n credential, never commit. The role claim sits in the PAYLOAD (the middle segment), first or not; the rule looks for the base64 of the claim in each of its three alignments. (Until 2026-10-03 the rule expected two dots AFTER the payload and so matched no real token — found by the aisha-team review.)"
+# header . payload-with-the-role-claim . signature
+regex = '''eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]*(?:InJvbGUiOiJzZXJ2aWNlX3JvbGUi|Jyb2xlIjoic2VydmljZV9yb2xlI|icm9sZSI6InNlcnZpY2Vfcm9sZS)[A-Za-z0-9_-]*\.[A-Za-z0-9_-]{20,}'''
+keywords = ["InJvbGUiOiJzZXJ2aWNlX3JvbGUi", "Jyb2xlIjoic2VydmljZV9yb2xlI", "icm9sZSI6InNlcnZpY2Vfcm9sZS"]
 
 [[rules]]
 id = "aisha-coolify-api-token"
@@ -138,6 +138,30 @@ regexes = [
   # entropie 5,04; lokální 8.30.1 ho nehlásí).
   # ⛔ VYJMUTA JE HODNOTA, NE CESTA — táž volba jako výš: Dockerfile se hlídá dál.
   '''RWTx5Zr1tiHQLwG9keckT0c45M3AGeHD6IvimQHpyRywVWGbP1aVSGav''',
+  # ATRAPA STARŠÍ HODNOTY V TREZORU Z BRÁNY `trezor-shoda-pred-konvergenci` (2026-10-04,
+  # commit bdccbb470). Test kontroly „trezor × živý stack“ potřebuje v trezoru JINOU
+  # hodnotu spravovaného klíče, než vrací falešné Coolify; literál `PKI_SVAULT_KEY=…`
+  # chytil `generic-api-key` (gitleaks 8.18.4 v CI i 8.30.1 lokálně). Nic neotevře:
+  # žádná instance ji nemá, skutečný PKI_SVAULT_KEY vyrábí generate-secrets.
+  # ⛔ VYJMUTA JE HODNOTA, NE CESTA — táž volba jako výš: soubor se hlídá dál.
+  # ⭐ V AKTUÁLNÍM STROMU UŽ LITERÁL NENÍ — atrapa se skládá za běhu. Výjimka je pro
+  # HISTORII: skener čte diffy commitů větve. Až bude za horizontem skenu, může zmizet.
+  '''stara-hodnota-z-minule-zalohy-0123''',
+  # ID POLOŽEK ZNALOSTÍ V SEEDU, NE KLÍČE (2026-10-05, dávka 4b, feat/znalosti-platformy).
+  # Seed páruje slug položky s jejím odvozeným uuid: `('model-access-architecture', '<uuid>'::uuid)`.
+  # Slovo „access“ / „api“ ve slugu a hodnota v uvozovkách za ním = tvar, na který se chytá
+  # `generic-api-key` (gitleaks 8.18.4 v CI i 8.30.1 lokálně). Uuid nic neotevře, je to klíč řádku.
+  # ⛔ VYJMUTA JE HODNOTA, NE CESTA — seed i jeho zkompilované kopie se hlídají dál; obecnou
+  # výjimku tvaru „slug, uuid“ nepřidávám, protože by skryla i skutečný klíč tvaru uuid.
+  # První dvě jsou v aktuálním stromu, další dvě jen v historii větve (do horizontu skenu).
+  '''82500165-e5ba-361f-98b0-0c8b5f612dc8''',  # model-access-architecture
+  '''ae9a9084-d342-2dbc-9080-9d6bdfc30faa''',  # ops-ci-run-states-and-forgejo-api
+  '''7a5f4adc-c1f7-25e1-e2f1-ce0312f2db40''',  # model-access-architecture (dřívější odvození, historie)
+  '''feb0fcca-b667-25e2-3640-5a4ba75ce7ce''',  # ops-ci-run-states-and-forgejo-api (dřívější odvození, historie)
+  # TESTOVACÍ JWT V BRÁNĚ „log bez tokenu“ (ws-gateway, fix/sluzby-nelogujou-url-s-tajemstvim):
+  # {"alg":"HS256"}.{"sub":"user-1"}.base64url("test-podpis"). Test tvrdí, že se token do logu
+  # NEDOSTANE, fixtura ho tedy představovat musí. Vyjmut je jen falešný podpis.
+  '''dGVzdC1wb2RwaXM''',
 ]
 paths = [
   '''src/tests/gates/no-committed-secrets\.gate\.test\.ts''',  # the enforcing gate references fragments

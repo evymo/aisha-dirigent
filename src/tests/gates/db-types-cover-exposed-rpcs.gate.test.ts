@@ -29,11 +29,22 @@
  *
  * WHAT IS EXCLUDED IS DERIVED, NOT LISTED
  * ---------------------------------------
- * A function is absent from the generated types for exactly two legitimate
- * reasons, both readable from its own definition:
- *   - it RETURNS trigger / event_trigger — PostgREST cannot call it (75 of them)
- *   - nothing GRANTs EXECUTE to a PostgREST role — it is unreachable (2)
- * Both are read per-file. No name appears in this gate.
+ * A function is absent from the generated types for exactly three legitimate
+ * reasons, all readable from its own definition:
+ *   - it RETURNS trigger / event_trigger — PostgREST cannot call it
+ *   - nothing GRANTs EXECUTE to a PostgREST role — it is unreachable
+ *   - it is created outside schema `public` — the types describe `public` only
+ * All are read per-file. No name appears in this gate.
+ *
+ * THE METER IS MEASURED TOO (2026-10-04)
+ * --------------------------------------
+ * ⛔ NAMĚŘENO: parser grantů hledal `ON FUNCTION \S+ TO` a signaturu s mezerou
+ * (`f(uuid, uuid)`) neviděl. U 1005 z 1726 vydaných funkcí tak vyšlo „nikdo ji
+ * nesmí volat“ a brána je přeskočila — zelená pro 58 % plochy, kterou má hlídat.
+ * Dvě RPC (v SoT od 2026-10-01) v typech chyběly a nic nespadlo. Kotva
+ * „inventář není prázdný“ to nechytla: 721 je víc než 100.
+ * Proto níž druhý, nezávislý měřák grantů (příkaz po příkazu, bez vzoru nad
+ * signaturou): oba se musí shodnout nad každým souborem SoT.
  */
 import { describe, expect, test } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
@@ -58,15 +69,39 @@ const MOBILE_TYPES = join(ROOT, "mobile-app/src/types/database.ts");
  * `audience_user_meets_tier_requirement`. Druhý kus dluhu nebyl nemapovatelný
  * typ, ale prostě NEPŘEGENEROVANÉ typy (`resolve_brand_for_hostname`) — ráčna
  * proto klesá 2 → 1, aby se ten rozdíl nemohl tiše vrátit.
+ *
+ * ⛔ NAMĚŘENO 2026-10-04: ráčna klesá 1 → 0. Ani `audience_user_meets_tier_requirement`
+ * nebyla nemapovatelná — v typech JE. Generátor funkci s přetížením tiskne jako
+ * sjednocení (`jmeno:` a `| {` až na dalším řádku) a čtečka jmen níž čekala `{`
+ * hned za dvojtečkou, takže každou přetíženou funkci hlásila jako chybějící.
  */
-const KNOWN_UNGENERATABLE = 1;
+const KNOWN_UNGENERATABLE = 0;
 
-/** Function names in the `Functions:` block of a generated types file. */
+/**
+ * Příjemci, přes které funkci zavolá role PostgRESTu. `public` (PUBLIC) k nim patří:
+ * je to každá role, tedy i anon. ⛔ NAMĚŘENO 2026-10-04: 9 funkcí SoT je vydaných
+ * jen `TO public` a brána je dřív za vydané nepovažovala.
+ */
+const GRANTEES = ["anon", "authenticated", "service_role", "public"] as const;
+type Grantee = (typeof GRANTEES)[number];
+
+/**
+ * Function names in the `Functions:` block of a generated types file. An
+ * overloaded function is printed as a union — the key is followed by a newline
+ * and `| {`, not by `{` — so the key alone is what identifies an entry.
+ */
 function generatedFunctionNames(path: string): Set<string> {
   const body = readFileSync(path, "utf8");
   const block = body.match(/Functions:\s*\{(.*?)\n {4}\}/s);
   if (!block) throw new Error(`${path}: no Functions block — the generator's shape changed`);
-  return new Set([...block[1].matchAll(/^ {6}([a-z0-9_]+):\s*\{/gm)].map((m) => m[1]));
+  return new Set([...block[1].matchAll(/^ {6}([a-z0-9_]+):/gm)].map((m) => m[1]));
+}
+
+/** Schemas the file creates functions in; an unqualified name lands in `public`. */
+function schemasOfCreatedFunctions(sql: string): string[] {
+  return [...sql.matchAll(/CREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+(?:"?([a-z_][a-z0-9_]*)"?\s*\.)?/gi)].map((m) =>
+    (m[1] ?? "public").toLowerCase(),
+  );
 }
 
 /** Every SoT function PostgREST can serve, with the reason derived per file. */
@@ -75,10 +110,41 @@ function exposedRpcs(): string[] {
     .filter((entry: { name: string; file: string }) => {
       const sql = readFileSync(join(FUNCTIONS_DIR, entry.file), "utf8");
       if (/returns\s+(event_)?trigger\b/i.test(sql)) return false;
+      const schemas = schemasOfCreatedFunctions(sql);
+      if (schemas.length > 0 && !schemas.includes("public")) return false;
       const g = extractGrants(sql);
-      return g.anon || g.authenticated || g.service_role;
+      return GRANTEES.some((grantee) => g[grantee]);
     })
     .map((entry: { name: string }) => entry.name);
+}
+
+/**
+ * Druhý měřák grantů, záměrně jinak postavený než `extractGrants`: čte příkaz po
+ * příkazu a příjemce bere jako konec příkazu za posledním TO / FROM — žádný vzor
+ * nad signaturou funkce, takže ho mezera v signatuře oslepit nemůže.
+ * Vedle toho hlásí REVOKE příjemce, které přichází PO jeho GRANTu: `extractGrants`
+ * pořadí příkazů nemodeluje a spoléhá na to, že takový soubor v SoT není.
+ */
+function grantsByStatement(sql: string): { granted: Record<Grantee, boolean>; revokedAfterGrant: Grantee[] } {
+  const withoutComments = sql.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/--[^\n]*/g, " ");
+  const granted: Record<Grantee, boolean> = { anon: false, authenticated: false, service_role: false, public: false };
+  const revokedAfterGrant: Grantee[] = [];
+  for (const statement of withoutComments.split(";").map((part) => part.trim())) {
+    const verb = statement.split(/\s+/)[0]?.toUpperCase();
+    if ((verb !== "GRANT" && verb !== "REVOKE") || !/\sFUNCTION\s/i.test(statement)) continue;
+    const tail = statement.split(verb === "GRANT" ? /\sTO\s/i : /\sFROM\s/i).pop() ?? "";
+    const named = tail.toLowerCase().split(/[\s,]+/).map((role) => role.replace(/"/g, ""));
+    for (const grantee of GRANTEES) {
+      if (!named.includes(grantee)) continue;
+      if (verb === "GRANT") granted[grantee] = true;
+      else if (granted[grantee]) revokedAfterGrant.push(grantee);
+    }
+  }
+  return { granted, revokedAfterGrant };
+}
+
+function sotFunctionFiles(): string[] {
+  return readdirSync(FUNCTIONS_DIR).filter((file) => file.endsWith(".sql")).sort();
 }
 
 describe("generated DB types cover every exposed RPC", () => {
@@ -110,6 +176,52 @@ describe("generated DB types cover every exposed RPC", () => {
 
   test("the inventory itself is non-empty — an empty check passes for the wrong reason", () => {
     expect(exposedRpcs().length).toBeGreaterThan(100);
+  });
+});
+
+describe("měřák grantů vidí to, co v SoT je", () => {
+  test("oba měřáky se shodnou nad každým souborem SoT", () => {
+    const rozdily = sotFunctionFiles().flatMap((file) => {
+      const sql = readFileSync(join(FUNCTIONS_DIR, file), "utf8");
+      const parser = extractGrants(sql);
+      const { granted } = grantsByStatement(sql);
+      const ruzne = GRANTEES.filter((g) => parser[g] !== granted[g]);
+      return ruzne.length > 0 ? [`${file}: ${ruzne.map((g) => `${g} parser=${parser[g]} příkazy=${granted[g]}`).join(", ")}`] : [];
+    });
+
+    expect(
+      rozdily,
+      "extractGrants a čtení příkaz po příkazu se rozcházejí — jeden z měřáků grant nevidí, " +
+        "a funkce, u které brána grant nevidí, se v typech nehlídá vůbec. Oprav měřák, ne tento seznam.",
+    ).toEqual([]);
+  });
+
+  test("kotva: shoda není shodou dvou slepých — signaturu s mezerou vidí oba", () => {
+    const sMezerou = sotFunctionFiles().filter((file) =>
+      /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+[\w."]+\([^)]*\s[^)]*\)\s+TO\s/i.test(readFileSync(join(FUNCTIONS_DIR, file), "utf8")),
+    );
+    expect(sMezerou.length, "SoT nemá grant se signaturou s mezerou — kotva nemá co měřit").toBeGreaterThan(0);
+
+    const nevidi = sMezerou.filter((file) => {
+      const sql = readFileSync(join(FUNCTIONS_DIR, file), "utf8");
+      const parser = extractGrants(sql);
+      const { granted } = grantsByStatement(sql);
+      return !GRANTEES.some((g) => parser[g]) || !GRANTEES.some((g) => granted[g]);
+    });
+    expect(nevidi, "grant se signaturou s mezerou některý měřák nevidí").toEqual([]);
+  });
+
+  test("žádný soubor SoT neodvolává příjemce poté, co mu funkci vydal", () => {
+    const odvolane = sotFunctionFiles().flatMap((file) => {
+      const { revokedAfterGrant } = grantsByStatement(readFileSync(join(FUNCTIONS_DIR, file), "utf8"));
+      return revokedAfterGrant.length > 0 ? [`${file}: ${revokedAfterGrant.join(", ")}`] : [];
+    });
+
+    expect(
+      odvolane,
+      "extractGrants pořadí GRANT → REVOKE nemodeluje (každý GRANT bere jako platný). " +
+        "Jakmile takový soubor vznikne, nauč parser pořadí příkazů — do té doby by funkci hlásil jako vydanou.",
+    ).toEqual([]);
   });
 });
 

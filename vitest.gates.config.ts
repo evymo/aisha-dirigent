@@ -55,6 +55,11 @@ export default defineConfig({
     // (a račna `zadny-fallback-nad-identitou` ho hned chytila — správně).
     // Sada bran měří JEDEN zvolený tvar; kdo chce jiný, změní tenhle řádek.
     env: { AISHA_PROFILE: "cloud-multi" },
+    // Každý soubor bran dostane vlastní dočasný adresář a po sobě ho smaže
+    // (naměřeno 2026-10-02: jeden běh nechával 214 adresářů / 93 MB).
+    setupFiles: [path.resolve(__dirname, "./src/test/docasny-adresar-souboru.ts")],
+    // …a kořen celého běhu smaže i adresáře souborů, kde neproběhl afterAll (vše přeskočené).
+    globalSetup: [path.resolve(__dirname, "./src/test/docasny-adresar-behu.ts")],
     include:
       LANE === "heavy" ? HEAVY : ["src/tests/gates/**/*.gate.test.ts"],
     // Lehká dráha vylučuje naměřené žrouty; ostatní dráhy nevylučují nic.

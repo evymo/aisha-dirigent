@@ -22,7 +22,7 @@ CREATE OR REPLACE FUNCTION public.fn_build_ragnarok_document(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 AS $$
 DECLARE
   v_filename text;
@@ -88,7 +88,12 @@ BEGIN
       )
     INTO v_filename, v_content, v_metadata
     FROM public.knowledge_items ki
-    WHERE ki.id = p_source_id;
+    WHERE ki.id = p_source_id
+      -- Dokument jen pro položku, kterou smí vrátit hledání: aktivní a v čitelném
+      -- stavu. Do 2026-10-04 tu podmínka nebyla — obsah položky v karanténě šel
+      -- do druhého indexu, který karanténu nezná.
+      AND ki.status = 'active'
+      AND public.knowledge_state_readable(ki.quarantine_status);
 
   ELSE
     RETURN jsonb_build_object(
@@ -98,6 +103,16 @@ BEGIN
   END IF;
 
   IF v_filename IS NULL THEN
+    -- Řádek existuje, ale do indexu nesmí — jiná odpověď než „nenalezeno“, ať
+    -- obsluha postupu neladí chybějící řádek. Obsah se nevrací ani v chybě.
+    IF p_source_table = 'knowledge_items'
+       AND EXISTS (SELECT 1 FROM public.knowledge_items ki WHERE ki.id = p_source_id) THEN
+      RETURN jsonb_build_object(
+        'error', 'Item is not readable',
+        'source_table', p_source_table,
+        'source_id', p_source_id
+      );
+    END IF;
     RETURN jsonb_build_object(
       'error', 'Row not found',
       'source_table', p_source_table,

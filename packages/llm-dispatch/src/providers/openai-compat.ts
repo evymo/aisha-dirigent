@@ -19,6 +19,7 @@ import type {
 } from "./types.js";
 import { parseOpenAISSE, type UnifiedStreamChunk } from "./streaming.js";
 import { recordLlmCall } from "./metrics.js";
+import { chybiKlic, resolveProviderKey } from "../credentialSource.js";
 
 import { createSafeLogger } from '@aisha/security';
 const log = createSafeLogger('svc-ai-chat');
@@ -91,6 +92,13 @@ export interface OpenAICompatConfig {
   modelPrefixes: string[];
   /** Health check endpoint path (relative to baseUrl, default: /models). */
   healthPath?: string;
+  /**
+   * Klíč je POVĚŘENÍ POSKYTOVATELE (jméno proměnné z katalogu, např. XAI_API_KEY):
+   * bere se při každém volání přes zdroj pověření služby (trezor instance), ne
+   * z `apiKey` při sestavení. Chybí-li, volání selže nahlas. Bez téhle volby platí
+   * `apiKey` jako dřív (lokální modely, platformní brány).
+   */
+  credentialEnvVar?: string;
 }
 
 // =============================================================================
@@ -142,6 +150,7 @@ export class OpenAICompatBackend implements InferenceBackend {
 
   private readonly baseUrl: string;
   private readonly apiKey: string;
+  private readonly credentialEnvVar?: string;
   private readonly modelPrefixes: string[];
   private readonly healthPath: string;
   /** Models discovered from last health check — used for alias resolution. */
@@ -152,6 +161,7 @@ export class OpenAICompatBackend implements InferenceBackend {
     this.label = config.label;
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
     this.apiKey = config.apiKey ?? "";
+    this.credentialEnvVar = config.credentialEnvVar;
     this.kind = config.kind;
     this.supportsTools = config.supportsTools;
     this.defaultTimeoutMs = config.defaultTimeoutMs ?? (config.kind === "local" ? 120_000 : 60_000);
@@ -160,17 +170,35 @@ export class OpenAICompatBackend implements InferenceBackend {
     this.healthPath = config.healthPath ?? "/models";
   }
 
+  /**
+   * Bearer pro tento požadavek: pověření poskytovatele (credentialEnvVar) při volání,
+   * jinak pevný `apiKey` (může být prázdný = bez autentizace). `null` = backend
+   * pověření deklaruje, ale nikde není.
+   */
+  private async bearer(): Promise<string | null> {
+    if (this.credentialEnvVar) return resolveProviderKey(this.credentialEnvVar, this.apiKey || undefined);
+    return this.apiKey;
+  }
+
+  private async bearerOrThrow(): Promise<string> {
+    const key = await this.bearer();
+    if (key === null) throw chybiKlic(this.id, this.credentialEnvVar ?? "apiKey");
+    return key;
+  }
+
   // ---------------------------------------------------------------------------
   // InferenceBackend: healthCheck
   // ---------------------------------------------------------------------------
   async healthCheck(): Promise<HealthResult> {
     const url = `${this.baseUrl}${this.healthPath}`;
     assertSafeUrl(url);
+    const key = await this.bearer();
+    if (key === null) return { available: false };
     const start = performance.now();
     try {
       const headers: Record<string, string> = {};
-      if (this.apiKey) {
-        headers["Authorization"] = `Bearer ${this.apiKey}`;
+      if (key) {
+        headers["Authorization"] = `Bearer ${key}`;
       }
       const res = await fetch(url, {
         signal: AbortSignal.timeout(5_000),
@@ -238,7 +266,8 @@ export class OpenAICompatBackend implements InferenceBackend {
     const url = `${this.baseUrl}/embeddings`;
     assertSafeUrl(url);
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    if (this.apiKey) headers["Authorization"] = `Bearer ${this.apiKey}`;
+    const key = await this.bearerOrThrow();
+    if (key) headers["Authorization"] = `Bearer ${key}`;
     const res = await fetch(url, {
       method: "POST",
       signal: AbortSignal.timeout(this.defaultTimeoutMs),
@@ -292,7 +321,7 @@ export class OpenAICompatBackend implements InferenceBackend {
   // Shared request builder — used by BOTH chat() and chatStream() so the two
   // modes can never diverge (§7.2 "JEDNA cesta, ne dvě paralelní").
   // ---------------------------------------------------------------------------
-  private prepareRequest(request: ChatRequest): { url: string; headers: Record<string, string>; body: Record<string, unknown> } {
+  private prepareRequest(request: ChatRequest, key: string): { url: string; headers: Record<string, string>; body: Record<string, unknown> } {
     // ⛔ NAMĚŘENO 2026-09-13: prefix backendu (`local-`, `vllm-`) se odřízl VŽDY.
     // Jenže svc-model obsluhuje model PŘESNĚ pod aliasem, který instance deklaruje
     // (`local-…`), a pod tímtéž id ho discovery zapisuje do registru. Po odříznutí
@@ -370,8 +399,8 @@ export class OpenAICompatBackend implements InferenceBackend {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };
-    if (this.apiKey) {
-      headers["Authorization"] = `Bearer ${this.apiKey}`;
+    if (key) {
+      headers["Authorization"] = `Bearer ${key}`;
     }
 
     return { url, headers, body };
@@ -382,7 +411,7 @@ export class OpenAICompatBackend implements InferenceBackend {
   // ---------------------------------------------------------------------------
   async chat(request: ChatRequest): Promise<ChatResponse> {
     await this.nactiListingProJmeno(request.model);
-    const { url, headers, body } = this.prepareRequest(request);
+    const { url, headers, body } = this.prepareRequest(request, await this.bearerOrThrow());
 
     // Metrics: emit aisha_llm_calls_total{provider,model,status} once per call.
     // Defaults to 'error', flipped to 'ok' before a successful return, recorded
@@ -432,7 +461,7 @@ export class OpenAICompatBackend implements InferenceBackend {
   // ---------------------------------------------------------------------------
   async *chatStream(request: ChatRequest): AsyncGenerator<UnifiedStreamChunk> {
     await this.nactiListingProJmeno(request.model);
-    const { url, headers, body } = this.prepareRequest(request);
+    const { url, headers, body } = this.prepareRequest(request, await this.bearerOrThrow());
     // stream:true + include_usage so the terminal chunk carries token totals.
     body.stream = true;
     body.stream_options = { include_usage: true };
@@ -503,15 +532,29 @@ export function createDockerBackend(): OpenAICompatBackend | null {
   });
 }
 
-/** Create a vLLM backend from env */
+/**
+ * Create a vLLM backend from env.
+ *
+ * Klíč se NEDOSAZUJE (E4, kontrakt oddělení nájemců): model forku může stát za vynucovacím
+ * bodem lane na GPU, který požadavek bez platného klíče odmítne (KLIC_CHYBI / KLIC_NEPLATNY).
+ * Dřívější literál "vllm" tak posílal do lane cizí, neplatný klíč a chyba vypadala jako
+ * výpadek modelu. Adresa bez klíče = vada doručení (klíč generuje env-doktor) → nahlas.
+ */
 export function createVLLMBackend(): OpenAICompatBackend | null {
   const url = process.env.VLLM_GENERATION_URL;
   if (!url) return null;
+  const apiKey = process.env.VLLM_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error(
+      "[vllm] VLLM_GENERATION_URL je nastavená, ale VLLM_API_KEY chybí — klíč modelu se nedosazuje " +
+        "(generuje ho env-doktor, doručuje compose jen volajícím modelu).",
+    );
+  }
   return new OpenAICompatBackend({
     id: "vllm",
     label: "vLLM Server",
     baseUrl: url,
-    apiKey: process.env.VLLM_API_KEY ?? "vllm",
+    apiKey,
     kind: "local",
     supportsTools: true,
     defaultTimeoutMs: 60_000,
@@ -540,13 +583,17 @@ export function createVLLMBackend(): OpenAICompatBackend | null {
  * other direct cloud providers).
  */
 export function createXAIBackend(): OpenAICompatBackend | null {
-  const key = process.env.XAI_API_KEY;
-  if (!key) return null;
+  if (!process.env.XAI_API_KEY) return null;
+  return xaiBackend();
+}
+
+/** xAI backend, jehož klíč (XAI_API_KEY) se bere při volání ze zdroje pověření. */
+export function xaiBackend(): OpenAICompatBackend {
   return new OpenAICompatBackend({
     id: "xai",
     label: "xAI Grok (direct)",
     baseUrl: process.env.XAI_BASE_URL ?? "https://api.x.ai/v1",
-    apiKey: key,
+    credentialEnvVar: "XAI_API_KEY",
     kind: "cloud",
     supportsTools: true,
     defaultTimeoutMs: 60_000,

@@ -15,14 +15,16 @@
  * ORDER IS LOAD-BEARING, and each edge below is a real dependency, not taste:
  *   1. i18n locales   — src/i18n/segments/**        -> src/i18n/locales/*.json
  *   2. i18n content   — src/i18n/content/**         -> aisha/db/seed/translations/*.sql
- *   3. demo seed      — aisha/db/seed/**            -> aisha/db/seed.compiled.sql (+ seed.sql mirror)
- *        …so it MUST follow step 2, whose output is one of its inputs. The
+ *   3. knowledge seed — aisha/knowledge/*.md        -> aisha/db/seed/core/41_aisha_knowledge_from_experience.sql
+ *        …an input of step 4, so it comes first.
+ *   4. demo seed      — aisha/db/seed/**            -> aisha/db/seed.compiled.sql (+ seed.sql mirror)
+ *        …so it MUST follow steps 2 and 3, whose outputs are its inputs. The
  *        committed artifact is the DEMO profile; compiling without
  *        AISHA_SEED_PROFILE=demo silently produces a different profile and the
  *        gate then fails against a file you just "regenerated".
- *   4. reflection graphs — seed-derived graph seed
- *   5. baseline       — aisha/db/sql/**             -> migrations/00000000000000_baseline.sql
- *   6. migration register — records absorbed migrations in baseline-meta.json
+ *   5. reflection graphs — seed-derived graph seed
+ *   6. baseline       — aisha/db/sql/**             -> migrations/00000000000000_baseline.sql
+ *   7. migration register — records absorbed migrations in baseline-meta.json
  *
  * NOT INCLUDED (deliberately): steps that need a live database
  * (db:types:refresh:local), a full build (gen:bridge, gen:static-defense), or
@@ -51,6 +53,15 @@ const STEPS = [
     from: "src/i18n/content/",
     to: "aisha/db/seed/translations/*.sql",
     run: ["run", "i18n:content:build"],
+  },
+  {
+    // Vstup kroku „demo seed": generovaný 41_aisha_knowledge_from_experience.sql leží
+    // v seed/core, takže musí vzniknout DŘÍV, než se seed zkompiluje.
+    group: "db",
+    name: "knowledge seed (from experience)",
+    from: "aisha/knowledge/*.md",
+    to: "aisha/db/seed/core/41_aisha_knowledge_from_experience.sql",
+    run: ["run", "db:seed:knowledge"],
   },
   {
     group: "db",

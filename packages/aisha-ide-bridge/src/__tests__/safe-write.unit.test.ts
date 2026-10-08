@@ -13,7 +13,7 @@
  *   - fresh write (new file)
  *   - new file with delimiters → straight write
  */
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import {
   mkdtempSync,
   readFileSync,
@@ -43,6 +43,10 @@ let tmpRoot: string;
 
 beforeEach(() => {
   tmpRoot = mkdtempSync(path.join(os.tmpdir(), "aisha-ide-bridge-test-"));
+});
+// Bez úklidu zůstával adresář po KAŽDÉM testu (naměřeno 2026-10-02: 2 214 v $TMPDIR).
+afterEach(() => {
+  rmSync(tmpRoot, { recursive: true, force: true });
 });
 
 function readFile(rel: string): string {

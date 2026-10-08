@@ -1,0 +1,337 @@
+# Prose lives in docs/compose-notes/docker-compose.coolify-model-most.yml.md — this file is shipped to the
+# server as a command-line argument and competes with ARG_MAX, so it carries
+# configuration only. Add explanations there, anchored to the line they explain.
+services:
+  model-mesh-agent:
+    image: ${IMAGE_NETBIRD}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-model-most--model-mesh
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+      - SYS_RESOURCE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    sysctls:
+      net.ipv4.ip_forward: "0"
+      net.ipv6.conf.all.disable_ipv6: "1"
+    security_opt: ["no-new-privileges:true"]
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        if [ -z "$${NB_MANAGEMENT_URL:-}" ] || [ -z "$${NB_HOSTNAME:-}" ]; then
+          echo "[most-model-mesh] FATAL: MODEL_MESH_MANAGEMENT_URL / MODEL_MESH_MOST_PEER nedoručeny — derivace modelového meshe (lane MODEL_MESH) se do aplikace nedostala" >&2
+          exit 1
+        fi
+        CONFIG_FILE=/etc/netbird/config.json
+        for _nb_stav in "$$CONFIG_FILE" /etc/netbird/default.json; do
+          if [ -s "$$_nb_stav" ]; then CONFIG_FILE="$$_nb_stav"; break; fi
+        done
+        if [ -s "$$CONFIG_FILE" ]; then
+          echo "[most-model-mesh] config found — reconnecting without setup key"
+          set -- --management-url "$${NB_MANAGEMENT_URL}" --hostname "$${NB_HOSTNAME}"
+        elif [ -n "$${NB_SETUP_KEY:-}" ]; then
+          echo "[most-model-mesh] enrolling as $${NB_HOSTNAME} via model mesh of the fork"
+          set -- --management-url "$${NB_MANAGEMENT_URL}" --hostname "$${NB_HOSTNAME}" --setup-key "$${NB_SETUP_KEY}"
+        else
+          echo "[most-model-mesh] State: PENDING_BOOTSTRAP — no config and no setup key"
+          trap 'exit 0' TERM INT
+          while :; do sleep 3600 & wait "$$!" || true; done
+        fi
+        trap 'echo "[most-model-mesh] received TERM — exiting"; exit 0' TERM INT
+        while :; do
+          netbird up --foreground-mode --disable-dns --disable-client-routes --disable-server-routes --block-lan-access "$$@" || true
+          echo "[most-model-mesh] netbird up exited — retry in 15s"
+          sleep 15 & wait "$$!" || true
+        done
+    extra_hosts:
+      - "${NETBIRD_MODEL_DOMAIN}:${MODEL_MESH_VSTUP_ADDR:?uzel edge, kam přistávají veřejná jména — dosazuje cold-start, doplňuje env-doktor}"
+    environment:
+      NB_SETUP_KEY: ${MODEL_MESH_MOST_SETUP_KEY:-}
+      NB_MANAGEMENT_URL: ${MODEL_MESH_MANAGEMENT_URL}
+      NB_HOSTNAME: ${MODEL_MESH_MOST_PEER}
+    volumes:
+      - model-most-mesh-data:/etc/netbird
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -z \"$$NB_SETUP_KEY\" ] && [ ! -s /etc/netbird/config.json ] && [ ! -s /etc/netbird/default.json ]; then exit 0; fi; netbird status --check ready"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+    networks:
+      ven: {}
+      most:
+        aliases: ["${APP_NAME_PREFIX:?identita instance}-model-most--model-mesh"]
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=false"
+
+  most-proxy:
+    image: ${IMAGE_CADDY}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-model-most--proxy
+    restart: unless-stopped
+    network_mode: "service:model-mesh-agent"
+    depends_on:
+      model-mesh-agent:
+        condition: service_started
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      MODEL_MESH_GPU_PEER_IP: ${MODEL_MESH_GPU_PEER_IP:-}
+      MODEL_MESH_PORT: ${MODEL_MESH_PORT}
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        case "$${MODEL_MESH_PORT}" in ''|*[!0-9]*) echo "[most] MODEL_MESH_PORT '$${MODEL_MESH_PORT}' není port" >&2; exit 1 ;; esac
+        if [ -n "$${MODEL_MESH_GPU_PEER_IP:-}" ]; then
+          if ! echo "$${MODEL_MESH_GPU_PEER_IP}" | grep -Eq '^[0-9]{1,3}([.][0-9]{1,3}){3}$$'; then
+            echo "[most] MODEL_MESH_GPU_PEER_IP '$${MODEL_MESH_GPU_PEER_IP}' není IPv4 adresa — doručení je vadné" >&2
+            exit 1
+          fi
+          _o1=$${MODEL_MESH_GPU_PEER_IP%%.*}
+          _zbytek=$${MODEL_MESH_GPU_PEER_IP#*.}
+          _o2=$${_zbytek%%.*}
+          if [ "$$_o1" -ne 100 ] || [ "$$_o2" -lt 64 ] || [ "$$_o2" -gt 127 ]; then
+            echo "[most] MODEL_MESH_GPU_PEER_IP '$${MODEL_MESH_GPU_PEER_IP}' leží mimo modelový mesh (100.64.0.0/10) — most smí jen do něj" >&2
+            exit 1
+          fi
+        fi
+        _vychozi=$$(ip -4 route show default | awk '{ for (i = 1; i < NF; i++) if ($$i == "dev") { print $$(i + 1); exit } }')
+        if [ -z "$$_vychozi" ]; then
+          echo "[most] FATAL: netns nemá výchozí trasu (síť ven) — síť mostu nejde odlišit" >&2
+          exit 1
+        fi
+        SIT_MOSTU=""
+        for _if in $$(ip -o -4 addr show | awk '{ print $$2 }' | sort -u); do
+          case "$$_if" in lo|wt*|"$$_vychozi") continue ;; esac
+          for _s in $$(ip -4 route show dev "$$_if" scope link | awk '{ print $$1 }'); do SIT_MOSTU="$$SIT_MOSTU $$_s"; done
+        done
+        set -- $$SIT_MOSTU
+        if [ "$$#" -ne 1 ]; then
+          echo "[most] FATAL: síť mostu musí být v netns PRÁVĚ jedna (nalezeno: '$${SIT_MOSTU:-}')" >&2
+          exit 1
+        fi
+        SIT_MOSTU="$$1"
+        ODMITNUTI='header Content-Type application/json\n    header x-aisha-odmitl most\n    respond `{"duvod":"LANE_NEDOSTUPNA","error":"%s"}` 503'
+        {
+          printf '{\n  admin off\n  auto_https off\n}\n\n'
+          printf ':%s {\n' "$${MODEL_MESH_PORT}"
+          printf '  @zmodelovehomeshe remote_ip 100.64.0.0/10\n  handle @zmodelovehomeshe {\n    abort\n  }\n'
+          printf '  @mimomost not remote_ip %s 127.0.0.1/32\n  handle @mimomost {\n    abort\n  }\n' "$$SIT_MOSTU"
+          printf '  handle /__most/zdravi {\n    respond "ok" 200\n  }\n'
+          if [ -n "$${MODEL_MESH_GPU_PEER_IP:-}" ]; then
+            printf '  handle {\n    reverse_proxy http://%s:%s {\n      flush_interval -1\n      transport http {\n        dial_timeout 3s\n      }\n    }\n  }\n' \
+              "$${MODEL_MESH_GPU_PEER_IP}" "$${MODEL_MESH_PORT}"
+          else
+            echo "[most] MODEL_MESH_GPU_PEER_IP nedoručena — uzel na GPU slotu v modelovém meshi ještě není; odpovídám 503 LANE_NEDOSTUPNA" >&2
+            printf "  handle {\n    $${ODMITNUTI}\n  }\n" "most: uzel na GPU slotu v modelovém meshi zatím není (IP nedoručena)"
+          fi
+          printf "  handle_errors {\n    $${ODMITNUTI}\n  }\n}\n" "most: uzel na GPU slotu v modelovém meshi neodpovídá"
+        } > /etc/caddy/Caddyfile
+        echo "[most] $${MODEL_MESH_PORT} (jen ze sítě mostu $$SIT_MOSTU) → '$${MODEL_MESH_GPU_PEER_IP:-}':$${MODEL_MESH_PORT} (jen hlavní → modelový)"
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:$$MODEL_MESH_PORT/__most/zdravi || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      - "coolify.managed=true"
+      - "traefik.enable=false"
+
+  pki-init:
+    build:
+      context: .
+      dockerfile: Dockerfile.pki-init
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-model-most--pki-init
+    restart: "no"
+    environment:
+      PKI_BRIDGE_URL: ${PKI_BRIDGE_URL:-}
+      # Odvozuje cold-start z manifestu (pki nasazeno ⇒ true); bez PKI se vypíná
+      # POŽADAVEK, ne jen adresa — výklad: docs/compose-notes/docker-compose.coolify.yml.md
+      PKI_BUNDLE_REQUIRED: ${PKI_BUNDLE_REQUIRED:?odvozuje cold-start z manifestu; bez něj pki-init trvá na bundlu i bez PKI}
+    command: ["/usr/local/bin/assemble-ca-bundle.sh"]
+    volumes:
+      - pki-certs:/certs/pki
+    healthcheck:
+      disable: true
+    networks:
+      - internal
+
+  netbird-agent:
+    # Mesh komponenta — bez meshe nemá co dělat. Profil "mesh" zapíná
+    # coolify-deploy-init.sh podle MESH_ENABLED; hlídá brána mesh-profil-drzi.
+    profiles: ["mesh"]
+    image: ${IMAGE_NETBIRD}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-model-most--netbird
+    cap_add:
+      - NET_ADMIN
+      - SYS_RESOURCE
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    depends_on:
+      pki-init:
+        condition: service_completed_successfully
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        if [ -z "$${NB_SETUP_KEY:-}" ]; then
+          echo "[netbird-agent] NB_SETUP_KEY empty for hostname='$${NB_HOSTNAME:-}'"
+          echo "[netbird-agent] State: PENDING_BOOTSTRAP — awaiting netbird-bootstrap.sh + redeploy."
+          trap 'echo "[netbird-agent] received TERM — exiting idle"; exit 0' TERM INT
+          while :; do sleep 3600 & wait "$$!" || true; done
+        fi
+        if ! command -v netbird >/dev/null 2>&1; then
+          echo "[netbird-agent] FATAL: netbird binary not in PATH" >&2
+          exit 127
+        fi
+        echo "[netbird-agent] Bridge mode — own netns, no host daemon conflict."
+        echo "[netbird-agent] DNS proxy disabled — model-most receives inbound mesh only."
+        # ⛔ NETBIRD 0.70 NEPÍŠE config.json (naměřeno 2026-09-06). Stav drží
+        # `default.json` + `active_profile.json`; podmínka na legacy cestu proto
+        # neplatila NIKDE — změřeno na 6 z 6 agentů včetně cizího nájemníka.
+        # Následek: agent se při KAŽDÉM startu zapsal jako NOVÝ peer, dostal
+        # novou mesh IP, a DNS záznam osiřel. Edge pak volal na starou adresu
+        # („dial 100.112.246.17:3002: no route to host") → live.<tld> 502.
+        # Je to ta příčina, proč se „mesh DNS se neprovisionuje samo" vracelo
+        # dokola: nešlo o provisioning, ale o ztrátu identity při restartu.
+        # Legacy cesta zůstává kvůli starším agentům — stačí KTERÝKOLI stavový
+        # soubor; teprve když není žádný, je zápis do meshe opravdu první.
+        CONFIG_FILE=/etc/netbird/config.json
+        if [ "$${NB_FORCE_REENROLL:-}" = "1" ]; then
+          echo "[netbird-agent] NB_FORCE_REENROLL=1 — wiping local NetBird state before enrollment."
+          rm -rf /etc/netbird/* 2>/dev/null || true
+        fi
+        for _nb_stav in "$$CONFIG_FILE" /etc/netbird/default.json /var/lib/netbird/default.json; do
+          if [ -s "$$_nb_stav" ]; then CONFIG_FILE="$$_nb_stav"; break; fi
+        done
+        if [ -s "$$CONFIG_FILE" ]; then
+          echo "[netbird-agent] Existing config found at $$CONFIG_FILE — reconnecting without setup key."
+          set -- --foreground-mode --disable-dns --management-url "$${NB_MANAGEMENT_URL}" --hostname "$${NB_HOSTNAME}"
+        else
+          echo "[netbird-agent] No existing config — enrolling as $${NB_HOSTNAME} via $${NB_MANAGEMENT_URL}."
+          set -- --foreground-mode --disable-dns --management-url "$${NB_MANAGEMENT_URL}" --setup-key "$${NB_SETUP_KEY}" --hostname "$${NB_HOSTNAME}"
+        fi
+        trap 'echo "[netbird-agent] received TERM — exiting"; exit 0' TERM INT
+        while :; do
+          netbird up "$$@" || true
+          echo "[netbird-agent] netbird up exited — retry in 15s; container stays UP (never trips Coolify restart-limit)."
+          sleep 15 & wait "$$!" || true
+        done
+    extra_hosts:
+      - "${NETBIRD_MESH_HOST}:${NETBIRD_MGMT_HOST:?adresa uzlu managementu hlavního meshe (generate-secrets / env-doktor)}"
+    volumes:
+      - netbird-model-most-data-v3:/etc/netbird
+      - netbird-model-most-data-v3:/var/lib/netbird
+      - pki-certs:/certs/pki:ro
+    environment:
+      NB_SETUP_KEY: ${NETBIRD_STACK_KEY_BACKEND}
+      NB_MANAGEMENT_URL: https://${NETBIRD_MESH_HOST}:${NETBIRD_MESH_PORT:?port managementu hlavního meshe (cold-start — adresní plán instance)}
+      NB_SSL_TRUST_BUNDLE: /certs/pki/aisha-ca-bundle.pem
+      SSL_CERT_FILE: /certs/pki/aisha-ca-bundle.pem
+      NB_HOSTNAME: backend-model-most
+      NB_FORCE_REENROLL: ${NB_FORCE_REENROLL:-}
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -z \"$$NB_SETUP_KEY\" ]; then exit 0; fi; ip -o addr show wt0 2>/dev/null | grep -qE 'inet 100\\.'"]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 8
+    restart: unless-stopped
+    networks:
+      - internal
+      - most
+
+  model-most-mesh-ingress:
+    # Mesh komponenta — bez meshe nemá co dělat. Profil "mesh" zapíná
+    # coolify-deploy-init.sh podle MESH_ENABLED; hlídá brána mesh-profil-drzi.
+    profiles: ["mesh"]
+    image: ${IMAGE_CADDY}
+    container_name: ${APP_NAME_PREFIX:?identita instance — jméno na sdíleném hostiteli ji MUSÍ nést}-model-most--mesh-ingress
+    restart: unless-stopped
+    network_mode: "service:netbird-agent"
+    depends_on:
+      netbird-agent:
+        condition: service_started
+    environment:
+      MODEL_MOST_MESH_INGRESS_ROUTES: ${MODEL_MOST_MESH_INGRESS_ROUTES:-}
+      # TÝŽ seznam, jaký dostává gateway — jeden zdroj (`lib/derive-subnets.mjs`).
+      # Bez něj Caddy `x-forwarded-for` přepíše a klientská adresa se ztratí.
+      GATEWAY_TRUSTED_PROXIES: ${GATEWAY_TRUSTED_PROXIES:-}
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
+        if [ -z "$${MODEL_MOST_MESH_INGRESS_ROUTES:-}" ]; then
+          echo "[mesh-ingress] MODEL_MOST_MESH_INGRESS_ROUTES prázdné — derivace nic nevydala nebo se nedoručila."
+          echo "[mesh-ingress] Naslouchám jen na health, aby bylo VIDĚT, že tabulka chybí."
+          printf ':8000 {\n  handle /__mesh_health {\n    respond "no-routes" 503\n  }\n  handle {\n    respond "mesh-ingress bez směrovací tabulky" 503\n  }\n}\n' > /etc/caddy/Caddyfile
+        else
+          : > /etc/caddy/Caddyfile
+          # ⛔ NAMĚŘENO 2026-08-31: brána viděla `x-forwarded-for` s JEDINÝM
+          # prvkem — adresou svého souseda (mesh-router edge). To je podpis
+          # NAHRAZENÍ, ne řetězu: Caddy bez `trusted_proxies` příchozí hlavičce
+          # nedůvěřuje a přepíše ji tím, kdo se právě připojil. Každý náš skok
+          # tak řetěz zahodil a klientská adresa se ke dveřím NEDOSTALA —
+          # `enforce` by zamkl i majitele.
+          #
+          # Hodnota se NEOPISUJE: je to TÝŽ seznam, jaký dostává gateway
+          # (`lib/derive-subnets.mjs` → GATEWAY_TRUSTED_PROXIES). Dva tvary
+          # (čárky pro env, mezery pro Caddy), jeden zdroj — kdyby si je každý
+          # skládal sám, chůze zprava by v každém prvku končila jinde.
+          if [ -n "$${GATEWAY_TRUSTED_PROXIES:-}" ]; then
+            printf '{\n  servers {\n    trusted_proxies static %s\n  }\n}\n\n' \
+              "$$(echo "$${GATEWAY_TRUSTED_PROXIES}" | tr ',' ' ')" >> /etc/caddy/Caddyfile
+          else
+            # Nedoručený seznam se NEDOSAZUJE. Bez něj Caddy řetěz přepíše —
+            # to je vada, ale TICHÁ; tady se aspoň řekne nahlas.
+            echo "[mesh-ingress] GATEWAY_TRUSTED_PROXIES nedoručen — x-forwarded-for bude PŘEPSÁN, klientská adresa se ztratí"
+          fi
+          PORTS=$$(echo "$${MODEL_MOST_MESH_INGRESS_ROUTES}" | tr ';' '\n' | cut -d'|' -f1 | sort -un)
+          for P in $$PORTS; do
+            printf ':%s {\n  handle /__mesh_health {\n    respond "ok" 200\n  }\n' "$$P" >> /etc/caddy/Caddyfile
+            echo "$${MODEL_MOST_MESH_INGRESS_ROUTES}" | tr ';' '\n' | while IFS='|' read -r RP RH RT; do
+              [ "$$RP" = "$$P" ] || continue
+              M=$$(echo "$$RH" | cut -d, -f1 | cut -d. -f1 | tr '-' '_')
+              HOSTS=$$(echo "$$RH" | tr ',' ' ')
+              printf '  @%s host %s\n  handle @%s {\n    reverse_proxy http://%s\n  }\n' "$$M" "$$HOSTS" "$$M" "$$RT" >> /etc/caddy/Caddyfile
+            done
+            printf '  handle {\n    respond "mesh-ingress: Host nepatri na tento port" 421\n  }\n}\n' >> /etc/caddy/Caddyfile
+          done
+          echo "[mesh-ingress] tabulka: $$(echo "$${MODEL_MOST_MESH_INGRESS_ROUTES}" | tr ';' '\n' | wc -l) tras na $$(echo "$$PORTS" | wc -w) portech"
+        fi
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8000/__mesh_health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  pki-certs:
+    name: ${APP_NAME_PREFIX:?}_model-most-pki-certs
+  netbird-model-most-data-v3:
+    name: ${APP_NAME_PREFIX:?}_netbird-model-most-data
+  model-most-mesh-data:
+    name: ${APP_NAME_PREFIX:?}_model-most-mesh-data
+networks:
+  internal:
+    external: true
+    name: ${APP_NAME_PREFIX:?identita instance}-shared-net
+  ven:
+    name: ${APP_NAME_PREFIX:?identita instance}-model-most-ven
+  most:
+    name: ${APP_NAME_PREFIX:?identita instance}-model-most
+    internal: true

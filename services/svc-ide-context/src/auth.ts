@@ -67,8 +67,15 @@ function collectScopes(payload: JWTPayload): string[] {
   );
 }
 
+/**
+ * Token smí přijít jen od klienta ze seznamu `KC_ALLOWED_CLIENTS` — podle `azp`, nebo `aud`.
+ *
+ * ⛔ PRÁZDNÝ SEZNAM = NIKDO. Do 2026-10-04 tu stálo „prázdný seznam pustí každého“: stačilo,
+ * aby seznam vyšel prázdný, a služba věřila tokenu kteréhokoli klienta realmu. Chybějící
+ * proměnná službu zastaví už při startu (config.ts); tohle je druhá pojistka pro seznam,
+ * který dorazil, ale nenese jediné jméno — nevím-li, komu věřit, nevěřím nikomu.
+ */
 function isAllowedClient(payload: JWTPayload): boolean {
-  if (config.kcAllowedClients.length === 0) return true;
   const allowed = new Set(config.kcAllowedClients);
   const record = payload as Record<string, unknown>;
   const azp = typeof record.azp === "string" ? record.azp : "";

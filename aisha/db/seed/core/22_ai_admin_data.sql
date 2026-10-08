@@ -170,13 +170,26 @@ ON CONFLICT DO NOTHING;
 -- ============================================================================
 -- 22.3: Golden Examples (LLM Evaluation)
 -- ============================================================================
+-- ⛔ IDENTITA (2026-10-05). Seed běží při KAŽDÉM nasazení. Řádky tu neměly id a
+-- končily `ON CONFLICT DO NOTHING` bez cíle; ai_golden_examples nemá jiný unikátní
+-- klíč než náhodné id, takže konflikt nikdy nenastal — naměřeno na čisté DB:
+-- 5 → 10 → 15 řádků po 1./2./3. seedu (každá kopie pak vstupuje do hodnocení
+-- agenta jako další vzor). Přirozený klíč vzoru je text otázky mezi kurátorskými
+-- vzory (bez message_id/conversation_id — ty nesou vzory povýšené z chatu);
+-- stabilní id je md5 z něj. Kopie na existujících DB slučuje heal
+-- „seed-bez-duplicit" v aisha/db/heals.sql (běží před seedem).
 
 INSERT INTO public.ai_golden_examples (
-  user_message, assistant_message, routing_category, model_used,
+  id, user_message, assistant_message, routing_category, model_used,
   agent_slug, admin_rating, admin_review_note,
   expected_relevance, expected_groundedness, expected_safety, expected_coherence,
   is_active
-) VALUES
+)
+SELECT md5('ai_golden_examples:' || v.user_message)::uuid, v.user_message, v.assistant_message,
+       v.routing_category, v.model_used, v.agent_slug, v.admin_rating, v.admin_review_note,
+       v.expected_relevance, v.expected_groundedness, v.expected_safety, v.expected_coherence,
+       v.is_active
+FROM (VALUES
 (
   'Jak funguje revenue split u konzultací?',
   'Revenue split u konzultací je 70/20/10: 70% pro konzultanta, 20% pro platformu, 10% do společného fondu pro marketing a rozvoj.',
@@ -232,7 +245,16 @@ INSERT INTO public.ai_golden_examples (
   0.70, 1.0, 1.0, 0.95,
   true
 )
-ON CONFLICT DO NOTHING;
+) AS v(user_message, assistant_message, routing_category, model_used,
+       agent_slug, admin_rating, admin_review_note,
+       expected_relevance, expected_groundedness, expected_safety, expected_coherence,
+       is_active)
+WHERE NOT EXISTS (
+  SELECT 1 FROM public.ai_golden_examples g
+   WHERE g.user_message = v.user_message
+     AND g.message_id IS NULL AND g.conversation_id IS NULL
+)
+ON CONFLICT (id) DO NOTHING;
 
 
 -- ============================================================================

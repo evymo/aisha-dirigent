@@ -1,0 +1,7 @@
+{
+  "_comment": "VZOROVÝ roster pro brány — smyšlené firmy, žádná skutečná data.",
+  "agendas": [
+    { "key": "vzorova-alfa", "label": "Vzorová Alfa s.r.o.", "port": 8101 },
+    { "key": "vzorova-beta", "label": "Vzorová Beta a.s.", "port": 8102 }
+  ]
+}

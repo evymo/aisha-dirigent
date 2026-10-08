@@ -19,7 +19,7 @@
  */
 export const OMEZENI = new Set([
   "$ref", "type", "required", "properties", "additionalProperties",
-  "patternProperties", "dependencies",
+  "patternProperties", "propertyNames", "dependencies",
   "items", "enum", "const", "pattern", "minLength", "maxLength",
   "minItems", "minimum", "maximum", "format",
 ]);
@@ -130,6 +130,14 @@ export function overit(data: unknown, schema: Uzel, korenSchema: Uzel, kde = "$"
       .map(([vzor, podschema]) => [new RegExp(vzor), podschema] as const);
     for (const r of (schema.required as string[] | undefined) ?? []) {
       if (!(r in obj)) chyby.push(`${kde}: chybí povinná vlastnost '${r}'`);
+    }
+    // Draft-07 `propertyNames`: KLÍČ objektu (vždy řetězec) musí vyhovět podschématu.
+    // Registr slotů (coolify/servers.json) jím drží výčet slotů — klíč, který
+    // výčet nezná, je slot přidaný jen na jedno místo.
+    if (schema.propertyNames !== undefined) {
+      for (const k of Object.keys(obj)) {
+        chyby.push(...overit(k, schema.propertyNames as Uzel, korenSchema, `${kde}{klíč ${k}}`));
+      }
     }
     for (const [k, v] of Object.entries(obj)) {
       // Draft-07: `properties` i všechny sedící `patternProperties` platí SOUČASNĚ;

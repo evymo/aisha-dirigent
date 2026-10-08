@@ -1,16 +1,20 @@
 /**
  * All API Keys Manager
  * 
- * Centrální správa všech API klíčů v aplikaci:
- * - OpenAI (AI funkce)
- * - Stripe (platby)
+ * Centrální správa API klíčů integrací:
+ * - Stripe (platby), Fio (banka)
  * - Packeta (doručení)
+ * - Home Assistant (IoT)
+ *
+ * Klíče poskytovatelů AI (OpenAI, Anthropic, Google, token Claude …) tu NEJSOU — mají
+ * vlastní sekci „Poskytovatelé AI a tokeny" (ProviderCredentialsManager), jejíž seznam
+ * je odvozený z DB. Dosavadní `openai_api_key` přejmenuje heals do nového domova.
  * 
  * Všechny klíče se ukládají šifrovaně do trezoru (set_api_key_admin → vault.secrets); nešifrovaná kopie v `app_secrets` se od 2026-09-28 nezapisuje.
  */
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Key, Eye, EyeOff, Check, AlertTriangle, RefreshCw, CreditCard, Truck, Bot, Cable, Landmark, Loader2 } from "lucide-react";
+import { Key, Eye, EyeOff, Check, AlertTriangle, RefreshCw, CreditCard, Truck, Cable, Landmark, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,13 +29,6 @@ import { fetchHomeAssistantHealth } from "@/hooks/useHomeAssistantProductionSync
 
 // Definice API klíčů které spravujeme
 const API_KEY_CONFIGS = {
-  openai: {
-    key: "openai_api_key",
-    label: "OpenAI API Key",
-    icon: Bot,
-    placeholder: "sk-...",
-    description: "API klíč pro AI funkce (chat, analýza dokumentů)",
-  },
   stripe_secret: {
     key: "stripe_secret_key",
     label: "Stripe Secret Key",
@@ -283,7 +280,7 @@ export function AllApiKeysManager() {
           </div>
         ) : (
           <Tabs defaultValue="payments" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="payments" className="gap-2">
                 <CreditCard className="h-4 w-4" />
                 {t("admin.settings.payments")}
@@ -291,10 +288,6 @@ export function AllApiKeysManager() {
               <TabsTrigger value="shipping" className="gap-2">
                 <Truck className="h-4 w-4" />
                 {t("admin.settings.shipping")}
-              </TabsTrigger>
-              <TabsTrigger value="ai" className="gap-2">
-                <Bot className="h-4 w-4" />
-                {t("admin.settings.ai")}
               </TabsTrigger>
               <TabsTrigger value="iot" className="gap-2">
                 <Cable className="h-4 w-4" />
@@ -340,14 +333,6 @@ export function AllApiKeysManager() {
                 keyType="packeta_sender_id"
                 status={statusMap?.packeta_sender_id}
                 onSave={(value) => handleSave("packeta_sender_id", value)}
-              />
-            </TabsContent>
-
-            <TabsContent value="ai" className="space-y-4 mt-4">
-              <ApiKeyEditor
-                keyType="openai"
-                status={statusMap?.openai_api_key}
-                onSave={(value) => handleSave("openai", value)}
               />
             </TabsContent>
 

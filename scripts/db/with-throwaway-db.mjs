@@ -36,14 +36,15 @@
  * @module
  */
 import { execFileSync, spawnSync } from "child_process";
-import { createHash, randomBytes } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, statSync } from "fs";
+import { randomBytes } from "node:crypto";
+import { existsSync } from "fs";
 import { createServer } from "net";
 import path from "path";
 import { fileURLToPath } from "url";
 import { psqlPripojeni } from "./lib/psql-pripojeni.mjs";
 import { resolveReachable } from "../lib/reachable-endpoint.mjs";
 import { argumentyTajemstvi } from "../lib/throwaway-db-tajemstvi.mjs";
+import { vychoziObrazDb } from "../lib/throwaway-db-obraz.mjs";
 import { registryProxyBuildArgs } from "../lib/registry-proxy.mjs";
 import { postgresMajor, postgresMajorBuildArgs } from "../lib/postgres-major.mjs";
 
@@ -57,32 +58,9 @@ if (process.env.AISHA_PG17_IMAGE) {
   process.exit(1);
 }
 const PG_MAJOR = postgresMajor();
-/**
- * Otisk OBSAHU build kontextu (infra/postgres) — část tagu výchozího obrazu.
- *
- * ⛔ Dřív byl tag jen `aisha-db-throwaway:pg<major>` a obraz se postavil JEDNOU:
- * změna entrypointu nebo initdb skriptu se do testů nedostala, dokud někdo ručně
- * nesmazal obraz — lokálně i na CI runneru s keší. Test pak měřil STARÝ obraz.
- * (Naraženo 2026-09-25: klíče šifrování se přestěhovaly z GUC do souborů, které
- * zapisuje entrypoint — se starým obrazem by helpery soubor nenašly.) Otisk bere
- * pracovní soubory, ne git strom, aby platil i pro necommitnuté úpravy.
- */
-function otiskKontextuDb() {
-  const koren = path.join(ROOT, "infra/postgres");
-  const h = createHash("sha256");
-  const projdi = (dir) => {
-    for (const jmeno of readdirSync(dir).sort()) {
-      const abs = path.join(dir, jmeno);
-      if (statSync(abs).isDirectory()) projdi(abs);
-      else h.update(path.relative(koren, abs)).update("\0").update(readFileSync(abs)).update("\0");
-    }
-  };
-  projdi(koren);
-  return h.digest("hex").slice(0, 12);
-}
-// Tag nese major verzi (obraz 17 z cache se nesmí vzít, když se měří 18) a otisk
-// kontextu (obraz starého entrypointu se nesmí vzít, když se měří nový).
-const DEFAULT_IMAGE = `aisha-db-throwaway:pg${PG_MAJOR}-${otiskKontextuDb()}`;
+// Tag nese major verzi a OTISK obsahu infra/postgres — jeden domov s typegenem
+// (scripts/lib/throwaway-db-obraz.mjs, proč viz tam).
+const DEFAULT_IMAGE = vychoziObrazDb(ROOT, PG_MAJOR);
 const IMAGE = process.env.AISHA_THROWAWAY_DB_IMAGE || DEFAULT_IMAGE;
 /**
  * Jméno kontejneru MUSÍ být per-běh unikátní. Port se odjakživa vybíral volný,

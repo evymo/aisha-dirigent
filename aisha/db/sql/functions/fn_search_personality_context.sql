@@ -6,13 +6,17 @@ CREATE OR REPLACE FUNCTION public.fn_search_personality_context(
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public', 'extensions'
+SET search_path TO 'pg_catalog', 'public', 'extensions', 'pg_temp'
 AS $$
 DECLARE
   v_base_traits jsonb;
   v_experiential jsonb;
   v_merged jsonb;
   v_effective_user_id uuid;
+  -- PRO KOHO se čte základní vrstva rysů (viditelnost): služba / správa jmenuje p_user_id, jinak volající sám.
+  v_audience_user uuid;
+  v_in_guild boolean;
+  v_is_admin boolean;
 BEGIN
   -- Auth: ensure caller is authenticated
   IF auth.uid() IS NULL THEN
@@ -31,6 +35,13 @@ BEGIN
     END IF;
     v_effective_user_id := auth.uid();
   END IF;
+
+  -- Viditelnost základních rysů (2026-10-05): jeden domov public.knowledge_visibility_searchable pro toho,
+  -- PRO KOHO se čte. Do 2026-10-05 funkce viditelnost nečetla — přihlášený dostal i soukromý globální rys.
+  -- Služba za uživatele měří jeho (p_user_id; bez něj je bez identity), správa bez p_user_id sebe.
+  v_audience_user := CASE WHEN public.is_service_role() THEN p_user_id ELSE COALESCE(v_effective_user_id, auth.uid()) END;
+  v_in_guild := public.knowledge_audience_in_guild(v_audience_user);
+  v_is_admin := COALESCE(public.is_admin_or_staff(v_audience_user), false);
 
   -- -----------------------------------------------------------------------
   -- A) Base traits (DNA) — always included, from knowledge_items
@@ -60,6 +71,13 @@ BEGIN
       JOIN knowledge_embeddings ke ON ke.chunk_id = kc.id
       WHERE ki.item_type = 'personality_trait'
         AND ki.status = 'active'
+        -- Jen GLOBÁLNÍ rysy: rys založený v příběhu není osobnost všech.
+        AND ki.story_id IS NULL
+        -- Jen čitelný stav (allowlist): rys v karanténě, nezměřený ani v neznámém
+        -- stavu se do osobnosti agenta nedostane. Do 2026-10-04 tu filtr nebyl vůbec.
+        AND public.knowledge_state_readable(ki.quarantine_status)
+        -- Viditelnost z jednoho domova pro toho, pro koho se čte; správa vidí vše.
+        AND (v_is_admin OR public.knowledge_visibility_searchable(ki.visibility, v_audience_user IS NOT NULL, v_in_guild))
         AND ke.embedding IS NOT NULL
       ORDER BY score DESC
       LIMIT p_limit
@@ -84,6 +102,11 @@ BEGIN
       FROM knowledge_items ki
       WHERE ki.item_type = 'personality_trait'
         AND ki.status = 'active'
+        -- Jen GLOBÁLNÍ rysy: rys založený v příběhu není osobnost všech.
+        AND ki.story_id IS NULL
+        -- Tatáž podmínka jako ve větvi s embeddingem — obě větve, ne jedna.
+        AND public.knowledge_state_readable(ki.quarantine_status)
+        AND (v_is_admin OR public.knowledge_visibility_searchable(ki.visibility, v_audience_user IS NOT NULL, v_in_guild))
     ) sub;
   END IF;
 

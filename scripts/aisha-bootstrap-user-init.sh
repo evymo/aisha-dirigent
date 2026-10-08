@@ -437,6 +437,21 @@ ok "ROPC token acquired (sub=${SUB:-?}, aud=${AUD:-?})"
 # runs in Phase B. So the .env.coolify values for AISHA_BOOTSTRAP_* are
 # empty during deploy-init's set_coolify_env_if pass.
 # ─────────────────────────────────────────────────────────────────────────────
+# ── Deklarované držení: do držené aplikace se env NEZAPISUJE (2026-10-04) ──────
+# Kroky 6 a 11 zapisují pověření přímo do env aplikací netbird a pki. Aplikaci,
+# kterou overlay instance drží (nasazeni-drzene.json), se zápis vyhne — projevil
+# by se při jejím příštím restartu, tedy mimo vědomé rozhodnutí. Deklaraci čte
+# jediný domov (lib/nasazeni-drzene.mjs přes lib/drzeni.sh); nečitelná = konec
+# dřív, než se do Coolify cokoli zapíše.
+if [ "$SYNC_COOLIFY" = "1" ]; then
+  # shellcheck source=lib/drzeni.sh
+  . "$ROOT/scripts/lib/drzeni.sh"
+  if ! drzeni_nacti "aisha-bootstrap-user-init" "$ENV_FILE"; then
+    err "Deklaraci držení aplikací nejde přečíst nebo je neplatná (důvod výš) — nevím, komu smím env zapsat. Do Coolify jsem nezapsal nic."
+    exit 1
+  fi
+fi
+
 if [ "$SYNC_COOLIFY" = "1" ] && [ -n "${COOLIFY_API_TOKEN:-$(env_value COOLIFY_API_TOKEN)}" ]; then
   banner "Step 6 — Sync AISHA_BOOTSTRAP_* to Coolify (aisha-netbird)"
 
@@ -447,6 +462,10 @@ if [ "$SYNC_COOLIFY" = "1" ] && [ -n "${COOLIFY_API_TOKEN:-$(env_value COOLIFY_A
   # try again with both PASSWORD and CLIENT_SECRET payloads.
   set +e
   step6_sync() {
+    if drzena netbird; then
+      warn "$(drzeni_hlaska netbird). AISHA_BOOTSTRAP_* se do ní NEZAPISUJÍ."
+      return 0
+    fi
     COOLIFY_API_TOKEN="${COOLIFY_API_TOKEN:-$(env_value COOLIFY_API_TOKEN)}"
     if [ -z "$COOLIFY_API_TOKEN" ] && [ -f "$TOKEN_FILE" ]; then
       COOLIFY_API_TOKEN="$(grep -E '^COOLIFY_API_TOKEN=' "$TOKEN_FILE" | head -1 | cut -d= -f2- | tr -d '"' | tr -d '[:space:]')"
@@ -839,7 +858,12 @@ if [ "$SYNC_COOLIFY" = "1" ] && [ -n "${COOLIFY_API_TOKEN:-$(env_value COOLIFY_A
     push_pki_to_app() {
       local target_uuid="$1"
       local target_name="$2"
+      local target_role="$3"
       local code
+      if drzena "$target_role"; then
+        warn "  $(drzeni_hlaska "$target_role"). AISHA_PKI_BOOTSTRAP_* se do ní NEZAPISUJÍ."
+        return 0
+      fi
       if [ -z "$target_uuid" ] || [ "$target_uuid" = "null" ]; then
         warn "  ${target_name}: UUID not resolved (transient API issue) — skip"
         return 0
@@ -872,8 +896,8 @@ if [ "$SYNC_COOLIFY" = "1" ] && [ -n "${COOLIFY_API_TOKEN:-$(env_value COOLIFY_A
       ok "  ${target_name} (${target_uuid}): AISHA_PKI_BOOTSTRAP_* zapsáno a ZPĚTNĚ OVĚŘENO v obou oblastech"
     }
 
-    push_pki_to_app "$NETBIRD_APP_UUID" "aisha-netbird"
-    push_pki_to_app "$PKI_APP_UUID" "aisha-pki"
+    push_pki_to_app "$NETBIRD_APP_UUID" "aisha-netbird" netbird
+    push_pki_to_app "$PKI_APP_UUID" "aisha-pki" pki
   }
   step11_sync
   set -e

@@ -2252,6 +2252,7 @@ export type Database = {
           can_write: boolean
           consecutive_failure_count: number
           created_at: string
+          credential_env_var: string | null
           display_name: string
           id: string
           is_enabled: boolean
@@ -2272,6 +2273,7 @@ export type Database = {
           can_write?: boolean
           consecutive_failure_count?: number
           created_at?: string
+          credential_env_var?: string | null
           display_name: string
           id?: string
           is_enabled?: boolean
@@ -2292,6 +2294,7 @@ export type Database = {
           can_write?: boolean
           consecutive_failure_count?: number
           created_at?: string
+          credential_env_var?: string | null
           display_name?: string
           id?: string
           is_enabled?: boolean
@@ -27930,9 +27933,11 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          kind: string
           label: string | null
           page_id: string
           page_settings: Json | null
+          updated_at: string
           version_number: number
         }
         Insert: {
@@ -27942,9 +27947,11 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          kind?: string
           label?: string | null
           page_id: string
           page_settings?: Json | null
+          updated_at?: string
           version_number?: number
         }
         Update: {
@@ -27954,9 +27961,11 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          kind?: string
           label?: string | null
           page_id?: string
           page_settings?: Json | null
+          updated_at?: string
           version_number?: number
         }
         Relationships: [
@@ -31071,6 +31080,7 @@ export type Database = {
         Args: {
           p_body?: string
           p_channel: string
+          p_event_id?: string
           p_external_id: string
           p_from?: string
           p_metadata?: Json
@@ -31643,6 +31653,10 @@ export type Database = {
       }
       can_access_story: {
         Args: { p_for_write?: boolean; p_story_id: string }
+        Returns: boolean
+      }
+      can_enter_voice_room: {
+        Args: { p_user_id: string; p_voice_room_id: string }
         Returns: boolean
       }
       can_invite_to_study: { Args: { p_study_id: string }; Returns: boolean }
@@ -33522,6 +33536,10 @@ export type Database = {
         Args: { p_id: string }
         Returns: boolean
       }
+      delete_provider_credential_admin: {
+        Args: { p_env_var: string }
+        Returns: Json
+      }
       delete_question_block_admin: { Args: { p_id: string }; Returns: boolean }
       delete_questionnaire_admin: { Args: { p_id: string }; Returns: boolean }
       delete_story_knowledge_item_audited: {
@@ -33584,6 +33602,10 @@ export type Database = {
         Args: { p_article_id: string }
         Returns: string
       }
+      discard_web_page_draft_admin: {
+        Args: { p_page_id: string }
+        Returns: string
+      }
       dismiss_story_link: { Args: { p_link_id: string }; Returns: Json }
       document_sensitivity_min_tier: {
         Args: { p_sensitivity: string }
@@ -33607,10 +33629,6 @@ export type Database = {
       }
       edge_blockchain_audit: {
         Args: { p_action: string; p_payload?: Json }
-        Returns: Json
-      }
-      edge_database_dump_table: {
-        Args: { p_actor_user_id: string; p_table: string }
         Returns: Json
       }
       edge_mobile_notifications: {
@@ -33793,6 +33811,14 @@ export type Database = {
       execute_improvement_proposal_rollback_admin: {
         Args: { p_proposal_id?: string; p_review_note?: string }
         Returns: Json
+      }
+      expert_rule_visible_to: {
+        Args: {
+          p_audience_user_id: string
+          p_author_partner_id: string
+          p_visibility: string
+        }
+        Returns: boolean
       }
       export_story_bundle: {
         Args: {
@@ -34096,6 +34122,13 @@ export type Database = {
         }
         Returns: string
       }
+      fn_deklarace_vah_embeddingu: {
+        Args: { p_model_id: string }
+        Returns: {
+          identita: string
+          max_tokens: number
+        }[]
+      }
       fn_detect_agent_runaway: {
         Args: {
           p_max_cost?: number
@@ -34261,7 +34294,10 @@ export type Database = {
           proposal_id: string
         }[]
       }
-      fn_get_psyche_traits: { Args: never; Returns: Json }
+      fn_get_psyche_traits: {
+        Args: { p_audience_user_id?: string }
+        Returns: Json
+      }
       fn_get_rag_baseline: {
         Args: {
           p_embedding_model?: string
@@ -34375,7 +34411,10 @@ export type Database = {
           story_id: string
         }[]
       }
-      fn_get_tao_principles: { Args: never; Returns: Json }
+      fn_get_tao_principles: {
+        Args: { p_audience_user_id?: string }
+        Returns: Json
+      }
       fn_get_trace_anomalies_24h: {
         Args: { p_max_results?: number; p_min_occurrences?: number }
         Returns: Json
@@ -34406,6 +34445,10 @@ export type Database = {
           p_story_id: string
         }
         Returns: Json
+      }
+      fn_identita_vektoru: {
+        Args: { p_model_version: string }
+        Returns: string
       }
       fn_list_quarantined_items: {
         Args: { p_limit?: number; p_offset?: number }
@@ -34664,15 +34707,6 @@ export type Database = {
       }
       fn_resolve_runtime: { Args: { p_clow: Json }; Returns: Json }
       fn_risk_level_ordinal: { Args: { p_level: string }; Returns: number }
-      fn_rollback_agent_config: {
-        Args: {
-          p_agent_configuration_id: string
-          p_proposal_id?: string
-          p_reason?: string
-          p_target_version?: number
-        }
-        Returns: Json
-      }
       fn_rollback_agent_model: {
         Args: { p_agent_slug: string; p_proposal_id: string; p_reason?: string }
         Returns: Json
@@ -34797,6 +34831,14 @@ export type Database = {
       fn_verify_audit_journal_entry: {
         Args: { p_entry_id: string }
         Returns: Json
+      }
+      fn_ziva_identita_v1: {
+        Args: never
+        Returns: {
+          identita: string
+          max_tokens: number
+          model_id: string
+        }[]
       }
       format_display_name_for_public: {
         Args: {
@@ -36589,7 +36631,10 @@ export type Database = {
         Args: { p_end_date?: string; p_start_date?: string }
         Returns: Json
       }
-      get_expert_rule_detail: { Args: { p_rule_slug: string }; Returns: Json }
+      get_expert_rule_detail: {
+        Args: { p_audience_user_id?: string; p_rule_slug: string }
+        Returns: Json
+      }
       get_expert_rules: {
         Args: {
           p_author_partner_id?: string
@@ -38625,6 +38670,14 @@ export type Database = {
           usage_count: number
         }[]
       }
+      get_news_tags_admin: {
+        Args: never
+        Returns: {
+          article_count: number
+          published_count: number
+          tag: string
+        }[]
+      }
       get_news_timeline_block: { Args: { p_params?: Json }; Returns: Json }
       get_next_playwright_run: {
         Args: never
@@ -40123,6 +40176,24 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_provider_credential_catalog: {
+        Args: never
+        Returns: {
+          env_var: string
+          is_set: boolean
+          source: string
+          updated_at: string
+          updated_by: string
+          used_by: Json
+        }[]
+      }
+      get_provider_credentials: {
+        Args: { p_env_vars: string[] }
+        Returns: {
+          env_var: string
+          value: string
+        }[]
+      }
       get_provider_registry_admin: {
         Args: { p_backend_kind?: string; p_enabled_only?: boolean }
         Returns: {
@@ -40581,7 +40652,7 @@ export type Database = {
       get_rent_breakdown: { Args: { p_params?: Json }; Returns: Json }
       get_rent_current: { Args: { p_params?: Json }; Returns: Json }
       get_retryable_integration_events: {
-        Args: { p_limit?: number }
+        Args: { p_limit?: number; p_sources: string[] }
         Returns: Json
       }
       get_reviewable_health_documents_audited: {
@@ -40843,13 +40914,6 @@ export type Database = {
           mime_type: string
           title: string
           user_id: string
-        }[]
-      }
-      get_story_basic_info: {
-        Args: { p_story_id?: string }
-        Returns: {
-          id: string
-          title: string
         }[]
       }
       get_story_context_for_ai_audited: {
@@ -42105,6 +42169,16 @@ export type Database = {
       get_vedeni_top_customers: { Args: { p_params?: Json }; Returns: Json }
       get_vedeni_vyhled_inkasa: { Args: { p_params?: Json }; Returns: Json }
       get_visible_partners: { Args: { p_city?: string }; Returns: Json }
+      get_voice_room_entry: {
+        Args: { p_livekit_room_name: string; p_user_id: string }
+        Returns: {
+          id: string
+          is_active: boolean
+          may_enter: boolean
+          room_type: string
+          story_id: string
+        }[]
+      }
       get_voucher_analytics_admin: {
         Args: never
         Returns: {
@@ -42176,6 +42250,8 @@ export type Database = {
           canvas_html: string
           created_at: string
           description_key: string
+          draft: Json
+          edit_stamp: string
           id: string
           is_active: boolean
           og_image_url: string
@@ -42705,20 +42781,6 @@ export type Database = {
         }
         Returns: Json
       }
-      ingest_inbound_comm_audited: {
-        Args: {
-          p_body?: string
-          p_channel: string
-          p_external_id: string
-          p_from?: string
-          p_metadata?: Json
-          p_parent_entry_id?: string
-          p_routed_to?: string
-          p_story_id: string
-          p_subject?: string
-        }
-        Returns: Json
-      }
       ingest_sentry_issue: { Args: { p_payload: Json }; Returns: string }
       insert_ai_trace_event: {
         Args: {
@@ -42918,6 +42980,31 @@ export type Database = {
       kiosk_tahac: { Args: { p_rz: string }; Returns: string }
       kiosk_vydej_relaci: { Args: { p_kid: string }; Returns: Json }
       knock_roster_zarizeni: { Args: never; Returns: Json }
+      knowledge_audience_in_guild: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
+      knowledge_ragnarok_action: {
+        Args: {
+          p_content_changed: boolean
+          p_new_state: string
+          p_new_status: string
+          p_old_state: string
+          p_old_status: string
+          p_op: string
+        }
+        Returns: string
+      }
+      knowledge_state_readable: { Args: { p_state: string }; Returns: boolean }
+      knowledge_visibilities_for_caller: { Args: never; Returns: string[] }
+      knowledge_visibility_searchable: {
+        Args: {
+          p_in_guild: boolean
+          p_signed_in: boolean
+          p_visibility: string
+        }
+        Returns: boolean
+      }
       leave_voice_room: {
         Args: { p_voice_room_id?: string }
         Returns: undefined
@@ -43723,7 +43810,11 @@ export type Database = {
         Returns: Json
       }
       mcp_get_agent_knowledge: {
-        Args: { p_agent_slug: string; p_binding_type?: string }
+        Args: {
+          p_agent_slug: string
+          p_audience_user_id?: string
+          p_binding_type?: string
+        }
         Returns: {
           ai_context_tags: string[]
           ai_instructions: string
@@ -43756,11 +43847,18 @@ export type Database = {
       }
       mcp_get_expertise_areas: { Args: never; Returns: Json }
       mcp_get_knowledge_item: {
-        Args: { p_item_id?: string; p_source_slug?: string }
+        Args: {
+          p_audience_user_id?: string
+          p_item_id?: string
+          p_source_slug?: string
+        }
         Returns: Json
       }
       mcp_get_knowledge_stats: { Args: never; Returns: Json }
-      mcp_get_rule_detail: { Args: { p_rule_slug: string }; Returns: Json }
+      mcp_get_rule_detail: {
+        Args: { p_audience_user_id?: string; p_rule_slug: string }
+        Returns: Json
+      }
       mcp_get_story_context: { Args: { p_story_id: string }; Returns: Json }
       mcp_match_experts: {
         Args: {
@@ -43789,6 +43887,7 @@ export type Database = {
       }
       mcp_search_knowledge: {
         Args: {
+          p_audience_user_id?: string
           p_category?: string
           p_context_tags?: string[]
           p_expertise_slug?: string
@@ -43798,37 +43897,22 @@ export type Database = {
         }
         Returns: Json
       }
-      mcp_search_knowledge_v2:
-        | {
-            Args: {
-              p_category?: string
-              p_context_tags?: string[]
-              p_expertise_slug?: string
-              p_include_ai_instructions?: boolean
-              p_item_types?: string[]
-              p_limit?: number
-              p_query_embedding?: string
-              p_query_text?: string
-              p_similarity_threshold?: number
-            }
-            Returns: Json
-          }
-        | {
-            Args: {
-              p_audience_user_id?: string
-              p_category?: string
-              p_context_tags?: string[]
-              p_expertise_slug?: string
-              p_include_ai_instructions?: boolean
-              p_item_types?: string[]
-              p_limit?: number
-              p_query_embedding?: string
-              p_query_text?: string
-              p_similarity_threshold?: number
-              p_story_id?: string
-            }
-            Returns: Json
-          }
+      mcp_search_knowledge_v2: {
+        Args: {
+          p_audience_user_id?: string
+          p_category?: string
+          p_context_tags?: string[]
+          p_expertise_slug?: string
+          p_include_ai_instructions?: boolean
+          p_item_types?: string[]
+          p_limit?: number
+          p_query_embedding?: string
+          p_query_text?: string
+          p_similarity_threshold?: number
+          p_story_id?: string
+        }
+        Returns: Json
+      }
       mcp_search_knowledge_v3: {
         Args: {
           p_audience_user_id?: string
@@ -43877,7 +43961,28 @@ export type Database = {
         Args: { p_source_story_id: string; p_target_story_id: string }
         Returns: Json
       }
+      meter_usage_between: {
+        Args: {
+          p_do: string
+          p_od: string
+          p_pravidlo?: string
+          p_twin_id: string
+        }
+        Returns: Json
+      }
+      meter_usage_stav_k: {
+        Args: {
+          n: number
+          pravidlo: string
+          t: string
+          ts: string[]
+          us: number[]
+          vymena: boolean[]
+        }
+        Returns: Json
+      }
       migrate_app_secrets_to_vault: { Args: never; Returns: number }
+      migrate_legacy_openai_key_to_credential: { Args: never; Returns: string }
       mint_production_tokens_on_release: {
         Args: { p_batch_id?: string }
         Returns: Json
@@ -44061,6 +44166,21 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      provider_credential_catalog: {
+        Args: never
+        Returns: {
+          env_var: string
+          used_by: Json
+        }[]
+      }
+      provider_credential_check_value: {
+        Args: { p_value: string }
+        Returns: undefined
+      }
+      provider_credential_require: {
+        Args: { p_env_var: string }
+        Returns: string
+      }
       publish_agent: { Args: { p_plugin_id: string }; Returns: Json }
       publish_expert_rule: { Args: { p_rule_id: string }; Returns: Json }
       publish_news_article_admin: {
@@ -44088,6 +44208,17 @@ export type Database = {
         Returns: string
       }
       publish_web_artifact: { Args: { p_job_id: string }; Returns: string }
+      publish_web_page_admin: {
+        Args: {
+          p_canvas_css?: string
+          p_canvas_data?: Json
+          p_canvas_html?: string
+          p_expected_stamp?: string
+          p_page_id: string
+          p_page_settings?: Json
+        }
+        Returns: string
+      }
       purchase_product_voucher: {
         Args: {
           p_point_cost: number
@@ -44121,10 +44252,6 @@ export type Database = {
           p_quality_score: number
           p_topic_version_id: string
         }
-        Returns: undefined
-      }
-      raw_query_admin: {
-        Args: { p_params?: string[]; p_sql: string }
         Returns: undefined
       }
       recalculate_all_ruleset_fingerprints: { Args: never; Returns: Json }
@@ -44455,6 +44582,10 @@ export type Database = {
       remove_story_participant_audited: {
         Args: { p_story_id: string; p_target_user_id: string }
         Returns: Json
+      }
+      rename_news_tag_admin: {
+        Args: { p_from: string; p_to: string }
+        Returns: number
       }
       request_account_deletion: {
         Args: { p_feedback?: string; p_reason?: string }
@@ -44866,6 +44997,17 @@ export type Database = {
         Args: { p_description?: string; p_name: string; p_page_id: string }
         Returns: string
       }
+      save_web_page_draft_admin: {
+        Args: {
+          p_canvas_css?: string
+          p_canvas_data?: Json
+          p_canvas_html?: string
+          p_expected_stamp?: string
+          p_page_id: string
+          p_page_settings?: Json
+        }
+        Returns: string
+      }
       save_workflow_node_run: {
         Args: {
           p_agent_name?: string
@@ -45092,6 +45234,14 @@ export type Database = {
       }
       set_production_workflow_template_default_admin: {
         Args: { p_id: string }
+        Returns: boolean
+      }
+      set_provider_credential_admin: {
+        Args: { p_env_var: string; p_value: string }
+        Returns: Json
+      }
+      set_provider_credential_if_absent: {
+        Args: { p_env_var: string; p_value: string }
         Returns: boolean
       }
       set_session_memory: {
@@ -46766,11 +46916,12 @@ export type Database = {
           p_canvas_css?: string
           p_canvas_data?: Json
           p_canvas_html?: string
+          p_expected_stamp?: string
           p_id: string
           p_page_settings?: Json
           p_publish?: boolean
         }
-        Returns: undefined
+        Returns: string
       }
       upsert_agent_tool_admin: {
         Args: {
@@ -47548,6 +47699,7 @@ export type Database = {
       wd_upsert_rides_audited: { Args: { p_rides: Json }; Returns: Json }
       wd_upsert_vehicles_audited: { Args: { p_vehicles: Json }; Returns: Json }
       wd_upsert_worktime_audited: { Args: { p_worktime: Json }; Returns: Json }
+      web_page_edit_stamp: { Args: { p_page_id: string }; Returns: string }
       workflow_step_derived_position: {
         Args: { p_step_id: string }
         Returns: Json

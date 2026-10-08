@@ -44,6 +44,17 @@ const {
 mockCreateSsrfGuard.mockReturnValue({ safeFetch: mockSafeFetch });
 mockCreateAitgRunner.mockReturnValue({ record: vi.fn() });
 
+// Čtečka pověření (2026-10-02): v testu trezor = prostředí procesu (tvar createCredentialReader).
+const { trezorPover } = vi.hoisted(() => ({ trezorPover: new Map<string, string>() }));
+vi.mock('../../lib/credentials.js', () => ({
+  credentials: {
+    get: async (n: string) => trezorPover.get(n) ?? null,
+    getMany: async (ns: readonly string[]) => Object.fromEntries(ns.map((n) => [n, process.env[n] ?? null])),
+    migrateEnvCredentials: async () => ({ moved: [], kept: [], absent: [], failed: [] }),
+    invalidate: () => undefined,
+  },
+  POVERENI_Z_PROSTREDI: [],
+}));
 vi.mock('@aisha/security', () => ({
   createSsrfGuard: mockCreateSsrfGuard,
   parseHostAllowlist: (s: string) => s.split(',').map((x) => x.trim()).filter(Boolean),
@@ -292,6 +303,8 @@ describe('modelsRoutes', () => {
     mockVerifyToken.mockReset();
     mockIsAdminOrStaff.mockReset();
     vi.spyOn(globalThis, 'fetch').mockReset();
+    trezorPover.clear();
+    trezorPover.set('OPENAI_API_KEY', 'sk-env-key-1234');
   });
 
   async function registerAndCall(method: 'POST' | 'GET', path: string, body?: unknown, authHeader?: string) {
@@ -320,57 +333,31 @@ describe('modelsRoutes', () => {
     expect(calls.code).toBe(403);
   });
 
-  it('POST /models/openai-key action=status — returns masked sk-...XXXX', async () => {
+  it('POST /models/openai-key action=status — klíč v trezoru → configured, bez jakékoli části hodnoty', async () => {
     mockVerifyToken.mockResolvedValue({ userId: 'u', roles: ['admin'], claims: {} });
     mockIsAdminOrStaff.mockReturnValue(true);
-    mockRpcService.mockResolvedValue({ value: 'sk-abcd1234567890LAST' });
+    trezorPover.set('OPENAI_API_KEY', 'sk-abcd1234567890LAST');
 
     const calls = await registerAndCall('POST', '/models/openai-key', { action: 'status' }, 'Bearer t');
-    expect(calls.body).toEqual({ configured: true, masked: 'sk-...LAST' });
+    expect(calls.body).toEqual({ configured: true, masked: null });
+    expect(JSON.stringify(calls.body)).not.toContain('LAST');
   });
 
-  it('POST /models/openai-key action=status — when DB has null value → configured=false', async () => {
+  it('POST /models/openai-key action=status — pověření nikde → configured=false', async () => {
     mockVerifyToken.mockResolvedValue({ userId: 'u', roles: ['admin'], claims: {} });
     mockIsAdminOrStaff.mockReturnValue(true);
-    mockRpcService.mockResolvedValue({ value: null });
+    trezorPover.clear();
     const calls = await registerAndCall('POST', '/models/openai-key', { action: 'status' }, 'Bearer t');
     expect(calls.body).toEqual({ configured: false, masked: null });
   });
 
-  it('POST /models/openai-key action=set — rejects keys without sk- prefix (400)', async () => {
-    mockVerifyToken.mockResolvedValue({ userId: 'u', roles: ['admin'], claims: {} });
-    mockIsAdminOrStaff.mockReturnValue(true);
-    const calls = await registerAndCall('POST', '/models/openai-key', { action: 'set', key: 'not-a-key' }, 'Bearer t');
-    expect(calls.code).toBe(400);
-    expect((calls.body as { error: string }).error).toContain('Invalid');
-  });
-
-  it('POST /models/openai-key action=set — upserts secret + audit-logs (audit failure is swallowed)', async () => {
+  it('POST /models/openai-key action=set → 410: klíč se nastavuje v administraci, nic se nezapíše', async () => {
     mockVerifyToken.mockResolvedValue({ userId: 'u', roles: ['admin'], claims: { sub: 'admin-uid' } });
     mockIsAdminOrStaff.mockReturnValue(true);
-    mockRpcService
-      .mockResolvedValueOnce(undefined) // edge_app_secrets upsert
-      .mockRejectedValueOnce(new Error('audit table down')); // log_audit_event fails
-
     const calls = await registerAndCall('POST', '/models/openai-key', { action: 'set', key: 'sk-newkey-12345LAST' }, 'Bearer t');
-    expect(calls.body).toEqual({ ok: true });
-    expect(mockRpcService).toHaveBeenCalledWith('edge_app_secrets', {
-      p_action: 'upsert', p_key: 'OPENAI_API_KEY', p_value: 'sk-newkey-12345LAST',
-    });
-    // Audit log fired; failure didn't bubble up
-    expect(mockRpcService).toHaveBeenCalledWith(
-      'log_audit_event',
-      expect.objectContaining({
-        p_action: 'OPENAI_KEY_UPDATED',
-        p_metadata: expect.objectContaining({ masked_key: 'sk-...LAST' }),
-        // Regression guard: actor id MUST come from the verified token's
-        // canonical .userId (the JWT sub claim), NOT the dropped .sub field.
-        // Under the old `user.sub` read this was `undefined`.
-        p_user_id: 'u',
-      }),
-    );
-    const auditCall = mockRpcService.mock.calls.find(([fn]) => fn === 'log_audit_event');
-    expect((auditCall![1] as { p_user_id: unknown }).p_user_id).not.toBeUndefined();
+    expect(calls.code).toBe(410);
+    expect((calls.body as { error: string }).error).toContain('administraci');
+    expect(mockRpcService).not.toHaveBeenCalled();
   });
 
   it('POST /models/openai-key unknown action → 400', async () => {
@@ -416,29 +403,8 @@ describe('modelsRoutes', () => {
   it('GET /models/list — no API key configured → returns empty + warning', async () => {
     mockVerifyToken.mockResolvedValue({ userId: 'u', roles: ['admin'], claims: {} });
     mockIsAdminOrStaff.mockReturnValue(true);
-    // Override config temporarily — re-mock
-    vi.resetModules();
-    vi.doMock('../../config.js', () => ({
-      config: {
-        postgrestUrl: 'http://postgrest:3000', postgrestServiceToken: 's',
-        n8nBaseUrl: 'http://n8n', ssrfHostAllowlist: '',
-        buildSha: 's', openaiApiKey: null, chatModelPrefixes: ['gpt-'],
-        kcJwksUrl: 'http://kc/jwks', kcIssuer: 'http://kc/realms/r',
-        keycloakUrl: 'http://kc', keycloakRealm: 'r',
-      },
-    }));
-
-    const { modelsRoutes } = await import('../../routes/models.js');
-    const { app, handlers } = makeApp();
-    await modelsRoutes(app);
-    const { reply, calls } = makeReply();
-    await handlers.get('GET /models/list')!(
-      { headers: { authorization: 'Bearer t' }, body: undefined },
-      reply,
-    );
+    trezorPover.clear();
+    const calls = await registerAndCall('GET', '/models/list', undefined, 'Bearer t');
     expect(calls.body).toEqual({ models: [], error: 'No OpenAI API key configured' });
-
-    // Restore for any subsequent test
-    vi.resetModules();
   });
 });

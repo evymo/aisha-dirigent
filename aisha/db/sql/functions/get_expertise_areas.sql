@@ -14,7 +14,7 @@ BEGIN
   SELECT
     gea.id, gea.slug, gea.name_key, gea.description_key, gea.icon, gea.parent_id, gea.sort_order,
     (SELECT count(DISTINCT gme.partner_id) FROM guild_member_expertise gme WHERE gme.expertise_area_id = gea.id) AS member_count,
-    (SELECT count(*) FROM expert_rules er WHERE er.expertise_area_id = gea.id AND er.status = 'published') AS rule_count
+    (SELECT count(*) FROM expert_rules er WHERE er.expertise_area_id = gea.id AND er.status = 'published' AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid())) AS rule_count
   FROM guild_expertise_areas gea
   WHERE gea.is_active = true
   ORDER BY gea.sort_order;

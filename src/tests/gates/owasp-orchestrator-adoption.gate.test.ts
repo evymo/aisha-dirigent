@@ -50,6 +50,53 @@ const OWASP_KNOWN_EXEMPTIONS: Record<string, string[]> = {
   // No HTTP listener, no JWT verification — outbound only, calls go through
   // PostgREST with service-role token. Same shape as event-worker.
   'svc-playwright-runner': ['applySecurity', 'helmet', 'rateLimit', 'cors'],
+  // svc-lane-klient is the fork's thin client of the shared GPU lane: a transparent proxy
+  // between model-mesh peers and the lane enforcement point. helmet IS wired (response
+  // headers only); applySecurity is not, because it bundles a rate limiter. Rate limiting
+  // belongs to the enforcement point (per-tenant quotas + concurrency) — a 429 from the
+  // client would break the closed LANE_* rejection contract (its only own code is
+  // LANE_NEDOSTUPNA). No browser reaches it, so no CORS. Positive replacement: prijem.ts
+  // admits only connections from the measured model-mesh range; quotas live at the entry.
+  'svc-lane-klient': ['applySecurity', 'rateLimit', 'cors'],
+  // svc-accel-vstup is the enforcement point of the shared GPU lane (operator side): tenants
+  // are processes on internal lane networks, never browsers, and authenticate with a per-tenant
+  // key, not a JWT. Each exempted check is replaced by a MEASURED property below
+  // (NAHRADNI_VLASTNOSTI), not by this comment.
+  'svc-accel-vstup': ['applySecurity', 'rateLimit', 'cors', 'jwt'],
+};
+
+/** Production source only: tests and comments are not evidence of a property. */
+function kod(ev: ServiceEvidence): string {
+  return ev.files
+    .filter((f) => !/[\\/]__tests__[\\/]|\.test\.tsx?$/.test(f.path))
+    .map((f) => f.content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
+    .join('\n');
+}
+
+/**
+ * Substitute properties: an exemption without a measured replacement is just text (Guru review
+ * 2026-10-06). For every check a listed service skips in OWASP_KNOWN_EXEMPTIONS, the replacement
+ * must be present in its production code.
+ */
+const NAHRADNI_VLASTNOSTI: Record<string, Record<string, { co: string; dukaz: (ev: ServiceEvidence) => boolean }>> = {
+  'svc-accel-vstup': {
+    applySecurity: {
+      co: 'helmet zvlášť + kvóta nájemce na cestě požadavku místo rate limiteru z applySecurity',
+      dukaz: (ev) => serviceUsesHelmet({ ...ev, files: ev.files.filter((f) => !/__tests__/.test(f.path)) }) && /\.kvoty\.vstup\(/.test(kod(ev)),
+    },
+    rateLimit: {
+      co: 'kvóta nájemce (souběh po třídě + gpu_ms za okno) na cestě požadavku → 429 KVOTA_PREKROCENA',
+      dukaz: (ev) => /\.kvoty\.vstup\(/.test(kod(ev)) && /['"]KVOTA_PREKROCENA['"]/.test(kod(ev)),
+    },
+    jwt: {
+      co: 'klíč nájemce = otisk sha256 porovnaný v konstantním čase (timingSafeEqual)',
+      dukaz: (ev) => /timingSafeEqual\(/.test(kod(ev)) && /createHash\(\s*['"]sha256['"]\s*\)/.test(kod(ev)),
+    },
+    cors: {
+      co: 'žádné CORS: nájemce je proces na vnitřní síti lane, ne prohlížeč',
+      dukaz: (ev) => !/@fastify\/cors|access-control-allow-origin/i.test(kod(ev)),
+    },
+  },
 };
 
 interface ServiceEvidence {
@@ -185,6 +232,7 @@ describe('OWASP — cross-service @aisha/security adoption', () => {
     });
 
     test('A07 — JWT verification is present when service consumes Authorization', () => {
+      if (isExempt(service, 'jwt')) return; // náhradu měří NAHRADNI_VLASTNOSTI
       // We flag only services that VERIFY an inbound Authorization header
       // (verifyToken / verifyAuth / req.headers.authorization read). Outbound
       // Authorization headers (sending Bearer to upstream services) are a
@@ -200,6 +248,30 @@ describe('OWASP — cross-service @aisha/security adoption', () => {
         `services/${service} verifies inbound Authorization but does not import a JWT verifier`,
       ).toBe(true);
     });
+  });
+});
+
+describe('OWASP — architektonická výjimka = měřená náhrada', () => {
+  for (const [service, vynechane] of Object.entries(OWASP_KNOWN_EXEMPTIONS)) {
+    const nahrady = NAHRADNI_VLASTNOSTI[service];
+    if (!nahrady) continue;
+    const ev = readServiceTree(service);
+    test(`${service}: každá vynechaná kontrola má náhradní vlastnost`, () => {
+      expect(vynechane.filter((c) => !nahrady[c])).toEqual([]);
+    });
+    for (const [kontrola, n] of Object.entries(nahrady)) {
+      test(`${service}: ${kontrola} → ${n.co}`, () => {
+        expect(n.dukaz(ev), `náhrada za ${kontrola} ve zdroji ${service} chybí`).toBe(true);
+      });
+    }
+  }
+  test('mutant: VB bez timingSafeEqual, bez kvóty na cestě, s CORS = náhrady červené', () => {
+    const ev = readServiceTree('svc-accel-vstup');
+    const zmen = (z: RegExp, na: string): ServiceEvidence => ({ ...ev, files: ev.files.map((f) => ({ ...f, content: f.content.replace(z, na) })) });
+    const n = NAHRADNI_VLASTNOSTI['svc-accel-vstup'];
+    expect(n.jwt.dukaz(zmen(/timingSafeEqual\(/g, 'rovnaSe(')), 'bez timingSafeEqual').toBe(false);
+    expect(n.rateLimit.dukaz(zmen(/\.kvoty\.vstup\(/g, '.nic(')), 'bez kvóty').toBe(false);
+    expect(n.cors.dukaz({ ...ev, files: [...ev.files, { path: 'x/src/cors.ts', content: "import cors from '@fastify/cors';" }] }), 's CORS').toBe(false);
   });
 });
 

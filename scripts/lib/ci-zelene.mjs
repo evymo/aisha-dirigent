@@ -50,6 +50,7 @@ export const PROMENNE_SADY = [
   "AISHA_SMOKE_SKIP_OFFLINE",
   "AISHA_SMOKE_SKIP_SERVICES",
   "AISHA_SMOKE_SKIP_UNIT",
+  "AISHA_SMOKE_SKIP_GATES",
   "AISHA_SKIP_ONLINE",
   "AISHA_SKIP_DB_TESTS",
   "AISHA_SKIP_AI_TESTS",
@@ -62,6 +63,23 @@ export const PROMENNE_SADY = [
   "AISHA_DB_PORT",
   "PGPORT",
 ];
+
+/**
+ * Prostředí BEZ přepínačů sady — pro testy, které pouštějí hák nebo výběr pre-pushe jako
+ * podproces. Pryč jde PROMENNE_SADY, každé AISHA_SMOKE_*, AISHA_PREPUSH_* a AISHA_CI_ZNOVU;
+ * co test potřebuje, nastaví VÝSLOVNĚ.
+ * ⛔ NAMĚŘENO 2026-10-05 (push integrační dávky 4a): brána háku běžela UVNITŘ cíleného
+ * pre-pushe, který už exportoval AISHA_SMOKE_SKIP_GATES/UNIT/SERVICES=1. Simulovaný hák je
+ * zdědil a jeho „plná sada" přeskakovala; mimo hák bylo prostředí čisté a test prošel.
+ * Výsledek testu tak závisel na tom, KDO ho pustil — měřil prostředí volajícího, ne hák.
+ */
+export function prostrediBezPrepinacuSady(env = process.env) {
+  const out = { ...env };
+  for (const k of Object.keys(out)) {
+    if (PROMENNE_SADY.includes(k) || /^AISHA_(SMOKE|PREPUSH)_/.test(k) || k === "AISHA_CI_ZNOVU") delete out[k];
+  }
+  return out;
+}
 
 /** Adresa PostgRESTu, jak ji vidí sonda testů — TOTÉŽ pořadí a výchozí hodnota jako
  *  src/tests/db/test-env-probe.ts (hlídá brána). Záměrně NE scripts/lib/env.mjs: ten při
@@ -262,11 +280,13 @@ export const REZIM_CELA_SADA = "vse";
 
 /**
  * Zapíše konec běhu: jen po CELÉ sadě (`rezim === "vse"`), jen když start existuje
- * a klíč na konci je TENTÝŽ. Pre-push podle cest (#1073) často pouští jen VÝBĚR —
- * zápis výběru by strom prohlásil za zelený celou sadou a push téhož stromu s širším
- * výběrem (jiný remote, jiná báze) by přeskočil části, které nikdy neběžely.
- * Chybějící nebo jiný režim = nezapsáno (fail-closed). HIT ze záznamu celé sady je
- * poctivý pro oba režimy: celá sada ⊇ jakýkoli výběr.
+ * a klíč na konci je TENTÝŽ. Pre-push je od 2026-10-05 CÍLENÝ (rozhodnutí majitele
+ * „plné sady jen v CI"): běží `vyber` (dotčené) nebo `sirsi` (lehká dráha + dotčené),
+ * celá sada jen s AISHA_PREPUSH_VSE=1 (`vse`). Zápis cíleného běhu by strom prohlásil
+ * za zelený celou sadou a push téhož stromu s jinou změnou (jiný remote, jiná báze) by
+ * přeskočil části, které nikdy neběžely. Rozsah tedy rozlišuje TENHLE zápis, ne klíč:
+ * cokoli jiného než `vse` = nezapsáno (fail-closed). HIT ze záznamu celé sady je
+ * poctivý pro všechny režimy: celá sada ⊇ jakýkoli výběr.
  */
 export function zapisKonec(dir, beh, kKonec, { ted = Date.now(), meta = {}, rezim } = {}) {
   const f = souborBehu(dir, beh);

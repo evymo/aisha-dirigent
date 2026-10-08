@@ -58,7 +58,9 @@ BEGIN
         'published_at', er.published_at
       ) ORDER BY er.published_at DESC NULLS LAST)
       FROM expert_rules er
-      WHERE er.author_partner_id = pp.id AND er.status = 'published'),
+      WHERE er.author_partner_id = pp.id AND er.status = 'published'
+        -- veřejný profil člena: jen pravidla bez identity viditelná (jen `public`)
+        AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, NULL::uuid)),
       '[]'::jsonb
     ) AS published_rules
   FROM partner_profiles pp

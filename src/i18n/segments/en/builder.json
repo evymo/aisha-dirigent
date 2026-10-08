@@ -185,6 +185,10 @@
       "discussion-thread": {
         "title": "Discussion",
         "description": "User posts threaded under this content node"
+      },
+      "app-banner": {
+        "title": "App Banner",
+        "description": "Get-our-app banner: iPhone → App Store, Android → Google Play, computer → both"
       }
     },
     "traits": {
@@ -301,7 +305,9 @@
       "layers": "Layers",
       "i18n": "Translations",
       "selectElement": "Select an element to edit its properties",
-      "emptyCanvas": "Canvas is empty"
+      "emptyCanvas": "Canvas is empty",
+      "panelError": "This panel could not be displayed.",
+      "toggleVisibility": "Show or hide"
     },
     "i18n": {
       "injectTranslations": "Preview translations",
@@ -344,7 +350,10 @@
         "news_article": "News Article",
         "web_page": "Web Page"
       },
-      "nodeId": "Node ID"
+      "nodeId": "Node ID",
+      "iosUrl": "App Store link (iPhone)",
+      "androidUrl": "Google Play link (Android)",
+      "dismissible": "Visitors can close it"
     },
     "versions": {
       "title": "Version History",
@@ -371,6 +380,17 @@
       "invalidType": "Unsupported file type",
       "tooLarge": "File is too large (max 20 MB)",
       "uploadFailed": "Asset upload failed"
+    },
+    "draft": {
+      "pending": "Unpublished changes",
+      "banner": "You are editing a draft. The website still shows the published version until you click “Publish changes”.",
+      "publishChanges": "Publish changes",
+      "discard": "Discard draft",
+      "conflictTitle": "The page was changed elsewhere",
+      "conflictBody": "Someone saved this page after you opened it. Reload to see their version, or overwrite it with yours.",
+      "reload": "Reload",
+      "overwrite": "Overwrite with mine",
+      "restoredToDraft": "The version was loaded into the draft. The website changes only after you publish."
     }
   }
 }

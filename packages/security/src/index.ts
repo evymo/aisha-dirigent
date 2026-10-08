@@ -4,6 +4,7 @@
  *
  * Module → OWASP category map:
  *   logger.ts       → A09  Security Logging & Monitoring Failures
+ *   logOptions.ts   → A09  (Fastify / pino logger factory: safe req/err serializers)
  *   audit.ts        → A09  (compliance/append-only trail)
  *   cors.ts         → A05  Security Misconfiguration
  *   helmet.ts       → A05  Security Misconfiguration
@@ -25,6 +26,7 @@
  */
 
 export * from './logger.js';
+export * from './logOptions.js';
 export * from './audit.js';
 export * from './cors.js';
 export * from './helmet.js';
@@ -36,6 +38,7 @@ export * from './errors.js';
 export * from './secrets.js';
 export * from './env.js';
 export * from './rotationManifests.js';
+export * from './credentials.js';
 
 export { applySecurity } from './applySecurity.js';
 export type { ApplySecurityConfig } from './applySecurity.js';

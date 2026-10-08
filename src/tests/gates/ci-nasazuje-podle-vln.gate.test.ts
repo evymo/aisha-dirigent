@@ -49,7 +49,12 @@ beforeAll(() => {
     [
       "#!/usr/bin/env bash",
       'echo "$1 $2" >> "$ZAPIS"',
+      'echo "$*" >> "$ZAPIS.vse"',
       'case ",${SELZE:-}," in *",$1,"*) echo "selhalo $1"; exit 1 ;; esac',
+      'case ",${PREDA:-}," in *",$1,"*) echo "::warning title=předáno pokračování::$1"; exit 4 ;; esac',
+      'case ",${MLCI:-}," in *",$1,"*) echo "nasazeno $1"; exit 0 ;; esac',
+      'case ",${PO_OPAKOVANI:-}," in *",$1,"*) echo "::error title=pád i po opakování::$1 — spadlo i po opakování v pokračovací úloze; další opakování nepomůže, oprav příčinu. Třída: sit-registru (přechodná): ECONNRESET"; exit 1 ;; esac',
+      'case " $* " in *" --navazat-od "*) echo "pokračování-výsledek: navázáno na běžící nas-$1 (in_progress) → ověřeno nasazení nas-$1" ;; esac',
       'case ",${NEDOBEHNE:-}," in *",$1,"*) echo "::error title=nasazení NEDOBĚHLO V ČASE::$1"; exit 4 ;; esac',
       'case ",${CHYBI:-}," in *",$1,"*) echo "::warning title=appka není nasazena::\'$1\' v Coolify není"; exit 0 ;; esac',
       'echo "nasazeno $1"',
@@ -71,7 +76,9 @@ function spust(args: string[], env: Record<string, string> = {}) {
     timeout: 30_000,
   });
   const volani = existsSync(zapis) ? readFileSync(zapis, "utf8").trim().split("\n").filter(Boolean) : [];
-  return { rc: r.status, vystup: `${r.stdout}\n${r.stderr}`, volani, aplikace: volani.map((v) => v.split(" ")[0]) };
+  const vse = existsSync(`${zapis}.vse`) ? readFileSync(`${zapis}.vse`, "utf8").trim().split("\n").filter(Boolean) : [];
+  const vystupy = env.GITHUB_OUTPUT && existsSync(env.GITHUB_OUTPUT) ? readFileSync(env.GITHUB_OUTPUT, "utf8") : "";
+  return { rc: r.status, vystup: `${r.stdout}\n${r.stderr}`, volani, vse, vystupy, aplikace: volani.map((v) => v.split(" ")[0]) };
 }
 
 describe("CI nasazuje po vlnách (nasad-podle-vln.sh)", () => {
@@ -166,5 +173,163 @@ describe("CI nasazuje po vlnách (nasad-podle-vln.sh)", () => {
     const r = spust(["--aplikace", ",,"]);
     expect(r.rc, r.vystup).toBe(0);
     expect(r.volani).toEqual([]);
+  });
+});
+
+/**
+ * MĚKKÝ TERMÍN A POKRAČOVÁNÍ (2026-10-01). Vlna s mnoha appkami trvá 35–49 min
+ * a runner job utne na stropu UPROSTŘED operace (2026-09-30: v 60. min, vlna 8
+ * nedohlídána). Vlnový job proto na měkkém termínu předá rozpracované appky
+ * pokračovacímu jobu (output `predano=true`) — ale skutečná chyba appky zůstává
+ * pádem a bez --predat je termín pád se seznamem (pokračování je jen jedno).
+ */
+describe("měkký termín a pokračování (nasad-podle-vln.sh)", () => {
+  const nizsi = "keycloak";
+  const vyssi = "ai-chat";
+  const vystupSoubor = () => join(repo, `vystup-${process.hrtime.bigint()}.txt`);
+
+  test("pořadí: zvolená nižší appka je opravdu v dřívější vlně než vyšší", () => {
+    expect(vlnaApp.get(nizsi)!).toBeLessThan(vlnaApp.get(vyssi)!);
+  });
+
+  test("bez nových přepínačů je volání deploy-and-verify beze změny", () => {
+    const r = spust(["--aplikace", `${nizsi},${vyssi}`]);
+    expect(r.rc, r.vystup).toBe(0);
+    for (const v of r.vse) expect(v, v).not.toMatch(/--termin|--navazat-od/);
+  });
+
+  test("termín už vypršel + --predat → nic se nespustí, všechno je NESPUŠTĚNO, předáno", () => {
+    const out = vystupSoubor();
+    const r = spust(["--aplikace", `${nizsi},${vyssi}`, "--mekky-termin", "1000000000", "--predat"], { GITHUB_OUTPUT: out });
+    expect(r.rc, r.vystup).toBe(0);
+    expect(r.aplikace).toEqual([]);
+    expect(r.vystupy).toContain("predano=true");
+    expect(r.vystupy).toMatch(new RegExp(`nespustene=.*${nizsi}`));
+    expect(r.vystup).toContain(`${vyssi}: NESPUŠTĚNO`);
+  });
+
+  test("rozpracovaná appka na termínu → PŘEDÁNO, další vlny se nespouští, output pro pokračování", () => {
+    const out = vystupSoubor();
+    const termin = String(Math.floor(Date.now() / 1000) + 3600);
+    const r = spust(["--aplikace", `${nizsi},${vyssi}`, "--mekky-termin", termin, "--predat"], { GITHUB_OUTPUT: out, PREDA: nizsi });
+    expect(r.rc, r.vystup).toBe(0);
+    expect(r.aplikace, "vyšší vlna závisí na rozpracované — nespouští se").not.toContain(vyssi);
+    expect(r.vystup).toContain(`${nizsi}: PŘEDÁNO`);
+    expect(r.vystup).toContain(`${vyssi}: NESPUŠTĚNO`);
+    expect(r.vystupy).toContain("predano=true");
+    expect(r.vystupy).toContain(`rozpracovane=${nizsi}`);
+    expect(r.vystupy).toContain(`nespustene=${vyssi}`);
+    expect(r.vse.find((v) => v.startsWith(nizsi)), "termín se předá deploy-and-verify").toContain(`--termin ${termin}`);
+  });
+
+  test("bez --predat je vypršený termín PÁD se seznamem (pokračování je jen jedno)", () => {
+    const termin = String(Math.floor(Date.now() / 1000) + 3600);
+    const r = spust(["--aplikace", nizsi, "--mekky-termin", termin], { PREDA: nizsi });
+    expect(r.rc, r.vystup).toBe(1);
+    expect(r.vystup).toMatch(/měkký termín vypršel::nedokončeno — rozpracované: keycloak/);
+  });
+
+  test("skutečná chyba appky je pád i tehdy, když se jiná appka vlny předává", () => {
+    // Dvě appky TÉŽE vlny (z reálného pořadí): jedna se předává, druhá skutečně selže.
+    const poVlnach = new Map<number, string[]>();
+    for (const [a, v] of vlnaApp) poVlnach.set(v, [...(poVlnach.get(v) ?? []), a]);
+    const dvojice = [...poVlnach.values()].find((xs) => xs.length >= 2);
+    expect(dvojice, "žádná vlna nemá dvě appky — test potřebuje dvě").toBeTruthy();
+    const [predava, selze] = dvojice!;
+    const out = vystupSoubor();
+    const termin = String(Math.floor(Date.now() / 1000) + 3600);
+    const r = spust(["--aplikace", `${predava},${selze}`, "--mekky-termin", termin, "--predat"], { GITHUB_OUTPUT: out, PREDA: predava, SELZE: selze });
+    expect(r.rc, r.vystup).toBe(1);
+    expect(r.vystup).toMatch(/vlna \d+ selhala/);
+    expect(r.vystupy).not.toContain("predano=true");
+  });
+
+  test("--navazat-od: předá se deploy-and-verify a souhrn říká, co pokračování udělalo", () => {
+    const r = spust(["--aplikace", nizsi, "--navazat-od", "1790000000"]);
+    expect(r.rc, r.vystup).toBe(0);
+    expect(r.vse[0]).toContain("--navazat-od 1790000000");
+    expect(r.vystup).toContain(`${nizsi}: navázáno na běžící nas-${nizsi}`);
+  });
+
+  test("--navazat-od: pokračování skončí nulou, ale neřekne, co udělalo → NEJASNÉ a pád, ne „ověřeno“", () => {
+    const r = spust(["--aplikace", nizsi, "--navazat-od", "1790000000"], { MLCI: nizsi });
+    expect(r.rc, r.vystup).toBe(1);
+    expect(r.vystup).toContain(`${nizsi}: NEJASNÉ`);
+    expect(r.vystup).not.toContain(`${nizsi}: nasazeno a ověřeno`);
+  });
+
+  test("⛔ pokračování spadlo i po opakování → souhrn to řekne výslovně i s třídou (ne „SELHALO“ jako přechodné)", () => {
+    const r = spust(["--aplikace", nizsi, "--navazat-od", "1790000000"], { PO_OPAKOVANI: nizsi });
+    expect(r.rc).toBe(1);
+    expect(r.vystup).toContain(`${nizsi}: PÁD I PO OPAKOVÁNÍ (rc=1) — třída: sit-registru (přechodná): ECONNRESET`);
+  });
+
+  test("bez --navazat-od zůstává souhrn „nasazeno a ověřeno“", () => {
+    const r = spust(["--aplikace", nizsi]);
+    expect(r.rc, r.vystup).toBe(0);
+    expect(r.vystup).toContain(`${nizsi}: nasazeno a ověřeno`);
+  });
+
+  test("--predat bez termínu a nečíselné razítko jsou chyba zadání", () => {
+    expect(spust(["--aplikace", nizsi, "--predat"]).rc).toBe(2);
+    expect(spust(["--aplikace", nizsi, "--mekky-termin", "zitra"]).rc).toBe(2);
+  });
+});
+
+describe("deklarované držení (nasad-podle-vln.sh --drzene)", () => {
+  // ⛔ NAMĚŘENO 2026-10-02 (dávka #1139): web-render držený rozhodnutím majitele
+  // padal preflightem při KAŽDÉM nasazení a další vlny stály. Deklarovaná držená
+  // aplikace se přeskočí VIDITELNĚ a další vlny pokračují; nedeklarovaná chybějící
+  // proměnná zůstává pádem.
+  const nizsi = "keycloak"; // vlna 4
+  const drzena = "ai-chat"; // vlna 7
+  const vyssi = "exec"; // vlna 8
+  const deklarace = JSON.stringify([
+    { aplikace: drzena, duvod: "Coolify převádí holý bind na prázdný svazek", kdo: "majitel", datum: "2026-09-28", odkaz: "rozhodnutí 2026-09-28", vlna: 7, dni: 4 },
+  ]);
+  const cile = `${nizsi},${drzena},${vyssi}`;
+
+  test("pořadí: držená appka leží mezi nižší a vyšší vlnou", () => {
+    expect(vlnaApp.get(nizsi)!).toBeLessThan(vlnaApp.get(drzena)!);
+    expect(vlnaApp.get(drzena)!).toBeLessThan(vlnaApp.get(vyssi)!);
+  });
+
+  test("držená appka se NEnasadí, souhrn i anotace ji vyjmenují s důvodem a stářím, další vlny pokračují", () => {
+    const r = spust(["--aplikace", cile, "--drzene", deklarace]);
+    expect(r.rc, r.vystup).toBe(0);
+    expect(r.aplikace).toEqual([nizsi, vyssi]);
+    expect(r.vystup).toContain(`${drzena}: DRŽENO — Coolify převádí holý bind na prázdný svazek (rozhodnutí majitel 2026-09-28, rozhodnutí 2026-09-28; drženo od 2026-09-28, 4 dní)`);
+    expect(r.vystup).toContain(`::warning title=DRŽENO: ${drzena}::`);
+    expect(r.vystup).toMatch(new RegExp(`Souhrn \\(2 nasazeno, drženo: ${drzena}\\)`));
+  });
+
+  test("prázdná deklarace ([]) = nic drženo, appka se nasadí normálně", () => {
+    const r = spust(["--aplikace", cile, "--drzene", "[]"]);
+    expect(r.rc, r.vystup).toBe(0);
+    expect(r.aplikace).toEqual([nizsi, drzena, vyssi]);
+    expect(r.vystup).not.toContain("DRŽENO");
+  });
+
+  test("⛔ nedeklarovaná chyba zůstává pádem i vedle držené appky", () => {
+    const r = spust(["--aplikace", cile, "--drzene", deklarace], { SELZE: nizsi });
+    expect(r.rc).toBe(1);
+    expect(r.aplikace).toEqual([nizsi]);
+    expect(r.vystup).toMatch(/vlna \d+ selhala/);
+  });
+
+  test("⛔ prázdná nebo nečitelná hodnota --drzene = chyba zadání, nenasadí se nic", () => {
+    for (const spatne of ["", "{", '{"aplikace":"x"}', '[{"aplikace":"x"}]']) {
+      const r = spust(["--aplikace", cile, "--drzene", spatne]);
+      expect(r.rc, `--drzene '${spatne}'`).toBe(2);
+      expect(r.aplikace, `--drzene '${spatne}'`).toEqual([]);
+    }
+  });
+
+  test("držená appka není v seznamu NESPUŠTĚNÝCH po měkkém termínu (pokračování ji nemá dohánět)", () => {
+    const out = join(repo, `vystup-drzene-${process.hrtime.bigint()}.txt`);
+    const r = spust(["--aplikace", cile, "--drzene", deklarace, "--mekky-termin", "1000000000", "--predat"], { GITHUB_OUTPUT: out });
+    expect(r.rc, r.vystup).toBe(0);
+    expect(r.vystupy).toMatch(new RegExp(`nespustene=.*${nizsi}`));
+    expect(r.vystupy).not.toMatch(new RegExp(`nespustene=.*${drzena}`));
   });
 });

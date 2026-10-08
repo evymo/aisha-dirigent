@@ -26,6 +26,7 @@ BEGIN
         FROM expert_rules er
         WHERE er.id = ANY(sr.rule_ids)
           AND er.status = 'published'
+          AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid())
       )
     )
   ) INTO v_result

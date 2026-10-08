@@ -1,6 +1,6 @@
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
 import Fastify from 'fastify';
-import { applySecurity, pluginRejection } from '@aisha/security';
+import { applySecurity, pluginRejection, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import { config } from './config.js';
@@ -13,7 +13,7 @@ import { smsOtpRoutes } from './routes/sms-otp.js';
 // Rollback: OTEL_SDK_DISABLED=true env (Coolify) + container restart.
 bootstrapOtel({ serviceName: 'svc-communications' });
 const app = Fastify({
-  logger: { level: config.logLevel },
+  logger: safeLoggerOptions({ level: config.logLevel }),
   trustProxy: true,
 });
 

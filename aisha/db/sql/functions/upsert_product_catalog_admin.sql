@@ -3,7 +3,7 @@
 -- Security: SECURITY DEFINER
 -- Source: Extracted from local DB (source-of-truth sync)
 
-CREATE OR REPLACE FUNCTION public.upsert_product_catalog_admin(p_id uuid DEFAULT NULL::uuid, p_code text DEFAULT NULL::text, p_category text DEFAULT 'product'::text, p_icon text DEFAULT '💊'::text, p_color text DEFAULT '#6366f1'::text, p_default_dose_amount numeric DEFAULT NULL::numeric, p_default_dose_unit text DEFAULT NULL::text, p_default_doses_per_day integer DEFAULT NULL::integer, p_default_dose_timing text[] DEFAULT NULL::text[], p_sort_order integer DEFAULT 0, p_is_active boolean DEFAULT true, p_translations jsonb DEFAULT NULL::jsonb)
+CREATE OR REPLACE FUNCTION public.upsert_product_catalog_admin(p_id uuid DEFAULT NULL::uuid, p_code text DEFAULT NULL::text, p_category text DEFAULT NULL, p_icon text DEFAULT NULL, p_color text DEFAULT NULL, p_default_dose_amount numeric DEFAULT NULL::numeric, p_default_dose_unit text DEFAULT NULL::text, p_default_doses_per_day integer DEFAULT NULL::integer, p_default_dose_timing text[] DEFAULT NULL::text[], p_sort_order integer DEFAULT NULL, p_is_active boolean DEFAULT NULL, p_translations jsonb DEFAULT NULL::jsonb)
  RETURNS uuid
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -49,9 +49,9 @@ BEGIN
       default_dose_amount, default_dose_unit, default_doses_per_day, default_dose_timing,
       sort_order, is_active
     ) VALUES (
-      p_code, p_category, p_icon, p_color,
+      p_code, COALESCE(p_category, 'product'::text), COALESCE(p_icon, '💊'::text), COALESCE(p_color, '#6366f1'::text),
       p_default_dose_amount, p_default_dose_unit, p_default_doses_per_day, p_default_dose_timing,
-      p_sort_order, p_is_active
+      COALESCE(p_sort_order, 0), COALESCE(p_is_active, true)
     )
     RETURNING id INTO v_id;
 

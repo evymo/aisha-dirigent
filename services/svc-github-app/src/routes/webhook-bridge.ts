@@ -1,5 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { urlHostForLog } from '@aisha/security';
 import { config } from '../config.js';
 import { rpcService } from '../postgrest.js';
 
@@ -316,7 +317,8 @@ export async function webhookBridgeRoutes(app: FastifyInstance): Promise<void> {
 
     // Forward to n8n
     const targetUrl = `${n8nBaseUrl.replace(/\/$/, '')}${webhookPath}`;
-    req.log.info({ event: eventType, delivery, targetUrl }, 'Forwarding to n8n');
+    // N8N_WEBHOOK_URL may carry credentials (userinfo); the path is ours.
+    req.log.info({ event: eventType, delivery, n8nHost: urlHostForLog(n8nBaseUrl), webhookPath }, 'Forwarding to n8n');
 
     try {
       const enrichedPayload = JSON.stringify({

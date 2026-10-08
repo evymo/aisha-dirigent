@@ -35,10 +35,13 @@ import { buildTopology, formatShellExports } from "./lib/derive-domains.mjs";
 import { createCoolifyClient } from "./lib/coolify-http.mjs";
 import { createProjectScope, resolveProjectName } from "./lib/coolify-project-scope.mjs";
 import { ctenarSouboru, vadyDveri, zmerDvereNaAplikaci } from "./lib/dvere-soulad.mjs";
-import { resolveInstanceIdentity } from "./lib/coolify-instance-scope.mjs";
+import { resolveInstanceIdentity, resolveManifestPath } from "./lib/coolify-instance-scope.mjs";
+import { vlastnictviProstredi } from "./lib/vlastnictvi-aplikaci.mjs";
 import { judgeResponse } from "./lib/routing-probe.mjs";
 import { jeProkazatelneZdrava, klasifikovatStavAppky } from "./lib/coolify-app-status.mjs";
 import { porovnej } from "./lib/razeni.mjs";
+import { CONFIG_ENV_FILES } from "./lib/config-env-files.mjs";
+import { drzeniProcesu } from "./lib/coolify-mutace.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
@@ -336,13 +339,18 @@ const IDENTITY_SOURCE = IDENTITY.source;
 // only when SOURCE_API_URL is set (federation opt-in). Parses the app GROUP
 // (role:GROUP:compose) so the status verdict can hold `experimental` apps
 // (ledger/exec) to a softer bar — they may be intentionally stopped.
+//
+// ⛔ 2026-10-04: čtení šlo napřímo na `coolify/manifests/${STORY}.manifest` (overlay
+// instance i MANIFEST_FILE ignorovalo) a vlastním regexem `^app:` — a čekalo i služby,
+// které tohle prostředí NEVLASTNÍ (profil: external_domain, např. sdílený Keycloak),
+// takže by staging s cizím Keycloakem hlásil „chybí aplikace“. Teď týmž resolverem
+// manifestu jako ostatní nástroje a jen VLASTNÍ aplikace (domov vlastnictví).
 function expectedAppsFromManifest() {
-  const manifestPath = resolve(ROOT, `coolify/manifests/${STORY}.manifest`);
-  const entries = readFileSync(manifestPath, "utf8")
-    .split(/\r?\n/)
-    .map((line) => line.match(/^app:\s*([a-z0-9-]+):([a-z0-9-]+):/))
-    .filter(Boolean)
-    .map((m) => ({ role: m[1], group: m[2] }))
+  const manifestPath = resolveManifestPath({ explicit: process.env.MANIFEST_FILE || undefined, explicitHint: "MANIFEST_FILE=<path>" });
+  const vl = vlastnictviProstredi({ manifest: manifestPath });
+  for (const x of vl.externi) console.log(`  ${x.hlaska} — její aplikaci neočekávám`);
+  const entries = vl.vlastni
+    .map((a) => ({ role: a.role, group: a.slot }))
     .filter((e) => e.role !== "source-broker" || Boolean(process.env.SOURCE_API_URL));
   if (entries.length === 0) {
     throw new Error(`No app entries parsed from ${manifestPath} — manifest format changed?`);
@@ -825,8 +833,23 @@ try {
 }
 const dvereFailed = Boolean(dvere.chyba) || dvere.vady.length > 0 || dvere.kolize.length > 0;
 const { all: expectedApps, required: requiredApps } = expectedAppsFromManifest();
+// ── Deklarované držení (2026-10-04) ──────────────────────────────────────────
+// Aplikaci, kterou overlay instance drží (nasazeni-drzene.json), studený start
+// záměrně nezaložil, nenasadil ani nerestartoval. Že v Coolify není, stojí nebo
+// běží na starší revizi, je tedy DEKLAROVANÝ stav, ne nález: verdikt ji vyjmenuje
+// a nehodnotí (jinak by běh instance s držením končil červeně napořád a stálá
+// červená by schovala skutečné vady). Deklaraci čte týž domov jako každá mutace;
+// nečitelná deklarace verdikt SHODÍ — nevíme, co se hodnotit nemá.
+let drzene = new Map();
+let drzeniChyba = "";
+try {
+  const { polozky } = drzeniProcesu("cold-start-verify", { envSoubory: CONFIG_ENV_FILES });
+  drzene = new Map(polozky.map((polozka) => [`${requirePrefix()}-${polozka.aplikace}`, polozka]));
+} catch (error) {
+  drzeniChyba = Array.isArray(error?.chyby) ? `${error.titulek}: ${error.chyby.join("; ")}` : String(error?.message ?? error);
+}
 const missingApps = coolify.apps?.length
-  ? expectedApps.filter((name) => !coolify.apps.some((app) => app.name === name))
+  ? expectedApps.filter((name) => !drzene.has(name) && !coolify.apps.some((app) => app.name === name))
   : [];
 // A present-but-crashed app used to pass green (only existence was checked).
 // Hold the REQUIRED apps (non-experimental) to a running/healthy status; a
@@ -841,7 +864,7 @@ const missingApps = coolify.apps?.length
 // Verdikt teď dává jediný primitiv, který porovnává CELÉ hodnoty.
 const unhealthyApps = coolify.apps?.length
   ? coolify.apps
-      .filter((app) => requiredApps.includes(app.name) && !jeProkazatelneZdrava(app.status))
+      .filter((app) => requiredApps.includes(app.name) && !drzene.has(app.name) && !jeProkazatelneZdrava(app.status))
       .map((app) => `${app.name}(${app.status} — ${klasifikovatStavAppky(app.status).duvod})`)
   : [];
 
@@ -852,7 +875,9 @@ const failed = results.filter((result) => !result.pass);
 // app-status section.
 const coolifyFailed = Boolean(coolify.error);
 const payload = {
-  ok: failed.length === 0 && missingApps.length === 0 && unhealthyApps.length === 0 && !coolifyFailed && !dvereFailed,
+  ok: failed.length === 0 && missingApps.length === 0 && unhealthyApps.length === 0 && !coolifyFailed && !dvereFailed && !drzeniChyba,
+  drzeneAplikace: [...drzene.keys()],
+  drzeniChyba,
   results,
   dvere,
   diagnostics,
@@ -897,6 +922,15 @@ if (JSON_OUTPUT) {
     }
   }
 
+  if (drzeniChyba) {
+    console.log(`\nFAIL deklarace držení aplikací: ${drzeniChyba}`);
+  } else if (drzene.size > 0) {
+    console.log("\nDRŽENÉ aplikace (deklarace v overlayi instance — stav se nehodnotí):");
+    for (const [jmeno, polozka] of drzene) {
+      const stav = coolify.apps?.find((app) => app.name === jmeno)?.status ?? "v Coolify není";
+      console.log(`  DRŽENO: ${polozka.aplikace} — ${polozka.duvod} (${jmeno}: ${stav})`);
+    }
+  }
   if (missingApps.length > 0) {
     console.log(`\nMissing Coolify apps: ${missingApps.join(", ")}`);
   }

@@ -209,7 +209,7 @@ if [ -n "$CHANGED" ]; then
   # Triggers the real clamd + MinIO integration gate (av-integration-gate).
   # docker/minio/ je tu proto, že test staví MinIO týmž Dockerfilem jako produkce:
   # změna obrazu tak na amd64 projde buildem i živým S3 dřív, než ji staví Coolify.
-  grep -qE '^(services/storage-auth/|infra/clamav/|docker/minio/|scripts/test/run-av-integration\.mjs)' <<< "$CHANGED" && AV_CHANGE=true || AV_CHANGE=false
+  grep -qE '^(services/storage-auth/|infra/clamav/|docker/minio/|scripts/test/run-av-integration\.mjs|packages/security/src/av-scan\.ts|infra/docs-scan/|Dockerfile\.docs-scan|src/tests/security/docs-scan-karantena)' <<< "$CHANGED" && AV_CHANGE=true || AV_CHANGE=false
 
   # --- Services (any microservice src/test) + their shared runner ---
   # Gates the per-service vitest lane (npm run test:services). Runner-script

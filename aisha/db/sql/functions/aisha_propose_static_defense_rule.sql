@@ -18,7 +18,7 @@ CREATE OR REPLACE FUNCTION public.aisha_propose_static_defense_rule(
   p_semgrep_pattern      jsonb DEFAULT NULL,
   p_semgrep_paths        jsonb DEFAULT NULL,
   p_semgrep_message      text DEFAULT NULL,
-  p_languages            text[] DEFAULT ARRAY['typescript']::text[],
+  p_languages            text[] DEFAULT NULL,
   p_rationale            text DEFAULT NULL,
   p_proposed_by          text DEFAULT NULL,
   p_decision_provenance  jsonb DEFAULT '[]'::jsonb
@@ -111,7 +111,7 @@ BEGIN
     )
     VALUES (
       p_rule_id, p_category, p_owasp_category,
-      p_semgrep_pattern, p_semgrep_paths, p_semgrep_message, p_languages,
+      p_semgrep_pattern, p_semgrep_paths, p_semgrep_message, COALESCE(p_languages, ARRAY['typescript']::text[]),
       p_severity, 'draft', 1,
       v_proposer, p_rationale
     )

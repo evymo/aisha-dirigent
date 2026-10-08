@@ -27,7 +27,7 @@
  * Auth: Bearer token via OPENCLAW_API_KEY (constant-time compare).
  */
 import Fastify, { type FastifyRequest, type FastifyReply } from 'fastify';
-import { applySecurity, createSsrfGuard, routeRateLimit } from '@aisha/security';
+import { applySecurity, createSsrfGuard, routeRateLimit, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import { pathToFileURL } from 'node:url';
@@ -107,7 +107,7 @@ const NotifySchema = z.object({
 
 export async function buildOpenClawApp() {
   const app = Fastify({
-    logger: { level: config.logLevel },
+    logger: safeLoggerOptions({ level: config.logLevel }),
     trustProxy: true,
     bodyLimit: 5 * 1024 * 1024, // 5 MB — workflow JSON can be sizeable
   });

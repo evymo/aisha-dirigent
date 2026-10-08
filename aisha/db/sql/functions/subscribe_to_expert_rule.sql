@@ -19,7 +19,8 @@ BEGIN
   END IF;
 
   -- Rule must be published
-  PERFORM 1 FROM expert_rules WHERE id = p_rule_id AND status = 'published';
+  PERFORM 1 FROM expert_rules er WHERE er.id = p_rule_id AND er.status = 'published'
+    AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid());
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Rule not found or not published';
   END IF;

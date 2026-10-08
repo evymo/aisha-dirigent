@@ -28,6 +28,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { jeVerejnyVapid, verejnyZeSoukromeho, vyrobVapidPar } from "../../../scripts/lib/vapid-par.mjs";
+import { envDoktorDokoncil } from "./_env-doktor-dokoncil";
 
 const ROOT = process.cwd();
 const DOKTOR = join(ROOT, "scripts/aisha-env-doctor.mjs");
@@ -60,7 +61,7 @@ function behDoktora(start: string | null): Beh {
       timeout: 60_000,
     });
     if (beh.error) throw beh.error;
-    if (beh.status !== 0 || !existsSync(envFile)) {
+    if (!envDoktorDokoncil(beh.status) || !existsSync(envFile)) {
       throw new Error(`env-doktor skončil ${beh.status}: ${(beh.stderr ?? "").trim().split("\n").slice(-3).join(" | ")}`);
     }
     // VŠECHNY výskyty klíče: dvojí řádek je sám vada (kterou hodnotu vezme parser?).

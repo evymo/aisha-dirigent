@@ -51,6 +51,7 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { meshServices, nonMeshStacks } from "./lib/mesh-conformance.mjs";
+import { isDirectRun } from "./lib/cli-entry.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const argv = process.argv.slice(2);
@@ -156,38 +157,56 @@ const stackShort = (compose) =>
 
 // ── kanonické šablony (čtené, ne opisované) ──────────────────────────────────
 
-const canonText = read(CANON);
+// Vzor se čte LÍNĚ (při prvním renderu) a vadný tvar HÁZE. Modul si
+// importuje i brána (mesh-blok-nese-vlastni-stack), a import nesmí zabít
+// proces (brána import-nesmi-zabit-proces) — běh výjimku převede na exit 2.
+//
 // Kanonickým zdrojem TCP rozvaděče je clamav — první stack, který ho dostal
 // (2026-08-22). Bloky se ČTOU, neopisují: kdyby tu ležela kopie, rozešla by se.
 const CANON_TCP = "docker-compose.coolify-clamav.yml";
-const canonTcpText = read(CANON_TCP);
-const TPL = {
-  agent: serviceBlock(canonText, "netbird-agent"),
-  ingress: serviceBlock(canonText, `${CANON_STACK}-mesh-ingress`),
-  pkiInit: serviceBlock(canonText, "pki-init"),
-  tcp: serviceBlock(canonTcpText, "clamav-mesh-tcp"),
-};
-for (const [k, v] of Object.entries(TPL)) {
-  if (!v) {
-    console.error(`FATAL: kanonický blok '${k}' v ${CANON} nenalezen — není z čeho generovat.`);
-    process.exit(2);
+class VadnyVzor extends Error {}
+let tplCache = null;
+function sablony() {
+  if (tplCache) return tplCache;
+  const canonText = read(CANON);
+  const canonTcpText = read(CANON_TCP);
+  const tpl = {
+    agent: serviceBlock(canonText, "netbird-agent"),
+    ingress: serviceBlock(canonText, `${CANON_STACK}-mesh-ingress`),
+    pkiInit: serviceBlock(canonText, "pki-init"),
+    tcp: serviceBlock(canonTcpText, "clamav-mesh-tcp"),
+  };
+  for (const [k, v] of Object.entries(tpl)) {
+    if (!v) throw new VadnyVzor(`kanonický blok '${k}' v ${CANON} nenalezen — není z čeho generovat.`);
   }
-}
-// Sonda musí umět říct „ne": kanonický tvar se pozná vlastnostmi, ne vírou.
-if (!/network_mode:\s*"?service:netbird-agent"?/.test(TPL.ingress) || !/_MESH_INGRESS_ROUTES/.test(TPL.ingress)) {
-  console.error(`FATAL: ${CANON} ingress není routes-driven v netns agenta — kanonický zdroj se změnil, zastavuji.`);
-  process.exit(2);
-}
-if (!/network_mode:\s*"?service:netbird-agent"?/.test(TPL.tcp) || !/_MESH_TCP_ROUTES/.test(TPL.tcp)) {
-  console.error(`FATAL: ${CANON_TCP} TCP rozvaděč není routes-driven v netns agenta — kanonický zdroj se změnil, zastavuji.`);
-  process.exit(2);
+  // Sonda musí umět říct „ne": kanonický tvar se pozná vlastnostmi, ne vírou.
+  if (!/network_mode:\s*"?service:netbird-agent"?/.test(tpl.ingress) || !/_MESH_INGRESS_ROUTES/.test(tpl.ingress)) {
+    throw new VadnyVzor(`${CANON} ingress není routes-driven v netns agenta — kanonický zdroj se změnil, zastavuji.`);
+  }
+  if (!/network_mode:\s*"?service:netbird-agent"?/.test(tpl.tcp) || !/_MESH_TCP_ROUTES/.test(tpl.tcp)) {
+    throw new VadnyVzor(`${CANON_TCP} TCP rozvaděč není routes-driven v netns agenta — kanonický zdroj se změnil, zastavuji.`);
+  }
+  tplCache = tpl;
+  return tpl;
 }
 
 // ── parametrizace ────────────────────────────────────────────────────────────
 
+// ⛔ NAMĚŘENO 2026-10-02 (web-render): kanonický vzor se od 2026-09-15 jmenuje
+// s IDENTITOU (`${APP_NAME_PREFIX:?…}-model--netbird`), kdežto náhrady níž znaly
+// jen dřívější tvar `experimental--model--netbird`. Míjely se, a nový stack tak
+// zdědil jména MODELU — kontejnery `<prefix>-model--netbird`/`--mesh-ingress`
+// a na sdílené síti alias `<prefix>-svc-model`, tedy cíl cizí trasy. Na
+// hostiteli, kde běží oba stacky, by si jména přetahovaly. Proto se nahrazuje
+// OBOJÍ tvar, kotvený na `}-` (konec identity), aby se netrefil jiný výskyt.
+const prejmenujStack = (t, pripona, stack, placement) =>
+  t
+    .replaceAll(`${CANON_PLACEMENT}--${CANON_STACK}--${pripona}`, `${placement}--${stack}--${pripona}`)
+    .replaceAll(`}-${CANON_STACK}--${pripona}`, `}-${stack}--${pripona}`);
+
 function renderAgent({ stack, placement, ports, networks }) {
-  let t = TPL.agent;
-  t = t.replaceAll(`${CANON_PLACEMENT}--${CANON_STACK}--netbird`, `${placement}--${stack}--netbird`);
+  let t = sablony().agent;
+  t = prejmenujStack(t, "netbird", stack, placement);
   t = t.replaceAll(`netbird-${CANON_STACK}-data-v3`, `netbird-${stack}-data-v3`);
   t = t.replace(/NB_SETUP_KEY: \$\{NETBIRD_STACK_KEY_[A-Z]+\}/, `NB_SETUP_KEY: \${NETBIRD_STACK_KEY_${placement.toUpperCase()}}`);
   t = t.replace(/NB_HOSTNAME: .*/, `NB_HOSTNAME: ${placement}-${stack}`);
@@ -195,16 +214,24 @@ function renderAgent({ stack, placement, ports, networks }) {
   // expose: nahradit celý seznam portů
   t = t.replace(/(\n    expose:\n)(?:      - "\d+"\n?)+/, (_, head) =>
     head + ports.map((p) => `      - "${p}"`).join("\n") + "\n");
-  // networks: nahradit seznam
-  t = t.replace(/(\n    networks:\n)(?:      - [A-Za-z0-9_-]+\n?)+/, (_, head) =>
-    head + networks.map((n) => `      - ${n}`).join("\n") + "\n");
+  // networks: nahradit CELOU sekci — seznam i mapu s aliasy. Kanonický agent
+  // nese od 2026-08-21 mapu s aliasem `<prefix>-svc-model`; vzor znal jen
+  // seznam, takže se mapa přenesla doslova i s cizím aliasem. Agent je HOSTITEL
+  // netns ingressu a alias cíle mu nepatří (brána cil-mesh-trasy-ma-alias-s-
+  // identitou: ingress by přeložil cíl sám na sebe), proto jen holý seznam sítí.
+  const predtim = t;
+  t = t.replace(/\n    networks:\n(?:      [^\n]*(?:\n|$))+/, () =>
+    "\n    networks:\n" + networks.map((n) => `      - ${n}`).join("\n") + "\n");
+  if (t === predtim) {
+    throw new VadnyVzor(`v kanonickém agentovi ${CANON} jsem nenašel sekci networks — vzor se změnil, zastavuji.`);
+  }
   return t.replace(/\n+$/, "");
 }
 
 function renderIngress({ stack, placement, idUpper, healthPort }) {
-  let t = TPL.ingress;
+  let t = sablony().ingress;
   t = t.replace(new RegExp(`^  ${CANON_STACK}-mesh-ingress:`, "m"), `  ${stack}-mesh-ingress:`);
-  t = t.replaceAll(`${CANON_PLACEMENT}--${CANON_STACK}--mesh-ingress`, `${placement}--${stack}--mesh-ingress`);
+  t = prejmenujStack(t, "mesh-ingress", stack, placement);
   t = t.replaceAll(`${CANON_STACK.toUpperCase()}_MESH_INGRESS_ROUTES`, `${idUpper}_MESH_INGRESS_ROUTES`);
   t = t.replace(/http:\/\/127\.0\.0\.1:\d+\/__mesh_health/, `http://127.0.0.1:${healthPort}/__mesh_health`);
   // ⛔ A TÝŽ PORT I V DEGRADOVANÉ VĚTVI. Když je tabulka tras prázdná, Caddy
@@ -222,16 +249,17 @@ function renderIngress({ stack, placement, idUpper, healthPort }) {
 }
 
 function renderTcp({ stack, placement, idUpper }) {
-  let t = TPL.tcp;
+  let t = sablony().tcp;
   t = t.replace(/^  clamav-mesh-tcp:/m, `  ${stack}-mesh-tcp:`);
   t = t.replaceAll("backend--clamav--mesh-tcp", `${placement}--${stack}--mesh-tcp`);
+  t = t.replaceAll("}-clamav--mesh-tcp", `}-${stack}--mesh-tcp`);
   t = t.replaceAll("CLAMAV_MESH_TCP_ROUTES", `${idUpper}_MESH_TCP_ROUTES`);
   return t.replace(/\n+$/, "");
 }
 
 function renderPkiInit({ stack, placement, network }) {
-  let t = TPL.pkiInit;
-  t = t.replaceAll(`${CANON_PLACEMENT}--${CANON_STACK}--pki-init`, `${placement}--${stack}--pki-init`);
+  let t = sablony().pkiInit;
+  t = prejmenujStack(t, "pki-init", stack, placement);
   t = t.replace(/(\n    networks:\n)(?:      - [A-Za-z0-9_-]+\n?)+/, (_, head) => head + `      - ${network}\n`);
   return t.replace(/\n+$/, "");
 }
@@ -395,46 +423,60 @@ function zapisPresyn(plan) {
 
 // ── běh ──────────────────────────────────────────────────────────────────────
 
-const universe = meshServices().filter((s) => !ONLY || s.id === ONLY);
-const offenders = new Set(nonMeshStacks());
-// Seskupení podle COMPOSE, ne podle služby: artefakt je soubor a peer je stack.
-const poCompose = new Map();
-for (const s of universe) poCompose.set(s.compose, [...(poCompose.get(s.compose) ?? []), s.id]);
-const plans = [...poCompose.entries()].map(([compose, ids]) => planFor({ compose, ids }));
+// Strážce vstupu (lib/cli-entry.mjs): test importuje `render*` a import nesmí
+// spustit běh nad stromem — s `--write` v argv by ho i zapsal.
+let offenders = new Set();
+if (isDirectRun(import.meta.url)) {
+  try {
+    sablony();
+  } catch (e) {
+    if (!(e instanceof VadnyVzor)) throw e;
+    console.error(`FATAL: ${e.message}`);
+    process.exit(2);
+  }
+  const universe = meshServices().filter((s) => !ONLY || s.id === ONLY);
+  offenders = new Set(nonMeshStacks());
+  // Seskupení podle COMPOSE, ne podle služby: artefakt je soubor a peer je stack.
+  const poCompose = new Map();
+  for (const s of universe) poCompose.set(s.compose, [...(poCompose.get(s.compose) ?? []), s.id]);
+  const plans = [...poCompose.entries()].map(([compose, ids]) => planFor({ compose, ids }));
 
-console.log(`mesh-conformance-apply — ${WRITE ? "ZÁPIS" : "PLÁN"}  (univerzum: ${universe.length}, nekonformních: ${offenders.size})\n`);
-let applied = 0, skipped = 0, gapsTotal = 0;
-for (const p of plans) {
-  if (p.skip) {
-    console.log(`  · ${p.id.padEnd(16)} ${p.skip}`);
-    skipped += 1;
-    continue;
+  console.log(`mesh-conformance-apply — ${WRITE ? "ZÁPIS" : "PLÁN"}  (univerzum: ${universe.length}, nekonformních: ${offenders.size})\n`);
+  let applied = 0, skipped = 0, gapsTotal = 0;
+  for (const p of plans) {
+    if (p.skip) {
+      console.log(`  · ${p.id.padEnd(16)} ${p.skip}`);
+      skipped += 1;
+      continue;
+    }
+    if (p.resync) {
+      // Ukazuje se ROZDÍL, ne jen „změněno": kdo to čte, musí vidět, co se hne.
+      const a = p.resync.stary.split("\n"), b = p.resync.novy.split("\n");
+      const pridano = b.filter((l) => !a.includes(l)).length;
+      const ubylo = a.filter((l) => !b.includes(l)).length;
+      console.log(`  ${WRITE ? "✎" : "→"} ${p.id.padEnd(16)} přesyn ingressu z modelu (+${pridano}/-${ubylo} řádků)`);
+      if (WRITE) { zapisPresyn(p); applied += 1; }
+      continue;
+    }
+    const what = [
+      p.needPkiInit && "pki-init",
+      p.addAgent && `agent(${p.placement}-${p.stack}; expose ${p.exposePorts.join(",")}; sítě ${p.nets.join(",")})`,
+      p.addIngress && `ingress(${p.idUpper}_MESH_INGRESS_ROUTES; health :${p.healthPort})`,
+      p.addTcp && `tcp(${p.idUpper}_MESH_TCP_ROUTES)`,
+      (p.needPkiVol || p.needAgentVol) && `volumes(${[p.needPkiVol && "pki-certs", p.needAgentVol && "netbird-data"].filter(Boolean).join(",")})`,
+    ].filter(Boolean).join(" + ");
+    console.log(`  ${WRITE ? "✎" : "→"} ${p.id.padEnd(16)} ${what}`);
+    if (p.targets.length) console.log(`      cíle: ${p.targets.join(", ")}`);
+    if (p.tcpTargets?.length) console.log(`      cíle TCP: ${p.tcpTargets.join(", ")}`);
+    for (const g of p.gaps) { console.log(`      ⚠ ${g}`); gapsTotal += 1; }
+    if (WRITE) {
+      try { apply(p); applied += 1; }
+      catch (e) { console.error(`      ✗ ${e.message}`); process.exitCode = 1; }
+    }
   }
-  if (p.resync) {
-    // Ukazuje se ROZDÍL, ne jen „změněno": kdo to čte, musí vidět, co se hne.
-    const a = p.resync.stary.split("\n"), b = p.resync.novy.split("\n");
-    const pridano = b.filter((l) => !a.includes(l)).length;
-    const ubylo = a.filter((l) => !b.includes(l)).length;
-    console.log(`  ${WRITE ? "✎" : "→"} ${p.id.padEnd(16)} přesyn ingressu z modelu (+${pridano}/-${ubylo} řádků)`);
-    if (WRITE) { zapisPresyn(p); applied += 1; }
-    continue;
-  }
-  const what = [
-    p.needPkiInit && "pki-init",
-    p.addAgent && `agent(${p.placement}-${p.stack}; expose ${p.exposePorts.join(",")}; sítě ${p.nets.join(",")})`,
-    p.addIngress && `ingress(${p.idUpper}_MESH_INGRESS_ROUTES; health :${p.healthPort})`,
-    p.addTcp && `tcp(${p.idUpper}_MESH_TCP_ROUTES)`,
-    (p.needPkiVol || p.needAgentVol) && `volumes(${[p.needPkiVol && "pki-certs", p.needAgentVol && "netbird-data"].filter(Boolean).join(",")})`,
-  ].filter(Boolean).join(" + ");
-  console.log(`  ${WRITE ? "✎" : "→"} ${p.id.padEnd(16)} ${what}`);
-  if (p.targets.length) console.log(`      cíle: ${p.targets.join(", ")}`);
-  if (p.tcpTargets?.length) console.log(`      cíle TCP: ${p.tcpTargets.join(", ")}`);
-  for (const g of p.gaps) { console.log(`      ⚠ ${g}`); gapsTotal += 1; }
-  if (WRITE) {
-    try { apply(p); applied += 1; }
-    catch (e) { console.error(`      ✗ ${e.message}`); process.exitCode = 1; }
-  }
+  console.log(`\nhotovo: ${WRITE ? `zapsáno ${applied}` : `k zápisu ${plans.filter((p) => !p.skip).length}`}, přeskočeno ${skipped}, mezer ${gapsTotal}`);
+  if (!WRITE) console.log("(bez --write se nic nezapisuje)");
+  else console.log("DALŠÍ KROK: bash scripts/preflight-compose.sh && node scripts/gen-mesh-conformance-baseline.mjs --write && npm run test:gates");
 }
-console.log(`\nhotovo: ${WRITE ? `zapsáno ${applied}` : `k zápisu ${plans.filter((p) => !p.skip).length}`}, přeskočeno ${skipped}, mezer ${gapsTotal}`);
-if (!WRITE) console.log("(bez --write se nic nezapisuje)");
-else console.log("DALŠÍ KROK: bash scripts/preflight-compose.sh && node scripts/gen-mesh-conformance-baseline.mjs --write && npm run test:gates");
+
+export { renderAgent, renderIngress, renderTcp, renderPkiInit, CANON_STACK };

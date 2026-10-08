@@ -2,7 +2,7 @@
  * Admin settings component for unified branding profile management.
  * Supports color palette, typography, assets, operator identity, email and login theme.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Loader2, Save, Upload } from "lucide-react";
 
@@ -14,6 +14,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { z } from "zod";
 import { useBrandingProfile, useUpdateBrandingProfile } from "@/hooks/useBrandingProfile";
+import { ALLOWED_ASSET_TYPES, MAX_ASSET_BYTES, usePageAssetUpload } from "@/hooks/usePageAssetUpload";
+import { hslNaHex, svgNaPng } from "@/lib/media/slozeniIkony";
+import { safeError } from "@/lib/security/safeLogger";
+import { SlozeniIkonyDialog, VSTUPNI_TYPY_IKONY } from "./SlozeniIkonyDialog";
 import {
   DEFAULT_BRANDING_PROFILE,
   fontFaceSchema,
@@ -69,6 +73,14 @@ export function BrandingProfileSettings() {
   // font_faces is a structured jsonb array edited as JSON text; kept in parent
   // state (not the editor) so the controlled textarea never fights re-sync.
   const [fontFacesText, setFontFacesText] = useState("");
+  // Nahrávání log a ikony (2026-10-01): tlačítko u polí bylo natvrdo vypnuté,
+  // šlo jen vložit adresu. Nahrává se TOU cestou, kterou mají obrázky stránek
+  // (usePageAssetUpload) — žádné druhé úložiště. SVG se převede na PNG v
+  // prohlížeči (úložiště SVG záměrně nebere), favicon se skládá v dialogu.
+  const { uploadAsset } = usePageAssetUpload();
+  const [ikonaOtevrena, setIkonaOtevrena] = useState(false);
+  const [nahravaSe, setNahravaSe] = useState<string | null>(null);
+  const vyberSouboru = useRef<Record<string, HTMLInputElement | null>>({});
   const [fontFacesError, setFontFacesError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -117,6 +129,24 @@ export function BrandingProfileSettings() {
 
   const handleFieldChange = (field: keyof BrandingProfileFormData, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const nahrajLogo = async (field: keyof BrandingProfileFormData, soubor: File) => {
+    setNahravaSe(field);
+    try {
+      const png = await svgNaPng(soubor);
+      if (!ALLOWED_ASSET_TYPES.has(png.type) || png.size > MAX_ASSET_BYTES) {
+        toast.error(t("admin.settings.brandingProfile.icon.unsupported"));
+        return;
+      }
+      handleFieldChange(field, await uploadAsset(png));
+      toast.success(t("admin.settings.brandingProfile.icon.uploaded"));
+    } catch (chyba) {
+      safeError("BrandingProfileSettings.nahrajLogo", chyba);
+      toast.error(t("admin.settings.brandingProfile.icon.uploadError"));
+    } finally {
+      setNahravaSe(null);
+    }
   };
 
   /**
@@ -261,26 +291,63 @@ export function BrandingProfileSettings() {
           <TabsContent value="assets" className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               {([
-                ["logo_path", "admin.settings.brandingProfile.logoLight"],
-                ["logo_dark_path", "admin.settings.brandingProfile.logoDark"],
-                ["favicon_path", "admin.settings.brandingProfile.favicon"],
-                ["login_logo_path", "admin.settings.brandingProfile.loginLogo"],
+                ["logo_path", "admin.settings.brandingProfile.logoPath"],
+                ["logo_dark_path", "admin.settings.brandingProfile.logoDarkPath"],
+                ["favicon_path", "admin.settings.brandingProfile.faviconPath"],
+                ["login_logo_path", "admin.settings.brandingProfile.loginLogoPath"],
               ] as const).map(([field, labelKey]) => (
                 <div key={field} className="space-y-2">
                   <Label>{t(labelKey)}</Label>
                   <div className="flex gap-2">
+                    {form[field] ? (
+                      <img src={form[field]} alt="" className="h-9 w-9 rounded border object-contain bg-muted" />
+                    ) : null}
                     <Input
                       value={form[field] ?? ""}
                       onChange={(e) => handleFieldChange(field, e.target.value)}
                     />
-                    <Button variant="outline" size="icon" disabled>
-                      <Upload className="h-4 w-4" />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      disabled={nahravaSe !== null}
+                      title={t(field === "favicon_path" ? "admin.settings.brandingProfile.icon.compose" : "admin.settings.brandingProfile.icon.upload")}
+                      aria-label={t(field === "favicon_path" ? "admin.settings.brandingProfile.icon.compose" : "admin.settings.brandingProfile.icon.upload")}
+                      onClick={() =>
+                        field === "favicon_path" ? setIkonaOtevrena(true) : vyberSouboru.current[field]?.click()
+                      }
+                    >
+                      {nahravaSe === field ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
                     </Button>
+                    <input
+                      ref={(el) => {
+                        vyberSouboru.current[field] = el;
+                      }}
+                      type="file"
+                      accept={VSTUPNI_TYPY_IKONY}
+                      className="hidden"
+                      onChange={(e) => {
+                        const soubor = e.target.files?.[0];
+                        e.target.value = "";
+                        if (soubor) void nahrajLogo(field, soubor);
+                      }}
+                    />
                   </div>
                 </div>
               ))}
             </div>
           </TabsContent>
+
+          <SlozeniIkonyDialog
+            open={ikonaOtevrena}
+            onOpenChange={setIkonaOtevrena}
+            vychoziBarva={hslNaHex(form.color_primary) ?? "#1d4ed8"}
+            nahraj={(png) => uploadAsset(png)}
+            onHotovo={(adresa) => {
+              handleFieldChange("favicon_path", adresa);
+              toast.success(t("admin.settings.brandingProfile.icon.uploaded"));
+            }}
+          />
 
           {/* Operator Tab */}
           <TabsContent value="operator" className="space-y-4">

@@ -1014,6 +1014,52 @@ if [ "$DRY_RUN" = "1" ]; then
   warn "DRY RUN mód — nic nebude skutečně změněno"
 fi
 
+# ── DEKLAROVANÉ DRŽENÍ: držený stack se NENASTAVUJE ──────────────────────────
+# ⛔ ZMĚŘENO ČTENÍM 2026-10-04: tenhle krok nastavoval env, domény a build server
+# každému stacku instance — i tomu, který overlay deklaruje jako držený
+# (nasazeni-drzene.json). Nenasazuje, ale přepisuje konfiguraci, se kterou
+# aplikace naběhne při příštím nasazení nebo restartu. Držený stack se proto
+# vyřadí ze VŠECH smyček níž (env, buildtime, build server) — i když ho obsluha
+# jmenuje přes --stack. Pravidla a validace: lib/nasazeni-drzene.mjs (čtenář
+# lib/drzeni.sh). Nečitelná nebo neplatná deklarace = STOP před prvním zápisem.
+# Stojí AŽ TADY: identita instance (prefix) je známá teprve po načtení env souborů.
+# shellcheck source=lib/drzeni.sh
+. "$SCRIPT_DIR/lib/drzeni.sh"
+# Adresu webhooku nasazení vydává jediný domov mutace (viz WEBHOOK SETUP níž).
+# shellcheck source=lib/coolify-mutace.sh
+. "$SCRIPT_DIR/lib/coolify-mutace.sh"
+if ! drzeni_nacti "coolify-deploy-init" "$DEPLOY_ENV_SOUBOR"; then
+  err "Deklaraci držení aplikací nejde přečíst nebo je neplatná (důvod výš) — nevím, který stack smím nastavit. Nic jsem nezapsal."
+  exit 1
+fi
+bez_drzenych() {
+  local _bd_s _bd_role _bd_prefix _bd_out=""
+  _bd_prefix="$(require_instance_prefix)" || exit 2
+  for _bd_s in $1; do
+    _bd_role="$(stack_app_name "$_bd_s")"
+    _bd_role="${_bd_role#"${_bd_prefix}"-}"
+    if drzena "$_bd_role"; then
+      # Jednou za stack (funkce běží dvakrát: všechny a vybrané stacky).
+      case " ${DI_DRZENE} " in *" $_bd_s "*) ;; *) DI_DRZENE="${DI_DRZENE:+$DI_DRZENE }$_bd_s"; warn "$(drzeni_hlaska "$_bd_role"). Stack '${_bd_s}' se NENASTAVUJE (env, domény, build server)." ;; esac
+      continue
+    fi
+    # EXTERNÍ služba (profil prostředí: external_domain; vlastnictví načetl
+    # load_app_compose_map výš): v tomhle prostředí není naše — literál ALL_STACKS
+    # ji jmenovat smí (keycloak), nastavovat se nesmí.
+    if externi "$_bd_role"; then
+      case " ${DI_EXTERNI} " in *" $_bd_s "*) ;; *) DI_EXTERNI="${DI_EXTERNI:+$DI_EXTERNI }$_bd_s"; warn "$(vlastnictvi_hlaska "$_bd_role"). Stack '${_bd_s}' se NENASTAVUJE (env, domény, build server)." ;; esac
+      continue
+    fi
+    _bd_out="${_bd_out}${_bd_s} "
+  done
+  BEZ_DRZENYCH="${_bd_out% }"
+}
+DI_DRZENE=""
+DI_EXTERNI=""
+bez_drzenych "$ALL_STACKS";      ALL_STACKS="$BEZ_DRZENYCH"
+bez_drzenych "$SELECTED_STACKS"; SELECTED_STACKS="$BEZ_DRZENYCH"
+unset BEZ_DRZENYCH
+
 info "Stacky k deploymentu: ${SELECTED_STACKS}"
 
 # ── API tokeny ────────────────────────────────────────────────────────────────
@@ -1319,52 +1365,44 @@ EOF_DELETE_ENV
 #     expose: 80   → "web=https://web.${PUBLIC_TLD}"     (přímé)
 #     expose: 8080 → "keycloak=https://auth.${PUBLIC_TLD}" + KC_HTTP_PORT=80
 
-# Hodnota domény služby BEZ hostů, které na svém uzlu vlastní edge
-# (EDGE_OWNED_HOSTS z derivace — edgeOwnedHosts v scripts/lib/derive-domains.mjs).
-#   bez_jmen_edge <služba> <doména[,doména…]>  → stdout: výsledná hodnota
-#
-# ⛔ NAMĚŘENO 2026-09-27 (jednouzlová instance s meshem — server_bindings všech
-# slotů na jeden stroj): edge-proxy i backendy registrovaly totéž
-# veřejné jméno (api × core gateway, auth × keycloak, mcp/dirigent × n8n-auth).
-# Na instanci s jedním uzlem jsou to dva routery na JEDNOM Traefiku → Coolify
-# zápis odmítne („Domain conflicts detected") a doktor hlásí FQDN_CONFLICT.
-# Jméno vlastní edge; backend ho vynechá. Nezbude-li mu žádné, výslovně svůj
-# router UVOLNÍ sentinelem: prázdnou doménu Coolify s HTTP 200 tiše zahodí
-# a router nechá (docs/deploy/MESH_BOOTSTRAP_2026_05_03.md); sentinel nese
-# jméno služby a prefix instance, aby nekolidoval s jiným projektem, a schéma
-# http://, aby k němu Coolify nepřilepil certresolver (ACME pro .invalid nevydá).
-#
-# Musí souhlasit s bezJmenEdge v scripts/lib/edge-vlastni-jmena.mjs (doktor);
-# brána edge-vlastni-jmena-na-svem-uzlu obě roviny SPOUŠTÍ nad týmiž vstupy.
-bez_jmen_edge() {
+
+# Hodnota domény, kterou služba SKUTEČNĚ registruje v Coolify — zrcadlo
+# domenaProCoolify v scripts/lib/edge-vlastni-jmena.mjs (doktor); brána
+# edge-vlastni-jmena-na-svem-uzlu obě roviny spouští nad týmiž vstupy.
+#   domena_pro_coolify <služba> <doména[,doména…]>  → stdout: výsledná hodnota
+# Vyřadí mesh jména (`*.internal`) i jména ve vlastnictví edge (EDGE_OWNED_HOSTS).
+# ⛔ (2026-10-02) Když nezbude NIC, dřív se položka jen přeskočila — a v Coolify
+# zůstal starý router (n8n-auth: veřejné mcp/dirigent mimo edge). Teď jde
+# uvolňovací sentinel; bez APP_NAME_PREFIX prázdný výstup (volající vynechá
+# a ohlásí), protože sentinel bez identity instance by kolidoval s jiným projektem.
+domena_pro_coolify() {
   local sluzba="$1" domena="$2" zbyva="" h host vyrazeno=0
-  local vlastni
-  vlastni=",$(printf '%s' "${EDGE_OWNED_HOSTS:-}" | tr 'A-Z' 'a-z' | tr -d ' '),"
-  if [ "$sluzba" = "edge-proxy" ] || [ "$vlastni" = ",," ]; then
-    printf '%s' "$domena"
-    return 0
+  local vlastni=",,"
+  if [ "$sluzba" != "edge-proxy" ]; then
+    vlastni=",$(printf '%s' "${EDGE_OWNED_HOSTS:-}" | tr 'A-Z' 'a-z' | tr -d ' '),"
   fi
   while IFS= read -r h; do
     h="$(printf '%s' "$h" | tr -d ' ')"
     [ -z "$h" ] && continue
     host="${h#*://}"; host="${host%%/*}"; host="${host%%:*}"
     host="$(printf '%s' "$host" | tr 'A-Z' 'a-z')"
+    case "$host" in
+      *.internal) vyrazeno=$((vyrazeno + 1)); continue ;;
+    esac
     case "$vlastni" in
       *",${host},"*) vyrazeno=$((vyrazeno + 1)); continue ;;
     esac
     zbyva="${zbyva:+${zbyva},}${h}"
-  done <<EOF_BEZ_JMEN_EDGE
+  done <<EOF_DOMENA_PRO_COOLIFY
 $(printf '%s' "$domena" | tr ',' '\n')
-EOF_BEZ_JMEN_EDGE
+EOF_DOMENA_PRO_COOLIFY
   if [ "$vyrazeno" -eq 0 ]; then
     printf '%s' "$domena"
   elif [ -n "$zbyva" ]; then
     printf '%s' "$zbyva"
   elif [ -z "${APP_NAME_PREFIX:-}" ]; then
-    # Bez identity instance by sentinel kolidoval s jiným projektem. Nechat
-    # původní hodnotu (dnešní chování) a říct to nahlas — tichá změna je horší.
-    echo "  ⚠ ${sluzba}: všechna jména vlastní edge, ale APP_NAME_PREFIX chybí — router NEuvolňuji" >&2
-    printf '%s' "$domena"
+    echo "  ⚠ ${sluzba}: nemá co registrovat, ale APP_NAME_PREFIX chybí — router NEuvolňuji" >&2
+    printf ''
   else
     printf 'http://%s-%s.edge-vlastni.invalid:80' "$sluzba" "$APP_NAME_PREFIX"
   fi
@@ -1407,19 +1445,17 @@ set_coolify_domains() {
     # Mesh je VNITŘNÍ rovina: jede přes wireguard a vlastní mesh-ingress
     # s certifikátem od AISHA PKI, ne přes veřejný Traefik s ACME. Ven se
     # vystrkuje jedině edge.
-    case "$svc_domain" in
-      *.internal|*.internal:*|*.internal/*)
-        info "  ${key}: mesh jméno ${svc_domain} se NEregistruje jako Coolify doména (mesh obsluhuje vlastní mesh-ingress, ne veřejný Traefik)"
-        continue
-        ;;
-    esac
-
-    # Veřejné jméno na uzlu edge vlastní edge (viz bez_jmen_edge výš).
-    local svc_domain_edge
-    svc_domain_edge="$(bez_jmen_edge "$svc_name" "$svc_domain")"
-    if [ "$svc_domain_edge" != "$svc_domain" ]; then
-      info "  ${key}: jména ve vlastnictví edge vynechána → ${svc_domain_edge}"
-      svc_domain="$svc_domain_edge"
+    # Mesh jména a jména ve vlastnictví edge vyřadí domena_pro_coolify (výš);
+    # když nezbude nic, pošle uvolňovací sentinel — jinak by starý router zůstal.
+    local svc_domain_coolify
+    svc_domain_coolify="$(domena_pro_coolify "$svc_name" "$svc_domain")"
+    if [ -z "$svc_domain_coolify" ]; then
+      info "  ${key}: nic k registraci a bez identity instance nejde uvolnit — vynecháno"
+      continue
+    fi
+    if [ "$svc_domain_coolify" != "$svc_domain" ]; then
+      info "  ${key}: mesh jména / jména ve vlastnictví edge vynechána → ${svc_domain_coolify}"
+      svc_domain="$svc_domain_coolify"
     fi
 
     if [ "$first" = true ]; then
@@ -1555,9 +1591,10 @@ set_coolify_domains() {
       for entry in "$@"; do
         local svc_name="${entry%%=*}"
         local svc_domain="${entry#*=}"
-        # Porovnává se s tím, co se ODESLALO: jména ve vlastnictví edge backend
-        # vynechal, takže původní hodnota by tu byla falešný „stale value".
-        svc_domain="$(bez_jmen_edge "$svc_name" "$svc_domain")"
+        # Porovnává se s tím, co se ODESLALO (domena_pro_coolify), jinak by
+        # vynechaná mesh jména a jména edge vypadala jako falešný „stale value".
+        svc_domain="$(domena_pro_coolify "$svc_name" "$svc_domain")"
+        [ -z "$svc_domain" ] && continue
         local snake_key="${svc_name//-/_}"
         local stored_dom=""
         stored_dom=$(echo "$stored" | jq -r --arg k1 "$svc_name" --arg k2 "$snake_key" \
@@ -2114,9 +2151,15 @@ for stack in $SELECTED_STACKS; do
       set_coolify_env_if "$local_uuid" "COMPANION_UPSTREAM_MESH"   "${COMPANION_UPSTREAM_MESH:-}"
 
       # ── Domains (Coolify proxy routing) ────────────────────────────
-      # `web` registers public web.${PUBLIC_TLD} → web container.
-      # WEB_FQDNS is an optional multi-brand comma-separated domain list —
-      # set_coolify_domains already handles comma-separated values.
+      # `web` registers the instance's public web hostnames → web container.
+      # ⛔ NAMĚŘENO 2026-10-04 (ostrý cold-start forku s víc značkami): tady se
+      # domény webu skládaly vlastním výkladem (`${WEB_FQDNS:-https://${APP_DOMAIN}}`
+      # + aliasy a apex jen bez WEB_FQDNS), kdežto coolify-domain-doctor.mjs jiným
+      # (APP_DOMAIN + aliasy + apex, WEB_FQDNS vůbec neznal). Doktor běží v kroku 4
+      # PO tomhle zápisu, takže jeho užší výklad vyhrál a `web` přišel o routy
+      # značek (Traefik 404, bez certifikátu). Teď je výklad JEDEN:
+      # scripts/lib/domeny-webu.mjs (pravidlo, pořadí, „nevím" i neplatné vstupy
+      # popisuje tam). Nesložené domény = konec, ne prázdný/užší seznam.
       #
       # `edge-proxy` is the Caddy listener (port 80) that reverse-proxies the
       # public *.${PUBLIC_TLD} hostnames to their *.backend.${INTERNAL_TLD}
@@ -2133,24 +2176,10 @@ for stack in $SELECTED_STACKS; do
       # Even a reserved `.invalid` value is indexed by Coolify as a globally
       # unique domain and poisons the whole multi-tenant PATCH.
       step "  Domains — edge (web + edge-proxy public hostnames)"
-      WEB_DOMAINS="${WEB_FQDNS:-https://${APP_DOMAIN}}"
-      if [ -z "${WEB_FQDNS:-}" ] && [ -n "${AISHA_WEB_PUBLIC_ALIASES:-}" ] && [ -n "${PUBLIC_TLD:-}" ]; then
-        IFS=',' read -r -a _web_aliases <<< "${AISHA_WEB_PUBLIC_ALIASES}"
-        for _alias in "${_web_aliases[@]}"; do
-          _alias="$(echo "${_alias}" | tr '[:upper:]' '[:lower:]' | xargs)"
-          if [[ "${_alias}" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
-            WEB_DOMAINS="${WEB_DOMAINS},https://${_alias}.${PUBLIC_TLD}"
-          fi
-        done
+      if ! WEB_DOMAINS="$(node "$_di_dir/lib/domeny-webu.mjs" --csv)"; then
+        err "  Domény webu nejdou složit z deklarace instance (důvody výše) — doménový kontrakt edge se NEZAPÍŠE"
+        exit 1
       fi
-      if [ -z "${WEB_FQDNS:-}" ] && [ "${AISHA_WEB_APEX_MODE:-redirect}" = "serve" ] && [ -n "${PUBLIC_TLD:-}" ] && [ "${PUBLIC_TLD}" != "${APP_DOMAIN:-}" ]; then
-        WEB_DOMAINS="${WEB_DOMAINS},https://${PUBLIC_TLD}"
-      fi
-      # A topology may already include the canonical host in WEB_FQDNS while
-      # also listing it as a brand alias. Coolify accepts CSV domains, but
-      # duplicated hosts create duplicate generated routers. Normalize once
-      # at the system boundary for every deployment profile.
-      WEB_DOMAINS="$(printf '%s' "$WEB_DOMAINS" | awk -F, '{ for (i=1; i<=NF; i++) if ($i != "" && !seen[$i]++) out=(out ? out "," : "") $i } END { print out }')"
 
       # Apex (bare ${PUBLIC_TLD}) joins the edge-proxy host list ONLY in
       # redirect mode when the operator's apex differs from the canonical web
@@ -2185,7 +2214,15 @@ for stack in $SELECTED_STACKS; do
       # dveřník PŘÍMO PŘED Keycloakem (forward_auth na svc-knock + lokální
       # proxy), který mesh nepotřebuje a funguje v každé fázi.
       EDGE_PROXY_DOMAINS="https://${API_DOMAIN_PUBLIC},https://${MCP_DOMAIN},https://${DIRIGENT_DOMAIN}"
-      if [ "${AISHA_WEB_APEX_MODE:-redirect}" != "serve" ] && [ -n "${PUBLIC_TLD:-}" ] && [ "${PUBLIC_TLD}" != "${APP_DOMAIN:-}" ]; then
+      # Režim apexu vykládá TENTÝŽ normalizátor jako složení webu výš a doktor domén
+      # (lib/domeny-webu.mjs → derive-domains normalizeApexMode). Vlastní porovnání
+      # s doslovným "serve" by surové `web`/`spa` četlo jako redirect, kdežto web
+      # jako serve — apex by dostal web i edge-proxy.
+      if ! WEB_APEX_REZIM="$(node "$_di_dir/lib/domeny-webu.mjs" --rezim-apexu)"; then
+        err "  Režim apexu nejde určit (důvod výše) — doménový kontrakt edge se NEZAPÍŠE"
+        exit 1
+      fi
+      if [ "${WEB_APEX_REZIM}" != "serve" ] && [ -n "${PUBLIC_TLD:-}" ] && [ "${PUBLIC_TLD}" != "${APP_DOMAIN:-}" ]; then
         EDGE_PROXY_DOMAINS="${EDGE_PROXY_DOMAINS},https://${PUBLIC_TLD}"
       fi
       # Optional edge-fronted public faces (live/gateway/companion). The
@@ -2546,12 +2583,9 @@ for stack in $SELECTED_STACKS; do
       set_coolify_env "$local_uuid" "PLUGIN_BROKER_URL"               "${PLUGIN_BROKER_URL}"
       set_coolify_env "$local_uuid" "BROKER_TOKEN_SECRET"             "${BROKER_TOKEN_SECRET}"
       set_coolify_env "$local_uuid" "KATA_DEFAULT_RUNTIME"            "${KATA_DEFAULT_RUNTIME}"
-      set_coolify_env "$local_uuid" "NETBIRD_API_URL"                 "${NETBIRD_API_URL}"
-      set_coolify_env "$local_uuid" "NETBIRD_AUTH_SCHEME"             "${NETBIRD_AUTH_SCHEME}"
-      set_coolify_env_if "$local_uuid" "NETBIRD_API_TOKEN"            "${NETBIRD_API_TOKEN:-}"
-      set_coolify_env "$local_uuid" "NETBIRD_MGMT_SECRET"             "${NETBIRD_MGMT_SECRET}"
-      set_coolify_env "$local_uuid" "NETBIRD_SANDBOX_GROUP"           "${NETBIRD_SANDBOX_GROUP}"
-      set_coolify_env "$local_uuid" "AISHA_DB_URL"                    "${AISHA_DB_URL}"
+      # Pověření ke správě mesh sítě (NETBIRD_MGMT_SECRET, API token) runner NEDOSTÁVÁ:
+      # klíč běhu se nerazí (2026-10-06, majitel „síť zavřít“ = volba A).
+      # AISHA_DB_URL runner nedostává: do DB jde přes PostgREST (compose exec ho nečte).
       set_coolify_env "$local_uuid" "POSTGREST_URL"                   "${POSTGREST_URL}"
       set_coolify_env "$local_uuid" "POSTGREST_SERVICE_TOKEN"         "${POSTGREST_SERVICE_TOKEN}"
 
@@ -2957,8 +2991,29 @@ fi
 # WEBHOOK SETUP (pouze pro Web stack — CI/CD z Forgejo)
 # ══════════════════════════════════════════════════════════════════════════════
 
+# ⛔ ADRESA WEBHOOKU JE MUTACE ODLOŽENÁ NA CIZÍ RUKU (2026-10-04): kdo ji zavolá,
+# aplikaci nasadí — bez ohledu na to, kdo ji složil. Vydává ji proto jediný domov
+# mutace (lib/coolify-mutace.mjs, akce `webhook`), který se před tím zeptá na
+# držení: DRŽENÉ aplikaci se webhook NEZAKLÁDÁ ani nevrací (ani ten, který nabízí
+# Coolify sám), a secret v repu se pro ni nenastavuje.
 WEBHOOK_URL=""
+WEBHOOK_SESTAVENY=""
+WEBHOOK_DRZENO=0
 if [ -n "$UUID_WEB" ]; then
+  _wh_rc=0
+  WEBHOOK_SESTAVENY=$(export COOLIFY_URL
+    coolify_mutace webhook "$(stack_app_name web)" "$UUID_WEB" --kdo coolify-deploy-init \
+      --prefix "$(require_instance_prefix)" --env-soubor "$DEPLOY_ENV_SOUBOR") || _wh_rc=$?
+  if [ "$_wh_rc" -eq "$COOLIFY_MUTACE_DRZENO" ]; then
+    WEBHOOK_DRZENO=1
+    warn "${WEBHOOK_SESTAVENY}. Webhook nasazení se NEZAKLÁDÁ ani nevrací."
+  elif [ "$_wh_rc" -ne 0 ]; then
+    err "Adresu webhooku nasazení nejde vydat (coolify-mutace kód ${_wh_rc}, důvod výš) — končím dřív, než ji kdokoli dostane."
+    exit 1
+  fi
+  unset _wh_rc
+fi
+if [ -n "$UUID_WEB" ] && [ "$WEBHOOK_DRZENO" = "0" ]; then
   step "Webhook — Web CI/CD pipeline"
 
   APP_DETAILS=$(coolify_api GET "/applications/${UUID_WEB}" 2>/dev/null || echo '{}')
@@ -2966,7 +3021,7 @@ if [ -n "$UUID_WEB" ]; then
   WEBHOOK_URL=$(echo "$APP_DETAILS" | jq -r '.webhook_url // .settings.webhook_url // empty' 2>/dev/null || true)
 
   if [ -z "$WEBHOOK_URL" ]; then
-    WEBHOOK_URL="${COOLIFY_URL}/api/v1/deploy?uuid=${UUID_WEB}&force=false"
+    WEBHOOK_URL="$WEBHOOK_SESTAVENY"
     info "Webhook URL sestaven z UUID: ${WEBHOOK_URL}"
   else
     ok "Webhook URL z API: ${WEBHOOK_URL}"
@@ -3079,6 +3134,11 @@ for stack in $ALL_STACKS; do
   printf "│    %-10s → %-52s │\n" "${stack}" "$(stack_compose "$stack")"
 done
 echo "└─────────────────────────────────────────────────────────────────────┘"
+
+if [ -n "$DI_DRZENE" ]; then
+  echo ""
+  warn "DRŽENO — stacky, které tenhle běh NENASTAVIL (deklarace v overlayi instance): ${DI_DRZENE}"
+fi
 
 echo ""
 echo "Další kroky:"

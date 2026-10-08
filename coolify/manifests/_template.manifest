@@ -12,6 +12,16 @@
 #   backend   — Database, game server, headless backend (12 GB RAM, no Traefik)
 #   experimental  — AI inference, ML models, staging (8 GB RAM, isolated)
 #   build  — Build only (no runtime containers)
+#
+# Deklarace nasazení — odkud Coolify staví (jediný výklad: scripts/lib/nasazovany-repozitar.mjs):
+#   repo:    povinné, cesta org/repo na Forgeji instance
+#   branch:  volitelné; chybí-li řádek, platí main. Prázdná hodnota je chyba, ne main.
+#   upstream_repo:, upstream_pr:  volitelné; čte je měření odchylky deploy větve
+#            (kam se odchylka má slít a které PR ji ruší).
+#   Každý klíč nejvýš jednou. Hodnota bez mezer (odkaz na PR mezery nést smí); smí být
+#   v PÁROVÝCH uvozovkách — nepárová uvozovka je chyba. Znak # mimo uvozovky je komentář.
+#   Větev i repozitář se deklarují TADY: GIT_BRANCH v prostředí, --branch ani --repo
+#   je nepřebijí — liší-li se, coolify-story-init.sh skončí chybou.
 # ==============================================================================
 
 story: CHANGE_ME

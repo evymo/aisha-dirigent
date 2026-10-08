@@ -6,13 +6,13 @@ import { Redis } from 'ioredis';
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 import type { RawData, WebSocket } from 'ws';
 import pino from 'pino';
-import { buildHelmetOptions, buildGlobalRateLimitOptions } from '@aisha/security';
+import { buildHelmetOptions, buildGlobalRateLimitOptions, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import { config } from './config.js';
 import { authorizeTopic, MAX_TOPICS } from './topic-auth.js';
 
-const log = pino({ level: config.logLevel });
+const log = pino(safeLoggerOptions({ level: config.logLevel }));
 
 // ── JWKS (built from config.jwksUri) ──
 const jwks = createRemoteJWKSet(new URL(config.jwksUri));

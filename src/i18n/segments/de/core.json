@@ -883,6 +883,7 @@
     "searchPlaceholder": "Artikel suchen…",
     "filter": {
       "tags": "Stichwörter",
+      "allTags": "Alle",
       "sort": "Sortieren",
       "label": "Filter"
     },
@@ -963,5 +964,12 @@
     "posted": "Veröffentlicht",
     "signIn": "Melden Sie sich an, um an der Diskussion teilzunehmen",
     "unconfigured": "Eine Diskussion ist hier noch nicht verfügbar."
+  },
+  "appBanner": {
+    "title": "Holen Sie sich unsere App",
+    "text": "Immer dabei — laden Sie die mobile App herunter.",
+    "appStore": "Laden im App Store",
+    "googlePlay": "Jetzt bei Google Play",
+    "close": "Schließen"
   }
 }

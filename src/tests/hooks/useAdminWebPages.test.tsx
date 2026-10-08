@@ -26,9 +26,11 @@ import {
   useAdminWebPage,
   useUpsertWebPage,
   useUpdateWebPageCanvas,
+  useDiscardWebPageDraft,
   useDeleteWebPage,
 } from "@/hooks/useAdminWebPages";
 import type { WebPageAdminDetail } from "@/lib/schemas/webPageSchemas";
+import { jeKonfliktUlozeni } from "@/lib/novinky/konflikt";
 
 const { mockRpc, mockUser } = vi.hoisted(() => ({
   mockRpc: vi.fn(),
@@ -313,8 +315,11 @@ describe("useUpdateWebPageCanvas", () => {
     });
   });
 
-  it("invalidates all 3 cache keys on success (detail, list, public)", async () => {
-    mockRpc.mockResolvedValue({ data: null, error: null });
+  // 2026-10-02: autosave NESMÍ znovu načíst editor — změnilo by se razítko a editor
+  // by se při každém uložení připojil znovu. Zveřejnění obnoví seznam a veřejný web;
+  // editor si po zveřejnění načte sám (AdminPageEditor).
+  it("zveřejnění obnoví seznam a veřejný web, editor ne", async () => {
+    mockRpc.mockResolvedValue({ data: "2026-10-02T10:00:00Z", error: null });
     const { Wrapper, queryClient } = createWrapper();
     const spy = vi.spyOn(queryClient, "invalidateQueries");
 
@@ -325,10 +330,96 @@ describe("useUpdateWebPageCanvas", () => {
       await result.current.mutateAsync({ id: UUID_PAGE, publish: true });
     });
 
-    expect(spy).toHaveBeenCalledWith({ queryKey: ["admin-web-page", UUID_PAGE] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ["admin-web-pages"] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ["web-page"] });
+    expect(spy).not.toHaveBeenCalledWith({ queryKey: ["admin-web-page", UUID_PAGE] });
   });
+
+  it("automatické uložení vrátí razítko a nenačítá znovu editor ani veřejný web", async () => {
+    mockRpc.mockResolvedValue({ data: "2026-10-02T10:00:05Z", error: null });
+    const { Wrapper, queryClient } = createWrapper();
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+
+    const { result } = renderHook(() => useUpdateWebPageCanvas(), {
+      wrapper: Wrapper,
+    });
+    let razitko = "";
+    await act(async () => {
+      razitko = await result.current.mutateAsync({ id: UUID_PAGE, canvas_html: "<p/>", expected_stamp: "2026-10-02T10:00:00Z" });
+    });
+
+    expect(razitko).toBe("2026-10-02T10:00:05Z");
+    expect(mockRpc).toHaveBeenCalledWith("update_web_page_canvas_admin", expect.objectContaining({
+      p_expected_stamp: "2026-10-02T10:00:00Z",
+    }));
+    expect(spy).not.toHaveBeenCalledWith({ queryKey: ["admin-web-page", UUID_PAGE] });
+    expect(spy).not.toHaveBeenCalledWith({ queryKey: ["web-page"] });
+  });
+
+  it("souběh (PT409) projde jako konflikt, ne obecná chyba", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: { message: "Page changed since it was loaded", code: "PT409" } });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useUpdateWebPageCanvas(), {
+      wrapper: Wrapper,
+    });
+    let chyba: unknown;
+    await act(async () => {
+      chyba = await result.current.mutateAsync({ id: UUID_PAGE }).catch((e: unknown) => e);
+    });
+    expect(jeKonfliktUlozeni(chyba)).toBe(true);
+  });
+
+  it("propagates RPC error", async () => {
+    mockRpc.mockResolvedValue({
+      data: null,
+      error: { message: "duplicate slug" },
+    });
+
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useUpsertWebPage(), { wrapper: Wrapper });
+    await expect(
+      act(async () => {
+        await result.current.mutateAsync({ slug: "/dupe", title_key: "x.t" });
+      }),
+    ).rejects.toThrow("duplicate slug");
+  });
+});
+
+// ── useUpdateWebPageCanvas ─────────────────────────────────────
+
+describe("useUpdateWebPageCanvas", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("calls update_web_page_canvas_admin with p_publish=false by default", async () => {
+    mockRpc.mockResolvedValue({ data: null, error: null });
+
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useUpdateWebPageCanvas(), {
+      wrapper: Wrapper,
+    });
+    await act(async () => {
+      await result.current.mutateAsync({
+        id: UUID_PAGE,
+        canvas_html: "<section/>",
+        canvas_css: ".x{}",
+        canvas_data: { components: [] },
+      });
+    });
+
+    expect(mockRpc).toHaveBeenCalledWith("update_web_page_canvas_admin", {
+      p_canvas_css: ".x{}",
+      p_canvas_data: { components: [] },
+      p_canvas_html: "<section/>",
+      p_id: UUID_PAGE,
+      p_page_settings: undefined,
+      p_publish: false,
+    });
+  });
+
+  // „invalidates all 3 cache keys" odstraněno 2026-10-02: autosave už editor
+  // znovu nenačítá (koncept + razítko) — chování drží testy v bloku výše.
 
   it("propagates RPC error", async () => {
     mockRpc.mockResolvedValue({
@@ -345,6 +436,28 @@ describe("useUpdateWebPageCanvas", () => {
         await result.current.mutateAsync({ id: UUID_PAGE });
       }),
     ).rejects.toThrow("page locked");
+  });
+});
+
+// ── useDiscardWebPageDraft ─────────────────────────────────────
+
+describe("useDiscardWebPageDraft", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("zahodí koncept a editor si stránku načte znovu (zveřejněný stav)", async () => {
+    mockRpc.mockResolvedValue({ data: "2026-10-02T09:00:00Z", error: null });
+    const { Wrapper, queryClient } = createWrapper();
+    const spy = vi.spyOn(queryClient, "invalidateQueries");
+    const { result } = renderHook(() => useDiscardWebPageDraft(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync(UUID_PAGE);
+    });
+
+    expect(mockRpc).toHaveBeenCalledWith("discard_web_page_draft_admin", { p_page_id: UUID_PAGE });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["admin-web-page", UUID_PAGE] });
   });
 });
 

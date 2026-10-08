@@ -61,13 +61,18 @@ function tsFiles(dir: string): string[] {
 }
 
 /**
- * Collect every distinct `plugin_kv_*` RPC name referenced via
- * rpcService('plugin_kv_…') / rpcService("plugin_kv_…") across the src tree,
- * remembering which file(s) referenced it.
+ * Collect every distinct `plugin_kv_*` RPC name referenced via any RPC client of
+ * the service — rpcService('plugin_kv_…'), rpcService<T>("plugin_kv_…"),
+ * rpcServiceVoid('plugin_kv_…') — across the src tree, remembering which file(s)
+ * referenced it.
+ *
+ * ⛔ NAMĚŘENO 2026-10-04: vzor znal jen `rpcService(` — `rpcService<unknown>(`
+ * (sandbox.ts) ani `rpcServiceVoid(` (zápisy RETURNS void, 204 bez těla) neviděl.
+ * Brána měří VLASTNOST (volání plugin_kv_* má SQL funkci), ne jméno klienta.
  */
 function collectPluginKvRpcs(): Map<string, Set<string>> {
   const calls = new Map<string, Set<string>>();
-  const re = /rpcService\s*\(\s*['"](plugin_kv_[a-z0-9_]+)['"]/g;
+  const re = /\brpc[A-Za-z]*\s*(?:<[^()]*>)?\s*\(\s*['"](plugin_kv_[a-z0-9_]+)['"]/g;
   for (const file of tsFiles(SRC_DIR)) {
     const src = stripComments(readFileSync(join(ROOT, file), "utf-8"));
     let m: RegExpExecArray | null;

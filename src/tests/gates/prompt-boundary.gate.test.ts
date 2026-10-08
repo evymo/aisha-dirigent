@@ -142,6 +142,31 @@ describe("prompt boundary — reflection generator wiring (impl/15 K2)", () => {
   });
 });
 
+describe("prompt boundary — odpověď z faktů se znalostmi (P2, 2026-10-06)", () => {
+  const znalosti = read("services/svc-ai-chat/src/lib/knowledgeRetrieval.ts");
+  const odpoved = read("services/svc-ai-chat/src/lib/groundedAnswer.ts");
+
+  test("úseky znalostí jdou do promptu jen přes primitiva @aisha/security", () => {
+    expect(znalosti).toMatch(/import \{[^}]*wrapUntrusted[^}]*\} from ['"]@aisha\/security['"]/);
+    expect(znalosti).toMatch(/import \{[^}]*UNTRUSTED_POLICY_PREAMBLE[^}]*\} from ['"]@aisha\/security['"]/);
+    // každý úsek v plotu, odkaz [K#] jako provenienční štítek
+    expect(znalosti).toMatch(/wrapUntrusted\(`\[\$\{h\.ref\}\][^`]*`,\s*h\.text\)/);
+  });
+
+  test("plot je vždy zapnutý — žádný vypínač, který by znalosti pustil do promptu bez plotu", () => {
+    expect(znalosti).not.toMatch(/UNTRUSTED_WRAPPER_ENABLED/);
+  });
+
+  test("odpověď z faktů skládá znalosti do promptu jen přes znalostiDoPromptu (žádný syrový text úseku)", () => {
+    expect(odpoved).toMatch(/import \{[^}]*znalostiDoPromptu[^}]*\} from ["']\.\/knowledgeRetrieval\.js["']/);
+    const od = odpoved.indexOf("r = await deps.llm(");
+    expect(od, "volání modelu v groundedAnswer nenalezeno — měřidlo slepé").toBeGreaterThan(-1);
+    const volaniModelu = odpoved.slice(odpoved.lastIndexOf("try {", od), odpoved.indexOf("} finally {", od));
+    expect(volaniModelu).not.toMatch(/\.text\b/);
+    expect(volaniModelu).toMatch(/znalostiDoPromptu\(hits\)/);
+  });
+});
+
 describe("prompt boundary — enforcement claim consistency", () => {
   test("untrusted.ts docstring cites this gate", () => {
     expect(read(UNTRUSTED)).toContain("prompt-boundary.gate.test.ts");

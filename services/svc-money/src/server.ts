@@ -21,7 +21,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import Fastify from 'fastify';
-import { applySecurity, createSafeLogger, pluginRejection } from '@aisha/security';
+import { applySecurity, createSafeLogger, pluginRejection, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import { AuthError, verifyToken } from './auth.js';
@@ -45,7 +45,7 @@ export async function build(cfg: MoneyConfig, tunnel: TunnelHandle | null) {
   // před ní není (compose jen `expose`, broker XFF neposílá; změřeno 09-25).
   // S `true` si každý volající volil počítadlo limitu hlavičkou X-Forwarded-For
   // (ověřeno živě: XFF 198.51.100.77 = vlastní počítadlo) → limit nic nechránil.
-  const app = Fastify({ logger: { level: cfg.logLevel }, trustProxy: false });
+  const app = Fastify({ logger: safeLoggerOptions({ level: cfg.logLevel }), trustProxy: false });
   await applySecurity(app, {
     service: 'svc-money',
     // Prázdný allowlist = žádný cizí původ. Tuhle službu volá produkce

@@ -26,6 +26,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { stripVTControlCharacters } from "node:util";
 import { describe, expect, test } from "vitest";
+import { envDoktorDokoncil } from "./_env-doktor-dokoncil";
 
 const ROOT = process.cwd();
 const DOKTOR = join(ROOT, "scripts/aisha-env-doctor.mjs");
@@ -68,7 +69,7 @@ function behDoktora(identita: string | null): { vystup: string; hodnoty: Map<str
       timeout: 60_000,
     });
     if (beh.error) throw beh.error;
-    if (beh.status !== 0 || !existsSync(envFile)) {
+    if (!envDoktorDokoncil(beh.status) || !existsSync(envFile)) {
       throw new Error(`env-doktor skončil ${beh.status}: ${(beh.stderr ?? "").trim().split("\n").slice(-3).join(" | ")}`);
     }
     const hodnoty = new Map<string, string>();
@@ -91,10 +92,9 @@ describe("env-doktor: prázdná identita = prázdná hodnota, ne cesta s dírou"
   test("kontrolní vzorek: s identitou se cesty a adresy složí z ní", () => {
     const { hodnoty } = behDoktora(IDENTITA);
     expect({
-      web: hodnoty.get("WEB_RENDER_STATIC_HOST_DIR"),
-      repo: hodnoty.get("AGENT_REPO_PATH"),
+      runs: hodnoty.get("AGENT_RUNS_DIR"),
       s3: hodnoty.get("S3_ENDPOINT"),
-    }).toEqual({ web: "/var/lib/zkouska/web-render/static", repo: "/srv/zkouska/base-repo", s3: "http://zkouska-minio:9000" });
+    }).toEqual({ runs: "/var/lib/zkouska/agent-runs", s3: "http://zkouska-minio:9000" });
   });
 
   test.skipIf(IDENTITA_Z_DISKU.length > 0)(
@@ -105,7 +105,9 @@ describe("env-doktor: prázdná identita = prázdná hodnota, ne cesta s dírou"
       // Měřidlo musí umět říct „ano": s identitou existují hodnoty, které ji nesou.
       expect([...sIdentitou.values()].filter((v) => v.includes(IDENTITA)).length).toBeGreaterThan(5);
       expect(diry(sIdentitou, hodnoty), "hodnota složená z prázdné identity").toEqual([]);
-      for (const k of ["WEB_RENDER_STATIC_HOST_DIR", "WEB_RENDER_SHELL_HOST_DIR", "AGENT_REPO_PATH", "AGENT_RUNS_DIR"]) {
+      // (WEB_RENDER_*_HOST_DIR tu byly do 2026-10-02; s předáním po síti zmizely.
+      // AGENT_REPO_PATH — sdílený base-repo — zmizel s klonem per běh, fix/exec-klon-per-beh.)
+      for (const k of ["AGENT_RUNS_DIR"]) {
         expect(hodnoty.get(k) ?? "", k).toBe("");
         expect(vystup, `${k} musí být vypsán jako prázdný povinný`).toMatch(new RegExp(`✗ ${k} \\(empty\\)`));
       }

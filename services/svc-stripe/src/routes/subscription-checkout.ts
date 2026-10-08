@@ -46,6 +46,9 @@ export async function subscriptionCheckoutRoute(app: FastifyInstance): Promise<v
       }
 
       // Fetch package
+      // ⛔ edge_profiles je dispečer SPRÁVY a SLUŽBY — uživatelským tokenem ho člen
+      // nezavolá (DB: „Unauthorized“), takže tahle cesta padala každému členovi.
+      // user_id pochází z ověřeného tokenu (verifyToken), ne od klienta → službou.
       const pkgResult = await rpcService<{ row?: SubscriptionPackage | null } | null>('edge_subscriptions', {
         p_action: 'get_package_by_id',
         p_payload: { package_id: packageId },
@@ -86,11 +89,8 @@ export async function subscriptionCheckoutRoute(app: FastifyInstance): Promise<v
       }
 
       // Get or create Stripe customer
-      const profileResult = await rpcUser<{ row?: { stripe_customer_id?: string | null; email?: string | null; first_name?: string | null; last_name?: string | null } | null } | null>(
-        'edge_profiles',
-        { p_action: 'get_user_profile', p_payload: { user_id: user.userId } },
-        jwt,
-      );
+      const profileResult = await rpcService<{ row?: { stripe_customer_id?: string | null; email?: string | null; first_name?: string | null; last_name?: string | null } | null } | null>('edge_profiles',
+        { p_action: 'get_user_profile', p_payload: { user_id: user.userId } });
       const profile = profileResult?.row ?? null;
 
       let stripeCustomerId: string;
@@ -104,10 +104,10 @@ export async function subscriptionCheckoutRoute(app: FastifyInstance): Promise<v
         });
         stripeCustomerId = customer.id;
 
-        await rpcUser('edge_profiles', {
+        await rpcService('edge_profiles', {
           p_action: 'set_stripe_customer',
           p_payload: { stripe_customer_id: stripeCustomerId, user_id: user.userId },
-        }, jwt);
+        });
       }
 
       const packageCurrency = (pkg.currency || (await resolveBaseCurrency())).toUpperCase();

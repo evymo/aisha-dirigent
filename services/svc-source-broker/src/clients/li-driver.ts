@@ -147,7 +147,10 @@ export interface LiPokrytiStavy {
   bez_vektoru: number;
 }
 
-/** Pokrytí vektory po třídách; `identita` null = pin nedeklarován (živé nelze odlišit). */
+/**
+ * Pokrytí vektory po třídách; `model`/`identita` null = prostor v1 nemá model (živé nelze odlišit).
+ * Nedeklarovaná identita vah (pin nebo formát) = měření NEZMĚŘENO (celé null), ne nuly.
+ */
 export interface LiPokrytiVektoru extends LiPokrytiStavy {
   model: string | null;
   identita: string | null;
@@ -1261,17 +1264,14 @@ export async function zmerPokrytiVektoru(
   logger: FastifyBaseLogger
 ): Promise<LiPokrytiVektoru | null> {
   try {
-    // Živá identita = model resolveru v1 + deklarovaný pin vah (ai_model_registry
-    // .provider_metadata.declared.weights_sha256) — TÁŽ definice jako fn_get_chunks_needing_v1.
-    const res = await pg.query<LiPokrytiStavy & { model: string | null; pin: string | null; trida: string }>(
-      `WITH m AS (SELECT model_id FROM public.fn_resolve_embedding_model_for_space('v1') LIMIT 1),
-            p AS (SELECT (SELECT model_id FROM m) AS model,
-                         (SELECT r.provider_metadata->'declared'->>'weights_sha256'
-                            FROM public.ai_model_registry r
-                           WHERE r.model_id = (SELECT model_id FROM m) AND r.is_embedding
-                           ORDER BY r.is_available DESC NULLS LAST
-                           LIMIT 1) AS pin)
-       SELECT p.model, p.pin, coalesce(ki.category, '?') AS trida,
+    // Živá identita = JEDINÝ domov public.fn_ziva_identita_v1() — TÁŽ, kterou čte dopočet
+    // (fn_get_chunks_needing_v1); `<formát>:<sha>` vah z deklarace instance, ne napevno gguf.
+    // Nedeklarovaný pin/formát tam selže s návodem → NEZMĚŘENO (catch níž). Bez modelu v1
+    // jeden řádek s null (LEFT JOIN), aby se úseky dál počítaly (vše „jiný model“).
+    const res = await pg.query<LiPokrytiStavy & { model: string | null; identita: string | null; trida: string }>(
+      `WITH p AS (SELECT z.model_id AS model, z.identita
+                    FROM (SELECT 1) j LEFT JOIN public.fn_ziva_identita_v1() z ON true)
+       SELECT p.model, p.identita, coalesce(ki.category, '?') AS trida,
               count(*)::int AS useku,
               (count(*) FILTER (WHERE e.stav = 'zivy'))::int AS zivy,
               (count(*) FILTER (WHERE e.stav = 'stary_runtime'))::int AS stary_runtime,
@@ -1283,8 +1283,8 @@ export async function zmerPokrytiVektoru(
         CROSS JOIN p
          LEFT JOIN LATERAL (
               SELECT CASE
-                       WHEN ke.model = p.model AND p.pin IS NOT NULL
-                        AND split_part(coalesce(ke.model_version, ''), ';', 1) = 'gguf:' || p.pin THEN 'zivy'
+                       WHEN ke.model = p.model AND p.identita IS NOT NULL
+                        AND split_part(coalesce(ke.model_version, ''), ';', 1) = p.identita THEN 'zivy'
                        WHEN ke.model = p.model THEN 'stary_runtime'
                        ELSE 'jiny_model'
                      END AS stav
@@ -1292,9 +1292,9 @@ export async function zmerPokrytiVektoru(
                WHERE ke.chunk_id = kc.id AND ke.locale = kc.locale
                LIMIT 1) e ON true
          LEFT JOIN public.knowledge_embedding_vynechani v
-                ON v.chunk_id = kc.id AND v.locale = kc.locale AND v.identita = 'gguf:' || p.pin
+                ON v.chunk_id = kc.id AND v.locale = kc.locale AND v.identita = p.identita
         WHERE ki.story_id = $1::uuid
-        GROUP BY p.model, p.pin, 3
+        GROUP BY p.model, p.identita, 3
         ORDER BY 3`,
       [storyId]
     );
@@ -1306,10 +1306,9 @@ export async function zmerPokrytiVektoru(
     for (const r of rows) {
       tridy[r.trida] = Object.fromEntries(STAVY.map((k) => [k, r[k] ?? 0])) as unknown as LiPokrytiStavy;
     }
-    const pin = rows[0]?.pin ?? null;
     return {
       model: rows[0]?.model ?? null,
-      identita: pin ? `gguf:${pin}` : null,
+      identita: rows[0]?.identita ?? null,
       ...soucet(),
       tridy,
       export_id: exportId,

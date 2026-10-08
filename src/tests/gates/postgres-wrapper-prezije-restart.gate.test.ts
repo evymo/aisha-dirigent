@@ -13,21 +13,32 @@
  *
  * ⭐ Brána SPOUŠTÍ skutečný wrapper (bash) s podvrženým docker-entrypoint.sh,
  * pg_isready, psql a sleep nad existujícím datovým adresářem a s ZASTARALÝM
- * nezapisovatelným `/tmp/postgres-reapply.sql` — přesně stav po nedoběhlém startu.
- * Měří, že wrapper dojde až k předání postmasteru. (Nezapisovatelnost se tu
- * vyrábí módem 000; pod rootem ji mód nevyrobí, proto se mutace ověřuje mimo root.)
+ * nezapisovatelným `postgres-reapply.sql` v adresáři, kam wrapper dočasné soubory
+ * píše — přesně stav po nedoběhlém startu. Měří, že wrapper dojde až k předání
+ * postmasteru A že soubor pro re-apply vzniká v TMPDIR běhu (mktemp), ne na pevné
+ * cestě. (Nezapisovatelnost se tu vyrábí módem 000; pod rootem ji mód nevyrobí,
+ * proto se mutace ověřuje mimo root.)
+ *
+ * ⛔ NAMĚŘENO 2026-10-04: fixtura dřív ležela na PEVNÉ `/tmp/postgres-reapply.sql` —
+ * sdílené všemi běhy a relacemi stroje. Přerušený běh ji nechal zapisovatelnou a pak
+ * padala u každého; pod zátěží se o ni míjela se sesterskou bránou. Wrapper přitom
+ * píše přes `mktemp -t` do `$TMPDIR`, takže na macOS fixtura ani neležela tam, kam
+ * zapisoval. Teď má každý běh vlastní TMPDIR a fixtura leží přesně v něm.
  */
 import { afterAll, describe, expect, test } from "vitest";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 
 const ROOT = resolve(__dirname, "../../..");
 const WRAPPER = join(ROOT, "infra/postgres/entrypoint-wrapper.sh");
-const ZASTARALY = "/tmp/postgres-reapply.sql";
-
 const dir = mkdtempSync(join(tmpdir(), "aisha-pg-wrapper-"));
+/** TMPDIR wrapperu — vlastní pro každý běh, žádná sdílená cesta stroje. */
+const tmpWrapperu = join(dir, "tmp");
+mkdirSync(tmpWrapperu, { recursive: true });
+/** Jméno souboru, který wrapper před opravou psal napevno — zbytek po nedoběhlém startu. */
+const ZASTARALY = join(tmpWrapperu, "postgres-reapply.sql");
 const pgdata = join(dir, "pgdata");
 const bin = join(dir, "bin");
 // Mód souboru re-apply zaznamená podvržený psql ve chvíli, kdy ho dostane (`-f`).
@@ -35,17 +46,14 @@ const bin = join(dir, "bin");
 // soubor souběžně běžící brány postgres-exporter-heslo-pri-startu (naměřeno
 // 2026-09-17). Teď re-applier doběhne a soubor po sobě smaže sám.
 const zaznamModu = join(dir, "rezim-souboru.txt");
-let zalozilJsem = false;
+const zaznamCesty = join(dir, "cesta-souboru.txt");
 
 function stub(jmeno: string, telo: string) {
   writeFileSync(join(bin, jmeno), `#!/bin/sh\n${telo}\n`, { mode: 0o755 });
 }
 
 afterAll(() => {
-  if (zalozilJsem && existsSync(ZASTARALY)) {
-    chmodSync(ZASTARALY, 0o600);
-    rmSync(ZASTARALY, { force: true });
-  }
+  if (existsSync(ZASTARALY)) chmodSync(ZASTARALY, 0o600);
   rmSync(dir, { recursive: true, force: true });
 });
 
@@ -60,7 +68,7 @@ describe("Postgres wrapper přežije restart po nedoběhlém startu (brána)", (
       [
         'prev=""',
         'for a in "$@"; do',
-        `  if [ "$prev" = "-f" ]; then ls -l "$a" | cut -c1-10 >> "${zaznamModu}"; fi`,
+        `  if [ "$prev" = "-f" ]; then ls -l "$a" | cut -c1-10 >> "${zaznamModu}"; echo "$a" >> "${zaznamCesty}"; fi`,
         '  if [ "$a" = "SELECT 1" ]; then echo 1; fi',
         '  prev="$a"',
         "done",
@@ -70,11 +78,8 @@ describe("Postgres wrapper přežije restart po nedoběhlém startu (brána)", (
     stub("sleep", "exit 0");
     stub("chown", "exit 0");
 
-    if (!existsSync(ZASTARALY)) {
-      writeFileSync(ZASTARALY, "-- zbytek po nedoběhlém startu\n");
-      zalozilJsem = true;
-    }
-    if (zalozilJsem) chmodSync(ZASTARALY, 0o000);
+    writeFileSync(ZASTARALY, "-- zbytek po nedoběhlém startu\n");
+    chmodSync(ZASTARALY, 0o000);
     expect(existsSync(ZASTARALY), "fixtura zastaralého souboru nevznikla").toBe(true);
     // Fixtura musí být pro tenhle proces NEZAPISOVATELNÁ, jinak neměří nic.
     const zapisovatelny = spawnSync("sh", ["-c", `: > "${ZASTARALY}"`]).status === 0;
@@ -91,6 +96,7 @@ describe("Postgres wrapper přežije restart po nedoběhlém startu (brána)", (
         COLUMN_ENCRYPTION_KEY: "zkusebni-klic-sloupcu-brany",
         // Klíče zapisuje wrapper do /run/aisha-keys — mimo kontejner do dočasného adresáře.
         AISHA_KLICE_DIR: join(dir, "klice"),
+        TMPDIR: tmpWrapperu,
       },
       encoding: "utf8",
       timeout: 30_000,
@@ -104,6 +110,20 @@ describe("Postgres wrapper přežije restart po nedoběhlém startu (brána)", (
     while (!existsSync(zaznamModu) && Date.now() < konec) spawnSync("sh", ["-c", "sleep 0.1"]);
     expect(existsSync(zaznamModu), "re-applier soubor psql nepředal — měřilo by se prázdno").toBe(true);
     expect(readFileSync(zaznamModu, "utf8").trim().split("\n")[0]).toBe("-rw-------");
+    // soubor vzniká v TMPDIR běhu pod vlastním jménem (mktemp) — ne na pevné cestě, kterou
+    // může blokovat zbytek po nedoběhlém startu (návrat k pevné cestě by na fixtuře výš padl,
+    // napevno zapsané /tmp by obešlo TMPDIR — proto se měří obojí)
+    // Kam `mktemp -t` píše, je věc platformy: GNU (Linux — produkce i CI) ctí TMPDIR,
+    // BSD na macOS dává přednost DARWIN_USER_TEMP_DIR. Měří se adresář, který by mktemp
+    // na TÉHLE platformě použil — napevno zapsané /tmp pak padne na obou.
+    const adresarMktemp =
+      process.platform === "darwin"
+        ? spawnSync("getconf", ["DARWIN_USER_TEMP_DIR"], { encoding: "utf8" }).stdout.trim().replace(/\/+$/, "")
+        : tmpWrapperu;
+    expect(adresarMktemp, "adresář mktemp nejde zjistit — měřilo by se prázdno").not.toBe("");
+    const cesta = readFileSync(zaznamCesty, "utf8").trim().split("\n")[0];
+    expect(dirname(cesta), `re-apply soubor mimo adresář mktemp (${adresarMktemp}): ${cesta}`).toBe(adresarMktemp);
+    expect(basename(cesta), "re-apply soubor na pevném jméně z incidentu").not.toBe("postgres-reapply.sql");
   });
 
   // ⛔ Klíče šifrování nejsou GUC (naměřeno 2026-09-25: GUC přečetla každá role). Wrapper je

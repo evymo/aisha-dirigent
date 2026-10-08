@@ -15,6 +15,9 @@
 export * from "./providers/index.js";
 export * from "./providers/streaming.js";
 // createXAIBackend is not in the providers barrel — re-export it explicitly.
-export { createXAIBackend } from "./providers/openai-compat.js";
+export { createXAIBackend, xaiBackend } from "./providers/openai-compat.js";
+// Zdroj klíčů poskytovatelů — služba předá svou čtečku pověření (trezor instance).
+export { setProviderKeySource, hasProviderKeySource, resolveProviderKey } from "./credentialSource.js";
+export type { ProviderKeySource } from "./credentialSource.js";
 export * from "./backendRegistry.js";
 export * from "./executionMode.js";

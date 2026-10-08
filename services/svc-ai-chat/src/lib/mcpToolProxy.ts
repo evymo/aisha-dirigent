@@ -35,6 +35,10 @@ const log = createSafeLogger("svc-ai-chat");
  * the PAT — so the caller FAILS CLOSED (tool-less turn) and never forwards an
  * unscoped or service-role credential downstream.
  *
+ * ⛔ PODMÍNKA VOLAJÍCÍHO (K-35/B8): `storyId` MUSÍ být ověřený (can_access_story pod uživatelem,
+ * lib/storyAccess.ts) PŘED ražbou. svc-mcp-knowledge hledá v KB identitou uživatele, takže RPC
+ * cizí příběh odmítne i tak — ražba neověřeného příběhu je ale chyba volajícího (dvě stráže).
+ *
  * The actual mint lives in lib/userScopedRpc.ts (shared with the legacy /chat
  * surface's user-plane RPC adapter) — ONE HMAC implementation, two lanes.
  */
@@ -51,6 +55,7 @@ interface JsonRpcResponse {
   result?: {
     tools?: Array<{ name: string; description?: string; inputSchema?: Record<string, unknown> }>;
     content?: Array<{ type: string; text?: string }>;
+    isError?: boolean;
   };
   error?: { code: number; message: string };
 }
@@ -104,25 +109,45 @@ export async function mcpToolsList(userJwt: string): Promise<LlmToolSpec[]> {
   }));
 }
 
+/** Result of one MCP tool call: the text for the model AND whether the call really succeeded. */
+export interface McpToolInvokeResult {
+  ok: boolean;
+  text: string;
+}
+
 /**
  * Execute one tool via the MCP server under the user's identity (per-tool auth +
- * RLS enforced there). Returns the result text to feed back to the model —
- * including a structured error string when the tool is not allowed or the call
- * fails, so the model can adapt rather than the whole turn 500-ing.
+ * RLS enforced there). `text` is what the model gets back — including a structured
+ * error string when the tool is not allowed or the call fails, so the model can
+ * adapt rather than the whole turn 500-ing; `ok` says which of the two it is (the
+ * /chat executor records a failed call as failed, not as a result).
  */
+export async function mcpToolInvoke(
+  userJwt: string,
+  name: string,
+  args: Record<string, unknown>,
+): Promise<McpToolInvokeResult> {
+  const rpc = await jsonRpc(userJwt, "tools/call", { name, arguments: args });
+  if (!rpc) return { ok: false, text: JSON.stringify({ error: "tool_unavailable", tool: name }) };
+  if (rpc.error) {
+    return {
+      ok: false,
+      text: JSON.stringify({ error: "tool_error", tool: name, code: rpc.error.code, message: rpc.error.message }),
+    };
+  }
+  const ok = rpc.result?.isError !== true;
+  const content = rpc.result?.content;
+  if (Array.isArray(content)) {
+    return { ok, text: content.map((c) => (c.type === "text" ? (c.text ?? "") : JSON.stringify(c))).join("\n") };
+  }
+  return { ok, text: JSON.stringify(rpc.result ?? {}) };
+}
+
+/** {@link mcpToolInvoke} for callers that only feed the text back to the model (/v1). */
 export async function mcpToolCall(
   userJwt: string,
   name: string,
   args: Record<string, unknown>,
 ): Promise<string> {
-  const rpc = await jsonRpc(userJwt, "tools/call", { name, arguments: args });
-  if (!rpc) return JSON.stringify({ error: "tool_unavailable", tool: name });
-  if (rpc.error) {
-    return JSON.stringify({ error: "tool_error", tool: name, code: rpc.error.code, message: rpc.error.message });
-  }
-  const content = rpc.result?.content;
-  if (Array.isArray(content)) {
-    return content.map((c) => (c.type === "text" ? (c.text ?? "") : JSON.stringify(c))).join("\n");
-  }
-  return JSON.stringify(rpc.result ?? {});
+  return (await mcpToolInvoke(userJwt, name, args)).text;
 }

@@ -460,25 +460,24 @@ else
   ok ".env již existuje (použij --reset pro přegenerování)"
 fi
 
-# Generate .mcp.json pointing to local MCP server.
-# Route through mergeMcpJson so that --reset (RESET=true) upserts ONLY the
-# aisha-knowledge entry and preserves any other MCP servers the user added by
-# hand — the old 'cat >' heredoc clobbered the whole file unconditionally.
+# Záznam serveru znalostí v .mcp.json má JEDEN tvar a jeden domov
+# (scripts/lib/mcp-server-znalosti.mjs): adresa z prostředí, přihlášení přes OAuth
+# u Keycloaku instance (veřejný klient z deklarace realmu) — v souboru žádná doslovná
+# adresa ani pověření. Do 2026-10 tu vznikal druhý tvar — místní adresa
+# a `Bearer <anon klíč>` —, který `/mcp` nepřijme a který při --reset přepsal platný záznam.
+# mergeMcpJson upsertuje JEN záznam aisha-knowledge; ostatní servery uživatele zůstanou.
 if [[ ! -f ".mcp.json" ]] || $RESET; then
-  MCP_URL="${LOCAL_AISHA_POSTGREST_URL}/functions/v1/mcp-knowledge-server" \
-  MCP_AUTH="Bearer ${ANON_KEY}" \
   node --input-type=module -e '
     import { readFileSync, writeFileSync, existsSync } from "fs";
     import { mergeMcpJson } from "./scripts/lib/mcp-json-merge.mjs";
+    import { JMENO_SERVERU_ZNALOSTI, serverZnalostiZProstredi } from "./scripts/lib/mcp-server-znalosti.mjs";
     const existing = existsSync(".mcp.json") ? readFileSync(".mcp.json", "utf-8") : "";
-    const merged = mergeMcpJson(existing, "aisha-knowledge", {
-      type: "http",
-      url: process.env.MCP_URL,
-      headers: { Authorization: process.env.MCP_AUTH },
-    });
-    writeFileSync(".mcp.json", merged);
+    writeFileSync(".mcp.json", mergeMcpJson(existing, JMENO_SERVERU_ZNALOSTI, serverZnalostiZProstredi()));
   '
-  ok ".mcp.json nastaven na lokální MCP server"
+  ok ".mcp.json: server znalostí čte adresu z prostředí (AISHA_MCP_URL), přihlášení přes OAuth v prohlížeči"
+  echo "    pro místní stack: AISHA_MCP_URL=${LOCAL_AISHA_POSTGREST_URL}/functions/v1/mcp-knowledge-server"
+  echo "    přihlášení: claude mcp login aisha-knowledge (nebo /mcp v Claude Code) a dokončit v prohlížeči"
+  echo "    statický token (AISHA_TOKEN) je jen pro stroje bez člověka — vlastní záznam, viz /aisha-setup"
 else
   ok ".mcp.json již existuje"
 fi

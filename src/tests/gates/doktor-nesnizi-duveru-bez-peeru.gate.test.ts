@@ -26,6 +26,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { gatewayTrustedProxies } from "../../../scripts/lib/derive-subnets.mjs";
+import { envDoktorDokoncil } from "./_env-doktor-dokoncil";
 
 const ROOT = process.cwd();
 const DOCTOR = path.join(ROOT, "scripts/aisha-env-doctor.mjs");
@@ -59,7 +60,7 @@ function doktorZapise(obsah: string): { hodnoty: string[]; vystup: string } {
   // ztratí a regex pak barvy tiše NEodstraňuje (stalo se při psaní téhle brány).
   // eslint-disable-next-line no-control-regex
   const vystup = `${r.stdout ?? ""}\n${r.stderr ?? ""}`.replace(/\u001b\[[0-9;]*m/g, "");
-  if (r.error || r.signal || r.status !== 0) {
+  if (r.error || r.signal || !envDoktorDokoncil(r.status)) {
     throw new Error(
       `env-doktor nedoběhl — soubor NENÍ měření: signal=${r.signal ?? "—"} ` +
         `error=${r.error ? (r.error as Error).message : "—"} status=${r.status}\n` +

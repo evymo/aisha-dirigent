@@ -122,6 +122,14 @@ registerRuntimeBlock(
   lazy(() => import("@/components/web/blocks/LanguageSwitcherBlock")),
 );
 
+// Nabídka mobilní aplikace: telefon dostane svůj obchod, počítač oba
+// (2026-10-01, naměřeno na instanci). Zařízení zná jen prohlížeč — statické plátno by
+// umělo jen „oba vždy“.
+registerRuntimeBlock(
+  "app-banner",
+  lazy(() => import("@/components/web/blocks/AppBannerBlock")),
+);
+
 registerRuntimeBlock(
   "contact-form",
   lazy(() => import("@/components/web/blocks/ContactFormBlock")),

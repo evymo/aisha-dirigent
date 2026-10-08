@@ -102,4 +102,13 @@ describe("LanguageSwitcherBlock", () => {
     expect(screen.getByRole("combobox")).toHaveProperty("value", "");
     expect(screen.getAllByRole("option").map((o) => o.textContent)[0]).toBe("—");
   });
+
+  // 2026-10-01 (na instanci): „English“ sedělo vlevo v pilulce — text selectu se centruje.
+  it("text vybraného jazyka je v pilulce vycentrovaný", () => {
+    mockJazyky.mockReturnValue({ data: ZIVE });
+    render(<LanguageSwitcherBlock config={{}} />);
+    const vyber = screen.getByRole("combobox") as HTMLSelectElement;
+    expect(vyber.style.textAlign).toBe("center");
+    expect(vyber.style.textAlignLast).toBe("center");
+  });
 });

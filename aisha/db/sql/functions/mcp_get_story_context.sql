@@ -1,17 +1,30 @@
 -- Function: public.mcp_get_story_context
 -- Arguments: p_story_id uuid
--- Security: SECURITY DEFINER
+-- Security: SECURITY DEFINER — stráž příběhu public.can_access_story PŘED dohledáním
 -- Source: Extracted from local DB (source-of-truth sync)
+--
+-- ⛔ NAMĚŘENO 2026-10-05 (nezávislá revize nad mainem 8b7637acc): funkce příběh nekontrolovala
+-- vůbec — KAŽDÝ přihlášený dostal podle id metadata CIZÍHO příběhu: repo (repo_url, provider,
+-- větev), účastníky (user_id, role), env_hints, build_config a mcp_endpoint. Teď jen ten, koho
+-- pustí jediný predikát příběhu can_access_story: vlastník, účastník, správa a služba (strojová
+-- lane). Stráž běží PŘED dohledáním, takže cizí i neexistující příběh vrací totéž (42501) — funkce
+-- není orákulem existence příběhu. Služba na neexistující příběh dál dostane {"error": "Story not
+-- found"} (pro ni stráž projde). Měří src/tests/db/pribeh-a-beh-cteni-podle-id.runtime.test.ts.
 
 CREATE OR REPLACE FUNCTION public.mcp_get_story_context(p_story_id uuid)
  RETURNS jsonb
  LANGUAGE plpgsql
  SECURITY DEFINER
- SET search_path TO 'public'
+ SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 AS $function$
 DECLARE
   v_result jsonb;
 BEGIN
+  -- Stráž (can_access_story.sql) — PŘED dohledáním, ať cizí a neexistující příběh vypadají stejně.
+  IF NOT public.can_access_story(p_story_id) THEN
+    RAISE EXCEPTION 'Access denied to story %', p_story_id USING ERRCODE = '42501';
+  END IF;
+
   SELECT jsonb_build_object(
     'story', jsonb_build_object(
       'id', ps.id,
@@ -45,7 +58,7 @@ BEGIN
         'role', sp.role,
         'joined_at', sp.joined_at
        ))
-       FROM story_participants sp WHERE sp.story_id = ps.id),
+       FROM public.story_participants sp WHERE sp.story_id = ps.id),
       '[]'::jsonb
     ),
     'rules_preview', COALESCE(
@@ -57,14 +70,15 @@ BEGIN
         'version', er.version
        ))
        FROM unnest(sr.rule_ids) AS rid
-       JOIN expert_rules er ON er.id = rid
-       WHERE er.status = 'published'),
+       JOIN public.expert_rules er ON er.id = rid
+       WHERE er.status = 'published'
+         AND public.expert_rule_visible_to(er.visibility, er.author_partner_id, auth.uid())),
       '[]'::jsonb
     )
   ) INTO v_result
-  FROM partner_stories ps
-  LEFT JOIN story_contexts sc ON sc.story_id = ps.id
-  LEFT JOIN story_rulesets sr ON sr.id = sc.ruleset_id
+  FROM public.partner_stories ps
+  LEFT JOIN public.story_contexts sc ON sc.story_id = ps.id
+  LEFT JOIN public.story_rulesets sr ON sr.id = sc.ruleset_id
   WHERE ps.id = p_story_id;
 
   IF v_result IS NULL THEN
@@ -75,6 +89,6 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION public.mcp_get_story_context(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.mcp_get_story_context(uuid) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.mcp_get_story_context(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.mcp_get_story_context(uuid) TO service_role;

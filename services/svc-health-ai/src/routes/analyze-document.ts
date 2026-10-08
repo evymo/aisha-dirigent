@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { verifyToken, AuthError } from '../auth.js';
 import { rpcUser, rpcService } from '../postgrest.js';
 import { config } from '../config.js';
+import { credentials } from '../credentials.js';
 import {
   redactWithCustomTerms,
   parseCustomRedactions,
@@ -9,6 +10,8 @@ import {
   sha256Hex,
   HEALTH_DOCUMENT_SYSTEM_PROMPT,
 } from '../helpers.js';
+import { isRateLimitExceeded, rateLimitFailureLogFields } from '../rate-limit.js';
+import type { VoidRpcResult } from '@aisha/postgrest-client';
 import { withAitgGuard, createAitgRunner } from '@aisha/aitg';
 import { createSsrfGuard, parseHostAllowlist } from '@aisha/security';
 import { z } from 'zod';
@@ -70,14 +73,22 @@ export async function analyzeDocumentRoutes(app: FastifyInstance): Promise<void>
 
     const customRedactions = parseCustomRedactions(rawRedactions);
 
-    // Rate limit via DB
+    // Rate limit via DB. enforce_rate_limit je RETURNS void → 204 → null.
+    // ⛔ 429 + audit „rate_limited" JEN pro skutečné překročení (P0001 + zpráva, viz
+    // rate-limit.ts). Jiná chyba = porucha stráže → 503 fail-closed: dál nepustit,
+    // ale ani nezapsat jako „rate limited" (dřív z KAŽDÉ chyby 429 + falešný audit).
+    const rateLimitKey = 'health_document_analysis';
     try {
-      await rpcUser('enforce_rate_limit', {
-        p_endpoint_key: 'health_document_analysis',
+      await rpcUser<VoidRpcResult>('enforce_rate_limit', {
+        p_endpoint_key: rateLimitKey,
         p_max_requests: config.analysesPerHour,
         p_window_ms: 60 * 60 * 1000,
       }, jwt);
-    } catch {
+    } catch (err) {
+      if (!isRateLimitExceeded(err, rateLimitKey)) {
+        req.log.error(rateLimitFailureLogFields(err, rateLimitKey), 'rate limit check failed — fail-closed 503');
+        return reply.status(503).send({ error: 'Rate limit check unavailable' });
+      }
       await rpcService('write_audit_journal', {
         p_action_type: 'error',
         p_area: 'documents',
@@ -210,7 +221,7 @@ export async function analyzeDocumentRoutes(app: FastifyInstance): Promise<void>
     const llmUrl = useGateway
       ? `${config.llmGatewayUrl.replace(/\/$/, '')}/v1/chat/completions`
       : config.openaiApiUrl;
-    const llmKey = useGateway ? config.llmGatewayKey : config.openaiApiKey;
+    const llmKey = useGateway ? config.llmGatewayKey : await credentials().get('OPENAI_API_KEY');
     const llmProvider = useGateway ? 'gateway' : 'openai';
 
     if (!llmUrl || !llmKey) {

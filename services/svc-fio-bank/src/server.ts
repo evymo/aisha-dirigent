@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { applySecurity } from '@aisha/security';
+import { applySecurity, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import { config } from './config.js';
@@ -12,10 +12,10 @@ import { syncRoutes } from './routes/sync.js';
 // Rollback: OTEL_SDK_DISABLED=true env (Coolify) + container restart.
 bootstrapOtel({ serviceName: 'svc-fio-bank' });
 const app = Fastify({
-  logger: {
+  logger: safeLoggerOptions({
     level: config.logLevel,
     ...(process.env.NODE_ENV !== 'production' ? { transport: { target: 'pino-pretty' } } : {}),
-  },
+  }),
   trustProxy: true,
 });
 

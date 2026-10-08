@@ -361,9 +361,7 @@ services:
       retries: 5
     restart: unless-stopped
     networks:
-      internal:
-        aliases:
-          - ${APP_NAME_PREFIX:?identita instance}-maestro
+      - internal
 
   integration-mesh-ingress:
     # Mesh komponenta — bez meshe nemá co dělat. Profil "mesh" zapíná

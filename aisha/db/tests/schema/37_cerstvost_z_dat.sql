@@ -7,7 +7,9 @@
 --   · univerzum se STARÝMI daty → stará čerstvost (ne dnešek);
 --   · prázdné univerzum → `trace_id` končí `:no_data`;
 --   · `created_at`, NE `ingested_at` (ten přepisuje každý import — naměřeno
---     2026-09-27: 813 smluv = jediný čas).
+--     2026-09-27: 813 smluv = jediný čas);
+--   · odmítací větve říkají důvod ze SLOVNÍKU (unauthorized / missing_config /
+--     bad_config / not_found) a ten důvod je pravda (14–24).
 --
 -- Fixture: jména s předponou `pgtap-cerstvost`, runs UNSEEDED as superuser,
 -- rolled back. Časy jsou pevné v minulosti, aby se nedaly splést s now().
@@ -15,7 +17,7 @@
 BEGIN;
 SET search_path = public, extensions;
 CREATE EXTENSION IF NOT EXISTS pgtap;
-SELECT plan(13);
+SELECT plan(24);
 
 SELECT set_config('request.jwt.claims', '{"role":"service_role"}', true);
 
@@ -130,6 +132,61 @@ SELECT is(
   'fleet-findings',
   'nálezy vozového parku s jízdou: bez :no_data'
 );
+
+-- ── 14–24) Slovník důvodů odmítnutí (brána cerstvost-z-dat, SLOVNIK_DUVODU) ──
+-- Odmítací větev smí vzít čas z hodin JEN proto, že `trace_id` přizná důvod ze
+-- slovníku. Slovo musí říkat pravdu: tatáž podmínka dřív vracela tři slova
+-- (unauthenticated / unauthorized / forbidden) a vadná hodnota se hlásila jako
+-- chybějící. Měří se tu, že:
+--   · přihlášený bez role dostane `unauthorized` (ne `unauthenticated`);
+--   · nepřihlášený (anon) k těmto funkcím vůbec nesmí — proto `unauthenticated`
+--     ve slovníku není: z odmítací větve by nikdy nebyl pravda;
+--   · klíč konfigurace CHYBÍ (i JSON null) → `missing_config`, klíč JE, ale hodnota
+--     je nepoužitelná → `bad_config` — a nic nespadne výjimkou.
+SELECT set_config('cz.admin', gen_random_uuid()::text, true);
+SELECT set_config('cz.plain', gen_random_uuid()::text, true);
+SET session_replication_role = replica;
+INSERT INTO aisha_auth.users (id) VALUES (current_setting('cz.admin')::uuid), (current_setting('cz.plain')::uuid);
+INSERT INTO user_roles (user_id, role) VALUES (current_setting('cz.admin')::uuid, 'admin');
+SET session_replication_role = origin;
+SELECT set_config('cz.skupiny', jsonb_build_object(
+  'source', 'pgtap-cerstvost-slovnik', 'date_fields', '{}'::jsonb,
+  'batch_classes', jsonb_build_array('shoda_dva_zdroje'),
+  'title_template', '{trida} ({pocet})', 'quote_template', '{zdroje}')::text, true);
+
+SELECT set_config('request.jwt.claims',
+  json_build_object('role', 'authenticated', 'sub', current_setting('cz.plain'))::text, true);
+SELECT is((public.get_twin_ref_group_block(current_setting('cz.skupiny')::jsonb))->'provenance'->>'trace_id',
+  'twin-ref-group:unauthorized', 'skupiny identit, přihlášený bez role: unauthorized');
+SELECT is((public.get_twin_ref_review_block('{}'::jsonb))->'provenance'->>'trace_id',
+  'twin-ref-review:unauthorized', 'návrhy identit, přihlášený bez role: unauthorized');
+SELECT is((public.get_twin_ref_pending_block('{}'::jsonb))->'provenance'->>'trace_id',
+  'twin-ref-pending:unauthorized', 'čekající identity, přihlášený bez role: unauthorized');
+SELECT is((public.get_twin_events_table_block('{}'::jsonb))->'provenance'->>'trace_id',
+  'twin-events:unauthorized', 'události dvojčat, přihlášený bez role: unauthorized');
+SELECT is((public.get_data_source_feed_health_block('{}'::jsonb))->'provenance'->>'trace_id',
+  'data-source-feed-health:unauthorized', 'zdraví zdrojů, přihlášený bez role: unauthorized (dřív forbidden)');
+SELECT is(
+  (SELECT array_agg(f ORDER BY f) FROM unnest(array[
+     'public.get_twin_ref_group_block(jsonb)', 'public.get_twin_ref_review_block(jsonb)',
+     'public.get_twin_ref_pending_block(jsonb)', 'public.get_twin_events_table_block(jsonb)',
+     'public.get_data_source_feed_health_block(jsonb)', 'public.get_doc_expiry_review_block(jsonb)']) f
+    WHERE has_function_privilege('anon', f, 'EXECUTE')),
+  NULL::text[],
+  'anon nemá EXECUTE na žádný z bloků — odmítací větev potká jen přihlášeného, proto unauthorized');
+
+SELECT set_config('request.jwt.claims',
+  json_build_object('role', 'authenticated', 'sub', current_setting('cz.admin'))::text, true);
+SELECT is((public.get_twin_ref_group_block((current_setting('cz.skupiny')::jsonb) - 'batch_classes'))->'provenance'->>'trace_id',
+  'twin-ref-group:missing_config', 'batch_classes chybí → missing_config');
+SELECT is((public.get_twin_ref_group_block((current_setting('cz.skupiny')::jsonb) || '{"batch_classes": null}'))->'provenance'->>'trace_id',
+  'twin-ref-group:missing_config', 'batch_classes = JSON null → missing_config (jako chybějící)');
+SELECT is((public.get_twin_ref_group_block((current_setting('cz.skupiny')::jsonb) || '{"batch_classes": "shoda_dva_zdroje"}'))->'provenance'->>'trace_id',
+  'twin-ref-group:bad_config', 'batch_classes je řetězec, ne pole → bad_config, bez výjimky');
+SELECT is((public.get_twin_ref_group_block((current_setting('cz.skupiny')::jsonb) || '{"batch_classes": {"shoda_dva_zdroje": true}}'))->'data'->'items',
+  '[]'::jsonb, 'batch_classes je objekt → žádná dávka se nenabídne');
+SELECT is((public.get_twin_ref_group_block((current_setting('cz.skupiny')::jsonb) - 'title_template'))->'provenance'->>'trace_id',
+  'twin-ref-group:missing_config', 'title_template chybí → missing_config');
 
 SELECT * FROM finish();
 ROLLBACK;

@@ -9,7 +9,7 @@ CREATE OR REPLACE FUNCTION public.fn_get_platform_warmup_state()
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path TO 'public'
+SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 STABLE
 AS $$
 DECLARE
@@ -58,8 +58,7 @@ BEGIN
       FROM public.knowledge_items ki
      WHERE ki.story_id = v_default_story_id
        AND ki.status = 'active'
-       AND (ki.quarantine_status IS NULL
-            OR ki.quarantine_status NOT IN ('flagged', 'quarantined'));
+       AND public.knowledge_state_readable(ki.quarantine_status);
   ELSE
     v_kb_count := 0;
   END IF;

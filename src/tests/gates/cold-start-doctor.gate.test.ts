@@ -20,7 +20,7 @@
 
 import { describe, test, expect } from "vitest";
 import { execFile, execFileSync, spawnSync } from "node:child_process";
-import { existsSync, readFileSync, mkdtempSync } from "node:fs";
+import { existsSync, readFileSync, mkdtempSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -718,5 +718,73 @@ describe("cold-start-doctor.sh — fáze N hlásí příčinu nezměřené shody
       "  esac",
     ].join("\n");
     expect(hlasiPricinu(vetevNezmereno(stary))).toBe(false);
+  });
+});
+
+// ============================================================================
+// Existující stack bez minulého souboru prostředí (revize dávky 2026-10-03)
+// ============================================================================
+//
+// Minulý soubor prostředí je vlastnost STROMU (není v gitu), ne instance: v čerstvém klonu,
+// v jiném pracovním stromu nebo na jiném stroji chybí. Nad existujícím stackem je to přitom
+// VSTUP kroku 2 — kontinuita držených hodnot (major databáze) a pinů operátora. Do 2026-10-03
+// krok 2 kontrolu při chybějícím souboru tiše přeskočil a doktor hlásil jen varování.
+describe("Phase C — existující stack bez minulého souboru prostředí", () => {
+  test("⛔ --stack-exists a soubor chybí nebo je prázdný → FAIL; bez existujícího stacku jen varování", () => {
+    const dir = mkdtempSync(join(tmpdir(), "doktor-kontinuita-"));
+    const chybi = join(dir, "neni.env");
+    const prazdny = join(dir, "prazdny.env");
+    writeFileSync(prazdny, "");
+    for (const soubor of [chybi, prazdny]) {
+      const r = runDoctor(["--phase", "C", "--no-network", "--stack-exists"], { ENV_FILE: soubor });
+      expect(r.exitCode, `${soubor}\n${r.stdout}`).toBe(1);
+      expect(r.stdout).toMatch(/kontinuita držených hodnot a pinů NEMĚŘENA/);
+    }
+    // KOTVA: první založení — soubor ještě být nemá (krok 2 ho vyrobí), FAIL kontinuity nesmí přijít.
+    const prvni = runDoctor(["--phase", "C", "--no-network"], { ENV_FILE: chybi });
+    expect(prvni.stdout).not.toMatch(/kontinuita držených hodnot/);
+    expect(prvni.stdout).toMatch(/missing — cold-start ji vygeneruje/);
+  });
+
+  test("doktor měří TUTÉŽ zálohu, kterou cold-start předává kroku 2 (ENV_PROD_BACKUP)", () => {
+    // Cold-start exportuje ENV_PROD_BACKUP; doktor ji do 2026-10-03 nečetl a měřil záložní soubor
+    // v kořeni stromu — u ne-produkčního prostředí nebo běhu z jiného pracovního stromu jiný soubor,
+    // než ze kterého krok 2 bere vstupy. Výslovný přepis (izolace testů) má dál přednost.
+    const doktor = readFileSync(DOCTOR, "utf8");
+    expect(doktor).toMatch(
+      /^PROD_BACKUP_FILE="\$\{AISHA_PROD_BACKUP_FILE:-\$\{ENV_PROD_BACKUP:-\$REPO_ROOT\/\.env-prod-backup\}\}"$/m,
+    );
+    const cs = readFileSync(join(ROOT, "scripts/aisha-cold-start.sh"), "utf8");
+    expect(cs).toMatch(/^export ENV_FILE="\$ENV_COOLIFY" ENV_PROD_BACKUP$/m);
+  });
+
+  test("⛔ zálohu doktor ČTE, nevykonává — hodnota s `|`, mezerou nebo `$(…)` nic nespustí (týž čtenář jako krok 2)", () => {
+    // NAMĚŘENO 2026-10-04: `set -a; . zaloha` vykonal holou hodnotu `a|touch <soubor>` (soubor vznikl)
+    // a do logu poslal kus jiné hodnoty jako „command not found“. Záloha vzniká i stažením env
+    // z Coolify, takže hodnota aplikace by se vykonala na stroji operátora.
+    const dir = mkdtempSync(join(tmpdir(), "doktor-zaloha-"));
+    const znacky = [join(dir, "z-roura"), join(dir, "z-substituce")];
+    const zaloha = join(dir, "zaloha.env");
+    writeFileSync(
+      zaloha,
+      [
+        `HODNOTA_S_ROUROU=a|touch ${znacky[0]}`,
+        "HOLA_S_MEZEROU=prvni druhe-slovo-ktere-nesmi-byt-prikaz",
+        `HODNOTA_SE_SUBSTITUCI=$(touch ${znacky[1]})`,
+        // řídicí proměnnou běhu čtenář cold-startu přeskočí a ohlásí — kotva, že čte on
+        "DRY_RUN=0",
+        "",
+      ].join("\n"),
+    );
+    const r = spawnSync("bash", [DOCTOR, "--phase", "C", "--no-network"], {
+      cwd: ROOT,
+      env: prostrediDoktora({ AISHA_PROD_BACKUP_FILE: zaloha }),
+      encoding: "utf8",
+    });
+    const vystup = `${r.stdout}\n${r.stderr}`;
+    expect(znacky.filter((z) => existsSync(z)), vystup).toEqual([]);
+    expect(vystup).not.toMatch(/command not found/);
+    expect(vystup).not.toMatch(/druhe-slovo-ktere-nesmi-byt-prikaz/);
+    expect(vystup, "zálohu nečte čtenář cold-startu (load_env_file_keys)").toMatch(/nese řídicí proměnnou DRY_RUN — ignoruji/);
   });
 });

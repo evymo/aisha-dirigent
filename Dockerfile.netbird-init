@@ -4,4 +4,6 @@
 ARG REGISTRY_PROXY=
 FROM ${REGISTRY_PROXY}library/alpine:3.20
 RUN apk add --no-cache gettext
-COPY coolify/netbird-management.json.template /staging/management.json.template
+# Instance stacku (config/netbird-instances.json) si vybírá svou šablonu; výchozí = hlavní řídicí rovina.
+ARG NETBIRD_MGMT_SABLONA=coolify/netbird-management.json.template
+COPY ${NETBIRD_MGMT_SABLONA} /staging/management.json.template

@@ -94,23 +94,28 @@ BEGIN
   END IF;
 
   -- Živé vazby obou zdrojů s normalizovaným klíčem.
-  CREATE TEMPORARY TABLE IF NOT EXISTS _pohl_vazby (
+  -- Dočasná tabulka se zakládá VŽDY znovu a čte se jen jako pg_temp.<jméno>.
+  -- `IF NOT EXISTS` by převzalo tabulku, kterou si volající založil v relaci
+  -- předem — s jeho řádky a spouštěmi, které by běžely právy vlastníka funkce.
+  DROP TABLE IF EXISTS pg_temp._pohl_vazby;
+  DROP TABLE IF EXISTS pg_temp._kanon_vazby;
+  DROP TABLE IF EXISTS pg_temp._pohl_twiny;
+  CREATE TEMPORARY TABLE _pohl_vazby (
     ref_id uuid PRIMARY KEY, twin_id uuid, ref_kind text, k text, state text, valid_to timestamptz
   ) ON COMMIT DROP;
-  CREATE TEMPORARY TABLE IF NOT EXISTS _kanon_vazby (
+  CREATE TEMPORARY TABLE _kanon_vazby (
     twin_id uuid, ref_kind text, k text
   ) ON COMMIT DROP;
-  CREATE TEMPORARY TABLE IF NOT EXISTS _pohl_twiny (
+  CREATE TEMPORARY TABLE _pohl_twiny (
     twin_id uuid PRIMARY KEY, trida text
   ) ON COMMIT DROP;
-  TRUNCATE _pohl_vazby, _kanon_vazby, _pohl_twiny;
 
-  INSERT INTO _pohl_vazby
+  INSERT INTO pg_temp._pohl_vazby
   SELECT r.id, r.twin_id, r.ref_kind, lower(regexp_replace(r.source_key, '[^[:alnum:]]', '', 'g')), r.state, r.valid_to
     FROM public.twin_external_refs r
    WHERE r.source = p_absorbed_source AND r.valid_to IS NULL AND r.state IN ('proposed', 'confirmed');
 
-  INSERT INTO _kanon_vazby
+  INSERT INTO pg_temp._kanon_vazby
   SELECT r.twin_id, r.ref_kind, lower(regexp_replace(r.source_key, '[^[:alnum:]]', '', 'g'))
     FROM public.twin_external_refs r
    WHERE r.source = v_kanon AND r.valid_to IS NULL AND r.state IN ('proposed', 'confirmed');
@@ -121,8 +126,8 @@ BEGIN
   -- druhu = spor → nejasne; nikdy archivace podle jednoho klíče.
   WITH par AS (
     SELECT a.twin_id, a.ref_id, c.twin_id AS kanon_twin
-      FROM _pohl_vazby a
-      LEFT JOIN _kanon_vazby c
+      FROM pg_temp._pohl_vazby a
+      LEFT JOIN pg_temp._kanon_vazby c
         ON c.ref_kind = a.ref_kind AND c.k = a.k AND c.twin_id <> a.twin_id
   ), souhrn AS (
     SELECT twin_id,
@@ -133,11 +138,11 @@ BEGIN
       FROM par
      GROUP BY twin_id
   )
-  INSERT INTO _pohl_twiny
+  INSERT INTO pg_temp._pohl_twiny
   SELECT s.twin_id,
          CASE
            WHEN s.sparovano = 0 THEN 'prevest'
-           WHEN NOT EXISTS (SELECT 1 FROM _kanon_vazby c WHERE c.twin_id = s.twin_id)
+           WHEN NOT EXISTS (SELECT 1 FROM pg_temp._kanon_vazby c WHERE c.twin_id = s.twin_id)
                 AND s.sparovano = s.klicu
                 AND s.kanon_twinu = 1
                 AND (SELECT te.entity_type FROM public.twin_entities te WHERE te.id = s.twin_id)
@@ -151,30 +156,30 @@ BEGIN
            'duplikat', count(*) FILTER (WHERE trida = 'duplikat'),
            'prevest',  count(*) FILTER (WHERE trida = 'prevest'),
            'nejasne',  count(*) FILTER (WHERE trida = 'nejasne'))
-    INTO v_tridy FROM _pohl_twiny;
+    INTO v_tridy FROM pg_temp._pohl_twiny;
   SELECT coalesce(jsonb_agg(twin_id ORDER BY twin_id), '[]'::jsonb) INTO v_nejasne
-    FROM _pohl_twiny WHERE trida = 'nejasne';
+    FROM pg_temp._pohl_twiny WHERE trida = 'nejasne';
 
   -- Vazby k ukončení: všechny u duplikátů + u převáděných ty, které týž twin
   -- už má od kanonického zdroje (převod by vyrobil dvojí vazbu).
   SELECT count(*) INTO v_n_nahr
-    FROM _pohl_vazby a JOIN _pohl_twiny t ON t.twin_id = a.twin_id
+    FROM pg_temp._pohl_vazby a JOIN pg_temp._pohl_twiny t ON t.twin_id = a.twin_id
    WHERE t.trida = 'duplikat'
-      OR (t.trida = 'prevest' AND EXISTS (SELECT 1 FROM _kanon_vazby c
+      OR (t.trida = 'prevest' AND EXISTS (SELECT 1 FROM pg_temp._kanon_vazby c
                                            WHERE c.twin_id = a.twin_id AND c.ref_kind = a.ref_kind AND c.k = a.k));
   SELECT count(*) INTO v_n_prev
-    FROM _pohl_vazby a JOIN _pohl_twiny t ON t.twin_id = a.twin_id
+    FROM pg_temp._pohl_vazby a JOIN pg_temp._pohl_twiny t ON t.twin_id = a.twin_id
    WHERE t.trida = 'prevest'
-     AND NOT EXISTS (SELECT 1 FROM _kanon_vazby c
+     AND NOT EXISTS (SELECT 1 FROM pg_temp._kanon_vazby c
                       WHERE c.twin_id = a.twin_id AND c.ref_kind = a.ref_kind AND c.k = a.k);
 
   -- Klíče duplikátů, které kanonický zdroj NIKDE nezná: ukončením zmizí z živých
   -- vazeb (řádek zůstává jako historie). Náhled je ukazuje, aby o ztrátě
   -- rozhodoval člověk vědomě — rozhodnutí je nepřiřazuje jinému twinu sám.
   SELECT count(*) INTO v_n_zanik
-    FROM _pohl_vazby a JOIN _pohl_twiny t ON t.twin_id = a.twin_id
+    FROM pg_temp._pohl_vazby a JOIN pg_temp._pohl_twiny t ON t.twin_id = a.twin_id
    WHERE t.trida = 'duplikat'
-     AND NOT EXISTS (SELECT 1 FROM _kanon_vazby c WHERE c.ref_kind = a.ref_kind AND c.k = a.k);
+     AND NOT EXISTS (SELECT 1 FROM pg_temp._kanon_vazby c WHERE c.ref_kind = a.ref_kind AND c.k = a.k);
 
   IF p_dry_run THEN
     RETURN jsonb_build_object('ok', true, 'dry_run', true, 'zdroj', p_absorbed_source, 'kanon', v_kanon,
@@ -189,10 +194,10 @@ BEGIN
   WITH zmenene AS (
     UPDATE public.twin_external_refs r
        SET state = 'superseded', valid_to = now(), updated_at = now()
-      FROM _pohl_vazby a JOIN _pohl_twiny t ON t.twin_id = a.twin_id
+      FROM pg_temp._pohl_vazby a JOIN pg_temp._pohl_twiny t ON t.twin_id = a.twin_id
      WHERE r.id = a.ref_id
        AND (t.trida = 'duplikat'
-            OR (t.trida = 'prevest' AND EXISTS (SELECT 1 FROM _kanon_vazby c
+            OR (t.trida = 'prevest' AND EXISTS (SELECT 1 FROM pg_temp._kanon_vazby c
                                                  WHERE c.twin_id = a.twin_id AND c.ref_kind = a.ref_kind AND c.k = a.k)))
     RETURNING r.id, a.state AS pred_state
   )
@@ -203,7 +208,7 @@ BEGIN
   WITH prevedene AS (
     UPDATE public.twin_external_refs r
        SET source = v_kanon, updated_at = now()
-      FROM _pohl_vazby a JOIN _pohl_twiny t ON t.twin_id = a.twin_id
+      FROM pg_temp._pohl_vazby a JOIN pg_temp._pohl_twiny t ON t.twin_id = a.twin_id
      WHERE r.id = a.ref_id
        AND t.trida = 'prevest'
        AND r.valid_to IS NULL
@@ -215,13 +220,13 @@ BEGIN
   -- 3) Archivovat duplikáty (stav PŘED zásahem jde do rozhodnutí).
   SELECT coalesce(jsonb_agg(jsonb_build_object('id', e.id, 'pred_status', e.status) ORDER BY e.id), '[]'::jsonb)
     INTO v_twiny
-    FROM public.twin_entities e JOIN _pohl_twiny t ON t.twin_id = e.id
+    FROM public.twin_entities e JOIN pg_temp._pohl_twiny t ON t.twin_id = e.id
    WHERE t.trida = 'duplikat';
   UPDATE public.twin_entities e
      SET status = 'archived',
          metadata = coalesce(e.metadata, '{}'::jsonb) || jsonb_build_object('archivovano_rozhodnutim', v_decision),
          updated_at = now()
-    FROM _pohl_twiny t
+    FROM pg_temp._pohl_twiny t
    WHERE e.id = t.twin_id AND t.trida = 'duplikat';
 
   INSERT INTO public.audit_journal (id, user_id, action, action_type, area, entity_type, entity_id,

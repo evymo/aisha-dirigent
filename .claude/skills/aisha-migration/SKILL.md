@@ -225,6 +225,15 @@ právě to zdržení, které tenhle skill jinde odstraňuje.
 v souboru tabulky shodí cold start (`set_updated_at()` ještě neexistuje). Jedna
 tabulka = jeden soubor, policies do `policies/`.
 
+### Parametr RPC: DEFAULT ano, výchozí hodnota v aktualizaci ne
+Nový nebo změněný parametr RPC dostane `DEFAULT` (starší volající nespadnou) —
+**žádná obalová funkce vedle se starou signaturou**. Jde-li parametr do aktualizační
+cesty `sloupec = COALESCE(p_x, sloupec)`, je ten DEFAULT **NULL** a výchozí hodnota
+patří jen do větve INSERT (`COALESCE(p_x, 'výchozí')`). Jinak vynechané pole není
+NULL, ale výchozí hodnota, a aktualizace tiše přepíše uložená data (2026-10-07:
+změna stavu veřejného chatu vrátila model, prompt i teplotu na výchozí). Hlídá brána
+`upsert-vychozi-hodnota-jen-pri-zalozeni`.
+
 ## Anti-patterny
 
 | ❌ | proč |
@@ -232,6 +241,7 @@ tabulka = jeden soubor, policies do `policies/`.
 | timestampovaná migrace | `baseline-only-release` gate ji zamítne; repo je wipe-first |
 | edit `baseline.sql` | zmizí při `db:init:generate` |
 | SoT soubor bez `\ir` v heals | na běžící DB se nikdy nepřehraje |
+| `DEFAULT 'x'` u parametru v `COALESCE(p_x, sloupec)` | vynechané pole v aktualizaci přepíše uložená data výchozí hodnotou |
 | neidempotentní SoT | heals běží při každém migrate → rozbije druhý deploy |
 | nový objekt bez `DROP` starých jmen | staré policies se OR-ují k nové a znegují ji |
 | `is_admin_or_staff()` v policy bez `(select …)` | per-row: 43 157 volání na jeden dotaz |

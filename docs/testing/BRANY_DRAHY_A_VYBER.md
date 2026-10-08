@@ -96,18 +96,50 @@ v lehké dráze, musí se do jejího limitu vejít i ten trojnásobek.
 ## Výběr dotčených
 
 `scripts/test/brany-dotcene.mjs` rozhoduje CO pustit,
-`brany-dotcene-spust.mjs` to spouští. Mapa kategorií je v `lanes.json`.
+`brany-dotcene-spust.mjs` to spouští ručně, `scripts/ci/prepush-cilene.mjs`
+v pre-push háku. Mapa je v `lanes.json`.
 
 ```
 změna jednoho compose souboru → 7 bran místo 627 → 8 s místo 53 s
 ```
+
+### Od 2026-10-05 je výběr jediná sada bran v pre-push
+
+Rozhodnutí majitele **„plné sady jen v CI"**: celou sadu (obě dráhy) měří CI
+(job Web: Brány, od téhož dne bez podmínky na `app`), pre-push pouští jen výběr.
+Brána se vybere pěti cestami (sjednocení; výpis háku říká, kolik které přispěly):
+
+| zdroj | co vybere |
+|---|---|
+| kategorie (`lanes.json`) | kurátorská mapa „cesty → brány, které je čtou" |
+| změněná brána | kdo mění bránu, musí ji pustit |
+| odkaz na cestu | brána, jejíž zdroj jmenuje změněný soubor — nebo kořen jeho pracovního prostoru (`oblasti`: `packages/x`, `services/x`, …) |
+| přímý import | brána, která změněný modul importuje (i relativně, i aliasem z `tsconfig`) |
+| třídní (vždy) | kategorie `trida-repo` s `vzdy`: brány nad celou třídou souborů (univerzum z `git ls-files` nebo z chůze stromem) — každá nová cesta je pro ně potenciální nález, jdou do KAŽDÉHO výběru |
+
+Odkaz i import se počítají ze zdroje bran při každém výběru, takže nestárnou.
+Naměřeno nad stromem 2026-10-05 (bez třídních): změna v `packages/security` → 9 bran
+z 884, `scripts/aisha-cold-start.sh` → 85 (kategorie coldstart + skripty + 78 bran, které
+skript jmenují), pomocník `src/tests/gates/lib/tracked-services.ts` → 15 (14 importem).
+Třídní brány (140) se přidávají ke každému výběru: zavedeny po PR #1152, kde výběr minul
+`neznamy-prepinac-neni-vychozi-chovani` a `git-v-testech-bez-prostredi` a obě v CI
+spadly na nových souborech téže změny. Brána vyber-bran-je-fail-closed hlídá, že každá
+brána nad `git ls-files` je třídní, a mutant „bez třídních" ji shodí.
+
+`oblasti` v `lanes.json` deklarují, kde stačí výběr odkazem a importem: cesta
+v oblasti je pro mapu ZNÁMÁ, i když ji žádná kategorie nejmenuje (jinak by změna
+v jednom balíčku padala na celou lehkou dráhu). `src/test/**` (setup obou vitest
+konfigurací) je z oblasti `src/**` vyjmutá — dotýká se všeho, fail-closed je tam
+správná odpověď. Celý postup pre-pushe: [docs/deploy/CICD.md](../deploy/CICD.md),
+oddíl „Plné sady jen v CI".
 
 ### Fail-closed je základ, ne výjimka
 
 Cestu, kterou mapa nezná, NELZE mlčky prohlásit za nedotčenou. Táž třída mapy
 se v `.forgejo/workflows/ci.yml` zdokumentovaně spletla **třikrát** (chyběly
 `apps/`, `docker-compose*.yml` + `config/`, `packages/`) a pokaždé to znamenalo,
-že „zelená znamenala NEMĚŘENO". Neznámá cesta proto padá na celou lehkou dráhu.
+že „zelená znamenala NEMĚŘENO". Neznámá cesta proto padá na celou lehkou dráhu
+(v pre-push „širší dráha": lehká dráha + vybrané těžké brány) a hák ji vypíše.
 
 `package.json` a `vitest.gates.config.ts` do mapy SCHVÁLNĚ nepatří: změna
 testovací konfigurace se dotýká všeho, takže fail-closed je u nich správná
@@ -115,13 +147,16 @@ odpověď, ne mezera.
 
 ### Co výběr NETVRDÍ
 
-Úplnost. Tvrzení „žádná brána mimo kategorii X nečte compose" je pro 501
+Úplnost. Tvrzení „žádná brána mimo kategorii X nečte compose" je pro stovky
 textových bran staticky nedokazatelné a pokus by byl jen další špatný regex.
-**Úplnost zaručuje plný běh, ne mapa.**
+**Úplnost zaručuje plný běh v CI, ne mapa.**
 
 Mapu hlídá orákulum `vyber-bran-je-fail-closed.gate.test.ts`, které selektor
-SPOUŠTÍ nad syntetickými commity v dočasném repu. Ověřuje tři vlastnosti:
-zužuje · fail-closed platí · vzory ve stromu na něco sedí.
+SPOUŠTÍ nad syntetickými commity v dočasném repu. Ověřuje: zužuje · fail-closed
+platí · oblast a změněná brána se vyberou · vzory ve stromu na něco sedí.
+Chování celého pre-pushe nad dočasným gitem (balíček, merge commit, neznámá cesta,
+pád směrovače i výběru, mutanti „merge = vše" a „neznámá = nic") měří
+`prepush-vyber-je-cileny.gate.test.ts`.
 
 ## Zásady, které dnešek doložil
 
@@ -244,6 +279,8 @@ nejhorším možným směrem: hlídač přestane zamrznutí poznávat a všechno
 | `src/tests/gates/vyber-bran-je-fail-closed.gate.test.ts` | orákulum výběru (spouští selektor nad syntetickými commity) |
 | `scripts/test/brany-dotcene.mjs` | rozhoduje, co je dotčené |
 | `scripts/test/brany-dotcene-spust.mjs` | spouští výběr, nebo poctivě celou dráhu |
+| `scripts/ci/prepush-cilene.mjs` | cílená / širší dráha pre-pushe (brány, sady workspace, testy přímým importem) |
+| `src/tests/gates/prepush-vyber-je-cileny.gate.test.ts` | chování pre-pushe nad dočasným gitem + mutanti |
 | `scripts/test/brany-obe-drahy.mjs` | obě dráhy + sečtený verdikt (NEzkratuje) |
 | `scripts/test/run-vitest.mjs` | běhoun: podlaha Node, průnik argumentů, stráže |
 | `scripts/test/verdikt-kody.mjs` | tři stavy běhu (0 / 1 / 75 NEZMĚŘENO) na jednom místě |

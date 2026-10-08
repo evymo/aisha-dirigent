@@ -34,7 +34,10 @@ vi.mock('../config.js', () => ({
 // thing without depending on real jose verification.
 
 describe('auth.ts — verifyToken role/scope/client extraction', () => {
-  async function setupWithVerifierResult(payload: Record<string, unknown>) {
+  async function setupWithVerifierResult(
+    payload: Record<string, unknown>,
+    kcAllowedClients: string[] = ['aisha-mcp', 'aisha-cli'],
+  ) {
     vi.resetModules();
     const mockVerify = vi.fn().mockResolvedValue(payload);
     vi.doMock('@aisha/security', () => ({
@@ -46,7 +49,7 @@ describe('auth.ts — verifyToken role/scope/client extraction', () => {
       config: {
         jwksUrl: 'http://kc/jwks',
         kcIssuer: 'http://kc/realms/aisha',
-        kcAllowedClients: ['aisha-mcp', 'aisha-cli'],
+        kcAllowedClients,
       },
     }));
     const mod = await import('../auth.js');
@@ -128,5 +131,28 @@ describe('auth.ts — verifyToken role/scope/client extraction', () => {
     });
     const out = await verifyToken('Bearer t');
     expect(out.userId).toBe('u');
+  });
+
+  // ⛔ Do 2026-10-04 prázdný seznam pouštěl KAŽDÉHO klienta realmu. Prázdný seznam = nikdo.
+  describe('prázdný seznam povolených klientů = nikdo', () => {
+    const token = { sub: 'u', azp: 'aisha-mcp', aud: ['aisha-cli'] };
+
+    it('jinak platný token dostane 403 — ani `azp`, ani `aud` nepomůže', async () => {
+      const { verifyToken } = await setupWithVerifierResult(token, []);
+      await expect(verifyToken('Bearer t')).rejects.toMatchObject({
+        name: 'AuthError',
+        statusCode: 403,
+        message: 'Keycloak client not allowed',
+      });
+    });
+
+    // Kotva: týž token projde, jakmile seznam jeho klienta nese — 403 výš je tedy seznamem, ne tokenem.
+    it.each([
+      ['podle azp', ['aisha-mcp']],
+      ['podle aud', ['aisha-cli']],
+    ])('kotva: týž token s neprázdným seznamem projde (%s)', async (_popis, seznam) => {
+      const { verifyToken } = await setupWithVerifierResult(token, seznam);
+      await expect(verifyToken('Bearer t')).resolves.toMatchObject({ userId: 'u' });
+    });
   });
 });

@@ -10,7 +10,14 @@
  * The model is a property of the corpus/index (see the multilingual-RAG RFC),
  * not a per-call dispatcher choice; the caller resolves it (config default for
  * the OpenAI path, the RAG backend's model_id for the v2 path).
+ *
+ * LANE NA GPU (varianta C, 2026-10-05): vLLM kinds (`vllm`, `local_vllm`) mohou stát za
+ * vynucovacím bodem společné lane. Ten chce u KAŽDÉHO požadavku třídu (`x-aisha-trida`,
+ * výchozí se nedosazuje), odmítá uzavřeným slovníkem `{duvod, error}` a k odpovědi přidává
+ * identitu vah (`x-aisha-identita`). Slovník i jména hlaviček jsou v `@aisha/accel-protokol`
+ * — tady se importují, neopisují.
  */
+import { HLAVICKY, jeDuvod, type Duvod, type Trida } from '@aisha/accel-protokol';
 
 /** OpenAI-compatible kinds POST {base}/v1/embeddings; ollama POSTs {base}/api/embed. */
 export type EmbedBackendKind =
@@ -60,13 +67,102 @@ export interface EmbedOptions {
   dimensions?: number;
   /** Per-request timeout (default 60000). */
   timeoutMs?: number;
+  /**
+   * Třída požadavku pro lane (`x-aisha-trida`): `dotaz` (interaktivní) | `davka` (přepočet).
+   * U vLLM kinds POVINNÁ — lane bez ní odmítne (POZADAVEK_NEPLATNY) a výchozí se nedosazuje.
+   */
+  trida?: Trida;
+}
+
+/** Identita vah, kterou lane k odpovědi připojila (EM2): `<formát>:<sha256>` + revize + recept. */
+export interface IdentitaVah {
+  identita: string;
+  revize: string | null;
+  recept: string;
+}
+
+/** Vektory + identita vah, které je spočítaly (null = backend identitu neposílá, např. llama.cpp). */
+export interface EmbedVysledek {
+  vectors: number[][];
+  identita: IdentitaVah | null;
 }
 
 export class EmbedDispatchError extends Error {
-  constructor(public statusCode: number, message: string, public providerBody?: string) {
+  constructor(
+    public statusCode: number,
+    message: string,
+    public providerBody?: string,
+    /** Kód odmítnutí lane ze slovníku @aisha/accel-protokol (jen když ho tělo neslo). */
+    public duvod?: Duvod,
+    /** Kdo odmítl (`x-aisha-odmitl`: vstup | klient | most). */
+    public odmitl?: string,
+    /** U KVOTA_PREKROCENA: která kvóta došla (`kvota` z těla odmítnutí). */
+    public kvota?: string,
+    /** Sekundy z `Retry-After` (jen nezáporné číslo; HTTP datum ani nic jiného = null, neodhaduje se). */
+    public znovuZaS: number | null = null,
+  ) {
     super(message);
     this.name = 'EmbedDispatchError';
   }
+}
+
+/** vLLM kinds — ty mohou stát za lane na GPU, takže nesou její požadavky (třída, klíč). */
+export function jeVllmKind(kind: EmbedBackendKind): boolean {
+  return kind === 'vllm' || kind === 'local_vllm';
+}
+
+const TVAR_IDENTITY = /^[A-Za-z0-9._-]+:[0-9a-f]{64}$/;
+
+/**
+ * Chybu z ne-2xx odpovědi sestaví s KÓDEM lane, když ho tělo nese (`{duvod, error}`).
+ * Volající se podle kódu rozhodne (LANE_STARTUJE/LANE_NEDOSTUPNA = vrstva stojí, nahlas;
+ * ENGINE_ODMITL = vstup nad oknem; KVOTA_PREKROCENA = počkat) — žádný návrat na jiný model.
+ */
+async function chybaZOdpovedi(res: Response, kontext: string): Promise<EmbedDispatchError> {
+  const text = await res.text().catch(() => '');
+  let duvod: Duvod | undefined;
+  let popis = '';
+  let kvota: string | undefined;
+  try {
+    const telo = JSON.parse(text) as { duvod?: unknown; error?: unknown; kvota?: unknown };
+    if (telo && jeDuvod(telo.duvod)) {
+      duvod = telo.duvod;
+      popis = typeof telo.error === 'string' ? telo.error : '';
+      kvota = typeof telo.kvota === 'string' ? telo.kvota : undefined;
+    }
+  } catch {
+    // tělo není JSON — chyba bez kódu lane
+  }
+  const odmitl = res.headers.get(HLAVICKY.ODMITL) ?? undefined;
+  const zprava = duvod
+    ? `lane odmítla ${kontext}: ${duvod}${popis ? ` — ${popis}` : ''}${odmitl ? ` (odmítl: ${odmitl})` : ''}`
+    : `${kontext}: provider returned ${res.status}`;
+  return new EmbedDispatchError(res.status, zprava, text.slice(0, 500), duvod, odmitl, kvota, znovuZa(res));
+}
+
+/** `Retry-After` ve vteřinách; cokoli jiného než nezáporné číslo (i HTTP datum) = null. */
+function znovuZa(res: Response): number | null {
+  const h = res.headers.get('retry-after');
+  if (h === null || !/^\d+(\.\d+)?$/.test(h.trim())) return null;
+  return Number(h.trim());
+}
+
+/**
+ * Identita vah z hlaviček odpovědi. Chybí-li `x-aisha-identita`, backend ji neposílá (null).
+ * Je-li, musí mít tvar `<formát>:<sha256>` a recept — neúplnou nebo vadnou identitu nelze
+ * k vektoru uložit (E2), takže je to chyba, ne „bez identity“.
+ */
+function identitaZOdpovedi(res: Response, kontext: string): IdentitaVah | null {
+  const identita = res.headers.get(HLAVICKY.IDENTITA);
+  if (identita === null) return null;
+  const recept = res.headers.get(HLAVICKY.RECEPT);
+  if (!TVAR_IDENTITY.test(identita) || !recept) {
+    throw new EmbedDispatchError(
+      502,
+      `${kontext}: identita vah v odpovědi je neúplná nebo vadná (identita='${identita.slice(0, 80)}', recept=${recept ? 'ano' : 'chybí'}) — vektor nelze přiřadit`,
+    );
+  }
+  return { identita, revize: res.headers.get(HLAVICKY.REVIZE), recept };
 }
 
 const OPENAI_DEFAULT_BASE = 'https://api.openai.com';
@@ -86,12 +182,20 @@ function isOllama(kind: EmbedBackendKind): boolean {
  * on missing config / non-2xx / shape failures (caller owns retry+backoff).
  */
 export async function embed(opts: EmbedOptions): Promise<number[][]> {
+  return (await embedSIdentitou(opts)).vectors;
+}
+
+/**
+ * Jako `embed()`, a navíc identita vah, které vektory spočítaly (lane ji posílá v hlavičkách).
+ * Kdo vektory UKLÁDÁ, volá tuhle — identita patří k vektoru (E2).
+ */
+export async function embedSIdentitou(opts: EmbedOptions): Promise<EmbedVysledek> {
   const { texts, model, backendKind, apiKey } = opts;
 
   if (!model || model.trim().length === 0) {
     throw new EmbedDispatchError(500, 'embed(): model is required (the corpus/index model is never defaulted)');
   }
-  if (texts.length === 0) return [];
+  if (texts.length === 0) return { vectors: [], identita: null };
 
   // Resolve the base. OpenAI/direct_cloud fall back to the public endpoint; every
   // other kind MUST be given a baseUrl (there is no sane default for a local box).
@@ -104,6 +208,10 @@ export async function embed(opts: EmbedOptions): Promise<number[][]> {
   if (!rawBase) {
     throw new EmbedDispatchError(503, `embed(): no baseUrl resolved for backendKind='${backendKind}'`);
   }
+  if (jeVllmKind(backendKind) && !opts.trida) {
+    // Programová chyba volajícího: lane bez třídy odmítne a dosadit ji tady by rozhodlo za něj.
+    throw new EmbedDispatchError(500, `embed(): třída požadavku (dotaz|davka) je u '${backendKind}' povinná — výchozí se nedosazuje`);
+  }
   const base = rootBase(rawBase);
   const url = isOllama(backendKind) ? `${base}/api/embed` : `${base}/v1/embeddings`;
 
@@ -112,6 +220,7 @@ export async function embed(opts: EmbedOptions): Promise<number[][]> {
     Accept: 'application/json',
   };
   if (apiKey && apiKey.trim().length > 0) headers.Authorization = `Bearer ${apiKey}`;
+  if (jeVllmKind(backendKind) && opts.trida) headers[HLAVICKY.TRIDA] = opts.trida;
 
   const timeoutMs = opts.timeoutMs ?? 60_000;
   // Both wire formats accept {model, input}. OpenAI/vLLM also accept an MRL
@@ -142,10 +251,10 @@ export async function embed(opts: EmbedOptions): Promise<number[][]> {
   clearTimeout(timer);
 
   if (!res.ok) {
-    const body = await res.text().catch(() => '(empty)');
-    throw new EmbedDispatchError(res.status, `embed provider returned ${res.status} (${backendKind})`, body.slice(0, 500));
+    throw await chybaZOdpovedi(res, `embed (${backendKind})`);
   }
 
+  const identita = identitaZOdpovedi(res, `embed (${backendKind})`);
   const json = (await res.json()) as unknown;
   if (typeof json !== 'object' || json === null) {
     throw new EmbedDispatchError(502, `embed provider returned non-object body (${backendKind})`);
@@ -156,17 +265,18 @@ export async function embed(opts: EmbedOptions): Promise<number[][]> {
     if (!Array.isArray(embeddings)) {
       throw new EmbedDispatchError(502, 'ollama /api/embed response missing embeddings[]');
     }
-    return embeddings as number[][];
+    return { vectors: embeddings as number[][], identita };
   }
 
   const data = (json as { data?: unknown }).data;
   if (!Array.isArray(data)) {
     throw new EmbedDispatchError(502, 'embeddings response missing data[]');
   }
-  return (data as Array<{ index: number; embedding: number[] }>)
+  const vectors = (data as Array<{ index: number; embedding: number[] }>)
     .slice()
     .sort((a, b) => a.index - b.index)
     .map((d) => d.embedding);
+  return { vectors, identita };
 }
 
 /**
@@ -175,18 +285,31 @@ export async function embed(opts: EmbedOptions): Promise<number[][]> {
  * Slouží k tomu, aby se text nad stropem (n_batch) NEKÓDOVAL: llama.cpp by ho tiše ořízl.
  * URL je odvozená z endpoint_url backendu (ai_provider_registry, ohraničeno DB) — stejný
  * původ jako embed() výš.
+ *
+ * Lane na GPU tuhle cestu NEMÁ (odmítne `CESTA_NEZNAMA`) a ořez nedělá: vstup nad oknem
+ * odmítne `ENGINE_ODMITL`. Proto se posílá klíč i třída (jinak by lane odmítla dřív, kódem
+ * KLIC_CHYBI, a volající by nepoznal, že mluví s lane) a chyba nese kód lane.
  */
-export async function countTokens(url: string, model: string, text: string, timeoutMs = 30_000): Promise<number> {
+export async function countTokens(
+  url: string,
+  model: string,
+  text: string,
+  timeoutMs = 30_000,
+  pozadavek: { apiKey?: string; trida?: Trida } = {},
+): Promise<number> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', Accept: 'application/json' };
+    if (pozadavek.apiKey && pozadavek.apiKey.trim().length > 0) headers.Authorization = `Bearer ${pozadavek.apiKey}`;
+    if (pozadavek.trida) headers[HLAVICKY.TRIDA] = pozadavek.trida;
     const res = await fetch(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers,
       body: JSON.stringify({ model, input: text }),
       signal: controller.signal,
     });
-    if (!res.ok) throw new EmbedDispatchError(502, `tokenize/count HTTP ${res.status}`);
+    if (!res.ok) throw await chybaZOdpovedi(res, 'tokenize/count');
     const body = (await res.json()) as { count?: unknown };
     if (typeof body.count !== 'number' || !Number.isFinite(body.count)) {
       throw new EmbedDispatchError(502, 'tokenize/count nevrátil číslo');

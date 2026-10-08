@@ -66,6 +66,7 @@ describe("WF_DRIFT_OBSERVER.json — structure", () => {
       "trigger-create-missing",
       "alert-security",
       "alert-critical",
+      "alert-unmeasured",
       "log-clean",
       "respond",
     ];
@@ -99,7 +100,7 @@ describe("WF_DRIFT_OBSERVER.json — structure", () => {
   test("classifier produces 5 severity levels", () => {
     const node = requireNode(wf, (n) => n.id === "parse-drift");
     const code = node.parameters.jsCode;
-    const severities = ["clean", "medium", "high", "critical", "security_concern"];
+    const severities = ["clean", "medium", "high", "critical", "security_concern", "nezmereno"];
     for (const s of severities) {
       expect(code).toContain(s);
     }
@@ -112,6 +113,52 @@ describe("WF_DRIFT_OBSERVER.json — structure", () => {
     expect(code).toContain("missing");
     expect(code).toContain("composeDrift");
     expect(code).toContain("serverDrift");
+    expect(code, "nezměřený server (U3, drift-check kód 3) NENÍ shoda").toContain("serverUnmeasured");
+  });
+
+  // CHOVÁNÍ, ne text (2026-10-05, revize U3): kód uzlu parse-drift se spustí nad falešným
+  // $input a každá závažnost, kterou vydá, musí mít VLASTNÍ větev přepínače. Fallback
+  // přepínače vede do „Log clean state“ — závažnost bez pravidla by se tvářila jako čisto.
+  test("classifier: nezměřený server a nečitelný výstup = nezmereno, a ta má vlastní větev (ne log-clean)", () => {
+    const node = requireNode(wf, (n) => n.id === "parse-drift");
+    const kod = node.parameters?.jsCode;
+    if (typeof kod !== "string") throw new Error("uzel parse-drift nemá jsCode — test by neměřil nic");
+    const klasifikuj = (vystup: unknown) => {
+      const $input = { first: () => ({ json: { body: { output: typeof vystup === "string" ? vystup : JSON.stringify(vystup) } } }) };
+      const $ = () => ({ first: () => ({ json: { reason: "test" } }) });
+      return (new Function("$input", "$", kod) as (a: unknown, b: unknown) => { json: { severity: string } })($input, $).json.severity;
+    };
+    const prazdne = { orphaned: [], missing: [], composeDrift: [], serverDrift: [], serverUnmeasured: [] };
+    expect(klasifikuj(prazdne), "kotva").toBe("clean");
+    expect(klasifikuj({ ...prazdne, serverUnmeasured: [{ name: "x", reason: "COOLIFY_SERVER_UUID_GPU nenastaveno" }] })).toBe("nezmereno");
+    expect(klasifikuj("{nejson")).toBe("nezmereno");
+    // Chybějící výstup runneru, prázdný řetězec, `{}`, `null` ani report bez některého z pěti
+    // polí nejsou měření — dřív `|| '{}'` udělalo z chybějícího výstupu clean.
+    const bezVystupu = (body: Record<string, unknown>) =>
+      (new Function("$input", "$", kod) as (a: unknown, b: unknown) => { json: { severity: string } })(
+        { first: () => ({ json: { body } }) },
+        () => ({ first: () => ({ json: { reason: "test" } }) }),
+      ).json.severity;
+    expect(bezVystupu({}), "runner bez output i stdout").toBe("nezmereno");
+    expect(bezVystupu({ output: "" }), "prázdný výstup").toBe("nezmereno");
+    expect(klasifikuj("{}"), "prázdný objekt není report").toBe("nezmereno");
+    expect(klasifikuj("null")).toBe("nezmereno");
+    const { serverUnmeasured: _bez, ...bezPole } = prazdne;
+    expect(klasifikuj(bezPole), "report bez pole serverUnmeasured").toBe("nezmereno");
+    expect(klasifikuj({ ...prazdne, serverDrift: [{ name: "x" }], serverUnmeasured: [{ name: "y" }] }), "server jinde je pořád kritický").toBe("critical");
+
+    const route = requireNode(wf, (n) => n.id === "route");
+    const pravidla = ((route.parameters?.rules?.values ?? []) as Array<{ outputKey: string; conditions: { conditions: Array<{ rightValue: string }> } }>);
+    expect(pravidla.length, "přepínač bez pravidel — test by neměřil nic").toBeGreaterThan(0);
+    const vetve = new Map(pravidla.map((p, i) => [p.conditions.conditions[0].rightValue, i]));
+    for (const zavaznost of ["medium", "high", "security_concern", "critical", "nezmereno"]) {
+      expect(vetve.has(zavaznost), `závažnost ${zavaznost} nemá vlastní větev — padla by do log-clean`).toBe(true);
+    }
+    const vystupy = wf.connections["Route by severity"].main ?? [];
+    expect(vystupy[vetve.get("nezmereno")!]?.[0]?.node).toBe("Unmeasured alert (server NEZMĚŘEN)");
+    // fallback (poslední výstup) je pořád log-clean
+    expect(vystupy[vystupy.length - 1][0].node).toBe("Log clean state");
+    expect(vystupy.length).toBe(pravidla.length + 1);
   });
 
   test("auto-fix-compose branch calls exec sandbox with --fix-compose", () => {

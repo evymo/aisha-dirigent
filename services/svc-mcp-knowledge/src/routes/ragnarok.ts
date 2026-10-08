@@ -2,6 +2,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { verifyToken, verifyServiceRole, isAdminOrStaff, AuthError } from '../auth.js';
 import { config } from '../config.js';
 import { detectSourceType } from '../lib/file-type.js';
+import { skenujNahravku } from '../lib/av-nahravka.js';
 
 const DEFAULT_LANG = 'cs-CZ';
 
@@ -238,6 +239,43 @@ export async function ragnarokRoutes(app: FastifyInstance): Promise<void> {
         chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as unknown as Uint8Array));
       }
       const fileBuffer = Buffer.concat(chunks);
+
+      // Antivir PŘED předáním enginu (lib/av-nahravka.ts). Dál smí jen `clean`;
+      // nález i neprovedený sken nahrání odmítnou — engine soubor vůbec neuvidí.
+      const verdikt = await skenujNahravku(fileBuffer);
+      if (verdikt.status === 'infected') {
+        req.log.warn({ signature: verdikt.signature, size: fileBuffer.length }, 'kb upload: malware detected — refused');
+        return reply.code(422).send({
+          error: 'File rejected: malware detected',
+          code: 'av_infected',
+          signature: verdikt.signature,
+        });
+      }
+      if (verdikt.status === 'disabled') {
+        req.log.error('kb upload: antivirus scan is switched OFF (AV_SCAN_ENABLED=false) in production — refused');
+        return reply.code(503).send({
+          error: 'Upload refused: antivirus scan is switched off',
+          code: 'av_disabled',
+        });
+      }
+      if (verdikt.status === 'error' && verdikt.kind === 'size_limit') {
+        // Vada SOUBORU, ne platformy: správce nemá hledat výpadek antiviru.
+        req.log.warn({ size: fileBuffer.length }, 'kb upload: file exceeds the antivirus stream limit — refused');
+        return reply.code(413).send({
+          error: 'File rejected: too large for the antivirus scan',
+          code: 'av_too_large',
+        });
+      }
+      if (verdikt.status === 'error') {
+        req.log.error({ reason: verdikt.reason, size: fileBuffer.length }, 'kb upload: antivirus scan did not complete — refused');
+        return reply.code(503).send({
+          error: 'Upload refused: antivirus scan is unavailable',
+          code: 'av_unavailable',
+        });
+      }
+      if (verdikt.status === 'skipped') {
+        req.log.warn('kb upload: antivirus scan is switched OFF (AV_SCAN_ENABLED=false) — file forwarded unscanned');
+      }
 
       // Detect source_type at the gateway: clients upload raw files, we map
       // them to Ragnarok's enum (pdf|txt|docx|html|pptx|xlsx). Klient může

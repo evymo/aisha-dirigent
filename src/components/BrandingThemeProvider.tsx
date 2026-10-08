@@ -8,6 +8,7 @@ import { BrandProvider } from "@/components/branding/BrandContext";
 import { buildFontFaceCss } from "@/lib/branding/fontFaceCss";
 
 import type { BrandingProfile } from "@/lib/schemas/brandingProfileSchemas";
+import { nastavIkonuOkna } from "@/lib/branding/ikonaOkna";
 
 interface BrandingThemeProviderProps {
   children: React.ReactNode;
@@ -89,9 +90,9 @@ export function BrandingThemeProvider({
 
     styleRef.current.textContent = cssText;
 
-    // Update favicon if specified
+    // Ikona okna instance (všechny <link rel="icon">, viz lib/branding/ikonaOkna.ts)
     if (profile.favicon_path) {
-      updateFavicon(profile.favicon_path);
+      nastavIkonuOkna(document, profile.favicon_path, profile.profile_version);
     }
 
     return () => {
@@ -124,18 +125,4 @@ function buildFontOverrideCss(profile: BrandingProfile): string {
     lines.push(`--font-code: ${profile.font_family_code};`);
   }
   return lines.join("\n    ");
-}
-
-/**
- * Dynamically update the favicon link element.
- */
-function updateFavicon(faviconPath: string): void {
-  let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-  if (!link) {
-    link = document.createElement("link");
-    link.rel = "icon";
-    document.head.appendChild(link);
-  }
-  // Assume branding-assets bucket with cache bust
-  link.href = `${faviconPath}?v=${Date.now()}`;
 }

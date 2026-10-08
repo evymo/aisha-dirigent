@@ -34,18 +34,19 @@ import { fileURLToPath } from "node:url";
 import { resolveInstanceIdentity, resolveManifestPath } from "./coolify-instance-scope.mjs";
 import { overlayDir } from "./instance-overlay.mjs";
 import { isDirectRun } from "./cli-entry.mjs";
+import { aplikaceManifestu } from "./vlastnictvi-aplikaci.mjs";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
-/** Tvar řádku, kterým manifest zakládá aplikaci `pki` — týž, jaký čte cold-start. */
-const PKI_APP_LINE = /^app:\s*pki:/m;
-
 /**
+ * Zakládá manifest aplikaci `pki`? Řádky `app:` čte JEDINÝ parser (domov vlastnictví,
+ * lib/vlastnictvi-aplikaci.mjs) — týž, podle kterého ji story-init zakládá. Otázka je
+ * inventářová (nese instance PKI vůbec), ne vlastnická.
  * @param {string} manifestText obsah `coolify/manifests/<story>.manifest`
  * @returns {"true"|"false"} hodnota pro `${PKI_BUNDLE_REQUIRED:?}` v compose
  */
 export function pkiBundleRequiredFromManifest(manifestText) {
-  return PKI_APP_LINE.test(String(manifestText ?? "")) ? "true" : "false";
+  return aplikaceManifestu(String(manifestText ?? "")).some((a) => a.role === "pki") ? "true" : "false";
 }
 
 /**

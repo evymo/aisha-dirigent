@@ -81,9 +81,12 @@ BEGIN
   v_kriterium := jsonb_build_object('template_name', p_template_name, 'before', p_before,
                                     'unbound_step_code', p_unbound_step_code);
 
-  CREATE TEMPORARY TABLE IF NOT EXISTS _stare_behy (batch_id uuid PRIMARY KEY) ON COMMIT DROP;
-  TRUNCATE _stare_behy;
-  INSERT INTO _stare_behy (batch_id)
+  -- Dočasná tabulka se zakládá VŽDY znovu a čte se jen jako pg_temp.<jméno>.
+  -- `IF NOT EXISTS` by převzalo tabulku, kterou si volající založil v relaci
+  -- předem — s jeho řádky a spouštěmi, které by běžely právy vlastníka funkce.
+  DROP TABLE IF EXISTS pg_temp._stare_behy;
+  CREATE TEMPORARY TABLE _stare_behy (batch_id uuid PRIMARY KEY) ON COMMIT DROP;
+  INSERT INTO pg_temp._stare_behy (batch_id)
   SELECT DISTINCT b.id
     FROM public.production_batches b
     JOIN public.production_workflow_templates w ON w.id = b.workflow_template_id
@@ -98,12 +101,12 @@ BEGIN
 
   IF p_dry_run THEN
     SELECT count(*) INTO v_uzlu
-      FROM public.production_workflow_steps s JOIN _stare_behy x ON x.batch_id = s.batch_id
+      FROM public.production_workflow_steps s JOIN pg_temp._stare_behy x ON x.batch_id = s.batch_id
      WHERE s.status = 'pending';
     SELECT count(*) INTO v_taktu
       FROM public.story_pulse_beats pb
       JOIN public.production_workflow_steps s ON pb.source_type = 'workflow_step' AND pb.source_id = s.id
-      JOIN _stare_behy x ON x.batch_id = s.batch_id
+      JOIN pg_temp._stare_behy x ON x.batch_id = s.batch_id
      WHERE pb.status = 'open';
     RETURN jsonb_build_object('ok', true, 'dry_run', true, 'behu', v_behu, 'uzlu', v_uzlu,
                               'taktu', v_taktu, 'kriterium', v_kriterium);
@@ -113,7 +116,7 @@ BEGIN
     UPDATE public.story_pulse_beats pb
        SET status = 'cancelled', closed_at = now(), closed_by = auth.uid(), updated_at = now()
       FROM public.production_workflow_steps s
-      JOIN _stare_behy x ON x.batch_id = s.batch_id
+      JOIN pg_temp._stare_behy x ON x.batch_id = s.batch_id
      WHERE pb.source_type = 'workflow_step' AND pb.source_id = s.id AND pb.status = 'open'
     RETURNING pb.id
   )
@@ -135,7 +138,7 @@ BEGIN
                                             'kriterium', v_kriterium,
                                             'pred_uzavrenim', coalesce(s.output_data, '{}'::jsonb)),
            updated_at = now()
-      FROM _stare_behy x
+      FROM pg_temp._stare_behy x
      WHERE x.batch_id = s.batch_id AND s.status = 'pending'
     RETURNING s.id
   )

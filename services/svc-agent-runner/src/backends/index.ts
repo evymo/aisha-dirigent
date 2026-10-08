@@ -3,18 +3,19 @@ export interface RunInput {
   kind: string;
   image: string;
   brokerToken: string;
-  brokerUrl: string;
+  // `BROKER_URL` běhu neurčuje volající: je to vždy broker-proxy runneru v uzavřené síti
+  // běhů (broker-proxy.ts). Klíč k mesh síti běh nedostává vůbec (2026-10-06, volba A).
   payload: Record<string, unknown>;
+  /**
+   * ENV s payloadem pro kontejner (broker-proxy.ts `payloadDoEnv`): `PLUGIN_PAYLOAD=…`,
+   * nebo prázdné, když se payload do ENV nevejde a běh si ho vyzvedne přes proxy.
+   * Chybí = backend složí `PLUGIN_PAYLOAD` sám (běhy mimo routes/runs.ts).
+   */
+  payloadEnv?: string[];
   timeoutMs: number;
-  netbirdSetupKey?: string;
   /** Execution profile selects VMM runtime: 'docker' | 'kata-firecracker' | 'kata-dragonball'. */
   profile?: string;
-  /**
-   * Per-run git worktree on the host (bind-mounted R/W into the container) for
-   * kind='claude_cli_task'. The ClaudeCliBackend creates/removes it.
-   */
-  worktreeHostPath?: string;
-  /** Branch the worktree run produces/pushes (carried into the container env). */
+  /** Branch the run produces/pushes (carried into the container env). */
   branch?: string;
   /** Structured run inputs (prompt, story_id, …) from agent_runs.inputs. */
   inputs?: Record<string, unknown>;

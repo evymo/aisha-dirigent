@@ -6,12 +6,12 @@
 CREATE OR REPLACE FUNCTION public.upsert_symptom_catalog_admin(
   p_id UUID DEFAULT NULL,
   p_code TEXT DEFAULT NULL,
-  p_category TEXT DEFAULT 'general',
-  p_icon TEXT DEFAULT '🩺',
-  p_color TEXT DEFAULT '#ef4444',
-  p_default_severity_scale INTEGER DEFAULT 5,
-  p_sort_order INTEGER DEFAULT 0,
-  p_is_active BOOLEAN DEFAULT true,
+  p_category TEXT DEFAULT NULL,
+  p_icon TEXT DEFAULT NULL,
+  p_color TEXT DEFAULT NULL,
+  p_default_severity_scale INTEGER DEFAULT NULL,
+  p_sort_order INTEGER DEFAULT NULL,
+  p_is_active BOOLEAN DEFAULT NULL,
   p_translations JSONB DEFAULT NULL  -- {"cs": {"name": "...", "description": "..."}, "en": {...}}
 )
 RETURNS UUID
@@ -55,8 +55,8 @@ BEGIN
       code, category, icon, color, default_severity_scale,
       sort_order, is_active
     ) VALUES (
-      p_code, p_category, p_icon, p_color, p_default_severity_scale,
-      p_sort_order, p_is_active
+      p_code, COALESCE(p_category, 'general'), COALESCE(p_icon, '🩺'), COALESCE(p_color, '#ef4444'), COALESCE(p_default_severity_scale, 5),
+      COALESCE(p_sort_order, 0), COALESCE(p_is_active, true)
     )
     RETURNING id INTO v_id;
 

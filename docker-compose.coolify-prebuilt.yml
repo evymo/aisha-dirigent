@@ -50,7 +50,9 @@ services:
       secrets:
         - sentry_auth_token
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/ || exit 1"]
+      # Lokální soubor, ne `/`: kořen jde přes předrender (web-render) a zdraví webu
+      # nesmí záviset na tom, jestli web-render zrovna odpovídá.
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:80/index.html || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 6
@@ -58,13 +60,16 @@ services:
     expose:
       - "80"
     restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
     environment:
-      WEB_RENDER_STATIC_HOST_DIR: ${WEB_RENDER_STATIC_HOST_DIR:?generate-secrets odvozuje /var/lib/<identita>/web-render/static}
-      WEB_RENDER_SHELL_HOST_DIR: ${WEB_RENDER_SHELL_HOST_DIR:?generate-secrets odvozuje /var/lib/<identita>/web-render/shell}
+      MESH_ENABLED: ${MESH_ENABLED:?vydává topologický resolver}
+      NETBIRD_PEER_CIDR: ${NETBIRD_PEER_CIDR:?vydává generate-secrets — rozsah peerů pro routu}
+      NETBIRD_DNS_IP: ${NETBIRD_DNS_IP:?vydává generate-secrets z MESH_DNS_RESOLVER_IP}
+      WEB_RENDER_UPSTREAM_MESH: ${WEB_RENDER_UPSTREAM_MESH:-}
+      WEB_RENDER_SHELL_TOKEN: ${WEB_RENDER_SHELL_TOKEN}
     volumes:
       - mesh-diag:/usr/share/nginx/html/__mesh_diag:ro
-      - "${WEB_RENDER_STATIC_HOST_DIR}:/usr/share/nginx/html/_static:ro"
-      - "${WEB_RENDER_SHELL_HOST_DIR}:/shell"
     networks:
       - internal
       - coolify
@@ -684,6 +689,9 @@ services:
       # Řídicí rovina meshe — veřejná tvář NetBirdu (viz netbird_block níž).
       NETBIRD_DOMAIN: ${NETBIRD_DOMAIN:-}
       NETBIRD_DOMAIN_DIRECT: ${NETBIRD_DOMAIN_DIRECT:-}
+      # Řídicí rovina MODELOVÉHO meshe forku (varianta C) — viz netbird_model_block níž.
+      NETBIRD_MODEL_DOMAIN: ${NETBIRD_MODEL_DOMAIN:-}
+      NETBIRD_MODEL_DOMAIN_DIRECT: ${NETBIRD_MODEL_DOMAIN_DIRECT:-}
       # Cizí aplikace přes mesh (EXTERNAL_FACES) — viz external_faces_block.
       EDGE_EXTERNAL_FACES: ${EDGE_EXTERNAL_FACES:-}
     entrypoint:
@@ -762,6 +770,13 @@ services:
             ;;
         esac
 
+        case "$${NETBIRD_DNS_IP}" in
+          ""|*[!0-9.]*|.*|*.|*..*)
+            echo "[edge-proxy] FATAL: NETBIRD_DNS_IP '$${NETBIRD_DNS_IP}' není IPv4 — mesh jména by neměl kdo bezpečně přeložit" >&2
+            exit 64 ;;
+        esac
+        mesh_dns=$$(printf '(mesh_dns) {\n  transport http {\n    resolvers %s\n  }\n}' "$${NETBIRD_DNS_IP}")
+
         for required_var in MCP_DOMAIN API_DOMAIN_PUBLIC DIRIGENT_DOMAIN AUTH_DOMAIN_PUBLIC MCP_UPSTREAM API_UPSTREAM DIRIGENT_UPSTREAM AUTH_UPSTREAM; do
           required_value="$$(printenv "$${required_var}" 2>/dev/null || true)"
           if [ -z "$${required_value}" ]; then
@@ -830,13 +845,13 @@ services:
         auth_host=$$(echo "$${AUTH_UPSTREAM}" | sed -E 's,^https?://,,;s,/.*,,')
 
         # Internal-zone upstream TLS trust: see compose-notes (api_tls/auth_tls).
-        api_tls=""
-        auth_tls=""
+        api_tls=$$(printf '\n              import mesh_dns')
+        auth_tls=$$(printf '\n              import mesh_dns')
         case "$${API_UPSTREAM}" in
-          https://*) api_tls=$$(printf '\n              transport http {\n                tls_insecure_skip_verify\n                tls_server_name %s\n              }' "$${api_host}") ;;
+          https://*) api_tls=$$(printf '\n              transport http {\n                resolvers %s\n                tls_insecure_skip_verify\n                tls_server_name %s\n              }' "$${NETBIRD_DNS_IP}" "$${api_host}") ;;
         esac
         case "$${AUTH_UPSTREAM}" in
-          https://*) auth_tls=$$(printf '\n              transport http {\n                tls_insecure_skip_verify\n                tls_server_name %s\n              }' "$${auth_host}") ;;
+          https://*) auth_tls=$$(printf '\n              transport http {\n                resolvers %s\n                tls_insecure_skip_verify\n                tls_server_name %s\n              }' "$${NETBIRD_DNS_IP}" "$${auth_host}") ;;
         esac
 
         # live.${PUBLIC_TLD} (ws-gateway) — OPTIONAL route, built only when
@@ -848,7 +863,7 @@ services:
         if [ -n "$${LIVE_UPSTREAM}" ] && [ -n "$${LIVE_DOMAIN_PUBLIC}" ] && [ "$${LIVE_DOMAIN_PUBLIC}" != "live-disabled.invalid" ]; then
           live_host=$$(echo "$${LIVE_UPSTREAM}" | sed -E 's,^https?://,,;s,/.*,,')
           echo "[edge-proxy] LIVE_DOMAIN_PUBLIC=$${LIVE_DOMAIN_PUBLIC} → $${LIVE_UPSTREAM} (ws)"
-          live_block=$$(printf '@live host %s\n  handle @live {\n    reverse_proxy %s {\n      header_up Host %s\n      header_up X-Forwarded-Host {http.request.host}\n      header_up X-Forwarded-Proto https\n    }\n  }' "$${LIVE_DOMAIN_PUBLIC}" "$${LIVE_UPSTREAM}" "$${live_host}")
+          live_block=$$(printf '@live host %s\n  handle @live {\n    reverse_proxy %s {\n      header_up Host %s\n      header_up X-Forwarded-Host {http.request.host}\n      header_up X-Forwarded-Proto https\n      import mesh_dns\n    }\n  }' "$${LIVE_DOMAIN_PUBLIC}" "$${LIVE_UPSTREAM}" "$${live_host}")
         else
           echo "[edge-proxy] live route disabled (realtime not in profile / LIVE_UPSTREAM empty)"
         fi
@@ -878,7 +893,7 @@ services:
         elif [ -n "$${EXTRANET_UPSTREAM}" ] && [ -n "$${EXTRANET_DOMAIN_PUBLIC}" ]; then
           extranet_host=$$(echo "$${EXTRANET_UPSTREAM}" | sed -E 's,^https?://,,;s,/.*,,')
           echo "[edge-proxy] EXTRANET_DOMAIN_PUBLIC=$${EXTRANET_DOMAIN_PUBLIC} → $${EXTRANET_UPSTREAM} (BEZ brány)"
-          extranet_block=$$(printf '@extranet host %s\n  handle @extranet {\n    reverse_proxy %s {\n      header_up Host %s\n      header_up X-Forwarded-Host {http.request.host}\n      header_up X-Forwarded-Proto https\n    }\n  }' "$${EXTRANET_DOMAIN_PUBLIC}" "$${EXTRANET_UPSTREAM}" "$${extranet_host}")
+          extranet_block=$$(printf '@extranet host %s\n  handle @extranet {\n    reverse_proxy %s {\n      header_up Host %s\n      header_up X-Forwarded-Host {http.request.host}\n      header_up X-Forwarded-Proto https\n      import mesh_dns\n    }\n  }' "$${EXTRANET_DOMAIN_PUBLIC}" "$${EXTRANET_UPSTREAM}" "$${extranet_host}")
         else
           echo "[edge-proxy] extranet route disabled (not in profile / EXTRANET_UPSTREAM empty)"
         fi
@@ -889,7 +904,7 @@ services:
         if [ -n "$${GATEWAY_UPSTREAM}" ] && [ -n "$${GATEWAY_DOMAIN_PUBLIC}" ] && [ "$${GATEWAY_DOMAIN_PUBLIC}" != "gateway-disabled.invalid" ]; then
           gateway_host=$$(echo "$${GATEWAY_UPSTREAM}" | sed -E 's,^https?://,,;s,/.*,,')
           echo "[edge-proxy] GATEWAY_DOMAIN_PUBLIC=$${GATEWAY_DOMAIN_PUBLIC} → $${GATEWAY_UPSTREAM}"
-          gateway_block=$$(printf '@gateway host %s\n  handle @gateway {\n    reverse_proxy %s {\n      header_up Host %s\n      header_up X-Forwarded-Host {http.request.host}\n      header_up X-Forwarded-Proto https\n    }\n  }' "$${GATEWAY_DOMAIN_PUBLIC}" "$${GATEWAY_UPSTREAM}" "$${gateway_host}")
+          gateway_block=$$(printf '@gateway host %s\n  handle @gateway {\n    reverse_proxy %s {\n      header_up Host %s\n      header_up X-Forwarded-Host {http.request.host}\n      header_up X-Forwarded-Proto https\n      import mesh_dns\n    }\n  }' "$${GATEWAY_DOMAIN_PUBLIC}" "$${GATEWAY_UPSTREAM}" "$${gateway_host}")
         else
           echo "[edge-proxy] gateway route disabled (llm-gateway not in profile / GATEWAY_UPSTREAM empty)"
         fi
@@ -900,7 +915,7 @@ services:
         if [ -n "$${COMPANION_UPSTREAM}" ] && [ -n "$${COMPANION_DOMAIN_PUBLIC}" ] && [ "$${COMPANION_DOMAIN_PUBLIC}" != "companion-disabled.invalid" ]; then
           companion_host=$$(echo "$${COMPANION_UPSTREAM}" | sed -E 's,^https?://,,;s,/.*,,')
           echo "[edge-proxy] COMPANION_DOMAIN_PUBLIC=$${COMPANION_DOMAIN_PUBLIC} → $${COMPANION_UPSTREAM}"
-          companion_block=$$(printf '@companion host %s\n  handle @companion {\n    reverse_proxy %s {\n      header_up Host %s\n      header_up X-Forwarded-Host {http.request.host}\n      header_up X-Forwarded-Proto https\n    }\n  }' "$${COMPANION_DOMAIN_PUBLIC}" "$${COMPANION_UPSTREAM}" "$${companion_host}")
+          companion_block=$$(printf '@companion host %s\n  handle @companion {\n    reverse_proxy %s {\n      header_up Host %s\n      header_up X-Forwarded-Host {http.request.host}\n      header_up X-Forwarded-Proto https\n      import mesh_dns\n    }\n  }' "$${COMPANION_DOMAIN_PUBLIC}" "$${COMPANION_UPSTREAM}" "$${companion_host}")
         else
           echo "[edge-proxy] companion route disabled (openclaw not in profile / COMPANION_UPSTREAM empty)"
         fi
@@ -912,7 +927,7 @@ services:
         ingest_block=""
         if [ -n "$${INGEST_UPSTREAM}" ] && [ -n "$${INGEST_DOMAIN_PUBLIC}" ] && [ "$${INGEST_DOMAIN_PUBLIC}" != "ingest-disabled.invalid" ]; then
           echo "[edge-proxy] INGEST_DOMAIN_PUBLIC=$${INGEST_DOMAIN_PUBLIC} → $${INGEST_UPSTREAM}"
-          ingest_block=$$(printf '@ingest host %s\n  handle @ingest {\n    reverse_proxy %s {\n      header_up Host {http.request.host}\n      header_up X-Forwarded-Host {http.request.host}\n      header_up X-Forwarded-Proto https\n    }\n  }' "$${INGEST_DOMAIN_PUBLIC}" "$${INGEST_UPSTREAM}")
+          ingest_block=$$(printf '@ingest host %s\n  handle @ingest {\n    reverse_proxy %s {\n      header_up Host {http.request.host}\n      header_up X-Forwarded-Host {http.request.host}\n      header_up X-Forwarded-Proto https\n      import mesh_dns\n    }\n  }' "$${INGEST_DOMAIN_PUBLIC}" "$${INGEST_UPSTREAM}")
         else
           echo "[edge-proxy] ingest route disabled (local-ingest not in profile / INGEST_UPSTREAM empty)"
         fi
@@ -923,7 +938,7 @@ services:
         potok_block=""
         if [ -n "$${POTOK_UPSTREAM}" ] && [ -n "$${POTOK_DOMAIN_PUBLIC}" ] && [ "$${POTOK_DOMAIN_PUBLIC}" != "potok-disabled.invalid" ]; then
           echo "[edge-proxy] POTOK_DOMAIN_PUBLIC=$${POTOK_DOMAIN_PUBLIC} → $${POTOK_UPSTREAM}"
-          potok_block=$$(printf '@potok host %s\n  handle @potok {\n    reverse_proxy %s {\n      header_up Host {http.request.host}\n      header_up X-Forwarded-Host {http.request.host}\n      header_up X-Forwarded-Proto https\n    }\n  }' "$${POTOK_DOMAIN_PUBLIC}" "$${POTOK_UPSTREAM}")
+          potok_block=$$(printf '@potok host %s\n  handle @potok {\n    reverse_proxy %s {\n      header_up Host {http.request.host}\n      header_up X-Forwarded-Host {http.request.host}\n      header_up X-Forwarded-Proto https\n      import mesh_dns\n    }\n  }' "$${POTOK_DOMAIN_PUBLIC}" "$${POTOK_UPSTREAM}")
         else
           echo "[edge-proxy] potok route disabled (potok not in profile / POTOK_UPSTREAM empty)"
         fi
@@ -944,6 +959,19 @@ services:
           # Jedno jméno pro obě tváře (jednouzlová topologie, instanční profil):
           # jméno patří netbird-proxy, edge by jinak proxoval sám na sebe.
           echo "[edge-proxy] netbird route disabled (netbird not in profile / NETBIRD_DOMAIN_DIRECT empty / same name as NETBIRD_DOMAIN)"
+        fi
+        # mesh-model.${PUBLIC_TLD} — řídicí rovina MODELOVÉHO meshe forku (varianta C):
+        # jediný vstup uzlu na GPU slotu (Signal/Relay/management pod týmž jménem, TCP 443).
+        # Týž tvar jako netbird_block: přímá tvář, ověřený certifikát, flush_interval -1.
+        netbird_model_block=""
+        if [ -n "$${NETBIRD_MODEL_DOMAIN}" ] && [ -n "$${NETBIRD_MODEL_DOMAIN_DIRECT}" ] \
+          && [ "$${NETBIRD_MODEL_DOMAIN%.invalid}" = "$${NETBIRD_MODEL_DOMAIN}" ] \
+          && [ "$${NETBIRD_MODEL_DOMAIN_DIRECT%.invalid}" = "$${NETBIRD_MODEL_DOMAIN_DIRECT}" ] \
+          && [ "$${NETBIRD_MODEL_DOMAIN}" != "$${NETBIRD_MODEL_DOMAIN_DIRECT}" ]; then
+          echo "[edge-proxy] NETBIRD_MODEL_DOMAIN=$${NETBIRD_MODEL_DOMAIN} → https://$${NETBIRD_MODEL_DOMAIN_DIRECT} (přímá tvář — řídicí rovina modelového meshe)"
+          netbird_model_block=$$(printf '@modelovymesh host %s\n  handle @modelovymesh {\n    reverse_proxy https://%s {\n      header_up Host %s\n      header_up X-Forwarded-Host {http.request.host}\n      header_up X-Forwarded-Proto https\n      flush_interval -1\n    }\n  }' "$${NETBIRD_MODEL_DOMAIN}" "$${NETBIRD_MODEL_DOMAIN_DIRECT}" "$${NETBIRD_MODEL_DOMAIN_DIRECT}")
+        else
+          echo "[edge-proxy] netbird-model route disabled (instance nemá modelový mesh / NETBIRD_MODEL_DOMAIN_DIRECT prázdná / totéž jméno)"
         fi
         # Cizí aplikace (EXTERNAL_FACES) — `<veřejné>|<mesh upstream>;…`
         # z derivace. Host se NEPŘEPISUJE: aplikace mimo platformu mesh jméno
@@ -971,7 +999,7 @@ services:
           esac
           _ef_n=$$((_ef_n + 1))
           echo "[edge-proxy] external face $$_ef_host → $$_ef_up"
-          external_faces_block="$${external_faces_block}$${_ef_nl}$$(printf '@external_face_%s host %s\n  handle @external_face_%s {\n    reverse_proxy %s {\n      header_up X-Forwarded-Host {http.request.host}\n      header_up X-Forwarded-Proto https\n    }\n  }' "$$_ef_n" "$$_ef_host" "$$_ef_n" "$$_ef_up")"
+          external_faces_block="$${external_faces_block}$${_ef_nl}$$(printf '@external_face_%s host %s\n  handle @external_face_%s {\n    reverse_proxy %s {\n      header_up X-Forwarded-Host {http.request.host}\n      header_up X-Forwarded-Proto https\n      import mesh_dns\n    }\n  }' "$$_ef_n" "$$_ef_host" "$$_ef_n" "$$_ef_up")"
         done
         [ "$$_ef_n" -gt 0 ] || echo "[edge-proxy] external faces: none (EDGE_EXTERNAL_FACES empty)"
 
@@ -1136,6 +1164,7 @@ services:
 
         cat > /etc/caddy/Caddyfile <<CADDY
         $${global_block}
+        $${mesh_dns}
         # ⛔ HEALTH NESMÍ ODPOVÍDAT SVĚTU. Do 2026-09-02 stál `handle /__edge_health`
         # na VEŘEJNÉ `:80` a dveře ho musely vyjímat matcherem. Odpověď „ok 200"
         # komukoli je ale prozrazení: scanner se dozví, že tu něco běží a je to
@@ -1202,6 +1231,7 @@ services:
               header_up Host {http.request.host}
               header_up X-Forwarded-Host {http.request.host}
               header_up X-Forwarded-Proto https
+              import mesh_dns
             }
           }
 
@@ -1234,6 +1264,7 @@ services:
               header_up Host {http.request.host}
               header_up X-Forwarded-Host {http.request.host}
               header_up X-Forwarded-Proto https
+              import mesh_dns
             }
           }
 
@@ -1273,6 +1304,7 @@ services:
 
           # netbird.${PUBLIC_TLD} (řídicí rovina meshe → přímá tvář) — conditional.
           $${netbird_block}
+          $${netbird_model_block}
           # Cizí aplikace přes mesh (EXTERNAL_FACES) — conditional.
           $${external_faces_block}
 

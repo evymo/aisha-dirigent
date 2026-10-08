@@ -14,7 +14,7 @@
 import Fastify from 'fastify';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import multipart from '@fastify/multipart';
-import { applySecurity } from '@aisha/security';
+import { applySecurity, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import { config } from './config.js';
@@ -26,7 +26,7 @@ import { seedDefaultRoutes } from './routes/seed-default.js';
 // other module performs network I/O. Exporter routes to Langfuse OTLP.
 // Rollback: OTEL_SDK_DISABLED=true env (Coolify) + container restart.
 bootstrapOtel({ serviceName: 'svc-web-artifact' });
-const app = Fastify({ logger: { level: config.logLevel }, trustProxy: true });
+const app = Fastify({ logger: safeLoggerOptions({ level: config.logLevel }), trustProxy: true });
 
 await applySecurity(app, {
   service: 'svc-web-artifact',

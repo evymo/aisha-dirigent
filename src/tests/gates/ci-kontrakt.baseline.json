@@ -28,11 +28,7 @@
     "secret:OPENCLAW_URL",
     "secret:SVC_AI_CHAT_SERVICE_TOKEN",
     "secret:SVC_AI_CHAT_URL",
-    "secret:VERDACCIO_PASSWORD",
-    "secret:VERDACCIO_TOKEN",
-    "secret:VERDACCIO_USER",
     "var:AISHA_PROFILE",
-    "var:HEAVY_LANE_NIGHTLY",
-    "var:VERDACCIO_URL"
+    "var:HEAVY_LANE_NIGHTLY"
   ]
 }

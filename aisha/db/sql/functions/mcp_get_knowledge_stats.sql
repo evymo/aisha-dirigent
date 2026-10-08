@@ -43,7 +43,9 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION mcp_get_knowledge_stats() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION mcp_get_knowledge_stats() TO anon;
-GRANT EXECUTE ON FUNCTION mcp_get_knowledge_stats() TO authenticated;
+-- Pohled správy na CELÝ korpus: počítá i položky příběhů a položky v karanténě a klíče
+-- items_by_category nesou názvy kategorií. Čtou ho nástroje správy služby znalostí a sonda
+-- pokrytí korpusu, obojí servisní rolí — nikomu jinému vydaný není. Do 2026-10-04 ho přes
+-- PostgREST spustil i nepřihlášený. Web a mobil mají vlastní počty (fn_get_platform_warmup_state).
+REVOKE ALL ON FUNCTION mcp_get_knowledge_stats() FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION mcp_get_knowledge_stats() TO service_role;

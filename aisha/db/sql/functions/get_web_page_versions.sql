@@ -19,6 +19,7 @@ AS $$
   SELECT v.id, v.version_number, v.label, v.created_by, v.created_at
   FROM public.web_page_versions v
   WHERE v.page_id = p_page_id
+    AND v.kind <> 'draft'  -- koncept není verze (2026-10-02)
   ORDER BY v.version_number DESC
   LIMIT 50;
 $$;

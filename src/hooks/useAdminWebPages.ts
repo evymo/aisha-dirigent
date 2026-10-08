@@ -21,6 +21,7 @@ import {
 } from "@/lib/schemas/webPageSchemas";
 import { useSession } from "@/hooks/useSession";
 import { safeError } from "@/lib/security/safeLogger";
+import { chybaZRpc } from "@/lib/novinky/konflikt";
 
 import type {
   WebPageAdminDetail,
@@ -177,13 +178,18 @@ export interface UpdateWebPageCanvasInput {
   canvas_css?: string | null;
   canvas_data?: unknown;
   canvas_html?: string | null;
+  /** Razítko stavu, který editor upravuje (web_page_edit_stamp); null = bez kontroly. */
+  expected_stamp?: string | null;
   id: string;
   page_settings?: Record<string, unknown> | null;
   publish?: boolean;
 }
 
 /**
- * Saves GrapeJS canvas data for a web page.
+ * Uloží plátno stránky. Server rozhodne, kam (2026-10-02): u ZVEŘEJNĚNÉ stránky
+ * do konceptu (web se nemění), jinak rovnou; `publish` přelije koncept na web
+ * a zapíše verzi. Vrací nové razítko; souběh (jiný editor mezitím uložil)
+ * skončí chybou s kódem PT409 (`jeKonfliktUlozeni`).
  *
  * @returns Mutation for saving canvas data
  */
@@ -191,24 +197,52 @@ export function useUpdateWebPageCanvas() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (input: UpdateWebPageCanvasInput) => {
-      const { error } = await aisha.rpc("update_web_page_canvas_admin", {
+    mutationFn: async (input: UpdateWebPageCanvasInput): Promise<string> => {
+      const { data, error } = await aisha.rpc("update_web_page_canvas_admin", {
         p_canvas_css: input.canvas_css ?? undefined,
         p_canvas_data: (input.canvas_data as Json) ?? null,
         p_canvas_html: input.canvas_html ?? undefined,
+        p_expected_stamp: input.expected_stamp ?? undefined,
         p_id: input.id,
         p_page_settings: (input.page_settings as unknown as Json) ?? undefined,
         p_publish: input.publish ?? false,
       });
-      if (error) throw new Error(error.message);
+      if (error) throw chybaZRpc(error);
+      return data as string;
     },
     onError: (error) => {
       safeError("admin.web_page.canvas.save.failed", error);
     },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({ queryKey: ["admin-web-page", variables.id] });
+    onSuccess: (_stamp, variables) => {
+      // Seznam ano; načtení EDITORU ne — editor drží stav sám a razítko si bere
+      // z odpovědi. Refetch by změnil razítko a editor by se při každém
+      // automatickém uložení připojil znovu (stejně jako u novinek).
       queryClient.invalidateQueries({ queryKey: ["admin-web-pages"] });
-      queryClient.invalidateQueries({ queryKey: ["web-page"] });
+      if (variables.publish) queryClient.invalidateQueries({ queryKey: ["web-page"] });
+    },
+  });
+}
+
+/**
+ * Zahodí koncept zveřejněné stránky — editor se vrátí ke zveřejněnému stavu.
+ *
+ * @returns Mutation vracející razítko živé stránky
+ */
+export function useDiscardWebPageDraft() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string): Promise<string> => {
+      const { data, error } = await aisha.rpc("discard_web_page_draft_admin", { p_page_id: id });
+      if (error) throw chybaZRpc(error);
+      return data as string;
+    },
+    onError: (error) => {
+      safeError("admin.web_page.draft.discard.failed", error);
+    },
+    onSuccess: (_stamp, id) => {
+      queryClient.invalidateQueries({ queryKey: ["admin-web-page", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-web-pages"] });
     },
   });
 }

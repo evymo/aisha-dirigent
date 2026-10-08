@@ -30,9 +30,24 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import { AuthError, isAdminOrStaff, verifyMcpToken, type VerifiedUser } from '../auth.js';
 import { rpcService, rpcUserClaims } from '../postgrest.js';
+import { z as z4 } from 'zod/v4';
 import { aitgDispatch } from '../lib/aitg-tools.js';
+import { AITG_TOOL_INPUTS } from '../lib/aitg-tool-inputs.js';
 import { flowboardDispatch } from '../lib/flowboard-tools.js';
-import { embedQueryForProfile } from '../lib/embed-query-in-space.js';
+import { FLOWBOARD_TOOL_INPUTS } from '../lib/flowboard-tool-inputs.js';
+import { KNOWLEDGE_TOOL_INPUTS, type KnowledgeToolInput } from '../lib/knowledge-tool-inputs.js';
+import { embedQueryForProfile, type EmbeddedQuery } from '../lib/embed-query-in-space.js';
+import {
+  KnowledgeSearchUnavailableError,
+  nedostupnostZEmbeddingu,
+  nedostupnostZIdentity,
+  overIdentituDotazu,
+} from '../lib/knowledge-search-unavailable.js';
+import { ChybaNastrojePrace, chybaPraceZRpc } from '../lib/chyba-nastroje-prace.js';
+import { randomUUID } from 'node:crypto';
+import { createSafeLogger } from '@aisha/security';
+
+const log = createSafeLogger('svc-mcp-knowledge:mcp');
 
 type JsonRpcId = string | number | null;
 
@@ -85,15 +100,31 @@ const JsonRpcRequestSchema = z.object({
   params: z.unknown().optional(),
 });
 
+/**
+ * Vstupní schéma každého nástroje — JEDINÝ zdroj rozhraní (validace v handleru + inputSchema
+ * v tools/list). Nástroj bez schématu shodí start služby (tool() níž), ne až první volání.
+ */
+const TOOL_INPUTS: Record<string, z4.ZodType> = {
+  ...KNOWLEDGE_TOOL_INPUTS,
+  ...AITG_TOOL_INPUTS,
+  ...FLOWBOARD_TOOL_INPUTS,
+};
+
 const TOOL_DEFINITIONS: ToolDefinition[] = [
   tool('search_knowledge', 'Search expert rules and AISHA knowledge by text, category, expertise area, or context tags.'),
-  tool('search_knowledge_v2', 'Hybrid AISHA knowledge search using text fallback and optional metadata filters.'),
+  tool('search_knowledge_v2', 'Semantic (vector) AISHA knowledge search in the embedding space of the live model, filtered by the declared weights identity. Fails loudly with isError {error: "embedding_unavailable", reason} when the embedding backend or the identity declaration is unavailable — there is no text fallback.'),
   tool('get_expert_rule', 'Load one published expert rule by slug.'),
   tool('get_knowledge_item', 'Load one knowledge item by id or source slug.'),
   tool('get_expertise_areas', 'List active expertise areas and rule counts.'),
   tool('match_experts', 'Find experts matching an expertise area or context tags.'),
   tool('get_agent_knowledge', 'Load knowledge bindings for an AISHA agent slug.'),
   tool('get_story_context', 'Load a story context bundle by story id.'),
+  // ── Práce pod identitou uživatele (F9) — co mám dělat, hotovo, průběh do příběhu ──
+  tool('my_next_steps', 'List the workflow steps assigned to you (your next work), newest runs first. Runs under your identity.'),
+  tool('complete_step', 'Mark one of your workflow steps as done, with an optional note and structured result. Returns {ok, error?} from the workflow engine.'),
+  tool('report_progress', 'Write a progress entry (status update, blocker, milestone or architecture decision) into a story you take part in. Defaults to the story bound to your token.'),
+  tool('add_knowledge', 'Save a private knowledge item to a writable story. It remains quarantined until human review; automatic scanning cannot publish it.'),
+  tool('request_capability', 'Propose a missing tool for human review. Never approves or executes code; returns a proposal status, subject to a per-user quota.'),
   tool('compose_context', 'Compose a multi-layer AI context bundle for a story and context profile.'),
   tool('route_task', 'Route a task kind/risk profile to the AISHA agent pipeline.'),
   tool('validate_compliance', 'Run lightweight AISHA platform compliance checks for a code or design snippet.'),
@@ -149,6 +180,11 @@ const AUTHENTICATED_TOOLS = new Set<string>([
   'get_agent_knowledge',
   'validate_compliance',
   'get_story_context',
+  'my_next_steps',
+  'complete_step',
+  'report_progress',
+  'add_knowledge',
+  'request_capability',
   'draft_flow',
   'get_flowboard_registry',
   // Intranet read-only surface — config/registry lookups, no admin/deploy op.
@@ -213,15 +249,11 @@ const ADMIN_TOOLS = new Set<string>([
 ]);
 
 function tool(name: string, description: string): ToolDefinition {
-  return {
-    name,
-    description,
-    inputSchema: {
-      type: 'object',
-      additionalProperties: true,
-      properties: {},
-    },
-  };
+  const vstup = TOOL_INPUTS[name];
+  if (!vstup) throw new Error(`MCP tool "${name}" has no input schema (TOOL_INPUTS)`);
+  // io: 'input' — pole s výchozí hodnotou klient posílat nemusí (nejsou required).
+  const { $schema: _schema, ...inputSchema } = z4.toJSONSchema(vstup, { io: 'input' }) as Record<string, unknown>;
+  return { name, description, inputSchema };
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -232,13 +264,7 @@ function asString(value: unknown, fallback = ''): string {
   return typeof value === 'string' ? value : fallback;
 }
 
-function asNumber(value: unknown, fallback: number): number {
-  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
-}
 
-function asStringArray(value: unknown): string[] {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
-}
 
 /**
  * JEDINÝ predikát oprávnění k nástroji — volá ho `tools/list` (co se ukáže)
@@ -270,6 +296,18 @@ function allowedToolDefinitions(user: VerifiedUser): ToolDefinition[] {
   return TOOL_DEFINITIONS.filter((definition) => canUseTool(user, definition.name));
 }
 
+/** Zpráva chyby nástroje pro volajícího — nikdy text chyby serveru (viz catch v route). */
+export function verejnaZpravaChyby(error: unknown, incident: string): string {
+  const issues = (error as { name?: unknown; issues?: unknown } | null)?.issues;
+  if (error instanceof Error && error.name === 'ZodError' && Array.isArray(issues)) {
+    const pole = [...new Set(issues
+      .map((i) => (Array.isArray((i as { path?: unknown }).path) ? (i as { path: unknown[] }).path.join('.') : ''))
+      .filter((p) => /^[A-Za-z0-9_.]{1,64}$/.test(p)))].slice(0, 10);
+    return `Invalid tool arguments${pole.length ? `: ${pole.join(', ')}` : ''} (incident ${incident})`;
+  }
+  return `MCP tool call failed (incident ${incident})`;
+}
+
 function jsonRpcError(id: JsonRpcId, code: number, message: string): Record<string, unknown> {
   return { jsonrpc: '2.0', error: { code, message }, id };
 }
@@ -284,8 +322,8 @@ function jsonRpcTextResult(id: JsonRpcId, value: unknown): Record<string, unknow
   };
 }
 
-function validateCompliance(args: Record<string, unknown>): Record<string, unknown> {
-  const snippet = asString(args.code_snippet, asString(args.description));
+function validateCompliance(input: KnowledgeToolInput<'validate_compliance'>): Record<string, unknown> {
+  const snippet = input.code_snippet ?? input.description ?? '';
   const findings: string[] = [];
 
   if (/\.from\s*\(/.test(snippet)) {
@@ -313,172 +351,319 @@ function validateCompliance(args: Record<string, unknown>): Record<string, unkno
  * (Brick2-PIN). p_story_id is the per-story isolation key in mcp_search_knowledge_v3's
  * SECURITY DEFINER RBAC guard — trusting an arg here would let a caller read another story's
  * corpus. The mediated/omni token carries story_id as a claim; absent ⇒ NULL ⇒ global-only.
+ *
+ * Claim ověřuje už ten, kdo token razí (mintMcpUserToken — can_access_story pod uživatelem,
+ * K-35/B8). Přesto se na něj tady NESPOLÉHÁ: v3/v2 se volají identitou uživatele (rpcUserClaims),
+ * takže stráž příběhu v RPC platí i pro chybně ražený claim (B8).
  */
 function storyIdFromClaims(auth: McpAuthContext): string | null {
   const claimed = (auth.user.claims as Record<string, unknown>).story_id;
   return typeof claimed === 'string' && claimed.length > 0 ? claimed : null;
 }
 
+/** Bind write tools to the verified token story; the RPC still verifies write permission. */
+function writeStoryId(auth: McpAuthContext, explicit: string | undefined, required: boolean): string | null {
+  const bound = storyIdFromClaims(auth);
+  if (bound && explicit && bound.toLowerCase() !== explicit.toLowerCase()) {
+    throw new ChybaNastrojePrace('forbidden', 'story differs from token scope');
+  }
+  const story = explicit || bound;
+  if (!story && required) throw new ChybaNastrojePrace('invalid_input', 'a writable story is required');
+  return story;
+}
+
 /**
- * Prod knowledge search (Brick2-PIN). Resolves the context profile's embedding space, embeds
+ * Prod knowledge search (Brick2-PIN + P2). Resolves the context profile's embedding space, embeds
  * the query in that SAME space, and runs mcp_search_knowledge_v3 with a HARD model-identity
- * filter (p_query_model) so the query is only cosine-compared against chunks embedded by the
- * same model. p_story_id comes from the minted token claims. If the embedding model / space
- * cannot be resolved or embedding fails, it DEGRADES to the text-only mcp_search_knowledge_v2
- * path (never 500) — retrieval stays available, just without the vector ranking.
+ * filter: the model name (p_query_model) AND the declared weights identity — v3 compares the query
+ * only with vectors whose identity equals the model's declaration (computed server-side, never
+ * taken from the caller). The identity the lane reported for the query vector is checked against
+ * the declaration HERE, on the service plane, before the search (overIdentituDotazu). p_story_id
+ * comes from the minted token claims.
+ *
+ * ⛔ P2 (NAMĚŘENO 2026-10-06, riq): při nedostupném embeddingu tu byla TICHÁ záloha na textové
+ * hledání v2 — výpadek modelu vypadal jako běžné hledání a volající dostal výsledky jiného druhu.
+ * Teď každé selhání (resolver bez modelu, lane/kvóta, nedeklarovaná nebo nesouhlasná identita vah)
+ * skončí typovanou chybou `embedding_unavailable` (lib/knowledge-search-unavailable.ts) — volající
+ * ji ukáže jako „vyhledávání nedostupné“. Jiné chyby RPC (cizí příběh 42501) projdou beze změny.
+ *
+ * ⛔ B8 (NAMĚŘENO 2026-10-01): v3 se dřív volala POD SLUŽBOU (rpcService) a pro službu stráž
+ * příběhu přeskakovala — p_story_id z claimu tak otevřel KB cizího příběhu, kdykoli claim někdo
+ * neověřil (/v1 bral příběh z těla požadavku). Teď běží identitou uživatele (rpcUserClaims
+ * z ověřeného tokenu): RPC samo ověří vlastníka/účastníka příběhu a tier-ACL přišpendlí
+ * k auth.uid(). Cizí příběh = 42501 z RPC, ne data.
  */
-async function searchKnowledgeProd(args: Record<string, unknown>, auth: McpAuthContext): Promise<unknown> {
-  const query = asString(args.query, asString(args.query_text));
-  const contextProfileSlug = asString(args.context_profile_slug) || null;
-  const limit = asNumber(args.limit, 20);
-  const similarityThreshold = asNumber(args.similarity_threshold, 0.3);
+async function searchKnowledgeProd(input: KnowledgeToolInput<'search_knowledge_v2'>, auth: McpAuthContext): Promise<unknown> {
+  const query = input.query ?? input.query_text ?? '';
+  const contextProfileSlug = input.context_profile_slug || null;
   const storyId = storyIdFromClaims(auth);
-  // Brick6 tier-ACL: the authenticated end-user whose tier gates retrieval. v3/v2 run as
-  // service_role here, so they honour this id only because the caller is trusted (service);
-  // an authenticated direct caller is pinned to its own auth.uid() inside the function.
+  // Brick6 tier-ACL: the authenticated end-user whose tier gates retrieval. Under the user's
+  // identity the RPC pins the audience to auth.uid() anyway.
   const audienceUserId = asString((auth.user.claims as Record<string, unknown>).sub) || null;
 
+  let embedded: EmbeddedQuery;
   try {
-    const embedded = await embedQueryForProfile(query, contextProfileSlug);
-    return await rpcService('mcp_search_knowledge_v3', {
+    embedded = await embedQueryForProfile(query, contextProfileSlug);
+  } catch (err) {
+    throw nedostupnostZEmbeddingu(err);
+  }
+  // P2: vektor dotazu spočítaly váhy, které data deklarují? (služebně, před hledáním — revize 10-07)
+  await overIdentituDotazu(embedded);
+  try {
+    return await rpcUserClaims('mcp_search_knowledge_v3', {
       p_audience_user_id: audienceUserId,
-      p_category: asString(args.category) || null,
-      p_context_tags: asStringArray(args.context_tags),
-      p_expertise_slug: asString(args.expertise_slug) || null,
-      p_include_ai_instructions: args.include_ai_instructions !== false,
-      p_item_types: asStringArray(args.item_types),
-      p_limit: limit,
+      p_category: input.category || null,
+      p_context_tags: input.context_tags,
+      p_expertise_slug: input.expertise_slug || null,
+      p_include_ai_instructions: input.include_ai_instructions,
+      p_item_types: input.item_types,
+      p_limit: input.limit,
       // Brick5: locale preference-boost (rerank, not a hard filter). NULL ⇒ no boost; a
       // caller passing `locale` reranks same-language variants slightly earlier. The
       // source_concept_id variant-dedup is always-on inside v3, independent of this.
-      p_locale: asString(args.locale) || null,
+      p_locale: input.locale || null,
       p_model_pref: embedded.ragSpace,
       p_query_embedding_v1: embedded.queryEmbeddingV1,
       p_query_embedding_v2: embedded.queryEmbeddingV2,
       p_query_model: embedded.backend.model_id,
       p_query_text: query,
-      p_similarity_threshold: similarityThreshold,
+      p_similarity_threshold: input.similarity_threshold,
       p_story_id: storyId,
-    });
-  } catch {
-    // Resolver/embed unavailable → degrade to text-only v2 (no vector, no 500). Pass the story
-    // + audience user so the degrade uses the 11-arg story overload and still enforces the
-    // Brick6 tier-ACL (the 9-arg global overload would fall closed to anonymous for service).
-    return rpcService('mcp_search_knowledge_v2', {
-      p_audience_user_id: audienceUserId,
-      p_category: asString(args.category) || null,
-      p_context_tags: asStringArray(args.context_tags),
-      p_expertise_slug: asString(args.expertise_slug) || null,
-      p_include_ai_instructions: args.include_ai_instructions !== false,
-      p_item_types: asStringArray(args.item_types),
-      p_limit: limit,
-      p_query_embedding: null,
-      p_query_text: query,
-      p_similarity_threshold: similarityThreshold,
-      p_story_id: storyId,
-    });
+    }, auth.user.claims);
+  } catch (err) {
+    throw nedostupnostZIdentity(err) ?? err;
   }
 }
 
-async function callTool(name: string, args: Record<string, unknown>, auth: McpAuthContext): Promise<unknown> {
+/**
+ * Selhání NÁSTROJE (ne protokolu) jako výsledek s `isError` — spec MCP: chybu nástroje má vidět
+ * model i klient, strukturovaně. Text nese týž JSON, aby ho přečetli i klienti bez
+ * `structuredContent` (n8n, starší IDE).
+ */
+function jsonRpcToolError(id: JsonRpcId, payload: Record<string, unknown>): Record<string, unknown> {
+  return {
+    jsonrpc: '2.0',
+    result: {
+      content: [{ type: 'text', text: JSON.stringify(payload) }],
+      structuredContent: payload,
+      isError: true,
+    },
+    id,
+  };
+}
+
+async function callTool(name: string, rawArgs: Record<string, unknown>, auth: McpAuthContext): Promise<unknown> {
+  // Syrové argumenty jen do .parse schématu nástroje (knowledge-tool-inputs.ts); dál už jen
+  // typovaný vstup — čtení mimo schéma chytí tsc (brána mcp-nastroj-schema-ze-zdroje).
+  const K = KNOWLEDGE_TOOL_INPUTS;
   switch (name) {
-    case 'search_knowledge':
+    case 'search_knowledge': {
+      // Expertní pravidla podle viditelnosti PRO TOHO, kdo se ptá: publikum je `sub` z ověřeného tokenu,
+      // nikdy argument klienta (bez publika by služba hledala jako anonym — jen `public`).
+      const a = K.search_knowledge.parse(rawArgs);
       return rpcService('mcp_search_knowledge', {
-        p_category: asString(args.category) || null,
-        p_context_tags: asStringArray(args.context_tags),
-        p_expertise_slug: asString(args.expertise_slug) || null,
-        p_include_ai_instructions: args.include_ai_instructions !== false,
-        p_limit: asNumber(args.limit, 20),
-        p_query: asString(args.query),
+        p_audience_user_id: asString((auth.user.claims as Record<string, unknown>).sub) || null,
+        p_category: a.category || null,
+        p_context_tags: a.context_tags,
+        p_expertise_slug: a.expertise_slug || null,
+        p_include_ai_instructions: a.include_ai_instructions,
+        p_limit: a.limit,
+        p_query: a.query,
       });
+    }
     case 'search_knowledge_v2':
-      // Brick2-PIN: embedding-space-pinned vector search via mcp_search_knowledge_v3 with a
-      // HARD model-identity filter and story_id from the minted token claims; degrades to the
-      // text-only mcp_search_knowledge_v2 path if the embedding model/space is unresolvable.
-      return searchKnowledgeProd(args, auth);
-    case 'get_expert_rule':
-      return rpcService('mcp_get_rule_detail', { p_rule_slug: asString(args.slug, asString(args.rule_slug)) });
-    case 'get_knowledge_item':
+      // Brick2-PIN + P2: embedding-space-pinned vector search via mcp_search_knowledge_v3 with a
+      // HARD model + weights-identity filter and story_id from the minted token claims; an
+      // unavailable embedding fails LOUD (embedding_unavailable) — no text fallback.
+      return searchKnowledgeProd(K.search_knowledge_v2.parse(rawArgs), auth);
+    case 'get_expert_rule': {
+      // Detail pravidla podle viditelnosti pro toho, kdo se ptá (publikum z ověřeného tokenu).
+      const a = K.get_expert_rule.parse(rawArgs);
+      return rpcService('mcp_get_rule_detail', {
+        p_audience_user_id: asString((auth.user.claims as Record<string, unknown>).sub) || null,
+        p_rule_slug: a.slug ?? a.rule_slug ?? '',
+      });
+    }
+    case 'get_knowledge_item': {
+      // Čtení podle id ví, pro koho čte (jako hledání): volá se servisní rolí, takže bez publika by
+      // databáze měřila úroveň členství i přístup k příběhu jako u anonyma. Publikum je `sub`
+      // z ověřeného tokenu — nikdy argument klienta.
+      const a = K.get_knowledge_item.parse(rawArgs);
+      const audienceUserId = asString((auth.user.claims as Record<string, unknown>).sub) || null;
       return rpcService('mcp_get_knowledge_item', {
-        p_item_id: asString(args.item_id) || null,
-        p_source_slug: asString(args.source_slug) || null,
+        p_audience_user_id: audienceUserId,
+        p_item_id: a.item_id || null,
+        p_source_slug: a.source_slug || null,
       });
+    }
     case 'get_expertise_areas':
+      K.get_expertise_areas.parse(rawArgs);
       return rpcService('mcp_get_expertise_areas');
-    case 'match_experts':
+    case 'match_experts': {
+      const a = K.match_experts.parse(rawArgs);
       return rpcService('mcp_match_experts', {
-        p_context_tags: asStringArray(args.context_tags),
-        p_expertise_slug: asString(args.expertise_slug) || null,
-        p_limit: asNumber(args.limit, 10),
-        p_min_proficiency: asNumber(args.min_proficiency, 1),
+        p_context_tags: a.context_tags,
+        p_expertise_slug: a.expertise_slug || null,
+        p_limit: a.limit,
+        p_min_proficiency: a.min_proficiency,
       });
-    case 'get_agent_knowledge':
+    }
+    case 'get_agent_knowledge': {
+      // Pravidla agenta podle viditelnosti pro toho, kdo se ptá (publikum z ověřeného tokenu).
+      const a = K.get_agent_knowledge.parse(rawArgs);
       return rpcService('mcp_get_agent_knowledge', {
-        p_agent_slug: asString(args.agent_slug),
-        p_binding_type: asString(args.binding_type) || null,
+        p_agent_slug: a.agent_slug,
+        p_audience_user_id: asString((auth.user.claims as Record<string, unknown>).sub) || null,
+        p_binding_type: a.binding_type || null,
       });
-    case 'get_story_context':
-      return rpcUserClaims('get_story_detail_audited', { p_story_id: asString(args.story_id) }, auth.user.claims);
-    case 'compose_context':
+    }
+    case 'get_story_context': {
+      const a = K.get_story_context.parse(rawArgs);
+      return rpcUserClaims('get_story_detail_audited', { p_story_id: a.story_id }, auth.user.claims);
+    }
+    // ── Práce pod identitou uživatele (F9). RPC autorizuje podle auth.uid() z ověřeného tokenu;
+    //    chyba RPC jde volajícímu jen jako kód z výčtu + incident (lib/chyba-nastroje-prace.ts).
+    case 'my_next_steps': {
+      const a = K.my_next_steps.parse(rawArgs);
+      try {
+        return await rpcUserClaims('get_my_workflow_steps', {
+          p_days: a.days,
+          p_include_closed: a.include_closed,
+          p_limit: a.limit,
+          p_status: a.status || null,
+        }, auth.user.claims);
+      } catch (err) {
+        throw chybaPraceZRpc(err);
+      }
+    }
+    case 'complete_step': {
+      const a = K.complete_step.parse(rawArgs);
+      try {
+        return await rpcUserClaims('complete_workflow_step', {
+          p_has_deviation: a.has_deviation,
+          p_notes: a.notes || null,
+          p_output_data: a.output_data,
+          p_step_id: a.step_id,
+        }, auth.user.claims);
+      } catch (err) {
+        throw chybaPraceZRpc(err);
+      }
+    }
+    case 'report_progress': {
+      const a = K.report_progress.parse(rawArgs);
+      // ⛔ Revize Guru 2026-10-07: token vázaný na příběh (PAT scoped_to_story_id, mediovaný token
+      // chatu) smí zapisovat JEN do svého příběhu — create_story_entry_audited kontroluje uživatele,
+      // ne vazbu tokenu, takže by argument otevřel každý příběh vlastníka. Token bez příběhu
+      // (přihlášení z IDE) píše tam, kam ukáže argument a kam uživatel smí.
+      const storyId = writeStoryId(auth, a.story_id, true);
+      try {
+        const entryId = await rpcUserClaims('create_story_entry_audited', {
+          p_content: a.content,
+          p_entry_type: a.kind,
+          p_metadata: { source: 'mcp', tool: 'report_progress' },
+          p_story_id: storyId,
+        }, auth.user.claims);
+        return { story_id: storyId, entry_id: entryId, kind: a.kind };
+      } catch (err) {
+        throw chybaPraceZRpc(err);
+      }
+    }
+    case 'add_knowledge': {
+      const a = K.add_knowledge.parse(rawArgs);
+      const storyId = writeStoryId(auth, a.story_id, true);
+      try {
+        const itemId = await rpcUserClaims('add_story_knowledge_audited', {
+          p_story_id: storyId, p_title: a.title, p_body_markdown: a.body_markdown,
+          p_item_type: a.item_type, p_summary: a.summary ?? null, p_ai_context_tags: a.context_tags,
+        }, auth.user.claims);
+        return { item_id: itemId, story_id: storyId, status: 'awaiting_human_review' };
+      } catch (err) { throw chybaPraceZRpc(err); }
+    }
+    case 'request_capability': {
+      const a = K.request_capability.parse(rawArgs);
+      const storyId = writeStoryId(auth, a.story_id, false);
+      try {
+        return await rpcUserClaims('request_capability_audited', {
+          p_capability: a.capability, p_question: a.question, p_reason: a.reason ?? null,
+          p_run_id: a.run_id ?? null, p_story_id: storyId,
+        }, auth.user.claims);
+      } catch (err) { throw chybaPraceZRpc(err); }
+    }
+    case 'compose_context': {
+      const a = K.compose_context.parse(rawArgs);
       return rpcUserClaims('compose_context', {
-        p_agent_slug: asString(args.agent_slug) || null,
-        p_context_profile_slug: asString(args.context_profile_slug, 'repo_plus_rules'),
-        p_query: asString(args.query) || null,
-        p_run_id: asString(args.run_id) || null,
-        p_story_id: asString(args.story_id),
+        p_agent_slug: a.agent_slug || null,
+        p_context_profile_slug: a.context_profile_slug,
+        p_query: a.query || null,
+        p_run_id: a.run_id || null,
+        p_story_id: a.story_id,
       }, auth.user.claims);
-    case 'route_task':
+    }
+    case 'route_task': {
+      const a = K.route_task.parse(rawArgs);
       return rpcUserClaims('route_task', {
-        p_constraints: asRecord(args.constraints),
-        p_domain: asStringArray(args.domain),
-        p_risk_profile: asString(args.risk_level, asString(args.risk_profile, 'low')),
-        p_story_id: asString(args.story_id) || null,
-        p_task_kind: asString(args.task_kind),
-        p_tech: asStringArray(args.tech),
+        p_constraints: a.constraints,
+        p_domain: a.domain,
+        p_risk_profile: a.risk_level ?? a.risk_profile ?? 'low',
+        p_story_id: a.story_id || null,
+        p_task_kind: a.task_kind,
+        p_tech: a.tech,
       }, auth.user.claims);
+    }
     case 'validate_compliance':
-      return validateCompliance(args);
+      return validateCompliance(K.validate_compliance.parse(rawArgs));
     case 'admin_health_check':
+      K.admin_health_check.parse(rawArgs);
       return { status: 'healthy', adapter: 'fastify-json-rpc', tools: TOOL_DEFINITIONS.length, stats: await rpcService('mcp_get_knowledge_stats') };
     case 'get_knowledge_stats':
+      K.get_knowledge_stats.parse(rawArgs);
       return rpcService('mcp_get_knowledge_stats');
-    case 'get_knowledge_topics_localized':
+    case 'get_knowledge_topics_localized': {
+      const a = K.get_knowledge_topics_localized.parse(rawArgs);
       return rpcService('get_knowledge_topics_localized', {
-        p_limit: asNumber(args.limit, 50),
-        p_locale: asString(args.locale, 'en'),
-        p_offset: asNumber(args.offset, 0),
-        p_search: asString(args.search) || null,
-        p_visibility: asString(args.visibility) || null,
+        p_limit: a.limit,
+        p_locale: a.locale,
+        p_offset: a.offset,
+        p_search: a.search || null,
+        p_visibility: a.visibility || null,
       });
-    case 'get_public_chat_channel_config':
+    }
+    case 'get_public_chat_channel_config': {
       // Gateway-facing alias → existing get_active_channel_config RPC.
+      const a = K.get_public_chat_channel_config.parse(rawArgs);
       return rpcService('get_active_channel_config', {
-        p_channel_slug: asString(args.channel_slug),
+        p_channel_slug: a.channel_slug,
       });
+    }
     case 'list_public_chat_channels':
       // Gateway-facing alias → existing get_public_chat_channels_admin RPC.
+      K.list_public_chat_channels.parse(rawArgs);
       return rpcService('get_public_chat_channels_admin');
-    case 'get_design_profile':
+    case 'get_design_profile': {
+      const a = K.get_design_profile.parse(rawArgs);
       return rpcService('get_design_profile', {
-        p_partner_id: asString(args.partner_id) || null,
+        p_partner_id: a.partner_id || null,
       });
-    case 'get_model_registry':
+    }
+    case 'get_model_registry': {
       // Gateway-facing alias → existing get_model_registry_admin RPC.
+      const a = K.get_model_registry.parse(rawArgs);
       return rpcService('get_model_registry_admin', {
-        p_available_only: args.available_only !== false,
-        p_eval_status: asString(args.eval_status) || null,
-        p_provider: asString(args.provider) || null,
+        p_available_only: a.available_only,
+        p_eval_status: a.eval_status || null,
+        p_provider: a.provider || null,
       });
+    }
 
     default:
       // Family dispatchers — set-membership delegation so adding a tool is one line
       // (add it to the FLOWBOARD_TOOLS / AITG_TOOLS Set above). The AITG-INF-03 gate
       // recognizes these in-file Sets as the dispatch surface.
       if (FLOWBOARD_TOOLS.has(name)) {
-        return flowboardDispatch(name, args, auth.user.claims);
+        return flowboardDispatch(name, rawArgs, auth.user.claims);
       }
       if (AITG_TOOLS.has(name)) {
-        return aitgDispatch(name, args, auth.user.claims);
+        return aitgDispatch(name, rawArgs, auth.user.claims);
       }
       throw new Error(`Unknown MCP tool: ${name}`);
   }
@@ -572,8 +757,29 @@ export async function mcpRoutes(app: FastifyInstance): Promise<void> {
       if (error instanceof AuthError) {
         return reply.code(error.statusCode).send(jsonRpcError(id, -32000, error.message));
       }
-      req.log.error({ err: error, toolName }, 'MCP tool call failed');
-      return reply.send(jsonRpcError(id, -32000, error instanceof Error ? error.message : 'MCP tool call failed'));
+      if (error instanceof KnowledgeSearchUnavailableError) {
+        // Podrobnost (hostitelé lane/meshe, URL, identita vah) JEN do logu služby pod id incidentu;
+        // volajícímu kód, důvod, kód lane a incident (revize bezpečnosti 2026-10-07).
+        const incident = randomUUID();
+        log.safeWarn('knowledge_search.unavailable', {
+          incident, tool: toolName ?? null, reason: error.reason, lane: error.lane ?? null, detail: error.message,
+        });
+        return reply.send(jsonRpcToolError(id, { ...error.toPayload(incident), tool: toolName ?? null }));
+      }
+      const incident = randomUUID();
+      if (error instanceof ChybaNastrojePrace) {
+        // Pracovní nástroje (F9): výsledek nástroje s kódem z výčtu — stejný tvar jako
+        // embedding_unavailable u hledání, model podle kódu ví, co dál. Detail jen do logu.
+        log.safeError('mcp.tool_failed', error, { incident, tool: toolName ?? null, code: error.kod });
+        return reply.send(jsonRpcToolError(id, { ...error.toPayload(incident), tool: toolName ?? null }));
+      }
+      // ⛔ Revize Guru 2026-10-07: text chyby (tělo PostgRESTu/DB až 300 znaků — statement timeout,
+      // „different vector dimensions“, hint/details) šel KAŽDÉMU volajícímu a přes /v1 i původ MCP
+      // v /chat až do modelu. Volajícímu teď jen obecná zpráva + id incidentu; podrobnost jen do
+      // bezpečného logu pod týmž incidentem. U neplatných argumentů (zod) navíc jména polí — pocházejí
+      // ze schématu nástroje a vstupu volajícího, ne ze serveru, a model podle nich opraví volání.
+      log.safeError('mcp.tool_failed', error, { incident, tool: toolName ?? null });
+      return reply.send(jsonRpcError(id, -32000, verejnaZpravaChyby(error, incident)));
     }
   });
 }

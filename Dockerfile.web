@@ -203,9 +203,19 @@ EXPOSE 80
 
 # ⛔ SKOŘÁPKA PRO GENERÁTOR musí být z TOHOTO buildu. Vite hashuje jména
 # chunků (`shared-BL9zUP3B.js`), takže generátor je nesmí hádat — čte je
-# z index.html, který právě servírujeme. Kopie do sdíleného volume `/shell`
-# se obnovuje při každém startu, takže po redeploy nikdy neodkazuje na
-# soubory z předchozí verze.
-# `|| true`: bez připojeného volume (např. samostatný běh obrazu) se webserver
-# nesmí odmítnout spustit — generátor je volitelná vrstva, ne podmínka.
-CMD ["/bin/sh", "-c", "mkdir -p /shell && cp /usr/share/nginx/html/index.html /shell/index.html || true; exec nginx -g 'daemon off;'"]
+# z index.html, který právě servírujeme. (d-ii, 2026-10-02) Dřív se kopírovala
+# do sdíleného svazku `/shell`; jenže web a web-render jsou dvě Coolify aplikace
+# a disk nesdílí (rozbor 2026-09-28). Skořápku proto při startu POŠLE
+# web-skorapka.sh (`PUT /shell` přímo meshem) a nginx si předrenderované stránky
+# odtamtud táhne. curl kvůli PUT (busybox wget ho neumí) je v obrazu nginx:alpine
+# už obsažený — žádný `apk add` (build by jinak závisel na zrcadle Alpine mimo
+# REGISTRY_PROXY; nález revize 2026-10-02). Výchozí include = upstream i předrender
+# vypnuté, takže obraz nastartuje i samostatně a `nginx -t` projde bez startovního
+# skriptu; skutečný cíl zapíše web-start.sh.
+RUN command -v curl >/dev/null \
+	&& printf 'upstream web_render {\n  server 127.0.0.1:9 down;\n}\n' > /etc/nginx/web-render-upstream.conf \
+	&& printf 'set $web_render_zapnuto "0";\nset $web_render_host "";\nset $skorapka_otisk "";\n' > /etc/nginx/web-render-cil.conf
+COPY docker/web-start.sh /usr/local/bin/web-start.sh
+COPY docker/web-skorapka.sh /usr/local/bin/web-skorapka.sh
+RUN chmod 0755 /usr/local/bin/web-start.sh /usr/local/bin/web-skorapka.sh
+CMD ["/bin/sh", "/usr/local/bin/web-start.sh"]

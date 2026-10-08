@@ -67,8 +67,11 @@ export function zkontrolujRedeploy(mjs: string): string[] {
   if (!/flag\("--restart-validate"\)/.test(mjs)) {
     nalezy.push("aisha-redeploy.mjs nezná --restart-validate — cold-start by volal neexistující režim.");
   }
-  if (!/\/applications\/\$\{uuid\}\/restart/.test(mjs)) {
-    nalezy.push("chybí triggerRestart přes /applications/{uuid}/restart — restart by se nespustil.");
+  // Od 2026-10-04 restart neodesílá redeploy sám: jde přes jediný domov mutace
+  // (lib/coolify-mutace.mjs, akce „restart“), který se před voláním ptá na deklarované
+  // držení. Cestu /applications/{uuid}/restart skládá domov — měří test níž.
+  if (!/async function triggerRestart\([\s\S]*?mutujAplikaci\(\{ akce: "restart", [^}]*\buuid\b[^}]*\}/.test(mjs)) {
+    nalezy.push("chybí triggerRestart přes domov mutace (akce „restart“ → /applications/{uuid}/restart) — restart by se nespustil.");
   }
   if (!/bez deployment_uuid/.test(mjs)) {
     nalezy.push(
@@ -116,6 +119,20 @@ describe("restart validace: zapojení + poctivé měření", () => {
 
   test("redeploy skript restart režim skutečně implementuje", () => {
     expect(zkontrolujRedeploy(mjs)).toEqual([]);
+  });
+
+  test("…a domov mutace akcí „restart“ volá /applications/{uuid}/restart (ne nasazení)", () => {
+    const domov = readFileSync(join(ROOT, "scripts/lib/coolify-mutace.mjs"), "utf-8");
+    const restart = /\n {2}restart: \(z\) => \{([\s\S]*?)\n {2}\},/.exec(domov)?.[1] ?? "";
+    expect(restart, "akce restart v domově mutace chybí").not.toBe("");
+    expect(restart).toMatch(/`\/applications\/\$\{uuid\}\/restart\$\{dotaz\}`/);
+    expect(restart).not.toMatch(/\/deploy\?/);
+  });
+
+  test("restart mimo domov mutace (bez akce „restart“) je nález", () => {
+    const mut = mjs.replace('mutujAplikaci({ akce: "restart", jmeno: name', 'mutujAplikaci({ akce: "deploy", jmeno: name');
+    expect(mut, "mutace se musí trefit").not.toBe(mjs);
+    expect(zkontrolujRedeploy(mut).join("\n")).toContain("restart by se nespustil");
   });
 
   // ── Negativní testy ─────────────────────────────────────────────────────────

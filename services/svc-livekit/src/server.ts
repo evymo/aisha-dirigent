@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify';
-import { applySecurity, pluginRejection } from '@aisha/security';
+import { applySecurity, pluginRejection, safeLoggerOptions } from '@aisha/security';
 import { bootstrapOtel } from '@aisha/observability/otel';
 import { registerMetricsPlugin } from '@aisha/observability/metrics';
 import { config } from './config.js';
@@ -14,7 +14,7 @@ import { recordingRoutes } from './routes/recording.js';
 // Rollback: OTEL_SDK_DISABLED=true env (Coolify) + container restart.
 bootstrapOtel({ serviceName: 'svc-livekit' });
 const app = Fastify({
-  logger: { level: config.logLevel },
+  logger: safeLoggerOptions({ level: config.logLevel }),
   trustProxy: true,
 });
 

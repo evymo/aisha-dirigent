@@ -97,9 +97,22 @@
     },
     {
       "parameters": {
+        "jsCode": "// Fingerprint the measured proposal outcome for the immutable ledger (OPANCHOR).\n// ⛔ The dispatcher edge_blockchain_audit knows insert_record (same as the deploy and\n// PKI producers); the former 'proposal_outcome_anchor' action never existed, so every\n// run's anchor failed silently (fail-open). Only the decision is anchored — the\n// 'outcome' phase (score_before/after, delta, rollback proposal) — not the baseline\n// snapshot nor skipped/unscoped items.\nconst crypto = require('crypto');\nconst out = [];\nfor (const item of $input.all()) {\n  const r = item.json || {};\n  if (r.phase !== 'outcome' || !r.proposal_id) continue;\n  const payload = { event: 'improvement_proposal_outcome', proposal_id: r.proposal_id, outcome: r, at: new Date().toISOString() };\n  const payload_hash = crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');\n  out.push({ json: { event_type: 'improvement_proposal', reference_table: 'improvement_proposals', reference_id: String(r.proposal_id), payload, payload_hash } });\n}\nreturn out;"
+      },
+      "id": "build-outcome-anchor",
+      "name": "Build Outcome Anchor",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        300
+      ]
+    },
+    {
+      "parameters": {
         "category": "custom",
         "functionName": "edge_blockchain_audit",
-        "rpcParams": "={{ JSON.stringify({ p_action: 'proposal_outcome_anchor', p_payload: { proposalId: $json.proposal_id || $json.proposalId, outcome: $json.outcome, reviewedAt: $json.reviewed_at || $json.reviewedAt } }) }}",
+        "rpcParams": "={{ JSON.stringify({ p_action: 'insert_record', p_payload: { event_type: $json.event_type, reference_table: $json.reference_table, reference_id: $json.reference_id, payload: $json.payload, payload_hash: $json.payload_hash } }) }}",
         "authMode": "service_role",
         "options": {},
         "onError": "continueRegularOutput"
@@ -109,7 +122,7 @@
       "type": "n8n-nodes-aisha.aishaRpc",
       "typeVersion": 1,
       "position": [
-        1080,
+        1300,
         300
       ],
       "onError": "continueRegularOutput",
@@ -159,7 +172,7 @@
       "main": [
         [
           {
-            "node": "Anchor Outcome",
+            "node": "Build Outcome Anchor",
             "type": "main",
             "index": 0
           }
@@ -169,6 +182,17 @@
     "Anchor Outcome": {
       "main": [
         []
+      ]
+    },
+    "Build Outcome Anchor": {
+      "main": [
+        [
+          {
+            "node": "Anchor Outcome",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     }
   },

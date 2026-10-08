@@ -1,12 +1,13 @@
 /**
  * Unit tests for svc-ai-chat security primitives.
  *
- * The three files under test are the foundation under every chat / probe
+ * The files under test are the foundation under every chat / probe
  * / orchestration flow:
  *
  *   - auth.ts             — JWT user verification, role check, service-role bearer check
  *   - lib/rpcAdapter.ts   — canonical rebrand RPC adapter, replaces the banned legacy SDK (createServiceRpcAdapter / createUserRpcAdapter)
- *   - lib/openaiKey.ts    — API key resolver (DB-first, env fallback)
+ *   (lib/openaiKey.ts zrušen 2026-10-02 — klíče čte čtečka pověření lib/credentials.ts,
+ *    testy v @aisha/security credentials.test.ts)
  *
  * If any of these regress silently, downstream RBAC / cost / safety
  * assumptions break. We lock in their contracts here.
@@ -60,6 +61,8 @@ vi.mock('@aisha/security', () => {
   }
   function verifyServiceRole(authHeader: string | undefined, expectedToken: string): void {
     if (!authHeader) throw new AuthError('Missing Authorization header', 401, 'missing');
+    // Shodně s upstreamem: prázdné očekávané tajemství nesmí autentizovat nikoho.
+    if (!expectedToken) throw new AuthError('Service role authentication is not configured', 503, 'unconfigured');
     const token = authHeader.replace(/^Bearer\s+/i, '');
     if (token.length !== expectedToken.length) {
       throw new AuthError('Invalid service role token', 403, 'invalid');
@@ -72,7 +75,9 @@ vi.mock('@aisha/security', () => {
   }
   return {
     createJwtVerifier: mockCreateJwtVerifier,
-    verifyServiceRole,
+    // vi.fn kvůli testu volajícího místa: služba musí hlavičku předat sdílené
+    // kontrole se SVÝM tajemstvím (vlastnosti porovnání drží packages/security).
+    verifyServiceRole: vi.fn(verifyServiceRole),
     AuthError,
   };
 });
@@ -291,16 +296,20 @@ describe('auth.ts :: verifyServiceRole — adversarial inputs', () => {
     }
   });
 
-  it('rejects extremely long token (DoS protection — length check is O(1))', async () => {
+  it('rejects extremely long token: předá ho sdílené kontrole se SVÝM tajemstvím → 403 (bez stopek)', async () => {
+    // ⛔ Dřív tu stály stopky (`performance.now()` < 50 ms) nad KOPIÍ porovnání
+    // z mocku výš. Pod zátěží pre-push (2026-10-02, load ~65) vyšlo 76 ms
+    // a push padl na kódu, který se neměnil. O(1) odmítnutí rozdílné délky
+    // a konstantní čas dokazuje SONDOU packages/security (jwt.test.ts,
+    // „vlastnosti bez hodin"). Služba odpovídá jen za volající místo.
+    const { verifyServiceRole: sdileny } = await import('@aisha/security');
+    const sdilenySpy = vi.mocked(sdileny);
+    sdilenySpy.mockClear();
     const { verifyServiceRole } = await import('../auth.js');
     const huge = 'A'.repeat(1_000_000);
-    const t0 = performance.now();
-    try { verifyServiceRole(`Bearer ${huge}`); } catch { /* expected */ }
-    const elapsed = performance.now() - t0;
-    // Length check rejects BEFORE the O(n) XOR loop runs, so even a 1MB
-    // bogus token returns in microseconds. Assert < 50ms to catch
-    // accidental O(n) regressions.
-    expect(elapsed).toBeLessThan(50);
+    expect(() => verifyServiceRole(`Bearer ${huge}`)).toThrow(expect.objectContaining({ statusCode: 403 }));
+    expect(sdilenySpy).toHaveBeenCalledTimes(1);
+    expect(sdilenySpy).toHaveBeenCalledWith(`Bearer ${huge}`, 'svc-secret-token-deadbeef');
   });
 });
 
@@ -455,80 +464,3 @@ describe('rpcAdapter :: createUserRpcAdapter (RLS-enforced)', () => {
     expect(mockRpcService).not.toHaveBeenCalled();
   });
 });
-
-// ===========================================================================
-// lib/openaiKey.ts — API key resolver
-// ===========================================================================
-
-describe('openaiKey :: getOpenAiApiKey', () => {
-  const origEnv = process.env.OPENAI_API_KEY;
-  beforeEach(() => {
-    delete process.env.OPENAI_API_KEY;
-  });
-  afterEach(() => {
-    if (origEnv === undefined) delete process.env.OPENAI_API_KEY;
-    else process.env.OPENAI_API_KEY = origEnv;
-  });
-
-  function mockClient(rpcImpl: (fn: string, params: Record<string, unknown>) => Promise<unknown>) {
-    return {
-      rpc: async <T = unknown>(fn: string, params: Record<string, unknown> = {}) => {
-        try {
-          const data = (await rpcImpl(fn, params)) as T | null;
-          return { data, error: null };
-        } catch (err) {
-          return { data: null, error: { message: (err as Error).message } };
-        }
-      },
-    };
-  }
-
-  it('calls edge_app_secrets with p_action=get and p_key=OPENAI_API_KEY', async () => {
-    const rpcSpy = vi.fn().mockResolvedValue({ value: 'sk-from-db' });
-    const client = mockClient(rpcSpy);
-    const { getOpenAiApiKey } = await import('../lib/openaiKey.js');
-    await getOpenAiApiKey(client);
-    expect(rpcSpy).toHaveBeenCalledWith('edge_app_secrets', {
-      p_action: 'get',
-      p_key: 'OPENAI_API_KEY',
-    });
-  });
-
-  it('returns DB-backed key when present (DB wins over env)', async () => {
-    // Mock value under 20 chars to stay below the service-security gate's
-    // hardcoded-secret threshold — see `tests/fixtures/mocks.ts` convention.
-    process.env.OPENAI_API_KEY = 'sk-env-mock';
-    const client = mockClient(async () => ({ value: 'sk-from-db' }));
-    const { getOpenAiApiKey } = await import('../lib/openaiKey.js');
-    const key = await getOpenAiApiKey(client);
-    expect(key).toBe('sk-from-db');
-  });
-
-  it('falls back to OPENAI_API_KEY env when DB returns null value', async () => {
-    process.env.OPENAI_API_KEY = 'sk-from-env';
-    const client = mockClient(async () => ({ value: null }));
-    const { getOpenAiApiKey } = await import('../lib/openaiKey.js');
-    const key = await getOpenAiApiKey(client);
-    expect(key).toBe('sk-from-env');
-  });
-
-  it('falls back to env when DB call THROWS (RPC down, secret missing, etc.)', async () => {
-    process.env.OPENAI_API_KEY = 'sk-from-env';
-    const client = mockClient(async () => {
-      throw new Error('postgrest: relation edge_app_secrets does not exist');
-    });
-    const { getOpenAiApiKey } = await import('../lib/openaiKey.js');
-    const key = await getOpenAiApiKey(client);
-    expect(key).toBe('sk-from-env');
-  });
-
-  it('returns null when neither DB nor env has a key', async () => {
-    const client = mockClient(async () => ({ value: null }));
-    const { getOpenAiApiKey } = await import('../lib/openaiKey.js');
-    const key = await getOpenAiApiKey(client);
-    expect(key).toBeNull();
-  });
-});
-
-// vitest doesn't surface a global afterEach import, declare here for use above
-import { afterEach } from 'vitest';

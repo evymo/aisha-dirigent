@@ -101,9 +101,9 @@ function extraHostsEnvKeys(): string[] {
  * `:?` stráž nemusí mít (stráž může stát jinde — nebo chybět). Runtime-only klíč
  * se při build-parse Coolify dosadí prázdný a položka `:/cíl` compose shodí.
  */
-function volumeSourceEnvKeys(): string[] {
+function volumeSourceEnvKeys(text: string = readFileSync(COMPOSE, 'utf8')): string[] {
   const keys = new Set<string>();
-  for (const z of zdrojeSvazku(COMPOSE, readFileSync(COMPOSE, 'utf8'))) {
+  for (const z of zdrojeSvazku(COMPOSE, text)) {
     for (const m of z.zdroj.matchAll(/\$\{([A-Z_][A-Z0-9_]*)/g)) keys.add(m[1]);
   }
   return [...keys].sort();
@@ -140,9 +140,22 @@ describe('edge-buildtime-allowlist — fresh-app deploys must survive compose in
 
   it('volume-source interpolated keys match the buildtime allowlist (empty source = hard parse error)', () => {
     const keys = volumeSourceEnvKeys();
-    // Edge web montuje výstup rendereru a skořápku z hostitelských cest instance;
-    // zmizí-li obě, extraktor (nebo compose) shnil — měřidlo nesmí zezelenat naprázdno.
-    expect(keys.length).toBeGreaterThanOrEqual(2);
+    // Od 2026-10-02 (předrender po síti, d-ii) edge žádný `${VAR}` ve zdroji svazku
+    // nemá — prázdný seznam je správný stav. Aby měřidlo nezezelenalo naprázdno,
+    // musí extraktor na KONTROLNÍM VZORKU klíč najít (krátký i dlouhý tvar).
+    const vzorek = [
+      'services:',
+      '  web:',
+      '    volumes:',
+      '      - "${VZOREK_KRATKY_DIR}:/x:ro"',
+      '      - type: bind',
+      '        source: ${VZOREK_DLOUHY_DIR}',
+      '        target: /y',
+    ].join('\n');
+    expect(volumeSourceEnvKeys(vzorek), 'extraktor zdrojů svazků shnil — brána by měřila prázdno').toEqual([
+      'VZOREK_DLOUHY_DIR',
+      'VZOREK_KRATKY_DIR',
+    ]);
     const re = buildtimeRegex();
     const uncovered = keys.filter((k) => !re.test(k));
     expect(

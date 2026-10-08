@@ -1,0 +1,462 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aisha/config/accel-uzel.schema.json",
+  "title": "Deklarace GPU uzlu (operátor společné lane)",
+  "description": "Co uzel servíruje KOMU: sítě, enginy, aliasy a kvóty nájemců. Autorizace a rozpočet, ne katalog pro uživatele. Leží v datech instance vlastníka vrstvy (overlay `accel/uzel.json`), do upstreamu patří jen schéma a příklad. Jediný domov faktů uzlu: env vrstvy (ACCEL_*) z ní odvozuje scripts/lib/derive-accel-uzel.mjs. Výklad: scripts/lib/accel-uzel.mjs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "verze",
+    "vlastnik",
+    "karta",
+    "firewall",
+    "jadro",
+    "enginy",
+    "modely",
+    "najemci",
+    "volne_sloty_blok"
+  ],
+  "properties": {
+    "verze": {
+      "const": 1
+    },
+    "vlastnik": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{1,30}$",
+      "description": "Identita vlastníka uzlu (ACCEL_OWNER_PREFIX). Nesou ji jména kontejnerů `<vlastnik>-accel-*`, sítě `<vlastnik>-accel-jadro` a `<vlastnik>-lane-<nájemce>` i svazek vah."
+    },
+    "karta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kapacita_mib",
+        "rezerva_mib"
+      ],
+      "properties": {
+        "kapacita_mib": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "rezerva_mib": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "description": "Σ enginy.vram_mib + rezerva_mib ≤ kapacita_mib (VT3)."
+    },
+    "jadro": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "podsit",
+        "vstup_ip"
+      ],
+      "properties": {
+        "podsit": {
+          "$ref": "#/definitions/cidr"
+        },
+        "vstup_ip": {
+          "$ref": "#/definitions/ipv4"
+        }
+      },
+      "description": "Interní síť <vlastnik>-accel-jadro: jen VB a enginy."
+    },
+    "enginy": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-z0-9][a-z0-9-]{0,31}$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "druh",
+          "repo",
+          "revize",
+          "soubor_vah",
+          "format_vah",
+          "sha256",
+          "vram_mib",
+          "max_model_len",
+          "start_mez_s",
+          "recept"
+        ],
+        "properties": {
+          "druh": {
+            "enum": [
+              "pooling",
+              "generate"
+            ]
+          },
+          "repo": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
+          },
+          "revize": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{40}$"
+          },
+          "soubor_vah": {
+            "type": "string",
+            "pattern": "^([A-Za-z0-9._-]+|@vse)$",
+            "description": "Jeden soubor vah, nebo `@vse` = identita celého adresáře revize (sha256 seřazeného seznamu `relativní/cesta:sha256` všech souborů mimo aisha-identita.json a .cache: váhy, config, tokenizér, šablona chatu)."
+          },
+          "format_vah": {
+            "enum": [
+              "pytorch",
+              "safetensors"
+            ]
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "vram_mib": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_model_len": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "start_mez_s": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "cache_prefixu": {
+            "type": "boolean"
+          },
+          "recept": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Pooling, normalizace, max tokenů, ořez — jde do x-aisha-recept."
+          },
+          "lora": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "max_adapteru",
+              "max_rank"
+            ],
+            "properties": {
+              "max_adapteru": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 64
+              },
+              "max_rank": {
+                "enum": [
+                  8,
+                  16,
+                  32,
+                  64,
+                  128,
+                  256
+                ]
+              }
+            },
+            "description": "Jen u chatového enginu (slot chat-*): meze LoRA adaptérů nájemců (vLLM --max-loras, --max-lora-rank). Adaptéry se načítají staticky z deklarace, za běhu nikdy."
+          }
+        }
+      },
+      "description": "Slot embed-<n> = pooling (embedder), chat-<n> = generate (chat + LoRA adaptéry nájemců). Sloty jsou služby katalogu accel-<id>."
+    },
+    "modely": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-z0-9][a-z0-9._-]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "engine"
+        ],
+        "properties": {
+          "engine": {
+            "type": "string",
+            "minLength": 1
+          },
+          "dim": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "max_tokenu": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "description": "Pojmenovaný model (váhy + recept jednoho enginu). Embedder: dim povinné, max_tokenu = obsah bez speciálních tokenů. Chat: max_tokenu povinné = strop vygenerovaných tokenů."
+      }
+    },
+    "najemci": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 8,
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9-]{0,30}$",
+        "not": {
+          "pattern": "^volny-[0-9]+$"
+        }
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slot",
+          "sit",
+          "klice",
+          "vypnuto",
+          "trida_duvery",
+          "modely",
+          "kvoty"
+        ],
+        "properties": {
+          "slot": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "sit": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "podsit",
+              "vstup_ip",
+              "rozsah_klientu"
+            ],
+            "properties": {
+              "podsit": {
+                "$ref": "#/definitions/cidr"
+              },
+              "vstup_ip": {
+                "$ref": "#/definitions/ipv4"
+              },
+              "rozsah_klientu": {
+                "$ref": "#/definitions/cidr"
+              }
+            },
+            "description": "rozsah_klientu je POVINNÝ (N1 revize 0c): leží v podsíti a nezahrnuje vstup_ip ani bránu .1. VB přijme jen zdroj z něj."
+          },
+          "klice": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 2,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "otisk_sha256"
+              ],
+              "properties": {
+                "otisk_sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$"
+                }
+              }
+            },
+            "description": "Otisky platných klíčů. Rotace: [starý, nový] → [nový]."
+          },
+          "vypnuto": {
+            "type": "boolean"
+          },
+          "trida_duvery": {
+            "type": "string",
+            "minLength": 1
+          },
+          "modely": {
+            "type": "object",
+            "minProperties": 1,
+            "propertyNames": {
+              "pattern": "^[a-z0-9][a-z0-9._-]*$"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "model"
+              ],
+              "properties": {
+                "model": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "max_tokenu": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "adapter": {
+                  "type": "string",
+                  "description": "Jméno adaptéru z najemci.<id>.adaptery (jen chatový model téhož enginu)."
+                }
+              },
+              "description": "Alias nájemce → pojmenovaný model. Nájemce vidí jen své aliasy (V1)."
+            }
+          },
+          "kvoty": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "rezim",
+              "okno_s",
+              "gpu_ms_za_okno",
+              "soubeh",
+              "davka_max_vstupu"
+            ],
+            "properties": {
+              "rezim": {
+                "enum": [
+                  "varovani",
+                  "vynucovat"
+                ],
+                "description": "varovani = požadavek nad kvótou projde, VB ho zapíše jako varování a vrátí hlavičku x-aisha-kvota; vynucovat = 429 KVOTA_PREKROCENA s Retry-After. Deklarace ho uvádí vždy výslovně, platforma nedosazuje."
+              },
+              "okno_s": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "gpu_ms_za_okno": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "soubeh": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "dotaz",
+                  "davka"
+                ],
+                "properties": {
+                  "dotaz": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "davka": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              },
+              "davka_max_vstupu": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          },
+          "diagnostika": {
+            "type": "boolean",
+            "description": "Diagnostika operátora (sonda): smí mířit na engine jiného nájemce. Jinak engine na nájemce (O-4)."
+          },
+          "adaptery": {
+            "type": "object",
+            "propertyNames": {
+              "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$"
+            },
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "engine",
+                "repo",
+                "revize",
+                "sha256"
+              ],
+              "properties": {
+                "engine": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "repo": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
+                },
+                "revize": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{40}$"
+                },
+                "sha256": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{64}$",
+                  "description": "Identita celého adresáře adaptéru (`@vse`): adapter_model.safetensors i adapter_config.json."
+                }
+              }
+            },
+            "description": "LoRA adaptéry nájemce (lens). Ve vLLM i ve VB se jmenují `<nájemce>.<jméno>`; zapsání sem = potvrzení člověkem (registr adaptérů)."
+          }
+        }
+      },
+      "description": "Nájemce = identita instance forku (APP_NAME_PREFIX). Jeho síť je `<vlastnik>-lane-<nájemce>`; jméno `volny-<n>` patří volným slotům."
+    },
+    "firewall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ssh",
+        "spravci",
+        "rezim",
+        "potvrzeni_s",
+        "interval_s"
+      ],
+      "properties": {
+        "ssh": {
+          "enum": [
+            "svet",
+            "sprava"
+          ],
+          "description": "tcp/22: svet = komukoli (hlídá sshd, jen klíč), sprava = jen správcovské adresy."
+        },
+        "spravci": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/cidr"
+          },
+          "description": "Odkud smí všechno ostatní, i publikované porty."
+        },
+        "rezim": {
+          "enum": [
+            "measure",
+            "enforce"
+          ],
+          "description": "measure = jen počítá, enforce = zahazuje zbytek."
+        },
+        "potvrzeni_s": {
+          "type": "integer",
+          "minimum": 30,
+          "description": "Okno pro potvrzení enforce novým SSH ze správy, jinak auto-návrat."
+        },
+        "interval_s": {
+          "type": "integer",
+          "minimum": 5
+        },
+        "udp_mesh_port": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 65535,
+          "description": "Příchozí UDP meshe jen s výslovnou deklarací. Chybí/null = zavřeno."
+        }
+      },
+      "description": "Firewall hostitele (accel-hostfw, A2-2). Výklad ACCEL_FW_* drží scripts/lib/accel-deklarace.mjs."
+    },
+    "volne_sloty_blok": {
+      "type": "string",
+      "pattern": "^\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}/21$",
+      "description": "Zarovnaná síť /21 pro volné sloty: slot n dostane /28 na začátku n-tého /24. Nájemce ani jádro do ní nesmí."
+    }
+  },
+  "definitions": {
+    "cidr": {
+      "type": "string",
+      "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$"
+    },
+    "ipv4": {
+      "type": "string",
+      "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}$"
+    }
+  }
+}

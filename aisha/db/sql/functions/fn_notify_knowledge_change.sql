@@ -9,7 +9,7 @@ CREATE OR REPLACE FUNCTION public.fn_notify_knowledge_change()
   RETURNS trigger
   LANGUAGE plpgsql
   SECURITY DEFINER
-  SET search_path TO 'public'
+  SET search_path TO 'pg_catalog', 'public', 'pg_temp'
 AS $function$
 DECLARE
   v_source_id uuid;
@@ -77,6 +77,7 @@ BEGIN
       v_category := OLD.category;
       v_tags := OLD.ai_context_tags;
       v_story_id := OLD.story_id;
+      v_action := public.knowledge_ragnarok_action('DELETE', OLD.status, OLD.quarantine_status, NULL, NULL, false);
     ELSE
       v_source_id := NEW.id;
       v_source_slug := NEW.source_slug;
@@ -85,25 +86,24 @@ BEGIN
       v_tags := NEW.ai_context_tags;
       v_story_id := NEW.story_id;
 
-      -- Skip non-meaningful changes
-      IF TG_OP = 'UPDATE'
-         AND OLD.body_markdown IS NOT DISTINCT FROM NEW.body_markdown
-         AND OLD.ai_instructions IS NOT DISTINCT FROM NEW.ai_instructions
-         AND OLD.title IS NOT DISTINCT FROM NEW.title
-         AND OLD.summary IS NOT DISTINCT FROM NEW.summary
-         AND OLD.status IS NOT DISTINCT FROM NEW.status
-      THEN
-        RETURN NEW;
+      -- Co se má v indexu stát, rozhoduje čistá funkce (status + stav karantény
+      -- + změna obsahu). Změna POUZE stavu karantény je významná: položka
+      -- označená po nahrání se musí z indexu stáhnout.
+      IF TG_OP = 'INSERT' THEN
+        v_action := public.knowledge_ragnarok_action('INSERT', NULL, NULL, NEW.status, NEW.quarantine_status, false);
+      ELSE
+        v_action := public.knowledge_ragnarok_action(
+          'UPDATE', OLD.status, OLD.quarantine_status, NEW.status, NEW.quarantine_status,
+          OLD.body_markdown IS DISTINCT FROM NEW.body_markdown
+            OR OLD.ai_instructions IS DISTINCT FROM NEW.ai_instructions
+            OR OLD.title IS DISTINCT FROM NEW.title
+            OR OLD.summary IS DISTINCT FROM NEW.summary
+        );
       END IF;
 
-      -- Skip inactive items
-      IF NEW.status != 'active' AND v_action = 'created' THEN
+      -- NULL = v indexu se nic nemění (není co nahrát ani stáhnout)
+      IF v_action IS NULL THEN
         RETURN NEW;
-      END IF;
-
-      -- If archived, treat as delete from Ragnarok
-      IF NEW.status = 'archived' THEN
-        v_action := 'archived';
       END IF;
     END IF;
   END IF;
@@ -116,6 +116,7 @@ BEGIN
     'source_slug', v_source_slug,
     'story_id', v_story_id,
     'action', v_action,
+    'op', TG_OP,
     'title', v_title,
     'category', v_category,
     'tags', to_jsonb(COALESCE(v_tags, ARRAY[]::text[])),
@@ -126,7 +127,7 @@ BEGIN
   PERFORM pg_notify('kb_ragnarok_sync', v_payload::text);
 
   -- 2. Log to audit_journal (user_id is NULL during seed/system triggers)
-  INSERT INTO audit_journal (user_id, action, metadata)
+  INSERT INTO public.audit_journal (user_id, action, metadata)
   VALUES (
     auth.uid(),
     'KB_RAGNAROK_SYNC_TRIGGER',
@@ -136,6 +137,7 @@ BEGIN
       'entity_type', TG_TABLE_NAME,
       'entity_id', v_source_id,
       'change_action', v_action,
+      'op', TG_OP,
       'source_slug', v_source_slug
     )
   );
@@ -160,7 +162,7 @@ BEGIN
     -- webhook hiccup on an expert_rule/knowledge_item DELETE/publish/archive into
     -- a hard failure of the triggering statement. FK allows NULL, so auth.uid()
     -- (NULL for system/seed triggers) is safe.
-    INSERT INTO audit_journal(user_id, action, metadata)
+    INSERT INTO public.audit_journal(user_id, action, metadata)
     VALUES (
       auth.uid(),
       'KB_WEBHOOK_DELIVERY_FAILED',
@@ -181,5 +183,5 @@ BEGIN
 END;
 $function$;
 
-REVOKE ALL ON FUNCTION fn_notify_knowledge_change() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION fn_notify_knowledge_change() TO service_role;
+REVOKE ALL ON FUNCTION public.fn_notify_knowledge_change() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.fn_notify_knowledge_change() TO service_role;

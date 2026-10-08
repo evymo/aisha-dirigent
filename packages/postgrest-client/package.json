@@ -1,6 +1,6 @@
 {
   "name": "@aisha/postgrest-client",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "license": "Elastic-2.0",
   "description": "The ONE PostgREST RPC call contract shared by every AISHA orchestrator service. Replaces the divergent hand-rolled services/*/src/postgrest.ts copies (SVC-01 / D11) with a single canonical client: rpcService / rpcUser / rpcUserClaims + table helpers, preserving each service's auth / timeout semantics via options.",
   "private": false,

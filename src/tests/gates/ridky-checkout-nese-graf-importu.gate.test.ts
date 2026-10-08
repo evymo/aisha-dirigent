@@ -8,6 +8,11 @@
  * Dosavadní brána (doruceni-povinnych-promennych) hlídala graf JEDNÉ knihovny a její
  * regex bral jen importy v dvojitých uvozovkách.
  *
+ * ⛔ NAMĚŘENO 2026-10-03 (revize): `scripts/ci/deploy-and-verify.sh` pouští
+ * `node scripts/lib/nasazeni-navazani.mjs` a ten v řídkém checkoutu tří pokračovacích
+ * úloh NEBYL. Pokračování běží jen po pádu vlastní úlohy — první skutečný běh by umřel
+ * na module-not-found. Graf proto začíná i u toho, co stažené `.sh` SPOUŠTĚJÍ.
+ *
  * Měří se: pro KAŽDÝ blok `sparse-checkout:` ve workflow a každý vyjmenovaný `.mjs/.js`
  * soubor tranzitivní graf relativních importů (import … from, export … from, holý
  * `import "x"`, dynamický `import("x")` s literálem; obě uvozovky). Každý importovaný
@@ -46,6 +51,44 @@ function grafImportu(start: string, videno = new Set<string>()): Set<string> {
   for (const spec of relativniImporty(readFileSync(join(ROOT, start), "utf8"))) {
     grafImportu(normalize(join(dirname(start), spec)), videno);
   }
+  return videno;
+}
+
+/**
+ * Co shellový skript SPOUŠTÍ nebo NAČÍTÁ z repa: `node scripts/x.mjs`, `bash scripts/x.sh`,
+ * `. scripts/x.sh` / `source …` a tvar `. "$(dirname "$0")/../lib/x.sh"`. Jen literální cesty;
+ * řádky komentářů a heredoc nápovědy („Ruční cesta zůstává: node …“) se neberou.
+ */
+export function spousteneZeShellu(soubor: string, zdroj: string): string[] {
+  const out = new Set<string>();
+  // Příkaz musí stát na POZICI PŘÍKAZU (začátek řádku, za `$(`, `!`, `|`, `&&`, `;`, then/do/else),
+  // ne uprostřed textu. Těla heredoců se přeskakují celá: je to nápověda pro člověka
+  // („node scripts/aisha-env-doctor.mjs  # doplní…“), ne kód, který úloha spustí.
+  const POZICE = String.raw`(?:^|\$\(|[;|&(!` + "`" + String.raw`]|\bthen\b|\bdo\b|\belse\b)\s*(?:[A-Za-z_][A-Za-z0-9_]*=\$\(\s*)?`;
+  const LITERAL = new RegExp(POZICE + String.raw`(?:node|bash|sh|source|\.)\s+"?((?:scripts|\.forgejo)\/[A-Za-z0-9_.\/-]+\.(?:mjs|js|sh))"?`, "g");
+  const VEDLE = new RegExp(POZICE + String.raw`(?:node|bash|sh|source|\.)\s+"\$\(dirname "\$0"\)\/([A-Za-z0-9_.\/-]+\.(?:mjs|js|sh))"`, "g");
+  let konecHeredocu: string | null = null;
+  for (const radek of zdroj.split("\n")) {
+    if (konecHeredocu !== null) {
+      if (radek.trim() === konecHeredocu) konecHeredocu = null;
+      continue;
+    }
+    if (/^\s*#/.test(radek)) continue;
+    for (const m of radek.matchAll(LITERAL)) out.add(m[1]);
+    for (const m of radek.matchAll(VEDLE)) out.add(normalize(join(dirname(soubor), m[1])));
+    const h = /<<-?\s*(["']?)([A-Za-z_][A-Za-z0-9_]*)\1/.exec(radek.replace(/<<</g, ""));
+    if (h) konecHeredocu = h[2];
+  }
+  return [...out].filter((c) => existsSync(join(ROOT, c)));
+}
+
+/** Tranzitivně: co stažený skript spouští (.sh) a importuje (.mjs/.js). */
+function grafSpousteni(start: string, videno = new Set<string>()): Set<string> {
+  if (videno.has(start) || !existsSync(join(ROOT, start))) return videno;
+  videno.add(start);
+  const zdroj = readFileSync(join(ROOT, start), "utf8");
+  if (/\.sh$/.test(start)) for (const c of spousteneZeShellu(start, zdroj)) grafSpousteni(c, videno);
+  else for (const spec of relativniImporty(zdroj)) grafSpousteni(normalize(join(dirname(start), spec)), videno);
   return videno;
 }
 
@@ -88,19 +131,44 @@ describe("řídký checkout nese celý graf importů stažených skriptů", () =
     ).toEqual(["./a.mjs", "./b.mjs", "./c.mjs", "./d.mjs", "./e.mjs"]);
   });
 
-  it("každý importovaný soubor je v témže bloku výslovně nebo pod vyjmenovaným adresářem", () => {
+  it("měřidlo spouštění ze shellu: bere node/bash/source s literální cestou, ne komentář", () => {
+    const sh = [
+      `VYBER=$(node scripts/lib/a.mjs --x)`,
+      `  if ! bash scripts/ci/b.sh "$1"; then`,
+      `. "$(dirname "$0")/../lib/c.sh"`,
+      `# node scripts/lib/komentar.mjs`,
+      `echo "Ruční cesta: spusť skript sám"`,
+    ].join("\n");
+    // existsSync filtr obcházíme: měříme rozpoznání tvaru nad skutečnými soubory níž
+    expect(spousteneZeShellu("scripts/ci/deploy-and-verify.sh", readFileSync(join(ROOT, "scripts/ci/deploy-and-verify.sh"), "utf8"))).toEqual(
+      expect.arrayContaining(["scripts/lib/nasazeni-navazani.mjs", "scripts/lib/povinne-promenne.mjs", "scripts/coolify-deploy-watch.mjs"]),
+    );
+    expect(spousteneZeShellu("scripts/ci/drzene-z-overlaye.sh", readFileSync(join(ROOT, "scripts/ci/drzene-z-overlaye.sh"), "utf8"))).toEqual(
+      expect.arrayContaining(["scripts/lib/git-klon.sh", "scripts/lib/nasazeni-drzene.mjs"]),
+    );
+    expect(spousteneZeShellu("scripts/ci/x.sh", sh), "vzorek odkazuje na neexistující soubory — filtr existence je vyřadí").toEqual([]);
+    // nápověda v heredocu („Ruční cesta zůstává: node scripts/aisha-redeploy.mjs“) není spuštění
+    const nasazeni = spousteneZeShellu("scripts/ci/deploy-and-verify.sh", readFileSync(join(ROOT, "scripts/ci/deploy-and-verify.sh"), "utf8"));
+    expect(nasazeni).not.toContain("scripts/aisha-redeploy.mjs");
+    expect(nasazeni).not.toContain("scripts/aisha-env-doctor.mjs");
+    expect(nasazeni).not.toContain("scripts/coolify-sync-envs.sh");
+  });
+
+  it("každý importovaný nebo spouštěný soubor je v témže bloku výslovně nebo pod vyjmenovaným adresářem", () => {
     const bloky = ridkeBloky();
     // Nula bloků by podmínku splnila triviálně.
     expect(bloky.length).toBeGreaterThanOrEqual(5);
     // Měřidlo musí vidět známou hranu, jinak parser přestal sedět.
     expect([...grafImportu("scripts/coolify-deploy-watch.mjs")]).toContain("scripts/lib/coolify-app-status.mjs");
+    // … a hranu ze shellu: skript nasazení pouští navázání na běžící nasazení.
+    expect([...grafSpousteni("scripts/ci/deploy-and-verify.sh")]).toContain("scripts/lib/nasazeni-navazani.mjs");
 
     const chybi: string[] = [];
     for (const { wf, cesty } of bloky) {
       const adresare = cesty.filter((c) => c.endsWith("/"));
       const kryto = (soubor: string) => cesty.includes(soubor) || adresare.some((a) => soubor.startsWith(a));
-      for (const start of cesty.filter((c) => /\.(mjs|js)$/.test(c))) {
-        for (const soubor of grafImportu(start)) {
+      for (const start of cesty.filter((c) => /\.(mjs|js|sh)$/.test(c))) {
+        for (const soubor of grafSpousteni(start)) {
           if (!kryto(soubor)) chybi.push(`${wf}: ${start} → ${soubor}`);
         }
       }

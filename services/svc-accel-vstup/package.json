@@ -1,0 +1,29 @@
+{
+  "name": "@aisha/svc-accel-vstup",
+  "version": "0.1.0",
+  "license": "Elastic-2.0",
+  "description": "Vynucovac\u00ed bod spole\u010dn\u00e9 lane na GPU uzlu: identita n\u00e1jemce ze vstupu (adresa + pods\u00ed\u0165) a kl\u00ed\u010de (otisk), filtr model\u016f, odm\u00edtnut\u00ed pol\u00ed platformy, kv\u00f3ty a gpu_ms, p\u0159ipravenost lane (health + zah\u0159\u00e1t\u00ed). P\u0159ed vLLM nikdo jin\u00fd nestoj\u00ed.",
+  "private": true,
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aisha/accel-protokol": "*",
+    "@aisha/observability": "*",
+    "@aisha/security": "*",
+    "@fastify/helmet": "^12.0.0",
+    "fastify": "^5.3.3",
+    "undici": "^7.26.0",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.2.4"
+  }
+}

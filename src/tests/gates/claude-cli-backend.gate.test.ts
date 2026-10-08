@@ -147,10 +147,18 @@ describe("Component 4 E4 — svc-agent-runner claude_cli_task backend", () => {
     expect(runs).toContain("config.maxTimeoutMs");
   });
 
-  test("ClaudeCliBackend manages a per-run worktree (add → bind R/W → remove)", () => {
-    expect(backend).toMatch(/worktree',\s*'add'/);
-    expect(backend).toMatch(/worktree',\s*'remove'/);
-    expect(backend).toContain(":/work:rw");
+  test("ClaudeCliBackend klonuje repo per běh (clone → bind HOSTITELSKÉ cesty R/W → smazání)", () => {
+    // Od 2026-09-24: žádný sdílený base-repo ani worktrees (nikdo ho neplnil, :ro
+    // mount git worktree add znemožnil). Dítě dostává v Binds cestu HOSTITELE —
+    // runner sám pracuje v pevném adresáři kontejneru (Coolify ${ v cíli svazku odmítá).
+    expect(backend).toMatch(/'clone',\s*'--filter=blob:none'/);
+    expect(backend).not.toMatch(/worktree',\s*'add'/);
+    expect(backend).toContain("pripojeniBehu(await mountyRunneru()");
+    expect(backend).toContain("mounts: [mount]");
+    expect(backend).not.toContain("cesty.hostitel");
+    // token ke klonu jen v env procesu, ne v argumentech ani v URL
+    expect(backend).toContain("GIT_CONFIG_VALUE_0");
+    expect(backend).not.toMatch(/https?:\/\/[^'`\s]*\$\{[^}]*[Tt]oken/);
   });
 
   test("ClaudeCliBackend injects the relay + LLM-routing env from config (no hardcoded URLs/tokens/keys)", () => {
@@ -167,25 +175,38 @@ describe("Component 4 E4 — svc-agent-runner claude_cli_task backend", () => {
 
   test("E4 config knobs are entirely env-driven (no fixed prod values, secrets default empty)", () => {
     for (const knob of [
-      "AGENT_RUNS_DIR", "AGENT_REPO_PATH", "AGENT_CLAUDE_IMAGE", "CLAUDE_CLI_TIMEOUT_MS",
-      "ANTHROPIC_BASE_URL", "ANTHROPIC_API_KEY", "AGENT_GIT_TOKEN",
+      "AGENT_RUNS_DIR", "AGENT_GIT_REMOTE", "AGENT_CLAUDE_IMAGE", "CLAUDE_CLI_TIMEOUT_MS",
+      "ANTHROPIC_BASE_URL", "AGENT_GIT_TOKEN",
     ]) {
       expect(cfg, `${knob} must be read from process.env`).toContain(`process.env.${knob}`);
     }
     // secrets must NOT carry a non-empty literal default
-    expect(cfg).toMatch(/anthropicApiKey:\s*process\.env\.ANTHROPIC_API_KEY\s*\?\?\s*''/);
     expect(cfg).toMatch(/agentMcpToken:[^\n]*\?\?\s*''/);
   });
 
-  test("runner image installs git for worktree ops; exec compose mounts worktree dir + base repo", () => {
+  // 2026-10-02 (pověření poskytovatelů v administraci): API klíč Anthropic NENÍ knob
+  // configu načtený při startu — čte se V OKAMŽIKU BĚHU z trezoru instance (čtečka
+  // @aisha/security, administrace „Poskytovatelé AI a tokeny"), aby si každý fork
+  // nastavil vlastní a výměna platila bez restartu. Literál klíče dál nikde.
+  test("ANTHROPIC_API_KEY se čte při běhu ze čtečky pověření, ne z configu načteného při startu", () => {
+    expect(cfg).not.toContain("process.env.ANTHROPIC_API_KEY");
+    expect(backend).toMatch(/credentials\.getMany\(/);
+    expect(backend).toContain("'ANTHROPIC_API_KEY'");
+    expect(backend).toMatch(/optional\('ANTHROPIC_API_KEY',\s*auth\.anthropicApiKey/);
+  });
+
+  test("runner image installs git; exec compose mounts the instance runs dir onto the runner's container dir", () => {
     expect(runnerDockerfile).toMatch(/apk add[^\n]*git/);
-    expect(execCompose).toContain("AGENT_RUNS_DIR");
-    expect(execCompose).toContain("AGENT_REPO_PATH");
-    // base repo mounted read-only. Coolify rejects ${VAR} in a volume SOURCE
-    // (command-injection guard, 2026-06-30 incident), so the mount uses the
-    // literal path AGENT_REPO_PATH defaults to — kept in sync via the compose
-    // comment. The :ro invariant is what matters here.
-    expect(execCompose).toMatch(/\/srv\/aisha\/base-repo:[^\n]*:ro/);
+    // Zdroj = per-instance hostitelská cesta (${AGENT_RUNS_DIR}), cíl = TÝŽ pevný
+    // adresář, se kterým runner počítá (config.agentRunsContainerDir) — jediný
+    // kontrakt mezi compose a kódem, proto se čte z configu, ne opisuje.
+    const cilKontejneru = /agentRunsContainerDir:\s*'([^']+)'/.exec(cfg)?.[1];
+    expect(cilKontejneru, "config.agentRunsContainerDir chybí").toBeDefined();
+    expect(execCompose).toContain(`agent-runs:${cilKontejneru}:rw`);
+    expect(execCompose).toContain("Dockerfile.agent-claude");
+    expect(execCompose).toContain("agent-claude-tag:");
+    // sdílený base-repo je pryč (běh si repo klonuje sám)
+    expect(execCompose).not.toMatch(/base-repo|AGENT_REPO_PATH/);
   });
 });
 
@@ -245,16 +266,25 @@ describe("Component 4 E5 — auth model (subscription → local LLM → api_key)
   const backend = read("services/svc-agent-runner/src/backends/claude-cli.ts");
 
   test("auth knobs are env-driven with a per-run override", () => {
-    for (const k of ["AGENT_AUTH_MODE", "AGENT_CLAUDE_OAUTH_TOKEN", "AGENT_LOCAL_LLM_URL"]) {
+    for (const k of ["AGENT_AUTH_MODE", "AGENT_LOCAL_LLM_URL"]) {
       expect(cfg, `${k} must be read from process.env`).toContain(`process.env.${k}`);
     }
     expect(backend).toMatch(/inputs\.auth_mode\s*\?\?\s*config\.agentAuthMode/);
   });
 
+  // 2026-10-02: token předplatného je POVĚŘENÍ, které runtime deklaruje
+  // (ai_runtime_registry.credential_env_var: cli:claude-cli → AGENT_CLAUDE_OAUTH_TOKEN)
+  // a čte se při běhu z trezoru instance — config ho při startu z env nenačítá.
+  test("token předplatného = pověření runtime, čtené při běhu (ne z configu)", () => {
+    expect(cfg).not.toContain("process.env.AGENT_CLAUDE_OAUTH_TOKEN");
+    expect(backend).toMatch(/credentialNameForRuntime\(`cli:\$\{cliSlug\}`\)/);
+    expect(backend).toMatch(/const auth = await resolveRunAuth\(inputs\)/);
+  });
+
   test("SUBSCRIPTION is the CLI's primary auth — OAuth token (no API key, no credits)", () => {
     // the subscription path injects the long-lived OAuth token, not an API key
     expect(backend).toContain("CLAUDE_CODE_OAUTH_TOKEN");
-    expect(backend).toContain("config.agentClaudeOauthToken");
+    expect(backend).toMatch(/optional\('CLAUDE_CODE_OAUTH_TOKEN',\s*auth\.runtimeCredential/);
     expect(backend).toMatch(/authMode === 'subscription'/);
     // a ~/.claude mount is still supported (Linux hosts)
     expect(backend).toContain("/home/agent/.claude:ro");
@@ -319,10 +349,16 @@ describe("Component 4 E8/E9/E13 — async runner + real cancel + story injection
     expect(runs).toMatch(/getBackend\(profile\)\.execute/);
   });
 
-  test("E9 — cancel terminates the live container + worktree, route wires it", () => {
-    expect(backend).toMatch(/static async cancel\(/);
-    expect(backend).toContain("killContainer");
-    expect(backend).toContain("removeWorktree");
+  test("E9 — cancel terminates the live container + run clone, route wires it", () => {
+    // Měří tělo cancel(), ne celý soubor: výskyt jména kdekoli jinde by prošel
+    // i s cancel(), který klon běhu po sobě nechá.
+    const zacatek = backend.indexOf("static async cancel(");
+    expect(zacatek, "static async cancel( nenalezeno").toBeGreaterThanOrEqual(0);
+    const konec = backend.indexOf("\n  }\n", zacatek);
+    expect(konec, "konec těla cancel() nenalezen").toBeGreaterThan(zacatek);
+    const telo = backend.slice(zacatek, konec);
+    expect(telo).toContain("killContainer");
+    expect(telo).toContain("removeRunDir");
     expect(runs).toContain("ClaudeCliBackend.cancel");
     expect(runs).toContain("container_killed");
   });
@@ -330,7 +366,8 @@ describe("Component 4 E8/E9/E13 — async runner + real cancel + story injection
   test("E13 — story context injected into the worktree (.aisha/story.json + CLAUDE.md brief)", () => {
     expect(backend).toContain("injectStoryContext");
     expect(backend).toContain("story.json");
-    expect(backend).toMatch(/appendFile\([^;]*CLAUDE\.md/s);
+    expect(backend).toContain("run-context.md");
+    expect(backend).not.toMatch(/appendFile\([^;]*CLAUDE\.md/s);
     expect(backend).toMatch(/acceptance_criteria/);
   });
 });

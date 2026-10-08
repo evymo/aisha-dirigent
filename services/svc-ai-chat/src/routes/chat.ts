@@ -1,5 +1,14 @@
 import { createServiceRpcAdapter, type PostgrestClient } from "../lib/rpcAdapter.js";
 import { createUserScopedRpcAdapter } from "../lib/userScopedRpc.js";
+import { createChatMcpOrigin, verifiedStoryForMcp } from "../lib/chatMcpOrigin.js";
+import { mcpToolInvoke, mintMcpUserToken } from "../lib/mcpToolProxy.js";
+import {
+  hledejVeZnalostech,
+  knowledgeSearchFromChannel,
+  KnowledgeSearchUnavailableError,
+  type KnowledgeHit,
+} from "../lib/knowledgeRetrieval.js";
+import { canAccessStory } from "../lib/storyAccess.js";
 import { withAitgGuardOrRefuse, createAitgRunner } from "@aisha/aitg";
 import { config } from "../config.js";
 import {
@@ -13,7 +22,7 @@ import {
 
 import { corsGuard } from "../lib/analyzeTrackingDocumentGuards.js";
 import { preflightResponse, silentCorsDenyResponse, buildCorsHeaders } from "../lib/cors.js";
-import { getOpenAiApiKey } from "../lib/openaiKey.js";
+import { credentials } from "../lib/credentials.js";
 import { estimateSpendUsd } from "../lib/spendEstimate.js";
 import { resolveDefaultBackend, resolveDefaultModel } from "../lib/defaultModel.js";
 import { evaluateChatMessage } from "../lib/messageEvaluation.js";
@@ -383,14 +392,32 @@ async function handleChatRequest(req: Request): Promise<Response> {
     let { message } = body;
     let conversation_id = body.conversation_id;
     const explicitStoryId = body.story_id;
+    // B8: story_id z požadavku jen OVĚŘENÝ (can_access_story pod uživatelem), a to dřív, než
+    // se cokoli uloží. Dřív šel neověřeně do route_task, reflexe, ukládání i tokenu pro MCP
+    // → KB cizího příběhu. Neprojde → 403 story_forbidden, stejně pro „neexistuje“ i „cizí“.
+    if (explicitStoryId !== undefined && explicitStoryId !== null && explicitStoryId !== '') {
+      const storyOk = typeof explicitStoryId === 'string'
+        && explicitStoryId.trim() !== ''
+        && await canAccessStory(pgrestUser, explicitStoryId.trim());
+      if (!storyOk) {
+        log.safeWarn('[ai-chat] story_id from request refused (no access)');
+        return new Response(JSON.stringify({ error: 'story_forbidden' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    }
 
     // ----------------------------------------
     // 3. LOAD LLM API KEYS + BACKEND AVAILABILITY
     // ----------------------------------------
     addDebug('llm.init', 'Loading LLM API keys and checking backend availability');
-    const openaiApiKey = (await getOpenAiApiKey(pgrestService)) ?? process.env.OPENAI_API_KEY;
-    const googleApiKey = process.env.GOOGLE_AI_API_KEY;
-    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
+    // Klíče z trezoru instance (administrace „Poskytovatelé AI a tokeny"), přechodně
+    // z prostředí s hlasitým varováním. Trezor nedostupný → výjimka → 5xx, ne tichý env.
+    const klice = await credentials.getMany(['OPENAI_API_KEY', 'GOOGLE_AI_API_KEY', 'ANTHROPIC_API_KEY']);
+    const openaiApiKey = klice.OPENAI_API_KEY ?? undefined;
+    const googleApiKey = klice.GOOGLE_AI_API_KEY ?? undefined;
+    const anthropicApiKey = klice.ANTHROPIC_API_KEY ?? undefined;
     const hasLocalLlmBackend = Boolean(
       process.env.DOCKER_MODEL_RUNNER_URL ||
       process.env.OLLAMA_URL ||
@@ -637,9 +664,26 @@ async function handleChatRequest(req: Request): Promise<Response> {
         throw new Error(`[grounding] kanál ${channelConfig.slug}: model vybírá resolver (rezidence dat) — model v kanálu nech prázdný`);
       }
       addDebug('grounding', `Kanál z faktů: blok ${grounding.factsBlock}, souběh ${grounding.maxConcurrent}`);
+      // P2 (2026-10-06): znalosti vlastními modely, deklaruje-li je kanál
+      // (vector_store_config.knowledge_search) — přes MCP search_knowledge_v2 (jediný domov
+      // vektorového hledání) ZPROSTŘEDKOVANÝM tokenem uživatele s ověřeným příběhem, nikdy
+      // servisní rolí. Bez tokenu nebo s nedostupným hledáním = selhání nahlas (503 níž).
+      const hledani = knowledgeSearchFromChannel(channelConfig.vector_store_config);
+      const hledej = hledani
+        ? async (otazka: string): Promise<KnowledgeHit[]> => {
+            const userJwt = mintMcpUserToken(userId, await verifiedStoryForMcp(pgrestUser, resolvedStoryId));
+            if (!userJwt) {
+              throw new KnowledgeSearchUnavailableError('identita_uzivatele', 'zprostředkovaný token uživatele pro MCP nevznikl (chybí podpisové tajemství)');
+            }
+            const nalezeno = await hledejVeZnalostech(hledani, { invoke: (n, a) => mcpToolInvoke(userJwt, n, a) }, otazka, language);
+            addDebug('grounding', `Znalosti: ${nalezeno.length} úseků`);
+            return nalezeno;
+          }
+        : undefined;
       let vysledek: Awaited<ReturnType<typeof odpovedZFaktu>>;
       try {
         vysledek = await odpovedZFaktu(grounding, {
+          ...(hledej ? { hledej } : {}),
           rpcUser: async (fn, args) => {
             const { data, error } = await pgrestUser.rpc(fn, args);
             return { data, error: error ? { message: error.message } : null };
@@ -675,6 +719,29 @@ async function handleChatRequest(req: Request): Promise<Response> {
       } catch (groundingError) {
         // Nemaskovat: klient (Ask) už ukazuje fakta a chybu označí jako výpadek řetězu.
         const errMsg = groundingError instanceof Error ? groundingError.message : String(groundingError);
+        if (groundingError instanceof KnowledgeSearchUnavailableError) {
+          // Vyhledávání ve znalostech nedostupné — vlastní kód, aby klient ukázal „vyhledávání
+          // nedostupné“, ne obecný výpadek řetězu. Odpověď BEZ znalostí se nevydává.
+          // Podrobnost (text chyby) JEN do logu služby; klientovi i do běhu kód, důvod a incident
+          // (revize bezpečnosti 2026-10-07 — text nese hostitele lane, URL, identitu vah).
+          log.safeWarn('[ai-chat] Knowledge search unavailable (fail loud)', {
+            reason: groundingError.reason, incident: groundingError.incident ?? null, detail: errMsg,
+          });
+          addDebug('grounding', `Znalosti nedostupné (${groundingError.reason})${groundingError.incident ? `, incident ${groundingError.incident}` : ''}`, 'error');
+          await tracer.finish('failed', {
+            error: 'knowledge_search_unavailable', grounding: grounding.factsBlock,
+            knowledge_reason: groundingError.reason, incident: groundingError.incident ?? null,
+          });
+          return new Response(JSON.stringify(withDebug({
+            error: 'Knowledge search unavailable',
+            code: 'KNOWLEDGE_SEARCH_UNAVAILABLE',
+            reason: groundingError.reason,
+            ...(groundingError.incident ? { incident: groundingError.incident } : {}),
+          })), {
+            status: 503,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
         log.safeWarn('[ai-chat] Grounded answer failed', { error: errMsg });
         addDebug('grounding', `Selhalo: ${errMsg}`, 'error');
         await tracer.finish('failed', { error: errMsg, grounding: grounding.factsBlock });
@@ -704,8 +771,20 @@ async function handleChatRequest(req: Request): Promise<Response> {
       }
       obsah = applyGuardrailsToResponse(obsah, guardrails, language);
       const dobaMs = Date.now() - startTime;
+      // Citace znalostí: do uložené zprávy jen odkazy (id, podobnost) — text úseku žije v KB;
+      // klient dostane i ukázku (hledalo se jeho identitou, smí ji vidět).
+      const znalostiOdpovedi = vysledek.knowledge
+        ? {
+            hits: vysledek.knowledge.hits,
+            citations: vysledek.knowledge.citations.map((c) => ({
+              ref: c.ref, knowledge_item_id: c.knowledge_item_id, chunk_id: c.chunk_id,
+              chunk_slug: c.chunk_slug, similarity: c.similarity, cited: c.cited,
+            })),
+          }
+        : null;
       const metadataZFaktu = {
         grounding: groundingVysledek,
+        ...(znalostiOdpovedi ? { knowledge: znalostiOdpovedi } : {}),
         response_time_ms: dobaMs,
         tokens_input: vysledek.usage.inputTokens,
         tokens_output: vysledek.usage.outputTokens,
@@ -748,6 +827,7 @@ async function handleChatRequest(req: Request): Promise<Response> {
           run_id: tracer.runId,
           aisha_model_selected: vysledek.model,
           grounding: metadataZFaktu.grounding,
+          ...(vysledek.knowledge ? { knowledge: vysledek.knowledge } : {}),
         },
       })), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -781,6 +861,9 @@ async function handleChatRequest(req: Request): Promise<Response> {
         // K-36: zákazy agentů trasy platí VŽDY (ne jen s DYNAMIC_TOOL_SELECTION) — executor je
         // nenabídne ani nespustí; a nespustí ani nic, co si kanál nevyžádal.
         deniedTools: aishaRoutePlan?.toolsDenylist ?? [],
+        // K-35: druhý původ = MCP (jako /v1), jen zprostředkovaným tokenem uživatele
+        // a s ověřeným příběhem; bez tokenu null → MCP nástroje se nenabídnou ani nespustí.
+        mcp: await createChatMcpOrigin({ userId, storyId: resolvedStoryId, pgrestUser }),
       },
     );
 

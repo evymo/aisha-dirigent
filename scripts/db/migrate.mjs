@@ -17,6 +17,7 @@ import { createHash } from "crypto";
 import path from "path";
 import { fileURLToPath } from "url";
 import { psqlPripojeni } from "./lib/psql-pripojeni.mjs";
+import { RESET_PUBLIC_SCHEMA_SQL } from "./lib/reset-public-schema.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "../..");
@@ -222,15 +223,12 @@ function hasPartialPublicSchema(connStr) {
 /**
  * Drop+recreate public schema. Safe to call ONLY when applied_migrations is empty
  * (= no migrations have been recorded as successful, so wiping is recoverable).
+ *
+ * Práva, která schéma po resetu dostane, mají JEDEN domov:
+ * scripts/db/lib/reset-public-schema.mjs (tam i proč PUBLIC nedostává CREATE).
  */
 function resetPublicSchema(connStr) {
-  psqlExec(
-    connStr,
-    `DROP SCHEMA IF EXISTS public CASCADE;
-     CREATE SCHEMA public;
-     GRANT ALL ON SCHEMA public TO postgres;
-     GRANT USAGE, CREATE ON SCHEMA public TO public;`
-  );
+  psqlExec(connStr, RESET_PUBLIC_SCHEMA_SQL);
 }
 
 function markApplied(connStr, file) {

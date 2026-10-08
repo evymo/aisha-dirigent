@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync, copyFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { envWithoutGitLocation } from "../../../scripts/lib/git-worktree-health.mjs";
+import { prostrediBezPrepinacuSady } from "../../../scripts/lib/ci-zelene.mjs";
 
 /**
  * Směrování podle cest má JEDEN DOMOV a pre-push je FAIL-CLOSED.
@@ -16,9 +17,12 @@ import { envWithoutGitLocation } from "../../../scripts/lib/git-worktree-health.
  * existuje (packages/ u `app` 2026-08-09, heals.sql u `db_change` 2026-09-11,
  * packages/ u `services_change` 2026-09-05). Proto: ci.yml i hook volají
  * scripts/ci/zmenene-cesty.sh a tahle brána měří, že (a) kopie nikde nezůstala,
- * (b) směrovač dává na kontrolních vzorcích to, co má, (c) hook při nejistotě
- * spouští CELOU sadu — merge commit v rozsahu, nová větev bez base, příliš
- * velká změna, vynucení člověkem.
+ * (b) směrovač dává na kontrolních vzorcích to, co má, (c) výběr je fail-closed:
+ * nová větev bez báze, příliš velká změna nebo rozpor směrování → ŠIRŠÍ cílená
+ * dráha (`rezim=sirsi`), plná sada jen na vynucení člověkem (AISHA_PREPUSH_VSE=1).
+ * Od rozhodnutí majitele 2026-10-05 („plné sady jen v CI") merge commit NENÍ
+ * nejistota: báze = společný předek s origin/main. Chování cílené dráhy (co se
+ * z plánu pustí) měří brána prepush-vyber-je-cileny.
  *
  * ⭐ KONTROLNÍ VZOREK JE ORIGINÁL, NE VYMYŠLENÝ SEZNAM. `fixtures/smerovani/pr-943.txt`
  * = `git diff --name-only` merge commitu upstream PR #943 (400 cest; běh 3592 hlásil
@@ -156,14 +160,16 @@ function repo(): { dir: string; git: (...a: string[]) => string; remote: string 
 }
 
 function vyber(dir: string, stdin: string, env: Record<string, string> = {}): { rc: number; p: Record<string, string>; out: string } {
-  const r = spawnSync("bash", ["scripts/ci/prepush-vyber.sh", "origin"], { cwd: dir, encoding: "utf8", input: stdin, env: envWithoutGitLocation({ ...process.env, ...env }) });
+  // Hermeticky: brána často běží UVNITŘ pre-pushe (AISHA_PREPUSH_*, AISHA_SMOKE_* v prostředí);
+  // výběr smí vidět jen to, co test nastaví výslovně (viz prostrediBezPrepinacuSady).
+  const r = spawnSync("bash", ["scripts/ci/prepush-vyber.sh", "origin"], { cwd: dir, encoding: "utf8", input: stdin, env: envWithoutGitLocation({ ...prostrediBezPrepinacuSady(process.env), ...env }) });
   const p: Record<string, string> = {};
   for (const l of (r.stdout ?? "").split("\n")) { const i = l.indexOf("="); if (i > 0) p[l.slice(0, i)] = l.slice(i + 1); }
   return { rc: r.status ?? -1, p, out: `${r.stdout}\n${r.stderr}` };
 }
 const ZERO = "0".repeat(40);
 
-describe("pre-push výběr je fail-closed (měřeno nad dočasným gitem)", () => {
+describe("pre-push výběr je fail-closed: nejistota = širší dráha (měřeno nad dočasným gitem)", () => {
   it("nová větev s jedním commitem jen ve službě → výběr: app=false, services_change=true", () => {
     const { dir, git, remote } = repo();
     try {
@@ -251,24 +257,25 @@ describe("pre-push výběr je fail-closed (měřeno nad dočasným gitem)", () =
     } finally { rmSync(dir, { recursive: true, force: true }); rmSync(remote, { recursive: true, force: true }); }
   });
 
-  it("merge commit v rozsahu → CELÁ sada s důvodem", () => {
+  it("merge commit v rozsahu → výběr proti bázi (společný předek s origin/main), ne plná sada", () => {
     const { dir, git, remote } = repo();
     try {
       git("checkout", "-qb", "t");
       writeFileSync(join(dir, "docs.md"), "t\n"); git("add", "-A"); git("commit", "-qm", "t1");
       git("checkout", "-q", "main");
       writeFileSync(join(dir, "jiny.md"), "m\n"); git("add", "-A"); git("commit", "-qm", "m1");
+      git("push", "-q", "origin", "main");
       git("checkout", "-q", "t");
       git("merge", "-q", "--no-ff", "-m", "merge main", "main");
       const sha = git("rev-parse", "HEAD");
       const r = vyber(dir, `refs/heads/t ${sha} refs/heads/t ${ZERO}\n`);
       expect(r.rc, r.out).toBe(0);
-      expect(r.p.rezim).toBe("vse");
-      expect(r.p.duvod).toMatch(/merge commit/);
+      expect(r.p, r.out).toMatchObject({ rezim: "vyber", slouceni: "1", zmeneno: "1", cesta: "docs.md" });
+      expect(r.out, "co přinesl main, už v mainu je — do rozsahu nepatří").not.toMatch(/^cesta=jiny\.md$/m);
     } finally { rmSync(dir, { recursive: true, force: true }); rmSync(remote, { recursive: true, force: true }); }
   });
 
-  it("nová větev bez origin/main → CELÁ sada (base neznámý)", () => {
+  it("nová větev bez origin/main → ŠIRŠÍ dráha (báze neznámá), ne plná sada a ne nic", () => {
     const { dir, git, remote } = repo();
     try {
       git("update-ref", "-d", "refs/remotes/origin/main");
@@ -276,22 +283,28 @@ describe("pre-push výběr je fail-closed (měřeno nad dočasným gitem)", () =
       writeFileSync(join(dir, "a.md"), "x\n"); git("add", "-A"); git("commit", "-qm", "t1");
       const sha = git("rev-parse", "HEAD");
       const r = vyber(dir, `refs/heads/t ${sha} refs/heads/t ${ZERO}\n`);
-      expect(r.p.rezim).toBe("vse");
-      expect(r.p.duvod).toMatch(/base neznámý/);
+      expect(r.p.rezim).toBe("sirsi");
+      expect(r.p.duvod).toMatch(/báze neznámá/);
     } finally { rmSync(dir, { recursive: true, force: true }); rmSync(remote, { recursive: true, force: true }); }
   });
 
-  it("remote sha, které lokálně neznáme → CELÁ sada", () => {
+  it("remote sha, které lokálně neznáme: báze z origin/main; bez origin/main → ŠIRŠÍ dráha", () => {
     const { dir, git, remote } = repo();
     try {
+      git("checkout", "-qb", "t");
+      mkdirSync(join(dir, "services/svc-x"), { recursive: true });
+      writeFileSync(join(dir, "services/svc-x/a.ts"), "x\n"); git("add", "-A"); git("commit", "-qm", "t1");
       const sha = git("rev-parse", "HEAD");
-      const r = vyber(dir, `refs/heads/main ${sha} refs/heads/main ${"1".repeat(40)}\n`);
-      expect(r.p.rezim).toBe("vse");
-      expect(r.p.duvod).toMatch(/není lokálně známé/);
+      const radek = `refs/heads/t ${sha} refs/heads/t ${"1".repeat(40)}\n`;
+      expect(vyber(dir, radek).p, "neznámé remote sha nevadí, když je báze z origin/main").toMatchObject({ rezim: "vyber", services_change: "true" });
+      git("update-ref", "-d", "refs/remotes/origin/main");
+      const r = vyber(dir, radek);
+      expect(r.p.rezim).toBe("sirsi");
+      expect(r.p.duvod).toMatch(/báze neznámá/);
     } finally { rmSync(dir, { recursive: true, force: true }); rmSync(remote, { recursive: true, force: true }); }
   });
 
-  it("víc cest než strop → CELÁ sada; AISHA_PREPUSH_VSE=1 → CELÁ sada; mazání větve → nic k posouzení", () => {
+  it("víc cest než strop → ŠIRŠÍ; AISHA_PREPUSH_VSE=1 → PLNÁ sada; mazání větve → ŠIRŠÍ (nic k posouzení)", () => {
     const { dir, git, remote } = repo();
     try {
       git("checkout", "-qb", "t");
@@ -300,9 +313,10 @@ describe("pre-push výběr je fail-closed (měřeno nad dočasným gitem)", () =
       git("add", "-A"); git("commit", "-qm", "t1");
       const sha = git("rev-parse", "HEAD");
       const radek = `refs/heads/t ${sha} refs/heads/t ${ZERO}\n`;
-      expect(vyber(dir, radek, { AISHA_PREPUSH_MAX_SOUBORU: "1" }).p).toMatchObject({ rezim: "vse" });
+      expect(vyber(dir, radek, { AISHA_PREPUSH_MAX_SOUBORU: "1" }).p).toMatchObject({ rezim: "sirsi", duvod: expect.stringMatching(/> 1/) });
+      expect(vyber(dir, radek, { AISHA_PREPUSH_MAX_SOUBORU: "x" }).p).toMatchObject({ rezim: "sirsi", duvod: expect.stringMatching(/není číslo/) });
       expect(vyber(dir, radek, { AISHA_PREPUSH_VSE: "1" }).p).toMatchObject({ rezim: "vse", duvod: expect.stringMatching(/vynucena/) });
-      expect(vyber(dir, `(delete) ${ZERO} refs/heads/t ${sha}\n`).p).toMatchObject({ rezim: "vse", duvod: expect.stringMatching(/mazání/) });
+      expect(vyber(dir, `(delete) ${ZERO} refs/heads/t ${sha}\n`).p).toMatchObject({ rezim: "sirsi", duvod: expect.stringMatching(/mazání/) });
       expect(vyber(dir, radek).p, "kontrolní vzorek: bez omezení projde výběr").toMatchObject({ rezim: "vyber", docs_only: "true" });
     } finally { rmSync(dir, { recursive: true, force: true }); rmSync(remote, { recursive: true, force: true }); }
   });

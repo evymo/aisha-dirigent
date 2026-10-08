@@ -8,8 +8,14 @@ import { KataBackend } from '../backends/kata.js';
 import { ClaudeCliBackend } from '../backends/claude-cli.js';
 import { validateClaudeResult, buildRunOutputs } from '../backends/claude-result.js';
 import type { RunnerBackend } from '../backends/index.js';
-import { createEphemeralKey, revokePeer } from '../netbird-client.js';
 import { getRunnerCaps } from '../runtime-config.js';
+import { odregistrujBeh, payloadDoEnv, registrujBeh } from '../broker-proxy.js';
+import { souhrnChyby } from '../chyba-behu.js';
+
+/** Kde běh poběží (`<backend>@<kontejner>`) — jedno místo pro všechny zápisy stavu běhu. */
+function hostBehu(): string {
+  return config.runnerBackend + '@' + (process.env.HOSTNAME ?? 'unknown');
+}
 
 function getBackend(profile: string): RunnerBackend {
   if (profile === 'kata-firecracker' || profile === 'kata-dragonball') return new KataBackend();
@@ -142,35 +148,35 @@ export async function runsRoutes(app: FastifyInstance): Promise<void> {
       timeoutMs,
     );
 
+    // Payload sandboxového běhu: do ENV jen malý, větší podrží runner a vydá přes proxy
+    // (proxy je povinná, takže doručit jde vždy — viz broker-proxy.ts payloadDoEnv).
+    const rozdeleni = isClaude ? undefined : payloadDoEnv(JSON.stringify(body.payload ?? {}));
+    const payloadEnv = rozdeleni?.env;
+    const payloadMimoEnv = rozdeleni?.mimoEnv;
+
     await rpcService('update_agent_run_status', {
-      p_host: config.runnerBackend + '@' + (process.env.HOSTNAME ?? 'unknown'),
+      p_host: hostBehu(),
       p_run_id: runId,
       p_status: 'running',
     });
 
-    // Pre-spawn: ephemeral NetBird peer identity for this run (both paths).
-    let netbirdSetupKey: string | undefined;
-    let netbirdPeerId: string | undefined;
-    if (config.netbirdEnabled) {
-      const nb = await createEphemeralKey(runId).catch((err: unknown) => {
-        app.log.warn({ run_id: runId, error: err instanceof Error ? err.message : String(err) }, 'NetBird key creation failed, proceeding without mesh identity');
-        return undefined;
-      });
-      if (nb) { netbirdSetupKey = nb.setupKey; netbirdPeerId = nb.peerId; }
-    }
-
+    // ⛔ Klíč k mesh síti se pro běh NERAZÍ (2026-10-06, majitel „síť zavřít“ = volba A).
+    // Dřív se tu pro KAŽDÝ běh razil klíč NetBirdu a šel do prostředí kontejneru, kde ho
+    // nikdo nepoužil — jen ležel na dosah pluginu, který vystoupí z VM. Jediná cesta ven
+    // z běhu je broker-proxy runneru v uzavřené síti běhů (broker-proxy.ts).
     const runInput = {
       runId,
       kind: body.kind,
       image,
       brokerToken,
-      brokerUrl: config.pluginBrokerUrl,
       payload: body.payload ?? {},
+      payloadEnv,
       timeoutMs,
-      netbirdSetupKey,
       profile,
       ...(isClaude ? { inputs: body.payload ?? {}, branch: body.source_ref ?? undefined, memoryLimit: caps!.execMemoryLimit } : {}),
     };
+    // Proxy pustí jen token běhu, který právě běží; finalize ho zase odebere.
+    registrujBeh(brokerToken, payloadMimoEnv);
 
     const finalize = async (
       status: string,
@@ -179,11 +185,7 @@ export async function runsRoutes(app: FastifyInstance): Promise<void> {
       errSummary: string | null,
       outputs: Record<string, unknown> | null = null,
     ): Promise<void> => {
-      if (config.netbirdEnabled && netbirdPeerId) {
-        revokePeer(netbirdPeerId).catch((err: unknown) => {
-          app.log.warn({ run_id: runId, peer_id: netbirdPeerId, error: err instanceof Error ? err.message : String(err) }, 'NetBird peer revocation failed');
-        });
-      }
+      odregistrujBeh(brokerToken);
       await rpcService('update_agent_run_status', {
         p_error_summary: errSummary, p_exit_code: exitCode, p_host: host, p_outputs: outputs, p_run_id: runId, p_status: status,
       }).catch(() => {});
@@ -211,7 +213,7 @@ export async function runsRoutes(app: FastifyInstance): Promise<void> {
         await finalize(message.includes('timeout') ? 'timeout' : 'failed', -1, runInput.image, message.slice(0, 500));
         return reply.status(500).send({ error: 'Spawn failed', detail: message, run_id: runId });
       }
-      const host = config.runnerBackend + '@' + (process.env.HOSTNAME ?? 'unknown');
+      const host = hostBehu();
       const storyId = (runInput.inputs as Record<string, unknown> | undefined)?.['story_id'];
       void cli.monitor(ctx)
         .then(async (result) => {
@@ -247,7 +249,7 @@ export async function runsRoutes(app: FastifyInstance): Promise<void> {
     // ── SYNC: short-lived sandboxed workloads (plugin/workflow/repo/doc-agent).
     try {
       const result = await getBackend(profile).execute(runInput);
-      await finalize(result.exitCode === 0 ? 'succeeded' : 'failed', result.exitCode, result.host, result.exitCode === 0 ? null : 'Exit code ' + result.exitCode);
+      await finalize(result.exitCode === 0 ? 'succeeded' : 'failed', result.exitCode, result.host, result.exitCode === 0 ? null : souhrnChyby(result.exitCode, result.logs));
       return reply.status(200).send({
         run_id: runId,
         status: result.exitCode === 0 ? 'succeeded' : 'failed',
@@ -261,7 +263,7 @@ export async function runsRoutes(app: FastifyInstance): Promise<void> {
       const message = err instanceof Error ? err.message : 'Execution error';
       const isTimeout = message.includes('timeout');
       app.log.error({ run_id: runId, error: message }, 'Agent run failed');
-      await finalize(isTimeout ? 'timeout' : 'failed', -1, config.runnerBackend + '@' + (process.env.HOSTNAME ?? 'unknown'), message.slice(0, 500));
+      await finalize(isTimeout ? 'timeout' : 'failed', -1, hostBehu(), message.slice(0, 500));
       return reply.status(500).send({ error: isTimeout ? 'Execution timeout' : 'Execution failed', detail: message, run_id: runId });
     }
   });

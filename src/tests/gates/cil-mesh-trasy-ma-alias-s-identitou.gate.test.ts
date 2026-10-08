@@ -24,14 +24,127 @@
  * Spouští se přes: npm run test:gates
  */
 import { describe, expect, test } from "vitest";
-import { readFileSync, existsSync, readdirSync } from "node:fs";
+import { readFileSync, existsSync, readdirSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { execFileSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { parse } from "yaml";
 
+import { klicePodminky } from "../../../scripts/lib/provision-gate.mjs";
+
 const ROOT = resolve(__dirname, "../../..");
 
 type Sluzba = { networks?: unknown; network_mode?: string };
+
+type KatalogSluzba = {
+  compose?: unknown;
+  provision_when_env?: unknown;
+  public_when_env?: unknown;
+  internal_url?: { service?: string };
+  internal_endpoints?: unknown[];
+  internal_tcp_endpoints?: unknown[];
+};
+
+/** Peer (= stack) z jména compose — týž klíč, pod jakým derivace vydává `<PEER>_MESH_*_ROUTES`. */
+const peerZCompose = (compose: string): string | null => {
+  const m = /^docker-compose\.coolify(?:-(.+))?\.yml$/.exec(compose);
+  return m ? (m[1] ?? "core").toUpperCase().replace(/-/g, "_") : null;
+};
+
+/** Prostředí derivace s profilem běhu, ve kterém model stojí na slotu s has_gpu (overlay). */
+function sModelemNaGpu(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const id = (env.AISHA_PROFILE ?? "").trim();
+  if (!id) throw new Error("profil běhu nedeklarovaný (AISHA_PROFILE) — tvar s modelem na GPU nemá z čeho vzniknout");
+  const vlastni = env.AISHA_INSTANCE_CONFIG_DIR ? join(env.AISHA_INSTANCE_CONFIG_DIR, "profiles", `${id}.json`) : "";
+  const zdroj = vlastni && existsSync(vlastni) ? vlastni : join(ROOT, "config/profiles", `${id}.json`);
+  const profil = JSON.parse(readFileSync(zdroj, "utf8"));
+  const sloty = JSON.parse(readFileSync(join(ROOT, "coolify/servers.json"), "utf8")).servers ?? {};
+  const gpu = Object.entries(sloty).find(([, d]) => (d as { has_gpu?: boolean })?.has_gpu === true)?.[0];
+  if (!gpu) throw new Error("registr slotů nemá slot s has_gpu — tvar s modelovým meshem nejde složit");
+  const dir = mkdtempSync(join(tmpdir(), "vesmir-model-gpu-"));
+  mkdirSync(join(dir, "profiles"));
+  const novy = `${id}-model-na-gpu`;
+  const prepisy = { ...(profil.service_overrides ?? {}), model: { ...(profil.service_overrides?.model ?? {}), placement: gpu } };
+  // Model na GPU slotu chce deklaraci vstupu lane nájemce (LANE_VSTUP_URL) — testovací hodnota.
+  const lane = profil.lane_gpu ?? { vlastnik: "testuzel", vstup_url: "http://10.251.9.2:8000" };
+  writeFileSync(join(dir, "profiles", `${novy}.json`), JSON.stringify({ ...profil, id: novy, service_overrides: prepisy, lane_gpu: lane }));
+  return { ...env, AISHA_INSTANCE_CONFIG_DIR: dir, AISHA_PROFILE: novy };
+}
+
+/**
+ * Trasy, které derivace vydá — nad CELÝM katalogem, ne nad výchozím profilem.
+ *
+ * ⛔ UNIVERZUM MINULO OPT-IN SLUŽBY (naměřeno živě 2026-10-02 na instanci). Derivace
+ * se tu volala s holým prostředím, takže služby s `provision_when_env` (model,
+ * potok, local-ingest, extranet, source-broker) do topologie vůbec nevstoupily
+ * a jejich cíle brána nikdy neviděla. Mezitím alias `<prefix>-svc-model` nesli
+ * na sdílené síti instance ČTYŘI držitelé — svc-model, agent modelu (hostitel
+ * netns ingressu) a agenti stacků exec a shared-redis. Uvnitř ingressu modelu
+ * se jméno překládalo na tři adresy; přímý dotaz vracel náhodně 200 nebo 421
+ * od cizího ingressu a trasa „fungovala“ jen díky tomu, že dialer zkusí další
+ * adresu a ingress, který trefí sám sebe, požadavek zatočí ještě jednou.
+ *
+ * Proto se zapnou VŠECHNY přepínače, které katalog deklaruje (`provision_when_env`,
+ * `public_when_env`) — odvozeně, ne seznamem, aby nová opt-in služba nevypadla.
+ *
+ * Identita se volí smyšlená: kdyby se prefix někde nedosadil, ukáže se to jako
+ * neshoda, ne jako trefa na jméno živé instance.
+ */
+function odvozeneTrasy(identita = "zkouska"): { cile: Set<string>; peery: Set<string>; optInPeery: Set<string> } {
+  const katalog = JSON.parse(readFileSync(join(ROOT, "config/services.json"), "utf8"));
+  const sluzby = Object.values(katalog.services ?? {}) as KatalogSluzba[];
+  const env: NodeJS.ProcessEnv = { ...process.env, MESH_ENABLED: "true", APP_NAME_PREFIX: identita };
+  for (const k of ["PUBLIC_TLD", "INTERNAL_TLD", "MESH_TLD"]) env[k] = env[k] || `${k.toLowerCase()}.test`;
+  const optInPeery = new Set<string>();
+  for (const s of sluzby) {
+    const prepinace = [...klicePodminky(s?.provision_when_env), ...klicePodminky(s?.public_when_env)];
+    for (const k of prepinace) env[k] = "zkouska-zapnuto";
+    const maMeshTvar = Boolean(s?.internal_url?.service) || (s?.internal_endpoints?.length ?? 0) > 0 ||
+      (s?.internal_tcp_endpoints?.length ?? 0) > 0;
+    const peer = typeof s?.compose === "string" ? peerZCompose(s.compose) : null;
+    if (prepinace.length && maMeshTvar && peer) optInPeery.add(peer);
+  }
+  const derivuj = (e: NodeJS.ProcessEnv) => execFileSync(process.execPath, [join(ROOT, "scripts/lib/derive-domains.mjs"), "--shell"], {
+    cwd: ROOT, env: e, encoding: "utf-8", maxBuffer: 32 * 1024 * 1024,
+  });
+  // ⭐ DRUHÝ TVAR INSTANCE (modelový mesh forku, varianta C, 2026-10-05). Lane MODEL_MESH
+  // NEJDE otevřít prostředím — otevírá ji UMÍSTĚNÍ modelu na slotu s has_gpu (derivace
+  // prostředí záměrně nepřebije). Bez tohoto tvaru by most (`model-most`) a jeho trasy
+  // v univerzu chyběly a brána by je neměřila. Měří se proto sjednocení: profil běhu
+  // a týž profil s modelem na GPU slotu (slot z registru, ne literál).
+  const gpuEnv = sModelemNaGpu(env);
+  let out: string;
+  try {
+    out = [derivuj(env), derivuj(gpuEnv)].join("\n");
+  } finally {
+    rmSync(String(gpuEnv.AISHA_INSTANCE_CONFIG_DIR), { recursive: true, force: true });
+  }
+
+  // ⛔ UNIVERZUM MINULO PŮLKU SVĚTA (naměřeno při wipu 2026-08-24). Smyčka brala
+  // jen `_MESH_INGRESS_ROUTES`, tedy HTTP trasy — a `_MESH_TCP_ROUTES` neviděla
+  // vůbec. Přitom právě tam patří clamav a shared-redis: trasa
+  // `3310|<prefix>-clamav:3310` mířila na jméno, které compose nepřidělovala,
+  // sidecar `clamav-mesh-tcp` padal v restart smyčce — a 7038 bran mlčelo.
+  //
+  // Tvary se liší a musí se číst každý po svém:
+  //   INGRESS: `port|jmena|cil:port`  → cíl je 3. pole
+  //   TCP:     `port|cil:port`        → cíl je 2. pole
+  const cile = new Set<string>();
+  const peery = new Set<string>();
+  for (const radek of out.split("\n")) {
+    const ingress = /^([A-Z0-9_]+)_MESH_INGRESS_ROUTES='?(.*?)'?$/.exec(radek);
+    const tcp = /^([A-Z0-9_]+)_MESH_TCP_ROUTES='?(.*?)'?$/.exec(radek);
+    const m = ingress ?? tcp;
+    if (!m) continue;
+    peery.add(m[1]);
+    const poleCile = ingress ? 2 : 1;
+    for (const trasa of m[2].split(";")) {
+      const cil = trasa.split("|")[poleCile];
+      if (cil) cile.add(cil.split(":")[0]);
+    }
+  }
+  return { cile, peery, optInPeery };
+}
 
 /** Cíle tras podle katalogu: {compose, službaKlíč, kdo}. */
 function cileTras(): Array<{ compose: string; sluzba: string; id: string }> {
@@ -80,6 +193,35 @@ describe("cíl mesh trasy má alias s identitou instance", () => {
     expect(cile.length, "katalog nedeklaruje ŽÁDNÝ cíl trasy — měřidlo osiřelo").toBeGreaterThan(20);
   });
 
+  test("univerzum derivace obsahuje KAŽDÝ opt-in stack s mesh tváří", () => {
+    // Hlídá samo měřidlo: testy níž porovnávají cíle, které derivace vydá.
+    // Vypadne-li z ní opt-in stack, jeho cíle nikdo nezměří — přesně tak
+    // zůstala nevidět kolize `<prefix>-svc-model` (2026-10-02).
+    const { peery, optInPeery } = odvozeneTrasy();
+    expect(optInPeery.size, "katalog nedeklaruje žádnou opt-in službu s mesh tváří — sonda osiřela").toBeGreaterThan(0);
+    const chybi = [...optInPeery].filter((p) => !peery.has(p)).sort();
+    expect(
+      chybi,
+      "Tyhle opt-in stacky v univerzu derivace chybí — jejich trasy brána neměří:\n  " + chybi.join("\n  "),
+    ).toEqual([]);
+  });
+
+  test("dva forky na jednom hostiteli (sdílený GPU stroj): cíle tras se NEPROTÍNAJÍ, včetně opt-in modelu", () => {
+    // Na GPU stroji poběží stacky víc forků vedle sebe (kontrakt d8 U7, 0c d).
+    // Cíl trasy, který dva forky sdílí, je přesně 36821f71b o úroveň výš:
+    // ingress forku A by trefil kontejner forku B. Derivace se proto pouští
+    // pro DVĚ identity se všemi přepínači opt-in (model včetně) a průnik musí být prázdný.
+    const a = odvozeneTrasy("forka");
+    const b = odvozeneTrasy("forkb");
+    expect(a.peery.has("MODEL"), "univerzum nemá stack modelu — dva forky s modelem na gpu brána neměří").toBe(true);
+    expect(a.cile.size, "derivace nevydala žádný cíl").toBeGreaterThan(10);
+    const prunik = [...a.cile].filter((c) => b.cile.has(c)).sort();
+    expect(prunik, "Tyhle cíle tras by dva forky na jednom hostiteli sdílely:\n  " + prunik.join("\n  ")).toEqual([]);
+    // Kotva: táž identita dvakrát = úplná shoda. Bez ní „prázdný průnik“ nedokazuje nic.
+    const a2 = odvozeneTrasy("forka");
+    expect([...a2.cile].filter((c) => a.cile.has(c)).length).toBe(a.cile.size);
+  });
+
   test("každý cíl trasy v compose existuje", () => {
     const chybi = cile
       .filter(({ compose, sluzba }) => maAliasSIdentitou(compose, sluzba) === null)
@@ -101,40 +243,7 @@ describe("cíl mesh trasy má alias s identitou instance", () => {
     //
     // Tady se porovnávají MNOŽINY: cíle, které derivace vydá, proti aliasům,
     // které compose vyrobí — obojí s dosazenou identitou.
-    const env: NodeJS.ProcessEnv = { ...process.env, MESH_ENABLED: "true", APP_NAME_PREFIX: "zkouska" };
-    // Identita se volí smyšlená: kdyby se prefix někde nedosadil, ukáže se to
-    // jako neshoda, ne jako trefa na jméno živé instance.
-    for (const k of ["PUBLIC_TLD", "INTERNAL_TLD", "MESH_TLD"]) env[k] = env[k] || `${k.toLowerCase()}.test`;
-    const out = execFileSync(process.execPath, [join(ROOT, "scripts/lib/derive-domains.mjs"), "--shell"], {
-      cwd: ROOT, env, encoding: "utf-8", maxBuffer: 32 * 1024 * 1024,
-    });
-
-    // ⛔ UNIVERZUM MINULO PŮLKU SVĚTA (naměřeno při wipu 2026-08-24). Tahle
-    // smyčka brala jen `_MESH_INGRESS_ROUTES`, tedy HTTP trasy — a `_MESH_TCP_ROUTES`
-    // nevidela vůbec. Přitom právě tam patří clamav a shared-redis: clamd i Redis
-    // mluví vlastním TCP protokolem, který Caddy rozvést neumí.
-    //
-    // Důsledek byl přesně ten, před kterým tahle brána má chránit: trasa
-    // `3310|<prefix>-clamav:3310` mířila na jméno, které compose nepřidělovala
-    // (alias byl jen `<prefix>-clamd`), sidecar `clamav-mesh-tcp` padal
-    // v restart smyčce na `host not found in upstream` — a 7038 bran mlčelo.
-    // Našel to až wipe, tedy nasazení, ne měřidlo.
-    //
-    // Tvary se liší a musí se číst každý po svém:
-    //   INGRESS: `port|jmena|cil:port`  → cíl je 3. pole
-    //   TCP:     `port|cil:port`        → cíl je 2. pole
-    const cile = new Set<string>();
-    for (const radek of out.split("\n")) {
-      const ingress = /^[A-Z0-9_]+_MESH_INGRESS_ROUTES='?(.*?)'?$/.exec(radek);
-      const tcp = /^[A-Z0-9_]+_MESH_TCP_ROUTES='?(.*?)'?$/.exec(radek);
-      const m = ingress ?? tcp;
-      if (!m) continue;
-      const poleCile = ingress ? 2 : 1;
-      for (const trasa of m[1].split(";")) {
-        const cil = trasa.split("|")[poleCile];
-        if (cil) cile.add(cil.split(":")[0]);
-      }
-    }
+    const { cile } = odvozeneTrasy();
     expect(cile.size, "derivace nevydala ŽÁDNOU trasu — měřidlo osiřelo").toBeGreaterThan(10);
 
     const aliasy = new Set<string>();
@@ -197,24 +306,7 @@ describe("cíl mesh trasy má alias s identitou instance", () => {
       return restart === "no" || /-init$/.test(jmeno);
     };
 
-    const env: NodeJS.ProcessEnv = { ...process.env, MESH_ENABLED: "true", APP_NAME_PREFIX: "zkouska" };
-    for (const k of ["PUBLIC_TLD", "INTERNAL_TLD", "MESH_TLD"]) env[k] = env[k] || `${k.toLowerCase()}.test`;
-    const out = execFileSync(process.execPath, [join(ROOT, "scripts/lib/derive-domains.mjs"), "--shell"], {
-      cwd: ROOT, env, encoding: "utf-8", maxBuffer: 32 * 1024 * 1024,
-    });
-
-    const cile = new Set<string>();
-    for (const radek of out.split("\n")) {
-      const ingress = /^[A-Z0-9_]+_MESH_INGRESS_ROUTES='?(.*?)'?$/.exec(radek);
-      const tcp = /^[A-Z0-9_]+_MESH_TCP_ROUTES='?(.*?)'?$/.exec(radek);
-      const m = ingress ?? tcp;
-      if (!m) continue;
-      const poleCile = ingress ? 2 : 1;
-      for (const trasa of m[1].split(";")) {
-        const cil = trasa.split("|")[poleCile];
-        if (cil) cile.add(cil.split(":")[0]);
-      }
-    }
+    const { cile } = odvozeneTrasy();
     expect(cile.size, "derivace nevydala ŽÁDNOU trasu — měřidlo osiřelo").toBeGreaterThan(10);
 
     // alias → seznam držitelů (soubor, služba, jednorázová?)
@@ -273,27 +365,19 @@ describe("cíl mesh trasy má alias s identitou instance", () => {
     // Testy výš se ptají „existuje jméno?" a „nedrží ho jen jednorázová?".
     // Obojí prošlo — jméno existovalo a oba držitelé běží. Měří se proto
     // JEDNOZNAČNOST: dva držitelé = Docker DNS vybírá, trasa funguje náhodou.
-    // A hostitel netns (`network_mode: service:<x>`) alias cíle nést nesmí
-    // nikdy: všechno, co v jeho netns běží — i ingress sám —, by jméno
-    // přeložilo na sebe.
-    const env: NodeJS.ProcessEnv = { ...process.env, MESH_ENABLED: "true", APP_NAME_PREFIX: "zkouska" };
-    for (const k of ["PUBLIC_TLD", "INTERNAL_TLD", "MESH_TLD"]) env[k] = env[k] || `${k.toLowerCase()}.test`;
-    const out = execFileSync(process.execPath, [join(ROOT, "scripts/lib/derive-domains.mjs"), "--shell"], {
-      cwd: ROOT, env, encoding: "utf-8", maxBuffer: 32 * 1024 * 1024,
-    });
-
-    const cile = new Set<string>();
-    for (const radek of out.split("\n")) {
-      const ingress = /^[A-Z0-9_]+_MESH_INGRESS_ROUTES='?(.*?)'?$/.exec(radek);
-      const tcp = /^[A-Z0-9_]+_MESH_TCP_ROUTES='?(.*?)'?$/.exec(radek);
-      const m = ingress ?? tcp;
-      if (!m) continue;
-      const poleCile = ingress ? 2 : 1;
-      for (const trasa of m[1].split(";")) {
-        const cil = trasa.split("|")[poleCile];
-        if (cil) cile.add(cil.split(":")[0]);
-      }
-    }
+    // A hostitel netns (`network_mode: service:<x>`) alias cíle nést nesmí,
+    // když v jeho netns běží něco, co to jméno PŘEKLÁDÁ: mesh ingress (rozvádí
+    // trasy podle jmen — incident výš) nebo služba, jejíž konfigurace alias
+    // zmiňuje. Ti by jméno přeložili sami na sebe.
+    //
+    // ⭐ ZPŘESNĚNO 2026-10-05 (most modelového meshe, varianta C). Most je první
+    // cíl, který v netns hostitele bydlet MUSÍ: most-proxy předává do modelového
+    // meshe, jehož rozhraní wt0 existuje jen v netns agenta modelového meshe.
+    // V té netns neběží ingress a most-proxy míří na IP uzlu, ne na jméno —
+    // nikdo tam alias nepřekládá, smyčka nevznikne. Incident z 09-30 (ingress
+    // v netns agenta, který nese alias cíle) brána chytá dál: mutace „ingress
+    // v netns agenta mostu“ a „proxy mostu míří na vlastní alias“ ji shodí.
+    const { cile } = odvozeneTrasy();
     expect(cile.size, "derivace nevydala ŽÁDNOU trasu — měřidlo osiřelo").toBeGreaterThan(10);
 
     // alias → držitelé (služba se počítá jednou, i když alias nese na více sítích)
@@ -302,23 +386,30 @@ describe("cíl mesh trasy má alias s identitou instance", () => {
       let doc: { services?: Record<string, Sluzba> };
       try { doc = parse(readFileSync(join(ROOT, f), "utf-8")); } catch { continue; }
       const sluzby = doc?.services ?? {};
-      const hostitele = new Set(
-        Object.values(sluzby)
-          .map((spec) => /^service:(.+)$/.exec(String(spec?.network_mode ?? ""))?.[1])
-          .filter((x): x is string => Boolean(x)),
-      );
+      // hostitel netns → obyvatelé (služby s `network_mode: service:<hostitel>`)
+      const obyvatele = new Map<string, Array<[string, Sluzba]>>();
+      for (const [jmeno, spec] of Object.entries(sluzby)) {
+        const h = /^service:(.+)$/.exec(String(spec?.network_mode ?? ""))?.[1];
+        if (h) obyvatele.set(h, [...(obyvatele.get(h) ?? []), [jmeno, spec]]);
+      }
+      // Překládá v netns někdo daný alias? Ingress rozvádí podle jmen vždy; jiný obyvatel,
+      // když jeho konfigurace alias (v podobě z compose) zmiňuje.
+      const prekladaVNetns = (hostitel: string, aliasSurovy: string): boolean =>
+        (obyvatele.get(hostitel) ?? []).some(([jmeno, spec]) =>
+          /-mesh-ingress$/.test(jmeno) || /_MESH_(INGRESS|TCP)_ROUTES/.test(JSON.stringify(spec ?? {})) ||
+          JSON.stringify(spec ?? {}).includes(aliasSurovy));
       for (const [jmeno, spec] of Object.entries(sluzby)) {
         const nets = spec?.networks;
         if (!nets || Array.isArray(nets)) continue;
-        const moje = new Set<string>();
+        const moje = new Map<string, string>(); // alias s dosazenou identitou → alias, jak stojí v compose
         for (const v of Object.values(nets as Record<string, { aliases?: unknown[] } | null>)) {
           for (const a of (v && Array.isArray(v.aliases) ? v.aliases : [])) {
-            moje.add(String(a).replace(/\$\{APP_NAME_PREFIX[^}]*\}/g, "zkouska"));
+            moje.set(String(a).replace(/\$\{APP_NAME_PREFIX[^}]*\}/g, "zkouska"), String(a));
           }
         }
-        for (const alias of moje) {
+        for (const [alias, surovy] of moje) {
           const seznam = drzitele.get(alias) ?? [];
-          seznam.push({ sluzba: jmeno, soubor: f, hostiNetns: hostitele.has(jmeno) });
+          seznam.push({ sluzba: jmeno, soubor: f, hostiNetns: obyvatele.has(jmeno) && prekladaVNetns(jmeno, surovy.replace(/\$\{APP_NAME_PREFIX[^}]*\}/g, "")) });
           drzitele.set(alias, seznam);
         }
       }
@@ -343,7 +434,8 @@ describe("cíl mesh trasy má alias s identitou instance", () => {
         "`/__mesh_health` hlásí `ok`.",
         "",
         "CO S TÍM: alias `${APP_NAME_PREFIX}-<služba>` nech JEN službě, která na",
-        "portu cíle poslouchá. Hostiteli netns (netbird-agent) aliasy cílů nedávej.",
+        "portu cíle poslouchá. Hostiteli netns, ve které běží ingress (netbird-agent)",
+        "nebo cokoli, co ten alias překládá, aliasy cílů nedávej.",
       ].join("\n"),
     ).toEqual([]);
   });

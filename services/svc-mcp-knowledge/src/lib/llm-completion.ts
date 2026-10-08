@@ -21,7 +21,7 @@
  *   4. process.env.OPENAI_API_BASE_URL
  *   Nic z toho = 503 (endpoint se nedosazuje — viz resolveBaseUrl).
  */
-import { config } from '../config.js';
+import { credentials } from './credentials.js';
 import { GeminiBackend, AnthropicBackend, type ChatRequest as DispatchChatRequest } from '@aisha/llm-dispatch';
 
 export interface ChatMessage {
@@ -135,7 +135,8 @@ const nonEmpty = (v: string | undefined | null): string | null => (v && v.trim()
  * model server. A prohlášená proměnná se bez `api_key` vůbec nečetla.
  *
  *   auth_env_var === null     backend autentizaci nemá → žádný klíč
- *   auth_env_var = 'NÁZEV'    klíč = api_key ?? process.env[NÁZEV]; chybí → 503
+ *   auth_env_var = 'NÁZEV'    klíč = api_key ?? pověření NÁZEV (trezor instance → přechodně
+ *                             env, čtečka pověření); chybí → 503
  *   neuvedeno + api_key       klíč předaný volajícím
  *   neuvedeno, endpoint od volajícího, bez api_key
  *                             → 503: backend svou autentizaci nedeklaroval a
@@ -144,11 +145,13 @@ const nonEmpty = (v: string | undefined | null): string | null => (v && v.trim()
  *                             → klíč spárovaný s tímtéž zdrojem (bez něj bez
  *                               hlavičky); klíč OpenAI jen endpointu OpenAI
  */
-function resolveApiKey(req: CompletionRequest, source: EndpointSource): { key: string | null; missing?: string } {
+async function resolveApiKey(req: CompletionRequest, source: EndpointSource): Promise<{ key: string | null; missing?: string }> {
   if (req.auth_env_var === null) return { key: null };
   if (typeof req.auth_env_var === 'string') {
-    const key = nonEmpty(req.api_key) ?? nonEmpty(process.env[req.auth_env_var]);
-    return key ? { key } : { key: null, missing: `auth_env_var=${req.auth_env_var} není v prostředí` };
+    const key = nonEmpty(req.api_key) ?? nonEmpty(await credentials().get(req.auth_env_var));
+    return key
+      ? { key }
+      : { key: null, missing: `pověření ${req.auth_env_var} není nastavené (administrace „Poskytovatelé AI a tokeny")` };
   }
   const explicit = nonEmpty(req.api_key);
   if (explicit) return { key: explicit };
@@ -160,8 +163,8 @@ function resolveApiKey(req: CompletionRequest, source: EndpointSource): { key: s
     case 'VLLM_GENERATION_URL':
       return { key: nonEmpty(process.env.VLLM_API_KEY) };
     case 'openai': {
-      const key = nonEmpty(config.openaiApiKey);
-      return key ? { key } : { key: null, missing: 'endpoint OpenAI bez OPENAI_API_KEY' };
+      const key = nonEmpty(await credentials().get('OPENAI_API_KEY'));
+      return key ? { key } : { key: null, missing: 'endpoint OpenAI bez OPENAI_API_KEY (administrace „Poskytovatelé AI a tokeny")' };
     }
   }
 }
@@ -175,7 +178,7 @@ function resolveApiKey(req: CompletionRequest, source: EndpointSource): { key: s
 async function chatCompletionNative(req: CompletionRequest, providerSlug: string): Promise<CompletionResult> {
   // Endpoint nativního poskytovatele určuje protokol, ne prostředí — klíč tedy
   // jen z prohlášení backendu nebo od volajícího, nikdy klíč OpenAI.
-  const { key: apiKey, missing } = resolveApiKey(req, 'caller');
+  const { key: apiKey, missing } = await resolveApiKey(req, 'caller');
   if (!apiKey) {
     throw new LlmCompletionError(
       503,
@@ -242,7 +245,7 @@ export async function chatCompletion(req: CompletionRequest): Promise<Completion
   const { url: baseUrl, source } = endpoint;
   // Klíč jen ten, který patří tomuto endpointu (viz resolveApiKey). Chybí-li
   // klíč, který endpoint vyžaduje, padáme nahlas — nic neodejde.
-  const { key: apiKey, missing } = resolveApiKey(req, source);
+  const { key: apiKey, missing } = await resolveApiKey(req, source);
   const timeoutMs = req.timeout_ms ?? 90_000;
 
   if (missing) {

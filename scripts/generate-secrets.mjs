@@ -118,6 +118,15 @@ if (stackExistsHodnota !== undefined && stackExistsHodnota !== '0' && stackExist
 }
 const stackExists     = stackExistsHodnota === '1';
 
+// Stack MODELOVÉHO meshe forku (varianta C) — změřená existence aplikace netbird-model
+// (cold-start: manifest → Coolify). '1' stojí, '0' změřeně nestojí, prázdné = nezměřeno.
+// Jen 0/1/prázdné: překlep by se jinak tiše vyhodnotil jako „nestojí“ a pustil výrobu.
+const mmStackHodnota = getArg('model-mesh-stack-exists') ?? process.env.AISHA_MODEL_MESH_STACK_EXISTS ?? '';
+if (!['', '0', '1'].includes(mmStackHodnota)) {
+  process.stderr.write(`⛔ [generate-secrets] --model-mesh-stack-exists přijímá jen 0, 1 nebo prázdné (nezměřeno), ne '${mmStackHodnota}'.\n`);
+  process.exit(2);
+}
+
 // ── Existing env file parser (same logic as preserve_or_gen in bash) ────────
 
 function parseEnvFile(filePath) {
@@ -340,7 +349,156 @@ const KEY_FLOORS = { JWT_SECRET: JWT_FLOOR };
 
 // Provably stateless: signing material only, no volume/DB state depends on the
 // raw value. Safe to re-key on ANY run (dependent JWTs are regenerated below).
-const STATELESS_KEYS = new Set(['JWT_SECRET']);
+const STATELESS_KEYS = new Set([
+  'JWT_SECRET',
+  // JWT podepsané JWT_SECRET (jwtDependent níž): chybí-li, smí se podepsat znovu —
+  // na raw hodnotě nezávisí žádná data; rotace JWT_SECRET je přegeneruje v témže běhu.
+  'ANON_KEY',
+  'SERVICE_ROLE_KEY',
+  // WEB_RENDER_SHELL_TOKEN (d-ii, #1140): sdílené tajemství JEN dvojice web → web-render,
+  // obě strany ho čtou z téhož env instance a nic za ním neleží ve svazku ani v DB.
+  // ⛔ NAMĚŘENO 2026-10-03 (kolo 16, krok 4): jako stavový ho konvergence existující
+  // instance nikdy nevyrobila („ODMÍTÁM … WEB_RENDER_SHELL_TOKEN“).
+  'WEB_RENDER_SHELL_TOKEN',
+  // KNOCK_ROSTER_TOKEN: sdílené tajemství JEN dvojice gateway (zarizeni-klic.ts, porovnání)
+  // ↔ dveře (SPA_OPERATORS_TOKEN v compose edge); obě strany čtou env instance, nic se
+  // neukládá, obě doručí cold-start v témže běhu a ani jednu nejde držet.
+  // ⛔ NAMĚŘENO 2026-10-04 (předlet forku nad W1): jako stavový ho krok 2 nad existující
+  // instancí, která dveře dosud neměla, odmítl vyrobit (rc 3).
+  'KNOCK_ROSTER_TOKEN',
+  // NETBIRD_MODEL_BOOTSTRAP_SECRET: tajemství KC klienta `netbird-model-bootstrap` (token
+  // bootstrap uživatele jen s audiencí modelového meshe). provision-sso ho v témže běhu
+  // nastaví Keycloaku a čte ho jen bootstrap — nic za ním neleží ve svazku ani v DB.
+  'NETBIRD_MODEL_BOOTSTRAP_SECRET',
+]);
+
+// ⛔ ZAŘAZENÍ KLÍČE JE POVINNÉ (2026-10-03, konvergence existující instance).
+// Dřív pg() bral KAŽDÝ klíč mimo STATELESS_KEYS jako stavový. NOVÉ sdílené tajemství
+// (heslo mezi dvěma službami, na kterém nezávisí žádná data) proto nad existujícím
+// stackem (`--stack-exists`, cold-start `--skip-create`) generátor odmítl vyrobit
+// („stavová tajemství bez vstupu“) a konvergence padla v kroku 2 — a totéž by potkalo
+// každý další nový klíč. Výchozí zařazení proto NEEXISTUJE: klíč z pg() stojí právě
+// v jedné z množin, pg() nezařazený klíč odmítne a hlídá to i brána
+// generate-secrets-zarazeni-klicu.
+//   STAVOVÝ  = na hodnotě závisí data nebo svazek (heslo DB, šifrovací klíč…) —
+//              přegenerovat smí jen wipe (--strength-floor);
+//   BEZSTAVOVÝ = podpis nebo sdílené heslo, které cold-start v témže běhu doručí
+//              všem stranám — nad existujícím stackem se smí vyrobit.
+// Dosavadní klíče jsou zařazené jako STAVOVÉ (chování beze změny); nový klíč se
+// zařadí vědomě při psaní kódu, ne až v okně nasazení.
+const STATEFUL_KEYS = new Set([
+  'AISHA_LLM_GATEWAY_KEY',
+  'AISHA_PKI_ISSUER_CLIENT_SECRET',
+  'APPSMITH_ADMIN_PASSWORD',
+  'APPSMITH_ENCRYPTION_PASSWORD',
+  'APPSMITH_ENCRYPTION_SALT',
+  'APPSMITH_INTRANET_OIDC_SECRET',
+  'APPSMITH_OIDC_SECRET',
+  'CLICKHOUSE_PASSWORD',
+  'COLUMN_ENCRYPTION_KEY',
+  'COSMOS_SIGNER_MNEMONIC',
+  'COSMOS_VALIDATOR_PASSWORD',
+  'ELASTIC_PASSWORD',
+  'EXTRANET_COOKIE_SECRET',
+  'EXTRANET_OIDC_SECRET',
+  'FEDERATION_VAULT_KEY',
+  'IMGPROXY_KEY',
+  'IMGPROXY_SALT',
+  'INGEST_DROP_ACCESS_KEY',
+  'INGEST_DROP_SECRET_KEY',
+  'INGEST_TOKEN',
+  'INTERNAL_API_KEY',
+  'INTRANET_API_KEY',
+  'KC_ADMIN_CLIENT_SECRET',
+  'KEYCLOAK_ADMIN_PASSWORD',
+  'KEYCLOAK_CLIENT_SECRET',
+  'KEYCLOAK_DB_PASSWORD',
+  'KRONOS_API_KEY',
+  'LANGFUSE_ADMIN_PASSWORD',
+  'LANGFUSE_DB_PASSWORD',
+  'LANGFUSE_ENCRYPTION_KEY',
+  'LANGFUSE_NEXTAUTH_SECRET',
+  'LANGFUSE_OIDC_SECRET',
+  'LANGFUSE_SALT',
+  'LANGFUSE_SECRET_KEY',
+  'LIVEKIT_API_KEY',
+  'LIVEKIT_API_SECRET',
+  'LIVEKIT_TURN_PASSWORD',
+  'LLM_GATEWAY_DB_PASSWORD',
+  'LLM_GATEWAY_OIDC_SECRET',
+  'LLM_GATEWAY_SECRET',
+  'LOGFLARE_API_KEY',
+  'MAESTRO_API_KEY',
+  'MATRIX_FORM_SECRET',
+  'MATRIX_MACAROON_SECRET_KEY',
+  'MATRIX_REGISTRATION_SHARED_SECRET',
+  'MINIO_ROOT_PASSWORD',
+  'MINIO_ROOT_USER',
+  'N8N_BASIC_AUTH_PASSWORD',
+  'N8N_BOOTSTRAP_OWNER_PASSWORD',
+  'N8N_COOKIE_SECRET',
+  'N8N_DB_PASSWORD',
+  'N8N_ENCRYPTION_KEY',
+  'N8N_OIDC_SECRET',
+  'N8N_WEBHOOK_AUTH_TOKEN',
+  'NETBIRD_DATASTORE_ENC_KEY',
+  'NETBIRD_DB_PASSWORD',
+  'NETBIRD_MGMT_SECRET',
+  // Modelový mesh forku (varianta C) — zařazení jako u hlavní instance.
+  'NETBIRD_MODEL_DATASTORE_ENC_KEY',
+  'NETBIRD_MODEL_DB_PASSWORD',
+  'NETBIRD_MODEL_MGMT_SECRET',
+  'NETBIRD_MODEL_OIDC_SECRET',
+  'NETBIRD_MODEL_RELAY_SECRET',
+  'NETBIRD_OIDC_SECRET',
+  'NETBIRD_RELAY_SECRET',
+  'NETBIRD_STACK_KEY_BACKEND',
+  'NETBIRD_STACK_KEY_BACKEND_ID',
+  'NETBIRD_STACK_KEY_EXPERIMENTAL',
+  'NETBIRD_STACK_KEY_EXPERIMENTAL_ID',
+  'NETBIRD_STACK_KEY_FRONTEND',
+  'NETBIRD_STACK_KEY_FRONTEND_ID',
+  'NETBIRD_STACK_KEY_INTEGRATION',
+  'NETBIRD_STACK_KEY_INTEGRATION_ID',
+  'NETBIRD_TURN_PASSWORD',
+  'NOCODB_ADMIN_PASSWORD',
+  'NOCODB_JWT_SECRET',
+  'NOCODB_OIDC_SECRET',
+  'OAUTH2_PROXY_COOKIE_SECRET',
+  'OPENCLAW_API_KEY',
+  'OPENCLAW_COOKIE_SECRET',
+  'OPENCLAW_DB_PASSWORD',
+  'OPENCLAW_OIDC_SECRET',
+  'OPENCLAW_SECRET',
+  'OPENXPKI_OPERATOR_PASSWORD',
+  'OPENXPKI_RPC_HMAC',
+  'PGADMIN_PASSWORD',
+  'PKI_CLIENT_KEY_B64',
+  'PKI_COOKIE_SECRET',
+  'PKI_DB_PASSWORD',
+  'PKI_DB_ROOT_PASSWORD',
+  'PKI_DEFAULT_SECRET',
+  'PKI_OIDC_SECRET',
+  'PKI_SVAULT_KEY',
+  'PLATFORM_ADMIN_PASSWORD',
+  'POSTGRES_PASSWORD',
+  'POTOK_TOKEN',
+  'RABBITMQ_DEFAULT_PASS',
+  'RAGNAROK_API_KEY',
+  'REALTIME_SECRET_KEY_BASE',
+  'REDIS_PASSWORD',
+  'REDIS_PASSWORD_ADMIN',
+  'REDIS_PASSWORD_CORE',
+  'REDIS_PASSWORD_LANGFUSE',
+  'REDIS_PASSWORD_N8N',
+  'SOURCE_WEBHOOK_HMAC_SECRET',
+  'STORAGE_UPLOAD_TOKEN_SECRET',
+  'STUDIO_COOKIE_SECRET',
+  'STUDIO_OIDC_SECRET',
+  'SYNAPSE_DB_PASSWORD',
+  'SYNAPSE_OIDC_CLIENT_SECRET',
+  'VAULT_ENCRYPTION_KEY',
+]);
 
 // No floor at all. NOTE: operator-supplied/BYOK keys (OPENAI_API_KEY, RESEND_API_KEY,
 // TELEGRAM_*, …) flow through preservedValue(), never pg(), so they are exempt
@@ -381,6 +539,13 @@ function warn(message) {
  *  Preserved values below the per-key strength floor are discarded (stateless
  *  keys: always; stateful keys: only under --strength-floor) — see policy above. */
 function pg(key, generator) {
+  if (STATELESS_KEYS.has(key) === STATEFUL_KEYS.has(key)) {
+    // nezařazený (nebo v obou množinách) — rozhodnutí patří autorovi klíče, ne výchozí hodnotě
+    throw new Error(
+      `generate-secrets: klíč ${key} ${STATELESS_KEYS.has(key) ? 'je v OBOU množinách' : 'není zařazený'} ` +
+      '(STATEFUL_KEYS / STATELESS_KEYS) — rozhodni, zda na jeho hodnotě závisí data nebo svazek',
+    );
+  }
   if (preserve) {
     const value = firstNonEmpty(key);
     if (value !== undefined) {
@@ -490,6 +655,28 @@ const emittedKeys = [];
 function emit(key, value) {
   emittedKeys.push(key);
   lines.push(`${key}=${shellQuote(value)}`);
+}
+
+// ── Tajemství modelového meshe forku (varianta C) ───────────────────────────
+// ⛔ NAMĚŘENO 2026-10-06 (suchý `cold-start --skip-create` nad main ≥ e5d41c82f, fork bez
+// modelového meshe): NETBIRD_MODEL_* se vyráběla NEPODMÍNĚNĚ jako stavová → nad existujícím
+// stackem bez vstupu závora „stavová tajemství bez vstupu“ ODMÍTLA běh a konvergence KAŽDÉHO
+// forku padla v kroku 2 — i tam, kde lane modelového meshe vůbec není.
+// Stavová jsou jen tam, kde stack modelového meshe UŽ STOJÍ:
+//  · lane ZAVŘENÁ (MODEL_MESH = "") → nevyrábět, nevyžadovat; existující hodnotu jen zachovat;
+//  · lane otevřená a stack ZMĚŘENĚ nestojí (--model-mesh-stack-exists=0) → první výroba je
+//    bezpečná, žádná data na hodnotě nezávisí;
+//  · lane otevřená a stack stojí, nebo nezměřeno, nebo lane neodvozená → stavová jako dřív.
+// Lanu vykládá JEN derivace: derive-domains vydá MODEL_MESH vždy (slot, nebo "" = zavřená;
+// týž klíč čte doktor) a cold-start její výstup zdrojuje před tímto během. Nepřítomná
+// proměnná = neodvozeno → fail-closed. Při zavřené lane se klíč vydá PRÁZDNÝ (nebo zachovaný):
+// heredoc cold-startu ho váže holým `${…}` a nevázaný by zápis .env.coolify přerušil.
+const laneModelu = process.env.MODEL_MESH;
+function tajemstviModelovehoMeshe(key, vyrob) {
+  if (laneModelu === '') return (preserve ? firstNonEmpty(key) : undefined) ?? '';
+  const hodnota = vyrob();
+  if (laneModelu && stackExists && mmStackHodnota === '0') stavoveBezVstupu.delete(key);
+  return hodnota;
 }
 
 // ── Secret definitions (mirrors the bash else-block in step 2) ───────────────
@@ -762,6 +949,16 @@ emit('NETBIRD_DATASTORE_ENC_KEY',pg('NETBIRD_DATASTORE_ENC_KEY',() => b64std(32)
 emit('NETBIRD_DB_PASSWORD',      pg('NETBIRD_DB_PASSWORD',      () => secret(32)));
 emit('NETBIRD_TURN_USERNAME',    preservedValue('NETBIRD_TURN_USERNAME', 'netbird-turn'));
 emit('NETBIRD_TURN_PASSWORD',    pg('NETBIRD_TURN_PASSWORD',    () => secret(24)));
+// Modelový mesh forku (varianta C): druhá instance stacku NetBird, vlastní tajemství,
+// zařazená jako u hlavní (STAVOVÁ) — ale STAVOVÁ jsou jen tam, kde stack modelového
+// meshe UŽ STOJÍ (tajemstviModelovehoMeshe výš).
+emit('NETBIRD_MODEL_OIDC_CLIENT_ID',    preservedValue('NETBIRD_MODEL_OIDC_CLIENT_ID', 'netbird-model'));
+emit('NETBIRD_MODEL_OIDC_SECRET', tajemstviModelovehoMeshe('NETBIRD_MODEL_OIDC_SECRET', () => pg('NETBIRD_MODEL_OIDC_SECRET', () => secret(32))));
+emit('NETBIRD_MODEL_MGMT_SECRET', tajemstviModelovehoMeshe('NETBIRD_MODEL_MGMT_SECRET', () => pg('NETBIRD_MODEL_MGMT_SECRET', () => secret(32))));
+emit('NETBIRD_MODEL_RELAY_SECRET', tajemstviModelovehoMeshe('NETBIRD_MODEL_RELAY_SECRET', () => pg('NETBIRD_MODEL_RELAY_SECRET', () => secret(32))));
+emit('NETBIRD_MODEL_DATASTORE_ENC_KEY', tajemstviModelovehoMeshe('NETBIRD_MODEL_DATASTORE_ENC_KEY', () => pg('NETBIRD_MODEL_DATASTORE_ENC_KEY', () => b64std(32))));
+emit('NETBIRD_MODEL_DB_PASSWORD', tajemstviModelovehoMeshe('NETBIRD_MODEL_DB_PASSWORD', () => pg('NETBIRD_MODEL_DB_PASSWORD', () => secret(32))));
+emit('NETBIRD_MODEL_BOOTSTRAP_SECRET', tajemstviModelovehoMeshe('NETBIRD_MODEL_BOOTSTRAP_SECRET', () => pg('NETBIRD_MODEL_BOOTSTRAP_SECRET', () => secret(32))));
 emit('NETBIRD_AUTH_SCHEME',      preservedValue('NETBIRD_AUTH_SCHEME', 'Bearer'));
 emit('NETBIRD_SANDBOX_GROUP',    preservedValue('NETBIRD_SANDBOX_GROUP', 'sandbox-run'));
 // DERIVED (not preserved): the resolver's stable IP on the instance-owned
@@ -892,19 +1089,16 @@ emit('NETSEG_DATA_NET',          preservedValue('NETSEG_DATA_NET',        `${dep
 emit('OIDC_APP_CLIENT_ID',   preservedValue('OIDC_APP_CLIENT_ID',   'aisha-app'));        // klient realmu
 emit('WS_JWT_AUDIENCE',      preservedValue('WS_JWT_AUDIENCE',      'aisha-app'));        // aud = týž klient
 emit('KC_ADMIN_CLIENT_ID',   preservedValue('KC_ADMIN_CLIENT_ID',   'aisha-user-admin')); // klient realmu
-// Hostitelské cesty exec stacku: NOVÁ instalace je dostane instančně (víc
+// Hostitelská cesta běhů exec stacku: NOVÁ instalace ji dostane instančně (víc
 // instancí na hostu = různé cesty), existující si preservedValue drží tu svou.
-emit('AGENT_REPO_PATH',      preservedValue('AGENT_REPO_PATH',      `/srv/${deployPrefix}/base-repo`));
+// (AGENT_REPO_PATH pryč 2026-09-24: běh si repo klonuje sám z AGENT_GIT_REMOTE.)
 emit('AGENT_RUNS_DIR',       preservedValue('AGENT_RUNS_DIR',       `/var/lib/${deployPrefix}/agent-runs`));
-// Hostitelské adresáře předrenderování (výstup rendereru + skořápka webu), které
-// sdílí renderer a web TÉŽE instance. Dřív doslovné /var/lib/aisha/web-{static,shell}
-// — naměřeno 2026-09-23: renderery dvou instancí na jednom stroji zapisovaly do
-// TÉHOŽ web-static. Jméno ZÁMĚRNĚ jiné než ten legacy literál: starý renderer
-// jiné instance do něj píše, dokud nenasadí nový compose, a web by ho servíroval.
-// Obsah je odvozený (re-render při startu, skořápku web kopíruje při startu), takže
-// stěhování nic nestojí. Compose je čte jako `${VAR}` (celá cesta, bez výchozí hodnoty).
-emit('WEB_RENDER_STATIC_HOST_DIR', preservedValue('WEB_RENDER_STATIC_HOST_DIR', `/var/lib/${deployPrefix}/web-render/static`));
-emit('WEB_RENDER_SHELL_HOST_DIR',  preservedValue('WEB_RENDER_SHELL_HOST_DIR',  `/var/lib/${deployPrefix}/web-render/shell`));
+// Předrender po síti (d-ii, rozhodnutí majitele 2026-10-02): web posílá SPA skořápku
+// web-renderu `PUT /shell`. VLASTNÍ tajemství jen pro tuhle dvojici — ne sdílený
+// service token (revize RIQi: přístupy se mezi službami nezaměňují). Dřívější
+// WEB_RENDER_*_HOST_DIR (sdílené hostitelské adresáře) zmizely: Coolify holý `${VAR}`
+// ve zdroji svazku převede na svazek KAŽDÉ aplikace zvlášť, takže se nic nesdílelo.
+emit('WEB_RENDER_SHELL_TOKEN',   pg('WEB_RENDER_SHELL_TOKEN',   () => secret(32)));
 // Bootstrap vlastník n8n: e-mail v doméně INSTANCE, ne v placeholder doméně.
 emit('N8N_BOOTSTRAP_OWNER_EMAIL', preservedValue('N8N_BOOTSTRAP_OWNER_EMAIL',
   `n8n-owner@${(process.env.PUBLIC_TLD || '').trim() || meshTld}`));
@@ -920,6 +1114,14 @@ emit('N8N_BOOTSTRAP_OWNER_EMAIL', preservedValue('N8N_BOOTSTRAP_OWNER_EMAIL',
 // při každém běhu (generate-coolify-context: profil váže roli na jméno
 // serveru, Coolify k němu vydá ip) a do repa se nikdy nezapisuje.
 emit('NETBIRD_MGMT_HOST',        netbirdMgmtHost);
+// Most modelového meshe (C4): VEŘEJNÉ jméno řídicí roviny modelového meshe přistává na
+// uzlu EDGE (slot s has_traefik → PUBLIC_EDGE_HOST_ADDR z generate-coolify-context),
+// ne na uzlu managementu — týž vzor jako NETBIRD_MGMT_HOST, jiná role. Zjištěná adresa
+// stojí před prostředím ze stejného důvodu; `||`, ne `??` (prázdný řetězec nepřebije).
+// Bez literálu: adresu edge má jeden domov (generate-coolify-context vydá PUBLIC_EDGE_HOST_ADDR
+// vždy, jednouzlová instalace = host-gateway). Prázdná tu znamená, že kontext neproběhl —
+// most pak spadne nahlas na `:?` v compose místo tichého hádání.
+emit('MODEL_MESH_VSTUP_ADDR',     process.env.PUBLIC_EDGE_HOST_ADDR || process.env.MODEL_MESH_VSTUP_ADDR || '');
 emit('NETBIRD_MESH_HOST',        preservedValue('NETBIRD_MESH_HOST', `netbird.${meshTld}`));
 // NETBIRD_STACK_KEY_* — filled by netbird-bootstrap.sh after first deploy
 emit('NETBIRD_STACK_KEY_FRONTEND',       pg('NETBIRD_STACK_KEY_FRONTEND',       () => ''));

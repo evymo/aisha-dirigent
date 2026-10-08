@@ -95,7 +95,21 @@ export function detectCategory(funcName) {
 // ---------------------------------------------------------------------------
 
 /**
- * Extract GRANT/REVOKE information from SQL source.
+ * Extract GRANT information from SQL source.
+ *
+ * Reads `GRANT EXECUTE|ALL ON FUNCTION <signature…> TO <roles…>;`. The signature
+ * may contain whitespace (`f(uuid, uuid)`, `f(p_a uuid, p_b integer)`,
+ * `double precision`) and may name several functions. Comments are dropped
+ * first, so a commented-out GRANT is not a grant. Grantees are compared as
+ * whole role names, not substrings.
+ *
+ * ⛔ NAMĚŘENO 2026-10-04: dřívější vzor `ON FUNCTION \S+ TO` signaturu s mezerou
+ * neviděl — u 1005 z 1726 vydaných funkcí SoT nevrátil ŽÁDNÝ grant a brána
+ * `db-types-cover-exposed-rpcs` pro ně byla slepá.
+ *
+ * REVOKE is NOT modelled: no SoT file revokes an API role after granting it. That
+ * premise is pinned in `db-types-cover-exposed-rpcs` — if it stops holding, teach
+ * this function the order of statements instead of trusting the result.
  *
  * @param {string} sql
  * @returns {{ anon: boolean; authenticated: boolean; service_role: boolean; public: boolean }}
@@ -103,15 +117,15 @@ export function detectCategory(funcName) {
 export function extractGrants(sql) {
   const grants = { anon: false, authenticated: false, service_role: false, public: false };
 
-  const pattern = /GRANT\s+EXECUTE\s+ON\s+FUNCTION\s+\S+\s+TO\s+([^;]+)/gi;
+  const withoutComments = sql.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--[^\n]*/g, ' ');
+  const pattern = /\bGRANT\s+(?:EXECUTE|ALL(?:\s+PRIVILEGES)?)\s+ON\s+FUNCTION\s+[^;]+?\s+TO\s+([^;]+)/gi;
   let m;
-  while ((m = pattern.exec(sql)) !== null) {
-    const roles = m[1].toLowerCase();
-    if (roles.includes('anon')) grants.anon = true;
-    if (roles.includes('authenticated')) grants.authenticated = true;
-    if (roles.includes('service_role')) grants.service_role = true;
-    // "public" as a grantee (not the schema)
-    if (/\bpublic\b/.test(roles) && !/function/i.test(roles)) grants.public = true;
+  while ((m = pattern.exec(withoutComments)) !== null) {
+    const grantees = m[1].toLowerCase().split(/[\s,]+/).map((role) => role.replace(/"/g, '')).filter(Boolean);
+    if (grantees.includes('anon')) grants.anon = true;
+    if (grantees.includes('authenticated')) grants.authenticated = true;
+    if (grantees.includes('service_role')) grants.service_role = true;
+    if (grantees.includes('public')) grants.public = true;
   }
 
   return grants;

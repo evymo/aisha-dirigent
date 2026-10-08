@@ -15,8 +15,20 @@
 #
 # "all" deploys keycloak → core → web in correct dependency order.
 #
+# DEKLAROVANÉ DRŽENÍ (od 2026-10-04): aplikaci, kterou overlay instance vede
+# v `nasazeni-drzene.json`, tenhle dispatch NENASADÍ ani NERESTARTUJE — stejně
+# jako vlny v ci.yml a studený start. Deklaraci čte TÝŽ skript jako ci.yml
+# (`drzene-z-overlaye.sh`, pravidla scripts/lib/nasazeni-drzene.mjs); nečitelný
+# deklarovaný overlay nebo neplatná deklarace = pád dřív, než se cokoli nasadí.
+# Nasazení i restart odesílá jediný domov mutace (scripts/lib/coolify-mutace.mjs),
+# který se na držení ptá před každým voláním. Držení se ruší smazáním položky
+# v overlayi — vstup, který by ho přebil, tu ZÁMĚRNĚ není.
+#
 # Required secrets:
 #   COOLIFY_API_TOKEN, COOLIFY_URL
+# Secrets pro deklaraci držení (tytéž jako ci.yml; bez INSTANCE_OVERLAY_REPO =
+# instance bez overlaye = nic drženo):
+#   INSTANCE_OVERLAY_REPO, REPO_API_TOKEN, FORGEJO_API_TOKEN
 # Optional secrets for db-migrate + autopilot smoke:
 #   AISHA_DB_URL, POSTGREST_URL, POSTGREST_SERVICE_TOKEN,
 #   AISHA_LLM_GATEWAY_URL, OPENCLAW_URL,
@@ -55,6 +67,7 @@ on:
           - observability-stack
           - edge
           - netbird
+          - netbird-model
           - registry
           - shared-redis
           - ledger
@@ -64,6 +77,11 @@ on:
           # kola 8 se nedal dohnat jinak než ručně v Coolify). Výčet musí pokrýt
           # KAŽDOU appku z `aisha-redeploy.mjs --print-waves` — hlídá brána
           # stack-bez-deploy-ulohy („ruční dispatch zná každou appku z WAVES").
+          - accel-chat-1
+          - accel-embed-1
+          - accel-embed-2
+          - accel-hostfw
+          - accel-vstup
           - domain-services
           - extranet
           - livekit
@@ -71,6 +89,7 @@ on:
           - mesh-router-backend
           - mesh-router-experimental
           - model
+          - model-most
           - monitoring
           - netinit-backend
           - netinit-experimental
@@ -93,7 +112,7 @@ concurrency:
 jobs:
   deploy:
     name: "Deploy: ${{ github.event.inputs.stack }}"
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_LIGHT_LABEL || 'ubuntu-latest' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -109,9 +128,28 @@ jobs:
             scripts/lib/coolify-http.mjs
             scripts/deploy/refresh-overlay-cachebust.sh
             scripts/deploy/overlay-cachebust.sh
+            scripts/ci/drzene-z-overlaye.sh
+            scripts/aisha-redeploy.mjs
+            scripts/lib/
+            .forgejo/workflows/ci.yml
+
+      # ⛔ ZMĚŘENO ČTENÍM 2026-10-04: ruční dispatch deklaraci držení NEČETL — volba
+      # `web-render` nebo `local-ingest` by drženou aplikaci nasadila (odpojení dat na
+      # prázdný svazek), ačkoli vlny v ci.yml ji přeskakují. Čte se proto TADY, týmž
+      # skriptem jako v ci.yml (deploy-razitko), PŘED jakýmkoli nasazením. Validace
+      # potřebuje pořadí vln (aisha-redeploy.mjs --print-waves) a ci.yml (přímé úlohy)
+      # — proto jsou v řídkém checkoutu výš.
+      - name: Deklarace držení aplikací (overlay instance)
+        id: drzeni
+        env:
+          OVERLAY_REPO: ${{ secrets.INSTANCE_OVERLAY_REPO }}
+          OVERLAY_TOKEN_PRIMARY: ${{ secrets.REPO_API_TOKEN }}
+          OVERLAY_TOKEN_FALLBACK: ${{ secrets.FORGEJO_API_TOKEN }}
+        run: bash scripts/ci/drzene-z-overlaye.sh
 
       - name: Execute deployment
         env:
+          DRZENE: ${{ steps.drzeni.outputs.drzene }}
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
           # Token pro `git ls-remote` soukromých overlay rep (refresh-overlay-cachebust.sh).
           # NAMĚŘENO 2026-09-24 (běh 51874): bez něj HEAD nešel přečíst a core i extranet
@@ -194,6 +232,29 @@ jobs:
               return 1
             }
 
+            # DRŽENÁ aplikace se nenasadí ani ručním dispatchem. Ptáme se domova držení
+            # nad deklarací, kterou krok výš přečetl a ověřil: 0 = držená, 3 = není,
+            # cokoli jiného = nevíme (ztracený output) → NENASAZOVAT.
+            # Jeden vyžádaný stack, který se nenasadil, je ČERVENÁ (požadavek splněný
+            # není); v hromadném běhu je to vypsaná výjimka a další stacky pokračují.
+            local DRZ_RC=0 DRZ_HLASKA
+            DRZ_HLASKA=$(node scripts/lib/nasazeni-drzene.mjs --drzene "${DRZENE:-}" --aplikace "${APP_NAME#"${APP_NAME_PREFIX}"-}") || DRZ_RC=$?
+            case "$DRZ_RC" in
+              3) : ;;
+              0)
+                if [ "${STACK_INPUT:-}" != "all" ]; then
+                  echo "::error title=${DRZ_HLASKA%% — *}::${DRZ_HLASKA#* — }. NENASAZUJI — vyžádané nasazení nelze provést, dokud deklarace v overlayi instance trvá."
+                  return 1
+                fi
+                echo "::warning title=${DRZ_HLASKA%% — *}::${DRZ_HLASKA#* — }. Nenasazuji, další stacky pokračují."
+                return 0
+                ;;
+              *)
+                echo "::error title=deklarace držení::dotaz na držení stacku '$STACK' selhal (kód ${DRZ_RC}) — nevíme, co je drženo, NENASAZUJI."
+                return 1
+                ;;
+            esac
+
             # Dynamic UUID resolution — falls back to the shared bash resolver
             local UUID
             UUID=$(bash scripts/lib/coolify-resolve-uuid.sh "$APP_NAME" 2>&1 || true)
@@ -220,9 +281,12 @@ jobs:
 
             if [ "$STACK" = "n8n-restart" ]; then
               printf 'Restarting n8n (uuid=%s)...\n' "${UUID:0:12}"
-              curl -sS -X POST "${BASE_URL}/api/v1/applications/${UUID}/restart" \
-                -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
-                -H "Content-Type: application/json"
+              # Restart odesílá domov mutace (ptá se na držení; 100 = DRŽENO, nic neodesláno).
+              node scripts/lib/coolify-mutace.mjs --akce restart --jmeno "$APP_NAME" --prefix "$APP_NAME_PREFIX" \
+                --uuid "$UUID" --kdo deploy.yml --drzene "${DRZENE:-}" || {
+                echo "::error::Restart n8n se neodeslal (coolify-mutace kód $?) — výpis výš."
+                return 1
+              }
               echo "n8n restart triggered"
             else
               # ⛔ Overlay cachebust MUSÍ být čerstvý DŘÍV, než se spustí build.
@@ -247,17 +311,17 @@ jobs:
               esac
 
               printf 'Deploying %s (uuid=%s, force=%s)...\n' "$STACK" "${UUID:0:12}" "$FORCE"
-              local HTTP_CODE
-              # ⛔ POST, ne GET. NAMĚŘENO 2026-09-23 (run 51695): Coolify na GET vrací
-              # HTTP 405 „This endpoint has changed to a POST request." — tahle cesta
-              # tedy nenasadila NIC. deploy-and-verify.sh volá POST od začátku.
-              HTTP_CODE=$(curl -s -o /tmp/deploy.txt -w "%{http_code}" --max-time 30 \
-                -X POST "${BASE_URL}/api/v1/deploy?uuid=${UUID}&force=${FORCE}" \
-                -H "Authorization: Bearer ${COOLIFY_API_TOKEN}")
-              echo "HTTP $HTTP_CODE"
+              # Nasazení odesílá JEDINÝ domov mutace (POST — Coolify na GET vrací 405,
+              # naměřeno 2026-09-23, run 51695). Před voláním se zeptá na držení nad
+              # deklarací, kterou krok výš přečetl a ověřil; odpověď Coolify jde na stdout.
+              # Kódy: 0 = přijato · 100 = DRŽENO · 1 = Coolify/síť · 2 = zadání nebo
+              # nečitelná deklarace (nic se neodeslalo).
+              local MUTACE_RC=0
+              node scripts/lib/coolify-mutace.mjs --akce deploy --jmeno "$APP_NAME" --prefix "$APP_NAME_PREFIX" \
+                --uuid "$UUID" --force "$FORCE" --kdo deploy.yml --drzene "${DRZENE:-}" > /tmp/deploy.txt || MUTACE_RC=$?
               cat /tmp/deploy.txt 2>/dev/null || true
-              if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
-                echo "::error::Deploy failed for $STACK with HTTP $HTTP_CODE"
+              if [ "$MUTACE_RC" -ne 0 ]; then
+                echo "::error::Deploy failed for $STACK (coolify-mutace kód $MUTACE_RC — 100 = DRŽENO, 1 = Coolify/síť, 2 = zadání nebo deklarace)"
                 return 1
               fi
 

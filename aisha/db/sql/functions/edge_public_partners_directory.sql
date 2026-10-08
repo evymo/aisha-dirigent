@@ -14,6 +14,18 @@ DECLARE
   v_city text;
   v_limit integer;
 BEGIN
+  -- ⛔ VEŘEJNÉ JSOU JEN VYJMENOVANÉ AKCE (nález 2026-10-06, táž třída jako
+  -- edge_bank_transactions). count_visible a get_partners čtou veřejný adresář
+  -- (partner_profiles_public) — ty smí kdokoli přihlášený. count_requests_* ale
+  -- počítají záznamy audit_journal libovolného účtu / otisku IP za poslední hodinu
+  -- (kdo se kdy díval do adresáře) — to je práce služby (gateway volá service
+  -- tokenem). Výchozí odmítnutí: nová akce je neveřejná, dokud ji sem někdo vědomě
+  -- nepřipíše (a do src/tests/gates/definer-dispecer-verejne-akce.json).
+  IF COALESCE(p_action, '') NOT IN ('count_visible', 'get_partners')
+     AND public.is_service_role() IS NOT TRUE THEN
+    RAISE EXCEPTION 'Access denied' USING ERRCODE = '42501';
+  END IF;
+
   IF p_action = 'count_requests_authenticated' THEN
     RETURN jsonb_build_object(
       'count',

@@ -120,15 +120,22 @@ describe("trezor nepřebíjí živou hodnotu", () => {
     // ⛔ Univerzum se musí vybrat na ŘÁDEK, KTERÝ TO SPOUŠTÍ. První výskyt
     // jména je KOMENTÁŘ o 130 řádků výš — brána na něm procházela i s
     // obnoveným `>/dev/null 2>&1` (chyceno mutací 2026-08-25).
+    // Nápověda obsluze (`err "…node scripts/coolify-pull-envs.mjs…"`) nástroj nespouští — mimo univerzum.
     const radky = sh.split("\n").filter(
-      (l) => l.includes("coolify-pull-envs.mjs") && /\bnode\b/.test(l) && !/^\s*#/.test(l),
+      (l) => l.includes("coolify-pull-envs.mjs") && /\bnode\b/.test(l) && !/^\s*#/.test(l) && !/^\s*(err|warn|info|ok|echo)\b/.test(l),
     );
-    expect(radky, "volání coolify-pull-envs.mjs se v cold-startu nenašlo — brána nic neměří").toHaveLength(1);
-    const radek = radky[0];
-    expect(radek, "výstup reverse-syncu se zahazuje do /dev/null").not.toMatch(/>\s*\/dev\/null/);
-    expect(
-      /\| *tee/.test(radek),
-      "roura by testovala exit kód tee, ne nodu — větev nezdaru by se nikdy nevykonala",
-    ).toBe(false);
+    // Dvě spuštění (od 2026-10-04): zpětná synchronizace před wipem a KONTROLA před krokem 2
+    // konvergence (--check). Obě se měří stejně — nezdar ani jedné nesmí zmizet.
+    const zpetna = radky.filter((l) => !/--check\b/.test(l));
+    const kontrola = radky.filter((l) => /--check\b/.test(l));
+    expect(zpetna, "zpětná synchronizace coolify-pull-envs.mjs se v cold-startu nenašla — brána nic neměří").toHaveLength(1);
+    expect(kontrola, "kontrola trezoru × živý stack (--check) se v cold-startu nenašla").toHaveLength(1);
+    for (const radek of [...zpetna, ...kontrola]) {
+      expect(radek, "výstup coolify-pull-envs se zahazuje do /dev/null").not.toMatch(/>\s*\/dev\/null/);
+      expect(
+        /\| *tee/.test(radek),
+        "roura by testovala exit kód tee, ne nodu — větev nezdaru by se nikdy nevykonala",
+      ).toBe(false);
+    }
   });
 });

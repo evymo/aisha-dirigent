@@ -32,7 +32,7 @@
  */
 import { createHash } from "node:crypto";
 import type { Dirent } from "node:fs";
-import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 /** Přípony podle MIME z `data:` URI — jiné formáty se nechají inline. */
@@ -46,6 +46,26 @@ const PRIPONY: Record<string, string> = {
 };
 
 const DATA_URI = /data:([a-z0-9.+/-]+);base64,([A-Za-z0-9+/=]+)/gi;
+
+/**
+ * Zapíše soubor ATOMICKY: dočasný soubor vedle cíle a `rename` (v rámci téhož
+ * svazku atomické). Výstup se servíruje po HTTP souběžně s přegenerováním —
+ * prostý `writeFile` na cílovou cestu by čtenáři v okně přepisu vydal useknutý
+ * nebo prázdný soubor (nález nezávislé revize d-ii 2026-10-02), a obrázek
+ * s `immutable` by si prohlížeč takhle rozbitý pamatoval rok.
+ */
+export async function zapisAtomicky(cesta: string, data: string | Buffer): Promise<void> {
+  const docasny = `${cesta}.tmp-${process.pid}-${Date.now().toString(36)}`;
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    await writeFile(docasny, data);
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    await rename(docasny, cesta);
+  } catch (err) {
+    await rm(docasny, { force: true });
+    throw err;
+  }
+}
 
 /**
  * Vytáhne `data:` obrázky do souborů a vrátí HTML s přepsanými odkazy.
@@ -70,7 +90,16 @@ export async function vytahniObrazky(
   if (zapsat.size > 0) {
     await mkdir(adresarObrazku, { recursive: true });
     for (const [jmeno, data] of zapsat) {
-      await writeFile(join(adresarObrazku, jmeno), data);
+      const cesta = join(adresarObrazku, jmeno);
+      // Jméno = sha256 obsahu, tedy existující soubor má TENTÝŽ obsah. Přepis by
+      // byl zbytečný a otevřel by okno, kdy se servíruje rozepsaný obrázek.
+      try {
+        await access(cesta);
+        continue;
+      } catch {
+        /* ještě neexistuje → zapsat */
+      }
+      await zapisAtomicky(cesta, data);
     }
   }
   return { html: prepsane, pocetObrazku: zapsat.size };
@@ -282,7 +311,7 @@ export async function zapisStranku(
 ): Promise<string> {
   const cesta = cestaProSlug(korenVystupu, slug);
   await mkdir(dirname(cesta), { recursive: true });
-  await writeFile(cesta, html, "utf8");
+  await zapisAtomicky(cesta, html);
   return cesta;
 }
 

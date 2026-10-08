@@ -80,6 +80,6 @@ ROLLBACK;
 `);
     expect(out, "bez práva NESMÍ vrátit 0 — to by tvrdilo měření").toContain("bez_prava=NULL/audience-kpi:unauthorized");
     expect(out, "pohled mimo jmenný prostor se nepustí, i když existuje").toContain("cizi_pohled=NULL/audience-kpi:missing_config");
-    expect(out).toContain("spatny_sloupec=NULL/audience-kpi:bad_column");
+    expect(out).toContain("spatny_sloupec=NULL/audience-kpi:bad_config");
   });
 });

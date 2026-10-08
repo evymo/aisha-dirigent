@@ -51,7 +51,8 @@
  *   AISHA_SMOKE_SKIP_BUILD=1       skip the slow `npm run build` step in phase 2
  *                                    (CI fast lane: test:stack:ci sets this)
  *   AISHA_SMOKE_SKIP_SERVICES=1    skip `npm run test:services` step in phase 2
- *   AISHA_SMOKE_SKIP_UNIT=1        skip `npm run test:run` (pre-push podle cest, app=false)
+ *   AISHA_SMOKE_SKIP_UNIT=1        skip `npm run test:run` (cílený pre-push: unit jen dotčené)
+ *   AISHA_SMOKE_SKIP_GATES=1       skip `npm run test:gates` (cílený pre-push: brány jen dotčené)
  *   AISHA_SMOKE_SKIP_WARMUP=1      skip phase 3 (CI default)
  *   AISHA_SMOKE_GATEWAY_URL=...    override gateway URL (default: http://localhost:3001)
  *   AISHA_SMOKE_SERVICE_TOKEN=...  override service-role JWT (default: $POSTGREST_SERVICE_TOKEN)
@@ -320,7 +321,10 @@ function phaseOffline() {
     //   běhu — táž třída, jakou u `test:run` popisuje komentář níž (timeout zabíjí
     //   skutečné běhy a tváří se jako nález). 40× (=20 min) dává tutéž rezervu;
     //   opravdové zatuhnutí dál chytají vlastní timeouty vitestu.
-    { label: 'npm run test:gates', cmd: 'npm', args: ['run', 'test:gates'], env: { AISHA_SKIP_ONLINE: '1' }, timeoutMs: TIMEOUT_MS * 40 },
+    //   `AISHA_SMOKE_SKIP_GATES=1`: cílený pre-push (rozhodnutí majitele 2026-10-05 „plné sady
+    //   jen v CI") pouští místo celé sady jen dotčené brány (scripts/ci/prepush-cilene.mjs);
+    //   přeskok se VYPÍŠE jako u unit/services/build. Celou sadu měří CI (Web: Brány).
+    { label: 'npm run test:gates', cmd: 'npm', args: ['run', 'test:gates'], env: { AISHA_SKIP_ONLINE: '1' }, optional: true, skipEnv: 'AISHA_SMOKE_SKIP_GATES', timeoutMs: TIMEOUT_MS * 40 },
     { label: 'npm run validate:static', cmd: 'npm', args: ['run', 'validate:static'] },
     { label: 'npm run i18n:check', cmd: 'npm', args: ['run', 'i18n:check'] },
     // test:run is the full ~5400-unit suite — legitimately ~13-20 min (heavy env/collect
@@ -328,8 +332,8 @@ function phaseOffline() {
     //   mid-flight (observed 764s/900s/1227s across runs → flaky "timeout" failures that
     //   were NOT real test failures). 60x (=30 min) leaves comfortable margin; genuine
     //   hangs are still caught by vitest's own per-test timeouts.
-    // `AISHA_SMOKE_SKIP_UNIT=1`: pre-push podle cest (scripts/ci/prepush-vyber.sh) ji vynechá,
-    // když se změna netýká webu (app=false); přeskok se VYPÍŠE jako u services/build.
+    // `AISHA_SMOKE_SKIP_UNIT=1`: cílený pre-push ji vynechá a pustí jen testy, které změněné
+    // moduly přímo importují (scripts/ci/prepush-cilene.mjs); přeskok se VYPÍŠE jako u services/build.
     { label: 'npm run test:run', cmd: 'npm', args: ['run', 'test:run', '--silent'], optional: true, skipEnv: 'AISHA_SMOKE_SKIP_UNIT', timeoutMs: TIMEOUT_MS * 60 },
     { label: 'npm run test:services', cmd: 'npm', args: ['run', 'test:services'], optional: true, skipEnv: 'AISHA_SMOKE_SKIP_SERVICES', timeoutMs: TIMEOUT_MS * 30 },
     { label: 'npm run build', cmd: 'npm', args: ['run', 'build'], optional: true, skipEnv: 'AISHA_SMOKE_SKIP_BUILD', timeoutMs: TIMEOUT_MS * 20 },

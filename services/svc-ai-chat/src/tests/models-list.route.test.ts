@@ -2,6 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Fastify from 'fastify';
 
 // Auth: admin principal. isAdminOrStaff → true so we reach the OpenAI fetch.
+// Čtečka pověření (2026-10-02): v testu trezor = prostředí procesu (tvar createCredentialReader).
+vi.mock('../lib/credentials.js', () => ({
+  credentials: {
+    get: async (n: string) => (n === 'OPENAI_API_KEY' ? 'sk-test' : null),
+    getMany: async (ns: readonly string[]) => Object.fromEntries(ns.map((n) => [n, process.env[n] ?? null])),
+    migrateEnvCredentials: async () => ({ moved: [], kept: [], absent: [], failed: [] }),
+    invalidate: () => undefined,
+  },
+  POVERENI_Z_PROSTREDI: [],
+}));
 vi.mock('../auth.js', () => ({
   verifyToken: vi.fn().mockResolvedValue({ userId: 'u1', roles: ['admin'] }),
   isAdminOrStaff: () => true,
