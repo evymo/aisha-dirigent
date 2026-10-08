@@ -42,6 +42,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { sOpakovanimPriNacitaniSchematu } from "./pgrst-schema-cache.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const DIST = process.env.OUT_DIR ?? join(ROOT, "dist", "plugins");
@@ -164,18 +165,21 @@ for (const a of artefakty) {
       continue;
     }
 
-    const odpoved = await fetch(`${PGRST.replace(/\/$/, "")}/rpc/submit_plugin`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${ADMIN_JWT}`,
-        apikey: ADMIN_JWT,
-      },
-      body: JSON.stringify({ p_artifact_sha256: sha, p_artifact_url: url, p_manifest: manifest }),
-      // Bez stropu by se skript při nedostupném PostgRESTu zasekl navěky —
-      // a zaseknutá publikace vypadá zvenčí jako probíhající, ne jako pád.
-      signal: AbortSignal.timeout(30_000),
-    });
+    // PGRST002 (schema cache se po migraci ještě načítá) je přechodný — zopakovat.
+    const odpoved = await sOpakovanimPriNacitaniSchematu(() =>
+      fetch(`${PGRST.replace(/\/$/, "")}/rpc/submit_plugin`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${ADMIN_JWT}`,
+          apikey: ADMIN_JWT,
+        },
+        body: JSON.stringify({ p_artifact_sha256: sha, p_artifact_url: url, p_manifest: manifest }),
+        // Bez stropu by se skript při nedostupném PostgRESTu zasekl navěky —
+        // a zaseknutá publikace vypadá zvenčí jako probíhající, ne jako pád.
+        signal: AbortSignal.timeout(30_000),
+      }),
+    );
     if (!odpoved.ok) {
       const telo = await odpoved.text();
       console.log(`  ✗ ${a.slug}: submit_plugin vrátil ${odpoved.status} — ${telo.slice(0, 200)}`);
