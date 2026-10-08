@@ -349,7 +349,7 @@ if [ "$MIGRATE_EXIT" = "0" ]; then
   # Výstup mimo aisha/db: lokální stack ho připojuje z pracovního stromu jen pro
   # čtení a zakommitovaný seed.compiled.sql se nesmí přepisovat. db:seed čte
   # právě tenhle soubor (AISHA_SEED_FILE).
-  SEED_OUT="${AISHA_SEED_FILE:-/tmp/aisha-seed.compiled.sql}"
+  SEED_OUT=/tmp/aisha-seed.compiled.sql
   if ! node scripts/db/compile-seed.mjs \
     --profile="$SEED_PROFILE" \
     --implementation="$SEED_IMPLEMENTATION" \
@@ -385,12 +385,13 @@ fi
 if [ "$FINAL_EXIT" = "0" ] && [ -n "${AISHA_LLM_GATEWAY_URL:-}" ]; then
   GW_EP="${AISHA_LLM_GATEWAY_URL%/}/v1"
   GW_HOST="${GW_EP#*://}"; GW_HOST="${GW_HOST%%[/:]*}"
-  PUBLIC_ZONE="${PUBLIC_TLD:-//no-public-tld//}"
   GW_IS_PUBLIC=0
-  case "$GW_HOST" in
-    *.backend.*) ;;  # internal plane — even when INTERNAL_TLD sits under PUBLIC_TLD
-    "$PUBLIC_ZONE"|*."$PUBLIC_ZONE") GW_IS_PUBLIC=1 ;;
-  esac
+  if [ -n "${PUBLIC_TLD:-}" ]; then
+    case "$GW_HOST" in
+      *.backend.*) ;;  # internal plane — even when INTERNAL_TLD sits under PUBLIC_TLD
+      "$PUBLIC_TLD"|*."$PUBLIC_TLD") GW_IS_PUBLIC=1 ;;
+    esac
+  fi
   case "$GW_IS_PUBLIC" in
     1) log "WARN llm-gateway reconcile SKIPPED — AISHA_LLM_GATEWAY_URL looks like the public API gateway ($GW_EP)";;
     *) psql "$DB_URL" -v ON_ERROR_STOP=0 -c \
