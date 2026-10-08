@@ -59,7 +59,7 @@ describe("Local-warmup OIDC consumer support boundary", () => {
     expect(hs).not.toMatch(/\$\{KEYCLOAK_REALM\}/);
     const compose = read("docker-compose.coolify-matrix.yml");
     expect(compose).toMatch(/SYNAPSE_OIDC_ISSUER=https:\/\/\$\{KEYCLOAK_DOMAIN_PUBLIC:\?[^}]*\}\/realms\/\$\{KEYCLOAK_REALM:\?[^}]*\}\s/);
-    expect(compose).toMatch(/SYNAPSE_OIDC_JWKS_URL=https:\/\/\$\{KEYCLOAK_DOMAIN:\?[^}]*\}\/realms\/\$\{KEYCLOAK_REALM:\?[^}]*\}\/protocol\/openid-connect\/certs/);
+    expect(compose).toMatch(/SYNAPSE_OIDC_JWKS_URL=\$\{KEYCLOAK_INTERNAL_URL:\?[^}]*\}\/realms\/\$\{KEYCLOAK_REALM:\?[^}]*\}\/protocol\/openid-connect\/certs/);
   });
 
   test("generator warns (NON-FATAL) about discovery consumers, BEFORE namespacing", () => {

@@ -53,7 +53,8 @@ See /memories/repo/coolify-bind-mount-trap.md
 Synapse přihlašuje přes Keycloak **bez discovery** (`discover: false` v
 `coolify/synapse/homeserver.yaml`): `issuer` (porovnává se s `iss` tokenu) a
 `authorization_endpoint` jdou přes veřejnou tvář, `token`/`userinfo`/`jwks_uri`
-přes vnitřní jméno. Jedna adresa pro obojí (discovery) neexistuje tam, kde se
+přes `KEYCLOAK_INTERNAL_URL` (uvnitř clusteru — jméno servírované zvenčí by z kontejneru
+odešlo na veřejnou IP a nevrátilo se; brána `server-side-jwks-in-cluster`). Jedna adresa pro obojí (discovery) neexistuje tam, kde se
 vnější a vnitřní cesta liší — lokální stack (`scripts/lib/kc-host-auth.mjs`
 adresy přepíše podle cesty) i mesh. Adresy skládá compose, šablona je jen bere.
 
