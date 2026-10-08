@@ -8,7 +8,7 @@
  * absent — while sitting in .env.coolify, where every other tool finds it.
  *
  * The failures never pointed at the cause. They surfaced as "COOLIFY_API_TOKEN
- * not found", "no project-scoped apps found", "FORGEJO_TOKEN empty",
+ * not found", "no project-scoped apps found", "<git token> empty",
  * "Reverse-sync failed (stack partially down?)" — each read like a different
  * problem, and one of them silently produced a pre-wipe backup containing ZERO
  * server-side secrets. Two of the sixteen were in the tenant-isolation guard and
@@ -76,7 +76,7 @@ async function credentialNames(): Promise<string[]> {
   // of the failures this gate was written for. A gate that does not catch its
   // own motivating case is worse than none.
   const resolver = readFileSync(join(SCRIPTS, "lib/coolify-credentials.sh"), "utf8");
-  for (const m of resolver.matchAll(/\b(COOLIFY|FORGEJO|VERDACCIO)_[A-Z0-9_]*(TOKEN|KEY|SECRET|PASSWORD)\b/g)) {
+  for (const m of resolver.matchAll(/\b(COOLIFY|GIT|GITHUB|VERDACCIO)_[A-Z0-9_]*(TOKEN|KEY|SECRET|PASSWORD)\b/g)) {
     names.add(m[0]);
   }
   return [...names];

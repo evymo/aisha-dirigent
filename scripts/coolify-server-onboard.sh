@@ -8,8 +8,11 @@
 #   2. Creates server in Coolify
 #   3. Validates Docker agent connectivity
 #   4. Provisions stacks (if specified)
-#   5. Installs Forgejo Actions runner (if role=backend)
-#   6. Updates Forgejo secrets with new UUIDs
+#   5. (build role) Optional private image-registry login for Coolify pulls
+#   6. Updates GitHub CI secrets with new UUIDs (gh; only when GITHUB_REPOSITORY
+#      + GITHUB_TOKEN are configured — otherwise prints what to set by hand)
+#
+# CI runners are not provisioned here: CI runs on GitHub Actions.
 #
 # Prerequisites:
 #   - jq, curl, ssh-keygen installed
@@ -29,7 +32,7 @@
 #
 # Roles:
 #   build    — Build server only (is_build_server=true, no stacks)
-#   backend  — Internal runtime + optional Forgejo runner
+#   backend  — Internal runtime
 #   staging  — Staging + project hosting
 # ==============================================================================
 
@@ -51,10 +54,9 @@ step()   { echo -e "\n${CYAN}━━━ $* ━━━${NC}"; }
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 COOLIFY_URL="${COOLIFY_URL:?COOLIFY_URL must be set}"
-FORGEJO_URL="${FORGEJO_URL:?FORGEJO_URL required (e.g. https://git.<your-domain>)}"
-# ⛔ ŽÁDNÝ FALLBACK (2026-08-24): dosazený donor ukazuje na CIZÍ repozitář.
-FORGEJO_OWNER="${FORGEJO_OWNER:?FORGEJO_OWNER required — organizace je vlastnost projektu, nedosazuje se}"
-FORGEJO_REPO="${FORGEJO_REPO:?FORGEJO_REPO required — repozitář je vlastnost projektu, nedosazuje se}"
+# CI secrets: GITHUB_REPOSITORY (owner/repo) + GITHUB_TOKEN — VOLITELNÉ.
+# ⛔ ŽÁDNÝ FALLBACK (2026-08-24): dosazené repo by ukazovalo na CIZÍ repozitář;
+# bez deklarace se krok přeskočí a řekne, co nastavit ručně.
 DRY_RUN="${DRY_RUN:-0}"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -67,7 +69,6 @@ SERVER_IP=""
 SERVER_ROLE="backend"
 SSH_USER="root"
 SSH_PORT="22"
-INSTALL_RUNNER=false
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -76,10 +77,10 @@ while [ $# -gt 0 ]; do
     --role|-r)     SERVER_ROLE="$2"; shift 2 ;;
     --ssh-user)    SSH_USER="$2"; shift 2 ;;
     --ssh-port)    SSH_PORT="$2"; shift 2 ;;
-    --runner)      INSTALL_RUNNER=true; shift ;;
+    --runner)      warn "--runner is ignored: CI runs on GitHub Actions, no self-hosted runner is installed"; shift ;;
     --dry-run)     DRY_RUN=1; shift ;;
     --help|-h)
-      echo "Usage: $0 --name <server> --ip <ip> [--role build|backend|staging] [--ssh-user root] [--runner] [--dry-run]"
+      echo "Usage: $0 --name <server> --ip <ip> [--role build|backend|staging] [--ssh-user root] [--dry-run]"
       exit 0
       ;;
     *) err "Unknown argument: $1"; exit 1 ;;
@@ -92,9 +93,6 @@ if [ -z "$SERVER_NAME" ] || [ -z "$SERVER_IP" ]; then
   exit 1
 fi
 
-# Auto-enable runner for backend role
-[ "$SERVER_ROLE" = "backend" ] && INSTALL_RUNNER=true
-
 # ── API helpers ───────────────────────────────────────────────────────────────
 coolify_api() {
   local method="$1" endpoint="$2" data="${3:-}"
@@ -106,15 +104,8 @@ coolify_api() {
   curl "${args[@]}" "${COOLIFY_URL}/api/v1${endpoint}"
 }
 
-forgejo_api() {
-  local method="$1" endpoint="$2" data="${3:-}"
-  local args=(-s -S --max-time 30 -X "$method"
-    -H "Authorization: token $FORGEJO_API_TOKEN"
-    -H "Accept: application/json"
-    -H "Content-Type: application/json")
-  [ -n "$data" ] && args+=(-d "$data")
-  curl "${args[@]}" "${FORGEJO_URL}/api/v1${endpoint}"
-}
+# shellcheck source=scripts/lib/github-ci-secret.sh
+. "${SCRIPT_DIR}/lib/github-ci-secret.sh"
 
 # ── Prerequisite checks ──────────────────────────────────────────────────────
 step "Prerequisites"
@@ -130,15 +121,14 @@ if [ -z "${COOLIFY_API_TOKEN:-}" ]; then
 fi
 ok "COOLIFY_API_TOKEN"
 
-if [ -z "${FORGEJO_API_TOKEN:-}" ]; then
-  warn "FORGEJO_API_TOKEN not set — Forgejo secrets won't be updated"
+if ! github_ci_configured; then
+  warn "GITHUB_REPOSITORY / GITHUB_TOKEN not set — GitHub CI secrets won't be updated"
 fi
 
 echo ""
 info "Server:  ${SERVER_NAME} (${SERVER_IP})"
 info "Role:    ${SERVER_ROLE}"
 info "SSH:     ${SSH_USER}@${SERVER_IP}:${SSH_PORT}"
-info "Runner:  ${INSTALL_RUNNER}"
 
 if [ "$DRY_RUN" = "1" ]; then
   warn "DRY RUN — no changes will be made"
@@ -264,128 +254,47 @@ if [ "$SERVER_ROLE" = "build" ] && [ "$DRY_RUN" != "1" ] && [ -n "$SERVER_UUID" 
     '{"settings": {"is_build_server": true, "concurrent_builds": 2}}' 2>/dev/null || echo '{}')
   ok "Build server settings applied"
 
-  # ── Forgejo container-registry login (enables NATIVE private image pulls) ───
+  # ── Private image-registry login (enables NATIVE private image pulls) ──────
   # Coolify v4 has no registry-credential store and never runs `docker login`
   # during a deploy; it mounts the SSH user's ~/.docker/config.json into its
   # build/helper container (ApplicationDeploymentJob::prepare_builder_image).
-  # So the build server itself must hold a login for our private Forgejo OCI
-  # registry — reusing the SAME credential Coolify already uses to clone
-  # (the FORGEJO_API_TOKEN as the 'aisha' user, valid for git AND the registry
-  # on the same host). This is what lets Coolify pull repo.${INTERNAL_TLD}/aisha/*
-  # images natively, with no pre-pull or pull_policy workarounds.
+  # So the build server itself must hold a login for a private OCI registry the
+  # operator uses (e.g. ghcr.io). OPTIONAL and operator-declared:
+  #   IMAGE_REGISTRY_HOST / IMAGE_REGISTRY_USER / IMAGE_REGISTRY_TOKEN
+  # Unset = public images only (no login, not an error).
   # NOTE: must log in as the SAME user Coolify connects with (SSH_USER, default
   # root) so creds land in the home dir Coolify mounts (Coolify issue #6398).
-  if [ -n "${FORGEJO_API_TOKEN:-}" ]; then
-    REGISTRY_HOST="${FORGEJO_URL#*://}"; REGISTRY_HOST="${REGISTRY_HOST%%/*}"
-    info "Configuring Forgejo registry login on ${SERVER_NAME} (${REGISTRY_HOST}, user ${FORGEJO_OWNER})..."
-    if printf '%s' "$FORGEJO_API_TOKEN" | ssh -o ConnectTimeout=30 -o StrictHostKeyChecking=accept-new \
+  if [ -n "${IMAGE_REGISTRY_HOST:-}" ] && [ -n "${IMAGE_REGISTRY_USER:-}" ] && [ -n "${IMAGE_REGISTRY_TOKEN:-}" ]; then
+    info "Configuring image-registry login on ${SERVER_NAME} (${IMAGE_REGISTRY_HOST}, user ${IMAGE_REGISTRY_USER})..."
+    if printf '%s' "$IMAGE_REGISTRY_TOKEN" | ssh -o ConnectTimeout=30 -o StrictHostKeyChecking=accept-new \
          -p "$SSH_PORT" -i "$SSH_KEY_PATH" "${SSH_USER}@${SERVER_IP}" \
-         "docker login '${REGISTRY_HOST}' -u '${FORGEJO_OWNER}' --password-stdin" >/dev/null 2>&1; then
+         "docker login '${IMAGE_REGISTRY_HOST}' -u '${IMAGE_REGISTRY_USER}' --password-stdin" >/dev/null 2>&1; then
       ok "Registry login stored in ${SSH_USER}'s ~/.docker/config.json → Coolify pulls private images natively"
     else
       warn "Registry login failed (non-fatal). Private image pulls will 401 until you run, as ${SSH_USER} on ${SERVER_NAME}:"
-      warn "  printf '%s' \"\$FORGEJO_API_TOKEN\" | docker login ${REGISTRY_HOST} -u ${FORGEJO_OWNER} --password-stdin"
+      warn "  printf '%s' \"\$IMAGE_REGISTRY_TOKEN\" | docker login ${IMAGE_REGISTRY_HOST} -u ${IMAGE_REGISTRY_USER} --password-stdin"
     fi
   else
-    warn "FORGEJO_API_TOKEN not set — skipping registry login; private image pulls will need a manual 'docker login'"
+    info "IMAGE_REGISTRY_HOST/USER/TOKEN not set — no private image-registry login (public images only)"
   fi
 fi
 
-# ── Step 5: Install Forgejo Runner ───────────────────────────────────────────
-if [ "$INSTALL_RUNNER" = true ]; then
-  step "5. Forgejo Actions Runner"
+# ── Step 6: Update GitHub CI Secrets ─────────────────────────────────────────
+step "6. Update GitHub CI Secrets"
 
-  if [ "$DRY_RUN" != "1" ]; then
-    info "Installing act_runner on ${SERVER_NAME} via SSH..."
-
-    # Get runner registration token from Forgejo
-    if [ -n "${FORGEJO_API_TOKEN:-}" ]; then
-      RUNNER_TOKEN_RESULT=$(forgejo_api GET "/repos/${FORGEJO_OWNER}/${FORGEJO_REPO}/actions/runners/registration-token" 2>/dev/null || echo '{}')
-      RUNNER_TOKEN=$(echo "$RUNNER_TOKEN_RESULT" | jq -r '.token // empty' 2>/dev/null || true)
-
-      if [ -n "$RUNNER_TOKEN" ]; then
-        ok "Runner registration token obtained"
-
-        ssh -o ConnectTimeout=30 -p "$SSH_PORT" -i "$SSH_KEY_PATH" "${SSH_USER}@${SERVER_IP}" bash <<RUNNER_INSTALL
-#!/bin/bash
-set -e
-
-# Install act_runner if not present
-if ! command -v act_runner &>/dev/null && [ ! -f /usr/local/bin/act_runner ]; then
-  echo "Installing act_runner..."
-  RUNNER_VERSION="0.2.11"
-  ARCH=\$(uname -m)
-  [ "\$ARCH" = "x86_64" ] && ARCH="amd64"
-  [ "\$ARCH" = "aarch64" ] && ARCH="arm64"
-  curl -fsSL "https://dl.gitea.com/act_runner/\${RUNNER_VERSION}/act_runner-\${RUNNER_VERSION}-linux-\${ARCH}" -o /usr/local/bin/act_runner
-  chmod +x /usr/local/bin/act_runner
-  echo "act_runner installed"
-fi
-
-# Register runner
-mkdir -p /opt/forgejo-runner
-cd /opt/forgejo-runner
-
-act_runner register --no-interactive \
-  --instance "${FORGEJO_URL}" \
-  --token "${RUNNER_TOKEN}" \
-  --name "${SERVER_NAME}-runner" \
-  --labels "ubuntu-latest:docker://node:22" 2>/dev/null || echo "Runner may already be registered"
-
-# Create systemd service
-cat > /etc/systemd/system/forgejo-runner.service <<'EOF'
-[Unit]
-Description=Forgejo Actions Runner
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/opt/forgejo-runner
-ExecStart=/usr/local/bin/act_runner daemon
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-systemctl daemon-reload
-systemctl enable forgejo-runner
-systemctl start forgejo-runner
-echo "Forgejo runner installed and started"
-RUNNER_INSTALL
-
-        ok "Forgejo runner installed on ${SERVER_NAME}"
-      else
-        warn "Could not get runner registration token — install manually"
-      fi
-    else
-      warn "FORGEJO_API_TOKEN not set — skipping runner installation"
-    fi
+SECRET_NAME="COOLIFY_SERVER_UUID_$(echo "$SERVER_NAME" | tr '[:lower:]' '[:upper:]')"
+if ! github_ci_configured || [ -z "$SERVER_UUID" ]; then
+  warn "Skipping GitHub CI secrets (GITHUB_REPOSITORY / GITHUB_TOKEN or server UUID missing) — set ${SECRET_NAME} by hand"
+elif [ "$DRY_RUN" != "1" ]; then
+  _gh_rc=0
+  github_ci_secret_set "$SECRET_NAME" "$SERVER_UUID" || _gh_rc=$?
+  if [ "$_gh_rc" -eq 0 ]; then
+    ok "GitHub CI secret ${SECRET_NAME} = ${SERVER_UUID}"
   else
-    info "[DRY RUN] Would install Forgejo Actions runner on ${SERVER_NAME}"
-  fi
-fi
-
-# ── Step 6: Update Forgejo Secrets ───────────────────────────────────────────
-step "6. Update Forgejo Secrets"
-
-if [ -n "${FORGEJO_API_TOKEN:-}" ] && [ -n "$SERVER_UUID" ]; then
-  SECRET_NAME="COOLIFY_SERVER_UUID_$(echo "$SERVER_NAME" | tr '[:lower:]' '[:upper:]')"
-
-  if [ "$DRY_RUN" != "1" ]; then
-    SECRET_PAYLOAD=$(jq -n --arg data "$SERVER_UUID" '{ data: $data }')
-    forgejo_api PUT "/repos/${FORGEJO_OWNER}/${FORGEJO_REPO}/actions/secrets/${SECRET_NAME}" \
-      "$SECRET_PAYLOAD" &>/dev/null
-
-    ok "Forgejo secret ${SECRET_NAME} = ${SERVER_UUID}"
-  else
-    info "[DRY RUN] Would set Forgejo secret ${SECRET_NAME} = ${SERVER_UUID}"
+    warn "GitHub CI secret ${SECRET_NAME}: $(github_ci_secret_reason "$_gh_rc")"
   fi
 else
-  warn "Skipping Forgejo secrets (missing token or UUID)"
+  info "[DRY RUN] Would set GitHub CI secret ${SECRET_NAME} = ${SERVER_UUID}"
 fi
 
 # ── Step 7: Update servers.json ──────────────────────────────────────────────
@@ -421,7 +330,6 @@ printf "│  Name:     %-47s │\n" "$SERVER_NAME"
 printf "│  IP:       %-47s │\n" "$SERVER_IP"
 printf "│  Role:     %-47s │\n" "$SERVER_ROLE"
 printf "│  UUID:     %-47s │\n" "${SERVER_UUID:-unknown}"
-printf "│  Runner:   %-47s │\n" "$INSTALL_RUNNER"
 echo "└─────────────────────────────────────────────────────────────┘"
 
 if [ "$DRY_RUN" = "1" ]; then

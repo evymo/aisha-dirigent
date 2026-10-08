@@ -382,17 +382,17 @@ describe("AISHA_INSTANCE_DATA_GIT_URL delivery chain", () => {
     return coldStart.slice(start, end);
   }
 
-  test("generate-secrets derives + emits the key (vault wins, FORGEJO fallback)", () => {
+  test("generate-secrets emits the key from operator config only (GIT_TOKEN tokenizes)", () => {
     expect(generateSecrets).toMatch(/emit\('AISHA_INSTANCE_DATA_GIT_URL'/);
-    expect(generateSecrets).toMatch(/preservedValue\('FORGEJO_API_TOKEN'/);
-    // Forkability: the overlay URL must be COMPOSED from a per-instance org+repo
-    // (so a fork derives ITS repo, not the hardcoded aisha/aisha-instance-data
-    // which 401s the whole overlay), not a baked literal. Assert the template
-    // shape + the org/repo derivation, and that the default repo follows the
-    // <org>-instance-data convention (keeps the upstream aisha instance identical).
-    expect(generateSecrets).toMatch(/forgejoOrg\s*=/);
-    expect(generateSecrets).toMatch(/\$\{forgejoOrg\}\/\$\{instanceRepo\}\.git#main/);
-    expect(generateSecrets).toMatch(/-instance-data`/);
+    expect(generateSecrets).toMatch(/preservedValue\('GIT_TOKEN'/);
+    // Forkability: the overlay URL is DECLARED by the operator, never composed
+    // from a forge host + org naming convention. A derived address of a shared
+    // host names a repo that does not exist (401/404) and the whole overlay
+    // drops silently — the instance comes up, just someone else's. No literal
+    // repo name, no derivation template.
+    expect(generateSecrets).toMatch(/preservedValue\('AISHA_INSTANCE_DATA_GIT_URL', ''\)/);
+    expect(generateSecrets).not.toMatch(/-instance-data`/);
+    expect(generateSecrets).not.toMatch(/\$\{instanceRepo\}/);
   });
 
   test("cold-start heredoc writes the key into .env.coolify (the wipe gap)", () => {
@@ -495,8 +495,7 @@ describe("AISHA_INSTANCE_DATA_GIT_URL delivery chain", () => {
         // The fixture must declare its instance: generate-secrets no longer guesses one.
         const scrubbed: Record<string, string | undefined> = { ...process.env, APP_NAME_PREFIX: "aisha" };
         delete scrubbed.AISHA_INSTANCE_DATA_GIT_URL;
-        delete scrubbed.FORGEJO_API_TOKEN;
-        delete scrubbed.FORGEJO_URL;
+        delete scrubbed.GIT_TOKEN;
         const result = spawnSync(
           "node",
           [
@@ -515,18 +514,20 @@ describe("AISHA_INSTANCE_DATA_GIT_URL delivery chain", () => {
         return line!;
       };
 
-      // 1. Derived from FORGEJO creds, oauth2-embedded, #main-pinned.
-      expect(
-        run(["FORGEJO_API_TOKEN=fixture-token-123", "FORGEJO_URL=https://git.example.test/"]),
-      ).toBe(
-        "AISHA_INSTANCE_DATA_GIT_URL='https://oauth2:fixture-token-123@git.example.test/aisha/aisha-instance-data.git#main'",
-      );
-
-      // 2. Explicit vault value beats derivation.
+      // 1. Token-free operator URL + GIT_TOKEN → oauth2-embedded, ref pin kept.
       expect(
         run([
-          "FORGEJO_API_TOKEN=fixture-token-123",
-          "FORGEJO_URL=https://git.example.test",
+          "GIT_TOKEN=fixture-token-123",
+          "AISHA_INSTANCE_DATA_GIT_URL=https://git.example.test/acme/acme-instance-data.git#main",
+        ]),
+      ).toBe(
+        "AISHA_INSTANCE_DATA_GIT_URL='https://oauth2:fixture-token-123@git.example.test/acme/acme-instance-data.git#main'",
+      );
+
+      // 2. A URL that already carries credentials is used verbatim (token not re-applied).
+      expect(
+        run([
+          "GIT_TOKEN=fixture-token-123",
           "AISHA_INSTANCE_DATA_GIT_URL=https://oauth2:other@fork.example.test/x/y.git#release",
         ]),
       ).toBe(
@@ -542,8 +543,10 @@ describe("AISHA_INSTANCE_DATA_GIT_URL delivery chain", () => {
         "AISHA_INSTANCE_DATA_GIT_URL='https://oauth2:tok@git.example.test/aisha/aisha-instance-data.git#main'",
       );
 
-      // 4. No creds, no explicit value → empty (community no-op, not an error).
+      // 4. No declared URL → empty (community no-op, not an error) — a token alone
+      //    derives NOTHING (no forge host + org convention).
       expect(run([])).toBe("AISHA_INSTANCE_DATA_GIT_URL=''");
+      expect(run(["GIT_TOKEN=fixture-token-123"])).toBe("AISHA_INSTANCE_DATA_GIT_URL=''");
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

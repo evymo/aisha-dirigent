@@ -90,10 +90,13 @@ function urlFromDomain(urlEnvKey, domainEnvKey, hintConfigFile) {
 /** Coolify control-plane URL. Source: `.env-prod-backup`. */
 export const COOLIFY_URL = required('COOLIFY_URL', '.env-prod-backup');
 
-/** Forgejo git server. URL or derived from FORGEJO_DOMAIN. */
-export const FORGEJO_URL = urlFromDomain('FORGEJO_URL', 'FORGEJO_DOMAIN', 'config/domains.env');
-/** @deprecated Use FORGEJO_URL. Kept for compat with existing imports. */
-export const GIT_URL = FORGEJO_URL;
+/**
+ * Git host the stack is cloned from (operator-declared, e.g. in .env-prod-backup).
+ * OPTIONAL and NOT validated at import: only finalize-production-kb records it,
+ * and every other importer of this module must keep working without it. Empty =
+ * not declared (the consumer omits it) — never a derived or literal host.
+ */
+export const GIT_BASE_URL = process.env.GIT_BASE_URL ?? '';
 
 /** Public n8n entry point. URL or derived from N8N_DOMAIN. */
 export const N8N_URL = urlFromDomain('N8N_URL', 'N8N_DOMAIN', 'config/domains.env');

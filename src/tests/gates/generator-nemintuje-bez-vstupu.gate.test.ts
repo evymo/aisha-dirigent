@@ -35,7 +35,6 @@ const GEN = join(ROOT, "scripts", "generate-secrets.mjs");
 const ARGS = [
   "--netbird-mgmt-host=host-gateway",
   "--mesh-tld=mesh.example.invalid",
-  "--forgejo-org=zkouska",
   "--nocodb-admin-email=admin@example.test",
 ];
 

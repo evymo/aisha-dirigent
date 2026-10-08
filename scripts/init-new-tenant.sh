@@ -243,14 +243,15 @@ KC_ALLOWED_CLIENTS=${CLIENT_PREFIX}app
 # ── Instance seed overlay (opt-in) ──────────────────────────────────────────
 # A private instance-data repo (KB + web + content + operators) cloned into
 # aisha/db/seed/instance/ at cold-start, plus a branded web template cloned into
-# domains/templates/<domain>/. URLs derive from \${FORGEJO_URL} (no hardcoded
-# forge host). DEFAULT OFF — keep the platform's core seed until your repos
+# domains/templates/<domain>/. URLs are declared token-free on your git host
+# (\${GIT_BASE_URL}; GIT_TOKEN is added for the clone — no hardcoded host).
+# DEFAULT OFF — keep the platform's core seed until your repos
 # exist, then uncomment AISHA_SEED_PROFILE=instance (+ REQUIRE to fail closed).
 AISHA_SEED_DOMAIN=$INSTANCE
 # AISHA_SEED_PROFILE=instance
 # AISHA_SEED_REQUIRE_INSTANCE=1
-# AISHA_INSTANCE_DATA_GIT_URL=\${FORGEJO_URL}/aisha/${INSTANCE}-instance-data.git
-# AISHA_WEB_DESIGN_GIT_URL=\${FORGEJO_URL}/aisha/${INSTANCE}-web.git
+# AISHA_INSTANCE_DATA_GIT_URL=\${GIT_BASE_URL}/<org>/${INSTANCE}-instance-data.git
+# AISHA_WEB_DESIGN_GIT_URL=\${GIT_BASE_URL}/<org>/${INSTANCE}-web.git
 
 # ── Federation broker (opt-in) ──────────────────────────────────────────────
 # svc-source-broker federates an EXTERNAL source app's users into an aisha

@@ -9,7 +9,7 @@
 # Prerekvizity:
 #   - jq nainstalován
 #   - COOLIFY_API_TOKEN env var (nebo --token)
-#   - Forgejo repo existuje a má compose soubory
+#   - git repo (GIT_BASE_URL + --repo) existuje a má compose soubory
 #
 # Použití:
 #   # Z manifest souboru:
@@ -28,7 +28,8 @@
 #
 # Výstup:
 #   - Coolify aplikace vytvořeny a nakonfigurovány
-#   - UUID vypsány pro uložení do Forgejo secrets
+#   - UUID uloženy do CI secrets na GitHubu (gh; jen když je GITHUB_REPOSITORY
+#     + GITHUB_TOKEN nakonfigurováno — jinak se vypíšou k ručnímu nastavení)
 #   - servers.json aktualizován (pokud --update-registry)
 #
 # Viz: docs/deploy/MULTI_SERVER_COOLIFY.md
@@ -76,25 +77,25 @@ PROJECT_ROOT="${PROJECT_ROOT:-$REPO_ROOT_GUESS}"
 
 COOLIFY_URL="${COOLIFY_URL:-}"
 COOLIFY_TOKEN="${COOLIFY_API_TOKEN:-${COOLIFY_TOKEN:-}}"
-# FORGEJO_URL: prefer explicit env override, else derive from FORGEJO_DOMAIN
-# (canonical: config/domains.env). Fail fast if neither is set — no fallback.
-if [ -z "${FORGEJO_URL:-}" ]; then
-  if [ -z "${FORGEJO_DOMAIN:-}" ]; then
-    echo "ERROR: neither FORGEJO_URL nor FORGEJO_DOMAIN is set." >&2
-    echo "  Add FORGEJO_DOMAIN=... to config/domains.env or export FORGEJO_URL=..." >&2
-    exit 1
-  fi
-  FORGEJO_URL="https://${FORGEJO_DOMAIN}"
+# GIT_BASE_URL: git hosting, ze kterého Coolify klonuje stack (např. https://github.com
+# nebo vlastní git server). Deklaruje ho operátor — žádné odvozování z topologie:
+# odvozené jméno sdílené infrastruktury vyrobí adresu, která neexistuje.
+if [ -z "${GIT_BASE_URL:-}" ]; then
+  echo "ERROR: GIT_BASE_URL is not set (the git host Coolify clones the stack from, e.g. https://github.com)." >&2
+  echo "  Set GIT_BASE_URL in .env-prod-backup or export GIT_BASE_URL=..." >&2
+  exit 1
 fi
-FORGEJO_TOKEN="${FORGEJO_API_TOKEN:-${FORGEJO_TOKEN:-}}"
+GIT_BASE_URL="${GIT_BASE_URL%/}"
+# Token pro klon SOUKROMÉHO repa; veřejné repo ho nepotřebuje.
+GIT_TOKEN="${GIT_TOKEN:-}"
 PROJECT_UUID="${COOLIFY_PROJECT_UUID:-}"
 ENVIRONMENT="${COOLIFY_ENVIRONMENT:-}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
 DRY_RUN="${DRY_RUN:-0}"
 
 # Git auth strategy:
-#   We embed FORGEJO_TOKEN directly into git_repository URL (see line ~170:
-#   "https://aisha:${FORGEJO_TOKEN}@..."). Coolify v4 clones via that URL,
+#   We embed GIT_TOKEN directly into git_repository URL (see GIT_URL below:
+#   "https://aisha:${GIT_TOKEN}@..."). Coolify v4 clones via that URL,
 #   so we do NOT need to attach a registered private_key_uuid here. Keeping
 #   the file lean — token-in-URL is the single source of truth for git auth.
 UPDATE_REGISTRY=0
@@ -180,7 +181,7 @@ while [ $# -gt 0 ]; do
       echo "Usage: $0 --story NAME --repo owner/repo --app role:server:compose [--app ...] [options]"
       echo ""
       echo "  --story NAME         Story/project name (e.g. acme)"
-      echo "  --repo owner/repo    Forgejo repo path"
+      echo "  --repo owner/repo    Git repo path (under GIT_BASE_URL)"
       echo "  --app SPEC           App spec: role:server:compose_path (repeatable)"
       echo "  --manifest FILE      Read apps from manifest file instead of --app"
       echo "  --token TOKEN        Coolify API token (or COOLIFY_API_TOKEN env)"
@@ -266,14 +267,14 @@ if ! command -v jq &>/dev/null; then
   exit 1
 fi
 
-GIT_URL="${FORGEJO_URL}/${REPO_PATH}.git"
+GIT_URL="${GIT_BASE_URL}/${REPO_PATH}.git"
 
-# Embed forgejo credentials in URL for private repo access (Coolify can't read)
+# Embed git credentials in URL for private repo access (Coolify can't read)
 # the host-side ~/.git-credentials, so creds must be in the URL itself.
-if [ -n "$FORGEJO_TOKEN" ]; then
+if [ -n "$GIT_TOKEN" ]; then
   # Strip scheme, prepend creds, re-add scheme
   GIT_URL_NOSCHEME="${GIT_URL#https://}"
-  GIT_URL="https://aisha:${FORGEJO_TOKEN}@${GIT_URL_NOSCHEME}"
+  GIT_URL="https://aisha:${GIT_TOKEN}@${GIT_URL_NOSCHEME}"
 fi
 
 # Token-free twin for anything human- or log-facing. GIT_URL now carries the
@@ -285,7 +286,7 @@ fi
 GIT_URL_SAFE=$(printf '%s' "$GIT_URL" | sed -E 's|(://)[^@/]+@|\1***@|')
 
 step "Story: ${STORY_NAME}"
-info "Repo: ${FORGEJO_URL}/${REPO_PATH}.git (branch: ${GIT_BRANCH}, creds embedded: $([ -n "$FORGEJO_TOKEN" ] && echo yes || echo no))"
+info "Repo: ${GIT_BASE_URL}/${REPO_PATH}.git (branch: ${GIT_BRANCH}, creds embedded: $([ -n "$GIT_TOKEN" ] && echo yes || echo no))"
 info "Apps: ${#APPS[@]}"
 [ "$DRY_RUN" = "1" ] && warn "DRY RUN — nothing will be created"
 
@@ -749,33 +750,36 @@ done
 echo ""
 info "Next steps:"
 echo "  1. Set env vars:  scripts/coolify-story-envs.sh --story ${STORY_NAME} --uuid UUID"
-echo "  2. Set Forgejo secrets (COOLIFY_UUID_*) for CI/CD"
+echo "  2. CI secrets (COOLIFY_UUID_*) on GitHub — set below when GITHUB_REPOSITORY + GITHUB_TOKEN are configured"
 echo "  3. Deploy:        curl -X POST \${COOLIFY_URL}/api/v1/applications/UUID/restart"
 echo "  4. Update:        coolify/servers.json + scripts/check-infra.mjs"
 
-# ── Forgejo secrets hint ──────────────────────────────────────────────────────
-if [ -n "$FORGEJO_TOKEN" ]; then
-  echo ""
-  step "Forgejo Secrets (auto-set)"
-  for result in "${RESULTS[@]}"; do
-    IFS='|' read -r role server uuid compose <<< "$result"
-    secret_name="COOLIFY_UUID_$(echo "${STORY_NAME}_${role}" | tr '[:lower:]' '[:upper:]' | tr '-' '_')"
-
-    if [ "$DRY_RUN" = "1" ]; then
-      warn "[DRY RUN] Would set Forgejo secret: ${secret_name}=${uuid}"
-      continue
-    fi
-
-    curl -sS --max-time 10 \
-      -X PUT \
-      -H "Authorization: token ${FORGEJO_TOKEN}" \
-      -H "Content-Type: application/json" \
-      "${FORGEJO_URL}/api/v1/repos/${REPO_PATH}/actions/secrets/${secret_name}" \
-      -d "{\"data\": \"${uuid}\"}" > /dev/null 2>&1 \
-      && ok "Forgejo secret: ${secret_name}" \
-      || warn "Could not set Forgejo secret: ${secret_name}"
-  done
+# ── CI secrets na GitHubu (volitelné) ─────────────────────────────────────────
+# shellcheck source=scripts/lib/github-ci-secret.sh
+. "${PROJECT_ROOT}/scripts/lib/github-ci-secret.sh"
+echo ""
+step "CI secrets (GitHub Actions)"
+if ! github_ci_configured; then
+  info "Přeskočeno: GITHUB_REPOSITORY / GITHUB_TOKEN nenakonfigurováno — nastav COOLIFY_UUID_* v repu ručně (Settings → Secrets and variables → Actions)."
 fi
+for result in "${RESULTS[@]}"; do
+  github_ci_configured || break
+  IFS='|' read -r role server uuid compose <<< "$result"
+  secret_name="COOLIFY_UUID_$(echo "${STORY_NAME}_${role}" | tr '[:lower:]' '[:upper:]' | tr '-' '_')"
+
+  if [ "$DRY_RUN" = "1" ]; then
+    warn "[DRY RUN] Would set CI secret: ${secret_name}=${uuid}"
+    continue
+  fi
+
+  _gh_rc=0
+  github_ci_secret_set "$secret_name" "$uuid" || _gh_rc=$?
+  if [ "$_gh_rc" -eq 0 ]; then
+    ok "CI secret: ${secret_name}"
+  else
+    warn "Could not set CI secret ${secret_name}: $(github_ci_secret_reason "$_gh_rc")"
+  fi
+done
 
 # ── Update registry ───────────────────────────────────────────────────────────
 if [ "$UPDATE_REGISTRY" = "1" ] && [ "$DRY_RUN" = "0" ] && [ -f "$SERVERS_JSON" ]; then

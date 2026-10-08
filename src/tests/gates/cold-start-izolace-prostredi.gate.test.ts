@@ -74,8 +74,8 @@ const ZALOHA = {
   APP_NAME_PREFIX: "inst",
   NOCODB_ADMIN_EMAIL: "admin@postroj.invalid",
   SMTP_ADMIN_EMAIL: "admin@postroj.invalid",
-  FORGEJO_API_TOKEN: "postroj-falesny-forgejo",
-  FORGEJO_TOKEN: "postroj-falesny-forgejo",
+  GITHUB_TOKEN: "postroj-falesny-github",
+  GIT_TOKEN: "postroj-falesny-git",
 };
 
 /** Produkční hodnota, která se do stagingu NESMÍ dostat (env-doctor ji bere jako externí klíč). */

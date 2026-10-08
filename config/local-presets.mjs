@@ -936,9 +936,13 @@ export const devEnvDefaults = {
   MATRIX_WEBHOOK_URL: `http://${INSTANCE_PREFIX}-gateway:3001/matrix/webhook`,
   COOLIFY_BASE_URL: "http://localhost",
   COOLIFY_API_KEY: "",
-  FORGEJO_URL: process.env.FORGEJO_URL || (process.env.FORGEJO_DOMAIN ? `https://${process.env.FORGEJO_DOMAIN}` : ""),
-  FORGEJO_TOKEN: "",
-  FORGEJO_REPO: "aisha/evymo-ai-orchestrator",
+  // GitHub (dev-patch, n8n self-tooling): local stack has no target repo by
+  // default — empty GITHUB_REPOSITORY = the features report "not configured".
+  GITHUB_API_URL: process.env.GITHUB_API_URL || "",
+  GITHUB_TOKEN: "",
+  GITHUB_REPOSITORY: process.env.GITHUB_REPOSITORY || "",
+  GIT_BASE_URL: process.env.GIT_BASE_URL || "",
+  GIT_TOKEN: "",
   GIT_SHA: "local",
 
   // ── Exec (svc-agent-runner) ──

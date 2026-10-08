@@ -1,9 +1,9 @@
 /**
  * git-origin.mjs — odkud tenhle strom pochází, bez přihlašovacích údajů.
  *
- * PROČ (naměřeno 2026-08-13): doctor čekal deklaraci `FORGEJO_URL`. Ta chyběla,
- * takže se kontrola dosažitelnosti Forgeja „přeskočila" s warningem — přestože
- * Coolify staví VŠECH 37 aplikací té instance právě z toho Forgeja. Přeskočená
+ * PROČ (naměřeno 2026-08-13): doctor čekal deklaraci adresy git hostingu. Ta chyběla,
+ * takže se kontrola dosažitelnosti „přeskočila" s warningem — přestože
+ * Coolify staví VŠECH 37 aplikací té instance právě z toho git hostingu. Přeskočená
  * kontrola nad povinnou závislostí je mlčení, ne úspěch.
  *
  * Původ je přitom po ruce: `git remote` ho drží vždycky a je to TÁŽ adresa,
@@ -26,7 +26,7 @@
  * Normalizuje remote URL na `host/org/repo` — tvar, ve kterém se dvě adresy
  * téhož repozitáře POROVNAJÍ bez ohledu na to, jak je kdo zapsal.
  *
- * ⛔ PROČ NE PODLE JMÉNA REMOTE. `upstream`, `upstream-forgejo` a podobná jména
+ * ⛔ PROČ NE PODLE JMÉNA REMOTE. `upstream`, `upstream-github` a podobná jména
  * jsou ZVYKLOST, ne vlastnost: ve forku může `upstream` ukazovat na mezifork a
  * měření proti němu vydá nepravdivý výsledek (typicky „už nic nenese" o větvi,
  * která nese). Identita repozitáře je v URL, ne ve jméně.

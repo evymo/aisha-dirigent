@@ -8,7 +8,7 @@
  *
  * It used to leak: coolify-story-init.sh's dry-run branch printed
  *   warn "  git: ${GIT_URL}@${GIT_BRANCH}"
- * which put the raw Forgejo token on the terminal — and into the CI job log
+ * which put the raw git token on the terminal — and into the CI job log
  * whenever the script runs in a pipeline (found 2026-07-20 while provisioning
  * svc-source-broker). A token in a build log is a token you must rotate.
  *
@@ -49,7 +49,7 @@ describe("no credential leak in logs", () => {
     const s = read("scripts/coolify-story-init.sh");
     expect(s, "scripts/coolify-story-init.sh not found").not.toBe("");
     // It embeds credentials…
-    expect(s).toMatch(/GIT_URL="https:\/\/aisha:\$\{FORGEJO_TOKEN\}@/);
+    expect(s).toMatch(/GIT_URL="https:\/\/aisha:\$\{GIT_TOKEN\}@/);
     // …so it must also derive the redacted form used for output.
     expect(s, "GIT_URL_SAFE (redacted twin) must be derived where GIT_URL gains credentials")
       .toMatch(/GIT_URL_SAFE=.*sed -E 's\|\(:\/\/\)\[\^@\/\]\+@\|/);
@@ -75,23 +75,23 @@ describe("no credential leak in logs", () => {
     expect(offenders, `print a redacted twin instead:\n  ${offenders.join("\n  ")}`).toEqual([]);
   });
 
-  test("no shell script interpolates FORGEJO_TOKEN into printed output", () => {
+  test("no shell script interpolates GIT_TOKEN / GITHUB_TOKEN into printed output", () => {
     const offenders: string[] = [];
     for (const file of shellScripts()) {
       const body = readFileSync(join(ROOT, file), "utf8");
       body.split("\n").forEach((line, i) => {
         const printing = new RegExp(String.raw`^\s*${PRINTERS}\b`).test(line);
-        // `\$FORGEJO_API_TOKEN` is ESCAPED — the shell prints the literal name,
-        // which is how coolify-server-onboard.sh hands the operator a command to
+        // `\$GITHUB_TOKEN` is ESCAPED — the shell prints the literal name,
+        // which is how a script hands the operator a command to
         // paste. Only an UNescaped `$` substitutes the value, so the lookbehind
         // is what makes this check mean "emits the token" rather than "mentions
         // it". Getting that wrong is the difference between a real finding and
         // an exception list.
-        const interpolates = /(?<!\\)\$\{?FORGEJO_(API_)?TOKEN/.test(line);
+        const interpolates = /(?<!\\)\$\{?(GIT|GITHUB)_TOKEN/.test(line);
         if (printing && interpolates) {
-          // `[ -n "$FORGEJO_TOKEN" ] && echo yes || echo no` reports PRESENCE;
+          // `[ -n "$GIT_TOKEN" ] && echo yes || echo no` reports PRESENCE;
           // the value itself never reaches the output stream.
-          const presenceTestOnly = /-n\s+"?\$\{?FORGEJO_(API_)?TOKEN/.test(line);
+          const presenceTestOnly = /-n\s+"?\$\{?(GIT|GITHUB)_TOKEN/.test(line);
           if (!presenceTestOnly) offenders.push(`${file}:${i + 1}`);
         }
       });

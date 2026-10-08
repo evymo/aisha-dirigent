@@ -86,10 +86,9 @@ const ALLOWLIST_EXTERNAL = new Set<string>([
   "COOLIFY_SERVER_UUID_FRONTEND",
   "COOLIFY_SERVER_UUID_EXPERIMENTAL",
   "COOLIFY_URL",
-  "COOLIFY_WEBHOOK_SECRET_FORGEJO",
   "COOLIFY_API_KEY", // alias of COOLIFY_API_TOKEN — set in alias step
-  "FORGEJO_TOKEN",   // alias of FORGEJO_API_TOKEN
-  "FORGEJO_API_TOKEN",
+  "GIT_TOKEN",       // private git clone token (BuildKit secret git_token)
+  "GITHUB_TOKEN",    // GitHub REST API (self-tooling, dev-patch, CI secrets)
   // Verdaccio (private registry, $VERDACCIO_URL) auth — 23 services that depend on @aisha/security
   // pass this through as Docker build-arg. Sourced from operator's
   // .env-prod-backup; cold-start emits it in the HEREDOC + REGEN_KEYS regex
