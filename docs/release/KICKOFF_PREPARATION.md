@@ -37,8 +37,9 @@ file changes, without importing upstream history.
 2. Inspect the final diff, regenerate baseline/seed when SQL changes, run a clean disposable
    database and verify upgrade compatibility. Never reset the instance database.
 3. In the private instance-data repository, finish operator identities/roles and the program
-   overlay for the EXISTING default story. Invite the two teammates and verify their individual
-   story/IDE access. Their contacts are still pending; do not create another story as a shortcut.
+   overlay for the EXISTING default story. The new kickoff users register and sign in first;
+   an existing administrator then grants them `admin` in `/admin/roles`. Verify their
+   individual story/IDE access. Pre-collecting emails for invitations is not a prerequisite.
 4. Set provider credentials through administration. Confirm a change is visible to the next
    service call/run, including credential-cache delay. Never put values in a commit or runbook.
 5. On the execution host, verify Docker API >= 1.45, named runs volume, agent image tag,
@@ -179,8 +180,9 @@ Verified on 8 October 2026 through scoped Coolify/Keycloak APIs and public endpo
   challenge. The new gateway handling, project SQL and MCP tools must reach core
   before claiming the end-to-end scenario is enabled.
 - Realm self-registration is currently enabled, but SMTP is unconfigured. Invitation
-  delivery and a human login were not verified. Collaborator contact identities are
-  still pending; do not invent accounts or copy the private operator roster here.
+  delivery and a human login were not verified. Per the operator's latest decision, new
+  kickoff users register/sign in themselves and are then promoted to `admin` through
+  AISHA administration. No account invitation or role elevation was performed here.
 
 ### Exact next-session steps
 
@@ -188,7 +190,10 @@ Verified on 8 October 2026 through scoped Coolify/Keycloak APIs and public endpo
    invariants. Review the final branch before any application deployment or merge.
 2. Confirm private instance-data/operator identities and effective production settings.
    Use the canonical environment resolver and deployment plan; never publish the
-   operator overlay, environment values or credentials to this repository.
+   operator overlay, environment values or credentials to this repository. New kickoff
+   users first register and sign in; an existing admin grants `admin` under `/admin/roles`
+   using their registered email. This is a selected-user action, not automatic admin
+   access for every new registration.
 3. Inspect OAuth reconciliation, then apply only displayed missing configuration:
 
    ```sh
@@ -264,3 +269,19 @@ credential tokens, private-key bodies or hardcoded test IPs in its measured scop
 13,216 tree entries and explicitly left 159 binary files and 20 lockfiles unscanned. All four
 submodule pointers match the GitHub base. This scan is a scoped safeguard, not a general
 security audit or an application readiness verdict.
+
+
+### Operator decision: new kickoff users become admins through administration
+
+The operator confirmed that selected new kickoff users will be made administrators in
+AISHA administration. Use the existing `/admin/roles` screen after their registration
+and first login. `useGrantUserRole` calls `grant_user_role_admin(p_email, p_role)` with
+`p_role = 'admin'`; the SQL requires an existing administrator and records the grant
+in the audit journal. No pre-created admin accounts or invitation emails are required
+for this chosen path. No live user role was changed during this checkpoint update.
+
+The application grant writes `user_roles`. MCP's separate admin-only tool filter reads
+verified token roles; this RPC does not modify Keycloak realm roles. Include effective
+application access and MCP admin-tool visibility in the live role verification rather
+than assuming a DB role grant also changes an existing OAuth token. Project onboarding
+MCP tools use authenticated caller RPCs and their database authorization.
