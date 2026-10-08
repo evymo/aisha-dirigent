@@ -14,6 +14,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Fastify from 'fastify';
 
+// Keep credentials outside this fixture's story-access RPC boundary (F8 convergence).
+vi.mock('../../lib/credentials.js', () => ({
+  credentials: {
+    get: async (name: string) => process.env[name] ?? null,
+    getMany: async (names: readonly string[]) => Object.fromEntries(names.map(name => [name, process.env[name] ?? null])),
+    migrateEnvCredentials: async () => ({ moved: [], kept: [], absent: [], failed: [] }),
+    invalidate: () => undefined,
+  },
+  POVERENI_Z_PROSTREDI: [],
+}));
+
 const USER_ID = '11111111-1111-1111-1111-111111111111';
 const MUJ = '44444444-4444-4444-4444-444444444444';
 const CIZI = '55555555-5555-5555-5555-555555555555';

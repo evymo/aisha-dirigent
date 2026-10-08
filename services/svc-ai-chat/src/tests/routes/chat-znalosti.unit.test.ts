@@ -28,6 +28,17 @@ const mcp = vi.hoisted(() => ({
 }));
 const llm = vi.hoisted(() => ({ chat: vi.fn() }));
 
+// The credential boundary is independent of the user-scoped knowledge RPC fixture.
+vi.mock('../../lib/credentials.js', () => ({
+  credentials: {
+    get: async (name: string) => process.env[name] ?? null,
+    getMany: async (names: readonly string[]) => Object.fromEntries(names.map(name => [name, process.env[name] ?? null])),
+    migrateEnvCredentials: async () => ({ moved: [], kept: [], absent: [], failed: [] }),
+    invalidate: () => undefined,
+  },
+  POVERENI_Z_PROSTREDI: [],
+}));
+
 vi.mock('../../auth.js', () => {
   class AuthError extends Error {
     constructor(public statusCode: number, message: string) {
