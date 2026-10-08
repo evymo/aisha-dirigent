@@ -13,10 +13,22 @@
  *
  * OWASP A10: outbound fetch goes through `ssrf.safeFetch`. The
  * llm-gateway host must be in OPENCLAW_OUTBOUND_HOSTS (config.ts).
+ *
+ * OWASP AITG: the task description comes from upstream callers and may carry
+ * an injection payload. The model output passes `withAitgGuard` (APP-01
+ * injection bleed-through, APP-12 toxic output) BEFORE it is parsed; a flagged
+ * output degrades to the same manual_review plan as any other failure.
  */
 import type { FastifyBaseLogger } from 'fastify';
 import type { SsrfGuard } from '@aisha/security';
+import { withAitgGuard, createAitgRunner, type AitgRunner } from '@aisha/aitg';
 import { config } from './config.js';
+
+const defaultAitgRunner = createAitgRunner({
+  postgrestUrl: config.postgrestUrl,
+  serviceToken: config.postgrestServiceJwt,
+  service: 'svc-openclaw:planner',
+});
 
 interface PlanInput {
   request_id?: string | null;
@@ -78,6 +90,7 @@ export async function planExecution(
   input: PlanInput,
   log: FastifyBaseLogger,
   ssrf: SsrfGuard,
+  aitgRunner: AitgRunner = defaultAitgRunner,
 ): Promise<PlanResult> {
   const req_id = input.request_id ?? null;
 
@@ -144,6 +157,21 @@ export async function planExecution(
     | { choices?: { message?: { content?: string } }[] }
     | null;
   const content = parsed?.choices?.[0]?.message?.content ?? '';
+
+  const guarded = await withAitgGuard(
+    {
+      runner: aitgRunner,
+      buildSha: config.buildSha,
+      triggeredBy: 'self',
+      enabled: ['AITG-APP-01', 'AITG-APP-12'],
+      service: 'svc-openclaw:planner',
+    },
+    async () => ({ text: content }),
+  );
+  if (guarded.violated) {
+    log.warn({ req_id, aitg_run_ids: guarded.runIds }, 'planner: LLM output flagged by AITG guard');
+    return manualReviewPlan(req_id, 'Planner output was flagged by the AITG guard', 'aitg_guard_violation');
+  }
 
   // Extract the plan JSON from the LLM response. Even with response_format
   // json_object we defensively strip a stray markdown fence.

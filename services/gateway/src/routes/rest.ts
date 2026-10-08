@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { prodluzNajem } from '../lib/najem-adresy.js';
+import { effectiveRestRole, isRestPathAllowed, REST_RPC_ONLY_ERROR } from '../lib/rest-jen-rpc.js';
 import httpProxy from '@fastify/http-proxy';
 import { config } from '../config.js';
 import { translateAuthorizationForPostgrest } from '../auth/postgrest-jwt.js';
@@ -16,6 +17,15 @@ import { translateAuthorizationForPostgrest } from '../auth/postgrest-jwt.js';
  * since PostgREST ignores it — auth is via Authorization: Bearer <jwt>.
  */
 export const restProxy: FastifyPluginAsync = async (app: FastifyInstance) => {
+  // Klient (anon / authenticated) smí jen /rpc/<funkce> a kořen; tabulky jen
+  // service_role. Hook běží PŘED proxy, tedy i před překladem tokenu — viz lib/rest-jen-rpc.ts.
+  app.addHook('preHandler', async (req: FastifyRequest, reply: FastifyReply) => {
+    const role = effectiveRestRole(req.headers.authorization, config.kcIssuer);
+    if (!isRestPathAllowed(req.url, role)) {
+      return reply.code(403).send({ error: REST_RPC_ONLY_ERROR });
+    }
+  });
+
   // Note: outer plugin is registered with prefix '/rest/v1' in server.ts,
   // so we must NOT set another prefix here — Fastify would compound them
   // to '/rest/v1/rest/v1/*'. rewritePrefix strips the inherited prefix

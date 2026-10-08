@@ -15,7 +15,7 @@ export interface PhiProfilePrefill {
  * 
  * @param params - Parametry funkce
  * @param params.client - API klient (musí být PHI klient v sensitive data režimu)
- * @returns Objekt s sensitive data daty nebo null pokud nenalezeno
+ * @returns Objekt s citlivými daty nebo null pokud nenalezeno
  * 
  * @example
  * ```typescript

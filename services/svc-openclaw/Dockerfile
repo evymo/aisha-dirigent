@@ -14,6 +14,7 @@ COPY . .
 RUN npm ci --workspace=@aisha/svc-openclaw --include-workspace-root --include=dev --ignore-scripts
 RUN npm run build --workspace=@aisha/observability && \
     npm run build --workspace=@aisha/security && \
+    npm run build --workspace=@aisha/aitg && \
     npm run build --workspace=@aisha/svc-openclaw
 # Prod-only deps via a CLEAN reinstall (NOT `npm prune` — the workspace prune has
 # evicted hoisted prod deps on deep trees). packages/*/dist built above survive
@@ -35,6 +36,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 COPY --from=build /app/packages/observability packages/observability
 COPY --from=build /app/packages/security packages/security
+COPY --from=build /app/packages/aitg packages/aitg
 COPY --from=build /app/services/svc-openclaw/package.json services/svc-openclaw/package.json
 COPY --from=build /app/services/svc-openclaw/dist services/svc-openclaw/dist
 # Nested (non-hoisted) service deps must travel too.

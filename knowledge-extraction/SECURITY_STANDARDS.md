@@ -247,7 +247,7 @@ Pokud aplikace pracuje se zdravotními nebo citlivými daty, každý přístup m
 // Co logovat v DB audit záznamu:
 {
   user_id: "uuid",          // KDO přistoupil
-  action: "sensitive data_READ",       // CO udělal
+  action: "SENSITIVE_DATA_READ",       // CO udělal
   entity_type: "health_check_ins", // NA CO
   entity_id: "uuid",        // KTERÉ entitě
   metadata: { limit: 30 },  // Kontext (počty, filtry) — BEZ sensitive data hodnot!

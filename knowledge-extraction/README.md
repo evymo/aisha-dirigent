@@ -15,7 +15,7 @@ Tento adresář obsahuje **přenositelné znalosti** pro zahájení vývoje nov�
 | [ARCHITECTURE_PATTERNS.md](./ARCHITECTURE_PATTERNS.md) | Strukturování projektu, vrstvy, odpovědnosti |
 | [API_COMMUNICATION.md](./API_COMMUNICATION.md) | Jak komunikovat s API výhradně přes hooky |
 | [HOOKS_PATTERNS.md](./HOOKS_PATTERNS.md) | Design hooků — šablony, konvence, Zod validace |
-| [TESTING_sensitive dataLOSOPHY.md](./TESTING_sensitive dataLOSOPHY.md) | Co testovat, kdy, jak a proč — 4 úrovně testů |
+| [TESTING_PHILOSOPHY.md](./TESTING_PHILOSOPHY.md) | Co testovat, kdy, jak a proč — 4 úrovně testů |
 | [CODE_QUALITY_GATES.md](./CODE_QUALITY_GATES.md) | CI gate testy, code hygiene, co musí projít |
 | [SECURITY_STANDARDS.md](./SECURITY_STANDARDS.md) | Bezpečnost, sensitive data, logging, přihlášení |
 | [NPM_RELEASE_SECURITY.md](./NPM_RELEASE_SECURITY.md) | NPM publish bezpečnost, kontext vs zásady pro AISHA orchestrace |

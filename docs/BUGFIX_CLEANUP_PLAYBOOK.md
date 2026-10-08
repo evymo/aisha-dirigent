@@ -17,7 +17,7 @@ Platí pro celý repozitář a doplňuje / zpřesňuje:
 - **Hierarchická kontrola jen směrem dolů**:
   - ověřuj dopady pouze na **podřízené** části (child komponenty, volané hooky, volané utility, integrační klienty),
   - neprováděj plošný audit „nahoru“ (routy, rodičovské layouty) – **pokud to není přímo součást opravovaného flow**.
-- **Produkční production + sensitive-data**:
+- **Produkční + sensitive-data**:
   - nikdy neloguj sensitive data (ani do konzole, ani do toastů, ani do error message),
   - žádné obcházení RLS / oprávnění „jen na FE“.
 - **Vždy test na konci**: minimálně `npm run test:run` + `npm run build`.

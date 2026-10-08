@@ -13,7 +13,7 @@ import { parseRateLimitError } from '@/lib/auth/rateLimitHelper';
 import type { ApiClient } from '@/integrations/api/client';
 
 /**
- * Context value for sensitive data (sensitive data) Mode.
+ * Context value for sensitive data Mode.
  *
  * Secure Mode is a high-security state that requires re-authentication.
  * It uses a separate API client with a dedicated PHI access token

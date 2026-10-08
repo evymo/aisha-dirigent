@@ -609,7 +609,7 @@ Ale `MemberStory.tsx` **neobsahuje StoryLoop workspace** — je to Member Diary 
 
 #### Záložky v localStorage
 
-Záložky jsou **pouze v prohlížeči** — neexistuje server persistence. Pro produkční production app je to problém:
+Záložky jsou **pouze v prohlížeči** — neexistuje server persistence. Pro produkční app je to problém:
 - Ztráta při vymazání cache
 - Nesynchornizované mezi zařízeními
 - Žádný audit trail

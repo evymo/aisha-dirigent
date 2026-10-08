@@ -41321,7 +41321,7 @@ BEGIN
   INSERT INTO audit_journal (user_id, action, metadata)
   VALUES (
     auth.uid(),
-    'sensitive data_READ',
+    'SENSITIVE_DATA_READ',
     jsonb_build_object(
       'area', 'partner',
       'severity', 'info',
@@ -69437,7 +69437,7 @@ BEGIN
   INSERT INTO audit_journal (user_id, action, metadata)
   VALUES (
     auth.uid(),
-    'sensitive data_READ',
+    'SENSITIVE_DATA_READ',
     jsonb_build_object(
       'area', 'longevity_score',
       'severity', 'info',
@@ -71780,7 +71780,7 @@ BEGIN
       jsonb_build_object('participant_count', v_participant_count, 'threshold', 5, 'function', 'get_study_cohort_lab_trends')
     );
     
-    RAISE EXCEPTION 'Cohort size too small for aggregate statistics (n=%). Minimum 5 participants required for compliance compliance.', v_participant_count;
+    RAISE EXCEPTION 'Cohort size too small for aggregate statistics (n=%). Minimum 5 participants required for compliance.', v_participant_count;
   END IF;
 
   -- Return trends, also filtering out individual months with small participant counts
@@ -71851,7 +71851,7 @@ BEGIN
         jsonb_build_object('participant_count', v_participant_count, 'threshold', 5)
       );
       
-      RAISE EXCEPTION 'Cohort size too small for aggregate statistics (n=%). Minimum 5 participants required for compliance compliance.', v_participant_count;
+      RAISE EXCEPTION 'Cohort size too small for aggregate statistics (n=%). Minimum 5 participants required for compliance.', v_participant_count;
     END IF;
   END IF;
 
@@ -71967,7 +71967,7 @@ BEGIN
       jsonb_build_object('participant_count', v_participant_count, 'threshold', 5, 'function', 'get_study_cohort_trends')
     );
     
-    RAISE EXCEPTION 'Cohort size too small for aggregate statistics (n=%). Minimum 5 participants required for compliance compliance.', v_participant_count;
+    RAISE EXCEPTION 'Cohort size too small for aggregate statistics (n=%). Minimum 5 participants required for compliance.', v_participant_count;
   END IF;
 
   -- Return trends, also filtering out individual weeks with small participant counts
@@ -86386,7 +86386,7 @@ BEGIN
   INSERT INTO audit_journal (user_id, action, metadata)
   VALUES (
     auth.uid(),
-    'sensitive data_READ',
+    'SENSITIVE_DATA_READ',
     jsonb_build_object(
       'area', 'longevity_score',
       'severity', 'info',
@@ -117698,7 +117698,7 @@ BEGIN
   INSERT INTO audit_journal (user_id, action, metadata)
   VALUES (
     auth.uid(),
-    'sensitive data_WRITE',
+    'SENSITIVE_DATA_WRITE',
     jsonb_build_object(
       'area', 'longevity_score',
       'severity', 'info',
@@ -204879,7 +204879,7 @@ USING (bucket_id = 'web-artifact-sources' AND (SELECT public.is_admin_or_staff()
 -- Grants: account_deletion_requests
 
 GRANT SELECT ON public.account_deletion_requests TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.account_deletion_requests TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.account_deletion_requests TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.account_deletion_requests TO service_role;
 
 
@@ -204890,7 +204890,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ac
 -- Grants: achievements
 
 GRANT SELECT ON public.achievements TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.achievements TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.achievements TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.achievements TO service_role;
 
 
@@ -204939,7 +204939,7 @@ GRANT EXECUTE ON FUNCTION acs_effect_mark_executed(text)                        
 -- Grants: agent_catalog
 
 GRANT SELECT ON public.agent_catalog TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.agent_catalog TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.agent_catalog TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.agent_catalog TO service_role;
 
 
@@ -204950,7 +204950,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ag
 -- Grants: agent_decision_trees
 
 GRANT SELECT ON public.agent_decision_trees TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.agent_decision_trees TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.agent_decision_trees TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.agent_decision_trees TO service_role;
 
 
@@ -204997,7 +204997,7 @@ END $$;
 -- Grants: agent_memories
 
 GRANT SELECT ON public.agent_memories TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.agent_memories TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.agent_memories TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.agent_memories TO service_role;
 
 
@@ -205052,7 +205052,7 @@ GRANT INSERT, UPDATE, DELETE ON TABLE public.ai_budget TO authenticated;
 -- Grants: ai_eval_results
 
 GRANT SELECT ON public.ai_eval_results TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_eval_results TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.ai_eval_results TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_eval_results TO service_role;
 
 
@@ -205063,7 +205063,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai
 -- Grants: ai_eval_runs
 
 GRANT SELECT ON public.ai_eval_runs TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_eval_runs TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.ai_eval_runs TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_eval_runs TO service_role;
 
 
@@ -205074,7 +205074,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai
 -- Grants: ai_golden_examples
 
 GRANT SELECT ON public.ai_golden_examples TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_golden_examples TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.ai_golden_examples TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_golden_examples TO service_role;
 
 
@@ -205085,7 +205085,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai
 -- Grants: ai_model_benchmarks
 
 GRANT SELECT ON public.ai_model_benchmarks TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_model_benchmarks TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.ai_model_benchmarks TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_model_benchmarks TO service_role;
 
 
@@ -205096,7 +205096,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai
 -- Grants: ai_model_registry
 
 GRANT SELECT ON public.ai_model_registry TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_model_registry TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.ai_model_registry TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_model_registry TO service_role;
 
 
@@ -205107,7 +205107,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai
 -- Grants: ai_proactive_runs
 
 GRANT SELECT ON public.ai_proactive_runs TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_proactive_runs TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.ai_proactive_runs TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_proactive_runs TO service_role;
 
 
@@ -205118,7 +205118,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai
 -- Grants: ai_proactive_trigger_definitions
 
 GRANT SELECT ON public.ai_proactive_trigger_definitions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_proactive_trigger_definitions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.ai_proactive_trigger_definitions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_proactive_trigger_definitions TO service_role;
 
 
@@ -205140,7 +205140,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai
 -- Grants: ai_runs
 
 GRANT SELECT ON public.ai_runs TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_runs TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.ai_runs TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_runs TO service_role;
 
 
@@ -205151,7 +205151,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai
 -- Grants: ai_scheduled_jobs
 
 GRANT SELECT ON public.ai_scheduled_jobs TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_scheduled_jobs TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.ai_scheduled_jobs TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_scheduled_jobs TO service_role;
 
 
@@ -205162,7 +205162,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai
 -- Grants: ai_session_memory
 
 GRANT SELECT ON public.ai_session_memory TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_session_memory TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.ai_session_memory TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_session_memory TO service_role;
 
 
@@ -205173,7 +205173,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai
 -- Grants: ai_tasks
 
 GRANT SELECT ON public.ai_tasks TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_tasks TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.ai_tasks TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_tasks TO service_role;
 
 
@@ -205184,7 +205184,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai
 -- Grants: ai_trace_events
 
 GRANT SELECT ON public.ai_trace_events TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_trace_events TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.ai_trace_events TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_trace_events TO service_role;
 
 
@@ -205195,7 +205195,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai
 -- Grants: ai_user_memory
 
 GRANT SELECT ON public.ai_user_memory TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_user_memory TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.ai_user_memory TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_user_memory TO service_role;
 
 
@@ -205206,7 +205206,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai
 -- Grants: ai_workflow_definitions
 
 GRANT SELECT ON public.ai_workflow_definitions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_workflow_definitions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.ai_workflow_definitions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_workflow_definitions TO service_role;
 
 
@@ -205217,7 +205217,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai
 -- Grants: ai_workflow_node_runs
 
 GRANT SELECT ON public.ai_workflow_node_runs TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_workflow_node_runs TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.ai_workflow_node_runs TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai_workflow_node_runs TO service_role;
 
 
@@ -205228,7 +205228,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ai
 -- Grants: alcohol_tracking_summary
 
 GRANT SELECT ON public.alcohol_tracking_summary TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.alcohol_tracking_summary TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.alcohol_tracking_summary TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.alcohol_tracking_summary TO service_role;
 
 
@@ -205239,7 +205239,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.al
 -- Grants: api_rate_limits
 
 GRANT SELECT ON public.api_rate_limits TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.api_rate_limits TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.api_rate_limits TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.api_rate_limits TO service_role;
 
 
@@ -205250,7 +205250,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ap
 -- Grants: app_role_permissions
 
 GRANT SELECT ON public.app_role_permissions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.app_role_permissions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.app_role_permissions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.app_role_permissions TO service_role;
 
 
@@ -205278,7 +205278,7 @@ REVOKE ALL ON public.app_secrets FROM PUBLIC, anon, authenticated, service_role;
 -- Grants: app_versions
 
 GRANT SELECT ON public.app_versions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.app_versions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.app_versions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.app_versions TO service_role;
 
 
@@ -205289,7 +205289,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ap
 -- Grants: archive_documents
 
 GRANT SELECT ON public.archive_documents TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.archive_documents TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.archive_documents TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.archive_documents TO service_role;
 
 
@@ -205300,7 +205300,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ar
 -- Grants: archive_tags
 
 GRANT SELECT ON public.archive_tags TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.archive_tags TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.archive_tags TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.archive_tags TO service_role;
 
 
@@ -205326,7 +205326,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.au
 -- Grants: audit_journal
 
 GRANT SELECT ON public.audit_journal TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.audit_journal TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.audit_journal TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.audit_journal TO service_role;
 
 
@@ -205337,7 +205337,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.au
 -- Grants: audit_logs
 
 GRANT SELECT ON public.audit_logs TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.audit_logs TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.audit_logs TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.audit_logs TO service_role;
 
 
@@ -205379,7 +205379,7 @@ ALTER ROLE authenticator SET pgrst.db_pre_request = 'public.aisha_pre_request';
 -- Grants: bank_transactions
 
 GRANT SELECT ON public.bank_transactions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.bank_transactions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.bank_transactions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.bank_transactions TO service_role;
 
 
@@ -205405,7 +205405,7 @@ GRANT SELECT ON public.batch_inventory_overview TO service_role;
 -- Grants: biomarker_reference_ranges
 
 GRANT SELECT ON public.biomarker_reference_ranges TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.biomarker_reference_ranges TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.biomarker_reference_ranges TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.biomarker_reference_ranges TO service_role;
 
 
@@ -205416,7 +205416,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.bi
 -- Grants: blockchain_audit_records
 
 GRANT SELECT ON public.blockchain_audit_records TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.blockchain_audit_records TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.blockchain_audit_records TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.blockchain_audit_records TO service_role;
 
 
@@ -205461,7 +205461,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ca
 -- Grants: cart_items
 
 GRANT SELECT ON public.cart_items TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.cart_items TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.cart_items TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.cart_items TO service_role;
 
 
@@ -205472,7 +205472,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ca
 -- Grants: certification_courses
 
 GRANT SELECT ON public.certification_courses TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.certification_courses TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.certification_courses TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.certification_courses TO service_role;
 
 
@@ -205496,7 +205496,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ch
 -- Grants: chat_conversations
 
 GRANT SELECT ON public.chat_conversations TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.chat_conversations TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.chat_conversations TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.chat_conversations TO service_role;
 
 
@@ -205507,7 +205507,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ch
 -- Grants: chat_messages
 
 GRANT SELECT ON public.chat_messages TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.chat_messages TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.chat_messages TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.chat_messages TO service_role;
 
 
@@ -205540,7 +205540,7 @@ GRANT ALL ON client_ratings TO service_role;
 -- Grants: consent_template_versions
 
 GRANT SELECT ON public.consent_template_versions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.consent_template_versions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.consent_template_versions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.consent_template_versions TO service_role;
 
 
@@ -205551,7 +205551,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.co
 -- Grants: consent_templates
 
 GRANT SELECT ON public.consent_templates TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.consent_templates TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.consent_templates TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.consent_templates TO service_role;
 
 
@@ -205562,7 +205562,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.co
 -- Grants: consents
 
 GRANT SELECT ON public.consents TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.consents TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.consents TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.consents TO service_role;
 
 
@@ -205593,7 +205593,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.co
 -- Grants: context_profiles
 
 GRANT SELECT ON public.context_profiles TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.context_profiles TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.context_profiles TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.context_profiles TO service_role;
 
 
@@ -205604,7 +205604,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.co
 -- Grants: control_protocols
 
 GRANT SELECT ON public.control_protocols TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.control_protocols TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.control_protocols TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.control_protocols TO service_role;
 
 
@@ -205615,7 +205615,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.co
 -- Grants: course_slides
 
 GRANT SELECT ON public.course_slides TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.course_slides TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.course_slides TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.course_slides TO service_role;
 
 
@@ -205626,7 +205626,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.co
 -- Grants: currency_rates
 
 GRANT SELECT ON public.currency_rates TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.currency_rates TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.currency_rates TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.currency_rates TO service_role;
 
 
@@ -205637,7 +205637,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.cu
 -- Grants: custom_node_registry
 
 GRANT SELECT ON public.custom_node_registry TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.custom_node_registry TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.custom_node_registry TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.custom_node_registry TO service_role;
 
 
@@ -205659,7 +205659,7 @@ GRANT ALL ON public.data_sensitivity_registry TO service_role;
 -- Grants: data_sharing_consents
 
 GRANT SELECT ON public.data_sharing_consents TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.data_sharing_consents TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.data_sharing_consents TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.data_sharing_consents TO service_role;
 
 
@@ -205683,7 +205683,7 @@ GRANT ALL ON TABLE public.delivery_statuses TO service_role;
 -- Grants: delivery_transition_rules
 
 GRANT SELECT ON public.delivery_transition_rules TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.delivery_transition_rules TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.delivery_transition_rules TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.delivery_transition_rules TO service_role;
 
 
@@ -205694,7 +205694,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.de
 -- Grants: delivery_transitions
 
 GRANT SELECT ON public.delivery_transitions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.delivery_transitions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.delivery_transitions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.delivery_transitions TO service_role;
 
 
@@ -205731,7 +205731,7 @@ GRANT SELECT ON public.distribution_adjustments_overview TO service_role;
 -- Grants: distribution_adjustments
 
 GRANT SELECT ON public.distribution_adjustments TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_adjustments TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.distribution_adjustments TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_adjustments TO service_role;
 
 
@@ -205742,7 +205742,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.di
 -- Grants: distribution_calendar
 
 GRANT SELECT ON public.distribution_calendar TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_calendar TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.distribution_calendar TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_calendar TO service_role;
 
 
@@ -205753,7 +205753,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.di
 -- Grants: distribution_forecast_items
 
 GRANT SELECT ON public.distribution_forecast_items TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_forecast_items TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.distribution_forecast_items TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_forecast_items TO service_role;
 
 
@@ -205764,7 +205764,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.di
 -- Grants: distribution_forecasts
 
 GRANT SELECT ON public.distribution_forecasts TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_forecasts TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.distribution_forecasts TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_forecasts TO service_role;
 
 
@@ -205790,7 +205790,7 @@ GRANT SELECT ON public.distribution_overview TO service_role;
 -- Grants: distribution_protocols
 
 GRANT SELECT ON public.distribution_protocols TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_protocols TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.distribution_protocols TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_protocols TO service_role;
 
 
@@ -205801,7 +205801,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.di
 -- Grants: distribution_schedule_orders
 
 GRANT SELECT ON public.distribution_schedule_orders TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_schedule_orders TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.distribution_schedule_orders TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_schedule_orders TO service_role;
 
 
@@ -205812,7 +205812,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.di
 -- Grants: distribution_schedule
 
 GRANT SELECT ON public.distribution_schedule TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_schedule TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.distribution_schedule TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.distribution_schedule TO service_role;
 
 
@@ -205823,7 +205823,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.di
 -- Grants: document_sharing_permissions
 
 GRANT SELECT ON public.document_sharing_permissions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.document_sharing_permissions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.document_sharing_permissions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.document_sharing_permissions TO service_role;
 
 
@@ -205834,7 +205834,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.do
 -- Grants: dose_units
 
 GRANT SELECT ON public.dose_units TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.dose_units TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.dose_units TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.dose_units TO service_role;
 
 
@@ -205845,7 +205845,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.do
 -- Grants: dosing_logs
 
 GRANT SELECT ON public.dosing_logs TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.dosing_logs TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.dosing_logs TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.dosing_logs TO service_role;
 
 
@@ -205873,7 +205873,7 @@ GRANT ALL ON public.agent_knowledge_sources, public.document_registry,
 -- Grants: expedition_calendar
 
 GRANT SELECT ON public.expedition_calendar TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expedition_calendar TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.expedition_calendar TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expedition_calendar TO service_role;
 
 
@@ -205899,7 +205899,7 @@ GRANT SELECT ON public.expedition_overview TO service_role;
 -- Grants: expert_rule_documents
 
 GRANT SELECT ON public.expert_rule_documents TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expert_rule_documents TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.expert_rule_documents TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expert_rule_documents TO service_role;
 
 
@@ -205910,7 +205910,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ex
 -- Grants: expert_rule_ratings
 
 GRANT SELECT ON public.expert_rule_ratings TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expert_rule_ratings TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.expert_rule_ratings TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expert_rule_ratings TO service_role;
 
 
@@ -205921,7 +205921,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ex
 -- Grants: expert_rule_subscriptions
 
 GRANT SELECT ON public.expert_rule_subscriptions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expert_rule_subscriptions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.expert_rule_subscriptions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expert_rule_subscriptions TO service_role;
 
 
@@ -205932,7 +205932,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ex
 -- Grants: expert_rule_versions
 
 GRANT SELECT ON public.expert_rule_versions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expert_rule_versions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.expert_rule_versions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expert_rule_versions TO service_role;
 
 
@@ -205944,7 +205944,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ex
 -- Updated: anon has SELECT only (migration 20260328174913)
 
 GRANT SELECT ON public.expert_rules TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expert_rules TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.expert_rules TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.expert_rules TO service_role;
 
 
@@ -205955,7 +205955,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ex
 -- Grants: featured_products
 
 GRANT SELECT ON public.featured_products TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.featured_products TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.featured_products TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.featured_products TO service_role;
 
 
@@ -206156,7 +206156,7 @@ END $$;
 -- Grants: growth_policy_parameters
 
 GRANT SELECT ON public.growth_policy_parameters TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.growth_policy_parameters TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.growth_policy_parameters TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.growth_policy_parameters TO service_role;
 
 
@@ -206167,7 +206167,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.gr
 -- Grants: guild_expertise_areas
 
 GRANT SELECT ON public.guild_expertise_areas TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.guild_expertise_areas TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.guild_expertise_areas TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.guild_expertise_areas TO service_role;
 
 
@@ -206178,7 +206178,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.gu
 -- Grants: guild_member_expertise
 
 GRANT SELECT ON public.guild_member_expertise TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.guild_member_expertise TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.guild_member_expertise TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.guild_member_expertise TO service_role;
 
 
@@ -206189,7 +206189,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.gu
 -- Grants: health_check_ins
 
 GRANT SELECT ON public.health_check_ins TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.health_check_ins TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.health_check_ins TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.health_check_ins TO service_role;
 
 
@@ -206200,7 +206200,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.he
 -- Grants: health_data_sync_log
 
 GRANT SELECT ON public.health_data_sync_log TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.health_data_sync_log TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.health_data_sync_log TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.health_data_sync_log TO service_role;
 
 
@@ -206211,7 +206211,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.he
 -- Grants: health_data
 
 GRANT SELECT ON public.health_data TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.health_data TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.health_data TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.health_data TO service_role;
 
 
@@ -206222,7 +206222,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.he
 -- Grants: health_metrics
 
 GRANT SELECT ON public.health_metrics TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.health_metrics TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.health_metrics TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.health_metrics TO service_role;
 
 
@@ -206233,7 +206233,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.he
 -- Grants: hero_slides
 
 GRANT SELECT ON public.hero_slides TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.hero_slides TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.hero_slides TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.hero_slides TO service_role;
 
 
@@ -206244,7 +206244,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.he
 -- Grants: improvement_proposals
 
 GRANT SELECT ON public.improvement_proposals TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.improvement_proposals TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.improvement_proposals TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.improvement_proposals TO service_role;
 
 
@@ -206255,7 +206255,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.im
 -- Grants: integration_service_logs
 
 GRANT SELECT ON public.integration_service_logs TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.integration_service_logs TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.integration_service_logs TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.integration_service_logs TO service_role;
 
 
@@ -206266,7 +206266,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.in
 -- Grants: integration_services
 
 GRANT SELECT ON public.integration_services TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.integration_services TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.integration_services TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.integration_services TO service_role;
 
 
@@ -206277,7 +206277,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.in
 -- Grants: invitation_claims
 
 GRANT SELECT ON public.invitation_claims TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.invitation_claims TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.invitation_claims TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.invitation_claims TO service_role;
 
 
@@ -206288,7 +206288,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.in
 -- Grants: invitations
 -- NO anon SELECT (audit C2 — PII/code/role leak via PostgREST). Redemption uses
 -- the SECURITY DEFINER validate_invitation/claim_invitation RPCs, not table reads.
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.invitations TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.invitations TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.invitations TO service_role;
 
 
@@ -206299,7 +206299,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.in
 -- Grants: invoice_sequences
 
 GRANT SELECT ON public.invoice_sequences TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.invoice_sequences TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.invoice_sequences TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.invoice_sequences TO service_role;
 
 
@@ -206319,7 +206319,7 @@ GRANT ALL ON knowledge_attribution TO service_role;
 -- Grants: knowledge_chunks
 
 GRANT SELECT ON public.knowledge_chunks TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_chunks TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.knowledge_chunks TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_chunks TO service_role;
 
 
@@ -206330,7 +206330,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.kn
 -- Grants: knowledge_embeddings
 
 GRANT SELECT ON public.knowledge_embeddings TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_embeddings TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.knowledge_embeddings TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_embeddings TO service_role;
 
 
@@ -206341,7 +206341,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.kn
 -- Grants: knowledge_items
 
 GRANT SELECT ON public.knowledge_items TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_items TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.knowledge_items TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_items TO service_role;
 
 
@@ -206352,7 +206352,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.kn
 -- Grants: knowledge_moderation_queue
 
 GRANT SELECT ON public.knowledge_moderation_queue TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_moderation_queue TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.knowledge_moderation_queue TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_moderation_queue TO service_role;
 
 
@@ -206374,7 +206374,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.kn
 -- Grants: knowledge_post_translations
 
 GRANT SELECT ON public.knowledge_post_translations TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_post_translations TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.knowledge_post_translations TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_post_translations TO service_role;
 
 
@@ -206385,7 +206385,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.kn
 -- Grants: knowledge_posts
 
 GRANT SELECT ON public.knowledge_posts TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_posts TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.knowledge_posts TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_posts TO service_role;
 
 
@@ -206396,7 +206396,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.kn
 -- Grants: knowledge_topic_links
 
 GRANT SELECT ON public.knowledge_topic_links TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_topic_links TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.knowledge_topic_links TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_topic_links TO service_role;
 
 
@@ -206407,7 +206407,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.kn
 -- Grants: knowledge_topic_translations
 
 GRANT SELECT ON public.knowledge_topic_translations TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_topic_translations TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.knowledge_topic_translations TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_topic_translations TO service_role;
 
 
@@ -206418,7 +206418,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.kn
 -- Grants: knowledge_topic_versions
 
 GRANT SELECT ON public.knowledge_topic_versions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_topic_versions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.knowledge_topic_versions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_topic_versions TO service_role;
 
 
@@ -206429,7 +206429,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.kn
 -- Grants: knowledge_topics
 
 GRANT SELECT ON public.knowledge_topics TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_topics TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.knowledge_topics TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.knowledge_topics TO service_role;
 
 
@@ -206440,7 +206440,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.kn
 -- Grants: lab_results
 
 GRANT SELECT ON public.lab_results TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.lab_results TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.lab_results TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.lab_results TO service_role;
 
 
@@ -206451,7 +206451,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.la
 -- Grants: lab_test_orders
 
 GRANT SELECT ON public.lab_test_orders TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.lab_test_orders TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.lab_test_orders TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.lab_test_orders TO service_role;
 
 
@@ -206462,7 +206462,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.la
 -- Grants: leaderboard_entries
 
 GRANT SELECT ON public.leaderboard_entries TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.leaderboard_entries TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.leaderboard_entries TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.leaderboard_entries TO service_role;
 
 
@@ -206473,7 +206473,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.le
 -- Grants: leaderboard_periods
 
 GRANT SELECT ON public.leaderboard_periods TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.leaderboard_periods TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.leaderboard_periods TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.leaderboard_periods TO service_role;
 
 
@@ -206484,7 +206484,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.le
 -- Grants: leaderboard_reward_config
 
 GRANT SELECT ON public.leaderboard_reward_config TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.leaderboard_reward_config TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.leaderboard_reward_config TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.leaderboard_reward_config TO service_role;
 
 
@@ -206523,7 +206523,7 @@ GRANT INSERT, UPDATE, DELETE ON TABLE public.llm_tier_defaults TO authenticated;
 -- Grants: longevity_scores
 
 GRANT SELECT ON public.longevity_scores TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.longevity_scores TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.longevity_scores TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.longevity_scores TO service_role;
 
 
@@ -206543,7 +206543,7 @@ GRANT ALL ON maintenance_contracts TO service_role;
 -- Grants: mcp_auth_tokens
 
 GRANT SELECT ON public.mcp_auth_tokens TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.mcp_auth_tokens TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.mcp_auth_tokens TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.mcp_auth_tokens TO service_role;
 
 
@@ -206554,7 +206554,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.mc
 -- Grants: member_compliance_scores
 
 GRANT SELECT ON public.member_compliance_scores TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_compliance_scores TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.member_compliance_scores TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_compliance_scores TO service_role;
 
 
@@ -206565,7 +206565,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.me
 -- Grants: member_dashboard_widgets
 
 GRANT SELECT ON public.member_dashboard_widgets TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_dashboard_widgets TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.member_dashboard_widgets TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_dashboard_widgets TO service_role;
 
 
@@ -206576,7 +206576,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.me
 -- Grants: member_distribution_plans
 
 GRANT SELECT ON public.member_distribution_plans TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_distribution_plans TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.member_distribution_plans TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_distribution_plans TO service_role;
 
 
@@ -206587,7 +206587,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.me
 -- Grants: member_health_documents
 
 GRANT SELECT ON public.member_health_documents TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_health_documents TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.member_health_documents TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_health_documents TO service_role;
 
 
@@ -206598,7 +206598,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.me
 -- Grants: member_health_logs
 
 GRANT SELECT ON public.member_health_logs TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_health_logs TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.member_health_logs TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_health_logs TO service_role;
 
 
@@ -206609,7 +206609,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.me
 -- Grants: member_health_states
 
 GRANT SELECT ON public.member_health_states TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_health_states TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.member_health_states TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_health_states TO service_role;
 
 
@@ -206620,7 +206620,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.me
 -- Grants: member_product_logs
 
 GRANT SELECT ON public.member_product_logs TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_product_logs TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.member_product_logs TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_product_logs TO service_role;
 
 
@@ -206631,7 +206631,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.me
 -- Grants: member_product_plans
 
 GRANT SELECT ON public.member_product_plans TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_product_plans TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.member_product_plans TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_product_plans TO service_role;
 
 
@@ -206642,7 +206642,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.me
 -- Grants: member_products
 
 GRANT SELECT ON public.member_products TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_products TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.member_products TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_products TO service_role;
 
 
@@ -206653,7 +206653,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.me
 -- Grants: member_subscriptions
 
 GRANT SELECT ON public.member_subscriptions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_subscriptions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.member_subscriptions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_subscriptions TO service_role;
 
 
@@ -206664,7 +206664,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.me
 -- Grants: member_wearable_connections
 
 GRANT SELECT ON public.member_wearable_connections TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_wearable_connections TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.member_wearable_connections TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.member_wearable_connections TO service_role;
 
 
@@ -206675,7 +206675,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.me
 -- Grants: memberships
 
 GRANT SELECT ON public.memberships TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.memberships TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.memberships TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.memberships TO service_role;
 
 
@@ -206686,7 +206686,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.me
 -- Grants: message_escalations
 
 GRANT SELECT ON public.message_escalations TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.message_escalations TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.message_escalations TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.message_escalations TO service_role;
 
 
@@ -206777,7 +206777,7 @@ END $$;
 -- Grants: mobile_sessions
 
 GRANT SELECT ON public.mobile_sessions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.mobile_sessions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.mobile_sessions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.mobile_sessions TO service_role;
 
 
@@ -206788,7 +206788,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.mo
 -- Grants: moderation_decisions
 
 GRANT SELECT ON public.moderation_decisions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.moderation_decisions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.moderation_decisions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.moderation_decisions TO service_role;
 
 
@@ -206799,7 +206799,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.mo
 -- Grants: moderation_sessions
 
 GRANT SELECT ON public.moderation_sessions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.moderation_sessions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.moderation_sessions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.moderation_sessions TO service_role;
 
 
@@ -206810,7 +206810,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.mo
 -- Grants: news_article_deliveries
 
 GRANT SELECT ON public.news_article_deliveries TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.news_article_deliveries TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.news_article_deliveries TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.news_article_deliveries TO service_role;
 
 
@@ -206821,7 +206821,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ne
 -- Grants: news_articles
 
 GRANT SELECT ON public.news_articles TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.news_articles TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.news_articles TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.news_articles TO service_role;
 
 
@@ -206832,7 +206832,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ne
 -- Grants: node_factory_requests
 
 GRANT SELECT ON public.node_factory_requests TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.node_factory_requests TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.node_factory_requests TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.node_factory_requests TO service_role;
 
 
@@ -206843,7 +206843,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.no
 -- Grants: notification_campaign_runs
 
 GRANT SELECT ON public.notification_campaign_runs TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_campaign_runs TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.notification_campaign_runs TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_campaign_runs TO service_role;
 
 
@@ -206854,7 +206854,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.no
 -- Grants: notification_campaign_schedules
 
 GRANT SELECT ON public.notification_campaign_schedules TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_campaign_schedules TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.notification_campaign_schedules TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_campaign_schedules TO service_role;
 
 
@@ -206865,7 +206865,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.no
 -- Grants: notification_campaigns
 
 GRANT SELECT ON public.notification_campaigns TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_campaigns TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.notification_campaigns TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_campaigns TO service_role;
 
 
@@ -206876,7 +206876,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.no
 -- Grants: notification_logs
 
 GRANT SELECT ON public.notification_logs TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_logs TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.notification_logs TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_logs TO service_role;
 
 
@@ -206887,7 +206887,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.no
 -- Grants: notification_preferences
 
 GRANT SELECT ON public.notification_preferences TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_preferences TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.notification_preferences TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notification_preferences TO service_role;
 
 
@@ -206898,7 +206898,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.no
 -- Grants: notifications
 
 GRANT SELECT ON public.notifications TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notifications TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.notifications TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.notifications TO service_role;
 
 
@@ -206909,7 +206909,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.no
 -- Grants: onboarding_responses
 
 GRANT SELECT ON public.onboarding_responses TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.onboarding_responses TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.onboarding_responses TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.onboarding_responses TO service_role;
 
 
@@ -206920,7 +206920,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.on
 -- Grants: operational_assessment_dimensions
 
 GRANT SELECT ON public.operational_assessment_dimensions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.operational_assessment_dimensions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.operational_assessment_dimensions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.operational_assessment_dimensions TO service_role;
 
 
@@ -206931,7 +206931,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.op
 -- Grants: operational_assessment_tags
 
 GRANT SELECT ON public.operational_assessment_tags TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.operational_assessment_tags TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.operational_assessment_tags TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.operational_assessment_tags TO service_role;
 
 
@@ -206942,7 +206942,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.op
 -- Grants: operational_assessments
 
 GRANT SELECT ON public.operational_assessments TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.operational_assessments TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.operational_assessments TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.operational_assessments TO service_role;
 
 
@@ -206953,7 +206953,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.op
 -- Grants: order_approval_rules
 
 GRANT SELECT ON public.order_approval_rules TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.order_approval_rules TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.order_approval_rules TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.order_approval_rules TO service_role;
 
 
@@ -206964,7 +206964,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.or
 -- Grants: order_items
 
 GRANT SELECT ON public.order_items TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.order_items TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.order_items TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.order_items TO service_role;
 
 
@@ -206975,7 +206975,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.or
 -- Grants: order_reviews
 
 GRANT SELECT ON public.order_reviews TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.order_reviews TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.order_reviews TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.order_reviews TO service_role;
 
 
@@ -206986,7 +206986,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.or
 -- Grants: orders
 
 GRANT SELECT ON public.orders TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.orders TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.orders TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.orders TO service_role;
 
 
@@ -206997,7 +206997,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.or
 -- Grants: partner_appointment_notes
 
 GRANT SELECT ON public.partner_appointment_notes TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_appointment_notes TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.partner_appointment_notes TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_appointment_notes TO service_role;
 
 
@@ -207008,7 +207008,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pa
 -- Grants: partner_appointment_reviews
 
 GRANT SELECT ON public.partner_appointment_reviews TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_appointment_reviews TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.partner_appointment_reviews TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_appointment_reviews TO service_role;
 
 
@@ -207019,7 +207019,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pa
 -- Grants: partner_appointments
 
 GRANT SELECT ON public.partner_appointments TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_appointments TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.partner_appointments TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_appointments TO service_role;
 
 
@@ -207030,7 +207030,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pa
 -- Grants: partner_availability
 
 GRANT SELECT ON public.partner_availability TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_availability TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.partner_availability TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_availability TO service_role;
 
 
@@ -207054,7 +207054,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pa
 -- Grants: partner_matching_profiles
 
 GRANT SELECT ON public.partner_matching_profiles TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_matching_profiles TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.partner_matching_profiles TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_matching_profiles TO service_role;
 
 
@@ -207081,7 +207081,7 @@ GRANT SELECT ON public.partner_profiles_public TO anon, authenticated, service_r
 -- Grants: partner_profiles
 
 GRANT SELECT ON public.partner_profiles TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_profiles TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.partner_profiles TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_profiles TO service_role;
 
 
@@ -207092,7 +207092,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pa
 -- Grants: partner_reviews
 
 GRANT SELECT ON public.partner_reviews TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_reviews TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.partner_reviews TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_reviews TO service_role;
 
 
@@ -207103,7 +207103,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pa
 -- Grants: partner_stories
 
 GRANT SELECT ON public.partner_stories TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_stories TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.partner_stories TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_stories TO service_role;
 
 
@@ -207114,7 +207114,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pa
 -- Grants: partner_templates
 
 GRANT SELECT ON public.partner_templates TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_templates TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.partner_templates TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.partner_templates TO service_role;
 
 
@@ -207125,7 +207125,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pa
 -- Grants: payment_sessions
 
 GRANT SELECT ON public.payment_sessions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.payment_sessions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.payment_sessions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.payment_sessions TO service_role;
 
 
@@ -207145,7 +207145,7 @@ GRANT ALL ON payout_ledger TO service_role;
 -- Grants: permissions
 
 GRANT SELECT ON public.permissions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.permissions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.permissions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.permissions TO service_role;
 
 
@@ -207167,7 +207167,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pe
 -- Grants: placebo_compensations
 
 GRANT SELECT ON public.placebo_compensations TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.placebo_compensations TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.placebo_compensations TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.placebo_compensations TO service_role;
 
 
@@ -207274,7 +207274,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pl
 -- Grants: product_access_rules
 
 GRANT SELECT ON public.product_access_rules TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_access_rules TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.product_access_rules TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_access_rules TO service_role;
 
 
@@ -207285,7 +207285,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: product_access
 
 GRANT SELECT ON public.product_access TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_access TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.product_access TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_access TO service_role;
 
 
@@ -207296,7 +207296,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: product_catalog
 
 GRANT SELECT ON public.product_catalog TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_catalog TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.product_catalog TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_catalog TO service_role;
 
 
@@ -207307,7 +207307,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: product_dose_units
 
 GRANT SELECT ON public.product_dose_units TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_dose_units TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.product_dose_units TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_dose_units TO service_role;
 
 
@@ -207318,7 +207318,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: product_label_archive
 
 GRANT SELECT ON public.product_label_archive TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_label_archive TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.product_label_archive TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_label_archive TO service_role;
 
 
@@ -207329,7 +207329,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: product_label_templates
 
 GRANT SELECT ON public.product_label_templates TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_label_templates TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.product_label_templates TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_label_templates TO service_role;
 
 
@@ -207340,7 +207340,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: product_reviews
 
 GRANT SELECT ON public.product_reviews TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_reviews TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.product_reviews TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_reviews TO service_role;
 
 
@@ -207351,7 +207351,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: product_vials
 
 GRANT SELECT ON public.product_vials TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_vials TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.product_vials TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_vials TO service_role;
 
 
@@ -207362,7 +207362,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: product_vouchers
 
 GRANT SELECT ON public.product_vouchers TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_vouchers TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.product_vouchers TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.product_vouchers TO service_role;
 
 
@@ -207373,7 +207373,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_batch_materials
 
 GRANT SELECT ON public.production_batch_materials TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_batch_materials TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_batch_materials TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_batch_materials TO service_role;
 
 
@@ -207384,7 +207384,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_batches
 
 GRANT SELECT ON public.production_batches TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_batches TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_batches TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_batches TO service_role;
 
 
@@ -207395,7 +207395,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_bom_entries
 
 GRANT SELECT ON public.production_bom_entries TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_bom_entries TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_bom_entries TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_bom_entries TO service_role;
 
 
@@ -207406,7 +207406,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_capa
 
 GRANT SELECT ON public.production_capa TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_capa TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_capa TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_capa TO service_role;
 
 
@@ -207417,7 +207417,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_coefficients
 
 GRANT SELECT ON public.production_coefficients TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_coefficients TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_coefficients TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_coefficients TO service_role;
 
 
@@ -207428,7 +207428,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_cost_lines
 
 GRANT SELECT ON public.production_cost_lines TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_cost_lines TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_cost_lines TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_cost_lines TO service_role;
 
 
@@ -207439,7 +207439,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_cost_rates
 
 GRANT SELECT ON public.production_cost_rates TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_cost_rates TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_cost_rates TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_cost_rates TO service_role;
 
 
@@ -207450,7 +207450,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_cost_scenarios
 
 GRANT SELECT ON public.production_cost_scenarios TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_cost_scenarios TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_cost_scenarios TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_cost_scenarios TO service_role;
 
 
@@ -207461,7 +207461,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_credentials
 
 GRANT SELECT ON public.production_credentials TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_credentials TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_credentials TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_credentials TO service_role;
 
 
@@ -207472,7 +207472,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_deviations
 
 GRANT SELECT ON public.production_deviations TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_deviations TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_deviations TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_deviations TO service_role;
 
 
@@ -207483,7 +207483,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_equipment_calibrations
 
 GRANT SELECT ON public.production_equipment_calibrations TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_equipment_calibrations TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_equipment_calibrations TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_equipment_calibrations TO service_role;
 
 
@@ -207494,7 +207494,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_equipment_cleaning
 
 GRANT SELECT ON public.production_equipment_cleaning TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_equipment_cleaning TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_equipment_cleaning TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_equipment_cleaning TO service_role;
 
 
@@ -207505,7 +207505,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_equipment
 
 GRANT SELECT ON public.production_equipment TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_equipment TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_equipment TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_equipment TO service_role;
 
 
@@ -207516,7 +207516,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_flow_nodes
 
 GRANT SELECT ON public.production_flow_nodes TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_flow_nodes TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_flow_nodes TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_flow_nodes TO service_role;
 
 
@@ -207527,7 +207527,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_flow_records
 
 GRANT SELECT ON public.production_flow_records TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_flow_records TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_flow_records TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_flow_records TO service_role;
 
 
@@ -207538,7 +207538,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_flow_substances
 
 GRANT SELECT ON public.production_flow_substances TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_flow_substances TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_flow_substances TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_flow_substances TO service_role;
 
 
@@ -207549,7 +207549,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_inventory_events
 
 GRANT SELECT ON public.production_inventory_events TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_inventory_events TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_inventory_events TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_inventory_events TO service_role;
 
 
@@ -207560,7 +207560,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_locations
 
 GRANT SELECT ON public.production_locations TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_locations TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_locations TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_locations TO service_role;
 
 
@@ -207571,7 +207571,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_logs
 
 GRANT SELECT ON public.production_logs TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_logs TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_logs TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_logs TO service_role;
 
 
@@ -207582,7 +207582,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_lots
 
 GRANT SELECT ON public.production_lots TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_lots TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_lots TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_lots TO service_role;
 
 
@@ -207593,7 +207593,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_materials
 
 GRANT SELECT ON public.production_materials TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_materials TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_materials TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_materials TO service_role;
 
 
@@ -207604,7 +207604,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_metrics
 
 GRANT SELECT ON public.production_metrics TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_metrics TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_metrics TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_metrics TO service_role;
 
 
@@ -207615,7 +207615,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_milestones
 
 GRANT SELECT ON public.production_milestones TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_milestones TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_milestones TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_milestones TO service_role;
 
 
@@ -207626,7 +207626,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_protocol_steps
 
 GRANT SELECT ON public.production_protocol_steps TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_protocol_steps TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_protocol_steps TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_protocol_steps TO service_role;
 
 
@@ -207637,7 +207637,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_qc_test_definitions
 
 GRANT SELECT ON public.production_qc_test_definitions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_qc_test_definitions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_qc_test_definitions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_qc_test_definitions TO service_role;
 
 
@@ -207648,7 +207648,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_quality_params
 
 GRANT SELECT ON public.production_quality_params TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_quality_params TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_quality_params TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_quality_params TO service_role;
 
 
@@ -207659,7 +207659,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_release_decisions
 
 GRANT SELECT ON public.production_release_decisions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_release_decisions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_release_decisions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_release_decisions TO service_role;
 
 
@@ -207670,7 +207670,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_resources
 
 GRANT SELECT ON public.production_resources TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_resources TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_resources TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_resources TO service_role;
 
 
@@ -207681,7 +207681,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_sensor_alerts
 
 GRANT SELECT ON public.production_sensor_alerts TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_sensor_alerts TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_sensor_alerts TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_sensor_alerts TO service_role;
 
 
@@ -207692,7 +207692,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_sensor_readings
 
 GRANT SELECT ON public.production_sensor_readings TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_sensor_readings TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_sensor_readings TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_sensor_readings TO service_role;
 
 
@@ -207703,7 +207703,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_suppliers
 
 GRANT SELECT ON public.production_suppliers TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_suppliers TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_suppliers TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_suppliers TO service_role;
 
 
@@ -207714,7 +207714,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_token_events
 
 GRANT SELECT ON public.production_token_events TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_token_events TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_token_events TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_token_events TO service_role;
 
 
@@ -207725,7 +207725,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_tokens
 
 GRANT SELECT ON public.production_tokens TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_tokens TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_tokens TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_tokens TO service_role;
 
 
@@ -207736,7 +207736,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_variants
 
 GRANT SELECT ON public.production_variants TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_variants TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_variants TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_variants TO service_role;
 
 
@@ -207747,7 +207747,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_workflow_steps
 
 GRANT SELECT ON public.production_workflow_steps TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_workflow_steps TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_workflow_steps TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_workflow_steps TO service_role;
 
 
@@ -207758,7 +207758,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_workflow_template_versions
 
 GRANT SELECT ON public.production_workflow_template_versions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_workflow_template_versions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_workflow_template_versions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_workflow_template_versions TO service_role;
 
 
@@ -207769,7 +207769,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: production_workflow_templates
 
 GRANT SELECT ON public.production_workflow_templates TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_workflow_templates TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.production_workflow_templates TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.production_workflow_templates TO service_role;
 
 
@@ -207780,7 +207780,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: products
 
 GRANT SELECT ON public.products TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.products TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.products TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.products TO service_role;
 
 
@@ -207791,7 +207791,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.pr
 -- Grants: profiles
 
 GRANT SELECT ON public.profiles TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.profiles TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.profiles TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.profiles TO service_role;
 
 
@@ -207834,7 +207834,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.qu
 -- Grants: question_block_types
 
 GRANT SELECT ON public.question_block_types TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.question_block_types TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.question_block_types TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.question_block_types TO service_role;
 
 
@@ -207845,7 +207845,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.qu
 -- Grants: question_blocks
 
 GRANT SELECT ON public.question_blocks TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.question_blocks TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.question_blocks TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.question_blocks TO service_role;
 
 
@@ -207856,7 +207856,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.qu
 -- Grants: questionnaire_blocks
 
 GRANT SELECT ON public.questionnaire_blocks TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.questionnaire_blocks TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.questionnaire_blocks TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.questionnaire_blocks TO service_role;
 
 
@@ -207867,7 +207867,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.qu
 -- Grants: questionnaire_responses
 
 GRANT SELECT ON public.questionnaire_responses TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.questionnaire_responses TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.questionnaire_responses TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.questionnaire_responses TO service_role;
 
 
@@ -207878,7 +207878,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.qu
 -- Grants: questionnaire_versions
 
 GRANT SELECT ON public.questionnaire_versions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.questionnaire_versions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.questionnaire_versions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.questionnaire_versions TO service_role;
 
 
@@ -207889,7 +207889,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.qu
 -- Grants: questionnaires
 
 GRANT SELECT ON public.questionnaires TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.questionnaires TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.questionnaires TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.questionnaires TO service_role;
 
 
@@ -207933,7 +207933,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ra
 -- Grants: reminder_completions
 
 GRANT SELECT ON public.reminder_completions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.reminder_completions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.reminder_completions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.reminder_completions TO service_role;
 
 
@@ -208028,7 +208028,7 @@ END $$;
 -- Grants: role_definitions
 
 GRANT SELECT ON public.role_definitions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.role_definitions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.role_definitions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.role_definitions TO service_role;
 
 
@@ -208039,7 +208039,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ro
 -- Grants: role_permissions
 
 GRANT SELECT ON public.role_permissions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.role_permissions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.role_permissions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.role_permissions TO service_role;
 
 
@@ -208050,7 +208050,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ro
 -- Grants: roles
 
 GRANT SELECT ON public.roles TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.roles TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.roles TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.roles TO service_role;
 
 
@@ -208061,7 +208061,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.ro
 -- Grants: rule_bindings
 
 GRANT SELECT ON public.rule_bindings TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.rule_bindings TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.rule_bindings TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.rule_bindings TO service_role;
 
 
@@ -208081,7 +208081,7 @@ GRANT ALL ON rule_quality_feedback TO service_role;
 -- Grants: schema_repairs
 
 GRANT SELECT ON public.schema_repairs TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.schema_repairs TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.schema_repairs TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.schema_repairs TO service_role;
 
 
@@ -208092,7 +208092,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.sc
 -- Grants: schema_version
 
 GRANT SELECT ON public.schema_version TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.schema_version TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.schema_version TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.schema_version TO service_role;
 
 
@@ -208103,7 +208103,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.sc
 -- Grants: security_event_resolutions
 
 GRANT SELECT ON public.security_event_resolutions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.security_event_resolutions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.security_event_resolutions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.security_event_resolutions TO service_role;
 
 
@@ -208114,7 +208114,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.se
 -- Grants: shipment_records
 
 GRANT SELECT ON public.shipment_records TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.shipment_records TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.shipment_records TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.shipment_records TO service_role;
 
 
@@ -208125,7 +208125,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.sh
 -- Grants: shipment_settings
 
 GRANT SELECT ON public.shipment_settings TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.shipment_settings TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.shipment_settings TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.shipment_settings TO service_role;
 
 
@@ -208229,7 +208229,7 @@ GRANT ALL ON specialist_ratings TO service_role;
 -- Grants: story_ai_sessions
 
 GRANT SELECT ON public.story_ai_sessions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_ai_sessions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.story_ai_sessions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_ai_sessions TO service_role;
 
 
@@ -208240,7 +208240,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: story_contexts
 
 GRANT SELECT ON public.story_contexts TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_contexts TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.story_contexts TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_contexts TO service_role;
 
 
@@ -208251,7 +208251,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: story_entries
 
 GRANT SELECT ON public.story_entries TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_entries TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.story_entries TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_entries TO service_role;
 
 
@@ -208262,7 +208262,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: story_environments
 
 GRANT SELECT ON public.story_environments TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_environments TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.story_environments TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_environments TO service_role;
 
 
@@ -208284,7 +208284,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: story_labels
 
 GRANT SELECT ON public.story_labels TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_labels TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.story_labels TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_labels TO service_role;
 
 
@@ -208306,7 +208306,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: story_participants
 
 GRANT SELECT ON public.story_participants TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_participants TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.story_participants TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_participants TO service_role;
 
 
@@ -208343,7 +208343,7 @@ GRANT SELECT, INSERT, UPDATE ON public.story_pulse_beats TO service_role;
 -- Grants: story_reminders
 
 GRANT SELECT ON public.story_reminders TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_reminders TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.story_reminders TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_reminders TO service_role;
 
 
@@ -208354,7 +208354,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: story_rulesets
 
 GRANT SELECT ON public.story_rulesets TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_rulesets TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.story_rulesets TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.story_rulesets TO service_role;
 
 
@@ -208365,7 +208365,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: stripe_disputes
 
 GRANT SELECT ON public.stripe_disputes TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.stripe_disputes TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.stripe_disputes TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.stripe_disputes TO service_role;
 
 
@@ -208376,7 +208376,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: studies
 
 GRANT SELECT ON public.studies TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.studies TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.studies TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.studies TO service_role;
 
 
@@ -208387,7 +208387,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: study_blinding_config
 
 GRANT SELECT ON public.study_blinding_config TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_blinding_config TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.study_blinding_config TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_blinding_config TO service_role;
 
 
@@ -208443,7 +208443,7 @@ GRANT SELECT ON public.study_cohort_trends TO service_role;
 -- Grants: study_consent_acceptances
 
 GRANT SELECT ON public.study_consent_acceptances TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_consent_acceptances TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.study_consent_acceptances TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_consent_acceptances TO service_role;
 
 
@@ -208454,7 +208454,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: study_consent_items
 
 GRANT SELECT ON public.study_consent_items TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_consent_items TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.study_consent_items TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_consent_items TO service_role;
 
 
@@ -208465,7 +208465,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: study_consent_requirements
 
 GRANT SELECT ON public.study_consent_requirements TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_consent_requirements TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.study_consent_requirements TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_consent_requirements TO service_role;
 
 
@@ -208476,7 +208476,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: study_consultants
 
 GRANT SELECT ON public.study_consultants TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_consultants TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.study_consultants TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_consultants TO service_role;
 
 
@@ -208487,7 +208487,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: study_contributions
 
 GRANT SELECT ON public.study_contributions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_contributions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.study_contributions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_contributions TO service_role;
 
 
@@ -208498,7 +208498,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: study_distribution_protocols
 
 GRANT SELECT ON public.study_distribution_protocols TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_distribution_protocols TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.study_distribution_protocols TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_distribution_protocols TO service_role;
 
 
@@ -208509,7 +208509,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: study_questionnaires
 
 GRANT SELECT ON public.study_questionnaires TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_questionnaires TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.study_questionnaires TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_questionnaires TO service_role;
 
 
@@ -208520,7 +208520,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: study_ratings
 
 GRANT SELECT ON public.study_ratings TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_ratings TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.study_ratings TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_ratings TO service_role;
 
 
@@ -208531,7 +208531,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: study_registrations
 
 GRANT SELECT ON public.study_registrations TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_registrations TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.study_registrations TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_registrations TO service_role;
 
 
@@ -208542,7 +208542,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: study_test_templates
 
 GRANT SELECT ON public.study_test_templates TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_test_templates TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.study_test_templates TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.study_test_templates TO service_role;
 
 
@@ -208553,7 +208553,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.st
 -- Grants: subscription_packages
 
 GRANT SELECT ON public.subscription_packages TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.subscription_packages TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.subscription_packages TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.subscription_packages TO service_role;
 
 
@@ -208564,7 +208564,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.su
 -- Grants: supported_languages
 
 GRANT SELECT ON public.supported_languages TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.supported_languages TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.supported_languages TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.supported_languages TO service_role;
 
 
@@ -208622,7 +208622,7 @@ grant all on public.surface_data_rpcs, public.surface_blocks,
 -- Grants: symptom_catalog
 
 GRANT SELECT ON public.symptom_catalog TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.symptom_catalog TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.symptom_catalog TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.symptom_catalog TO service_role;
 
 
@@ -208633,7 +208633,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.sy
 -- Grants: system_config
 
 GRANT SELECT ON public.system_config TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.system_config TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.system_config TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.system_config TO service_role;
 
 
@@ -208657,7 +208657,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.te
 -- Grants: test_questions
 
 GRANT SELECT ON public.test_questions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.test_questions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.test_questions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.test_questions TO service_role;
 
 
@@ -208668,7 +208668,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.te
 -- Grants: test_templates
 
 GRANT SELECT ON public.test_templates TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.test_templates TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.test_templates TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.test_templates TO service_role;
 
 
@@ -208679,7 +208679,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.te
 -- Grants: token_allocations
 
 GRANT SELECT ON public.token_allocations TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.token_allocations TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.token_allocations TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.token_allocations TO service_role;
 
 
@@ -208690,7 +208690,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.to
 -- Grants: token_burns
 
 GRANT SELECT ON public.token_burns TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.token_burns TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.token_burns TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.token_burns TO service_role;
 
 
@@ -208701,7 +208701,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.to
 -- Grants: token_config
 
 GRANT SELECT ON public.token_config TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.token_config TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.token_config TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.token_config TO service_role;
 
 
@@ -208712,7 +208712,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.to
 -- Grants: token_locks
 
 GRANT SELECT ON public.token_locks TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.token_locks TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.token_locks TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.token_locks TO service_role;
 
 
@@ -208723,7 +208723,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.to
 -- Grants: token_production_events
 
 GRANT SELECT ON public.token_production_events TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.token_production_events TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.token_production_events TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.token_production_events TO service_role;
 
 
@@ -208734,7 +208734,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.to
 -- Grants: token_reward_rules
 
 GRANT SELECT ON public.token_reward_rules TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.token_reward_rules TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.token_reward_rules TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.token_reward_rules TO service_role;
 
 
@@ -208745,7 +208745,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.to
 -- Grants: token_transactions
 
 GRANT SELECT ON public.token_transactions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.token_transactions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.token_transactions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.token_transactions TO service_role;
 
 
@@ -208756,7 +208756,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.to
 -- Grants: translations
 
 GRANT SELECT ON public.translations TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.translations TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.translations TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.translations TO service_role;
 
 
@@ -208887,7 +208887,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.tw
 -- Grants: user_achievements
 
 GRANT SELECT ON public.user_achievements TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_achievements TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.user_achievements TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_achievements TO service_role;
 
 
@@ -208898,7 +208898,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.us
 -- Grants: user_course_progress
 
 GRANT SELECT ON public.user_course_progress TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_course_progress TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.user_course_progress TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_course_progress TO service_role;
 
 
@@ -208909,7 +208909,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.us
 -- Grants: user_distribution_schedule_orders
 
 GRANT SELECT ON public.user_distribution_schedule_orders TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_distribution_schedule_orders TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.user_distribution_schedule_orders TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_distribution_schedule_orders TO service_role;
 
 
@@ -208920,7 +208920,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.us
 -- Grants: user_distribution_schedule
 
 GRANT SELECT ON public.user_distribution_schedule TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_distribution_schedule TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.user_distribution_schedule TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_distribution_schedule TO service_role;
 
 
@@ -208945,7 +208945,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.us
 -- Grants: user_reminders
 
 GRANT SELECT ON public.user_reminders TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_reminders TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.user_reminders TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_reminders TO service_role;
 
 
@@ -208956,7 +208956,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.us
 -- Grants: user_roles
 
 GRANT SELECT ON public.user_roles TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_roles TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.user_roles TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_roles TO service_role;
 
 
@@ -208967,7 +208967,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.us
 -- Grants: user_sessions
 
 GRANT SELECT ON public.user_sessions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_sessions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.user_sessions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_sessions TO service_role;
 
 
@@ -208978,7 +208978,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.us
 -- Grants: user_shipment_preferences
 
 GRANT SELECT ON public.user_shipment_preferences TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_shipment_preferences TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.user_shipment_preferences TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_shipment_preferences TO service_role;
 
 
@@ -208989,7 +208989,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.us
 -- Grants: user_ui_preferences
 
 GRANT SELECT ON public.user_ui_preferences TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_ui_preferences TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.user_ui_preferences TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_ui_preferences TO service_role;
 
 
@@ -209000,7 +209000,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.us
 -- Grants: user_wallets
 
 GRANT SELECT ON public.user_wallets TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_wallets TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.user_wallets TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.user_wallets TO service_role;
 
 
@@ -209039,7 +209039,7 @@ GRANT SELECT ON public.v_health_weekly_summary TO authenticated, service_role;
 -- Grants: variable_symbol_sequences
 
 GRANT SELECT ON public.variable_symbol_sequences TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.variable_symbol_sequences TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.variable_symbol_sequences TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.variable_symbol_sequences TO service_role;
 
 
@@ -209050,7 +209050,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.va
 -- Grants: vial_assignments
 
 GRANT SELECT ON public.vial_assignments TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.vial_assignments TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.vial_assignments TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.vial_assignments TO service_role;
 
 
@@ -209072,7 +209072,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.vo
 -- Grants: wearable_analysis_files
 
 GRANT SELECT ON public.wearable_analysis_files TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.wearable_analysis_files TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.wearable_analysis_files TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.wearable_analysis_files TO service_role;
 
 
@@ -209083,7 +209083,7 @@ GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.we
 -- Grants: wearables_data
 
 GRANT SELECT ON public.wearables_data TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.wearables_data TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.wearables_data TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.wearables_data TO service_role;
 
 
@@ -209103,7 +209103,7 @@ GRANT ALL ON public.web_artifact_jobs TO service_role;
 -- Grants: web_push_subscriptions
 
 GRANT SELECT ON public.web_push_subscriptions TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.web_push_subscriptions TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.web_push_subscriptions TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.web_push_subscriptions TO service_role;
 
 
@@ -209157,7 +209157,7 @@ GRANT ALL ON TABLE public.workflow_statuses TO service_role;
 -- Grants: workflow_templates
 
 GRANT SELECT ON public.workflow_templates TO anon;
-GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.workflow_templates TO authenticated;
+GRANT DELETE, INSERT, SELECT, UPDATE ON public.workflow_templates TO authenticated;
 GRANT DELETE, INSERT, REFERENCES, SELECT, TRIGGER, TRUNCATE, UPDATE ON public.workflow_templates TO service_role;
 
 

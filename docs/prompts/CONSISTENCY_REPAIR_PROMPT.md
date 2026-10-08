@@ -2,7 +2,7 @@
 
 ## 📋 Kontext
 
-Tento prompt je určen pro systematickou opravu konzistence **produkční production aplikace** pracující s **reálnými sensitive data daty**. Aplikace již měla funkční RBAC systém s daty, který se během vývoje poškodil nebo ztratil konzistenci.
+Tento prompt je určen pro systematickou opravu konzistence **produkční aplikace** pracující s **reálnými citlivými daty**. Aplikace již měla funkční RBAC systém s daty, který se během vývoje poškodil nebo ztratil konzistenci.
 
 ---
 

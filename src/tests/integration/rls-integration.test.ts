@@ -14,7 +14,7 @@
  * - Partner data access with consent verification
  * - Admin full access capabilities
  * - Cross-user data access prevention
- * - sensitive data (sensitive data) access controls
+ * - sensitive data access controls
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';

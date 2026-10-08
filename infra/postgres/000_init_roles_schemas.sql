@@ -382,8 +382,13 @@ CREATE TABLE IF NOT EXISTS storage.objects (
 ALTER TABLE storage.buckets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE storage.objects  ENABLE ROW LEVEL SECURITY;
 
-GRANT ALL ON storage.buckets TO authenticated, service_role;
-GRANT ALL ON storage.objects  TO authenticated, service_role;
+-- authenticated: jen práva, která hlídá RLS. TRUNCATE/REFERENCES/TRIGGER RLS
+-- nepodléhají (TRUNCATE vyprázdní celou tabulku bez ohledu na politiky) — stejné
+-- pravidlo jako u public (brána authenticated-grants-bez-ddl).
+GRANT SELECT, INSERT, UPDATE, DELETE ON storage.buckets TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON storage.objects  TO authenticated;
+GRANT ALL ON storage.buckets TO service_role;
+GRANT ALL ON storage.objects  TO service_role;
 GRANT SELECT ON storage.buckets TO anon;
 GRANT SELECT ON storage.objects  TO anon;
 

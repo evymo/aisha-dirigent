@@ -41,6 +41,19 @@ vi.mock('@aisha/observability/otel', () => ({
   bootstrapOtel: mocks.bootstrapOtel,
 }));
 
+// planner.ts builds its AITG runner at import time; the real @aisha/aitg would
+// reach into the mocked @aisha/security above. The guard is covered in
+// planner.test.ts — here it passes the model output through unchanged.
+vi.mock('@aisha/aitg', () => ({
+  createAitgRunner: () => ({ record: async () => null }),
+  withAitgGuard: async (_opts: unknown, fn: () => Promise<{ text: string }>) => ({
+    result: await fn(),
+    runIds: {},
+    violated: false,
+    observations: {},
+  }),
+}));
+
 vi.mock('./planner.js', async (importActual) => {
   const actual = await importActual<typeof import('./planner.js')>();
   return { planExecution: (...args: Parameters<typeof actual.planExecution>) => mocks.planExecution(...args) };

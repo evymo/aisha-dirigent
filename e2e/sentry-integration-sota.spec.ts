@@ -354,7 +354,7 @@ test.describe("Data Protection in Sentry", () => {
   test("sensitive data nejsou v error messages", async ({ page }) => {
     const { getErrors } = setupErrorCapture(page);
 
-    // Navštiv stránku s sensitive data daty
+    // Navštiv stránku s citlivými daty
     await page.goto("/admin/users");
     await waitForLoadingComplete(page);
 

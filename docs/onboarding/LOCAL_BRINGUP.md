@@ -13,7 +13,7 @@
 
 ```bash
 nvm use                       # Node 22 (.nvmrc)
-npm install                   # nebo bun install
+npm ci                        # podle package-lock.json (jiný správce balíčků lockfile nemá)
 
 # 1) celý stack + seed profil FULL (klíč: NE dev, NE instance — jinak se <instance> ruleset nenaváže)
 AISHA_SEED_PROFILE=full bash scripts/local-warmup.sh --preset optimum --seed-profile full --wait

@@ -2,17 +2,17 @@
 
 > **Verze:** 2.0 | **Datum:** 18. ledna 2026
 
-Produkční production aplikace s reálnými sensitive data daty. Tento dokument definuje pravidla, která zajišťují bezpečnost, konzistenci a kvalitu kódu.
+Produkční aplikace s reálnými citlivými daty. Tento dokument definuje pravidla, která zajišťují bezpečnost, konzistenci a kvalitu kódu.
 
 ---
 
 ## 🎯 Proč tato pravidla existují
 
-Tato aplikace zpracovává **sensitive data (sensitive data)** — citlivá zdravotní data skutečných lidí. Každé pravidlo zde má konkrétní důvod:
+Tato aplikace zpracovává **sensitive data** — citlivá zdravotní data skutečných lidí. Každé pravidlo zde má konkrétní důvod:
 
 | Pravidlo | Důvod |
 |----------|-------|
-| RPC-only pro sensitive data | Audit trail pro compliance (compliance) |
+| RPC-only pro sensitive data | Audit trail pro compliance |
 | Žádné sensitive data v logách | Ochrana soukromí pacientů |
 | i18n pro všechny texty | Multijazyčná aplikace, konzistentní UX |
 | Explicitní sloupce | Minimalizace dat, rychlejší queries |
@@ -244,7 +244,7 @@ export function useHealthTracking() {
 
 ### RPC-Only Pattern pro sensitive data
 
-**Proč:** Každý přístup k sensitive data datům musí být auditován pro compliance compliance.
+**Proč:** Každý přístup k citlivým datům musí být auditován pro compliance.
 
 ```typescript
 // ✅ SPRÁVNĚ: RPC s auditem
@@ -295,7 +295,7 @@ queryClient.invalidateQueries({
 
 ## 🔐 Bezpečnost a sensitive data
 
-### Co je sensitive data (sensitive data)
+### Co je sensitive data
 
 | Kategorie | Příklady |
 |-----------|----------|
@@ -492,7 +492,7 @@ BEGIN
   
   -- 2. Audit log
   INSERT INTO audit_journal (user_id, action, metadata)
-  VALUES (auth.uid(), 'sensitive data_READ', jsonb_build_object('limit', p_limit));
+  VALUES (auth.uid(), 'SENSITIVE_DATA_READ', jsonb_build_object('limit', p_limit));
   
   -- 3. Return data (explicitní sloupce)
   RETURN QUERY 

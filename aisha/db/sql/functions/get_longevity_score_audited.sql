@@ -94,7 +94,7 @@ BEGIN
   INSERT INTO audit_journal (user_id, action, metadata)
   VALUES (
     auth.uid(),
-    'sensitive data_READ',
+    'SENSITIVE_DATA_READ',
     jsonb_build_object(
       'area', 'longevity_score',
       'severity', 'info',

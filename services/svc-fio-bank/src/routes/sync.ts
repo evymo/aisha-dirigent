@@ -3,6 +3,7 @@ import { config } from '../config.js';
 import { verifyToken, isAdminOrStaff, AuthError } from '../auth.js';
 import { rpcService } from '../postgrest.js';
 import { resolveBaseCurrency } from '../lib/currency.js';
+import { resolveFioDateRange } from '../lib/dateRange.js';
 
 // ── Fio API types ──
 
@@ -175,11 +176,12 @@ export async function syncRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(400).send({ ok: false, reason: 'Fio API token not configured' });
     }
 
-    // Date range — last 30 days default
-    const fromDate = body.from_date
-      ?? new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-    const toDate = body.to_date
-      ?? new Date().toISOString().split('T')[0];
+    // Date range — last 30 days default; validated because it goes into the URL path
+    const range = resolveFioDateRange(body);
+    if (!range.ok) {
+      return reply.status(400).send({ ok: false, reason: range.reason });
+    }
+    const { fromDate, toDate } = range;
 
     req.log.info({ fromDate, toDate }, 'Fetching Fio transactions');
 

@@ -332,12 +332,11 @@ test.describe("API: Data Availability", () => {
 
       if (anonKey) {
         const baseUrl = process.env.VITE_AISHA_POSTGREST_URL ?? (process.env.PUBLIC_TLD ? `https://api.${process.env.PUBLIC_TLD}` : (() => { throw new Error("E2E: set VITE_AISHA_POSTGREST_URL or PUBLIC_TLD"); })());
-        const res = await request.get(
-          `${baseUrl}/rest/v1/expert_rules?select=id,title,slug,status&status=eq.published&limit=10`,
-          {
-            headers: { apikey: anonKey },
-          },
-        );
+        // RPC-only: gateway pouští klienta jen na /rpc/<funkce> (lib/rest-jen-rpc.ts).
+        const res = await request.post(`${baseUrl}/rest/v1/rpc/get_expert_rules`, {
+          headers: { apikey: anonKey, "Content-Type": "application/json" },
+          data: { p_limit: 10 },
+        });
 
         expect(res.ok()).toBeTruthy();
         const rules = await res.json();
@@ -358,12 +357,10 @@ test.describe("API: Data Availability", () => {
 
       if (anonKey) {
         const baseUrl = process.env.VITE_AISHA_POSTGREST_URL ?? (process.env.PUBLIC_TLD ? `https://api.${process.env.PUBLIC_TLD}` : (() => { throw new Error("E2E: set VITE_AISHA_POSTGREST_URL or PUBLIC_TLD"); })());
-        const res = await request.get(
-          `${baseUrl}/rest/v1/knowledge_topics?select=id,slug,title_key,visibility&limit=10`,
-          {
-            headers: { apikey: anonKey },
-          },
-        );
+        const res = await request.post(`${baseUrl}/rest/v1/rpc/get_knowledge_topics_localized`, {
+          headers: { apikey: anonKey, "Content-Type": "application/json" },
+          data: { p_limit: 10 },
+        });
 
         expect(res.ok()).toBeTruthy();
         const topics = await res.json();
@@ -384,12 +381,10 @@ test.describe("API: Data Availability", () => {
 
       if (anonKey) {
         const baseUrl = process.env.VITE_AISHA_POSTGREST_URL ?? (process.env.PUBLIC_TLD ? `https://api.${process.env.PUBLIC_TLD}` : (() => { throw new Error("E2E: set VITE_AISHA_POSTGREST_URL or PUBLIC_TLD"); })());
-        const res = await request.get(
-          `${baseUrl}/rest/v1/hero_slides?select=id,is_active,title_key&is_active=eq.true&limit=5`,
-          {
-            headers: { apikey: anonKey },
-          },
-        );
+        const res = await request.post(`${baseUrl}/rest/v1/rpc/get_public_hero_slides`, {
+          headers: { apikey: anonKey, "Content-Type": "application/json" },
+          data: {},
+        });
 
         expect(res.ok()).toBeTruthy();
         const slides = await res.json();

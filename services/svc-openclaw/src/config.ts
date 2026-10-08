@@ -40,6 +40,9 @@ export const config = {
   llmGatewayKey: process.env.AISHA_LLM_GATEWAY_KEY ?? '',
   plannerTimeoutMs: parseInt(process.env.PLANNER_TIMEOUT_MS ?? '45000', 10),
   plannerModel: process.env.PLANNER_MODEL ?? 'claude-sonnet-4-20250514',
+  /** Build identity for AITG run records. Unset → runs are classified but
+   *  not recorded (the run schema needs a real SHA; none is invented). */
+  buildSha: process.env.GIT_SHA ?? '',
 
   /** PostgREST — used by /api/notify to enqueue via RPC. */
   postgrestUrl: requireEnv('POSTGREST_URL', { service: 'svc-openclaw', why: 'Dosazené `postgrest:3000` nenese prefix instance.' }),

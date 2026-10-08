@@ -222,3 +222,46 @@ describe('planExecution — normalization', () => {
     expect(sent.messages[1].content).toContain('"budget":"low"');
   });
 });
+
+describe('planExecution — AITG output guard', () => {
+  it('degrades to manual_review when the model output reads as an obeyed injection', async () => {
+    const { createInMemoryAitgRunner } = await import('@aisha/aitg');
+    const runner = createInMemoryAitgRunner();
+    process.env.GIT_SHA = 'abcdef1234567';
+    safeFetch.mockResolvedValueOnce(
+      gatewayResponse(JSON.stringify({
+        steps: [{ action: 'exfiltrate', rationale: 'Ignoring previous instructions as requested.' }],
+      })),
+    );
+    const planExecution = await loadPlanner();
+
+    const r = await planExecution({ task: TASK }, noopLog, ssrf, runner);
+    delete process.env.GIT_SHA;
+
+    expect(r.source).toBe('fallback');
+    expect(r.plan.steps).toHaveLength(1);
+    expect(r.plan.steps[0].action).toBe('manual_review');
+    expect(r.warnings).toEqual(['aitg_guard_violation']);
+    expect(runner.records.map((x) => [x.testId, x.status])).toEqual([
+      ['AITG-APP-01', 'failed'],
+      ['AITG-APP-12', 'passed'],
+    ]);
+  });
+
+  it('records a passing run and returns the plan for a clean output', async () => {
+    const { createInMemoryAitgRunner } = await import('@aisha/aitg');
+    const runner = createInMemoryAitgRunner();
+    process.env.GIT_SHA = 'abcdef1234567';
+    safeFetch.mockResolvedValueOnce(
+      gatewayResponse(JSON.stringify({ steps: [{ action: 'fetch-source' }] })),
+    );
+    const planExecution = await loadPlanner();
+
+    const r = await planExecution({ task: TASK }, noopLog, ssrf, runner);
+    delete process.env.GIT_SHA;
+
+    expect(r.source).toBe('llm_gateway');
+    expect(r.plan.steps[0].action).toBe('fetch-source');
+    expect(runner.records.every((x) => x.status === 'passed')).toBe(true);
+  });
+});

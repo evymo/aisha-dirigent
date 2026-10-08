@@ -98,7 +98,7 @@ Do not:
 
 ## Stop-and-ask rule
 
-If a change touches sensitive-data, auth, permissions, or DB functions and you are not 100% sure it is safe, stop and ask before committing.
+If a change touches citlivými daty, auth, permissions, or DB functions and you are not 100% sure it is safe, stop and ask before committing.
 
 ## Engineering principles — no workarounds, no regressions
 
