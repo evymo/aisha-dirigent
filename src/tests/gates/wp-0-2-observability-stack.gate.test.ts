@@ -207,7 +207,9 @@ describe('Phase 12 WP 0.2 — Grafana provisioning + dashboards', () => {
   it('Loki datasource has derivedFields → Langfuse trace URL (per §-1.12 R1)', () => {
     const cfg = readOrEmpty(GRAFANA_DATASOURCES);
     expect(cfg).toMatch(/derivedFields/);
-    expect(cfg).toMatch(/langfuse\.backend\.id3a\.cz/);
+    // Odkaz do Langfuse je adresa OPERÁTORA (env), ne doména konkrétní instance.
+    expect(cfg).toMatch(/\$\{LANGFUSE_PUBLIC_URL\}\/trace\//);
+    expect(cfg).not.toMatch(/id3a\.cz|aisha\.guru/);
     expect(cfg).toMatch(/trace_id/);
   });
 

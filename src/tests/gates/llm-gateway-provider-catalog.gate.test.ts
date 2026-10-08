@@ -29,11 +29,14 @@ describe("LLM gateway naming + provider catalog", () => {
     expect(catalog).not.toMatch(/'llm-gateway'[^)]*?'https:\/\/gateway\.aisha\.guru/);
   });
 
-  test("migrate entrypoint reconciles the llm-gateway endpoint to the derived URL (aisha.guru fail-safe)", () => {
+  test("migrate entrypoint reconciles the llm-gateway endpoint to the derived URL (public-zone fail-safe)", () => {
     expect(entrypoint).toContain("AISHA_LLM_GATEWAY_URL");
     expect(entrypoint).toMatch(/UPDATE public\.ai_provider_registry SET endpoint_url[\s\S]{0,120}slug = 'llm-gateway'/);
     // never re-point at the public API gateway
-    expect(entrypoint).toMatch(/\*aisha\.guru\*[\s\S]{0,80}SKIPPED/);
+    // ... decided by the instance's own PUBLIC_TLD, never by a built-in domain
+    expect(entrypoint).toMatch(/"\$PUBLIC_TLD"\|\*\."\$PUBLIC_TLD"\)\s*GW_IS_PUBLIC=1/);
+    expect(entrypoint).toMatch(/GW_IS_PUBLIC" in\s*1\)[\s\S]{0,80}SKIPPED/);
+    expect(entrypoint).not.toMatch(/\*aisha\.guru\*/);
   });
 
   test("openrouter is registered as a first-class direct provider (OSS aggregator, OpenAI-compat)", () => {

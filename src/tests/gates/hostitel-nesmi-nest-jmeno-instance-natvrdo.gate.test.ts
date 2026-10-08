@@ -154,10 +154,8 @@ describe("hostitel v adrese nesmí nést jméno instance natvrdo", () => {
     // identitě. Zásah do 8 služeb + jejich testů — vlastní úkol.
     // Seznam se smí jen ZKRACOVAT; cokoli mimo něj bránu shodí.
     const ZNAMY_DLUH = new Map<string, number>([
-      // 2026-08-21: 10 → 2. Osm adres převedeno na `${INSTANCE_PREFIX}-…`;
-      // zbylé dvě nesou tvar podle PLACEMENTU (`backend--integration--…`),
-      // ne podle instance — jiná třída, patří k jinému měřidlu.
-      ["config/local-presets.mjs", 2],
+      // config/local-presets.mjs: 2026-08-21 10 → 2, 2026-10-08 2 → 0 (AISHA_DB_URL
+      // a N8N_DB_HOST se skládají z `${INSTANCE_PREFIX}-db`) — splaceno, ze seznamu pryč.
       ["packages/cache-redis/src/client.ts", 2],
       ["scripts/lib/local-env-assertions.test.mjs", 5],
       ["services/svc-ai-chat/src/tests/config-kc-issuer.unit.test.ts", 3],

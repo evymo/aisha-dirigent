@@ -678,7 +678,7 @@ function renderMode(el) {
     el.querySelector("#mode-hint").textContent =
       mode === "selfhost"
         ? "→ Doplníš infra/topology inputy (krok „Deploy config“) a spustíš cold-start. Krok „Cloud“ přeskoč."
-        : "→ Přeskoč „Deploy config“. V kroku „Cloud“ se přihlásíš ke své AISHA (výchozí lokální http://localhost:3001) a napojíš editor přes PAT.";
+        : "→ Přeskoč „Deploy config“. V kroku „Cloud“ se přihlásíš ke své AISHA (výchozí: gateway lokálního stacku z local-warmup) a napojíš editor přes PAT.";
   };
   el.innerHTML = `
     <h2>Jak chceš AISHA používat?</h2>
@@ -691,7 +691,7 @@ function renderMode(el) {
       </div>
       <div class="card card-selectable" data-mode="central">
         <h3>🔌 Napojení na existující AISHA</h3>
-        <p>Doplněk (Dirigent) řídí TVŮJ projekt proti AISHA, která už běží — lokální stack (<code>http://localhost:3001</code>) nebo tvoje nasazená instance.</p>
+        <p>Doplněk (Dirigent) řídí TVŮJ projekt proti AISHA, která už běží — lokální stack (gateway z <code>local-warmup</code>) nebo tvoje nasazená instance.</p>
         <p style="font-size:12px">Dodáš: jen přihlášení → PAT pro tvou story. Editor napojíš přes base-URL + token.</p>
       </div>
     </div>

@@ -72,7 +72,8 @@ describe('Phase 12 WP 2.4 — aisha-llm-cost.json dashboard', () => {
 
   it('documents Langfuse vs Grafana split (where to find what)', () => {
     const src = readOrEmpty(DASHBOARD);
-    expect(src).toMatch(/langfuse\.backend\.id3a\.cz/);
+    expect(src).toMatch(/Langfuse UI/);
+    expect(src, "dashboard must not link a specific instance's Langfuse").not.toMatch(/id3a\.cz|aisha\.guru/);
     expect(src).toMatch(/aisha_llm_calls_total/);
     expect(src).toMatch(/[Ww]here to find what/);
   });
