@@ -14,10 +14,14 @@ on:
       - 'packages/acs-contracts/**'
       - 'packages/acs-sdk/**'
       - 'scripts/acs/**'
+      - '.github/workflows/acs-contracts.yml'
+
+permissions:
+  contents: read
 
 jobs:
   contracts:
-    runs-on: docker
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:

@@ -217,7 +217,7 @@ describe("každá cesta nasazení obnovuje cachebust před buildem", () => {
   i `Deploy: Core`):
       ::warning::SURFACE_OVERLAY_CACHEBUST: HEAD overlay repa se nepodařilo přečíst …
       PROVEDENO: refresh-overlay-cachebust.sh doběhl před buildem
-  Dvě vady naráz: (1) deploy joby neměly FORGEJO_TOKEN, takže `git ls-remote`
+  Dvě vady naráz: (1) deploy joby neměly token (dnes GIT_TOKEN), takže `git ls-remote`
   soukromého overlay repa selhal; (2) skript přesto skončil 0 — smyčka běžela
   v rouře (podskořepina) a neúspěch byl jen `continue` — a souhrn z toho udělal
   „PROVEDENO". Core i extranet se postavily z KEŠOVANÉHO overlaye.
@@ -239,7 +239,7 @@ describe("cachebust mluví pravdu a má čím číst HEAD", () => {
       .filter((u) => u.jmeno);
   }
 
-  it("každá úloha, která nasazuje přes deploy-and-verify / vlny / refresh, dostává FORGEJO_TOKEN", () => {
+  it("každá úloha, která nasazuje přes deploy-and-verify / vlny / refresh, dostává GIT_TOKEN", () => {
     const bezTokenu: string[] = [];
     let nasazujicich = 0;
     for (const wf of [".github/workflows/ci.yml", ".github/workflows/deploy.yml"]) {
@@ -249,7 +249,7 @@ describe("cachebust mluví pravdu a má čím číst HEAD", () => {
           /bash scripts\/ci\/deploy-and-verify\.sh|bash scripts\/ci\/nasad-podle-vln\.sh|bash scripts\/deploy\/refresh-overlay-cachebust\.sh/.test(kod);
         if (!nasazuje) continue;
         nasazujicich++;
-        if (!/^\s+FORGEJO_TOKEN:\s*\$\{\{\s*secrets\.[A-Z_]+\s*\}\}\s*$/m.test(kod)) bezTokenu.push(`${wf}:${u.jmeno}`);
+        if (!/^\s+GIT_TOKEN:\s*\$\{\{\s*secrets\.[A-Z_]+\s*\}\}\s*$/m.test(kod)) bezTokenu.push(`${wf}:${u.jmeno}`);
       }
     }
     // Nula nasazujících úloh by podmínku splnila triviálně.

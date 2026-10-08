@@ -64,7 +64,7 @@ describe('Semgrep SAST integrity gate', () => {
     const content = readFileSync(SEMGREP_WORKFLOW, 'utf8');
     // Match the pinned Semgrep image wherever it is referenced — as a job
     // `container: image:` OR on a `docker run semgrep/semgrep:<ver>` line
-    // (the latter is required on Forgejo, whose act_runner can't run JS
+    // (the latter form exists for container-based runners that can't run JS
     // actions inside a job container). Spec unchanged: a pinned semgrep/semgrep
     // image must be used, and `:latest` is rejected below.
     const imageMatch = content.match(/semgrep\/semgrep:([^\s"'\\]+)/);

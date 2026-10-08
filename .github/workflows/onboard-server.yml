@@ -1,11 +1,15 @@
 # =============================================================================
-# Server Onboarding — Coolify Multi-Server Infrastructure (Forgejo Actions)
+# Server Onboarding — Coolify Multi-Server Infrastructure (GitHub Actions)
 # =============================================================================
-# Manually onboard a new server into the AISHA Coolify cluster.
-# Registers SSH key, creates server in Coolify, validates Docker,
-# optionally installs Forgejo runner.
+# Manually onboard a new server into the instance's Coolify cluster.
+# Registers SSH key, creates server in Coolify, validates Docker.
+# (CI runners are not installed from here — the pipeline runs on GitHub-hosted
+# runners; a self-hosted runner is registered per GitHub's own docs.)
 #
-# Usage: Forgejo UI -> Actions -> onboard-server -> Run workflow
+# OPT-IN: runs only in a repository that declares its instance (repository
+# variable APP_NAME_PREFIX) and holds COOLIFY_URL + COOLIFY_API_TOKEN.
+#
+# Usage: GitHub → Actions → Onboard Server → Run workflow
 # =============================================================================
 
 name: Onboard Server
@@ -34,19 +38,37 @@ on:
         required: false
         type: string
         default: "root"
-      install_runner:
-        description: "Install Forgejo Actions runner"
-        required: false
-        type: boolean
-        default: false
 
 concurrency:
   group: onboard-server
   cancel-in-progress: false
 
+permissions:
+  contents: read
+
 jobs:
+  # Bez deklarované instance se nic nenasazuje — a ruční spuštění to řekne
+  # nahlas (souhrn běhu), místo aby skončilo prázdným přeskočením.
+  nenakonfigurovano:
+    name: "Nasazení není nakonfigurované"
+    if: vars.APP_NAME_PREFIX == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Opt-in vysvětlení
+        run: |
+          echo "::notice title=nasazení je opt-in::Tohle repo nedeklaruje instanci (proměnná APP_NAME_PREFIX), takže se nic nenasazuje."
+          {
+            echo "### Nasazení je opt-in"
+            echo
+            echo "Nastav v **Settings → Secrets and variables → Actions**:"
+            echo "- proměnnou \`APP_NAME_PREFIX\` (identita instance — prefix jmen Coolify aplikací),"
+            echo "- secrety \`COOLIFY_URL\` a \`COOLIFY_API_TOKEN\` (+ volitelně \`GIT_TOKEN\` pro privátní overlaye)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
   onboard:
     name: "Onboard: ${{ github.event.inputs.server_name }}"
+    if: vars.APP_NAME_PREFIX != ''
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -56,19 +78,18 @@ jobs:
         env:
           COOLIFY_API_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
           COOLIFY_URL: ${{ secrets.COOLIFY_URL }}
-          FORGEJO_API_TOKEN: ${{ secrets.FORGEJO_API_TOKEN }}
-          FORGEJO_URL: ${{ github.server_url }}
-          FORGEJO_OWNER: aisha
-          FORGEJO_REPO: aisha-dirigent
+          # Vstupy jdou do skriptu přes env, ne interpolací do shellu
+          # (workflow-injection — semgrep-sast).
+          SERVER_NAME: ${{ github.event.inputs.server_name }}
+          SERVER_IP: ${{ github.event.inputs.server_ip }}
+          SERVER_ROLE: ${{ github.event.inputs.server_role }}
+          SSH_USER: ${{ github.event.inputs.ssh_user }}
         run: |
-          RUNNER_FLAG=""
-          if [ "${{ github.event.inputs.install_runner }}" = "true" ]; then
-            RUNNER_FLAG="--runner"
-          fi
-
+          set -euo pipefail
+          : "${COOLIFY_URL:?COOLIFY_URL must be set via repository secret}"
+          : "${COOLIFY_API_TOKEN:?COOLIFY_API_TOKEN must be set via repository secret}"
           bash scripts/coolify-server-onboard.sh \
-            --name "${{ github.event.inputs.server_name }}" \
-            --ip "${{ github.event.inputs.server_ip }}" \
-            --role "${{ github.event.inputs.server_role }}" \
-            --ssh-user "${{ github.event.inputs.ssh_user }}" \
-            $RUNNER_FLAG
+            --name "$SERVER_NAME" \
+            --ip "$SERVER_IP" \
+            --role "$SERVER_ROLE" \
+            --ssh-user "$SSH_USER"

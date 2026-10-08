@@ -139,9 +139,10 @@ se dalo měsíce mergovat s pocitem, že se nasazuje. Proto teď padá.
 
 CO S TÍM — jedno ze dvou:
   (a) doplnit tajemství COOLIFY_API_TOKEN + COOLIFY_URL do nastavení repozitáře
-      (Forgejo → Settings → Actions → Secrets); pak se nasazuje automaticky;
-  (b) pokud se tahle instalace nasazuje VÝHRADNĚ ručně, vypnout deploy úlohy
-      v .github/workflows/ci.yml — ať pipeline nepředstírá krok, který nedělá.
+      (Settings → Secrets and variables → Actions); pak se nasazuje automaticky;
+  (b) pokud se tahle instalace nasazuje VÝHRADNĚ ručně, smazat proměnnou
+      APP_NAME_PREFIX — deploy úlohy v .github/workflows/ci.yml jsou opt-in
+      a bez ní se nespustí, takže pipeline nepředstírá krok, který nedělá.
 Ruční cesta zůstává: node scripts/aisha-redeploy.mjs --only=<app>
 NAPOVEDA
   exit 1
@@ -181,7 +182,7 @@ fi
 if [ -z "$APP_PREFIX" ]; then
   echo "::error title=deploy misconfigured::APP_NAME_PREFIX není nastaven a v instances/ není žádná instance."
   echo "::error::Nevím, KTEROU instanci nasadit, a proto nenasazuji nic."
-  echo "::error::Nastav proměnnou repozitáře APP_NAME_PREFIX (Forgejo → Settings → Actions → Variables)"
+  echo "::error::Nastav proměnnou repozitáře APP_NAME_PREFIX (Settings → Secrets and variables → Actions → Variables)"
   echo "::error::— stejnou, jakou používá deploy.yml. Výchozí hodnota se ZÁMĚRNĚ nedosazuje:"
   echo "::error::dosazený 'aisha' by z forku nasadil cizí produkci."
   exit 1
@@ -419,7 +420,7 @@ fi
 # pokusy nemění. Stack bez overlaye je pro skript no-op.
 #
 # ⛔ KÓD, NE „DOBĚHL". NAMĚŘENO 2026-09-24 (běh 51874): skript vypsal „HEAD overlay
-# repa se nepodařilo přečíst" (deploy joby neměly FORGEJO_TOKEN), skončil ale 0
+# repa se nepodařilo přečíst" (deploy joby neměly token pro čtení overlay rep), skončil ale 0
 # a tenhle souhrn z toho udělal „PROVEDENO" — core i extranet se postavily
 # z KEŠOVANÉHO overlaye. Skript teď vrací 3 = NEDOKÁZÁNO a souhrn čte kód.
 CACHEBUST_STAV="NEDOKÁZÁNO: cachebust overlaye se neobnovil — build mohl vzít overlay z keše."
@@ -428,7 +429,7 @@ COOLIFY_BASE_URL="$COOLIFY_URL" bash scripts/deploy/refresh-overlay-cachebust.sh
 case "$CACHEBUST_RC" in
   0) CACHEBUST_STAV="DOKÁZÁNO: cachebust overlaye je aktuální před buildem (obnoven, beze změny, nebo stack overlay nemá — viz výpis výše)." ;;
   3) CACHEBUST_STAV="NEDOKÁZÁNO: overlay je deklarovaný, ale cachebust se neobnovil (HEAD nečitelný, zápis nebo envy selhaly) — build vezme overlay z KEŠE."
-     echo "::warning title=cachebust NEDOKÁZÁN::'$APP' — build vezme overlay z keše (důvod ve výpisu refresh-overlay-cachebust výše; chybí FORGEJO_TOKEN?)." ;;
+     echo "::warning title=cachebust NEDOKÁZÁN::'$APP' — build vezme overlay z keše (důvod ve výpisu refresh-overlay-cachebust výše; chybí GIT_TOKEN?)." ;;
   *) CACHEBUST_STAV="NEDOKÁZÁNO: refresh-overlay-cachebust.sh skončil kódem ${CACHEBUST_RC} (chyba zadání) — cachebust se neobnovil."
      echo "::warning title=cachebust neobnoven::'$APP' — refresh-overlay-cachebust.sh kód ${CACHEBUST_RC}; build může vzít overlay z keše, nebo na prázdném cachebustu spadnout." ;;
 esac

@@ -1,10 +1,10 @@
 # =============================================================================
-# AISHA Dirigent Supervisor — Pure-Node E2E (Forgejo Actions)
+# AISHA Dirigent Supervisor — Pure-Node E2E (GitHub Actions)
 # =============================================================================
 # Verifies the supervisor's CLI surface (mock backend + bash hooks + Node
-# relay) without Docker — the only runner currently registered at the
-# Forgejo instance level (aisha-runner, labels: ubuntu-latest,
-# ubuntu-22.04, self-hosted) is not DinD-enabled.
+# relay) without Docker, so the job runs on any runner — and identically on a
+# contributor's machine (`node --test --test-concurrency=1 cli/*.spec.mjs` in
+# tests/e2e-dirigent/ against `npx tsx mock-backend/server.ts`).
 #
 # What this CI job covers:
 #   - Mock backend boots (tsx mock-backend/server.ts) + 3 endpoints respond
@@ -22,8 +22,8 @@
 #   level: extensions/aisha-dirigent/__tests__/rules-engine.test.ts (21
 #   tests on cache + matcher), gate tests on adapter output drift.
 #
-# Conventions: unprefixed actions/X@v4 (Forgejo's registered action
-# source), NODE_VERSION 22 (matches ci.yml).
+# Conventions: official upstream actions (actions/checkout@v4,
+# actions/setup-node@v4), NODE_VERSION 22 (matches ci.yml).
 # =============================================================================
 
 name: e2e-dirigent
@@ -50,6 +50,9 @@ on:
       - "tests/e2e-dirigent/**"
       - ".github/workflows/e2e-dirigent.yml"
 
+permissions:
+  contents: read
+
 concurrency:
   group: e2e-dirigent-${{ github.ref }}
   cancel-in-progress: ${{ github.ref_name != 'main' }}
@@ -71,7 +74,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          registry-url: ${{ vars.VERDACCIO_URL }}
 
       - name: Diagnostics — env probe
         run: |
@@ -150,7 +152,7 @@ jobs:
           # pouští SOUBĚŽNĚ, takže reset jednoho smaže stav, který si druhý právě
           # nastavil — a advisory dorazí prázdné.
           #
-          # Lokálně sada projde 12/12; na runneru padá. Měřidlo tedy měří stroj a
+          # Lokálně sada projde 12/12; na sdíleném runneru padala. Měřidlo tedy měří stroj a
           # časování, ne kód — táž třída jako zelená deploy úloha, která nic
           # nenasadila. Dokud sdílený backend nebude per-soubor, musí být běh
           # sériový. (Poctivá varianta téhož: dát každému souboru vlastní port a

@@ -1,9 +1,9 @@
 /**
  * Gate test: heavy supply-chain lane — adoption + stagger contract.
  *
- * WHY (2026-07-25). The Forgejo runner on soren is registered instance-wide: it
- * serves 14 repositories across two orgs at capacity 2. Every repository that
- * adopts this platform inherits `.github/workflows/supply-chain.yml` verbatim,
+ * WHY (2026-07-25). A shared runner served 14 repositories across two orgs at
+ * capacity 2, and every repository that adopts this platform inherits
+ * `.github/workflows/supply-chain.yml` verbatim,
  * so ONE unconditional nightly cron meant N repositories firing the same ~60-job
  * matrix into 2 slots in the same minute. Measured in the runner log, not
  * assumed: a sibling repo started at 01:17:40 UTC — on our cron.

@@ -4,7 +4,7 @@
  * PROČ SDÍLENÝ MODUL (naměřeno 2026-09-12, HEAD 239361626)
  * ---------------------------------------------------------
  * Brána `stack-nesmi-znat-jmeno-instance` odvozovala množinu jmen ze čtyř
- * kanálů (instances/, remoty, identita stromu, registr forků na Forgejo) —
+ * kanálů (instances/, remoty, identita stromu, registr forků na GitHubu) —
  * a vedle ní dvě n8n brány (tři asserce) měřily totéž pravidlo VLASTNÍM literálem
  * `/aisha-|<fork>-/`: jménem JEDNÉ skutečné instance. To je vzorek, ne
  * vlastnost — sedmá instance tudy projde zeleně, a generická brána přitom
@@ -110,19 +110,19 @@ export async function jmenaInstanci(root: string = ROOT): Promise<string[]> {
 }
 
 /**
- * Registr forků — organizace na Forgejo, kam míří `origin`.
+ * Registr forků — vlastník repa na GitHubu, kam míří `origin`.
  *
  * ⛔ NAMĚŘENO 2026-09-12 (upstream, HEAD 1af002269): všechny tři kanály výš
  * jsou LOKÁLNÍ. V CI upstreamu (checkout zakládá jen `origin` → upstream, bez
  * `instances/`, bez `.env*`) je množina jmen PRÁZDNÁ a brána se přeskočí —
  * takže identitu žádného forku tam nikdy nezměří a je zelená-protože-neviditelná.
  * Přitom repo NEMÁ registr forků (config/, docs/, coolify/manifests: 0 nálezů);
- * jediné místo, které o forcích ví, je organizace na Forgejo: `GET
- * /api/v1/orgs/<org>/repos` vrací u forku `fork: true` a `parent.full_name`
- * = upstream (změřeno: 5 forků + `<jméno>-instance-data` repa instancí),
- * ⛔ ale organizace je PRIVÁTNÍ: anonymní dotaz vrací HTTP 200 a PRÁZDNÉ pole
- * (naměřeno: 0 rep bez tokenu, 49 s tokenem). Kód odpovědi tedy NENÍ měření;
- * prázdný registr je vada měřidla a hlásí se, ne „čistý stav".
+ * o forcích ví jen forge: `GET /repos/<vlastník>/<repo>/forks` (forky upstreamu)
+ * a `GET /orgs/<vlastník>/repos` (u osobního účtu `/users/…`) s
+ * `<jméno>-instance-data` repy instancí —
+ * ⛔ ale ta repa jsou PRIVÁTNÍ: bez tokenu je výpis nevidí (naměřeno na
+ * předchozím forgi: 0 rep bez tokenu, 49 s tokenem). Kód odpovědi tedy NENÍ
+ * měření; prázdný registr je vada měřidla a hlásí se, ne „čistý stav".
  *
  * ODKUD SE REGISTR BERE (v tomhle pořadí, první, který odpoví):
  *   0. `AISHA_FORK_REGISTRY_NEZMERENO` — krok CI, který registr stahuje, sám
@@ -131,9 +131,9 @@ export async function jmenaInstanci(root: string = ROOT): Promise<string[]> {
  *   1. soubor `AISHA_FORK_REGISTRY` — v CI ho stáhne SAMOSTATNÝ krok
  *      (.github/workflows/ci.yml, „Registr forků"), který má token a spouští
  *      jen curl. Token se do procesu testů NEDÁVÁ: tenhle job běží kód z PR
- *      a plný token organizace by z něj šel vynést.
- *   2. token v prostředí (`REPO_API_TOKEN` / `FORGEJO_API_TOKEN`), nebo
- *      `git credential fill` NEINTERAKTIVNĚ (lokálně: keychain) — jen GET.
+ *      a token by z něj šel vynést.
+ *   2. token v prostředí (`GIT_TOKEN` / `GH_TOKEN`), nebo `git credential
+ *      fill` NEINTERAKTIVNĚ (lokálně: keychain) — jen GET.
  *   3. nic z toho → NEZMĚŘENO s důvodem.
  *
  * TVAR, NE VZOREK: jméno instance se odvozuje z tvaru repa —
@@ -220,7 +220,7 @@ export function jmenaZRepozitaru(repa: Repo[], org: string, upstreamRepo: string
 }
 
 function tokenProOrigin(server: string, root: string): string {
-  const zEnv = process.env.REPO_API_TOKEN || process.env.FORGEJO_API_TOKEN || "";
+  const zEnv = process.env.GIT_TOKEN || process.env.GH_TOKEN || "";
   if (zEnv) return zEnv;
   try {
     const out = execFileSync("git", ["-c", "credential.interactive=never", "credential", "fill"], {
@@ -237,12 +237,18 @@ function tokenProOrigin(server: string, root: string): string {
   }
 }
 
-/** GET přes API Forgejo. `null` = HTTP 404 (věc neexistuje — stav, ne chyba měřidla); jiný ne-2xx je pád. */
-async function apiJson(url: string, token: string): Promise<unknown | null> {
+/** REST API GitHubu pro web server `server` (github.com → api.github.com, jinak GitHub Enterprise `/api/v3`). */
+export function apiProServer(server: string): string {
+  const host = new URL(server).host;
+  return host === "github.com" ? "https://api.github.com" : `${new URL(server).origin}/api/v3`;
+}
+
+/** GET přes REST API GitHubu. `null` = HTTP 404 (věc neexistuje — stav, ne chyba měřidla); jiný ne-2xx je pád. */
+async function apiJson(url: string, token: string, accept = "application/vnd.github+json"): Promise<unknown | null> {
   let res: Response;
   try {
     res = await fetch(url, {
-      headers: { Accept: "application/json", Authorization: `token ${token}` },
+      headers: { Accept: accept, Authorization: `Bearer ${token}`, "X-GitHub-Api-Version": "2022-11-28" },
       signal: AbortSignal.timeout(15_000),
     });
   } catch (e) {
@@ -254,14 +260,14 @@ async function apiJson(url: string, token: string): Promise<unknown | null> {
 }
 
 /** Jména deklarovaná v `profiles/*.json` instance-data repa — totéž, co dělá krok CI. */
-async function jmenaZInstanceData(server: string, org: string, repo: string, token: string): Promise<string[]> {
-  const seznam = await apiJson(`${server}/api/v1/repos/${org}/${repo}/contents/profiles`, token);
+async function jmenaZInstanceData(api: string, org: string, repo: string, token: string): Promise<string[]> {
+  const seznam = await apiJson(`${api}/repos/${org}/${repo}/contents/profiles`, token);
   if (seznam === null) return []; // repo bez profiles/ — nic, ne pád
   if (!Array.isArray(seznam)) throw new Error(`NEZMĚŘENO: ${repo}/contents/profiles nevrátil seznam souborů`);
   const out: string[] = [];
   for (const polozka of seznam as { name?: string; type?: string }[]) {
     if (polozka.type !== "file" || !/\.json$/.test(polozka.name ?? "")) continue;
-    const profil = await apiJson(`${server}/api/v1/repos/${org}/${repo}/raw/profiles/${polozka.name}`, token);
+    const profil = await apiJson(`${api}/repos/${org}/${repo}/contents/profiles/${polozka.name}`, token, "application/vnd.github.raw+json");
     if (profil === null) throw new Error(`NEZMĚŘENO: ${repo}/profiles/${polozka.name} byl v seznamu, ale raw vrátil 404`);
     const jmeno = jmenoZProfilu(profil);
     if (jmeno) out.push(jmeno);
@@ -296,17 +302,26 @@ export async function jmenaZRegistruForku(root: string = ROOT): Promise<Registr>
     if (process.env.AISHA_SKIP_ONLINE === "1") return { jmena: [], nezmereno: "AISHA_SKIP_ONLINE=1 — registr forků je online kanál" };
     // 2. token z prostředí nebo z git credential helperu
     const token = tokenProOrigin(server, root);
-    if (!token) return { jmena: [], nezmereno: `organizace ${org} na ${server} je privátní a token není (REPO_API_TOKEN / git credential)` };
-    for (let page = 1; page <= 20; page++) {
-      const url = `${server}/api/v1/orgs/${org}/repos?limit=50&page=${page}`;
-      const davka = await apiJson(url, token);
-      if (!Array.isArray(davka)) throw new Error(`NEZMĚŘENO: ${url} nevrátil pole repozitářů`);
-      repa.push(...(davka as Repo[]));
-      if (davka.length < 50) break;
-    }
+    if (!token) return { jmena: [], nezmereno: `repa instancí vlastníka ${org} na ${server} jsou privátní a token není (GIT_TOKEN / git credential)` };
+    const api = apiProServer(server);
+    // Repa vlastníka (organizace; u osobního účtu /users/…) + forky upstreamu —
+    // tytéž dva výpisy jako krok CI „Registr forků".
+    const strankuj = async (zaklad: string, oznac: (r: Repo) => Repo): Promise<boolean> => {
+      for (let page = 1; page <= 20; page++) {
+        const url = `${zaklad}?per_page=100&page=${page}`;
+        const davka = await apiJson(url, token);
+        if (davka === null && page === 1) return false;
+        if (!Array.isArray(davka)) throw new Error(`NEZMĚŘENO: ${url} nevrátil pole repozitářů`);
+        repa.push(...(davka as Repo[]).map(oznac));
+        if (davka.length < 100) break;
+      }
+      return true;
+    };
+    if (!(await strankuj(`${api}/orgs/${org}/repos`, (r) => r))) await strankuj(`${api}/users/${org}/repos`, (r) => r);
+    await strankuj(`${api}/repos/${org}/${upstreamRepo}/forks`, (r) => ({ ...r, fork: true, parent: { full_name: `${org}/${upstreamRepo}` } }));
     // Deklarovaná identita forků: totéž, co stahuje krok CI do `jmena_z_profilu`.
     for (const r of repa) {
-      if (/-instance-data$/.test(r.name)) r.jmena_z_profilu = await jmenaZInstanceData(server, org, r.name, token);
+      if (/-instance-data$/.test(r.name)) r.jmena_z_profilu = await jmenaZInstanceData(api, org, r.name, token);
     }
   }
   return { jmena: jmenaZRepozitaru(repa, org, upstreamRepo), nezmereno: null };

@@ -14,7 +14,7 @@
  * z `build.dockerfile` v compose souboru přiřazeném appce v manifestu.
  *
  * ⛔ PODŘETĚZCOVÁ PAST (chycena při psaní téhle změny, ne až v provozu)
- * `contains()` ve Forgejo/GitHub výrazech je PODŘETĚZCOVÝ:
+ * `contains()` ve výrazech GitHub Actions je PODŘETĚZCOVÝ:
  *
  *     contains('ledger', 'edge')  →  PRAVDA     (l-`edge`-r)
  *

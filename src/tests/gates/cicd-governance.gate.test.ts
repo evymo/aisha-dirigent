@@ -1,7 +1,7 @@
 /**
  * CI/CD Governance Gate Tests
  *
- * Ověřuje, že Forgejo CI/CD pipeline obsahuje povinné governance kroky:
+ * Ověřuje, že CI/CD pipeline (GitHub Actions) obsahuje povinné governance kroky:
  * - detekci db_change, n8n_workflow, security_change
  * - governance-gate job pro DB/security změny
  * - validate-n8n-workflows job pro workflow změny
@@ -22,10 +22,10 @@ const CI_YML = path.join(ROOT, ".github/workflows/ci.yml");
 const N8N_WORKFLOWS_DIR = path.join(ROOT, "n8n/workflows");
 
 // ---------------------------------------------------------------------------
-// Forgejo CI workflow — governance structure
+// CI workflow (.github/workflows/ci.yml) — governance structure
 // ---------------------------------------------------------------------------
 describe("CI/CD Governance Gate", () => {
-  describe("Forgejo CI workflow exists and is valid YAML", () => {
+  describe("CI workflow exists and is valid YAML", () => {
     it("ci.yml exists", () => {
       expect(fs.existsSync(CI_YML), "Chybí .github/workflows/ci.yml").toBe(true);
     });
@@ -68,7 +68,7 @@ describe("CI/CD Governance Gate", () => {
     });
 
     it("all three new outputs are declared in detect job outputs: block", () => {
-      // Exact output declarations as rendered by Forgejo Actions
+      // Exact output declarations as rendered in the workflow file
       expect(content).toContain("db_change: ${{ steps.changes.outputs.db_change }}");
       expect(content).toContain("n8n_workflow: ${{ steps.changes.outputs.n8n_workflow }}");
       expect(content).toContain("security_change: ${{ steps.changes.outputs.security_change }}");

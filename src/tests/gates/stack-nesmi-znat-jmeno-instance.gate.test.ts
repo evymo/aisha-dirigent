@@ -82,6 +82,7 @@ import { envWithoutGitLocation } from "../../../scripts/lib/git-worktree-health.
 import {
   JMENO_PLATFORMY,
   ROOT,
+  apiProServer,
   jmenaInstanci,
   jmenaZRepozitaru,
   jmenoZPrefixu,
@@ -292,6 +293,11 @@ describe("kód stacku nesmí znát jméno konkrétní instance", () => {
         "upstream",
       ),
     ).toEqual(["testfork", "vlastni", "x"]);
+  });
+
+  it("registr forků se ptá REST API forge, kam míří origin (github.com i GitHub Enterprise)", () => {
+    expect(apiProServer("https://github.com")).toBe("https://api.github.com");
+    expect(apiProServer("https://git.example.test")).toBe("https://git.example.test/api/v3");
   });
 
   // Dva domovy jednoho pravidla se srovnávají nad touž fixturou: jq filtr

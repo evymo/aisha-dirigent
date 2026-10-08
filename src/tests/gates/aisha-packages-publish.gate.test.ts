@@ -3,7 +3,8 @@
  *
  * Closes the "stale Verdaccio publish" loop that surfaced in PR #73:
  *   - the runner script exists
- *   - the Forgejo workflow exists and points at the runner
+ *   - the GitHub Actions workflow exists, points at the runner and is opt-in
+ *     (publishes only where the repository declares its own registry)
  *   - the selection rule (private:false + publishConfig + build script + not-excluded)
  *     matches what the runner uses
  *   - every package that other services consume via "@aisha/<name>": "*"
@@ -97,7 +98,7 @@ describe('AISHA packages auto-publish — runner + workflow', () => {
   });
 });
 
-describe('AISHA packages auto-publish — Forgejo workflow', () => {
+describe('AISHA packages auto-publish — GitHub Actions workflow', () => {
   test('workflow file exists at canonical path', () => {
     expect(existsSync(WORKFLOW), '.github/workflows/aisha-packages-publish.yml missing').toBe(true);
   });
@@ -105,7 +106,7 @@ describe('AISHA packages auto-publish — Forgejo workflow', () => {
   test('workflow YAML parses cleanly', () => {
     // PR #92 (commit 7461c36f) shipped a heredoc inside a `run: |` block with
     // the terminator (`JSON`) at column 0. YAML treats indent < block-indicator
-    // as end-of-literal, so the workflow failed to load on Forgejo runners
+    // as end-of-literal, so the workflow failed to load on the runner
     // ("Failing after 0s" — never executed). This test parses the YAML to
     // catch the same class of bug before it lands again.
     const text = readFileSync(WORKFLOW, 'utf8');
@@ -136,6 +137,15 @@ describe('AISHA packages auto-publish — Forgejo workflow', () => {
   test('workflow plumbs VERDACCIO_TOKEN from secrets', () => {
     const yml = readFileSync(WORKFLOW, 'utf8');
     expect(yml).toMatch(/secrets\.VERDACCIO_TOKEN/);
+  });
+
+  test('publish is OPT-IN: runs only where the repository declares its registry, never pinned to a repo name', () => {
+    // Forks inherit the push-to-main trigger. Identity = the repository's OWN
+    // variable (not inherited by forks), not a repository name baked into the
+    // public file — and a repo without a registry skips, it does not fail.
+    const doc = yaml.load(readFileSync(WORKFLOW, 'utf8')) as { jobs: Record<string, { if?: string }> };
+    expect(String(doc.jobs.publish.if ?? '')).toMatch(/vars\.VERDACCIO_URL\s*!=\s*''/);
+    expect(String(doc.jobs.publish.if ?? '')).not.toMatch(/github\.repository\s*==/);
   });
 
   test('workflow has concurrency lock (no parallel publishes)', () => {

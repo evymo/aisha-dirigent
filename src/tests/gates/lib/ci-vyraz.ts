@@ -1,5 +1,5 @@
 /**
- * Vyhodnocovač podmínek `if:` z Forgejo/GitHub Actions.
+ * Vyhodnocovač podmínek `if:` z GitHub Actions (.github/workflows/).
  *
  * PROČ SDÍLENÝ MODUL (naměřeno 2026-08-22)
  * ----------------------------------------
@@ -15,6 +15,17 @@
  * Kopírovat ho podruhé by znamenalo dva výklady téhož jazyka, které se rozejdou.
  */
 export type Hodnota = string | boolean;
+
+/**
+ * Svět repozitáře, který si NASAZENÍ ZAPNUL. Deploy úlohy v ci.yml jsou opt-in
+ * (`vars.APP_NAME_PREFIX != ''`): veřejný klon bez instance nenasazuje nic.
+ * Brány, které se ptají „spustí se nasazení?", se ptají ve světě, kde instance
+ * JE deklarovaná — a to, že bez ní se nespustí nic, měří samostatná sonda
+ * (deploy-se-nesmi-preskocit). Jeden domov, aby se čtyři modely nerozešly.
+ */
+export const SVET_S_INSTANCI: Readonly<Record<string, Hodnota>> = Object.freeze({
+  "vars.APP_NAME_PREFIX": "zkouska",
+});
 
 export function vyhodnotit(vyraz: string, svet: Record<string, Hodnota>): boolean {
   const src = vyraz.replace(/\$\{\{/g, " ").replace(/\}\}/g, " ").trim();
@@ -48,7 +59,7 @@ export function vyhodnotit(vyraz: string, svet: Record<string, Hodnota>): boolea
       i = konec + 1;
       return s;
     }
-    // `contains(a, b)` — podřetězcová funkce výrazů Forgejo/GitHub. Vyhodnocovač
+    // `contains(a, b)` — podřetězcová funkce výrazů GitHub Actions. Vyhodnocovač
     // ji musí umět, jinak by podmínky, které ji používají, spadly do „nerozumím"
     // a brána by o nich MLČELA. Mlčící brána je horší než žádná: vypadá zeleně.
     if (/^contains\s*\(/.test(src.slice(i))) {

@@ -17,7 +17,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import yaml from "js-yaml";
-import { vyhodnotit, type Hodnota } from "./ci-vyraz";
+import { SVET_S_INSTANCI, vyhodnotit, type Hodnota } from "./ci-vyraz";
 
 type Uloha = { name?: string; if?: string; needs?: string[] | string };
 
@@ -48,7 +48,7 @@ export const zavisiNaGovernance = (u: Uloha): boolean =>
 /** Spustí se úloha, když governance-gate skončila `vysledek` a vše ostatní ukazuje na nasazení? */
 export function spustiSePriGovernance(root: string, u: Uloha, vysledek: "success" | "skipped" | "failure"): boolean {
   const vyraz = String(u.if ?? "");
-  const svet: Record<string, Hodnota> = { "github.event_name": "push", "github.ref": "refs/heads/main" };
+  const svet: Record<string, Hodnota> = { ...SVET_S_INSTANCI, "github.event_name": "push", "github.ref": "refs/heads/main" };
   for (const m of vyraz.matchAll(/needs\.([A-Za-z0-9_-]+)\.result/g)) svet[m[0]] = "success";
   for (const m of vyraz.matchAll(/needs\.detect\.outputs\.([A-Za-z0-9_]+)/g)) svet[m[0]] = "true";
   svet["needs.detect.outputs.already_verified"] = "false";
