@@ -1,7 +1,8 @@
 # Coolify Deployment Setup
 
 Tento dokument popisuje jak nastavit Coolify pro deployment web aplikace (single-server).
-CI/CD běží na **Forgejo** (git.id3a.cz), deploy se triggeruje přes Coolify webhook.
+CI/CD běží na **GitHub Actions** (`.github/workflows/ci.yml`, hostované runnery); nasazení
+je opt-in (proměnná repozitáře `APP_NAME_PREFIX`) a jde přes Coolify API — viz [CICD.md](CICD.md).
 
 > **Multi-server deployment?** Viz [MULTI_SERVER_COOLIFY.md](MULTI_SERVER_COOLIFY.md) — architektura,
 > placement, init skripty a runbook pro stories rozprostřené přes Frontend/Backend/Experimental/Build.
@@ -12,19 +13,19 @@ Toto je deployment část primary A-Z cesty. Celá canonical cesta je zde:
 ## Architektura
 
 ```
-Forgejo Actions (git.id3a.cz, DinD runner)
+GitHub Actions (ubuntu-latest)
 ┌────────────────────────────────────────────────────────┐
 │ 1. Smart change detection                              │
 │ 2. TypeScript + Lint + i18n check                      │
 │ 3. Unit tests + Gate tests                             │
 │ 4. Production build verification                       │
-│ 5. curl Coolify webhook (on success)                   │
+│ 5. Coolify API deploy (on success, opt-in)             │
 └────────────────────────────────────────────────────────┘
                          │
                          ▼ webhook
 ┌────────────────────────────────────────────────────────┐
 │                    Coolify                              │
-│ 6. Pull kód z Forgejo (git.id3a.cz)                   │
+│ 6. Pull kód z git repozitáře                          │
 │ 7. Build: docker-compose.coolify-prebuilt.yml          │
 │    a) migrate service → DB migrace                     │
 │    b) web service → Dockerfile.web → nginx SPA         │
@@ -136,25 +137,29 @@ V Coolify UI nastav tyto proměnné pro compose:
 **DŮLEŽITÉ:** V Coolify UI označujte proměnné správně jako "Build" nebo "Runtime".
 Build proměnné se injektují do `docker build --build-arg`. Runtime se předají do kontejneru.
 
-## Forgejo Secrets
+## Secrets a proměnné CI
 
-Nastavit v Forgejo UI: repo **Settings → Secrets**
+Nastavit v GitHubu: repo **Settings → Secrets and variables → Actions**.
+Úplný seznam (co CI čte, odkud a zda je povinné) vede `scripts/lib/ci-kontrakt.mjs`
+a tabulka v [CICD.md](CICD.md#opt-in-nasazení).
 
-| Secret                | Popis                      |
-| --------------------- | -------------------------- |
-| `COOLIFY_WEBHOOK_URL` | Coolify deploy webhook URL |
+| Jméno                 | Druh     | Popis                                          |
+| --------------------- | -------- | ---------------------------------------------- |
+| `APP_NAME_PREFIX`     | variable | Identita instance; zapíná deploy úlohy         |
+| `COOLIFY_URL`         | secret   | Adresa Coolify API                             |
+| `COOLIFY_API_TOKEN`   | secret   | Token Coolify API                              |
 
 Volitelné:
-| Secret | Popis |
-|--------|-------|
-| `VERDACCIO_TOKEN` | NPM auth token pro npm.id3a.cz |
+| Jméno | Druh | Popis |
+|-------|------|-------|
+| `VERDACCIO_URL` (+ `VERDACCIO_TOKEN`) | variable (+ secret) | Privátní npm registr pro publikaci `@aisha/*` |
 | `N8N_API_KEY` | n8n API klíč (pro workflow triggery) |
 
 ## Soubory
 
 | Soubor                                | Účel                                       |
 | ------------------------------------- | ------------------------------------------ |
-| `.forgejo/workflows/ci.yml`           | CI/CD pipeline (Forgejo Actions)           |
+| `.github/workflows/ci.yml`           | CI/CD pipeline (GitHub Actions)            |
 | `docker-compose.coolify-prebuilt.yml` | Web deploy compose (migrate + web)         |
 | `docker-compose.coolify.yml`          | Supabase stack (separátní Coolify projekt) |
 | `Dockerfile.web`                      | Standalone web build (3-stage)             |
@@ -163,22 +168,22 @@ Volitelné:
 ## Deploy Flow
 
 ```
-push to main (git.id3a.cz)
+push to main
      │
      ▼
 ┌─────────────────────────────────────────┐
-│ Forgejo CI (.forgejo/workflows/ci.yml) │
+│ GitHub Actions (.github/workflows/ci.yml) │
 │ 1. Detect changes (smart routing)       │
 │ 2. TypeScript + Lint + i18n             │
 │ 3. Unit tests + Gate tests              │
 │ 4. Production build check               │
-│ 5. curl COOLIFY_WEBHOOK_URL             │
+│ 5. Coolify API deploy (opt-in)          │
 └────────┬────────────────────────────────┘
          │
          ▼ webhook
 ┌─────────────────────────────────────────┐
 │ Coolify                                 │
-│ 1. Pull kód z git.id3a.cz              │
+│ 1. Pull kód z git repozitáře           │
 │ 2. docker compose build (prebuilt.yml)  │
 │ 3. migrate → DB migrace                │
 │ 4. web → Dockerfile.web → nginx        │
@@ -227,7 +232,7 @@ PGPASSWORD=postgres psql -h 127.0.0.1 -p 57422 -U postgres -d postgres -t -A -c 
 
 ### Webhook nefunguje
 
-1. Ověř `COOLIFY_WEBHOOK_URL` v Forgejo secrets
+1. Ověř `COOLIFY_WEBHOOK_URL` v nastavení repozitáře / Coolify
 2. Test manuálně: `curl -v -X POST "$COOLIFY_WEBHOOK_URL"`
 3. Zkontroluj Coolify deployment logs
    ```

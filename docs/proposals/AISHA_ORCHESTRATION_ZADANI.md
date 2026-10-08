@@ -103,7 +103,7 @@ AISHA = **governance/control-plane**, která rozhoduje pro každý unit-of-work 
 - **E0 governance layer (`[merged]` — PR #442, on `main`):**
   - Persisted decision journal: `ai_decisions` table + `fn_record_execution_decision` (VOLATILE wrapper) + `decision_id` on `ai_trace_events` (`ai_trace_events.sql:19`). The `decisionProvenance` id now lands in a durable row instead of going nowhere.
   - Admission Layer composer: `fn_admit_clow` over **4 derived axes** — spend (reuse `fn_authorize_task_spend`) + runtime-availability (`fn_runtime_available` + `ai_runtime_registry`) + capability-match + risk (`fn_compute_clow_risk` + `ai_risk_policies`). Capability-availability, **zero membership allow-lists** (see [[feedback_no_allowlists_capability_availability]]).
-  - E0.2b journaled dispatch across `workflowEngine.ts` (every `unifiedChat` site journals); E0.6 per-graph iteration cap (`orchestrator.ts:201` `graph.max_iterations ?? config.maxIterationsPerRun`, schema `types.ts:52`); E0.7 gitleaks secret-scan CI (`.forgejo/workflows/ci.yml`, PR-delta scoped).
+  - E0.2b journaled dispatch across `workflowEngine.ts` (every `unifiedChat` site journals); E0.6 per-graph iteration cap (`orchestrator.ts:201` `graph.max_iterations ?? config.maxIterationsPerRun`, schema `types.ts:52`); E0.7 gitleaks secret-scan CI (`.github/workflows/ci.yml`, PR-delta scoped).
 - **E1/E3 execution layer (`[merged]` on `main`, sync 2026-06-21):**
   - Single-run ToT v1: `tot_planner` / `tot_expand` / `tot_evaluate` / `tot_search`, `ToTState`, `reasoning-tree-reflect.json`, generated seed row and fullenv tests.
   - RuntimeAdapter registry: `direct_llm`, `openclaw`, `hermes` adapters in `reflection/runtime/adapters.ts`; `runtime-execute` graph derives runtime+model, dispatches, traces, and fails loud on unavailable adapters.
@@ -364,7 +364,7 @@ Dependency-ordered. Každé PR: scope · files · klasifikace · proving gate.
 - **E0.2b** `[merged]` journaled dispatch across `workflowEngine.ts` — every `unifiedChat` site journals. Files: `lib/workflowEngine.ts`, `lib/orchestrationBridge.ts`.
 - **E0.5** `[merged]` admission composer `fn_admit_clow` (4 derived axes: spend + runtime-availability + capability-match + risk) + `ai_runtime_registry` + `ai_risk_policies` + `fn_compute_clow_risk` + `fn_runtime_available`; wired into `openclaw_resolve_clow`. Capability-availability, **zero allow-lists**.
 - **E0.6** `[merged]` per-graph `max_iterations` override (`orchestrator.ts:201` `graph.max_iterations ?? config.maxIterationsPerRun`, schema `types.ts:52`).
-- **E0.7** `[merged]` gitleaks secret-scan CI (`.forgejo/workflows/ci.yml`, scoped to the PR delta `merge-base(origin/main)..HEAD`).
+- **E0.7** `[merged]` gitleaks secret-scan CI (`.github/workflows/ci.yml`, scoped to the PR delta `merge-base(origin/main)..HEAD`).
 
 ### E1 — Single-run ToT `[merged]`
 - **PR-E1.1** `[merged]` 4 node handlers (tot_planner/expand/evaluate/search) + Zod enum + `state.tot` types. Files: `reflection/nodes/tot_*.ts`, `reflection/tot/types.ts`, `reflection/types.ts` (NodeTypeSchema). Gate: `tot-nodes.unit.test.ts` (Sure/Maybe/Impossible thresholding).

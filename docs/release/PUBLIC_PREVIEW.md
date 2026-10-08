@@ -16,10 +16,12 @@ Consequences:
 - `git log` on GitHub shows the previews only. The upstream commit each preview was cut from is
   recorded in the commit message.
 - There are no branches other than `main` on GitHub.
-- **Nothing runs on GitHub** (owner's decision, 2026-10-03): the snapshot carries no
-  `.github/workflows/` and no Dependabot configuration, and Actions are disabled on the repository.
-  CI, deployment and dependency updates live upstream (`.forgejo/workflows/`,
-  `scripts/aisha-deps-update.mjs`).
+- **CI runs on GitHub** (owner's decision, 2026-10-08, superseding the 2026-10-03 "nothing runs on
+  GitHub"): the snapshot carries `.github/workflows/` — GitHub Actions on GitHub-hosted runners, with
+  no private runner, registry or forge. Instance-specific lanes (deploys, kiosk/mobile publishing,
+  package publishing, the scheduled dependency sweep) are opt-in through repository variables and
+  are skipped otherwise. The exclude list must therefore NOT drop `.github/workflows/`; Dependabot
+  configuration stays excluded (`scripts/aisha-deps-update.mjs` is the updater).
 - Replacing `main` is a forced push by design — and **a forced push does not remove history from a
   repository that already had some**. See the next section before making any repository public.
 

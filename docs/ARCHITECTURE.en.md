@@ -24,7 +24,7 @@ deployable as one stack on the operator's own infrastructure.
 | Data | PostgreSQL 18 + PostgREST; RPC-only access through audited `SECURITY DEFINER` functions behind Row-Level Security; schema source of truth compiled into one baseline plus an upgrade path | `aisha/db/` |
 | Network and PKI | NetBird mesh with instance-scoped names, OpenXPKI internal CA, single-packet-authorisation door for the admin plane | `infra/mesh`, `infra/pki`, `services/svc-knock` |
 | Observability | Langfuse traces, Prometheus/Loki/Grafana, Sentry, OpenTelemetry bootstrap in every service | `packages/observability`, `grafana/`, `prometheus/` |
-| Delivery | Manifest-driven Coolify deployment in waves; cold-start from zero; convergence of an existing instance; doctor pre-flight; CI on the upstream forge | `coolify/manifests`, `scripts/aisha-cold-start.sh`, `.forgejo/workflows` |
+| Delivery | Manifest-driven Coolify deployment in waves; cold-start from zero; convergence of an existing instance; doctor pre-flight; CI on the upstream forge | `coolify/manifests`, `scripts/aisha-cold-start.sh`, `.github/workflows` |
 
 ## Architectural principles
 

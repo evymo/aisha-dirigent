@@ -214,7 +214,7 @@ We are in a good position to:
 **Nature and scope of the uncommitted work (categorized from fresh `git status --porcelain`):**
 - **70 scripts/**: massive modernization — heavy edits to `rebrand-id3a-to-aisha-guru.py`, almost all provision-*, smoke-*, test-*, warmup, pki-*, cold-start-*, n8n-*, netbird-*, appsmith-*, etc. scripts. Also new/fixed local-db.mjs, .fix-domains.pl scripts.
 - **Many docker-compose.* + coolify configs** (11+ coolify ymls, synapse bridges for matrix, element, netbird, pki, llm-gateway, monitoring, n8n, openclaw, registry, etc.).
-- **.forgejo/workflows/** (ci.yml, e2e-dirigent, onboard-server, aisha-packages-publish, etc.).
+- **.github/workflows/** (ci.yml, e2e-dirigent, onboard-server, aisha-packages-publish, etc.).
 - **16 n8n/workflows/** (many WF_* updated, plus .fix-domains.pl).
 - **Extensions** (aisha-dirigent: package, changelog, i18n, license, vscodeignore).
 - **Mobile-app**, **e2e/** tests, **keycloak** configs, **openxpki-config**, **infra**, **aisha/db/seed/** (backbone + translations for consents/kpis/questionnaires), **config/** (domains.env, local-presets).

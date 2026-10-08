@@ -8,12 +8,17 @@ change needs before it can be merged, and the rules that the repository enforces
 
 ## Where development happens
 
-- **Upstream** is the maintainers' own forge (Forgejo). CI, gates and deployments run there.
-- **GitHub** (`evymo/aisha-orchestrator`) is the public, history-free snapshot of upstream. Issues and pull
-  requests opened here are reviewed by the maintainers and ported upstream; expect a reply, not an
-  automatic CI run: nothing runs on GitHub — the public snapshot carries no workflows.
-- Every public preview is produced by `npm run release:public-snapshot` from a known upstream commit
+- **GitHub** (`evymo/aisha-orchestrator`) is the public repository. Pull requests run the CI pipeline in
+  **GitHub Actions** (`.github/workflows/`) on GitHub-hosted runners — no private runner, registry or
+  forge is needed. A merge to `main` waits on a single required check, `PR: verdikt`.
+- **Deployment is opt-in.** The deploy/provision jobs (Coolify), kiosk and mobile publishing, package
+  publishing and the scheduled dependency sweep only run in a repository that configures them
+  (repository variables such as `APP_NAME_PREFIX`, `VERDACCIO_URL`, `KIOSK_REGISTRY_REPO`); everywhere
+  else they show as skipped. Nothing about a particular instance is written into the workflows.
+- Public previews are produced by `npm run release:public-snapshot` from a known commit
   (see [docs/release/PUBLIC_PREVIEW.md](docs/release/PUBLIC_PREVIEW.md)).
+- Every CI lane is also runnable **locally, without any forge** — see
+  [Running the CI lanes locally](#running-the-ci-lanes-locally).
 
 ## Licence and CLA
 
@@ -60,6 +65,32 @@ bypass them — if a hook is wrong, fix the hook.
 More: [README.md](README.md), [docs/DEV_STACK.md](docs/DEV_STACK.md),
 [docs/onboarding/LOCAL_BRINGUP.md](docs/onboarding/LOCAL_BRINGUP.md),
 [docs/COMMIT_WORKFLOW.md](docs/COMMIT_WORKFLOW.md).
+
+## Running the CI lanes locally
+
+Every job in `.github/workflows/ci.yml` is a thin wrapper around an npm script or a repository script,
+so the same checks run on a laptop with no forge, no secrets and no private registry. Install once
+(`npm ci && npm run build:packages`), then:
+
+| CI job | Local command |
+|---|---|
+| Detect Changes (path routing) | `bash scripts/ci/zmenene-cesty.sh --seznam origin/main HEAD \| bash scripts/ci/zmenene-cesty.sh` |
+| Web: TypeScript & Lint | `npx tsc --noEmit -p tsconfig.app.json && npm run lint && npm run i18n:check && npm run gate` |
+| Web: Tests | `npm run test:run`, `npm run test:gates`, `npm run test:scripts` |
+| Web: Build | `npm run build` |
+| Services: Tests | `npm run test:services` |
+| Surfaces: Contract & Overlays | `npm run test:surfaces && npm run surfaces:build:all` |
+| Governance: DB & Security Gate | `npm run validate:static && node scripts/db/db-manager/access.mjs --static` |
+| DB runtime lanes (Docker) | `npm run test:db`, `npm run test:db:rohatka`, `npm run test:db:surfaces` (throwaway Postgres) |
+| AV / Blockchain integration (Docker) | `npm run test:integration:av`, `npm run test:integration:blockchain` |
+| Disclosure / secret scan | `node scripts/verify-no-dev-codes.mjs`, `gitleaks detect --config .gitleaks.toml` |
+| Mobile, Extension, n8n nodes, Cosmos | `npm --prefix mobile-app test`, `npm --prefix extensions/aisha-dirigent test`, `npm --prefix packages/n8n-nodes-aisha test`, `(cd cosmos && go test ./...)` |
+
+The pre-push hook (`.husky/pre-push`) already runs the lanes that the changed paths select (same
+router as CI, `scripts/ci/zmenene-cesty.sh`); `npm run test:gates:dotcene` runs just the gates your
+change touches. To lint the workflow files themselves use
+[`actionlint`](https://github.com/rhysd/actionlint); to replay a whole workflow in Docker,
+[`act`](https://github.com/nektos/act) works too (its `.secrets`/`.actrc` are git-ignored).
 
 ## Engineering conventions (short form)
 

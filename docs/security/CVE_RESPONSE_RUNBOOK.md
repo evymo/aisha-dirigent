@@ -46,7 +46,7 @@ What *is* needed:
 6. Merge to main
         │
         ▼
-7. .forgejo/workflows/aisha-packages-publish.yml triggers automatically
+7. .github/workflows/aisha-packages-publish.yml triggers automatically (opt-in: vars.VERDACCIO_URL)
         │ — Detects packages/** change → builds → publishes
         ▼
 8. Verdaccio has fresh version. Services using "@aisha/<pkg>": "*"
@@ -85,8 +85,8 @@ PR #105) requires a version bump alongside any `src/**` change. CVE fixes
 
 ## PR template
 
-Use `.github/PULL_REQUEST_TEMPLATE/cve-response.md` (also mirrored to
-Forgejo when the operator picks it from the dropdown). Required fields:
+Use `.github/PULL_REQUEST_TEMPLATE/cve-response.md` (append `?template=cve-response.md`
+to the compare URL, or pick it when opening the PR). Required fields:
 
 ```markdown
 **CVE ID:**
@@ -120,8 +120,9 @@ Normal CVE PR merge → `aisha-packages-publish.yml`:
 The workflow exposes a `force: bool` input via `workflow_dispatch`:
 
 ```
-Forgejo UI → Actions → AISHA Packages Publish → Run workflow
+GitHub → Actions → AISHA Packages Publish → Run workflow
   → force: true
+# or: gh workflow run aisha-packages-publish.yml -f force=true
 ```
 
 **Only legitimate use:** a prior workflow run left Verdaccio in a

@@ -53,9 +53,9 @@ Detailni postup je v [COOLIFY_SETUP.md](COOLIFY_SETUP.md).
 
 Bezny deploy flow je jednoduchy:
 
-1. `git push` do `main` na Forgejo
-2. Forgejo CI provede checks, testy a build
-3. CI zavola Coolify webhook
+1. `git push` do `main`
+2. CI (GitHub Actions) provede checks, testy a build
+3. CI nasadi pres Coolify API (opt-in: proměnná repozitáře `APP_NAME_PREFIX`)
 4. Coolify nasadi web stack (`docker-compose.coolify-prebuilt.yml`)
 
 To je vse. Pro web produkci neni potreba spoustet core/langfuse/admin stacky.
@@ -66,7 +66,7 @@ To je vse. Pro web produkci neni potreba spoustet core/langfuse/admin stacky.
 - `setup.sh`: scriptable first-time local setup
 - `warmup.sh`: stage-based verify/recovery workflow
 - `deploy:init`: one-time deployment bootstrap
-- `.forgejo/workflows/ci.yml`: gate + build + deploy orchestrace
+- `.github/workflows/ci.yml`: gate + build + deploy orchestrace
 
 ## Out of Scope (Advanced)
 

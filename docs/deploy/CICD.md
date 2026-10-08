@@ -4,176 +4,139 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│               Forgejo Actions (git.id3a.cz)                     │
-│               Runner: DinD (coolify/apps/forgejo)               │
+│        GitHub Actions — .github/workflows/ci.yml                │
+│        Runner: GitHub-hosted ubuntu-latest (Docker uvnitř)      │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
 │  🔍 detect  ──┬──► 🧪 check (TypeScript, Lint, i18n)            │
 │  (changes)   │                                                   │
-│              ├──► 🧪 test (Unit, Gates)                         │
+│              ├──► 🧪 test (Unit, Gates, Scripts, Services, DB)  │
 │              │                                                   │
 │              ├──► 🏗️ build (Vite production build)              │
 │              │                                                   │
-│              └──► 🚀 deploy (Coolify webhook)                   │
+│              ├──► ⚖️ PR: verdikt (jediná povinná kontrola)       │
+│              │                                                   │
+│              └──► 🚀 deploy (Coolify API, OPT-IN)               │
 │                       └─► Coolify builds + deploys              │
-│                           (docker-compose.coolify-prebuilt.yml) │
-│                           migrate → web                          │
 │                                                                  │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+Pipeline nepotřebuje žádnou soukromou infrastrukturu: oficiální akce
+(`actions/checkout@v4`, `actions/setup-node@v4`, …), výchozí npm registr
+(`@aisha/*` jsou workspaces stavěné ze zdroje), obrazy z Docker Hubu přímo nebo
+přes volitelnou pull-through cache (`vars.REGISTRY_PROXY`).
+
 ## Smart Routing
 
-Pipeline automaticky detekuje co se změnilo a přeskočí irelevantní joby:
+Úloha `detect` volá směrovač `scripts/ci/zmenene-cesty.sh` (týž, který používá
+pre-push hook) a `scripts/aisha-changed-apps.mjs` (které appky se změna týká).
+Joby, kterých se změna netýká, se přeskočí:
 
-| Změna | check | test | build | deploy |
+| Změna | check | test | build | deploy (opt-in) |
 |-------|-------|------|-------|--------|
 | Jen docs | skip | skip | skip | skip |
-| Jen migrations | ✅ | ✅ | skip | ✅ (migrate service) |
-| Jen code | ✅ | ✅ | ✅ | ✅ |
-| code + migrations | ✅ | ✅ | ✅ | ✅ |
+| SQL / DB | governance + cold-start DB | ✅ | dle dotčených appek | dotčené appky |
+| Kód webu | ✅ | ✅ | ✅ | edge / core |
+| Služba | — | Services: Tests | — | její stack |
+| `.github/workflows/` | ✅ (ci_change) | ✅ | ✅ | — |
 
-## Infrastruktura
+## Opt-in nasazení
 
-| Komponenta | Služba | URL |
-|------------|--------|-----|
-| **Git server** | Forgejo | `git.id3a.cz` |
-| **CI/CD Runner** | Forgejo Actions (DinD) | Součást Forgejo stacku |
-| **NPM proxy** | Verdaccio | `npm.id3a.cz` |
-| **Deployment** | Coolify | Traefik reverse proxy |
-| **Web app** | nginx SPA | `web.aisha.guru` |
-| **API** | Kong/Supabase | `api.aisha.guru` |
+Deploy/provision úlohy (`deploy-*`, `provision-*`) běží jen na push do `main`
+v repu, které deklaruje instanci — **proměnná repozitáře `APP_NAME_PREFIX`**.
+Veřejný klon ani fork bez ní nenasazuje nic (úlohy se ukážou jako přeskočené).
+Totéž platí pro ruční `deploy.yml`, `staging-deploy.yml` a `onboard-server.yml`
+(bez instance jen vypíší, co nastavit).
 
-### Forgejo Runner
+Nastavení: **Settings → Secrets and variables → Actions**
 
-Runner je **součástí Forgejo stacku** (`coolify/apps/forgejo/docker-compose.yml`):
-- Image: `code.forgejo.org/forgejo/runner:6.2.2`
-- Izolace: DinD (Docker-in-Docker) — nepřipojuje se na host Docker socket
-- Labels: `ubuntu-latest:docker://node:20-bookworm`, `self-hosted:host`
-- **Runner NENÍ v tomto repozitáři** — žije v `coolify/apps/forgejo/`
+| Jméno | Druh | Popis | Povinné |
+|-------|------|-------|---------|
+| `APP_NAME_PREFIX` | variable | Identita instance = prefix jmen Coolify aplikací; zároveň přepínač nasazení | pro nasazení |
+| `COOLIFY_URL` | secret | Adresa Coolify API | pro nasazení |
+| `COOLIFY_API_TOKEN` | secret | Token Coolify API | pro nasazení |
+| `GIT_TOKEN` | secret | Čtení privátních rep instance (overlay cachebust, brány nad overlayem, mobilní build) | ❌ |
+| `DEPLOY_HEALTH_URL_*`, `DEPLOY_VERIFY_URL_*` | secret | Sondy „odpovídá to?" a „změnil se obsah?" po nasazení | ❌ |
+| `REGISTRY_PROXY` | variable | Pull-through cache Docker Hubu (`<host>/`) | ❌ |
+| `VERDACCIO_URL` (+ `VERDACCIO_*` secrets) | variable | Privátní npm registr pro publikaci `@aisha/*` a n8n nodů | ❌ |
 
-### Proč DinD?
-
-Runner nemůže přímo deployovat na host Docker daemon. Proto:
-1. CI testuje kód (uvnitř DinD kontejneru)
-2. CI triggeruje Coolify webhook po úspěšných testech
-3. **Coolify** builduje a deployuje z `docker-compose.coolify-prebuilt.yml`
+Úplný seznam (co CI čte a odkud se to bere) vede `scripts/lib/ci-kontrakt.mjs`;
+`node scripts/lib/ci-kontrakt.mjs --repo <vlastník>/<repo>` (s `GITHUB_TOKEN`)
+změří, co repo opravdu má.
 
 ## Deploy strategie
 
-### Web deploy (Coolify webhook)
-
 ```
-push to main → Forgejo CI → testy projdou → curl webhook → Coolify builds + deploys
+push to main → CI (testy zelené) → deploy-and-verify.sh → Coolify API (POST /deploy)
+             → čeká na terminální stav → ověří revizi a obsah artefaktu
 ```
 
-Coolify používá `docker-compose.coolify-prebuilt.yml` (~2KB):
-- `migrate` service — spustí DB migrace (Dockerfile.migrate)
-- `web` service — builduje frontend (Dockerfile.web), startuje po úspěšné migraci
-
-**Proč prebuilt compose?** Hlavní `docker-compose.coolify.yml` (35KB, 18 služeb) způsoboval
-`proc_open(): posix_spawn() failed: Argument list too long` — Coolify base64-encoduje
-celý compose do SSH argumentu, 47KB přesahuje OS ARG_MAX limit.
-
-### Supabase stack
-
-Supabase backend (`docker-compose.coolify.yml`) je deploynutý **separátně** a mění se zřídka.
-Web deploys jdou přes lehký prebuilt compose, ne přes 35KB all-in-one soubor.
+`scripts/ci/deploy-and-verify.sh` nasazuje jednu appku a nahlas říká, co
+dokázal a co ne; `scripts/ci/nasad-podle-vln.sh` nasazuje dotčené stacky ve
+vlnách (pořadí z `scripts/aisha-redeploy.mjs`).
 
 ### DB Migrace
 
-Migrace běží jako `migrate` service v `docker-compose.coolify-prebuilt.yml`:
-- Používá `Dockerfile.migrate` (Node 22 + postgresql-client)
-- Připojeno na `aisha-network` → přístup k `aisha-db:5432`
-- `restart: "no"` — spustí se jednou a ukončí se
-- Web service startuje až po `service_completed_successfully`
+Migraci jádra provádí služba `migrate` uvnitř stacku (`docker-compose.coolify.yml`);
+dokončený deployment je důkazem migrace. Druhý, volitelný kanál je krok
+„DB migrate" v ruční `deploy.yml` (s `AISHA_DB_URL`).
 
 ## Pipeline Stages
 
 ### 1. 🔍 Detect Changes
-- Porovná HEAD~1 vs HEAD
-- Nastaví output flagy: `code`, `migrations`, `docs_only`, `functions`
-- Docs-only změny přeskočí celý pipeline
+- `scripts/ci/zmenene-cesty.sh` (příznaky `app`, `db_change`, `services_change`, …)
+- `scripts/aisha-changed-apps.mjs` (`deploy_apps`)
+- `already_verified`: merge, jehož strom už CI změřila (zelený `PR: verdikt` na hlavě PR), testy nepřehrává
 
 ### 2. 🧪 Check
-- TypeScript: `npx tsc --noEmit`
+- TypeScript: `npx tsc --noEmit -p tsconfig.app.json`
 - ESLint: `npm run lint`
 - i18n: `npm run i18n:check`
 
 ### 3. 🧪 Test
-- Unit testy: `npm run test:run`
+- Unit testy: `npm run test:run` (8 shardů)
 - Gate testy: `npm run test:gates`
+- Skripty: `npm run test:scripts`
+- Služby, povrchy, DB runtime (throwaway Postgres v Dockeru), AV a blockchain integrace
 
 ### 4. 🏗️ Build
 - Production build: `npm run build`
-- Ověření, že build projde (Coolify pak builduje znovu z Dockerfile.web)
 
-### 5. 🚀 Deploy
-- `curl -X POST "$COOLIFY_WEBHOOK_URL"` s ref + sha
-- Coolify obdrží webhook → pulls kód → builds compose → deploys
+### 5. ⚖️ PR: verdikt
+- Jediná kontrola, na které visí slití do `main`; `skipped` je v pořádku, `failure`/`cancelled` ne
 
-## Setup (Forgejo Secrets + Coolify env vars)
-
-**Automatický setup (doporučeno):**
-```bash
-npm run deploy:init        # interaktivně
-npm run deploy:init:dry    # dry run
-```
-
-Viz [COOLIFY_SETUP.md](COOLIFY_SETUP.md) pro detaily.
-
-### Forgejo Secrets
-
-Nastavit v Forgejo UI: **Settings → Secrets** (nebo automaticky přes `deploy:init`)
-
-| Secret | Popis | Required |
-|--------|-------|----------|
-| `COOLIFY_WEBHOOK_URL` | Coolify deploy webhook URL | ✅ |
-| `VERDACCIO_TOKEN` | NPM auth token pro npm.id3a.cz | ❌ (pro publish) |
-| `N8N_API_KEY` | n8n API klíč (pro workflow triggery) | ❌ |
-
-### Coolify env vars (v Coolify UI pro prebuilt compose, nebo přes `deploy:init`)
-
-| Proměnná | Typ | Popis |
-|----------|-----|-------|
-| `VITE_AISHA_POSTGREST_URL` | Build | Supabase API URL |
-| `VITE_AISHA_POSTGREST_ANON_KEY` | Build | Supabase anon key |
-| `VITE_PUBLIC_SITE_URL` | Build | Veřejná URL pro auth redirecty |
-| `PUBLIC_SITE_URL` | Build | URL pro sitemap/robots (SEO) |
-| `VITE_SENTRY_DSN` | Build | Sentry error monitoring |
-| `AISHA_DB_URL` | Runtime | DB connection string (pro migrate) |
+### 6. 🚀 Deploy (opt-in)
+- Viz výše; jen push do `main` s `APP_NAME_PREFIX`
 
 ## Soubory
 
 | Soubor | Účel |
 |--------|------|
-| `.forgejo/workflows/ci.yml` | CI/CD pipeline (Forgejo Actions) |
-| `.forgejo/workflows/test-community-nodes.yml` | n8n community nodes testy |
-| `docker-compose.coolify-prebuilt.yml` | Coolify deploy compose (web + migrate) |
-| `docker-compose.coolify.yml` | Supabase stack (separátní deploy) |
-| `Dockerfile.web` | Standalone web build (3-stage: deps→builder→nginx) |
-| `Dockerfile.migrate` | Standalone migrace (2-stage: deps→migrator) |
-| `docker/nginx.conf` | Nginx SPA konfigurace |
+| `.github/workflows/ci.yml` | CI/CD pipeline (push/PR) |
+| `.github/workflows/supply-chain.yml` | npm audit, OSV, SBOM, Trivy (ručně; noční běh opt-in `HEAVY_LANE_NIGHTLY`) |
+| `.github/workflows/deploy.yml` | Ruční nasazení stacku (opt-in) |
+| `.github/workflows/staging-deploy.yml` | Staging (opt-in) |
+| `.github/workflows/aisha-packages-publish.yml` | Publikace `@aisha/*` (opt-in `VERDACCIO_URL`) |
+| `.github/workflows/aisha-deps-update.yml` | Aktualizace závislostí (cron opt-in `DEPS_UPDATE_SCHEDULED`) |
+| `scripts/ci/` | Sdílené kroky CI (směrovač, deploy-and-verify, stráže) |
+
+## Lokálně, bez forge
+
+Každá dráha je npm skript nebo skript repa — tabulka příkazů je v
+[CONTRIBUTING.md › Running the CI lanes locally](../../CONTRIBUTING.md#running-the-ci-lanes-locally).
+Workflow soubory ověří `actionlint`; celý workflow jde přehrát přes `act`.
 
 ## Manuální operace
 
 ### Trigger deploy
 
 ```bash
-# Deploy se spouští automaticky při push na main.
-# Manuální trigger: Forgejo UI → Actions → Run workflow
-
-# Nebo přímý webhook:
-curl -X POST "$COOLIFY_WEBHOOK_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"ref": "refs/heads/main"}'
-```
-
-### Check container status
-
-```bash
-docker ps --filter "name=platform-web"
-docker logs platform-web --tail 100
+# Deploy se spouští automaticky při push na main (s APP_NAME_PREFIX).
+# Ručně:
+gh workflow run deploy.yml -f stack=core
+# nebo bez CI vůbec:
+node scripts/aisha-redeploy.mjs --only=<app>
 ```
 
 ### Rollback
@@ -185,35 +148,22 @@ docker logs platform-web --tail 100
 
 ## Troubleshooting
 
-### "Argument list too long"
-
-Coolify builduje z `docker-compose.coolify.yml` (35KB) místo prebuilt compose.
-**Řešení:** V Coolify UI změnit Docker Compose file na `docker-compose.coolify-prebuilt.yml`.
-
-### Migrace selhávají
-
-```bash
-# Check migrate container logs
-docker logs <migrate-container-name> --tail 100
-
-# Verify DB connectivity
-PGPASSWORD=postgres psql -h 127.0.0.1 -p 57422 -U postgres -d postgres -t -A -c "SELECT 1"
-```
-
 ### CI joby selhávají
 
-1. Zkontroluj Forgejo Actions log: `git.id3a.cz` → repo → Actions
-2. Ověř, že runner běží: Forgejo admin → Runners
-3. Ověř npm.id3a.cz dostupnost (Verdaccio)
+1. Log běhu: GitHub → Actions → běh → job (nebo `gh run view <id> --log-failed`)
+2. Pád `Web: Tests` zapíše diagnostiku do PR (komentář) nebo do issue na `main`
+3. Lokální reprodukce: příkaz z tabulky v CONTRIBUTING.md
 
-### Webhook nefunguje
+### Deploy úlohy se přeskakují
 
-```bash
-# Test webhook manuálně
-curl -v -X POST "$COOLIFY_WEBHOOK_URL" \
-  -H "Content-Type: application/json" \
-  -d '{"ref": "refs/heads/main"}'
+Repo nedeklaruje instanci — nastav proměnnou `APP_NAME_PREFIX` (a secrety
+`COOLIFY_URL`, `COOLIFY_API_TOKEN`).
 
-# Check Coolify deployment logs v Coolify UI
-```
+### "Argument list too long"
 
+`proc_open(): posix_spawn() failed: Argument list too long` — Coolify base64-encoduje
+celý compose do SSH argumentu; ~47KB base64 (35KB compose, 18 služeb) přesáhlo OS
+ARG_MAX limit. Hlídá to brána velikosti compose v `coolify-compose-compliance.gate.test.ts`.
+
+Coolify builduje z `docker-compose.coolify.yml` (velký) místo menšího compose.
+**Řešení:** V Coolify UI změnit Docker Compose file na menší compose stacku.
