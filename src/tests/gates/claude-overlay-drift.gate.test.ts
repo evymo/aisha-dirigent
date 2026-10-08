@@ -106,7 +106,7 @@ describe("AISHA Dirigent Claude Overlay — Drift Detection", () => {
       // expectation 'stdout contains X' fails.
       //
       // Documented offender (2026-05-24): `(?:...)` non-capturing group
-      // worked on local macOS but broke runtime gate on Linux Forgejo
+      // worked on local macOS but broke runtime gate on a Linux CI
       // runner.
       //
       // POSIX ERE supports: . * + ? | () [] {} ^ $ and (via GNU/BSD

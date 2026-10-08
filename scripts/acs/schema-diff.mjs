@@ -22,9 +22,7 @@ const git = (args) => execFileSync('git', args, { encoding: 'utf8' });
 const tryGit = (args) => { try { return git(args); } catch { return null; } };
 
 const baseRef = process.argv[2]
-  ?? (tryGit(['rev-parse', '--verify', '--quiet', 'origin/main']) ? 'origin/main'
-    : tryGit(['rev-parse', '--verify', '--quiet', 'forgejo/main']) ? 'forgejo/main'
-      : 'main');
+  ?? (tryGit(['rev-parse', '--verify', '--quiet', 'origin/main']) ? 'origin/main' : 'main');
 
 const parseRef = (name) => {
   const m = /^(?<base>.+)@(?<major>\d+)\.(?<minor>\d+)\.json$/.exec(name);

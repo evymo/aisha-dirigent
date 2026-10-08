@@ -436,8 +436,8 @@ describe('no-hardcoded-deployment-config — repo must be template-only, values 
   });
 
   it('no hardcoded private-registry / forge host (`npm.id3a.cz` / `repo.id3a.cz`) as a VALUE in shipping code', () => {
-    // The private Verdaccio + Forgejo hosts are deployment infra — they must
-    // come from VERDACCIO_URL / FORGEJO_URL (or rendered template placeholders),
+    // The private Verdaccio + git hosts are deployment infra — they must
+    // come from VERDACCIO_URL / GIT_BASE_URL (or rendered template placeholders),
     // never be baked into package.json publishConfig, Dockerfile npmrc, .npmrc
     // files, config templates, or service code. (2026-06-10: user directive
     // "ani repo ani verdaccio nechceme hardcoded".)
@@ -474,7 +474,7 @@ describe('no-hardcoded-deployment-config — repo must be template-only, values 
     }
     const msg =
       findings.length > 0
-        ? `Found ${findings.length} hardcoded registry/forge host literal(s) — source from VERDACCIO_URL / FORGEJO_URL or a rendered template placeholder.\n` +
+        ? `Found ${findings.length} hardcoded registry/forge host literal(s) — source from VERDACCIO_URL / GIT_BASE_URL or a rendered template placeholder.\n` +
           findings.map((f) => `  ${f.file}:${f.line} — ${f.snippet}`).join('\n')
         : '';
     ratchetCheck('registry_host_literals', findings.length, msg);

@@ -4,7 +4,7 @@
  *
  * Brings up REAL clamd + MinIO using `docker build` + `docker run` — the SAME primitives the
  * coldstart-db-gate CI job uses, so this runs identically on a developer machine and on the
- * self-hosted Forgejo DinD runner (which has `docker run`, but NOT necessarily the
+ * self-hosted DinD CI runner (which has `docker run`, but NOT necessarily the
  * `docker compose` plugin). Waits for MinIO (HTTP health) + clamd (a real PING ⇒ PONG, which
  * only succeeds once the signature DB is loaded — a bare TCP connect is NOT enough), ensures the
  * minio client is installed for storage-auth, runs the *.it.test.ts suite (vitest.it.config.ts)

@@ -371,7 +371,7 @@
           }
         },
         {
-          "$comment": "Commit action (step 2/2) \u2014 fired by the explicit Commit button on an already-approved proposal. POSTs to WF_AISHA_TOOLING_COMMITTER which guards approval_status='approved' before creating the Forgejo branch/file/PR.",
+          "$comment": "Commit action (step 2/2) \u2014 fired by the explicit Commit button on an already-approved proposal. POSTs to WF_AISHA_TOOLING_COMMITTER which guards approval_status='approved' before creating the GitHub branch/file/PR.",
           "name": "triggerCommitter",
           "datasource": "AISHA n8n API",
           "actionConfiguration": {

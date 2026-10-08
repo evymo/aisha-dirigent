@@ -10,7 +10,7 @@
 // ⛔ CO SE STANE PŘI POCHYBNOSTI: pustí se CELÁ lehká dráha (~53 s). Není to
 // nouzový režim, je to POCTIVÁ odpověď — mapa, která neznámou cestu mlčky
 // prohlásí za nedotčenou, vyrábí zelenou, která znamená NEMĚŘENO. Přesně to
-// se v `.forgejo/workflows/ci.yml` stalo třikrát.
+// se v `.github/workflows/ci.yml` (dříve v CI na vlastním serveru) stalo třikrát.
 //
 // Použití:
 //   node scripts/test/brany-dotcene-spust.mjs [--base=<sha>] [--head=<sha>]

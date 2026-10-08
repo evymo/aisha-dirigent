@@ -56,7 +56,7 @@ function runSquawk(files) {
   //
   // CI isolation: squawk auto-detects a GitHub-Actions environment (GITHUB_ACTIONS
   // env var) and then emits `::warning::` GHA annotations to stdout, OVERRIDING
-  // `--reporter=json` — which breaks the JSON parse below. Forgejo Actions sets
+  // `--reporter=json` — which breaks the JSON parse below. The CI runner sets
   // GITHUB_ACTIONS=true for GitHub compatibility, so the gate failed CI-only while
   // passing locally. Strip the var for this child so --reporter=json is honored.
   const env = { ...process.env };

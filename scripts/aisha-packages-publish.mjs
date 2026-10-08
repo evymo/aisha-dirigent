@@ -20,7 +20,7 @@
 // version after adding it to packages/security/src/).
 //
 // Triggers:
-//   - CI (.forgejo/workflows/aisha-packages-publish.yml) on push to main when
+//   - CI (.github/workflows/aisha-packages-publish.yml) on push to main when
 //     packages/** changes
 //   - Manual: `node scripts/aisha-packages-publish.mjs`
 //

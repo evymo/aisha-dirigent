@@ -75,7 +75,7 @@ export function readConfigKey(key, { files = CONFIG_ENV_FILES } = {}) {
         // Last NON-EMPTY occurrence wins. Last-wins matches `set -a; source`,
         // but an empty assignment carries no information — and a later empty one
         // erasing an earlier real value is a live failure mode here, not a
-        // hypothetical: a heal pass appended `FORGEJO_URL=` after the real URL,
+        // hypothetical: a heal pass appended `GIT_BASE_URL=` after the real URL,
         // this lookup returned "", and deploy-init fell through to deriving a
         // hostname that does not exist. A lookup wants a VALUE; the toolchain's
         // own convention agrees (generate-secrets.mjs:firstNonEmpty skips empty).

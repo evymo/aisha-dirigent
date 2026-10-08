@@ -93,7 +93,7 @@ const KNOWN_SERVERS = getServerRoles();
 // Subdomains that are intentionally allowed to remain on id3a.cz.
 // Infra aliases:
 //   - frontend.id3a.cz, coolify.id3a.cz: Coolify management endpoints
-//   - repo.id3a.cz, git.id3a.cz:      Forgejo Git remote
+//   - repo.id3a.cz, git.id3a.cz:      private git remote
 // External services (NOT part of AISHA stack):
 //   - sentry.id3a.cz, npm.id3a.cz
 // Generic doc placeholders / anti-pattern references:

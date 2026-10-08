@@ -28,7 +28,7 @@ import { createCoolifyClient } from './coolify-http.mjs';
 import { createProjectScope, resolveProjectName } from './coolify-project-scope.mjs';
 
 // env.mjs se načítá až při skutečném dotazu: při importu hází na každou chybějící
-// URL (i n8n, Forgejo…) a zapisuje .env-prod-backup do process.env. Brána, která
+// URL (i n8n, git host…) a zapisuje .env-prod-backup do process.env. Brána, která
 // vstříkne vlastního klienta, tím nesmí projít — skutečný běh ano, beze změny.
 async function getEnv() {
   const { COOLIFY_URL: COOLIFY_URL_FROM_ENV } = await import('./env.mjs');

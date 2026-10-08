@@ -36,7 +36,7 @@ workbench/                          # IDE build infrastructure
 ├── patches/                        # Custom patches applied to VS Code source
 ├── bundled-extensions/             # Optional extra .vsix files to pre-install
 ├── resources/fonts/nunito-sans/    # Brand typography (Nunito Sans, OFL)
-└── .forgejo/workflows/build.yml    # CI pipeline
+└── (CI: GitHub Actions, .github/workflows/)
 
 extensions/aisha-dirigent/          # AISHA Core Extension (source of truth)
 ├── src/                            # Veškerá logika — auth, story, LLM, chat, warmup
@@ -71,8 +71,9 @@ extensions/aisha-dirigent (Extension = Source of Truth)
 - jq, git, python3
 - librsvg (`rsvg-convert`), icoutils (`icotool`)
 - macOS: Xcode Command Line Tools + `iconutil`
-- **`FORGEJO_BASE_URL`** — bez ní build spadne na PRVNÍM řádku
-  (`utils.sh`: `FORGEJO_BASE_URL must be set`). Odmítá dosadit výchozí
+- **`RELEASE_REPO`** (plná URL release repa workbenche, např.
+  `https://github.com/<org>/aisha-workbench`) — bez ní build spadne na PRVNÍM
+  řádku (`utils.sh`: `RELEASE_REPO must be set`). Odmítá dosadit výchozí
   hodnotu záměrně: adresa je vlastnost instalace, ne kódu.
 
 ### Local build
@@ -82,14 +83,14 @@ extensions/aisha-dirigent (Extension = Source of Truth)
 bash build/generate_icons.sh
 
 # Build for current platform
-FORGEJO_BASE_URL=https://repo.example.com ./build.sh
+RELEASE_REPO=https://git.example.com/acme/aisha-workbench ./build.sh
 
 # Build for specific platform
-FORGEJO_BASE_URL=https://repo.example.com ./build.sh --platform linux --arch x64
-FORGEJO_BASE_URL=https://repo.example.com ./build.sh --platform osx --arch arm64
+RELEASE_REPO=https://git.example.com/acme/aisha-workbench ./build.sh --platform linux --arch x64
+RELEASE_REPO=https://git.example.com/acme/aisha-workbench ./build.sh --platform osx --arch arm64
 
 # Opakovaný build nad už staženým VSCodiem (ušetří ~10 min klonování)
-FORGEJO_BASE_URL=https://repo.example.com ./build.sh --platform osx --arch arm64 --skip-clone
+RELEASE_REPO=https://git.example.com/acme/aisha-workbench ./build.sh --platform osx --arch arm64 --skip-clone
 ```
 
 Výstup: `workbench/artifacts/` (macOS `.zip`, Linux `.tar.gz`/`.deb`, Windows `.exe`).
@@ -109,7 +110,7 @@ Aktuální patche:
 
 ### CI
 
-Forgejo Actions workflow in `.forgejo/workflows/build.yml`:
+GitHub Actions workflow (`.github/workflows/`):
 - Linux x64 on every push to `main`
 - macOS arm64/x64 on tags (`v*`)
 - Manual trigger via `workflow_dispatch`

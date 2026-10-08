@@ -53,7 +53,7 @@ if (NODE_MAJOR < 22) {
 // + `foo.gate.test.ts` vybere 1 soubor, kdežto dosavadní zápis (adresář jako
 // pozicní arg z package.json + argument uživatele) vybral 628 — vitest bere
 // pozicní vzory jako SJEDNOCENÍ. `npm run test:gates -- <soubor>` tedy
-// nefiltroval, jen přidával; zdokumentováno i v .forgejo/workflows/ci.yml.
+// nefiltroval, jen přidával; zdokumentováno i v .github/workflows/ci.yml.
 //
 // Nově: adresář se předává jako `--default-dir`. Bez pozicních argumentů se
 // použije on; s nimi se použijí ONY a každý se ověří, že do adresáře patří —
