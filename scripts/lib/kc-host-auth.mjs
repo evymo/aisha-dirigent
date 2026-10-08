@@ -19,6 +19,7 @@
 import {
   hostPorts,
   devEnvDefaults,
+  INSTANCE_PREFIX,
   KC_HOST_FACING_HOST,
   KC_HOST_FACING_SCHEME,
 } from "../../config/local-presets.mjs";
@@ -31,7 +32,14 @@ import {
 
 // The local Keycloak's container DNS name + in-network HTTP port (KC_HTTP_PORT=80
 // in docker-compose.coolify-keycloak.yml).
-export const KC_CONTAINER = "aisha-keycloak";
+// Jméno kontejneru se SKLÁDÁ z identity lokální instance (`<INSTANCE_PREFIX>-keycloak`,
+// lokálně `local-keycloak`) — stejně jako ho skládá compose (`${APP_NAME_PREFIX}-keycloak`).
+// ⛔ Literál `aisha-keycloak` se po přechodu na jména z identity s ničím nepotkal:
+// přepis issueru se tiše přeskočil a služby ověřovaly tokeny proti
+// `https://auth.localhost/realms/…`, který lokální Keycloak nikdy nevydá.
+export const KC_CONTAINER = `${INSTANCE_PREFIX}-keycloak`;
+// Klíč v registru vystavených portů (config/local-presets.mjs hostPorts).
+export const KC_EXPOSURE_KEY = "aisha-keycloak";
 export const KC_IN_NETWORK_PORT = 80;
 export const KC_IN_NETWORK_SCHEME = "http";
 
@@ -44,7 +52,7 @@ export { getEnvValue, setEnvValue };
  * Returns the legacy fields plus the full `endpoints` object.
  */
 export function resolveKcHostAuth() {
-  const kcHostPort = hostPorts[KC_CONTAINER]?.[KC_IN_NETWORK_PORT] ?? 8180;
+  const kcHostPort = hostPorts[KC_EXPOSURE_KEY]?.[KC_IN_NETWORK_PORT] ?? 8180;
   const realm = devEnvDefaults.KEYCLOAK_REALM ?? "aisha";
   const endpoints = resolveKcEndpoints({
     hostFacingHost: KC_HOST_FACING_HOST,

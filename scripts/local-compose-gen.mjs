@@ -226,7 +226,13 @@ console.error(`[local-compose-gen] Host-exposed services (only these publish a h
 // LOCAL_*_PORT contract the getters/overrides already use.
 const allocatedPortEnv = {};
 const portRecord = (name, containerPort, envKey) => {
-  const p = exposedHostPorts[name]?.[containerPort];
+  // Klíče vystavených portů (config/local-presets.mjs hostPorts) jsou role
+  // `<něco>-gateway|web|keycloak|db`, kontejner `<INSTANCE_PREFIX>-<role>`.
+  // ⛔ Přesná shoda jména dřív NIKDY nenastala (local-gateway ≠ aisha-gateway),
+  // takže se skutečné porty do env nezapsaly a celý blok níž byl mrtvý kód.
+  const role = name.startsWith(`${INSTANCE_PREFIX}-`) ? name.slice(INSTANCE_PREFIX.length + 1) : name;
+  const key = exposedHostPorts[name] ? name : Object.keys(exposedHostPorts).find((k) => k.endsWith(`-${role}`));
+  const p = key ? exposedHostPorts[key]?.[containerPort] : undefined;
   if (p !== undefined) allocatedPortEnv[envKey] = String(p);
 };
 // ⛔ JMÉNA SE SKLÁDAJÍ Z IDENTITY (2026-08-25). Stálo tu natvrdo `aisha-gateway`,
@@ -243,6 +249,15 @@ if (allocatedPortEnv.LOCAL_GATEWAY_PORT) {
   allocatedPortEnv.VITE_AISHA_GATEWAY_URL = `http://localhost:${gp}`;
   allocatedPortEnv.VITE_API_URL = `http://localhost:${gp}`;
   allocatedPortEnv.VITE_AISHA_BACKEND_URL = `http://localhost:${gp}`;
+  // Veřejná adresa gatewaye = host port lokálního stacku. Gateway běží s
+  // NODE_ENV=production: bez PUBLIC_URL odpovídají trasy přihlášení 503 a
+  // /.well-known/app-config.json vrací RELATIVNÍ mcp_url/aisha_url.
+  allocatedPortEnv.PUBLIC_URL = `http://localhost:${gp}`;
+}
+if (allocatedPortEnv.LOCAL_WEB_PORT) {
+  // Kam se prohlížeč vrací po přihlášení. Bez ní by se odvodila z APP_DOMAIN
+  // (`https://web.local`), kde lokálně nic neposlouchá.
+  allocatedPortEnv.FRONTEND_URL = `http://localhost:${allocatedPortEnv.LOCAL_WEB_PORT}`;
 }
 if (allocatedPortEnv.LOCAL_KC_PORT) {
   const kp = allocatedPortEnv.LOCAL_KC_PORT;
@@ -251,14 +266,15 @@ if (allocatedPortEnv.LOCAL_KC_PORT) {
   // do adresy, na kterou se SPA přihlašuje. Dosazená cizí značka znamená build,
   // který se hlásí do cizího realmu.
   //
-  // Zdroj je ale JINÝ než u nasazení, a to je tu podstatné: tenhle generátor
-  // staví LOKÁLNÍ dev stack, ne instanci. Ten má vlastní deklarovanou identitu
-  // (`LOCAL_STACK`, viz scripts/lib/local-stack-name.mjs — per-implementace,
-  // přebíjí se přes AISHA_LOCAL_STACK). Vyžadovat po lokálním stacku produkční
-  // `KEYCLOAK_REALM` by znamenalo, že bez produkční deklarace nejde vygenerovat
-  // ani dev compose. Obě větve jsou tedy DEKLAROVANÉ hodnoty, jen z různých
-  // rozsahů — nikde se nedosazuje jméno cizí implementace.
-  const kcRealm = (process.env.KEYCLOAK_REALM || "").trim() || LOCAL_STACK;
+  // Zdroj je ale JINÝ než u nasazení: lokální stack má realm deklarovaný v
+  // config/local-presets.mjs (LOCAL_KC_REALM → devEnvDefaults.KEYCLOAK_REALM),
+  // a TÝŽ realm importuje Keycloak i čte gateway. Jméno stacku (LOCAL_STACK)
+  // realm není — VITE_KC_AUTHORITY s ním by mířila do realmu, který neexistuje.
+  const kcRealm = (process.env.KEYCLOAK_REALM || "").trim() || devEnvDefaults.KEYCLOAK_REALM;
+  if (!kcRealm) {
+    console.error("[local-compose-gen] FAIL KEYCLOAK_REALM není deklarovaný (config/local-presets.mjs)");
+    process.exit(1);
+  }
   allocatedPortEnv.VITE_KC_URL = `http://127.0.0.1:${kp}`;
   allocatedPortEnv.VITE_KC_AUTHORITY = `http://127.0.0.1:${kp}/realms/${kcRealm}`;
 }
@@ -552,6 +568,24 @@ if (Object.values(merged.services).some((s) => s?.container_name === KC_CONTAINE
       }
       console.error(`[local-compose-gen] Gateway ALLOWED_ORIGINS set for local browser CORS (${LOCAL_WEB_ORIGINS})`);
     }
+  }
+}
+
+// ── Gateway: veřejná adresa a frontend = skutečné host porty lokálního stacku ──
+// Nastavuje se AŽ po transformaci: rewriteDomainStr přepisuje každé
+// `http://localhost:<port>` na port gatewaye, takže by FRONTEND_URL skončila na :3001.
+if (merged.services.gateway && allocatedPortEnv.PUBLIC_URL) {
+  const env = merged.services.gateway.environment;
+  if (env && !Array.isArray(env)) {
+    env.PUBLIC_URL = allocatedPortEnv.PUBLIC_URL;
+    if (allocatedPortEnv.FRONTEND_URL) {
+      env.FRONTEND_URL = allocatedPortEnv.FRONTEND_URL;
+      // /.well-known/app-config.json: web_url by se jinak odvodil z APP_DOMAIN
+      // (`https://web.local`), kde lokálně nic neposlouchá.
+      env.APP_CONFIG_WEB_URL = allocatedPortEnv.FRONTEND_URL;
+    }
+    // keycloak_url pro klienty (rozšíření, mobil): host-facing issuer lokálního KC.
+    if (allocatedPortEnv.VITE_KC_AUTHORITY) env.APP_CONFIG_KEYCLOAK_URL = allocatedPortEnv.VITE_KC_AUTHORITY;
   }
 }
 

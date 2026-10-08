@@ -19,6 +19,7 @@ import {
   applyHostClientAuthFix,
   resolveKcHostAuth,
   KC_CONTAINER,
+  KC_EXPOSURE_KEY,
 } from "../../../scripts/lib/kc-host-auth.mjs";
 import { devEnvDefaults, hostPorts } from "../../../config/local-presets.mjs";
 
@@ -34,7 +35,7 @@ function brokenDoc() {
   const authBad = "https:///realms/aisha/protocol/openid-connect/auth";
   return {
     services: {
-      keycloak: { container_name: "aisha-keycloak", environment: { KC_HOSTNAME: "", KC_HTTP_PORT: "80" } },
+      keycloak: { container_name: KC_CONTAINER, environment: { KC_HOSTNAME: "", KC_HTTP_PORT: "80" } },
       gateway: {
         container_name: "aisha-gateway",
         environment: {
@@ -63,7 +64,7 @@ function brokenDoc() {
   };
 }
 
-const IN_NETWORK_OK = /^http:\/\/aisha-keycloak(?::\d+)?\/realms\//;
+const IN_NETWORK_OK = new RegExp(`^http://${KC_CONTAINER}(?::\\d+)?/realms/`);
 const NOT_LOCAL_OR_PUBLIC = /https:\/\/|\.guru|\.cz|localhost|127\.0\.0\.1/;
 
 describe("Local Host-Client Auth — Integral Design (model-driven resolver)", () => {
@@ -71,7 +72,7 @@ describe("Local Host-Client Auth — Integral Design (model-driven resolver)", (
   const { issuer, inNetworkJwks, inNetworkToken, hostFacingBase, hostFacingAuth, kcHostPort } = ha;
 
   test("KC host port + issuer derive from the local presets (no hardcoded drift)", () => {
-    expect(kcHostPort, "from hostPorts['aisha-keycloak'][80]").toBe(hostPorts[KC_CONTAINER]?.[80]);
+    expect(kcHostPort, "from hostPorts[KC_EXPOSURE_KEY][80]").toBe(hostPorts[KC_EXPOSURE_KEY]?.[80]);
     expect(issuer).toBe(`http://127.0.0.1:${kcHostPort}/realms/${devEnvDefaults.KEYCLOAK_REALM}`);
   });
 
