@@ -51,11 +51,25 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# ── Local stack: hodnoty, které generátor SKUTEČNĚ vydal ────────────────────
+# Porty přiděluje scripts/local-compose-gen.mjs (volné porty, ne pevné) a spolu
+# s realmem a identitou instance je zapisuje do .env.local.dev. Odsud se čtou —
+# dřív tu stály literály 5173/8080 a jména `aisha-*`, takže proti běžícímu
+# stacku sonda hlásila „nedosažitelné" a „absent" (naměřeno 2026-10-08).
+LOCAL_ENV_FILE="$PROJECT_ROOT/.env.local.dev"
+_local_env() {
+  [[ -f "$LOCAL_ENV_FILE" ]] || return 0
+  grep -E "^$1=" "$LOCAL_ENV_FILE" | tail -1 | cut -d= -f2- || true
+}
+LOCAL_GATEWAY_PORT="$(_local_env LOCAL_GATEWAY_PORT)"
+LOCAL_WEB_PORT="$(_local_env LOCAL_WEB_PORT)"
+LOCAL_KC_PORT="$(_local_env LOCAL_KC_PORT)"
+
 # ── Auto-detect environment ─────────────────────────────────────────────────
 if [[ -z "$MODE" ]]; then
-  # If the local gateway or Keycloak is reachable, prefer local mode.
-  if curl -fsS --connect-timeout 1 --max-time 2 "http://127.0.0.1:3001/health" >/dev/null 2>&1 ||
-     curl -fsS --connect-timeout 1 --max-time 2 "http://127.0.0.1:8080/realms/${KEYCLOAK_REALM:?jméno realmu je identita instance — nedosazuje se}/.well-known/openid-configuration" >/dev/null 2>&1; then
+  # If the local gateway is reachable, prefer local mode.
+  if [[ -n "$LOCAL_GATEWAY_PORT" ]] &&
+     curl -fsS --connect-timeout 1 --max-time 2 "http://127.0.0.1:${LOCAL_GATEWAY_PORT}/health" >/dev/null 2>&1; then
     MODE="local"
   else
     MODE="prod"
@@ -64,6 +78,7 @@ fi
 
 # ── Endpoint configuration ──────────────────────────────────────────────────
 if [[ "$MODE" == "prod" ]]; then
+  LOCAL_PFX=""   # jména kontejnerů se měří jen v lokálním režimu
   # Compose the SAME env foundation cold-start uses: operator env
   # (.env-prod-backup) → topology resolver (*_DOMAIN SoT) → domains.env
   # composites. Makes `npm run stack:health:prod` standalone-runnable from a
@@ -120,9 +135,16 @@ if [[ "$MODE" == "prod" ]]; then
   PKI_URL="https://$(_vnejsi_tvar PKI)"
 else
   # Local: aisha/db + gateway + Keycloak/PKI. Override per service as needed.
-  API_BASE="${AISHA_LOCAL_API_URL:-${AISHA_API_URL:-http://127.0.0.1:3001}}"
-  APP_URL="${AISHA_LOCAL_APP_URL:-${PUBLIC_SITE_URL:-http://127.0.0.1:5173}}"
-  KC_URL="${AISHA_LOCAL_KEYCLOAK_URL:-${KEYCLOAK_URL:-http://127.0.0.1:8080}}"
+  # Realm a identita instance jsou z vygenerovaného .env.local.dev (viz výš);
+  # bez nich lokální stack neběží, takže chybějící hodnota je chyba, ne výchozí.
+  KEYCLOAK_REALM="$(_local_env KEYCLOAK_REALM)"
+  LOCAL_PFX="$(_local_env APP_NAME_PREFIX)"
+  : "${KEYCLOAK_REALM:?KEYCLOAK_REALM chybí — lokální stack ho zapisuje do .env.local.dev (scripts/local-warmup.sh)}"
+  : "${LOCAL_PFX:?APP_NAME_PREFIX (identita instance) chybí — lokální stack ho zapisuje do .env.local.dev (scripts/local-warmup.sh)}"
+  : "${LOCAL_GATEWAY_PORT:?LOCAL_GATEWAY_PORT chybí v .env.local.dev}" "${LOCAL_WEB_PORT:?LOCAL_WEB_PORT chybí v .env.local.dev}" "${LOCAL_KC_PORT:?LOCAL_KC_PORT chybí v .env.local.dev}"
+  API_BASE="${AISHA_LOCAL_API_URL:-http://127.0.0.1:${LOCAL_GATEWAY_PORT}}"
+  APP_URL="${AISHA_LOCAL_APP_URL:-http://127.0.0.1:${LOCAL_WEB_PORT}}"
+  KC_URL="${AISHA_LOCAL_KEYCLOAK_URL:-http://127.0.0.1:${LOCAL_KC_PORT}}"
   N8N_URL="${AISHA_LOCAL_N8N_URL:-http://127.0.0.1:5678}"
   LANGFUSE_URL="${AISHA_LOCAL_LANGFUSE_URL:-http://127.0.0.1:3100}"
   NOCODB_URL="${AISHA_LOCAL_NOCODB_URL:-http://127.0.0.1:8085}"
@@ -148,6 +170,11 @@ RUNNING=""
 resolve_container_name() {
   local pattern="$1"
   local line
+  # Přesná shoda jména (i za prefixem projektu `<stack>__`) má přednost: vzor
+  # `local-langfuse` jinak chytil i `local-langfuse-redis` — podle pořadí výpisu.
+  while IFS= read -r line; do
+    [[ "$line" == "$pattern" || "$line" == *"__$pattern" ]] && { printf '%s' "$line"; return; }
+  done <<< "$RUNNING"
   while IFS= read -r line; do
     [[ "$line" == *"$pattern"* ]] && { printf '%s' "$line"; return; }
   done <<< "$RUNNING"
@@ -305,16 +332,16 @@ run_checks() {
   fi
   # Optional/per-preset services: 5th arg = local container basename. When that
   # container isn't running (subset preset), the service is skipped, not failed.
-  check_service "Keycloak (OIDC)"      "${KC_URL}/realms/${KEYCLOAK_REALM:?jméno realmu je identita instance — nedosazuje se}/.well-known/openid-configuration" "200" "keycloak"  "aisha-keycloak"
-  check_service "PKI (OpenXPKI + aisha_auth)" "${PKI_URL}/" "200,302" "pki"    "aisha-pki"
+  check_service "Keycloak (OIDC)"      "${KC_URL}/realms/${KEYCLOAK_REALM:?jméno realmu je identita instance — nedosazuje se}/.well-known/openid-configuration" "200" "keycloak"  "${LOCAL_PFX}-keycloak"
+  check_service "PKI (OpenXPKI + aisha_auth)" "${PKI_URL}/" "200,302" "pki"    "${LOCAL_PFX}-pki-webui"
 
   if ! $JSON_OUTPUT; then
     echo -e "\n${BOLD}Ecosystem:${NC}"
   fi
-  check_service "n8n (Workflows)"      "${N8N_URL}/healthz"              "200"         "n8n"       "aisha-n8n"
-  check_service "Langfuse (LLM Obs)"   "${LANGFUSE_URL}/"                "200,302"     "langfuse"  "aisha-langfuse"
-  check_service "NocoDB"               "${NOCODB_URL}/"                  "200,302"     "admin"     "aisha-nocodb"
-  check_service "Appsmith"             "${APPSMITH_URL}/"                "200,302"     "admin"     "aisha-appsmith"
+  check_service "n8n (Workflows)"      "${N8N_URL}/healthz"              "200"         "n8n"       "${LOCAL_PFX}-n8n--main"
+  check_service "Langfuse (LLM Obs)"   "${LANGFUSE_URL}/"                "200,302"     "langfuse"  "${LOCAL_PFX}-langfuse"
+  check_service "NocoDB"               "${NOCODB_URL}/"                  "200,302"     "admin"     "${LOCAL_PFX}-nocodb"
+  check_service "Appsmith"             "${APPSMITH_URL}/"                "200,302"     "admin"     "${LOCAL_PFX}-appsmith"
 }
 
 # ── Wait mode ────────────────────────────────────────────────────────────────
