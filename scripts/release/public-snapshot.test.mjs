@@ -173,8 +173,8 @@ describe("shapes the first version of the checks did not see (council review 202
   it("a service_role JWT is recognised by its DECODED payload — role first or not", () => {
     const r = najdi({
       "a.env.txt": `KEY=${jwt({ role: "service_role", iss: "x", exp: 2240000000 })}\n`,
-      "b.ts": `const k = "${jwt({ iss: "supabase", ref: "abc", role: "service_role", exp: 2240000000 })}";\n`,
-      "c.ts": `const anon = "${jwt({ iss: "supabase", role: "anon" })}";\n`,
+      "b.ts": `const k = "${jwt({ iss: "aisha", ref: "abc", role: "service_role", exp: 2240000000 })}";\n`,
+      "c.ts": `const anon = "${jwt({ iss: "aisha", role: "anon" })}";\n`,
     });
     expect(r.findings.filter((f) => f.check === "service-role-jwt").map((f) => f.path).sort()).toEqual(["a.env.txt", "b.ts"]);
   });
