@@ -476,7 +476,7 @@ async function checkAdminBridge() {
     { name: "NocoDB", urlKey: "NOCODB_URL", path: "/api/v1/health" },
     { name: "Appsmith", urlKey: "APPSMITH_URL", path: "/api/v1/health" },
     { name: "Langfuse", urlKey: "LANGFUSE_HOST", path: "/api/public/health" },
-    { name: "Forgejo", urlKey: "FORGEJO_URL", path: "/api/v1/version" },
+    { name: "GitHub API", urlKey: "GITHUB_API_URL", path: "/zen" },
   ];
 
   for (const svc of serviceChecks) {
@@ -495,10 +495,10 @@ async function checkAdminBridge() {
     }
   }
 
-  // 6j. MCP admin tools — extended list (including appsmith & forgejo)
+  // 6j. MCP admin tools — extended list (including appsmith & github git ops)
   if (existsSync(join(ROOT, "services/svc-mcp-knowledge/src/server.ts"))) {
     const mcpSrc2 = readFileSync(join(ROOT, "services/svc-mcp-knowledge/src/server.ts"), "utf-8");
-    const extendedTools = ["admin_appsmith", "admin_forgejo_git", "admin_n8n_workflows"];
+    const extendedTools = ["admin_appsmith", "admin_github_git", "admin_n8n_workflows"];
     let found2 = 0;
     for (const tool of extendedTools) {
       if (mcpSrc2.includes(`"${tool}"`)) found2++;

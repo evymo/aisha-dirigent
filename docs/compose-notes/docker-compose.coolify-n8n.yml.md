@@ -163,9 +163,11 @@ Výchozí adresa BEZ meshe. V mesh režimu ji entrypoint přepíše na
 ## `- N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-}`
 
 ── Self-tooling loop (WF_AISHA_*): PostgREST direct read, webhook dispatch,
-   Forgejo committer. All values come from the n8n Coolify app env, which
+   GitHub committer. All values come from the n8n Coolify app env, which
    coolify-deploy-init.sh derives from canonical vars (AISHA_API_URL,
-   SERVICE_ROLE_KEY, N8N_WEBHOOK_URL, FORGEJO_*). No hardcoding here. ──
+   SERVICE_ROLE_KEY, N8N_WEBHOOK_URL, GITHUB_*). GITHUB_API_URL comes from the
+   env-doctor contract (public API default), GITHUB_REPOSITORY is an operator
+   declaration — empty = the GitHub steps fail closed. No hardcoding here. ──
 
 ## `- LANGFUSE_HOST=${LANGFUSE_HOST}`
 
@@ -308,7 +310,7 @@ deploy-workflows.mjs creates the aishaPostgrestApi n8n credential ("AISHA
 PostgREST") if absent so the workflows' __REMAP__ refs resolve. Needs the
 service key + gateway URL (the same canonical values the n8n service uses).
 
-## `- FORGEJO_API_TOKEN=${FORGEJO_API_TOKEN:-}`
+## `- GITHUB_TOKEN=${GITHUB_TOKEN:-}`
 
 Bootstrap-only secrets (read once here to mint encrypted n8n credentials):
 

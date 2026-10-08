@@ -5,7 +5,7 @@
  *   - Triggered by operator/Aisha after publish_static_defense_rule succeeds
  *   - Fetches active rules from DB
  *   - Generates YAML inline (mirroring scripts/gen-static-defense.mjs)
- *   - Creates Forgejo branch + writes YAML + opens PR
+ *   - Creates GitHub branch + writes YAML + opens PR
  *   - Logs to audit_journal
  *
  * Why a gate: the n8n workflow could silently break (someone edits a node,
@@ -58,7 +58,9 @@ describe('Static defense committer flow gate (Phase 10)', () => {
       'Validate Input',
       'Fetch Active Rules',
       'Generate YAML',
-      'Create Forgejo Branch',
+      'Get Base Branch',
+      'Create GitHub Branch',
+      'Read Current YAML',
       'Write Regenerated YAML',
       'Create Pull Request',
       'Log Success',
@@ -130,15 +132,35 @@ describe('Static defense committer flow gate (Phase 10)', () => {
     }
   });
 
-  test('Create Forgejo Branch posts to Forgejo API', () => {
+  test('Create GitHub Branch posts a ref to the GitHub API (from the base branch SHA)', () => {
     const wf = JSON.parse(readFileSync(WORKFLOW, 'utf-8')) as N8nWorkflow;
-    const branch = wf.nodes.find((n) => n.name === 'Create Forgejo Branch');
+    const branch = wf.nodes.find((n) => n.name === 'Create GitHub Branch');
     expect(branch).toBeDefined();
     expect(branch!.type).toBe('n8n-nodes-base.httpRequest');
-    const params = branch!.parameters as { method?: string; url?: string };
+    const params = branch!.parameters as { method?: string; url?: string; jsonBody?: string };
     expect(params.method).toBe('POST');
-    expect(params.url).toMatch(/FORGEJO_API_URL/);
-    expect(params.url).toMatch(/\/branches/);
+    expect(params.url).toMatch(/GITHUB_API_URL/);
+    expect(params.url).toMatch(/GITHUB_REPOSITORY/);
+    expect(params.url).toMatch(/\/git\/refs$/);
+    expect(params.jsonBody).toContain("$('Get Base Branch')");
+  });
+
+  test('Write Regenerated YAML updates the existing file (PUT + blob sha when present)', () => {
+    const wf = JSON.parse(readFileSync(WORKFLOW, 'utf-8')) as N8nWorkflow;
+    const write = wf.nodes.find((n) => n.name === 'Write Regenerated YAML');
+    const params = write!.parameters as { method?: string; url?: string; jsonBody?: string };
+    expect(params.method).toBe('PUT');
+    expect(params.url).toMatch(/\/contents\//);
+    expect(params.jsonBody).toContain("$('Read Current YAML').first().json.sha");
+  });
+
+  test('commits only to a DECLARED repository (no guessed default)', () => {
+    const wf = JSON.parse(readFileSync(WORKFLOW, 'utf-8')) as N8nWorkflow;
+    const validate = wf.nodes.find((n) => n.name === 'Validate Input');
+    const code = (validate!.parameters as { jsCode?: string })?.jsCode ?? '';
+    expect(code).toContain('GITHUB_REPOSITORY not configured');
+    const raw = readFileSync(WORKFLOW, 'utf-8');
+    expect(raw).not.toMatch(/GITHUB_REPOSITORY\s*\|\|\s*'[^']/);
   });
 
   test('Create Pull Request opens PR against main', () => {

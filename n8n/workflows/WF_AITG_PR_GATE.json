@@ -9,7 +9,7 @@
   },
   "nodes": [
     {
-      "name": "Forgejo PR Webhook",
+      "name": "PR Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
@@ -175,12 +175,21 @@
       ],
       "onError": "continueRegularOutput",
       "parameters": {
-        "operation": "forgejo.setPrStatus",
-        "ref": "={{ $node['Validate Payload'].json.buildSha }}",
-        "state": "failure",
-        "context": "aitg/pr-gate",
-        "description": "={{ 'AITG ' + ($node['Read Automation Setting'].json.parameters?.block_severity ?? 'high') + '+ failures — see aitg_findings for detail' }}",
+        "service": "github",
+        "operation": "set_commit_status",
+        "repoOwner": "={{ ($env.GITHUB_REPOSITORY || '').split('/')[0] || '' }}",
+        "repoName": "={{ ($env.GITHUB_REPOSITORY || '').split('/')[1] || '' }}",
+        "commitSha": "={{ $node['Validate Payload'].json.buildSha }}",
+        "statusState": "failure",
+        "statusContext": "aitg/pr-gate",
+        "statusDescription": "={{ 'AITG ' + ($node['Read Automation Setting'].json.parameters?.block_severity ?? 'high') + '+ failures — see aitg_findings for detail' }}",
         "onError": "continueRegularOutput"
+      },
+      "credentials": {
+        "aishaGitHubApi": {
+          "id": "__REMAP__",
+          "name": "GitHub API"
+        }
       }
     },
     {
@@ -193,12 +202,21 @@
       ],
       "onError": "continueRegularOutput",
       "parameters": {
-        "operation": "forgejo.setPrStatus",
-        "ref": "={{ $node['Validate Payload'].json.buildSha }}",
-        "state": "success",
-        "context": "aitg/pr-gate",
-        "description": "AITG static + runtime probes passed",
+        "service": "github",
+        "operation": "set_commit_status",
+        "repoOwner": "={{ ($env.GITHUB_REPOSITORY || '').split('/')[0] || '' }}",
+        "repoName": "={{ ($env.GITHUB_REPOSITORY || '').split('/')[1] || '' }}",
+        "commitSha": "={{ $node['Validate Payload'].json.buildSha }}",
+        "statusState": "success",
+        "statusContext": "aitg/pr-gate",
+        "statusDescription": "AITG static + runtime probes passed",
         "onError": "continueRegularOutput"
+      },
+      "credentials": {
+        "aishaGitHubApi": {
+          "id": "__REMAP__",
+          "name": "GitHub API"
+        }
       }
     },
     {
@@ -231,17 +249,6 @@
     }
   ],
   "connections": {
-    "Forgejo PR Webhook": {
-      "main": [
-        [
-          {
-            "node": "Validate Payload",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Validate Payload": {
       "main": [
         [
@@ -376,6 +383,17 @@
         [
           {
             "node": "Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PR Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Payload",
             "type": "main",
             "index": 0
           }

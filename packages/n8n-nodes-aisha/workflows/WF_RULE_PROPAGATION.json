@@ -8,7 +8,7 @@
   },
   "meta": {
     "designPattern": "event-driven-propagation",
-    "philosophy": "Listens for expert_rule changes via webhook (triggered by pg_notify or Supabase webhook). Propagates changes: fetches instruction payload, generates ALL IDE instruction files (copilot, agents, claude, cursorrules, windsurfrules, aisha-agent, codex-skill), commits to Forgejo, notifies MCP clients, logs to Langfuse.",
+    "philosophy": "Listens for expert_rule changes via webhook (triggered by pg_notify or Supabase webhook). Propagates changes: fetches instruction payload, generates ALL IDE instruction files (copilot, agents, claude, cursorrules, windsurfrules, aisha-agent, codex-skill), commits to GitHub (one multi-file commit), notifies MCP clients, logs to Langfuse.",
     "selfDesignHint": "Aisha: This workflow closes the loop between DB rule edits and ALL downstream IDE consumers. It ensures every IDE instruction file stays in sync with expert_rules via the adapter registry pattern."
   },
   "connections": {
@@ -49,14 +49,14 @@
       "main": [
         [
           {
-            "node": "Commit to Forgejo",
+            "node": "Commit to GitHub",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Commit to Forgejo": {
+    "Commit to GitHub": {
       "main": [
         [
           {
@@ -148,33 +148,30 @@
       }
     },
     {
+      "parameters": {
+        "service": "github",
+        "operation": "commit_files",
+        "repoOwner": "={{ ($env.GITHUB_REPOSITORY || '').split('/')[0] || '' }}",
+        "repoName": "={{ ($env.GITHUB_REPOSITORY || '').split('/')[1] || '' }}",
+        "targetBranch": "",
+        "files": "={{ $json.files }}",
+        "commitMessage": "={{ `chore(ide): auto-regenerate IDE instruction files [skip ci]\\n\\nRule: ${$json.ruleSlug} (${$json.operation})\\nAdapters: ${$json.adapterCount}\\nFingerprint: ${$json.fingerprint || 'n/a'}` }}"
+      },
       "id": "rp-commit-007",
-      "name": "Commit to Forgejo",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
+      "name": "Commit to GitHub",
+      "type": "n8n-nodes-aisha.aishaAdminBridge",
+      "typeVersion": 1,
       "position": [
         1120,
         300
       ],
-      "parameters": {
-        "method": "POST",
-        "url": "={{ $env.FORGEJO_URL || 'https://git.id3a.cz' }}/api/v1/repos/{{ $env.FORGEJO_OWNER || 'aisha' }}/{{ $env.FORGEJO_REPO || 'aisha-ai-orchestrator' }}/contents",
-        "authentication": "genericCredentialType",
-        "genericAuthType": "httpHeaderAuth",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ message: `chore(ide): auto-regenerate IDE instruction files [skip ci]\\n\\nRule: ${$json.ruleSlug} (${$json.operation})\\nAdapters: ${$json.adapterCount}\\nFingerprint: ${$json.fingerprint || 'n/a'}`, files: Object.entries($json.files).map(([path, content]) => ({ operation: 'update', path, content: Buffer.from(content).toString('base64'), encoding: 'base64' })) }) }}",
-        "options": {
-          "timeout": 30000
-        }
-      },
       "credentials": {
-        "httpHeaderAuth": {
-          "id": "forgejo-token",
-          "name": "Forgejo API Token"
+        "aishaGitHubApi": {
+          "id": "__REMAP__",
+          "name": "GitHub API"
         }
       },
-      "onError": "continueRegularOutput"
+      "onError": "stopWorkflow"
     },
     {
       "id": "rp-langfuse-005",
