@@ -403,9 +403,12 @@ services:
       AI_CHAT_SERVICE_URL: http://${APP_NAME_PREFIX:?identita instance}-svc-ai-chat:3011
       COOLIFY_API_KEY: ${COOLIFY_API_KEY:-}
       COOLIFY_BASE_URL: ${COOLIFY_BASE_URL:-}
-      FORGEJO_URL: ${FORGEJO_URL:-}
-      FORGEJO_TOKEN: ${FORGEJO_TOKEN:-}
-      FORGEJO_REPO: ${FORGEJO_REPO:-}
+      # dev-patch (routes/dev-patch.ts) commituje přes GitHub REST API. Prázdné
+      # GITHUB_REPOSITORY/GITHUB_TOKEN = funkce hlásí „not configured", nic nezapíše;
+      # prázdné GITHUB_API_URL = veřejné API (GHE ho přepíše).
+      GITHUB_API_URL: ${GITHUB_API_URL:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_REPOSITORY: ${GITHUB_REPOSITORY:-}
       NODE_EXTRA_CA_CERTS: /certs/pki/aisha-ca-bundle.pem
     volumes:
       - pki-certs:/certs/pki:ro

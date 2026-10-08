@@ -2,10 +2,16 @@
  * Dev-patch — AI agent that generates code patches from improvement proposals.
  * Service-role only (called from n8n WF_SELF_LEARNING_LOOP).
  *
- * Flow: load context → LLM generates code → commit to Forgejo → audit trail.
+ * Flow: load context → LLM generates code → commit to GitHub → audit trail.
+ *
+ * GitHub target comes ONLY from the operator (GITHUB_REPOSITORY + GITHUB_TOKEN,
+ * optional GITHUB_API_URL for GitHub Enterprise) — see lib/github-git.ts.
+ * Unset = status `not_configured`, nothing is written anywhere.
  */
+import { createSsrfGuard } from '@aisha/security';
 import type { FastifyBaseLogger, FastifyInstance, FastifyPluginAsync } from 'fastify';
 import { config } from '../config.js';
+import { commitFiles, readGitHubConfig } from '../lib/github-git.js';
 
 const POSTGREST = config.postgrestUrl;
 const SERVICE_TOKEN = (process.env.POSTGREST_SERVICE_TOKEN ?? '');
@@ -138,60 +144,28 @@ Generate the minimal code changes needed. Return valid JSON only.`;
   return { commit_message: `chore: placeholder for ${proposal.title}`, files: [], reasoning: 'No LLM backend available for code generation' };
 }
 
-// ── Forgejo git operations ──
+// ── GitHub git operations ──
 
-async function commitToForgejo(branch: string, files: PatchFile[], commitMessage: string, logger: FastifyBaseLogger): Promise<{ sha: string; success: boolean }> {
-  const forgejoUrl = process.env.FORGEJO_URL;
-  const forgejoToken = process.env.FORGEJO_TOKEN;
-  const forgejoRepo = process.env.FORGEJO_REPO ?? 'aisha/evymo-ai-orchestrator';
+type CommitOutcome = { configured: boolean; sha: string; success: boolean };
 
-  if (!forgejoUrl || !forgejoToken) {
-    return { sha: '', success: false };
+async function commitToGitHub(branch: string, files: PatchFile[], commitMessage: string, logger: FastifyBaseLogger): Promise<CommitOutcome> {
+  const gh = readGitHubConfig();
+  if (!gh.ok) {
+    // ⛔ Bez deklarovaného repa se NIC nezapisuje — dosazené repo by commitovalo do cizího.
+    logger.warn({ reason: gh.reason }, 'dev-patch: GitHub not configured — commit skipped');
+    return { configured: false, sha: '', success: false };
   }
-
-  let lastSha = '';
-  for (const file of files) {
-    const endpoint = `${forgejoUrl}/api/v1/repos/${forgejoRepo}/contents/${encodeURIComponent(file.path)}`;
-
-    // Check if file exists to get its SHA
-    let existingSha: string | undefined;
-    try {
-      const getResp = await fetch(`${endpoint}?ref=${encodeURIComponent(branch)}`, {
-        headers: { 'Authorization': `token ${forgejoToken}` },
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (getResp.ok) {
-        const existing = await getResp.json() as { sha?: string };
-        existingSha = existing.sha;
-      }
-    } catch {
-      // File doesn't exist yet
-    }
-
-    const body: Record<string, unknown> = {
-      branch,
-      content: Buffer.from(file.content).toString('base64'),
-      message: commitMessage,
-    };
-    if (existingSha) body.sha = existingSha;
-
-    const resp = await fetch(endpoint, {
-      body: JSON.stringify(body),
-      headers: { 'Authorization': `token ${forgejoToken}`, 'Content-Type': 'application/json' },
-      method: existingSha ? 'PUT' : 'POST',
-      signal: AbortSignal.timeout(30_000),
-    });
-
-    if (resp.ok) {
-      const result = await resp.json() as { content?: { sha?: string } };
-      lastSha = result.content?.sha ?? '';
-    } else {
-      logger.error({ file: file.path, status: resp.status }, 'Forgejo commit failed');
-      return { sha: '', success: false };
-    }
-  }
-
-  return { sha: lastSha, success: true };
+  // Odchozí volání přes SSRF guard: jen hostitel deklarovaného API, jen https;
+  // vnitřní sítě povolené (GitHub Enterprise), metadata/loopback blokované vždy.
+  const guard = createSsrfGuard({
+    allowInternalNetworks: true,
+    allowedSchemes: ['https:'],
+    hostAllowlist: [new URL(gh.config.apiUrl).hostname.toLowerCase()],
+    service: 'gateway-dev-patch',
+  });
+  const result = await commitFiles(gh.config, branch, files, commitMessage, (url, init) => guard.safeFetch(url, init));
+  if (!result.success) logger.error({ error: result.error }, 'GitHub commit failed');
+  return { configured: true, sha: result.sha, success: result.success };
 }
 
 // ── Route ──
@@ -232,8 +206,8 @@ export const devPatchRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
       return reply.send({ files_modified: [], proposal_id, reasoning: patch.reasoning, status: 'no_changes' });
     }
 
-    // 3. Commit to Forgejo
-    const commitResult = await commitToForgejo(branch, patch.files, patch.commit_message, request.log);
+    // 3. Commit to GitHub
+    const commitResult = await commitToGitHub(branch, patch.files, patch.commit_message, request.log);
 
     // 4. Log trace
     await rpc('fn_log_ai_trace_event', {
@@ -243,7 +217,7 @@ export const devPatchRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
       p_operation: 'implement_proposal',
       p_request_summary: { category, files_count: patch.files.length, proposal_id },
       p_response_summary: { commit_message: patch.commit_message, commit_sha: commitResult.sha, files: patch.files.map((f) => f.path) },
-      p_status: commitResult.success ? 'success' : 'error',
+      p_status: commitResult.success ? 'success' : commitResult.configured ? 'error' : 'skipped',
     });
 
     return reply.send({
@@ -252,7 +226,7 @@ export const devPatchRoutes: FastifyPluginAsync = async (app: FastifyInstance) =
       files_modified: patch.files.map((f) => ({ action: f.action, path: f.path })),
       proposal_id,
       reasoning: patch.reasoning,
-      status: commitResult.success ? 'applied' : 'commit_failed',
+      status: commitResult.success ? 'applied' : commitResult.configured ? 'commit_failed' : 'not_configured',
     });
   });
 };
