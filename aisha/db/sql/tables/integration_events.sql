@@ -10,9 +10,9 @@ CREATE TABLE IF NOT EXISTS public.integration_events (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Identity & source
-  event_source    text NOT NULL                       -- 'github_webhook', 'forgejo_webhook', 'stripe_webhook', 'deployment', 'n8n_callback', 'email_inbound'
+  event_source    text NOT NULL                       -- 'github_webhook', 'git_webhook' (any other git host), 'stripe_webhook', 'deployment', 'n8n_callback', 'email_inbound'
                   CHECK (event_source IN (
-                    'github_webhook', 'forgejo_webhook', 'stripe_webhook',
+                    'github_webhook', 'git_webhook', 'stripe_webhook',
                     'deployment', 'n8n_callback', 'manual', 'email_inbound'
                   )),
   external_id     text NOT NULL,                      -- X-GitHub-Delivery UUID, Stripe event ID, etc.
@@ -65,3 +65,25 @@ ALTER TABLE public.integration_events ENABLE ROW LEVEL SECURITY;
 
 -- Columns added by later migrations (back-port reconciliation):
 ALTER TABLE public.integration_events ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+-- event_source: a self-hosted git host is no longer a NAMED integration — webhooks
+-- from any git host other than GitHub are the generic 'git_webhook'. The inline
+-- CHECK above only applies to a fresh table, so an existing database converges
+-- here (idempotent): drop the old CHECK, relabel every value outside the new set
+-- (only the retired self-hosted forge source can be one — the old CHECK allowed
+-- nothing else) to 'git_webhook', re-add the CHECK. No (event_source,
+-- external_id) collision is possible: 'git_webhook' did not exist before.
+ALTER TABLE public.integration_events
+  DROP CONSTRAINT IF EXISTS integration_events_event_source_check;
+UPDATE public.integration_events
+   SET event_source = 'git_webhook'
+ WHERE event_source NOT IN (
+         'github_webhook', 'git_webhook', 'stripe_webhook',
+         'deployment', 'n8n_callback', 'manual', 'email_inbound'
+       );
+ALTER TABLE public.integration_events
+  ADD CONSTRAINT integration_events_event_source_check
+  CHECK (event_source IN (
+    'github_webhook', 'git_webhook', 'stripe_webhook',
+    'deployment', 'n8n_callback', 'manual', 'email_inbound'
+  ));

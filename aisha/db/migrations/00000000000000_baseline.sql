@@ -2942,7 +2942,7 @@ COMMENT ON TABLE public.aisha_static_defense_rules IS
 
 -- Table: aisha_tooling_proposals
 -- AISHA-generated Claude Code skill/hook/command proposals.
--- Propagated do .claude/ po approval gate via Forgejo commit (managed by WF_AISHA_TOOLING_COMMITTER).
+-- Propagated do .claude/ po approval gate via GitHub PR (managed by WF_AISHA_TOOLING_COMMITTER).
 -- Source: docs/deploy/AISHA_SELF_TOOLING.md (META-2 vrstva nad AUTONOMOUS_DEPLOY_FLOW)
 
 CREATE TABLE IF NOT EXISTS public.aisha_tooling_proposals (
@@ -2963,7 +2963,7 @@ CREATE TABLE IF NOT EXISTS public.aisha_tooling_proposals (
   approval_id         uuid,
   approved_by         uuid,
   approved_at         timestamptz,
-  committed_sha       text,                            -- Forgejo commit SHA after merge
+  committed_sha       text,                            -- git commit SHA (GitHub contents API) of the artifact
   committed_at        timestamptz,
   reverted_sha        text,                            -- if reverted later
   reverted_at         timestamptz,
@@ -2977,7 +2977,7 @@ CREATE TABLE IF NOT EXISTS public.aisha_tooling_proposals (
 );
 
 COMMENT ON TABLE public.aisha_tooling_proposals IS
-  'AISHA-generated Claude Code skill/hook/command proposals. Propagated do .claude/  po approval gate via Forgejo commit (manageed by WF_AISHA_TOOLING_COMMITTER).';
+  'AISHA-generated Claude Code skill/hook/command proposals. Propagated do .claude/ po approval gate via GitHub PR (managed by WF_AISHA_TOOLING_COMMITTER).';
 COMMENT ON COLUMN public.aisha_tooling_proposals.trigger_pattern IS
   'Detected pattern (action_sequence, occurrence_count, success_rate) that motivated  this proposal. Used pro decision provenance + dedup check.';
 COMMENT ON COLUMN public.aisha_tooling_proposals.manual_locked IS
@@ -12553,9 +12553,9 @@ CREATE TABLE IF NOT EXISTS public.integration_events (
   id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Identity & source
-  event_source    text NOT NULL                       -- 'github_webhook', 'forgejo_webhook', 'stripe_webhook', 'deployment', 'n8n_callback', 'email_inbound'
+  event_source    text NOT NULL                       -- 'github_webhook', 'git_webhook' (any other git host), 'stripe_webhook', 'deployment', 'n8n_callback', 'email_inbound'
                   CHECK (event_source IN (
-                    'github_webhook', 'forgejo_webhook', 'stripe_webhook',
+                    'github_webhook', 'git_webhook', 'stripe_webhook',
                     'deployment', 'n8n_callback', 'manual', 'email_inbound'
                   )),
   external_id     text NOT NULL,                      -- X-GitHub-Delivery UUID, Stripe event ID, etc.
@@ -12608,6 +12608,28 @@ ALTER TABLE public.integration_events ENABLE ROW LEVEL SECURITY;
 
 -- Columns added by later migrations (back-port reconciliation):
 ALTER TABLE public.integration_events ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+-- event_source: a self-hosted git host is no longer a NAMED integration — webhooks
+-- from any git host other than GitHub are the generic 'git_webhook'. The inline
+-- CHECK above only applies to a fresh table, so an existing database converges
+-- here (idempotent): drop the old CHECK, relabel every value outside the new set
+-- (only the retired self-hosted forge source can be one — the old CHECK allowed
+-- nothing else) to 'git_webhook', re-add the CHECK. No (event_source,
+-- external_id) collision is possible: 'git_webhook' did not exist before.
+ALTER TABLE public.integration_events
+  DROP CONSTRAINT IF EXISTS integration_events_event_source_check;
+UPDATE public.integration_events
+   SET event_source = 'git_webhook'
+ WHERE event_source NOT IN (
+         'github_webhook', 'git_webhook', 'stripe_webhook',
+         'deployment', 'n8n_callback', 'manual', 'email_inbound'
+       );
+ALTER TABLE public.integration_events
+  ADD CONSTRAINT integration_events_event_source_check
+  CHECK (event_source IN (
+    'github_webhook', 'git_webhook', 'stripe_webhook',
+    'deployment', 'n8n_callback', 'manual', 'email_inbound'
+  ));
 
 
 -- -----------------------------------------------------------------------------
@@ -51652,7 +51674,7 @@ BEGIN
   INTO v_webhook_total, v_webhook_success
   FROM integration_events
   WHERE story_id = p_story_id
-    AND event_source IN ('github_webhook', 'forgejo_webhook')
+    AND event_source IN ('github_webhook', 'git_webhook')
     AND created_at > v_cutoff;
 
   -- Average response time — uses idx_integration_events_maturity_duration
@@ -131024,7 +131046,7 @@ GRANT EXECUTE ON FUNCTION public.update_token_lock(p_lock_id uuid, p_unlock bool
 -- Popis: State transition pro tooling proposal. Validates approval_status enum.
 --        Při 'approved' nastavuje approved_at + approved_by. Při 'committed'
 --        nastavuje committed_sha + committed_at. Loguje do audit_journal.
--- Volá: WF_APPROVAL_GATE callback, WF_AISHA_TOOLING_COMMITTER po Forgejo merge
+-- Volá: WF_APPROVAL_GATE callback, WF_AISHA_TOOLING_COMMITTER po GitHub PR commitu
 -- Auth: service_role nebo admin/staff
 -- ============================================================================
 

@@ -1802,7 +1802,7 @@ ON CONFLICT (scope_type, scope_id, task_kind) DO UPDATE SET
 -- 1. guild_expertise_areas (no deps, 15 rows from production)
 -- 2. context_profiles (no deps, 8 rows from production + learnings_enabled, K-26a)
 -- 3. agent_catalog (refs context_profiles slug, 7 rows from production)
--- 4. integration_services (no deps, 6 rows — full stack incl. appsmith + forgejo)
+-- 4. integration_services (no deps, 6 rows — full stack incl. appsmith + github)
 -- 5. delivery_transition_rules (no deps, 54 rows from production)
 -- 6. ai_model_registry (no deps, 14 models from migrations)
 -- 7. agent_tools (no deps, 6 tools from migrations)
@@ -3153,13 +3153,13 @@ INSERT INTO public.integration_services (
     is_active,
     managed_by
 ) VALUES (
-    'forgejo',
-    'Forgejo',
+    'github',
+    'GitHub',
     'scm',
-    'https://${FORGEJO_DOMAIN}',
+    'https://api.github.com',
     NULL,
     '{
-  "description": "Git hosting and CI/CD for AISHA self-management"
+  "description": "GitHub REST API — git hosting, PRs and commit statuses for AISHA self-management (GitHub Enterprise: set base_url to https://<host>/api/v3)"
 }'::jsonb,
     'healthy',
     now(),
@@ -13739,13 +13739,13 @@ INSERT INTO public.coolify_app_slots (id, app_name, blue_app_uuid, green_app_uui
   ('5e1f5e1f-0000-4000-8000-0000000000c1', 'self-eval-showcase-svc', 'se-blue-0001', 'se-green-0001', 'blue', '5e1f5e1f-0000-4000-8000-000000000001')
 ON CONFLICT (id) DO NOTHING;
 
--- ── integration_events — 2 forgejo webhooks (completed) + 1 deploy (completed)
+-- ── integration_events — 2 github webhooks (completed) + 1 deploy (completed)
 --    → webhook_reliability 2/2, deployment 1/1. duration_ms is a GENERATED column
 --    (= whole-second epoch of finished-started × 1000), so we drive it via a 1s
 --    processing window → duration_ms 1000ms each, avg 1000ms.
 INSERT INTO public.integration_events (id, event_source, external_id, event_type, status, story_id, processing_started_at, processing_finished_at, created_at) VALUES
-  ('5e1f5e1f-0000-4000-8000-0000000000f1', 'forgejo_webhook', 'se-wh-1',  'push',   'completed', '5e1f5e1f-0000-4000-8000-000000000001', now() - interval '3 days', now() - interval '3 days' + interval '1 second', now() - interval '3 days'),
-  ('5e1f5e1f-0000-4000-8000-0000000000f2', 'forgejo_webhook', 'se-wh-2',  'push',   'completed', '5e1f5e1f-0000-4000-8000-000000000001', now() - interval '2 days', now() - interval '2 days' + interval '1 second', now() - interval '2 days'),
+  ('5e1f5e1f-0000-4000-8000-0000000000f1', 'github_webhook',  'se-wh-1',  'push',   'completed', '5e1f5e1f-0000-4000-8000-000000000001', now() - interval '3 days', now() - interval '3 days' + interval '1 second', now() - interval '3 days'),
+  ('5e1f5e1f-0000-4000-8000-0000000000f2', 'github_webhook',  'se-wh-2',  'push',   'completed', '5e1f5e1f-0000-4000-8000-000000000001', now() - interval '2 days', now() - interval '2 days' + interval '1 second', now() - interval '2 days'),
   ('5e1f5e1f-0000-4000-8000-0000000000f3', 'deployment',      'se-dep-1', 'deploy', 'completed', '5e1f5e1f-0000-4000-8000-000000000001', now() - interval '1 day',  now() - interval '1 day'  + interval '1 second', now() - interval '1 day')
 ON CONFLICT (id) DO NOTHING;
 

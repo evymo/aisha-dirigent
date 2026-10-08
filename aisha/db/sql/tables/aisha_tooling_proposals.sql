@@ -1,6 +1,6 @@
 -- Table: aisha_tooling_proposals
 -- AISHA-generated Claude Code skill/hook/command proposals.
--- Propagated do .claude/ po approval gate via Forgejo commit (managed by WF_AISHA_TOOLING_COMMITTER).
+-- Propagated do .claude/ po approval gate via GitHub PR (managed by WF_AISHA_TOOLING_COMMITTER).
 -- Source: docs/deploy/AISHA_SELF_TOOLING.md (META-2 vrstva nad AUTONOMOUS_DEPLOY_FLOW)
 
 CREATE TABLE IF NOT EXISTS public.aisha_tooling_proposals (
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS public.aisha_tooling_proposals (
   approval_id         uuid,
   approved_by         uuid,
   approved_at         timestamptz,
-  committed_sha       text,                            -- Forgejo commit SHA after merge
+  committed_sha       text,                            -- git commit SHA (GitHub contents API) of the artifact
   committed_at        timestamptz,
   reverted_sha        text,                            -- if reverted later
   reverted_at         timestamptz,
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS public.aisha_tooling_proposals (
 );
 
 COMMENT ON TABLE public.aisha_tooling_proposals IS
-  'AISHA-generated Claude Code skill/hook/command proposals. Propagated do .claude/  po approval gate via Forgejo commit (manageed by WF_AISHA_TOOLING_COMMITTER).';
+  'AISHA-generated Claude Code skill/hook/command proposals. Propagated do .claude/ po approval gate via GitHub PR (managed by WF_AISHA_TOOLING_COMMITTER).';
 COMMENT ON COLUMN public.aisha_tooling_proposals.trigger_pattern IS
   'Detected pattern (action_sequence, occurrence_count, success_rate) that motivated  this proposal. Used pro decision provenance + dedup check.';
 COMMENT ON COLUMN public.aisha_tooling_proposals.manual_locked IS

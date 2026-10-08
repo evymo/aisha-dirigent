@@ -11813,3 +11813,20 @@ NOTIFY pgrst, 'reload schema';
 \ir sql/functions/is_consultant_for_user.sql
 
 NOTIFY pgrst, 'reload schema';
+
+-- ⛔ GIT HOSTING = GITHUB, NE POJMENOVANÝ SOUKROMÝ FORGE (2026-10-08, rozhodnutí majitele).
+-- Veřejný kód žije na GitHubu a integrace (self-tooling PR, dev-patch, statusy PR brány)
+-- jdou přes GitHub REST API. V datech se soukromý forge jako integrace nejmenuje:
+--   · integration_events.event_source: webhooky jiného git hostingu než GitHubu jsou
+--     obecné 'git_webhook'. Soubor tabulky CHECK sloučí — staré hodnoty mimo novou
+--     množinu přeznačí na 'git_webhook' a CHECK znovu založí (idempotentně; inline
+--     CHECK v CREATE TABLE se na existující tabulku neaplikuje, proto to musí jít tudy).
+--   · get_story_aisha_maturity počítá spolehlivost webhooků z github_webhook + git_webhook.
+--   · aisha_tooling_proposals: komentář tabulky (propagace přes GitHub PR).
+-- Řádek integration_services se seedem přidá ('github', ON CONFLICT DO NOTHING); existující
+-- řádky instance se tu NEMAŽOU — jsou to provozní data instance, ne schéma.
+\ir sql/tables/integration_events.sql
+\ir sql/functions/get_story_aisha_maturity.sql
+\ir sql/tables/aisha_tooling_proposals.sql
+
+NOTIFY pgrst, 'reload schema';

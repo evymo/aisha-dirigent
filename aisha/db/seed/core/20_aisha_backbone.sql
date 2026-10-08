@@ -7,7 +7,7 @@
 -- 1. guild_expertise_areas (no deps, 15 rows from production)
 -- 2. context_profiles (no deps, 8 rows from production + learnings_enabled, K-26a)
 -- 3. agent_catalog (refs context_profiles slug, 7 rows from production)
--- 4. integration_services (no deps, 6 rows — full stack incl. appsmith + forgejo)
+-- 4. integration_services (no deps, 6 rows — full stack incl. appsmith + github)
 -- 5. delivery_transition_rules (no deps, 54 rows from production)
 -- 6. ai_model_registry (no deps, 14 models from migrations)
 -- 7. agent_tools (no deps, 6 tools from migrations)
@@ -1358,13 +1358,13 @@ INSERT INTO public.integration_services (
     is_active,
     managed_by
 ) VALUES (
-    'forgejo',
-    'Forgejo',
+    'github',
+    'GitHub',
     'scm',
-    'https://${FORGEJO_DOMAIN}',
+    'https://api.github.com',
     NULL,
     '{
-  "description": "Git hosting and CI/CD for AISHA self-management"
+  "description": "GitHub REST API — git hosting, PRs and commit statuses for AISHA self-management (GitHub Enterprise: set base_url to https://<host>/api/v3)"
 }'::jsonb,
     'healthy',
     now(),
