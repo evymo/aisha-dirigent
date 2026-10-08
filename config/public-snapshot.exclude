@@ -3,13 +3,18 @@
 # One gitignore-style pattern per line; put the reason in the comment above it.
 # Consumed by scripts/release/public-snapshot.mjs (see docs/release/PUBLIC_PREVIEW.md).
 
-# Dependabot never ran on the primary forge (dependency updates: scripts/aisha-deps-update.mjs).
-# On the public mirror it only opened pull requests nobody merged (66 branches by 2026-09) and
-# the gate `owasp-orchestrator-adoption` still expects the file upstream, so it stays there.
+# Dependabot is not the dependency updater (that is scripts/aisha-deps-update.mjs). On the public
+# mirror it only opened pull requests nobody merged (66 branches by 2026-09); the gate
+# `owasp-orchestrator-adoption` still reads the file upstream, so it stays there.
 .github/dependabot.yml
 
-# Owner's decision 2026-10-03: nothing runs on GitHub — no tests, no deploys, no signing. CI and
-# deployment live on the upstream forge (.forgejo/workflows/). The mirror workflows stay upstream,
-# where four gates read them (ci-deploy-honesty, no-hardcoded-coolify-uuids, owasp-orchestrator-adoption,
-# sbom-coverage); in a public clone those four gates therefore report the files as missing.
-.github/workflows/
+# .github/workflows/ is NOT excluded (since 2026-10-08): CI lives in .github/workflows/ and runs
+# on GitHub-hosted runners or locally (npm run test:gates / test:run / test:services / test:db),
+# so a public clone carries the same lanes and the gates that read them measure instead of skip.
+
+# The container-signing workflow (cosign attestation of each image's SBOM) is not part of this tree:
+# it signs with the maintainers' registry and signing identity. Listed here so the gates that read it
+# (sbom-coverage, owasp-orchestrator-adoption, static-defense-in-depth) skip with this reason instead
+# of failing; porting it as an opt-in GitHub Actions lane is tracked in
+# docs/release/NEXT_PREVIEW_INTEGRATION.md.
+.github/workflows/container-signing.yml

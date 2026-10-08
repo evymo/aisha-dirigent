@@ -5,7 +5,8 @@
  * upstreamu přes scripts/release/public-snapshot.mjs a `config/public-snapshot.exclude`
  * z něj vyřazuje cesty. Do 2026-10-08 (rozhodnutí majitele 2026-10-03: na GitHubu
  * nic neběží) vyřazoval `.github/workflows/` i `.github/dependabot.yml`; od přesunu CI
- * na GitHub Actions snapshot workflow nese a vyřazení platí pro Dependabot. Co přesně
+ * na GitHub Actions snapshot workflow nese a vyřazení platí pro Dependabot a podpisový
+ * workflow, který tenhle strom nemá. Co přesně
  * vyřazuje, říká jen ten soubor. Brány, které vyřazené soubory čtou (podpis kontejnerů,
  * SBOM, deploy lane, Dependabot), ve veřejném klonu NEMAJÍ CO MĚŘIT.
  *

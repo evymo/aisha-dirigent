@@ -40,8 +40,8 @@ const ROOT = process.cwd();
 // attestation) and is not part of this tree (see DUVOD_PODPIS below).
 const DEP_SEC_WORKFLOW = resolve(ROOT, '.github/workflows/supply-chain.yml');
 const CONTAINER_SIGN_WORKFLOW = resolve(ROOT, '.github/workflows/container-signing.yml');
-// Veřejný snapshot podpisový workflow nevozí (config/public-snapshot.exclude) —
-// tam se testy nad ním PŘESKOČÍ s důvodem; v upstreamu měří. Viz lib/vynechano-snapshotem.
+// Vyřadí-li veřejný snapshot podpisový workflow (config/public-snapshot.exclude),
+// testy nad ním se tam PŘESKOČÍ s důvodem; jinak měří. Viz lib/vynechano-snapshotem.
 const DUVOD_PODPIS = duvodVynechanoSnapshotem('.github/workflows/container-signing.yml');
 const nezmereno = (nazev: string): string => (DUVOD_PODPIS ? `${nazev} — NEZMĚŘENO: ${DUVOD_PODPIS}` : nazev);
 

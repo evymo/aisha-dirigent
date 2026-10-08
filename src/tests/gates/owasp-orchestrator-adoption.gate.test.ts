@@ -247,9 +247,9 @@ describe('OWASP — database-level controls (file-level signal)', () => {
   });
 });
 
-// Veřejný snapshot `.github/dependabot.yml` ani `.github/workflows/` nevozí
-// (config/public-snapshot.exclude) — tam se tyto testy PŘESKOČÍ s důvodem,
-// v upstreamu měří. Viz lib/vynechano-snapshotem.
+// Co veřejný snapshot vyřazuje (config/public-snapshot.exclude — Dependabot a podpisový
+// workflow; ostatní workflow nese), se tam PŘESKOČÍ s důvodem; jinak se měří.
+// Viz lib/vynechano-snapshotem.
 const DUVOD_DEPENDABOT = duvodVynechanoSnapshotem('.github/dependabot.yml');
 const DUVOD_PODPIS = duvodVynechanoSnapshotem('.github/workflows/container-signing.yml');
 

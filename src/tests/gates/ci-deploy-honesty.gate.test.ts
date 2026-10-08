@@ -55,9 +55,9 @@ const RESOLVER_WORKFLOWS = [
 ];
 
 /**
- * Workflow, které veřejný snapshot nevozí (config/public-snapshot.exclude), se
- * neměří — v tomhle stromu nejsou. Hlásí je samostatný PŘESKOČENÝ test s důvodem,
- * aby „změřeno 3 ze 4" nevypadalo jako „změřeno všechno". Upstream je má → měří.
+ * Workflow, které by veřejný snapshot vyřadil (config/public-snapshot.exclude), se
+ * neměří — v tom stromu nejsou. Hlásí je samostatný PŘESKOČENÝ test s důvodem,
+ * aby „změřeno 3 ze 4" nevypadalo jako „změřeno všechno". Strom je má → měří.
  */
 const VYNECHANE_WORKFLOWS = RESOLVER_WORKFLOWS.map((rel) => duvodVynechanoSnapshotem(rel)).filter(
   (d): d is string => d !== null,
