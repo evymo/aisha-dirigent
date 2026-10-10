@@ -1,0 +1,27 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "aisha": {
+      "type": "streamable-http",
+      "url": "https://api.aisha.guru/functions/v1/mcp-knowledge-server",
+      "extensions": {
+        "com.openai": {
+          "auth": {
+            "type": "oauth",
+            "client": {
+              "mode": "provided",
+              "clientId": "aisha-openai-plugin",
+              "tokenEndpointAuthMethod": "none"
+            },
+            "baseScopes": [
+              "openid",
+              "email",
+              "profile",
+              "offline_access"
+            ]
+          }
+        }
+      }
+    }
+  }
+}

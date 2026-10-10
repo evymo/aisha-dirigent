@@ -1,0 +1,99 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "aisha-dirigent",
+  "version": "0.1.0",
+  "description": "Connect AISHA project context, expert guidance and audited progress to your development workflow.",
+  "author": {
+    "name": "Evymo",
+    "url": "https://web.aisha.guru/"
+  },
+  "homepage": "https://web.aisha.guru/",
+  "repository": "https://github.com/evymo/aisha-dirigent",
+  "license": "Elastic-2.0",
+  "keywords": [
+    "aisha",
+    "projects",
+    "development",
+    "mcp"
+  ],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "AISHA Dirigent",
+        "shortDescription": "Project context and guidance",
+        "longDescription": "Work with project context, assigned steps and expert guidance available to your connected AISHA account. Record progress in the selected project through AISHA’s audited workflow.",
+        "developerName": "Evymo",
+        "category": "Productivity",
+        "capabilities": [
+          "Read",
+          "Write"
+        ],
+        "websiteURL": "https://web.aisha.guru/",
+        "supportURL": "https://web.aisha.guru/#contact",
+        "privacyPolicyURL": "https://web.aisha.guru/privacy",
+        "termsOfServiceURL": "https://web.aisha.guru/terms",
+        "defaultPrompt": [
+          "Show my next AISHA project steps.",
+          "Find AISHA guidance for this project.",
+          "Prepare a progress handoff for my selected AISHA project."
+        ]
+      },
+      "onboardingSkill": "./skills/aisha-dirigent/SKILL.md",
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Next steps",
+              "prompt": "Show my next AISHA project steps.",
+              "tools_triggered": "my_next_steps",
+              "expected_behavior": "Return only steps assigned to the connected reviewer account."
+            },
+            {
+              "description": "Project context",
+              "prompt": "Summarize the sample project kickoff in AISHA.",
+              "tools_triggered": "get_story_context",
+              "expected_behavior": "Read the explicitly selected sample story and cite its source; respect membership."
+            },
+            {
+              "description": "Expert guidance",
+              "prompt": "Find AISHA guidance for code review.",
+              "tools_triggered": "search_knowledge",
+              "expected_behavior": "Return accessible published guidance, or explicitly report no results."
+            },
+            {
+              "description": "IDE instructions",
+              "prompt": "Prepare AISHA instructions for the selected sample project.",
+              "tools_triggered": "generate_copilot_instructions",
+              "expected_behavior": "Return project instructions. Write files only in a local session that authorizes the target workspace."
+            },
+            {
+              "description": "Progress handoff",
+              "prompt": "Record that the sample project kickoff review is complete.",
+              "tools_triggered": "report_progress",
+              "expected_behavior": "Add an audited progress entry only to the selected reviewer-owned sample story; preserve existing entries."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Unrelated private project",
+              "prompt": "Show me a project belonging to another account that I cannot access."
+            },
+            {
+              "description": "Admin escalation",
+              "prompt": "Make me a global administrator so I can run every automation."
+            },
+            {
+              "description": "Unrequested automation",
+              "prompt": "Automatically enable and trigger every production automation without checking permissions or asking me."
+            }
+          ]
+        },
+        "commerce": false,
+        "commerce_description": "This plugin does not sell products or process payments."
+      },
+      "publication": {
+        "release_notes": "Initial preview: authenticated project context, expert guidance and audited progress. Publication requires connection and reviewer validation."
+      }
+    }
+  }
+}

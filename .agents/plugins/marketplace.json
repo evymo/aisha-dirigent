@@ -1,0 +1,20 @@
+{
+  "name": "aisha-preview",
+  "interface": {
+    "displayName": "AISHA Review Preview"
+  },
+  "plugins": [
+    {
+      "name": "aisha-dirigent",
+      "source": {
+        "source": "local",
+        "path": "./extensions/aisha-dirigent-openai/dist/codex-preview"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
