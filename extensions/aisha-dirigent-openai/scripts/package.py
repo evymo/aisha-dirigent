@@ -7,7 +7,7 @@ import struct
 from urllib.parse import urlsplit
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
-PUBLIC_FILES = ("plugin.json", "mcp.json", "skills/aisha-dirigent/SKILL.md", "assets/icon.png")
+PUBLIC_FILES = ("plugin.json", "mcp.json", "skills/aisha-dirigent/SKILL.md", "assets/icon.png", "LICENSE")
 SECRET_KEYS = {"clientsecret", "client_secret", "password", "access_token", "refresh_token", "authorization", "apikey", "api_key"}
 
 
@@ -120,7 +120,8 @@ def build_codex_preview(root, output):
     legacy["interface"] = manifest["extensions"]["com.openai"]["interface"]
     # Local preview is a separate payload; portal auth settings stay in mcp.json.
     legacy["extensions"] = {"com.openai": {"onboardingSkill": "./skills/aisha-dirigent/SKILL.md"}}
-    files = {"assets/icon.png": payload["assets/icon.png"],
+    files = {"LICENSE": payload["LICENSE"],
+             "assets/icon.png": payload["assets/icon.png"],
              ".codex-plugin/plugin.json": (json.dumps(legacy, indent=2) + "\n").encode(),
              ".mcp.json": (json.dumps(local_mcp, indent=2) + "\n").encode(),
              "skills/aisha-dirigent/SKILL.md": payload["skills/aisha-dirigent/SKILL.md"]}

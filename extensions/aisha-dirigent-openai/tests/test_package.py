@@ -36,6 +36,36 @@ class PackageTests(unittest.TestCase):
             self.assertEqual(z.namelist(), list(package.PUBLIC_FILES))
             self.assertIsNone(z.testzip())
 
+    def test_standalone_archive_contains_complete_canonical_license(self):
+        archive = package.build(self.root, Path(self.temp.name) / "licensed.zip")
+        with ZipFile(archive) as zipped:
+            self.assertIn("LICENSE", zipped.namelist())
+            self.assertEqual(zipped.read("LICENSE"), (ROOT.parents[1] / "LICENSE").read_bytes())
+
+    def test_codex_preview_contains_complete_canonical_license(self):
+        directory = package.build_codex_preview(self.root, Path(self.temp.name) / "licensed-preview")
+        self.assertEqual((directory / "LICENSE").read_bytes(), (ROOT.parents[1] / "LICENSE").read_bytes())
+
+    def test_both_distributed_source_folders_preserve_canonical_license_and_identity(self):
+        canonical = (ROOT.parents[1] / "LICENSE").read_bytes()
+        for folder, manifest_path in ((ROOT, "plugin.json"),
+                                     (ROOT.parent / "aisha-dirigent-claude-cloud", ".claude-plugin/plugin.json")):
+            with self.subTest(folder=folder.name):
+                self.assertEqual((folder / "LICENSE").read_bytes(), canonical)
+                manifest = json.loads((folder / manifest_path).read_text())
+                self.assertEqual(manifest["license"], "Elastic-2.0")
+                self.assertEqual(manifest["name"], "aisha-dirigent")
+                self.assertEqual(manifest["version"], "0.1.0")
+
+    def test_missing_license_prevents_distribution(self):
+        (self.root / "LICENSE").unlink(missing_ok=True)
+        for builder, destination in ((package.build, "missing-license.zip"),
+                                     (package.build_codex_preview, "missing-license-preview")):
+            with self.subTest(builder=builder.__name__):
+                with self.assertRaises(FileNotFoundError):
+                    builder(self.root, Path(self.temp.name) / destination)
+                self.assertFalse((Path(self.temp.name) / destination).exists())
+
     def test_codex_preview_uses_legacy_loopback_oauth_without_portal_settings(self):
         directory = package.build_codex_preview(self.root, Path(self.temp.name) / "preview")
         self.assertFalse((directory / "mcp.json").exists())

@@ -21,3 +21,7 @@ explicitly for review and keep automatic publication disabled until review.
 
 Prepared backend metadata changes are tracked separately in the private backend
 review. Package validation does not prove that those changes have been deployed.
+
+## License
+
+The plugin manifest declares `Elastic-2.0`. [LICENSE](./LICENSE) ships with this folder and includes the complete Elastic License 2.0 terms and copyright notice, copied unchanged from the repository root license. Keep this file when distributing or reviewing the cloud plugin folder. When the root license changes, update the bundled copy; the public plugin packaging tests check byte-for-byte equality.

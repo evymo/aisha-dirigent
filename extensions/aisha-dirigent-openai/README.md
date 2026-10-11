@@ -12,7 +12,7 @@ python3 -m unittest discover -s tests -v
 python3 scripts/package.py --output dist/aisha-dirigent-0.1.0.zip --codex-preview dist/codex-preview
 ```
 
-The reproducible public ZIP contains only `plugin.json`, `mcp.json`, the onboarding skill and the AISHA icon. It excludes the local preview configuration, identity-provider candidate, build tools, tests and credentials. The publisher must still review both the package and live backend before submission.
+The reproducible public ZIP contains only `plugin.json`, `mcp.json`, the onboarding skill, the AISHA icon and the complete `LICENSE`. It excludes the local preview configuration, identity-provider candidate, build tools, tests and credentials. The publisher must still review both the package and live backend before submission.
 
 ## Local Codex preview
 
@@ -50,3 +50,7 @@ An existing record can require an exact internal package name. Build its upload 
 ## Package CI
 
 `ci/github-actions.yml` is the prepared GitHub Actions workflow. Install it as `.github/workflows/aisha-openai-plugin.yml` using a GitHub credential allowed to manage workflows. It runs the package tests and both builds with read-only repository permissions. Until installed, this file is a review template and does not run in GitHub Actions.
+
+## License
+
+The plugin is licensed under Elastic License 2.0. [LICENSE](./LICENSE) includes the full terms and copyright notice, copied unchanged from the repository root license. The public ZIP and generated local Codex preview both include that file. When the root license changes, update the bundled copies before rebuilding; the packaging tests check byte-for-byte equality.
