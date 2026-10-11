@@ -1,0 +1,207 @@
+{
+  "date": "2026-10-11",
+  "mode": "manual exact-revision read-only diff review; no native scan",
+  "base": "e9b790bb67b53fa8e12284aef2a92c0beafa2f92",
+  "head": "ffbb71f06449f7be85056f50cc154ad1d9c6fd67",
+  "tree": "30a3bbf72a712d99a0d8e336e1396c6804c13202",
+  "review_ref": "refs/heads/codex/public-aisha-plugin-2026-10-10",
+  "ref_sha_verified": "ffbb71f06449f7be85056f50cc154ad1d9c6fd67",
+  "changed_files": [
+    {
+      "path": ".agents/plugins/marketplace.json",
+      "git_blob": "ca50b54112adda8a33ef9e96e40ea8698d53dd7c",
+      "bytes": 420,
+      "sha256": "77a3249380900271daa124b65ec0112b9d53848e3a4ac94dff133334089d0f87",
+      "review": "reviewed"
+    },
+    {
+      "path": "extensions/aisha-dirigent-claude-cloud/.claude-plugin/plugin.json",
+      "git_blob": "4455784e07d460ac021173bbf0ae9b1381979ec5",
+      "bytes": 732,
+      "sha256": "64a1f490af9d92b8586534f53de36694b0b2c50a3cf8dc04c888861830eaa0ea",
+      "review": "reviewed"
+    },
+    {
+      "path": "extensions/aisha-dirigent-claude-cloud/.mcp.json",
+      "git_blob": "fd79e1ae6057f09bbc9196aa5a8a3f342ce4d85f",
+      "bytes": 141,
+      "sha256": "2a1c1db56a086da16141332d363a516a80206be18d8400ec41248eea9829ed96",
+      "review": "reviewed"
+    },
+    {
+      "path": "extensions/aisha-dirigent-claude-cloud/README.md",
+      "git_blob": "c44e5b73cc1aa20577d6d91f7736ae5bd93bdcf4",
+      "bytes": 2274,
+      "sha256": "cce3f43976966d1fa48ec5f55ff1b23a02068f83a0a287f3da8880d20cfbaa08",
+      "review": "reviewed"
+    },
+    {
+      "path": "extensions/aisha-dirigent-claude-cloud/assets/icon.png",
+      "git_blob": "da230b31c19dd98fa9c8f40d65e4183233cae823",
+      "bytes": 17229,
+      "sha256": "f3f3342f23912fafbe3b72bc5ef6b5344bc9e57949b84b088713a4d938ecc572",
+      "review": "reviewed; PNG verified as image data"
+    },
+    {
+      "path": "extensions/aisha-dirigent-claude-cloud/skills/aisha-dirigent/SKILL.md",
+      "git_blob": "41b01bb169302e6661e4ecff39a80cf89fe874cd",
+      "bytes": 1887,
+      "sha256": "a467224cd1696c70a75eda39d62d064b9f9de9ecd1a5eb87683d5502cb3f9b58",
+      "review": "reviewed"
+    },
+    {
+      "path": "extensions/aisha-dirigent-openai/.gitignore",
+      "git_blob": "2ead01d05d23a280fee30aac5394d5697000e6f6",
+      "bytes": 19,
+      "sha256": "eb23201bf8045bae97d6f115436fbeceb52a080b218644bf1b15f92b9da8dd4e",
+      "review": "reviewed"
+    },
+    {
+      "path": "extensions/aisha-dirigent-openai/.mcp.json",
+      "git_blob": "0a65270f8065e8d825de60f1ed768f28027b0141",
+      "bytes": 295,
+      "sha256": "2bf9e8873905bc219dc8be70effc7b7a39830ec421baf1d934d1529db4e17db4",
+      "review": "reviewed"
+    },
+    {
+      "path": "extensions/aisha-dirigent-openai/README.md",
+      "git_blob": "0deb68cb677d7da2969ecf3210a884800735184e",
+      "bytes": 4996,
+      "sha256": "09d6b032874b288f38b2199d0f5a34f55d6feb384d9a91689bb66813ad18805c",
+      "review": "reviewed"
+    },
+    {
+      "path": "extensions/aisha-dirigent-openai/assets/icon.png",
+      "git_blob": "da230b31c19dd98fa9c8f40d65e4183233cae823",
+      "bytes": 17229,
+      "sha256": "f3f3342f23912fafbe3b72bc5ef6b5344bc9e57949b84b088713a4d938ecc572",
+      "review": "reviewed; PNG verified as image data"
+    },
+    {
+      "path": "extensions/aisha-dirigent-openai/ci/github-actions.yml",
+      "git_blob": "f30b8a643e0c23a8717d9cf173724eab3580af52",
+      "bytes": 882,
+      "sha256": "cdb1476a350e31df2630161c781fae0129f359d3b39a34d09f549ee660433a02",
+      "review": "reviewed"
+    },
+    {
+      "path": "extensions/aisha-dirigent-openai/mcp.json",
+      "git_blob": "5c9cd7df1d4adc74a094d7190374ee36565143e4",
+      "bytes": 665,
+      "sha256": "375dd3aafddfe46b9add3d477cde1de37dc72a9c1450b49442f087ab0a46a9a3",
+      "review": "reviewed"
+    },
+    {
+      "path": "extensions/aisha-dirigent-openai/package.json",
+      "git_blob": "dd396a65c6909a20b363bf34edac031bb9c1be4a",
+      "bytes": 308,
+      "sha256": "3058d8b92fc25e0639a8f8e79ecb715872fec16659c6774b9e831e3ffd1f7e94",
+      "review": "reviewed"
+    },
+    {
+      "path": "extensions/aisha-dirigent-openai/plugin.json",
+      "git_blob": "4c489226a99093de510acdb0af995c422d9a3dd9",
+      "bytes": 4294,
+      "sha256": "17a2085f5cb70cb192809d9b3c40af160f1f555688cedfce8feb2354d86468ad",
+      "review": "reviewed"
+    },
+    {
+      "path": "extensions/aisha-dirigent-openai/scripts/package.py",
+      "git_blob": "bbeca21917253b66385c673ce99e3b31cd3a96b9",
+      "bytes": 7968,
+      "sha256": "f51d1956c6d15fcd73cb9cd08288c341592c069c3da41c3fddf4a002069a6a21",
+      "review": "reviewed"
+    },
+    {
+      "path": "extensions/aisha-dirigent-openai/skills/aisha-dirigent/SKILL.md",
+      "git_blob": "5f0d5403629089c846fde3c93d558301fc7e6d8a",
+      "bytes": 1869,
+      "sha256": "062c6418c4d972664b5daf1f54af24fee4ff2536253d71774a2fe964448103d4",
+      "review": "reviewed"
+    },
+    {
+      "path": "extensions/aisha-dirigent-openai/tests/test_package.py",
+      "git_blob": "5fe65da0a4b1c35b63efd54d408f3d61b3661449",
+      "bytes": 6564,
+      "sha256": "86341aa507cf1bbdbafaa708e1e35358b690aec0ae7ae00c0dbff8f5c7d1f881",
+      "review": "reviewed"
+    }
+  ],
+  "archive": {
+    "entries": [
+      "plugin.json",
+      "mcp.json",
+      "skills/aisha-dirigent/SKILL.md",
+      "assets/icon.png"
+    ],
+    "corrupt_entry": null,
+    "sha256": "77d5181c72f98ca2fe00e3d5fc8323a7665ee28c96a381c7c8fa0e6bc978411e",
+    "license_text_present": false
+  },
+  "icons": [
+    {
+      "path": "extensions/aisha-dirigent-claude-cloud/assets/icon.png",
+      "dimensions": [
+        256,
+        256
+      ],
+      "chunks": [
+        "IHDR",
+        "pHYs",
+        "IDAT",
+        "IDAT",
+        "IDAT",
+        "IEND"
+      ],
+      "valid_crc": true
+    },
+    {
+      "path": "extensions/aisha-dirigent-openai/assets/icon.png",
+      "dimensions": [
+        256,
+        256
+      ],
+      "chunks": [
+        "IHDR",
+        "pHYs",
+        "IDAT",
+        "IDAT",
+        "IDAT",
+        "IEND"
+      ],
+      "valid_crc": true
+    }
+  ],
+  "package_tests": {
+    "run_here": true,
+    "passed": 16,
+    "failed": 0,
+    "exit_code": 0
+  },
+  "builds": {
+    "portable_zip": "passed",
+    "codex_preview": "passed"
+  },
+  "claude_cli_validate": {
+    "run_here": false,
+    "reason": "Claude CLI unavailable; exact-head success supplied by primary session"
+  },
+  "full_tests": {
+    "run_here": false,
+    "source": "primary session and exact-head PR metadata",
+    "web_passed": 6411,
+    "web_conditional_skips": 911,
+    "light_gates_passed": 8712,
+    "light_gates_conditional_skips": 19,
+    "heavy_gates_passed": 313,
+    "build": "PASS supplied",
+    "lint": "PASS supplied",
+    "i18n": "PASS supplied"
+  },
+  "classification": "public sanitized release handoff; internal evidence and reproductions excluded",
+  "limits": [
+    "Exact snapshot; later PR heads need new validation",
+    "Full-stack historical audit evidence is retained internally",
+    "No runtime exploit reproduction or live OAuth/RAG validation in this review"
+  ]
+}
