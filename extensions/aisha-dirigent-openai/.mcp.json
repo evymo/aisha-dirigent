@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "aisha": {
+      "type": "http",
+      "url": "https://api.aisha.guru/functions/v1/mcp-knowledge-server",
+      "oauth": {
+        "clientId": "aisha-mcp-client",
+        "callbackUrl": "http://127.0.0.1:59876/callback",
+        "callbackPort": 59876
+      }
+    }
+  }
+}

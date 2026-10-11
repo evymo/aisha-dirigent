@@ -1,0 +1,10 @@
+{
+  "name": "@aisha/dirigent-openai-preview",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Elastic-2.0",
+  "scripts": {
+    "test": "python3 -m unittest discover -s tests -v",
+    "build": "python3 scripts/package.py --output dist/aisha-dirigent-0.1.0.zip --codex-preview dist/codex-preview"
+  }
+}

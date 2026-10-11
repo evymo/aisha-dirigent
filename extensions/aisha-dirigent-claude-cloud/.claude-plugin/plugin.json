@@ -1,0 +1,24 @@
+{
+  "name": "aisha-dirigent",
+  "version": "0.1.0",
+  "description": "Connect AISHA project context, expert guidance and audited progress to your development workflow.",
+  "author": {
+    "name": "Evymo",
+    "url": "https://web.aisha.guru/"
+  },
+  "homepage": "https://web.aisha.guru/",
+  "repository": "https://github.com/evymo/aisha-dirigent",
+  "license": "Elastic-2.0",
+  "keywords": [
+    "aisha",
+    "projects",
+    "development",
+    "mcp"
+  ],
+  "displayName": "AISHA Dirigent",
+  "icon": "./assets/icon.png",
+  "documentationUrl": "https://web.aisha.guru/",
+  "supportUrl": "https://web.aisha.guru/#contact",
+  "privacyPolicyUrl": "https://web.aisha.guru/privacy",
+  "termsOfServiceUrl": "https://web.aisha.guru/terms"
+}
