@@ -3,10 +3,11 @@ import argparse
 import json
 from pathlib import Path
 import re
+import struct
 from urllib.parse import urlsplit
 from zipfile import ZipFile, ZipInfo, ZIP_DEFLATED
 
-PUBLIC_FILES = ("plugin.json", "mcp.json", "skills/aisha-dirigent/SKILL.md")
+PUBLIC_FILES = ("plugin.json", "mcp.json", "skills/aisha-dirigent/SKILL.md", "assets/icon.png")
 SECRET_KEYS = {"clientsecret", "client_secret", "password", "access_token", "refresh_token", "authorization", "apikey", "api_key"}
 
 
@@ -54,6 +55,14 @@ def public_payload(root):
         raise ValueError("Onboarding skill must be in the payload")
     for key in ("websiteURL", "supportURL", "privacyPolicyURL", "termsOfServiceURL"):
         https_url(extension["interface"][key])
+    if any(extension["interface"].get(key) != "./assets/icon.png" for key in ("logo", "composerIcon")):
+        raise ValueError("Both listing and composer icons must reference the bundled icon")
+    icon = payload["assets/icon.png"]
+    if len(icon) < 33 or icon[:8] != b"\x89PNG\r\n\x1a\n" or icon[12:16] != b"IHDR":
+        raise ValueError("Invalid PNG icon")
+    width, height = struct.unpack(">II", icon[16:24])
+    if width != height or not 48 <= width <= 4096:
+        raise ValueError("Icon must be square, between 48 and 4096 pixels")
     cases = extension["review"]["test_cases"]
     if len(cases["positive"]) < 5 or len(cases["negative"]) < 3:
         raise ValueError("Missing reviewer cases")
@@ -75,8 +84,14 @@ def public_payload(root):
     return payload
 
 
-def build(root, output):
+def build(root, output, plugin_name=None):
     payload = public_payload(root)
+    if plugin_name is not None:
+        if not isinstance(plugin_name, str) or not re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", plugin_name):
+            raise ValueError("Invalid portal package name")
+        manifest = json.loads(payload["plugin.json"])
+        manifest["name"] = plugin_name
+        payload["plugin.json"] = (json.dumps(manifest, ensure_ascii=False, indent=2) + "\n").encode()
     output = Path(output).resolve()
     for name in PUBLIC_FILES:
         if output == (Path(root) / name).resolve():
@@ -105,7 +120,8 @@ def build_codex_preview(root, output):
     legacy["interface"] = manifest["extensions"]["com.openai"]["interface"]
     # Local preview is a separate payload; portal auth settings stay in mcp.json.
     legacy["extensions"] = {"com.openai": {"onboardingSkill": "./skills/aisha-dirigent/SKILL.md"}}
-    files = {".codex-plugin/plugin.json": (json.dumps(legacy, indent=2) + "\n").encode(),
+    files = {"assets/icon.png": payload["assets/icon.png"],
+             ".codex-plugin/plugin.json": (json.dumps(legacy, indent=2) + "\n").encode(),
              ".mcp.json": (json.dumps(local_mcp, indent=2) + "\n").encode(),
              "skills/aisha-dirigent/SKILL.md": payload["skills/aisha-dirigent/SKILL.md"]}
     output.mkdir(parents=True, exist_ok=True)
@@ -124,8 +140,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--codex-preview", type=Path)
+    parser.add_argument("--plugin-name", help="Exact package name required by an existing publisher record; public ZIP only")
     args = parser.parse_args()
     root = Path(__file__).resolve().parent.parent
-    print(build(root, args.output))
+    print(build(root, args.output, args.plugin_name))
     if args.codex_preview:
         print(build_codex_preview(root, args.codex_preview))

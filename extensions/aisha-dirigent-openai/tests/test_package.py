@@ -94,6 +94,38 @@ class PackageTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Symlink"):
             package.public_payload(self.root)
 
+    def test_portal_identity_override_does_not_change_source_or_display_name(self):
+        name = "app-69cc2f10efec8191b84de34ea25260af"
+        source = (self.root / "plugin.json").read_bytes()
+        archive = package.build(self.root, Path(self.temp.name) / "portal.zip", name)
+        with ZipFile(archive) as z:
+            manifest = json.loads(z.read("plugin.json"))
+            self.assertEqual(manifest["name"], name)
+            self.assertEqual(manifest["extensions"]["com.openai"]["interface"]["displayName"], "AISHA Dirigent")
+        self.assertEqual((self.root / "plugin.json").read_bytes(), source)
+
+    def test_rejects_invalid_portal_identity(self):
+        for name in ("../escape", "AISHA", "", "bad_name"):
+            with self.assertRaisesRegex(ValueError, "portal"):
+                package.build(self.root, Path(self.temp.name) / "bad.zip", name)
+
+    def test_requires_both_bundled_icons(self):
+        self.edit("plugin.json", lambda j: j["extensions"]["com.openai"]["interface"].pop("logo"))
+        with self.assertRaisesRegex(ValueError, "icons"):
+            package.public_payload(self.root)
+
+    def test_rejects_malformed_or_non_square_icon(self):
+        path = self.root / "assets/icon.png"
+        original = path.read_bytes()
+        for data in (b"invalid", original[:16] + (256).to_bytes(4, "big") + (128).to_bytes(4, "big") + original[24:]):
+            path.write_bytes(data)
+            with self.assertRaisesRegex(ValueError, "icon|Icon"):
+                package.public_payload(self.root)
+
+    def test_preview_includes_referenced_visual_asset(self):
+        directory = package.build_codex_preview(self.root, Path(self.temp.name) / "preview")
+        self.assertEqual((directory / "assets/icon.png").read_bytes(), (self.root / "assets/icon.png").read_bytes())
+
     def test_cannot_overwrite_manifest(self):
         with self.assertRaisesRegex(ValueError, "overwrite"):
             package.build(self.root, self.root / "plugin.json")

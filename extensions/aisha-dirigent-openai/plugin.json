@@ -36,7 +36,9 @@
           "Show my next AISHA project steps.",
           "Find AISHA guidance for this project.",
           "Prepare a progress handoff for my selected AISHA project."
-        ]
+        ],
+        "logo": "./assets/icon.png",
+        "composerIcon": "./assets/icon.png"
       },
       "onboardingSkill": "./skills/aisha-dirigent/SKILL.md",
       "review": {
