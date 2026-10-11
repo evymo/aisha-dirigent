@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "aisha": {
+      "type": "http",
+      "url": "https://api.aisha.guru/functions/v1/mcp-knowledge-server"
+    }
+  }
+}
